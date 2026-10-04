@@ -1,0 +1,18 @@
+# Fixture checksums and source artifacts must survive Windows/Unix checkouts.
+* text=auto
+*.json text eol=lf
+*.cs text eol=lf
+*.mjs text eol=lf
+artifacts/released-baseline/SHA256SUMS -text
+*.ps1 text eol=lf
+*.md text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.csproj text eol=lf
+*.slnx text eol=lf
+NuGet.Config text eol=lf
+# Genuine capture metadata is hashed as physical bytes, including its original line endings.
+fixtures/pi-v0.99.1/session-compaction/** -text
+
+fixtures/pi-v0.99.1/session-recovery/** -text
+compatibility/semantic-full-structural-openai.plan.json -text

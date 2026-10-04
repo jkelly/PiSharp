@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "kind": "public-source-snapshot-review-candidate",
+  "sdk": "10.0.401",
+  "framework": "net10.0",
+  "productionProjects": 14,
+  "publicOfflineProviderGroups": {
+    "azureResponses": 15,
+    "mistralText": 23
+  },
+  "publicSnapshotChecks": "PENDING; no checks on this public commit yet",
+  "sourceDifferentialParity": false,
+  "privateQualificationInputsIncluded": false,
+  "redistributionArchivesIncluded": false,
+  "releaseAcceptance": false,
+  "nativeToolContinuationCriterion3": "Bounded native integration independently accepted in separate retained qualification; public subset does not reproduce this private gate",
+  "openCriteria": [
+    "source and immutable JSON parity",
+    "identity replacement qualification",
+    "whole-provider/live API/catalog qualification",
+    "platform/distribution/phase/release acceptance"
+  ],
+  "priorQualification": "Historical native baseline and disposable Windows tool smoke retained privately; no transfer of counts to this snapshot"
+}

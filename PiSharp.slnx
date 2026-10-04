@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PiSharp.AI/PiSharp.AI.csproj" />
+    <Project Path="src/PiSharp.Agent/PiSharp.Agent.csproj" />
+    <Project Path="src/PiSharp.Cli/PiSharp.Cli.csproj" />
+    <Project Path="src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <Project Path="src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
+    <Project Path="src/PiSharp.Contracts/PiSharp.Contracts.csproj" />
+    <Project Path="src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj" />
+    <Project Path="src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" />
+    <Project Path="src/PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
+    <Project Path="src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+    <Project Path="src/PiSharp.Rpc/PiSharp.Rpc.csproj" />
+    <Project Path="src/PiSharp.Sessions/PiSharp.Sessions.csproj" />
+    <Project Path="src/PiSharp.Tools/PiSharp.Tools.csproj" />
+    <Project Path="src/PiSharp.Tui/PiSharp.Tui.csproj" />
+  </Folder>
+  <Folder Name="/tests/public-offline/">
+    <Project Path="tests/PiSharp.AzureResponses.Tests/PiSharp.AzureResponses.Tests.csproj" />
+    <Project Path="tests/PiSharp.MistralConversations.Tests/PiSharp.MistralConversations.Tests.csproj" />
+  </Folder>
+</Solution>

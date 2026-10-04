@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "status": "PROPOSED_ONLY_NOT_APPLIED",
+  "basisCommit": "25eb103ff17c2f2ecf61b25fab48ce983bf1bb40",
+  "basisFilePins": [
+    {
+      "bytes": 6950,
+      "sha256": "16a6895d999d154582eb9150316ec9b6da61df8fcf30e8f8f2d6df038c400419",
+      "path": "PiSharp.slnx"
+    },
+    {
+      "bytes": 59012,
+      "sha256": "7cbb1d322036d566547d6f8bb6d59f726dc62eb5afe1ed579bb5f8d2ecb8873a",
+      "path": "tools/native-companion-targets.json"
+    },
+    {
+      "bytes": 56449,
+      "sha256": "50022d4b6768b2122ae3b99290787e204af3ef82e7ce92b36dc61d3a4b82bd95",
+      "path": "tools/native-companion-registration.ps1"
+    },
+    {
+      "bytes": 20472,
+      "path": "tools/prepare-native-products.ps1",
+      "sha256": "8d2dbf0ecaaad8c52e67182a04653aedafe99f7fc4c0aee9dddacc9e19eac439"
+    }
+  ],
+  "solutionAddition": {
+    "lines": [
+      "  <Folder Name=\"/tests/companions/PiSharp.Authentication.Tests/\">",
+      "    <Project Path=\"tests/PiSharp.Authentication.Tests/PiSharp.Authentication.Tests.csproj\" />",
+      "  </Folder>"
+    ],
+    "insertBefore": "</Solution>",
+    "path": "PiSharp.slnx"
+  },
+  "runnerRequiredIdsAddition": {
+    "withExact": "        'terminal-select-list', 'terminal-select-dialog', 'authentication')",
+    "path": "tools/native-companion-registration.ps1",
+    "replaceExact": "        'terminal-select-list', 'terminal-select-dialog')"
+  },
+  "registrationJsonPatch": [
+    {
+      "op": "replace",
+      "value": 27,
+      "path": "/requiredCount"
+    },
+    {
+      "op": "add",
+      "value": {
+        "id": "authentication",
+        "project": "tests/PiSharp.Authentication.Tests/PiSharp.Authentication.Tests.csproj",
+        "projectSha256": "5b39ed009ad7fad5a5972ae64105cad9242c73b3a0a050dac5b0f972f3594582",
+        "entryAssembly": "tests/PiSharp.Authentication.Tests/bin/Release/net10.0/PiSharp.Authentication.Tests.dll",
+        "arguments": [
+          {
+            "kind": "literal",
+            "value": "--report"
+          },
+          {
+            "kind": "report"
+          }
+        ],
+        "fixturePins": [],
+        "outputFixturePins": [],
+        "reportName": "authentication.json",
+        "timeoutSeconds": 60,
+        "lockFile": {
+          "status": "PINNED_EXISTING",
+          "sha256": "3e16ab11cc165b059ba0f89bcc544826628139b0300de0e22b2c6893b9f3e28b",
+          "path": "tests/PiSharp.Authentication.Tests/packages.lock.json",
+          "bytes": 235
+        },
+        "currentExecution": "UNEXECUTED",
+        "originalExpectationChanges": 0
+      },
+      "path": "/targets/-"
+    }
+  ],
+  "registrationPath": "tools/native-companion-targets.json",
+  "runnerCommand": {
+    "arguments": [
+      "--report",
+      "<fresh evidence directory>/authentication.json"
+    ],
+    "entryAssembly": "tests/PiSharp.Authentication.Tests/bin/Release/net10.0/PiSharp.Authentication.Tests.dll",
+    "launch": "Invoke-NativeCompanionTargets with existing reviewed source/build/host receipts and --report argument handling; no direct bypass"
+  },
+  "sourceAdmission": {
+    "newDirectories": [
+      "src/PiSharp.AI/Authentication",
+      "tests/PiSharp.Authentication.Tests"
+    ],
+    "action": "Integrating owner must regenerate and review exact whole checkout source manifest and permitted build receipt; source manifest includes every tracked added/changed file, including proposals. Existing source admission derives bin/obj roots from csproj; no allowed-root code changes."
+  },
+  "productAdmission": {
+    "project": "tests/PiSharp.Authentication.Tests/PiSharp.Authentication.Tests.csproj",
+    "entryAssembly": "tests/PiSharp.Authentication.Tests/bin/Release/net10.0/PiSharp.Authentication.Tests.dll",
+    "action": "Prepare through existing locked/offline full-solution restore/build only after assignment; pin new DLL and AI dependency bytes in fresh reviewed build receipt. Authored lock has only existing AI/Contracts project references; do not claim successful restore."
+  },
+  "dependenciesAdded": [],
+  "executed": false,
+  "preparedRootGateAddition": {
+    "replaceExact": "        if ($roots.Count -ne 47) { throw 'All original 42 output roots plus isolated keybindings, Pi Messages, Google and both selector consumer roots are required.' }",
+    "newCount": 48,
+    "addedRoot": "tests/PiSharp.Authentication.Tests/bin/Release/net10.0",
+    "path": "tools/prepare-native-products.ps1",
+    "withExact": "        if ($roots.Count -ne 48) { throw 'All original 47 output roots plus the isolated authentication consumer root are required.' }",
+    "preserveOriginalRootSet": true,
+    "oldCount": 47
+  },
+  "provenanceUpdates": [
+    {
+      "artifact": "tools/native-companion-targets.json",
+      "fields": [
+        "basisSourceCandidate",
+        "basisSourceTree",
+        "basisStaticReview.candidate",
+        "basisStaticReview.sha256",
+        "scope"
+      ],
+      "required": "Integrating owner must bind actual composition candidate/tree and independently generated review artifact hash; never reuse older review as approval or fabricate nonexistent seals. Update scope to retained original26 targets plus authentication. Source-only nativeBuilds/nativeAssertions stay zero until real runs."
+    },
+    {
+      "artifact": "exact-checkout-source-manifest",
+      "fields": [
+        "candidate",
+        "tree",
+        "files relative/bytes/sha256",
+        "sourceCount"
+      ],
+      "required": "Regenerate full final reviewed checkout inventory, including solution, registry, registration runner, prepare script and all auth source/test/handoff/proposals. New csproj declares only its existing project references and bin/obj generated roots through existing policy."
+    },
+    {
+      "artifact": "approved-runtime-allocation",
+      "fields": [
+        "candidate",
+        "tree",
+        "sourceManifestSha256",
+        "reviewedRepositoryRoot",
+        "dotnet pin",
+        "allowedOperation",
+        "expiresUtc"
+      ],
+      "required": "Separate coordinator obtains genuine allocation tied to new full source manifest; this lane creates no execution permission or host pin."
+    },
+    {
+      "artifact": "actual-permitted-build-receipt.json",
+      "fields": [
+        "candidate",
+        "tree",
+        "sourceManifestSha256",
+        "reviewedRepositoryRoot",
+        "runtimeAllocation",
+        "runtimeAllocationSha256",
+        "sourceAdmission",
+        "productRoots",
+        "products",
+        "actualPreparationSteps"
+      ],
+      "required": "Prepare only after allocation. Root array is exact original47 plus authentication. Capture real pinned SDK/restore/build logs and every product byte in all48 roots, including the auth DLL and AI/Contracts copies. Existing Google/selector/Kitty scoped views keep names/counts and bind new actual candidate products."
+    },
+    {
+      "artifact": "complete-prepared-admission.json",
+      "fields": [
+        "candidate",
+        "tree",
+        "sourceFiles",
+        "productRoots",
+        "registeredTargets",
+        "actualProducts",
+        "validation",
+        "actualBuildReceipt"
+      ],
+      "required": "Regenerate from settled verified preparation, productRoots=48 and registeredTargets=27. Get-NativePreparedValidation derives exact root set from registration, checks receipt root equality and full product coverage, and includes new entryAssembly automatically."
+    },
+    {
+      "artifact": "native-companion-run-evidence",
+      "fields": [
+        "registrationSha256",
+        "preparedValidation",
+        "required",
+        "targets authentication launchPins/report/stdout/stderr/process joins"
+      ],
+      "required": "After separate runtime assignment invoke through unchanged receipt/host admission with the new reviewed registry; required=27. Authentication target accepts --report and creates exactly one fresh report. Retain real code/results and output joins; never infer native pass from authored source."
+    }
+  ]
+}

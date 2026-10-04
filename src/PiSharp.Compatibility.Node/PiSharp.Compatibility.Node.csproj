@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
+    <ProjectReference Include="../PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj" />
+    <ProjectReference Include="../PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" />
+    <ProjectReference Include="../PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+  </ItemGroup>
+</Project>

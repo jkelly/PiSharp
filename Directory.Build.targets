@@ -1,0 +1,4 @@
+<Project>
+  <!-- Stop the default Directory.Build.targets search at this pinned root.
+       Preparation also passes both DirectoryBuild*Path values explicitly. -->
+</Project>

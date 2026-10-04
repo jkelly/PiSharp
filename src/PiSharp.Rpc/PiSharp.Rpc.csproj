@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Rpc.Tests" />
+    <InternalsVisibleTo Include="PiSharp.CodingAgent.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
+    <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <ProjectReference Include="../PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

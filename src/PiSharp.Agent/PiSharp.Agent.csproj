@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
+    <ProjectReference Include="../PiSharp.AI/PiSharp.AI.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "acceptanceId": "PM-NATIVE-TOOL-CONTINUATION-3-C80169F5-R1",
+  "criterion": "PM-NATIVE-TOOL-CONTINUATION/3",
+  "currentStatus": "ACCEPTED_BOUNDED_AUTHORED_NATIVE_INTEGRATION",
+  "acceptedCandidate": "c80169f5ce935b1913abd9fda7119ad03725f5c7",
+  "acceptedTree": "6523965bf9a1520e2e72b45148a4940e3b41a4eb",
+  "reviewedSourceCorrection": "bd50fdc33d31a56f23ab258e34bc65c6e54086e7",
+  "scope": "Exact original-case native Agent/ToolInvoker two-turn integration, explicit fixture/system and Agent stamp mapping, mandatory authority and joined ownership",
+  "decisionAuthority": {
+    "acceptanceRecordReview": "PENDING_SEPARATE_REVIEW",
+    "communication": "Explicit delegated instruction accepts this criterion for bounded authored native integration at exact candidate/tree and qualification handoff hash",
+    "standaloneReviewerArtifact": null,
+    "kind": "coordinator-transmitted independent evidence reviewer acceptance"
+  },
+  "nativeIntegrationAccepted": true,
+  "boundedNativeRuntimeAccepted": true,
+  "qualification": {
+    "transportGroupsFailed": 0,
+    "sourceAdmissionControlsPassed": 174,
+    "handoffSha256": "6b6ad0318ec05cabde0c858a017d806692e6014a9805e4a3ce76582a2f5c46c0",
+    "failureControl": {
+      "testId": "agent.case.pi-messages-agent.original-pm-second-request-failure-retains-root",
+      "legacyTestId": "agent.SecondRequestFailure",
+      "name": "pi-messages-agent.original-pm-second-request-failure-retains-root",
+      "status": "passed"
+    },
+    "sourceFilesVerified": 1796,
+    "sourceManifest": {
+      "artifactId": "native-source-manifest-c80169f5",
+      "bytes": 678815,
+      "sha256": "66f5067ff5fe11abe193446be4a0632ba1cb0b1b0d11c121bf3d111abd7aab31"
+    },
+    "buildReceipt": {
+      "sha256": "c61658f66c5d3946668ea939d47232b887bf7590ec114c51ae9d083941cddcdc",
+      "bytes": 858383,
+      "artifactId": "native-build-receipt-c80169f5"
+    },
+    "handoffFile": "ORIGINAL_PM_NATIVE_TOOL_CONTINUATION_QUALIFICATION_HANDOFF_c80169f5.json",
+    "preparationStagesPassed": 24,
+    "agentGroupsPassed": 230,
+    "allOriginalProcessAndOutputOwnersJoined": true,
+    "generatedInputsVerified": 2428,
+    "agentReport": {
+      "artifactId": "core-agent-report-c80169f5",
+      "bytes": 879607,
+      "sha256": "361b23ab87314735357955b5d4a1afe6bb2011dfa3f38983e1eb8990433b246e"
+    },
+    "agentGroupsFailed": 0,
+    "transportGroupsPassed": 222,
+    "productFilesVerified": 816,
+    "originalCase": {
+      "testId": "agent.case.pi-messages-agent.original-pm-native-tool-continuation",
+      "legacyTestId": "agent.<Cases>b__16_0",
+      "name": "pi-messages-agent.original-pm-native-tool-continuation",
+      "status": "passed"
+    },
+    "coordinatorReportedRuntimePins": 108,
+    "transportReport": {
+      "artifactId": "core-transport-report-c80169f5",
+      "bytes": 28684,
+      "sha256": "1e29a3674b66009ac76e7cc9ec964086e78da4c842f2a156703be558f847e0e1"
+    }
+  },
+  "acceptedMapping": {
+    "actualWireThinkingLevel": "off",
+    "systemText": "Authored inert system.",
+    "roleAndTimestampRetained": true,
+    "firstPhysicalRequest": "Entire frozen request URI/method/headers/body UTF8 bytes/body JSON",
+    "requestTimestamp": 123,
+    "separateAssertionOnlyProjection": "Only thinkingLevel=off is removed from observed second request body for complete frozen provider-layer JSON/UTF8 comparison; actual request/history remain stamped",
+    "toolResultTimestamp": 123,
+    "agentExpectationVersion": "AGENT_THINKING_STAMP_R1",
+    "finalAssistant": "Full frozen final provider assistant plus required Agent off stamp",
+    "system": "Frozen systemMessage -> native content at prompt admission -> original systemMessage at test-only provider boundary",
+    "secondPhysicalRequest": "Entire versioned Agent request with thinkingLevel=off, including exact UTF8 bytes, full JSON and both header layers",
+    "canonicalHistoryAndNonSystemMessageIdentityRetained": true
+  },
+  "observedNativeFacts": {
+    "failureControlCompleteEvidence": false,
+    "preparations": 1,
+    "heldBarriers": [
+      "first-http-cleanup",
+      "assistant",
+      "tool-result",
+      "second-http-cleanup",
+      "final-assistant"
+    ],
+    "actualEffectCount": 1,
+    "failureControlOriginalJoined": true,
+    "toolResult": "Actual adapter-produced Observed seven.; no fixture result injection",
+    "physicalRequestUtf8Lengths": [
+      213,
+      805
+    ],
+    "failureControlIntentional": true,
+    "finalizedArgument": 7,
+    "originalPromptTaskJoined": true,
+    "unexpectedFailureEvidence": null,
+    "authorizations": 1,
+    "mappedRequests": 2,
+    "validations": 2,
+    "completeIntegrationEvidencePresent": true
+  },
+  "preservedHistory": {
+    "fixtureSha256": "1b8a6fbb80726e6f1a6cb1848d2df9b7da41c9015d91592d9f077f2aa8c04891",
+    "originalAuthoredState": "compatibility/original-pi-messages-tool-continuation.json",
+    "frozenBytesRewritten": false,
+    "priorFailuresRetained": [
+      "bef2272a860ff2349dddbf4325e793edee595f34",
+      "eb1cdf3ca34201d1f4395e4c6dced19349c95301"
+    ],
+    "providerHarnessOpenLedgerUnmodified": true,
+    "originalOpenAnalysis": "compatibility/pi-messages-open-criteria-899e00f5.json",
+    "historicalOpenAndRuntimeAcceptanceFalseMetadataUnmodified": true,
+    "criterionDependenciesSha256": "5a2ede772b7b4e906671c92a12a26654d3e1f69588bcf0b519bcb96c43aabb81"
+  },
+  "excludedAcceptance": {
+    "identityReplacementCriterion1": "OPEN",
+    "identityReplacementCriterion2": "OPEN",
+    "sourceDifferentialQualification": "OPEN",
+    "sourceParity": "OPEN",
+    "broaderSdkAcceptance": "OPEN",
+    "packageAcceptance": "OPEN",
+    "providerFamilyQualification": "OPEN",
+    "genuineSourceCaptures": 0,
+    "phaseAcceptance": "OPEN",
+    "claimOfAcceptanceForOtherCandidates": false,
+    "claimOfRawAgentRequestEqualityWithProviderOnlyFixture": false,
+    "releaseAcceptance": "OPEN"
+  },
+  "recordWork": {
+    "mainMerged": false,
+    "testEdits": 0,
+    "newBuildsExecuted": 0,
+    "newTestsExecuted": 0,
+    "newSourceExecutions": 0,
+    "productionEdits": 0,
+    "kind": "docs/evidence-only successor",
+    "publicPublished": false
+  }
+}

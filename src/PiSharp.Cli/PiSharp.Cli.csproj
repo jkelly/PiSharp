@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.CodingAgent.Tests" />
+    <InternalsVisibleTo Include="PiSharp.NodeCommandInputPackage.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <ProjectReference Include="../PiSharp.Tools/PiSharp.Tools.csproj" />
+    <ProjectReference Include="../PiSharp.Rpc/PiSharp.Rpc.csproj" />
+    <ProjectReference Include="../PiSharp.Tui/PiSharp.Tui.csproj" />
+    <ProjectReference Include="../PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+    <ProjectReference Include="../PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
+  </ItemGroup>
+</Project>

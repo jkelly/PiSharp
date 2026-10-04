@@ -1,0 +1,144 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using PiSharp.Contracts;
+
+namespace PiSharp.Rpc;
+
+public enum JsonlStreamOwnership { Borrowed, Owned }
+public sealed record JsonlTransportOptions(int ReadBufferBytes = 4096, int MaximumFrameBytes = 1_048_576,
+    int MaximumJsonDepth = 32, int MaximumPendingWrites = 16)
+{
+    internal void Validate(JsonlStreamOwnership ownership)
+    {
+        if (ReadBufferBytes is < 1 or > 65_536 || MaximumFrameBytes is < 1 or > int.MaxValue - 1 ||
+            MaximumJsonDepth is < 1 or > 64 || MaximumPendingWrites <= 0 || !Enum.IsDefined(ownership))
+            throw new ArgumentOutOfRangeException(nameof(JsonlTransportOptions), "Invalid JSONL transport limits or ownership.");
+    }
+}
+public enum JsonlTransportFailure
+{
+    FrameLimit, DepthLimit, InvalidUtf8, InvalidUnicode, MalformedJson, PartialFinalFrame,
+    DuplicateProperty, InvalidRecord, PendingWriteLimit
+}
+public sealed class JsonlTransportException : IOException
+{
+    public JsonlTransportFailure Failure { get; }
+    internal JsonlTransportException(JsonlTransportFailure failure) : base(failure switch
+    {
+        JsonlTransportFailure.FrameLimit => "JSONL frame exceeds the byte limit.",
+        JsonlTransportFailure.DepthLimit => "JSONL frame exceeds the JSON depth limit.",
+        JsonlTransportFailure.InvalidUtf8 => "JSONL frame contains invalid UTF-8.",
+        JsonlTransportFailure.InvalidUnicode => "JSONL frame contains unsupported unpaired Unicode.",
+        JsonlTransportFailure.PartialFinalFrame => "JSONL input ended with an incomplete or malformed final frame.",
+        JsonlTransportFailure.DuplicateProperty => "JSONL frame contains duplicate decoded object names.",
+        JsonlTransportFailure.InvalidRecord => "JSONL protocol record must be a JSON object.",
+        JsonlTransportFailure.PendingWriteLimit => "JSONL writer pending-call limit exceeded.",
+        _ => "JSONL frame is not complete strict JSON."
+    }) => Failure = failure;
+}
+
+internal static class JsonlRecordCodec
+{
+    private static readonly UTF8Encoding Utf8 = new(false, true);
+    internal static JsonData Parse(ReadOnlySpan<byte> bytes, JsonlTransportOptions options, bool final)
+    {
+        string raw;
+        try { raw = Utf8.GetString(bytes); }
+        catch (DecoderFallbackException) { throw Failure(JsonlTransportFailure.InvalidUtf8); }
+        CheckDepth(raw, options.MaximumJsonDepth);
+        try
+        {
+            using var document = JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 64 });
+            Validate(document.RootElement, raw);
+            return JsonData.FromElement(document.RootElement);
+        }
+        catch (JsonException) { throw Failure(final ? JsonlTransportFailure.PartialFinalFrame : JsonlTransportFailure.MalformedJson); }
+    }
+
+    internal static byte[] Encode(JsonData record, JsonlTransportOptions options)
+    {
+        var raw = record.ToString(); CheckDepth(raw, options.MaximumJsonDepth);
+        // JsonData may originate from a document parsed with comments/trailing commas enabled.
+        // Owned structural validation does not establish strict retained wire syntax.
+        using var strict = ReparseStrict(raw); Validate(strict.RootElement, raw);
+        var compact = new StringBuilder(Math.Min(raw.Length, options.MaximumFrameBytes));
+        var quoted = false; var escaped = false;
+        foreach (var character in raw)
+        {
+            if (quoted)
+            {
+                compact.Append(character);
+                if (escaped) escaped = false;
+                else if (character == '\\') escaped = true;
+                else if (character == '"') quoted = false;
+            }
+            else if (character == '"') { quoted = true; compact.Append(character); }
+            else if (character is not (' ' or '\t' or '\r' or '\n')) compact.Append(character);
+            if (compact.Length > options.MaximumFrameBytes) throw Failure(JsonlTransportFailure.FrameLimit);
+        }
+        var text = compact.ToString(); int count;
+        try { count = Utf8.GetByteCount(text); }
+        catch (EncoderFallbackException) { throw Failure(JsonlTransportFailure.InvalidUnicode); }
+        if (count > options.MaximumFrameBytes) throw Failure(JsonlTransportFailure.FrameLimit);
+        var result = new byte[count + 1]; Utf8.GetBytes(text, result); result[^1] = (byte)'\n'; return result;
+    }
+
+    private static JsonDocument ReparseStrict(string raw)
+    {
+        try { return JsonDocument.Parse(raw, new JsonDocumentOptions { MaxDepth = 64 }); }
+        catch (JsonException) { throw Failure(JsonlTransportFailure.MalformedJson); }
+    }
+
+    private static void CheckDepth(string raw, int maximum)
+    {
+        var quoted = false; var escaped = false; var depth = 0;
+        foreach (var character in raw)
+        {
+            if (quoted)
+            {
+                if (escaped) escaped = false;
+                else if (character == '\\') escaped = true;
+                else if (character == '"') quoted = false;
+            }
+            else if (character == '"') quoted = true;
+            else if (character is '{' or '[') { if (++depth > maximum) throw Failure(JsonlTransportFailure.DepthLimit); }
+            else if (character is '}' or ']') depth--;
+        }
+    }
+
+    private static void Validate(JsonElement value, string raw)
+    {
+        if (value.ValueKind != JsonValueKind.Object) throw Failure(JsonlTransportFailure.InvalidRecord);
+        // Strict UTF-8 cannot contain literal unpaired surrogates; escaped surrogates need their own check.
+        for (var index = 0; index < raw.Length; index++)
+        {
+            if (raw[index] != '\\') continue;
+            if (++index >= raw.Length || raw[index] != 'u') continue;
+            var code = int.Parse(raw.AsSpan(index + 1, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture); index += 4;
+            if (code is >= 0xD800 and <= 0xDBFF)
+            {
+                if (index + 6 >= raw.Length || raw[index + 1] != '\\' || raw[index + 2] != 'u' ||
+                    int.Parse(raw.AsSpan(index + 3, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture) is not (>= 0xDC00 and <= 0xDFFF))
+                    throw Failure(JsonlTransportFailure.InvalidUnicode);
+                index += 6;
+            }
+            else if (code is >= 0xDC00 and <= 0xDFFF) throw Failure(JsonlTransportFailure.InvalidUnicode);
+        }
+        CheckDuplicates(value);
+    }
+    private static void CheckDuplicates(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.Object)
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var property in value.EnumerateObject())
+            {
+                if (!names.Add(property.Name)) throw Failure(JsonlTransportFailure.DuplicateProperty);
+                CheckDuplicates(property.Value);
+            }
+        }
+        else if (value.ValueKind == JsonValueKind.Array) foreach (var item in value.EnumerateArray()) CheckDuplicates(item);
+    }
+    private static JsonlTransportException Failure(JsonlTransportFailure failure) => new(failure);
+}

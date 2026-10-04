@@ -1,13 +1,7 @@
 # Contributing to PiSharp
 
-PiSharp is currently a planning project. Useful contributions include clarifying requirements, documenting upstream behavior against the pinned baseline, and reviewing the proposed phase boundaries.
+Keep changes focused. Distinguish implemented behavior, authored tests, measured results and acceptance. Cite immutable public upstream sources and retain applicable MIT/third-party notices. Do not submit credentials, personal machine paths, private captures or unresolved third-party binary archives.
 
-1. Open an issue describing the proposed change and its rationale before substantial work.
-2. Keep documentation pull requests focused. Distinguish planned behavior from verified observations and implemented functionality.
-3. Cite public upstream sources with immutable commit links when describing baseline behavior.
-4. Submit only material you have the right to share publicly. Exclude credentials, personal data, confidential material, and private repository content.
-5. Preserve applicable copyright and license notices for any future third-party material. Contributions are provided under this repository's MIT license.
+Use the pinned SDK and public build/offline checks in [README](README.md). The two fake-HTTP provider test products are a scoped public subset. The complete private native/reference gate needs omitted inputs and cannot be reproduced by this snapshot alone. Source, test scope and fixture changes need their own review and checks.
 
-There is no implementation, build procedure, or automated test suite yet. For documentation changes, check links, spelling, and consistency with the [planning index](docs/plans/README.md). Do not claim tests passed or parity was achieved without corresponding implementation and evidence.
-
-Detailed phase plans and implementation contribution guidance will be added as the project develops.
+The [planning index](docs/plans/README.md) describes original requirements. Do not silently regenerate goldens, transfer counts to changed source, or promote bounded tests into platform, parity, phase or release acceptance. Contributions use the repository's MIT license.

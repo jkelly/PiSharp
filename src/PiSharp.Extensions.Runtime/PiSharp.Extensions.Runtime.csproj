@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,31 @@
+<Project>
+  <!-- Opt-in only. The execution coordinator must admit this input before use. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'PiSharp.Cli'">
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>pisharp</ToolCommandName>
+    <PackageId>PiSharp.Cli</PackageId>
+    <Authors>PiSharp contributors</Authors>
+    <Description>Independent native .NET 10 port of Pi; preview compatibility remains scoped to recorded evidence.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryCommit>$(PiSharpSourceCommit)</RepositoryCommit>
+    <Version>$(PiSharpReleaseVersion)</Version>
+    <PackageVersion>$(PiSharpReleaseVersion)</PackageVersion>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishAot>false</PublishAot>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'PiSharp.Cli'">
+    <None Include="$(MSBuildThisFileDirectory)../../LICENSE" Pack="true" PackagePath="/" CopyToPublishDirectory="PreserveNewest" Link="LICENSE" />
+    <None Include="$(MSBuildThisFileDirectory)../../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="/" CopyToPublishDirectory="PreserveNewest" Link="THIRD-PARTY-NOTICES.md" />
+    <None Include="$(MSBuildThisFileDirectory)../../README.md" Pack="true" PackagePath="/" CopyToPublishDirectory="PreserveNewest" Link="README.md" />
+    <None Include="$(PiSharpProvenanceFile)" Condition="'$(PiSharpProvenanceFile)' != ''" Pack="true" PackagePath="/provenance.json" CopyToPublishDirectory="PreserveNewest" Link="provenance.json" />
+  </ItemGroup>
+  <Target Name="ValidatePiSharpDistributionInputs" BeforeTargets="Pack;Publish" Condition="'$(MSBuildProjectName)' == 'PiSharp.Cli'">
+    <Error Condition="'$(PiSharpReleaseVersion)' == ''" Text="An explicit independently versioned PiSharpReleaseVersion is required." />
+    <Error Condition="'$(PiSharpProvenanceFile)' == '' Or !Exists('$(PiSharpProvenanceFile)')" Text="An admitted PiSharpProvenanceFile is required." />
+    <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(PiSharpSourceCommit)', '^[0-9a-f]{40}$')) != 'True'" Text="PiSharpSourceCommit must identify the admitted source commit." />
+    <Error Condition="'$(PublishTrimmed)' == 'true' Or '$(PublishSingleFile)' == 'true' Or '$(PublishAot)' == 'true'" Text="Distribution candidates require untrimmed JIT payloads; other variants need separate qualification." />
+  </Target>
+</Project>

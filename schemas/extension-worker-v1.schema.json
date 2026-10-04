@@ -1,0 +1,361 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pisharp.invalid/schemas/extension-worker-v1.schema.json",
+  "title": "PiSharp optional extension worker v1 early protocol slice",
+  "description": "Structural schema only. Codec additionally enforces strict LF/UTF8, decoded duplicate names, scalar Unicode, finite binary64 numeric values, safe integer identities and configured byte/depth/value/count budgets. No extension support or broker execution grant.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "workerGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "sessionGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "const": "hello"
+        },
+        "features": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.:-]{1,96}$"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "workerGeneration",
+        "sessionGeneration",
+        "features"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "workerGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "sessionGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "const": "request"
+        },
+        "id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "value": {
+          "$ref": "#/$defs/value"
+        },
+        "method": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.:-]{1,96}$"
+        },
+        "handle": {
+          "$ref": "#/$defs/handle"
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "workerGeneration",
+        "sessionGeneration",
+        "id",
+        "value",
+        "method"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "workerGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "sessionGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "const": "response"
+        },
+        "id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "value": {
+          "$ref": "#/$defs/value"
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "workerGeneration",
+        "sessionGeneration",
+        "id",
+        "value"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "workerGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "sessionGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "const": "error"
+        },
+        "id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "error": {
+          "$ref": "#/$defs/error"
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "workerGeneration",
+        "sessionGeneration",
+        "id",
+        "error"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "workerGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "sessionGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "const": "progress"
+        },
+        "id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "value": {
+          "$ref": "#/$defs/value"
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "workerGeneration",
+        "sessionGeneration",
+        "id",
+        "value"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "workerGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "sessionGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "const": "cancel"
+        },
+        "id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "workerGeneration",
+        "sessionGeneration",
+        "id"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "workerGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "sessionGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "kind": {
+          "const": "shutdown"
+        }
+      },
+      "required": [
+        "version",
+        "kind",
+        "workerGeneration",
+        "sessionGeneration"
+      ]
+    }
+  ],
+  "$defs": {
+    "value": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "presence": {
+              "const": "absent"
+            }
+          },
+          "required": [
+            "presence"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "presence": {
+              "const": "undefined"
+            }
+          },
+          "required": [
+            "presence"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "presence": {
+              "const": "json"
+            },
+            "data": {}
+          },
+          "required": [
+            "presence",
+            "data"
+          ]
+        }
+      ]
+    },
+    "handle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.:-]{1,96}$"
+        },
+        "ownerGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "registrationId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.:-]{1,96}$"
+        },
+        "callbackId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.:-]{1,96}$"
+        }
+      },
+      "required": [
+        "ownerId",
+        "ownerGeneration",
+        "registrationId",
+        "callbackId"
+      ]
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.:-]{1,96}$"
+        },
+        "outcome": {
+          "enum": [
+            "notSent",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "outcome"
+      ]
+    }
+  }
+}
