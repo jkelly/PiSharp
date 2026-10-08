@@ -18,6 +18,7 @@
     <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
     <ProjectReference Include="../PiSharp.PromptTemplates.Yaml/PiSharp.PromptTemplates.Yaml.csproj" Condition="'$(EnablePromptTemplateYaml)' == 'true'" />
     <ProjectReference Include="../PiSharp.Tools/PiSharp.Tools.csproj" />
+    <ProjectReference Include="../PiSharp.Tools.Skia/PiSharp.Tools.Skia.csproj" />
     <ProjectReference Include="../PiSharp.Rpc/PiSharp.Rpc.csproj" />
     <ProjectReference Include="../PiSharp.Tui/PiSharp.Tui.csproj" />
     <ProjectReference Include="../PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
@@ -25,6 +26,11 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Models/*.json" LogicalName="PiSharp.Cli.Models.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The read tool's SkiaSharp image codec (owner decision 0004) and its native Skia components. -->
+    <None Include="../../third-party/SkiaSharp.LICENSE.txt" Link="licenses/SkiaSharp.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <None Include="../../third-party/SkiaSharp.THIRD-PARTY-NOTICES.txt" Link="licenses/SkiaSharp.THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
   <ItemGroup Condition="'$(EnablePromptTemplateYaml)' == 'true'">
     <None Include="../../third-party/YamlDotNet.LICENSE.txt" Link="licenses/YamlDotNet.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />

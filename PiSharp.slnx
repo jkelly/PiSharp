@@ -5,6 +5,7 @@
     <Project Path="src/PiSharp.Agent/PiSharp.Agent.csproj" />
     <Project Path="src/PiSharp.Sessions/PiSharp.Sessions.csproj" />
     <Project Path="src/PiSharp.Tools/PiSharp.Tools.csproj" />
+    <Project Path="src/PiSharp.Tools.Skia/PiSharp.Tools.Skia.csproj" />
     <Project Path="src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
     <Project Path="src/PiSharp.PromptTemplates.Yaml/PiSharp.PromptTemplates.Yaml.csproj" />
     <Project Path="src/PiSharp.Cli/PiSharp.Cli.csproj" />

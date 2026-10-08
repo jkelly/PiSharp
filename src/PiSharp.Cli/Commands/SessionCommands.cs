@@ -57,7 +57,8 @@ public static class SessionCommands
         NativeExtensionConfiguration.Flags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags +
         " (startup settings/tools apply to create, prompt and resume); session inspect|tree|history --session <JSONL> [--leaf <id>|--root]";
     private static readonly UTF8Encoding Utf8 = new(false, true);
-    private static readonly SessionLogReaderOptions ReaderBounds = new(MaximumInputBytes: 8_388_608, MaximumLines: 10_000, MaximumRecords: 10_000);
+    // Pi-sized records and files (owner decision 0004): sessions hold read images of up to 4.5MB of base64.
+    private static readonly SessionLogReaderOptions ReaderBounds = PiPayloadBudget.SessionReader(new(MaximumLines: 10_000, MaximumRecords: 10_000));
     private sealed record Arguments(string Command, string Session, string? Workspace, string? Script, string? Message,
         bool Latest, string? Leaf, ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi,
         OfflineBashAuthorization? Bash, bool Print, bool Json, NativeExtensionConfiguration? Extension, bool SupportsImages,
@@ -66,7 +67,11 @@ public static class SessionCommands
     public static Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr, CancellationToken cancellationToken = default,
         PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
         Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null) =>
-        RunCoreAsync(args, stdout, stderr, new(), cancellationToken, mcpAdmission, persistRetryEnabledOriginal);
+        RunCoreAsync(args, stdout, stderr, JsonOutput, cancellationToken, mcpAdmission, persistRetryEnabledOriginal);
+
+    /// <summary>JSON-mode records carry tool results with Pi-sized images.</summary>
+    internal static SessionJsonEventOutputOptions JsonOutput { get; } =
+        new(MaximumRecordBytes: PiPayloadBudget.OutputRecordBytes, MaximumTotalBytes: 1L << 30);
 
     /// <summary>Explicit trusted native JSON delivery limits; other output modes keep their existing profile.</summary>
     public static Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr,
@@ -241,8 +246,8 @@ public static class SessionCommands
         await profile.LoadPromptTemplatesAsync(args.Prompts, stderr, token).ConfigureAwait(false);
         await profile.LoadSkillsAsync(args.Skills, stderr, token).ConfigureAwait(false);
         var options = new PersistentAgentSessionOptions(UseLatestLeaf: args.Latest, SelectedLeafId: args.Leaf,
-            AgentOptions: new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024)),
-            SessionLogStoreOptions: new(ReaderOptions: ReaderBounds));
+            AgentOptions: PiPayloadBudget.Agent(new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024))),
+            SessionLogStoreOptions: new(ReaderOptions: ReaderBounds), ContextOptions: PiPayloadBudget.Context);
         var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); long sequence = 0;
         long Clock() => startTime + Interlocked.Increment(ref sequence);
         string NextId() => "cli-" + Guid.NewGuid().ToString("N");

@@ -2,6 +2,30 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "SkiaSharp": {
+        "type": "Transitive",
+        "resolved": "4.152.1",
+        "contentHash": "p3rj8SVoa+2Tmx1EITE4jIwCDPcYjwXdZ3c9yM6l9wNn6572hwxzrth6WOBK0iGnAoTGoJBZuZpy8wYjbov6sw==",
+        "dependencies": {
+          "SkiaSharp.NativeAssets.Win32": "4.152.1",
+          "SkiaSharp.NativeAssets.macOS": "4.152.1"
+        }
+      },
+      "SkiaSharp.NativeAssets.Linux.NoDependencies": {
+        "type": "Transitive",
+        "resolved": "4.152.1",
+        "contentHash": "I/WMSZeE4QFFJoXGu5SNJVhWOBLZqtaUIN5wug3VaTJzpPEsk0t1GMrv0OG+ZoRrXExoW8RLo/bye+WkjVuEFQ=="
+      },
+      "SkiaSharp.NativeAssets.macOS": {
+        "type": "Transitive",
+        "resolved": "4.152.1",
+        "contentHash": "gKaE2zNHsPLjlA88ZClRNmtZlHNGEa/W4iPy5GpP1TtUELIXzrSr2udCbl1GWYFuCdA36IycBk5YhUuK1xi9UA=="
+      },
+      "SkiaSharp.NativeAssets.Win32": {
+        "type": "Transitive",
+        "resolved": "4.152.1",
+        "contentHash": "MLDP6XT8CHLHF6gZlpW06iswGNBlL/JB2+SKuSLz0Y0k1zzsfofNyUY6J6FC32A4/F67E9S8MwovRBL+ELw0lw=="
+      },
       "YamlDotNet": {
         "type": "Transitive",
         "resolved": "16.3.0",
@@ -10,33 +34,34 @@
       "pisharp.agent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.AI": "[1.1.0, )",
-          "PiSharp.Contracts": "[1.1.0, )"
+          "PiSharp.AI": "[1.1.0.1, )",
+          "PiSharp.Contracts": "[1.1.0.1, )"
         }
       },
       "pisharp.ai": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0, )"
+          "PiSharp.Contracts": "[1.1.0.1, )"
         }
       },
       "pisharp.cli": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.CodingAgent": "[1.1.0, )",
-          "PiSharp.Extensions.Agent": "[1.1.0, )",
-          "PiSharp.Extensions.Runtime": "[1.1.0, )",
-          "PiSharp.PromptTemplates.Yaml": "[1.1.0, )",
-          "PiSharp.Rpc": "[1.1.0, )",
-          "PiSharp.Tools": "[1.1.0, )",
-          "PiSharp.Tui": "[1.1.0, )"
+          "PiSharp.CodingAgent": "[1.1.0.1, )",
+          "PiSharp.Extensions.Agent": "[1.1.0.1, )",
+          "PiSharp.Extensions.Runtime": "[1.1.0.1, )",
+          "PiSharp.PromptTemplates.Yaml": "[1.1.0.1, )",
+          "PiSharp.Rpc": "[1.1.0.1, )",
+          "PiSharp.Tools": "[1.1.0.1, )",
+          "PiSharp.Tools.Skia": "[1.1.0.1, )",
+          "PiSharp.Tui": "[1.1.0.1, )"
         }
       },
       "pisharp.codingagent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Agent": "[1.1.0, )",
-          "PiSharp.Sessions": "[1.1.0, )"
+          "PiSharp.Agent": "[1.1.0.1, )",
+          "PiSharp.Sessions": "[1.1.0.1, )"
         }
       },
       "pisharp.contracts": {
@@ -45,48 +70,58 @@
       "pisharp.extensions.abstractions": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0, )"
+          "PiSharp.Contracts": "[1.1.0.1, )"
         }
       },
       "pisharp.extensions.agent": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Agent": "[1.1.0, )",
-          "PiSharp.Extensions.Runtime": "[1.1.0, )"
+          "PiSharp.Agent": "[1.1.0.1, )",
+          "PiSharp.Extensions.Runtime": "[1.1.0.1, )"
         }
       },
       "pisharp.extensions.runtime": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Extensions.Abstractions": "[1.1.0, )"
+          "PiSharp.Extensions.Abstractions": "[1.1.0.1, )"
         }
       },
       "pisharp.prompttemplates.yaml": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.CodingAgent": "[1.1.0, )",
+          "PiSharp.CodingAgent": "[1.1.0.1, )",
           "YamlDotNet": "[16.3.0, 16.3.0]"
         }
       },
       "pisharp.rpc": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.CodingAgent": "[1.1.0, )",
-          "PiSharp.Contracts": "[1.1.0, )",
-          "PiSharp.Extensions.Abstractions": "[1.1.0, )"
+          "PiSharp.CodingAgent": "[1.1.0.1, )",
+          "PiSharp.Contracts": "[1.1.0.1, )",
+          "PiSharp.Extensions.Abstractions": "[1.1.0.1, )"
         }
       },
       "pisharp.sessions": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Contracts": "[1.1.0, )"
+          "PiSharp.Contracts": "[1.1.0.1, )"
         }
       },
       "pisharp.tools": {
         "type": "Project",
         "dependencies": {
-          "PiSharp.Agent": "[1.1.0, )",
-          "PiSharp.Contracts": "[1.1.0, )"
+          "PiSharp.Agent": "[1.1.0.1, )",
+          "PiSharp.Contracts": "[1.1.0.1, )"
+        }
+      },
+      "pisharp.tools.skia": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Tools": "[1.1.0.1, )",
+          "SkiaSharp": "[4.152.1, 4.152.1]",
+          "SkiaSharp.NativeAssets.Linux.NoDependencies": "[4.152.1, 4.152.1]",
+          "SkiaSharp.NativeAssets.Win32": "[4.152.1, 4.152.1]",
+          "SkiaSharp.NativeAssets.macOS": "[4.152.1, 4.152.1]"
         }
       },
       "pisharp.tui": {

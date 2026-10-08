@@ -94,7 +94,7 @@ public static class RpcSessionCommand
             if (mcpAdmission is null && !parsed.Tools.NoMcp && mcpHost is not null) mcpAdmission = mcpHost.CreateAdmission(parsed.Workspace, stderr);
             backend = parsed.SessionMode == "open" ? null : new SessionStorageBackend(Path.GetDirectoryName(parsed.Session)!,
                 parsed.SessionMode == "new-memory" ? SessionStorageMode.InMemory : SessionStorageMode.LazyLocal,
-                new(MaximumFileBytes: 8_388_608));
+                new(MaximumFileBytes: PiPayloadBudget.SessionFileBytes, MaximumResidentBytes: PiPayloadBudget.SessionFileBytes));
             var turns = parsed.Script is null ? ImmutableArray<JsonData>.Empty :
                 await SessionCommands.ScriptAsync(parsed.Script, cancellationToken).ConfigureAwait(false);
             gate = OfflineGate.From(turns);
@@ -120,8 +120,9 @@ public static class RpcSessionCommand
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);
             var options = new PersistentAgentSessionOptions(UseLatestLeaf: parsed.Latest, SelectedLeafId: parsed.Leaf,
-                AgentOptions: new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024)),
-                SessionLogStoreOptions: new(ReaderOptions: new(MaximumInputBytes: 8_388_608, MaximumLines: 10_000, MaximumRecords: 10_000)));
+                AgentOptions: PiPayloadBudget.Agent(new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024))),
+                SessionLogStoreOptions: new(ReaderOptions: PiPayloadBudget.SessionReader(new(MaximumLines: 10_000, MaximumRecords: 10_000))),
+                ContextOptions: PiPayloadBudget.Context);
             string NextId() => "rpc-" + Guid.NewGuid().ToString("N");
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);
@@ -146,7 +147,8 @@ public static class RpcSessionCommand
             if (reloadAdmission is not null) profile.ConfigureReload(reloadAdmission);
             await profile.ApplyInitialToolSelectionAsync(session, cancellationToken).ConfigureAwait(false);
             observedInput = new InputObservation(stdin, gate);
-            var outputFraming = parsed.Bash is null ? Framing : Framing with { MaximumFrameBytes = 8 * 1024 * 1024 };
+            // Events and responses carry tool results with Pi-sized images (owner decision 0004).
+            var outputFraming = Framing with { MaximumFrameBytes = PiPayloadBudget.OutputRecordBytes };
             observedOutput = new OutputObservation(stdout, gate, outputFraming.MaximumFrameBytes);
             reader = new JsonlReader(observedInput, Framing);
             writer = new JsonlWriter(observedOutput, outputFraming);

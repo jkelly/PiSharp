@@ -247,7 +247,7 @@ internal static class CompletionsJson
         {
             return JsonData.Parse(EcmaScriptJsonProjection.Project(data, new(MaximumInputCharacters: maximumCharacters,
                 MaximumInputBytes: maximumBytes, MaximumOutputCharacters: maximumCharacters, MaximumOutputBytes: maximumBytes,
-                MaximumDepth: maximumDepth), token));
+                MaximumDepth: maximumDepth, MaximumStringCharacters: maximumCharacters), token));
         }
         catch (EcmaScriptJsonProjectionException error)
         { throw Fail(error.Failure == EcmaScriptJsonProjectionFailure.ResourceLimit ? CompletionsRequestFailure.ResourceLimit : CompletionsRequestFailure.InvalidTranscript); }

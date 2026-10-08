@@ -4,5 +4,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Tools/PiSharp.Tools.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Tools.Skia/PiSharp.Tools.Skia.csproj" />
   </ItemGroup>
 </Project>
