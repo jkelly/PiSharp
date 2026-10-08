@@ -9,11 +9,23 @@ public sealed partial class PersistentAgentSession
 
     /// <summary>
     /// Source pending tools: names that were active when a reload (or another owned retirement publication) replaced the
-    /// catalog but are not registered in it, such as MCP tools whose server connects later. A later catalog publication that
-    /// registers one activates it. Running a prompt drops them, as does a selection that deactivates an active tool; a tool
-    /// the user disabled is never pending, so it is not resurrected. In-memory only, like the source.
+    /// catalog but are not registered in it, such as MCP tools whose server connects later, and names of the loadout restored
+    /// from the transcript (session open without initial names, tree navigation) that are not registered yet. A later catalog
+    /// publication that registers one activates it. Running a prompt drops them, as does a selection that deactivates an active
+    /// tool; a tool the user disabled is never pending, so it is not resurrected. In-memory only, like the source.
     /// </summary>
     public ImmutableArray<string> PendingToolNames { get { lock (_gate) return _pendingToolNames; } }
+
+    /// <summary>
+    /// Source _restoreToolsFromTranscript: the restored loadout replaces the pending set. Unlike the source, which records the
+    /// loadout at the next prompt, the restored (registered) loadout is recorded before the session is used, so every later
+    /// transcript resolution sees only bound declarations.
+    /// </summary>
+    private async Task RecordRestoredToolsAsync(ImmutableArray<string> active, ImmutableArray<string> pending, CancellationToken token)
+    {
+        await SetActiveToolsAsync(active, token).ConfigureAwait(false);
+        lock (_gate) _pendingToolNames = pending;
+    }
 
     /// <summary>The names a catalog publication requests (its own, then pending ones) and the pending candidates it considers.</summary>
     private (ImmutableArray<string> Requested, ImmutableArray<string> Candidates) PendingToolRequestLocked(SessionRuntimeRegistry replacement,

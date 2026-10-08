@@ -306,7 +306,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             acquired.Claim(); runtime = acquired;
             var registry = runtime.Registry.RetainToolSelection(configured.LifetimeToolSelection);
             cancellationToken.ThrowIfCancellationRequested();
-            var selection = await registry.PrepareAndDrainAsync(() => registry.Resolve(context, fallbackModel, cancellationToken, registry.InitialActiveToolNames), cancellationToken).ConfigureAwait(false);
+            // Without initial names the transcript's loadout is restored; its unbound tools are left out (Pi 0.99.2).
+            var (selection, unbound) = await registry.PrepareAndDrainAsync(() => registry.ResolveRestored(context, fallbackModel, cancellationToken,
+                registry.InitialActiveToolNames), cancellationToken).ConfigureAwait(false);
             var bridge = new Bridge();
             agent = new(selection.Configuration, clock, bridge, configured.AgentOptions);
             agent.ReplaceMessages(SessionContextProjector.AgentMessages(context));
@@ -314,8 +316,12 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             opened = new(path, store, agent, bridge, projector, codec, context, selection.Configuration, clock, nextEntryId,
                 configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions)
             { _registry = registry, _runtimeLease = runtime };
+            var restored = selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
             if (registry.InitialActiveToolNames is not null)
-                await opened.SetActiveToolsAsync(selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), cancellationToken).ConfigureAwait(false);
+                await opened.SetActiveToolsAsync(restored, cancellationToken).ConfigureAwait(false);
+            // Restored tools that are not registered yet, such as MCP tools whose server is still connecting, stay pending.
+            else if (!unbound.IsEmpty)
+                await opened.RecordRestoredToolsAsync(restored, registry.PendingRestoredTools(unbound), cancellationToken).ConfigureAwait(false);
             return opened;
         }
         catch (Exception admission)

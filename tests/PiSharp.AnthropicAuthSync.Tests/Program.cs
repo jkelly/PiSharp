@@ -45,6 +45,8 @@ internal static class Program
             ("refresh.cancellation-while-waiting-for-lane-skips-refresh", RefreshLaneWait),
             ("refresh.cancellation-before-callback-entry-skips-refresh", RefreshCallbackEntry),
             ("refresh.anthropic-refresh-body-persists-despite-cancellation", RefreshAnthropic),
+            ("refresh.late-success-after-timeout-is-persisted-and-returned", RefreshAfterDeadline),
+            ("refresh.late-success-after-timeout-persists-for-cancelled-caller", RefreshAfterDeadlineCancelled),
             ("oauth.copy-code-login-select-prompt-url-and-exchange", CopyCodeLogin),
             ("oauth.copy-code-state-mismatch-and-missing-code", CopyCodeFailures),
             ("oauth.authorization-url-form-encoding", AuthorizationUrl),
@@ -630,6 +632,61 @@ internal static class Program
         BodyEqual($$"""{"grant_type":"refresh_token","client_id":"{{ClientId}}","refresh_token":"old-refresh"}""", seen.Body);
         var stored = source.Current!;
         Require(stored.Access == "new-access" && stored.Refresh == "new-refresh" && stored.ExpiresUnixMilliseconds == Epoch + 3_600_000 - 300_000 && source.Writes == 1);
+    }
+
+    // Pi 1.0.3 resolve.ts: oauth.refresh receives AbortSignal.timeout(15 s) and nothing races it, so a refresh that
+    // ignores the timeout and succeeds late is persisted by credentials.modify and returned to the waiting caller.
+    private sealed class DeadlineClock(long milliseconds) : TimeProvider
+    {
+        private readonly List<(TimerCallback Callback, object? State)> deadlines = [];
+        public override DateTimeOffset GetUtcNow() => DateTimeOffset.FromUnixTimeMilliseconds(milliseconds);
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            Require(dueTime == StoredOAuthLifecycle.RefreshTimeout, "Only the refresh timeout uses this clock.");
+            lock (deadlines) deadlines.Add((callback, state)); return new Held();
+        }
+        public void Elapse() { (TimerCallback Callback, object? State)[] due; lock (deadlines) due = [.. deadlines]; foreach (var (callback, state) in due) callback(state); }
+        private sealed class Held : ITimer
+        {
+            public bool Change(TimeSpan dueTime, TimeSpan period) => true;
+            public void Dispose() { }
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
+    private static async Task RefreshAfterDeadline()
+    {
+        var clock = new DeadlineClock(Epoch);
+        var source = new Source(); source.Seed(Expiring());
+        var entered = Signal<CancellationToken>(); var finish = Signal<OAuthCredentialSnapshot>();
+        var refresh = new Refresh((_, token) => { entered.SetResult(token); return finish.Task; });
+        var owner = new StoredOAuthLifecycle(source, refresh, clock);
+        var operation = owner.ResolveAsync("anthropic");
+        var refreshToken = await entered.Task;
+        clock.Elapse();
+        var second = owner.ResolveAsync("anthropic");
+        Require(refreshToken.IsCancellationRequested && !operation.IsCompleted && !second.IsCompleted, "The timeout signals the refresh; nothing races it.");
+        var rotated = new OAuthCredentialSnapshot("late-access", "late-refresh", Epoch + 3_600_000);
+        finish.SetResult(rotated);
+        Require(ReferenceEquals(await operation, rotated), "The waiting caller receives the late refresh.");
+        Require(ReferenceEquals(await second, rotated) && ReferenceEquals(source.Current, rotated) && source.Writes == 1 && refresh.Calls == 1,
+            "The late refresh is persisted once and the queued caller does not refresh again.");
+    }
+
+    private static async Task RefreshAfterDeadlineCancelled()
+    {
+        var clock = new DeadlineClock(Epoch);
+        var source = new Source(); source.Seed(Expiring());
+        var entered = Signal<bool>(); var finish = Signal<OAuthCredentialSnapshot>();
+        var refresh = new Refresh((_, _) => { entered.SetResult(true); return finish.Task; });
+        using var caller = new CancellationTokenSource();
+        var operation = new StoredOAuthLifecycle(source, refresh, clock).ResolveAsync("anthropic", cancellationToken: caller.Token);
+        await entered.Task; clock.Elapse(); caller.Cancel();
+        var rotated = new OAuthCredentialSnapshot("late-access", "late-refresh", Epoch + 3_600_000);
+        finish.SetResult(rotated);
+        var error = await Throws<OperationCanceledException>(() => operation);
+        Require(error.CancellationToken == caller.Token && ReferenceEquals(source.Current, rotated) && source.Writes == 1,
+            "A cancelled caller observes its cancellation while the late refresh is still stored.");
     }
 
     // ---- OAuth login ----

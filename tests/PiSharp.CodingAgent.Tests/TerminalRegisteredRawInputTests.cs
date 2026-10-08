@@ -29,7 +29,7 @@ internal static class TerminalRegisteredRawInputTests
                         return new(Data: data == "x" ? "mapped" : data == "\u001b[6;20;10t" ? "c" : data);
                     });
                     return ValueTask.CompletedTask;
-                })));
+                }))));
             var registration = registry.InvokeCommandAsync(registry.CaptureSnapshot(), "register", JsonData.EmptyObject).AsTask();
             originals.Add(registration); await registration;
             var actualReader = new TerminalChatInput(terminal, null, null, null,
@@ -81,7 +81,7 @@ internal static class TerminalRegisteredRawInputTests
             try
             {
                 if (!await Input.Reader.WaitToReadAsync(token)) return 0;
-                Check(Input.Reader.TryRead(out var text)); text!.AsMemory().CopyTo(destination); return text.Length;
+                Check(Input.Reader.TryRead(out var text)); text!.AsMemory().CopyTo(destination); return text!.Length;
             }
             finally { Interlocked.Decrement(ref Active); Interlocked.Increment(ref Settled); }
         }

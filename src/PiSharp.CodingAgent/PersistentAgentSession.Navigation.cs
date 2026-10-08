@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using PiSharp.Agent;
@@ -102,8 +103,21 @@ public sealed partial class PersistentAgentSession
                 editorText = TreeContentText(target.WireBody.Value.GetProperty("content"), work);
             }
             var prospective = _projector.Project(revision.Log.Entries, newLeaf, work);
-            var configuration = _registry is { } registry
-                ? (await PrepareAndDrainLoadoutAsync(() => registry.Resolve(prospective, revision.Configuration.Model, work), work).ConfigureAwait(false)).Configuration : revision.Configuration;
+            // Source navigateTree -> _restoreToolsFromTranscript: the target's loadout is restored; its unbound tools are left
+            // out, recorded as removed with the navigation and kept pending (when allowed) until they register.
+            ImmutableArray<string> unbound = [];
+            AgentConfiguration configuration;
+            if (_registry is { } registry)
+                (configuration, unbound) = await PrepareAndDrainLoadoutAsync(() =>
+                {
+                    var (restored, missing) = registry.ResolveRestored(prospective, revision.Configuration.Model, work);
+                    return (restored.Configuration, missing);
+                }, work).ConfigureAwait(false);
+            else configuration = revision.Configuration;
+            var restoredTools = configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+            var restoredRecord = unbound.IsEmpty ? null
+                : _registry!.CreateActivationMessage(restoredTools, RecordedActiveToolNames(prospective, work), _clock(), work);
+            var pendingTools = unbound.IsEmpty ? [] : _registry!.PendingRestoredTools(unbound);
             ValidateRuntimeContext(prospective, configuration);
             var messages = SessionContextProjector.AgentMessages(prospective);
             await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
@@ -134,6 +148,9 @@ public sealed partial class PersistentAgentSession
                 }
             }
             var records = await PrepareTreeRecordsAsync(revision, preview, options, provided, request.Execution, work, originals).ConfigureAwait(false);
+            if (restoredRecord is { } loadout)
+                records = records.Add(Record(_codec, "message", Identity(_nextEntryId, revision.Log.Header.Id, revision.Log.Entries.AddRange(records)),
+                    records.IsEmpty ? newLeaf : records[^1].Id, _clock, writer => { writer.WritePropertyName("message"); writer.WriteRawValue(loadout.WireBody.Value.GetRawText()); }));
             var publishedLog = revision.Log;
             if (!records.IsEmpty)
             {
@@ -170,6 +187,8 @@ public sealed partial class PersistentAgentSession
                     _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(configuration), messages);
                     _configuration = configuration; _context = prospective; _acknowledgedLog = publishedLog;
                     restoreActivation();
+                    // Source _restoreToolsFromTranscript replaces the pending set with the target's unregistered tools.
+                    _pendingToolNames = pendingTools;
                     selected = new(SessionTreeNavigationDisposition.Selected,
                         new(revision.Attachment, this, publishedLog, prospective, configuration,
                             new SessionTreeQueries().Build(publishedLog.Entries), _activationEpoch), _agent.Snapshot, editorText)

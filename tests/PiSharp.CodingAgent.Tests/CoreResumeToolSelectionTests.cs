@@ -14,7 +14,7 @@ internal static class CoreResumeToolSelectionTests
     internal static IEnumerable<(string Name, Func<Task> Run)> Cases() =>
     [
         (StartupToolSelectionTests.Prefix + "core initial read and empty precede unavailable restored binding", Initial),
-        (StartupToolSelectionTests.Prefix + "core absent unknown and retained mismatched declaration fail without mutation", Rejection),
+        (StartupToolSelectionTests.Prefix + "core absent restored binding is pending; unknown initial and retained mismatched declaration fail without mutation", Rejection),
         (StartupToolSelectionTests.Prefix + "core held failed initial reporter joins runtime before release without append", Reporter),
         (StartupToolSelectionTests.Prefix + "core lifetime cap survives owner bind and later durable logical activation", Activation),
         (StartupToolSelectionTests.Prefix + "core lifetime cap filters refreshed replacement catalog and rejects widening factory", Replacement),
@@ -44,11 +44,23 @@ internal static class CoreResumeToolSelectionTests
     }
     private static async Task Rejection()
     {
-        foreach (var kind in new[] { "absent", "unknown", "mismatch" })
+        // Pi 0.99.2 _restoreToolsFromTranscript: without initial names an unbound restored tool is left out and pending,
+        // not rejected. The restored loadout is recorded before use; historical bytes stay a prefix.
+        {
+            using var f = new StartupSettingsTests.Fixture(); await using var profile = await Profile(f);
+            var path = Path.Combine(f.Root, "old.jsonl"); await Seed(path, f.Root, "legacy"); var before = await Bytes(path);
+            var registry = Registry(profile, f.Root, new()); var ids = 0;
+            await using var session = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "pending-" + ++ids, fallbackModel: profile.SelectedModel);
+            Names(session); Check(session.PendingToolNames.SequenceEqual(["legacy"]), "Unbound restored tool was not kept pending.");
+            var after = await Bytes(path); Check(after.Length > before.Length && after.Take(before.Length).SequenceEqual(before), "Restored loadout rewrote history or skipped its record.");
+            Check(profile.UsedTurns == 0 && profile.Actions.Length == 0, "Resume restoration inferred or executed a tool.");
+        }
+        // Initial names that are not registered, and a retained mismatched declaration, are still rejected.
+        foreach (var kind in new[] { "unknown", "mismatch" })
         {
             using var f = new StartupSettingsTests.Fixture(); await using var profile = await Profile(f);
             var path = Path.Combine(f.Root, "old.jsonl"); await Seed(path, f.Root, kind == "mismatch" ? "read" : "legacy"); var before = await Bytes(path);
-            ImmutableArray<string>? initial = kind == "absent" ? null : kind == "unknown" ? ["missing"] : ["read"];
+            ImmutableArray<string> initial = kind == "unknown" ? ["missing"] : ["read"];
             var registry = Registry(profile, f.Root, new() { InitialActiveToolNames = initial }); var ids = 0;
             var error = await Failure(PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "reject-" + ++ids, fallbackModel: profile.SelectedModel));
             Check(error is SessionRuntimeRegistryException binding && binding.Failure == (kind == "mismatch" ? SessionRuntimeRegistryFailure.DeclarationMismatch : SessionRuntimeRegistryFailure.UnknownTool), "Wrong binding rejection.");

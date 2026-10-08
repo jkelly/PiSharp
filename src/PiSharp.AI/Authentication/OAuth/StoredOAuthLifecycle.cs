@@ -4,7 +4,8 @@ namespace PiSharp.AI.Authentication.OAuth;
 /// <summary>
 /// Stored OAuth owner over admitted synthetic dependencies. Keeps original tasks joined before
 /// releasing a provider lane, even if a dependency ignores cancellation. A refresh that has
-/// started completes and is persisted even if the caller cancels (Pi 1.0.3). Does not select
+/// started completes and is persisted even if the caller cancels or it succeeds after
+/// <see cref="RefreshTimeout"/>, which only signals the refresh (Pi 1.0.3). Does not select
 /// env/API keys, acquire tokens, run login flows, or supply storage/provider effects.
 /// </summary>
 public sealed class StoredOAuthLifecycle
@@ -94,7 +95,7 @@ public sealed class StoredOAuthLifecycle
         // Pi 1.0.3 refreshStoredOAuthCredential: the caller token cancels only the wait for the
         // source's serialization. Once the mutation starts, the provider may already have rotated
         // the refresh token, so the refresh and its persistence ignore the caller and are bounded
-        // only by RefreshTimeout. Otherwise a cancelled caller would discard the only valid token.
+        // only by RefreshTimeout's token. Otherwise a cancelled caller would discard the only valid token.
         using var lockWait = new CancellationTokenSource();
         var forward = token.UnsafeRegister(static state => ((CancellationTokenSource)state!).Cancel(), lockWait);
         try
@@ -116,10 +117,9 @@ public sealed class StoredOAuthLifecycle
                 }
                 catch (Exception error) { throw new OAuthLifecycleException(OAuthLifecycleFailure.Refresh, error, originalRefresh?.Exception); }
                 // A rejection above owns its original fault, even if the caller cancelled meanwhile.
-                // A successful non-cooperative completion after the deadline is still refused.
-                if (deadline.IsCancellationRequested)
-                    throw new OAuthLifecycleException(OAuthLifecycleFailure.Refresh,
-                        new TimeoutException("Stored OAuth refresh deadline elapsed."));
+                // Pi 1.0.3: the deadline is only the provider's AbortSignal.timeout. A refresh that ignores
+                // it and succeeds late is still persisted (and returned to a caller that is still waiting),
+                // because the provider may already have rotated the stored refresh token.
                 return replacement ?? throw new OAuthLifecycleException(OAuthLifecycleFailure.Refresh);
             }, lockWait.Token);
             post = await originalModify.ConfigureAwait(false);

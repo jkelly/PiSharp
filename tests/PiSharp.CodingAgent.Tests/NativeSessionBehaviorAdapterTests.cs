@@ -161,7 +161,7 @@ internal static class NativeSessionBehaviorAdapterTests
     {
         using var deadline = new CancellationTokenSource();
         var diagnostic = Track(Task.Delay(TimeSpan.FromSeconds(10), deadline.Token));
-        Track(gate); foreach (var terminal in terminals) Track(terminal);
+        _ = Track(gate); foreach (var terminal in terminals) _ = Track(terminal);
         try
         {
             var race = Track(Task.WhenAny(new[] { gate, diagnostic }.Concat(terminals)));
@@ -307,7 +307,7 @@ internal static class NativeSessionBehaviorAdapterTests
         var unexpectedOriginal = Task.FromCanceled(unexpectedCancel.Token);
         async Task CanceledSiblingProbe()
         {
-            Track(expectedOriginal); Track(unexpectedOriginal);
+            _ = Track(expectedOriginal); _ = Track(unexpectedOriginal);
             var observed = await Error(expectedOriginal);
             Check(observed is OperationCanceledException error && error.CancellationToken == expectedCancel.Token && expectedOriginal.IsCanceled);
             Control.Value!.AcknowledgeCanceled(expectedOriginal, expectedCancel.Token);
@@ -352,7 +352,7 @@ internal static class NativeSessionBehaviorAdapterTests
         var wrappedOriginal = Task.FromException(wrapper);
         async Task UnexpectedWrapperProbe()
         {
-            Track(wrappedOriginal); Check(ReferenceEquals(await Error(wrappedOriginal), wrapper));
+            _ = Track(wrappedOriginal); Check(ReferenceEquals(await Error(wrappedOriginal), wrapper));
             var refused = false;
             try { Control.Value!.AcknowledgeFault(wrappedOriginal, [known]); }
             catch (IOException error) when (error.Message == "Session behavior custody control failed.") { refused = true; }

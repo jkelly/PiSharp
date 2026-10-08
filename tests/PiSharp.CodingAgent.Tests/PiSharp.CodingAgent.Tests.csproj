@@ -3,6 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
     <ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
+    <ProjectReference Include="../../src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj" />
     <ProjectReference Include="../fixtures/extensions/native/PublishedFixture.SessionLifecycle/PublishedFixture.SessionLifecycle.csproj" />
   </ItemGroup>
   <ItemGroup>
