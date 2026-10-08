@@ -123,6 +123,20 @@ internal static partial class Program
         Check(ProviderHeaderPolicies.WithOpenCodeSessionHeader(null, null) is null, "no session id");
     }
 
+    /// <summary>Decision 0004: a stored "!command" api_key runs through the shared config-value resolver for every provider, as Pi's
+    /// auth-storage read does; a command that resolves nothing leaves the key absent, so the environment variable applies.</summary>
+    private static async Task StoredCommandKeys()
+    {
+        var directory = Temp("authjson-command"); var path = Path.Combine(directory, "auth.json");
+        await File.WriteAllTextAsync(path, """{"groq":{"type":"api_key","key":"!echo stored-command-key"},"xai":{"type":"api_key","key":"!exit 1"}}""");
+        var store = new AuthJsonCredentialStore(path);
+        PiSharp.Cli.Authentication.ProviderLiveAuthentication Auth(string id, params (string Name, string Value)[] env) => new(
+            PiSharp.Cli.Authentication.ProviderAuthCatalog.Find(id)!, store,
+            new PiSharp.Cli.Authentication.LiveProcessEnvironment(name => env.FirstOrDefault(pair => pair.Name == name).Value, []), () => new HttpMessageInvoker(new HttpClientHandler()));
+        Equal("stored-command-key", (await Auth("groq").ResolveAsync(default))?.ApiKey, "stored command key");
+        Equal("env-xai", (await Auth("xai", ("XAI_API_KEY", "env-xai")).ResolveAsync(default))?.ApiKey, "failed command falls back to the environment");
+    }
+
     private static async Task AuthJsonFields()
     {
         var directory = Temp("authjson"); var path = Path.Combine(directory, "auth.json");

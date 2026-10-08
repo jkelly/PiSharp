@@ -109,7 +109,7 @@ internal sealed class LiveProviderRoute
                     MaxTokens = maximum, CacheRetention = summary ? "none" : null,
                     Auth = async token => { var auth = await CurrentAsync(token).ConfigureAwait(false); return (auth.ApiKey, auth.Environment); }
                 }, new AwsEnvironment(environment.Get, runtime.HomeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    credentialHttp.Value, runtime.Time), handler, summary && Levels(definition).Contains("off") ? "off" : null);
+                    credentialHttp.Value, runtime.Time) { RunCredentialProcess = AwsCredentialProcess.RunAsync }, handler, summary && Levels(definition).Contains("off") ? "off" : null);
             case "openai-codex":
                 return NativeProviderFactory.CreateCodexResponses(model, definition.Raw, new OpenAICodexResponsesOptions
                 {

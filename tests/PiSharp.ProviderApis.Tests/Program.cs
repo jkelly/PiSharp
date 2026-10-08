@@ -46,6 +46,7 @@ internal static partial class Program
             ("opencode.session-header-policy", Sync(OpenCodeHeaders)),
             ("budget.4-5-mb-images-reach-copilot-bedrock-and-codex", LargeImageRequests),
             ("authjson.json-provider-fields-and-api-key-entries", AuthJsonFields),
+            ("authjson.stored-command-keys-resolve-for-every-provider", StoredCommandKeys),
             ("live.provider-route-selection-and-per-request-auth", LiveRoutes),
             ("login.every-provider-cli-flow-api-key-and-oauth", CliLogin),
         };

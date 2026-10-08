@@ -30,8 +30,8 @@ public sealed class AwsEnvironment
     public HttpMessageInvoker Http { get; }
     public TimeProvider Time { get; }
     public Func<string, string?> ReadFile { get; }
-    /// <summary>Runs a profile's credential_process and returns its stdout. Null (the default) refuses credential_process, as PiSharp
-    /// refuses stored "!command" keys; an owner decision is required to enable it.</summary>
+    /// <summary>Runs a profile's credential_process and returns its stdout. Null (the library default) refuses credential_process; the
+    /// CLI supplies a runner that executes it as the AWS SDK does (decision 0004).</summary>
     public Func<string, CancellationToken, Task<string>>? RunCredentialProcess { get; init; }
     /// <summary>Writes a refreshed SSO token cache file. Null leaves the cache unchanged.</summary>
     public Action<string, string>? WriteFile { get; init; }

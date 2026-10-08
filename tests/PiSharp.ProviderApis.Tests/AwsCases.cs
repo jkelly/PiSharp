@@ -50,12 +50,18 @@ internal static partial class Program
         var portal = http.All.Last(request => request.Url.StartsWith("https://portal.sso", StringComparison.Ordinal));
         Check(portal.Url == "https://portal.sso.us-east-2.amazonaws.com/federation/credentials?account_id=111122223333&role_name=Dev" &&
             portal.Header("x-amz-sso_bearer_token") == "sso-access", "sso portal request");
-        // credential_process is refused (as PiSharp refuses stored "!command" keys) unless the host enables it.
+        // The library refuses credential_process unless the host enables it.
         Check((await Throws<AwsCredentialsException>(() => new AwsCredentialChain(Env(new() { ["AWS_PROFILE"] = "proc" })).ResolveAsync(default))).Message
             .Contains("credential_process, which PiSharp does not run", StringComparison.Ordinal), "credential_process refused");
         var enabled = new AwsEnvironment(_ => null, home, new HttpMessageInvoker(http, disposeHandler: false), time)
         { RunCredentialProcess = (command, _) => Task.FromResult(command == "/usr/bin/creds" ? """{"Version":1,"AccessKeyId":"AKIDPROC","SecretAccessKey":"p"}""" : "{}") };
         Equal("AKIDPROC", (await new AwsCredentialChain(enabled, "proc").ResolveAsync(default)).AccessKeyId, "enabled credential_process");
+        // The CLI enables it as the AWS SDK does (child_process.exec through the platform shell); a failing command is an error.
+        var printed = await PiSharp.Cli.Commands.AwsCredentialProcess.RunAsync(OperatingSystem.IsWindows()
+            ? "echo {\"Version\":1,\"AccessKeyId\":\"AKIDSHELL\",\"SecretAccessKey\":\"s\"}" : "printf '%s' '{\"Version\":1,\"AccessKeyId\":\"AKIDSHELL\",\"SecretAccessKey\":\"s\"}'", default);
+        Check(printed.Contains("\"AccessKeyId\":\"AKIDSHELL\"", StringComparison.Ordinal), "cli credential_process output: " + printed);
+        Check((await Throws<AwsCredentialsException>(() => PiSharp.Cli.Commands.AwsCredentialProcess.RunAsync("exit 3", default))).Message
+            .StartsWith("Command failed: exit 3", StringComparison.Ordinal), "cli credential_process failure");
         // Web identity from a profile; then the environment's token file.
         Equal("ASIAWEB", (await new AwsCredentialChain(Env(new()), "web").ResolveAsync(default)).AccessKeyId, "profile web identity");
         var webRequest = http.All.Last(request => request.Url.StartsWith("https://sts.us-east-1", StringComparison.Ordinal));

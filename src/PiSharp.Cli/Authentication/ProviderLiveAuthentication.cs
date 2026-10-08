@@ -69,8 +69,6 @@ internal sealed class ProviderLiveAuthentication
         string? key = null;
         if (stored?.Key is { Length: > 0 } configured)
         {
-            if (ConfigValueTemplate.IsCommand(configured))
-                throw new InvalidOperationException("Stored API key commands (\"!command\") are not run by PiSharp; store the key value instead.");
             key = ConfigValueTemplate.Resolve(configured, stored.Environment, environment.Get);
         }
         var scoped = stored?.Environment?.ToImmutableDictionary(StringComparer.Ordinal);
