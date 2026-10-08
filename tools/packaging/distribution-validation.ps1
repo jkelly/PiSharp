@@ -72,7 +72,8 @@ function Assert-PiSharpDistribution {
         [ValidateSet('win-x64', 'linux-x64', 'osx-arm64')][string]$Rid,
         [bool]$EnablePromptTemplateYaml = $true
     )
-    if ($Version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'Explicit SemVer candidate required.' }
+    # A fourth numeric segment marks a C#-only patch on an unchanged Pi baseline.
+    if ($Version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'Explicit SemVer candidate required.' }
     if ($Kind -eq 'standalone' -and -not $Rid) { throw 'Standalone RID required.' }
     $baseline = Get-Content -LiteralPath (Join-Path $Repo 'compatibility/baseline.lock.json') -Raw | ConvertFrom-Json
     if ($baseline.source.tag -cne 'v0.99.1' -or $baseline.source.commit -cne 'd86654abb8862e201933517d6f1fce9f88dd117f') { throw 'Pinned Pi baseline changed.' }

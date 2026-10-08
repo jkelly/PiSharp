@@ -1,12 +1,29 @@
 <Project>
   <!-- Opt-in through CustomAfterMicrosoftCommonTargets; shared projects unchanged. -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'PiSharp.Contracts' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Abstractions' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Runtime'">
+  <PropertyGroup>
+    <PiSharpNativeSdkPackage Condition="'$(MSBuildProjectName)' == 'PiSharp.Contracts' Or '$(MSBuildProjectName)' == 'PiSharp.AI' Or '$(MSBuildProjectName)' == 'PiSharp.Agent' Or '$(MSBuildProjectName)' == 'PiSharp.Sessions' Or '$(MSBuildProjectName)' == 'PiSharp.Tools' Or '$(MSBuildProjectName)' == 'PiSharp.CodingAgent' Or '$(MSBuildProjectName)' == 'PiSharp.PromptTemplates.Yaml' Or '$(MSBuildProjectName)' == 'PiSharp.Rpc' Or '$(MSBuildProjectName)' == 'PiSharp.Tui' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Abstractions' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Runtime' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Agent' Or '$(MSBuildProjectName)' == 'PiSharp.ExtensionHost' Or '$(MSBuildProjectName)' == 'PiSharp.Compatibility.Node'">true</PiSharpNativeSdkPackage>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(PiSharpNativeSdkPackage)' == 'true'">
     <IsPackable>true</IsPackable>
     <PackageId>$(MSBuildProjectName)</PackageId>
     <Version>$(PiSharpReleaseVersion)</Version>
     <PackageVersion>$(PiSharpReleaseVersion)</PackageVersion>
     <Authors>PiSharp contributors</Authors>
-    <Description>Native .NET extension contracts and runtime for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description>Native .NET library for PiSharp, an independent port of the Pi coding agent. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Contracts'">Shared message, streaming and JSON contracts for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.AI'">Streaming LLM provider transports and model catalog for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Agent'">Agent loop, tool invocation and input queues for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Sessions'">Tree-structured session storage, compaction and context for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Tools'">Built-in file and process tools for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.CodingAgent'">Coding-agent profile with persistent sessions and recovery for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.PromptTemplates.Yaml'">YAML frontmatter support for PiSharp prompt templates. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Rpc'">JSON RPC protocol over stdin/stdout for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Tui'">Terminal UI components, input and rendering for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Extensions.Abstractions'">Native .NET extension contracts for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Extensions.Runtime'">Native .NET extension discovery, loading and dispatch for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Extensions.Agent'">Connects PiSharp extension hooks to the agent loop. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.ExtensionHost'">Supervised out-of-process extension workers for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Compatibility.Node'">Optional Node.js bridge for Pi TypeScript extensions in PiSharp. Requires Node.js. Compatibility is limited to recorded acceptance evidence.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryType>git</RepositoryType>
@@ -15,13 +32,13 @@
     <IncludeSource>false</IncludeSource>
     <SuppressDependenciesWhenPacking>false</SuppressDependenciesWhenPacking>
   </PropertyGroup>
-  <ItemGroup Condition="'$(MSBuildProjectName)' == 'PiSharp.Contracts' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Abstractions' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Runtime'">
+  <ItemGroup Condition="'$(PiSharpNativeSdkPackage)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)../../LICENSE" Pack="true" PackagePath="/" />
     <None Include="$(MSBuildThisFileDirectory)../../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="/" />
     <None Include="$(MSBuildThisFileDirectory)../../README.md" Pack="true" PackagePath="/" />
     <None Include="$(PiSharpProvenanceFile)" Condition="'$(PiSharpProvenanceFile)' != ''" Pack="true" PackagePath="/provenance.json" />
   </ItemGroup>
-  <Target Name="ValidatePiSharpNativeSdkPackageInputs" BeforeTargets="Pack" Condition="'$(MSBuildProjectName)' == 'PiSharp.Contracts' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Abstractions' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Runtime'">
+  <Target Name="ValidatePiSharpNativeSdkPackageInputs" BeforeTargets="Pack" Condition="'$(PiSharpNativeSdkPackage)' == 'true'">
     <Error Condition="'$(PiSharpReleaseVersion)' == ''" Text="Explicit private SDK version required." />
     <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(PiSharpSourceCommit)', '^[0-9a-f]{40}$')) != 'True'" Text="Exact source commit required." />
     <Error Condition="'$(PiSharpProvenanceFile)' == '' Or !Exists('$(PiSharpProvenanceFile)')" Text="Admitted native SDK provenance required." />
