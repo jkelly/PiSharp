@@ -10,6 +10,12 @@ using PiSharp.Cli.Interactive;
 
 namespace PiSharp.Cli.Authentication;
 
+/// <summary>One <c>auth.json</c> entry: <c>oauth</c>, <c>api_key</c> (with its configured, unresolved key and <c>env</c>) or another type.</summary>
+internal sealed record StoredCredentialEntry(string Type, string? Key, IReadOnlyDictionary<string, string>? Environment)
+{
+    public override string ToString() => $"StoredCredentialEntry ({Type}) [redacted]";
+}
+
 /// <summary>
 /// The source <c>auth.json</c> credential store (<c>&lt;agent dir&gt;/auth.json</c>, shared with Pi) as the stored OAuth source of
 /// <see cref="StoredOAuthLifecycle"/>. Entries are <c>{"type":"oauth","refresh","access","expires",...}</c>; other providers and
@@ -62,6 +68,47 @@ internal sealed class AuthJsonCredentialStore : IAdmittedOAuthCredentialSource
             document[provider] = entry;
             return (next, document);
         }, cancellationToken);
+    }
+
+    /// <summary>Source AuthStorage.read: the entry's type tag, and for <c>api_key</c> its configured key value (unresolved) and
+    /// <c>env</c>. Null for a missing entry. A missing file is read without creating the directory or the lock.</summary>
+    public async Task<StoredCredentialEntry?> ReadEntryAsync(string provider, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(provider);
+        if (!File.Exists(AuthPath)) return null;
+        return await WithLockAsync(document => Task.FromResult(((StoredCredentialEntry?)Entry(document, provider), (JsonObject?)null)),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Source AuthStorage.list: provider ids and credential types, without resolving key values.</summary>
+    public async Task<IReadOnlyList<(string Provider, string Type)>> ListAsync(CancellationToken cancellationToken)
+    {
+        if (!File.Exists(AuthPath)) return [];
+        return await WithLockAsync(document => Task.FromResult(((IReadOnlyList<(string, string)>)document
+            .Select(entry => (entry.Key, entry.Value is JsonObject value && value["type"] is JsonValue type && type.TryGetValue<string>(out var text) ? text : ""))
+            .ToList(), (JsonObject?)null)), cancellationToken).ConfigureAwait(false);
+    }
+
+    private static StoredCredentialEntry? Entry(JsonObject document, string provider)
+    {
+        if (!document.TryGetPropertyValue(provider, out var node) || node is null) return null;
+        if (node is not JsonObject entry || entry["type"] is not JsonValue typeValue || !typeValue.TryGetValue<string>(out var type))
+            throw new InvalidDataException($"Invalid auth.json credential for provider \"{provider}\"");
+        if (type == "oauth") { _ = Credential(document, provider); return new(type, null, null); }
+        if (type != "api_key") return new(type, null, null);
+        string? key = null; Dictionary<string, string>? environment = null;
+        if (entry["key"] is { } keyNode)
+            key = keyNode is JsonValue keyValue && keyValue.TryGetValue<string>(out var text) ? text
+                : throw new InvalidDataException($"Invalid auth.json credential for provider \"{provider}\"");
+        if (entry["env"] is { } envNode)
+        {
+            if (envNode is not JsonObject values) throw new InvalidDataException($"Invalid auth.json credential for provider \"{provider}\"");
+            environment = new(StringComparer.Ordinal);
+            foreach (var (name, value) in values)
+                environment[name] = value is JsonValue text && text.TryGetValue<string>(out var stringValue) ? stringValue
+                    : throw new InvalidDataException($"Invalid auth.json credential for provider \"{provider}\"");
+        }
+        return new(type, key, environment);
     }
 
     /// <summary>Source AuthStorage.delete (used by logout); a missing entry is not an error.</summary>

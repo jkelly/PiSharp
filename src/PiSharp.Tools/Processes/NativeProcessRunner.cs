@@ -16,7 +16,11 @@ public enum ProcessDiagnostic
 /// <summary>Trusted effect input. This primitive does not authorize commands or enforce a sandbox.</summary>
 public sealed record ProcessRequest(string Executable, ImmutableArray<string> Arguments,
     string WorkingDirectory, ImmutableDictionary<string, string> Environment, string SpillPath,
-    double? TimeoutSeconds = null);
+    double? TimeoutSeconds = null)
+{
+    /// <summary>MCP process launch only: a command line tail used as is instead of the quoted <see cref="Arguments"/>.</summary>
+    public string? VerbatimArguments { get; init; }
+}
 
 public sealed record ProcessRunnerOptions(int MaximumRawBytes = 64 * 1024 * 1024,
     int ModelMaxLines = 2000, int ModelMaxBytes = 50 * 1024,

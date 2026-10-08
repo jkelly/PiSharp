@@ -7,10 +7,15 @@ public sealed record McpProcessAdmission(string Executable, ImmutableArray<strin
     string WorkingDirectory, ImmutableDictionary<string, string> Environment,
     int MaximumStderrBytes = 1024 * 1024)
 {
+    /// <summary>A command line tail passed as is after the quoted executable, instead of <see cref="Arguments"/> (which must
+    /// then be empty): the `cmd.exe /d /s /c "..."` line that runs a batch file, like node's windowsVerbatimArguments.</summary>
+    public string? VerbatimArguments { get; init; }
+
     public void Validate()
     {
         if (!Path.IsPathFullyQualified(Executable) || !Path.IsPathFullyQualified(WorkingDirectory) ||
             Arguments.IsDefault || MaximumStderrBytes is < 1 or > 1024 * 1024 ||
+            VerbatimArguments is { } verbatim && (verbatim.Contains('\0') || !Arguments.IsEmpty) ||
             Executable.Contains('\0') || WorkingDirectory.Contains('\0') ||
             Arguments.Any(a => a is null || a.Contains('\0')) ||
             Environment is null || Environment.Any(e => string.IsNullOrEmpty(e.Key) ||
@@ -147,7 +152,7 @@ public sealed class McpProcessLease
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("MCP process ownership requires Windows.");
         var lifetime = await McpWindowsProcessLifetime.StartAsync(new(admission.Executable, admission.Arguments,
-            admission.WorkingDirectory, admission.Environment, string.Empty), null, token).ConfigureAwait(false);
+            admission.WorkingDirectory, admission.Environment, string.Empty) { VerbatimArguments = admission.VerbatimArguments }, null, token).ConfigureAwait(false);
         return new NativeOwnedProcess(lifetime);
     }
 

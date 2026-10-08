@@ -13,12 +13,33 @@ using PiSharp.Contracts;
 
 namespace PiSharp.Cli.Commands;
 
+/// <summary>The live route's effects: the process environment reader (read once per name for the session), the provider HTTP
+/// handler, and the <c>auth.json</c> path (null: no stored credentials) with the client and clock its OAuth refresh uses.</summary>
 internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment, Func<HttpMessageHandler?> CreateHttpHandler,
-    Func<CancellationToken, ValueTask<AuthenticationResolution?>>? ResolveStoredAnthropic = null)
+    string? AuthPath = null, Func<HttpMessageInvoker>? CreateAuthHttp = null, TimeProvider? Time = null)
 {
+    /// <summary>Provider variables read when the session starts (env-api-keys.ts, anthropic.ts and azure-openai-config.ts).</summary>
+    internal static readonly ImmutableArray<string> ProviderVariables =
+    [
+        InjectedAuthenticationResolver.AnthropicAuthToken, InjectedAuthenticationResolver.AnthropicOAuthToken, InjectedAuthenticationResolver.AnthropicApiKey,
+        InjectedAuthenticationResolver.AnthropicFederationRuleId, InjectedAuthenticationResolver.AnthropicOrganizationId,
+        InjectedAuthenticationResolver.AnthropicServiceAccountId, InjectedAuthenticationResolver.AnthropicIdentityTokenFile,
+        InjectedAuthenticationResolver.AnthropicWorkspaceId, "OPENAI_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY",
+        "AZURE_OPENAI_API_KEY", AzureOpenAIConfiguration.BaseUrlVariable, AzureOpenAIConfiguration.ResourceNameVariable,
+        "AZURE_OPENAI_API_VERSION", AzureOpenAIConfiguration.DeploymentNameMapVariable
+    ];
+
     // A stored auth.json credential (written by /login) owns the Anthropic provider; the environment is read only without one.
-    internal static LiveSessionRuntime Default { get; } = new(Environment.GetEnvironmentVariable, () => null,
-        PiSharp.Cli.Authentication.StoredAnthropicAuthentication.ResolveDefaultAsync);
+    internal static LiveSessionRuntime Default => DefaultRuntime.Value;
+    private static readonly Lazy<LiveSessionRuntime> DefaultRuntime = new(() => new(Environment.GetEnvironmentVariable, () => null,
+        PiSharp.Cli.Authentication.AuthJsonCredentialStore.CreateDefault().AuthPath));
+
+    /// <summary>The session's environment, built once from <see cref="ReadEnvironment"/>.</summary>
+    internal PiSharp.Cli.Authentication.LiveProcessEnvironment CreateEnvironment() => new(ReadEnvironment, ProviderVariables);
+
+    internal PiSharp.Cli.Authentication.AnthropicLiveAuthentication CreateAnthropicAuthentication(PiSharp.Cli.Authentication.LiveProcessEnvironment environment) =>
+        new(AuthPath is null ? null : new PiSharp.Cli.Authentication.AuthJsonCredentialStore(AuthPath, Time), environment,
+            CreateAuthHttp ?? (() => new HttpClient()), Time);
 }
 internal sealed class LiveSessionException(string code, string message) : Exception(message)
 { internal string Code { get; } = code; }
@@ -31,8 +52,15 @@ internal sealed class LiveSessionSelection
         ["anthropic"] = "aa4342dfb96feb1619794113619d6630088d6ac544c547a4f9899a0a7f26419b",
         ["openai"] = "f4c1ac9f8f84cb9f2a952b0ceec51c90a38b31b4cdf33200e018ece9d408e95f",
         ["mistral"] = "fcd37c7b178416f86954efdacbb45726d10f102fd1211062792691e62fcf327c",
-        ["openrouter"] = "c86aa3b95d412465dac54cb902402cbdb40f47a1fe33f12b002913834724d8f0"
+        ["openrouter"] = "c86aa3b95d412465dac54cb902402cbdb40f47a1fe33f12b002913834724d8f0",
+        ["azure"] = "46c4e25b84463c6475e706c581196d2735c35feb9612d2efca0ab932c917d727"
     }.ToImmutableDictionary(StringComparer.Ordinal);
+    /// <summary>The live APIs per provider; azure (providers/azure.ts) serves both of its catalog APIs.</summary>
+    private static bool SupportedApi(string provider, string api) => provider switch
+    {
+        "anthropic" => api == "anthropic-messages", "openai" => api == "openai-responses", "mistral" => api == "mistral-conversations",
+        "azure" => api is "azure-openai-responses" or "openai-completions", _ => api == "openai-completions"
+    };
     internal FrozenCatalogModel Definition { get; }
     internal ModelDescriptor Model { get; }
     internal int MaximumOutputTokens { get; }
@@ -52,30 +80,63 @@ internal sealed class LiveSessionSelection
         if (Convert.ToHexStringLower(SHA256.HashData(bytes)) != CatalogHashes[provider])
             throw new LiveSessionException("LiveCatalogMismatch", "The pinned live model catalog hash differs.");
         var catalog = FrozenModelCatalog.ReadProviderJson(provider, bytes);
-        if (!catalog.TryGetModel(CatalogModelType.Chat, model, out var definition) ||
-            definition.DeclaredApi != (provider == "anthropic" ? "anthropic-messages" : provider == "openai" ? "openai-responses" : provider == "mistral" ? "mistral-conversations" : "openai-completions"))
+        if (!catalog.TryGetModel(CatalogModelType.Chat, model, out var definition) || !SupportedApi(provider, definition.DeclaredApi))
             throw new LiveSessionException("UnknownLiveModel", "Select a chat model from the pinned provider catalog for the supported live API.");
         var modelLimit = definition.Raw.Value.GetProperty("maxTokens").GetDouble();
         if (tokens > modelLimit) throw new LiveSessionException("LiveOutputLimit", "The requested output limit exceeds the selected model metadata.");
         return new(definition, tokens);
     }
+    /// <param name="reresolve">The provider's auth resolution, run again before every request (model-runtime prepareRequest); null keeps
+    /// the explicit admitted <paramref name="authentication"/> for the whole session.</param>
     internal ValueTask<LiveSessionConnection> ConnectResolvedAnthropicAsync(AuthenticationResolution authentication,
-        HttpMessageHandler? handler = null, CancellationToken cancellationToken = default)
+        HttpMessageHandler? handler = null, CancellationToken cancellationToken = default,
+        Func<CancellationToken, ValueTask<AuthenticationResolution>>? reresolve = null)
     {
         if (Model.Provider != "anthropic" || Model.Api != "anthropic-messages")
             throw new ArgumentException("Explicit resolved authentication requires an Anthropic selection.");
-        return LiveSessionConnection.ConnectResolvedAsync(this, authentication, handler, cancellationToken);
+        return LiveSessionConnection.ConnectResolvedAsync(this, authentication, handler, cancellationToken, reresolve);
+    }
+
+    /// <summary>Anthropic, resolved as upstream resolveProviderAuth does (stored auth.json credential, then the environment's
+    /// AUTH_TOKEN, OAUTH_TOKEN, API_KEY, then workload identity federation) at start and before every request.</summary>
+    internal async ValueTask<(AuthenticationResolution Authentication, HttpMessageHandler? Handler,
+        Func<CancellationToken, ValueTask<AuthenticationResolution>> Reresolve)> ResolveAnthropicAsync(LiveSessionRuntime? runtime, CancellationToken cancellationToken)
+    {
+        if (Model.Provider != "anthropic") throw new ArgumentException("Anthropic resolution requires an Anthropic selection.");
+        runtime ??= LiveSessionRuntime.Default;
+        var authentication = runtime.CreateAnthropicAuthentication(runtime.CreateEnvironment());
+        AuthenticationResolution resolved;
+        // Source ModelsError texts: a failed refresh or an unreadable store refuses the session with its reason.
+        try { resolved = await authentication.ResolveAsync(cancellationToken).ConfigureAwait(false); }
+        catch (PiSharp.AI.Authentication.OAuth.OAuthLifecycleException error) when (error.Failure == PiSharp.AI.Authentication.OAuth.OAuthLifecycleFailure.Refresh)
+        { throw new LiveSessionException("LiveAuthenticationFailed", "OAuth refresh failed for anthropic"); }
+        catch (Exception error) when (error is PiSharp.AI.Authentication.OAuth.OAuthLifecycleException or InvalidDataException or InvalidOperationException or IOException)
+        { throw new LiveSessionException("LiveAuthenticationFailed", error is PiSharp.AI.Authentication.OAuth.OAuthLifecycleException
+            ? "Credential store read failed for anthropic" : error.Message); }
+        if (resolved is not { Diagnostic: AuthenticationDiagnostic.Resolved, Authentication: not null })
+            throw new LiveSessionException("MissingLiveApiKey", "Run /login, or set ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN, ANTHROPIC_OAUTH_TOKEN, or the workload identity federation variables) before launching the live session.");
+        return (resolved, runtime.CreateHttpHandler(), authentication.ResolveAsync);
     }
 
     internal LiveSessionConnection Connect(LiveSessionRuntime? runtime)
     {
         runtime ??= LiveSessionRuntime.Default;
-        var variable = Model.Provider switch { "openai" => "OPENAI_API_KEY", "openrouter" => "OPENROUTER_API_KEY", "mistral" => "MISTRAL_API_KEY", _ => "ANTHROPIC_API_KEY" };
-        var key = runtime.ReadEnvironment(variable);
+        var environment = runtime.CreateEnvironment();
+        var variable = Model.Provider switch { "openai" => "OPENAI_API_KEY", "openrouter" => "OPENROUTER_API_KEY", "mistral" => "MISTRAL_API_KEY",
+            "azure" => "AZURE_OPENAI_API_KEY", _ => "ANTHROPIC_API_KEY" };
+        var key = environment.Get(variable);
         if (string.IsNullOrWhiteSpace(key) || key.Length > 4096 || key.Any(char.IsControl))
             throw new LiveSessionException("MissingLiveApiKey", "Set the existing " + variable + " environment variable before launching the live session.");
+        AzureEndpointOptions? azure = null;
+        if (Model.Provider == "azure")
+        {
+            // Azure models ship without a baseUrl: AZURE_OPENAI_BASE_URL, then AZURE_OPENAI_RESOURCE_NAME (azure-openai-config.ts).
+            azure = new() { Environment = environment.Snapshot([.. LiveSessionRuntime.ProviderVariables.Where(name => name.StartsWith("AZURE_OPENAI_", StringComparison.Ordinal))]) };
+            try { _ = AzureOpenAIConfiguration.ResolveBaseUrl(Definition.BaseUrl, azure); }
+            catch (ArgumentException error) { throw new LiveSessionException("LiveAzureEndpoint", error.Message); }
+        }
         // The profile joins Agent/session work before disposing factory-owned providers. Injected handlers remain caller-owned.
-        return new(this, runtime.CreateHttpHandler(), key);
+        return new(this, runtime.CreateHttpHandler(), key) { Azure = azure };
     }
 }
 
@@ -125,12 +186,61 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     private AnthropicInjectedTransportLease? _resolvedMain;
     private AuthenticationResolution? _resolvedAuthentication;
     private Task? _resolvedClose;
+    // Per-request re-resolution: a changed resolution (a refreshed OAuth token, a new login, a logout to the environment)
+    // binds a fresh main lease; replaced leases may still serve in-flight streams and are disposed with the connection.
+    private Func<CancellationToken, ValueTask<AuthenticationResolution>>? _reresolve;
+    private readonly SemaphoreSlim _rebind = new(1, 1);
+    private readonly List<AnthropicInjectedTransportLease> _replacedMains = [];
+    /// <summary>Azure endpoint/deployment configuration (the session's AZURE_OPENAI_* values) for provider azure.</summary>
+    internal AzureEndpointOptions? Azure { get; init; }
     internal static async ValueTask<LiveSessionConnection> ConnectResolvedAsync(LiveSessionSelection selected,
-        AuthenticationResolution authentication, HttpMessageHandler? handler, CancellationToken token)
+        AuthenticationResolution authentication, HttpMessageHandler? handler, CancellationToken token,
+        Func<CancellationToken, ValueTask<AuthenticationResolution>>? reresolve = null)
     {
         var main = await AcquireResolvedAsync(selected, authentication, handler, selected.MaximumOutputTokens, false, token).ConfigureAwait(false);
-        return new(selected, handler, string.Empty) { _resolvedMain = main, _resolvedAuthentication = authentication };
+        return new(selected, handler, string.Empty) { _resolvedMain = main, _resolvedAuthentication = authentication, _reresolve = reresolve };
     }
+
+    /// <summary>Source prepareRequest: resolve the provider's auth for this request and bind it. An unchanged resolution keeps the
+    /// current lease (and its federation token cache).</summary>
+    private async ValueTask<(AnthropicInjectedTransportLease Main, AuthenticationResolution Authentication)> CurrentResolvedAsync(CancellationToken token)
+    {
+        if (_reresolve is not { } reresolve)
+            lock (_resolvedGate) return (_resolvedMain ?? throw new InvalidOperationException("Resolved main lease missing."),
+                _resolvedAuthentication ?? throw new InvalidOperationException("Resolved authentication missing."));
+        await _rebind.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            var next = await reresolve(token).ConfigureAwait(false);
+            if (next is not { Diagnostic: AuthenticationDiagnostic.Resolved, Authentication: { } fresh })
+                throw new LiveSessionException("MissingLiveApiKey", "Provider is not configured: anthropic");
+            AnthropicInjectedTransportLease current; AuthenticationResolution bound;
+            lock (_resolvedGate)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                current = _resolvedMain ?? throw new InvalidOperationException("Resolved main lease missing.");
+                bound = _resolvedAuthentication ?? throw new InvalidOperationException("Resolved authentication missing.");
+            }
+            if (Same(bound.Authentication!, fresh)) return (current, bound);
+            var replacement = await AcquireResolvedAsync(Selected, next, Handler, MaximumOutputTokens, false, token).ConfigureAwait(false);
+            lock (_resolvedGate)
+            {
+                if (_disposed) { _replacedMains.Add(replacement); throw new ObjectDisposedException(nameof(LiveSessionConnection)); }
+                _replacedMains.Add(current); _resolvedMain = replacement; _resolvedAuthentication = next;
+            }
+            return (replacement, next);
+        }
+        finally { _rebind.Release(); }
+
+        static bool Same(ResolvedAuthentication bound, ResolvedAuthentication fresh) =>
+            bound.Kind == fresh.Kind && bound.Origin == fresh.Origin && bound.EnvironmentName == fresh.EnvironmentName &&
+            string.Equals(bound.Secret, fresh.Secret, StringComparison.Ordinal) &&
+            (bound.Kind != AuthenticationKind.WorkloadIdentityFederation || FederationNames.All(name => string.Equals(
+                bound.CredentialEnvironment?.GetValue(name), fresh.CredentialEnvironment?.GetValue(name), StringComparison.Ordinal)));
+    }
+    private static readonly string[] FederationNames = [InjectedAuthenticationResolver.AnthropicFederationRuleId,
+        InjectedAuthenticationResolver.AnthropicOrganizationId, InjectedAuthenticationResolver.AnthropicServiceAccountId,
+        InjectedAuthenticationResolver.AnthropicIdentityTokenFile, InjectedAuthenticationResolver.AnthropicWorkspaceId];
     private static ValueTask<AnthropicInjectedTransportLease> AcquireResolvedAsync(LiveSessionSelection selected,
         AuthenticationResolution authentication, HttpMessageHandler? handler, int maximum, bool summary, CancellationToken token)
     {
@@ -188,6 +298,20 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
                 new(MaxTokens: maximum, MaximumPayloadBytes: 1_048_576), handler, summary ? null : definition.Raw);
             return Own(provider);
         }
+        if (model.Provider == "azure")
+        {
+            // providers/azure.ts: azure-openai-responses through its Simple stream, openai-completions through the OpenAI client.
+            var azure = Azure ?? throw new InvalidOperationException("Azure endpoint configuration missing.");
+            if (model.Api == "azure-openai-responses")
+                return Own(NativeProviderFactory.CreateAzureResponses(model, credential, definition.Raw,
+                    new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576), maximum, azure, handler,
+                    fixedReasoningOff: summary));
+            return Own(NativeProviderFactory.CreateAzureCompletions(model, credential, azure,
+                new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
+                    ToolDeclarations: new(MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576)) { ModelSupportsImages = definition.DeclaresImageInput },
+                new(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
+                    MaximumPayloadBytes: 1_048_576) { ModelMetadata = definition.Raw }, handler, summary ? null : definition.Raw));
+        }
         if (model.Api == "openai-completions")
         {
             var endpoint = new Uri(definition.BaseUrl.TrimEnd('/') + "/chat/completions");
@@ -240,10 +364,16 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         await Task.WhenAll(pending).ConfigureAwait(false);
         var failures = new List<Exception>();
         lock (_resolvedGate) failures.AddRange(_resolvedCleanupFailures);
-        var lease = _resolvedMain ?? throw new InvalidOperationException("Resolved main lease missing.");
-        Task? original = null;
-        try { using var cleanupFrame = new ResolvedFrameBinding(this); original = lease.DisposeAsync().AsTask(); await original.ConfigureAwait(false); }
-        catch (Exception error) { failures.Add((Exception?)original?.Exception ?? error); }
+        // A pending rebind completes (or fails) before its replaced and replacement leases are collected.
+        await _rebind.WaitAsync().ConfigureAwait(false);
+        AnthropicInjectedTransportLease[] leases;
+        lock (_resolvedGate) leases = [.. _replacedMains, _resolvedMain ?? throw new InvalidOperationException("Resolved main lease missing.")];
+        foreach (var lease in leases)
+        {
+            Task? original = null;
+            try { using var cleanupFrame = new ResolvedFrameBinding(this); original = lease.DisposeAsync().AsTask(); await original.ConfigureAwait(false); }
+            catch (Exception error) { failures.Add((Exception?)original?.Exception ?? error); }
+        }
         if (failures.Count != 0) throw new AggregateException("Resolved connection cleanup failed.", failures);
     }
     private sealed class ResolvedTransport(LiveSessionConnection connection, int maximum, bool summary)
@@ -281,12 +411,11 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             {
                 using (var factoryFrame = new ResolvedFrameBinding(connection))
                 {
-                var main = connection._resolvedMain ?? throw new InvalidOperationException("Resolved main lease missing.");
+                var (main, authentication) = await connection.CurrentResolvedAsync(cancellationToken).ConfigureAwait(false);
                 var transport = main.Transport;
                 if (summary)
                 {
-                    summaryLease = await AcquireResolvedAsync(connection.Selected, connection._resolvedAuthentication
-                        ?? throw new InvalidOperationException("Resolved authentication missing."), connection.Handler, maximum, true, cancellationToken).ConfigureAwait(false);
+                    summaryLease = await AcquireResolvedAsync(connection.Selected, authentication, connection.Handler, maximum, true, cancellationToken).ConfigureAwait(false);
                     transport = summaryLease.Transport;
                 }
                 enumerator = transport.StreamAsync(request, cancellationToken).GetAsyncEnumerator(cancellationToken);

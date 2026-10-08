@@ -51,6 +51,13 @@ internal static partial class Program
             ("osc7501.terminal-view-start-report-and-stop", TerminalView),
             ("auth.anthropic.login-copy-code-stores-auth-json-and-refreshes", LoginStoresAndRefreshes),
             ("auth.anthropic.login-browser-pasted-redirect-and-state-mismatch", BrowserLoginPastedRedirect),
+            ("auth.logout-selects-and-removes-stored-credentials", LogoutRemovesStoredCredentials),
+            ("auth.anthropic.live-route-stored-oauth-refreshes-mid-session-and-logout-falls-back", LiveStoredOAuthRefreshesMidSession),
+            ("auth.anthropic.live-route-stored-key-env-precedence-and-federation", LiveAnthropicPrecedenceAndFederation),
+            ("provider.azure.live-route-responses-completions-and-endpoint-errors", LiveAzureRoutes),
+            ("mcp.session.global-config-direct-background-failure-report-and-no-mcp", McpProductionSession),
+            ("mcp.session.oauth-server-sends-stored-mcp-auth-token", McpOAuthServerUsesStoredTokens),
+            ("mcp.session.windows-command-resolution-and-cmd-escaping", McpStdioWindowsCommand),
             ("wire.agent-settled.json-mode-record-with-aborted", JsonModeAgentSettled),
             ("wire.agent-settled.native-extension-observation-and-reported-failure", ExtensionAgentSettled),
             ("wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas", InteractiveUserBash)

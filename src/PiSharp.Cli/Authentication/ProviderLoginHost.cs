@@ -56,13 +56,4 @@ internal static class StoredAnthropicAuthentication
         return await InjectedAuthenticationResolver.ResolveAnthropicApiKeyAsync(new ProviderEnvironmentSnapshot(),
             (_, _) => ValueTask.FromResult<StoredApiKeyCredential?>(new(credential.Access)), cancellationToken).ConfigureAwait(false);
     }
-
-    /// <summary>The default live runtime reads the shared <c>auth.json</c> only when it exists, so a session start creates no files.</summary>
-    public static async ValueTask<AuthenticationResolution?> ResolveDefaultAsync(CancellationToken cancellationToken)
-    {
-        var store = AuthJsonCredentialStore.CreateDefault();
-        if (!File.Exists(store.AuthPath)) return null;
-        using var http = new HttpClient();
-        return await ResolveAsync(store, http, null, cancellationToken).ConfigureAwait(false);
-    }
 }

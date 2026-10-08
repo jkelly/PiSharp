@@ -402,11 +402,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         }
         if (registeredMcpAdmission is not null && mcpAdmission is not null)
             throw new ArgumentException("Choose one explicit MCP profile admission.");
-        if (resolvedAnthropicAuthentication is null && resolvedAnthropicHandler is null && liveSelection is { Model.Provider: "anthropic" } &&
-            (liveRuntime ?? LiveSessionRuntime.Default) is { ResolveStoredAnthropic: { } resolveStored } storedRuntime &&
-            await resolveStored(token).ConfigureAwait(false) is { } storedAnthropic)
-        { resolvedAnthropicAuthentication = storedAnthropic; resolvedAnthropicHandler = storedRuntime.CreateHttpHandler(); }
         // Explicit admitted resolution uses no environment lookup; reject invalid composition before profile effects.
+        // Without it, an Anthropic selection resolves its auth like upstream resolveProviderAuth, at start and per request.
         if (resolvedAnthropicAuthentication is not null &&
             (liveSelection is null || liveSelection.Model.Provider != "anthropic" || liveSelection.Model.Api != "anthropic-messages" ||
              resolvedAnthropicAuthentication.Diagnostic != AuthenticationDiagnostic.Resolved || resolvedAnthropicAuthentication.Authentication is null))
@@ -504,7 +501,13 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         {
             if (extensionPreflight is not null) activation = await NativeExtensionActivation.LoadAsync(extensionPreflight, token, extensionUi, reportInputDiagnostic,
                 configuredInitializerInstallation: configuredInitializerInstallation, configuredExecInstallation: configuredExecInstallation).ConfigureAwait(false);
-            if (resolvedAnthropicAuthentication is null) connection = liveSelection?.Connect(liveRuntime);
+            if (resolvedAnthropicAuthentication is null && liveSelection is { Model.Provider: "anthropic" })
+            {
+                var (anthropic, anthropicHandler, reresolve) = await liveSelection.ResolveAnthropicAsync(liveRuntime, token).ConfigureAwait(false);
+                connectionOriginal = liveSelection.ConnectResolvedAnthropicAsync(anthropic, anthropicHandler, token, reresolve).AsTask();
+                connection = await connectionOriginal.ConfigureAwait(false);
+            }
+            else if (resolvedAnthropicAuthentication is null) connection = liveSelection?.Connect(liveRuntime);
             else
             {
                 connectionOriginal = (liveSelection ?? throw new InvalidOperationException("Validated Anthropic selection is absent."))
