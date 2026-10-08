@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/oauth/flow.ts registerClient/token requests and packages/mcp/src/oauth/types.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -30,6 +31,14 @@ internal sealed class McpDefaultOAuthProtocol(McpDefaultOAuthHost host, McpDefau
         var metadata = options.ClientMetadata.Value;
         if (metadata.ValueKind != JsonValueKind.Object) throw new ArgumentException("OAuth client metadata must be an object.");
         var fields = metadata.EnumerateObject().ToDictionary(pair => pair.Name, pair => pair.Value.Clone(), StringComparer.Ordinal);
+        // OpenID Connect servers assume `web` without `application_type`, which rejects http loopback redirect URIs
+        // (MCP SEP-837). Loopback hosts and custom schemes are native (RFC 8252). Set before `scope`, like the original.
+        if (!fields.TryGetValue("application_type", out var declaredType) || declaredType.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            var proposed = fields.TryGetValue("redirect_uris", out var uris) && uris.ValueKind == JsonValueKind.Array ? uris.EnumerateArray()
+                .Where(uri => uri.ValueKind == JsonValueKind.String).Select(uri => uri.GetString()!) : [];
+            fields["application_type"] = JsonSerializer.SerializeToElement(ApplicationType(proposed));
+        }
         if (!string.IsNullOrEmpty(scope)) fields["scope"] = JsonSerializer.SerializeToElement(scope);
         var response = await http.SendAsync(endpoint, McpDefaultOAuthHttpPurpose.Registration, HttpMethod.Post,
             Headers("application/json"), JsonSerializer.Serialize(fields), token).ConfigureAwait(false);
@@ -46,7 +55,7 @@ internal sealed class McpDefaultOAuthProtocol(McpDefaultOAuthHost host, McpDefau
     }
     internal Task<McpOAuthTokens> ExchangeCodeAsync(McpOAuthOrchestrationContext context, string code, string verifier, CancellationToken token) =>
         TokenAsync(context, [new("grant_type", "authorization_code"), new("code", code), new("code_verifier", verifier),
-            new("redirect_uri", resources.RedirectUri.AbsoluteUri)], McpDefaultOAuthHttpPurpose.AuthorizationCode, null, token);
+            new("redirect_uri", context.RedirectUrl ?? resources.RedirectUri.AbsoluteUri)], McpDefaultOAuthHttpPurpose.AuthorizationCode, null, token);
     internal Task<McpOAuthTokens> RefreshAsync(McpOAuthOrchestrationContext context, string refresh, CancellationToken token) =>
         TokenAsync(context, [new("grant_type", "refresh_token"), new("refresh_token", refresh)], McpDefaultOAuthHttpPurpose.Refresh, refresh, token);
     private async Task<McpOAuthTokens> TokenAsync(McpOAuthOrchestrationContext context,
@@ -101,7 +110,9 @@ internal sealed class McpDefaultOAuthProtocol(McpDefaultOAuthHost host, McpDefau
         if (parsed is null || parsed.Value.ValueKind != JsonValueKind.Object)
             throw new McpOAuthProtocolException("token_invalid", "OAuth token response must be a JSON object.", original: parsing);
         var value = parsed.Value; double? expiry = null;
-        if (value.TryGetProperty("expires_in", out var duration))
+        // `Number(null)` is 0, which would mark the token as expired at once, so `null` and `""` are absent.
+        if (value.TryGetProperty("expires_in", out var duration) &&
+            !(duration.ValueKind == JsonValueKind.Null || duration.ValueKind == JsonValueKind.String && duration.GetString()!.Length == 0))
         { expiry = Number(duration, false); if (!double.IsFinite(expiry.Value)) throw new McpOAuthProtocolException("token_invalid", "OAuth expiry must coerce to a finite number."); }
         return new(Text(value, "access_token", true)!, Text(value, "token_type", true)!, expiry,
             Text(value, "scope", false), Text(value, "refresh_token", false) ?? refresh, Text(value, "id_token", false));
@@ -121,7 +132,7 @@ internal sealed class McpDefaultOAuthProtocol(McpDefaultOAuthHost host, McpDefau
         var query = new List<KeyValuePair<string, string>>
         {
             new("response_type", "code"), new("client_id", context.Client.ClientId), new("code_challenge", challenge),
-            new("code_challenge_method", "S256"), new("redirect_uri", resources.RedirectUri.AbsoluteUri)
+            new("code_challenge_method", "S256"), new("redirect_uri", context.RedirectUrl ?? resources.RedirectUri.AbsoluteUri)
         };
         if (!string.IsNullOrEmpty(context.State)) query.Add(new("state", context.State));
         if (!string.IsNullOrEmpty(context.Scope))
@@ -146,6 +157,8 @@ internal sealed class McpDefaultOAuthProtocol(McpDefaultOAuthHost host, McpDefau
     internal static string? Text(JsonElement value, string key, bool required)
     {
         if (!value.TryGetProperty(key, out var field)) return required ? throw new McpOAuthProtocolException("metadata_invalid", "Required OAuth string missing.") : null;
+        // Servers send `null` and `""` for optional fields they have no value for, like `scope: ""`.
+        if (!required && (field.ValueKind == JsonValueKind.Null || field.ValueKind == JsonValueKind.String && field.GetString()!.Length == 0)) return null;
         if (field.ValueKind != JsonValueKind.String || string.IsNullOrEmpty(field.GetString())) throw new McpOAuthProtocolException("metadata_invalid", "OAuth string must be nonempty.");
         return field.GetString();
     }
@@ -165,6 +178,10 @@ internal sealed class McpDefaultOAuthProtocol(McpDefaultOAuthHost host, McpDefau
         if (!string.IsNullOrEmpty(client.ClientSecret) && supported.Contains("client_secret_post")) return "client_secret_post";
         return supported.Contains("none") || string.IsNullOrEmpty(client.ClientSecret) ? "none" : "client_secret_post";
     }
+    /// <summary>OpenID Connect `application_type` for `redirect_uris`: `native` for loopback hosts and custom schemes.</summary>
+    internal static string ApplicationType(IEnumerable<string> redirectUris) => redirectUris.Any(uri =>
+        Uri.TryCreate(uri, UriKind.Absolute, out var parsed) && (parsed.Scheme is not ("http" or "https") ||
+            parsed.IdnHost.ToLowerInvariant() is "localhost" or "127.0.0.1" or "::1" or "[::1]")) ? "native" : "web";
     private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     internal static string Form(IEnumerable<KeyValuePair<string, string>> fields) => string.Join('&', fields.Select(pair => Escape(pair.Key) + "=" + Escape(pair.Value)));
     private static string Escape(string value)

@@ -8,7 +8,26 @@ namespace PiSharp.Cli.Mcp.Authentication;
 
 internal sealed class McpDefaultOAuthHttp(McpDefaultOAuthHost host, McpDefaultOAuthHostResources resources)
 {
+    // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts timedFetch.
+    /// <summary>Each request to the authorization server is time-limited on top of the caller's cancellation, so an
+    /// unresponsive server cannot hold a refresh, delay shutdown or keep a sign-in waiting for long. A timeout is a
+    /// request failure, never reported as the caller's cancellation.</summary>
     internal async Task<McpOAuthExchangeResponse> SendAsync(Uri endpoint, McpDefaultOAuthHttpPurpose purpose,
+        HttpMethod method, ImmutableDictionary<string, string> headers, string? body, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var limit = resources.RequestTimeout ?? McpDefaultOAuthHostResources.DefaultRequestTimeout;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(limit);
+        try { return await SendCoreAsync(endpoint, purpose, method, headers, body, timeout.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException canceled) when (!token.IsCancellationRequested && timeout.IsCancellationRequested)
+        {
+            throw new TimeoutException("OAuth " + purpose + " request timed out after " +
+                limit.TotalSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + " s.", canceled);
+        }
+    }
+
+    private async Task<McpOAuthExchangeResponse> SendCoreAsync(Uri endpoint, McpDefaultOAuthHttpPurpose purpose,
         HttpMethod method, ImmutableDictionary<string, string> headers, string? body, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();

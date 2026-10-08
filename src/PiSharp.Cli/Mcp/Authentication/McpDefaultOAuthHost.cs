@@ -1,3 +1,5 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/oauth/flow.ts adaptOAuthProvider, packages/mcp/src/oauth/discovery.ts
+// and packages/coding-agent/src/extensions/mcp/oauth.ts signInMcpServer.
 using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
 using System.Text;
@@ -48,6 +50,13 @@ public sealed class McpDefaultOAuthHost : IAsyncDisposable
         if (Encoding.UTF8.GetByteCount(admitted.ClientMetadata.ToString()) > admitted.MaximumBytes) throw new ArgumentException("Client metadata exceeds finite bound.");
         state = new(admitted.Server, new GuardedStore(this, admitted.Store), () => InvokeBorrowed(() =>
         { var now = admitted.UnixMilliseconds(); return double.IsFinite(now) ? now : throw new ArgumentException("Finite admitted clock required."); }));
+        if (admitted.ClientMetadataDocumentBase is { } documentBase)
+        {
+            if (!documentBase.IsAbsoluteUri || documentBase.Scheme != "https") throw new ArgumentException("An https Client ID Metadata Document base is required.");
+            clientMetadataDocument = metadata => McpOAuthClientMetadataDocuments.Create(documentBase, admitted.Server, admitted.RedirectUri.AbsoluteUri, metadata);
+        }
+        if (admitted.RequestTimeout is { } timeout && (timeout <= TimeSpan.Zero || timeout > TimeSpan.FromHours(1)))
+            throw new ArgumentException("A positive finite OAuth request timeout is required.");
         http = new(this, admitted); protocol = new(this, admitted, http);
         orchestrator = new(new(
             (options, token) => new(DiscoverAsync(options, token)),
@@ -79,24 +88,28 @@ public sealed class McpDefaultOAuthHost : IAsyncDisposable
     public Task<McpOAuthOrchestrationResult> AuthorizeAsync(McpOAuthOrchestrationOptions options, CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(options);
-        if (options.ServerUrl != resources.Server || options.ClientMetadata.ToString() != resources.ClientMetadata.ToString() || options.ClientMetadataUrl != resources.ClientMetadataUrl)
+        if (options.ServerUrl != resources.Server || options.ClientMetadata.ToString() != resources.ClientMetadata.ToString() ||
+            !ReferenceEquals(options.ClientMetadataDocument, clientMetadataDocument) || options.AuthorizationServerMetadataUrl != resources.AuthorizationServerMetadataUrl)
             throw new ArgumentException("Authorization options belong to the exact installed server/client metadata admission.");
-        if (options.AuthorizationCode is not null) throw new ArgumentException("Code exchange requires the explicit response-state validation entry.");
+        if (options.AuthorizationCode is not null || options.Iss is not null) throw new ArgumentException("Code exchange requires the explicit response-state validation entry.");
         return Start(ct => ObserveAsync("orchestrator:authorize", () => new ValueTask<McpOAuthOrchestrationResult>(orchestrator.AuthorizeAsync(options, ct)), ct), token);
     }
+    /// <summary>Validates the response state, then the RFC 9207 <paramref name="iss"/> of the authorization response
+    /// against the authorization server metadata, before the code is sent to any token endpoint.</summary>
     public Task<McpOAuthOrchestrationResult> CompleteAuthorizationAsync(string code, string? returnedState,
-        string? scope = null, CancellationToken token = default)
+        string? scope = null, CancellationToken token = default, string? iss = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(code);
         return Start(async ct =>
         {
             await ObserveAsync("response:validate-state", () => resources.ValidateAuthorizationState(returnedState, ct), ct).ConfigureAwait(false);
-            return await ObserveAsync("orchestrator:exchange-code", () => new ValueTask<McpOAuthOrchestrationResult>(orchestrator.AuthorizeAsync(Options(code, scope), ct)), ct).ConfigureAwait(false);
+            return await ObserveAsync("orchestrator:exchange-code", () => new ValueTask<McpOAuthOrchestrationResult>(orchestrator.AuthorizeAsync(Options(code, scope, iss: iss), ct)), ct).ConfigureAwait(false);
         }, token);
     }
-    public McpOAuthOrchestrationOptions Options(string? code = null, string? scope = null, bool skipRefresh = false) =>
+    public McpOAuthOrchestrationOptions Options(string? code = null, string? scope = null, bool skipRefresh = false, string? iss = null) =>
         new(resources.Server, resources.ClientMetadata, McpDefaultOAuthProtocol.Text(resources.ClientMetadata.Value, "scope", false),
-            resources.ClientMetadataUrl, scope, code, skipRefresh);
+            clientMetadataDocument, scope, code, skipRefresh, iss, resources.AuthorizationServerMetadataUrl);
+    private readonly Func<JsonData?, McpOAuthClientMetadataDocument?>? clientMetadataDocument;
     private Task<McpOAuthState> ReadStateAsync(CancellationToken token) =>
         ObserveAsync("state:read", () => new ValueTask<McpOAuthState>(state.ReadAsync()), token);
     private async Task<McpOAuthTokens?> ReadTokensAsync(CancellationToken token) => (await ReadStateAsync(token).ConfigureAwait(false)).Tokens;
@@ -141,7 +154,8 @@ public sealed class McpDefaultOAuthHost : IAsyncDisposable
         var current = await ReadStateAsync(token).ConfigureAwait(false);
         McpAdmittedOAuthExchange exchange = (request, ct) => new(http.SendAsync(request.Endpoint, McpDefaultOAuthHttpPurpose.Discovery,
             request.Method, request.Headers, request.Body, ct));
-        if (current.Discovery is { } cached && cached.Value.ValueKind == JsonValueKind.Object && cached.Value.TryGetProperty("authorizationServerUrl", out _))
+        // With a configured metadata URL, discovery is neither read from nor written to the cache.
+        if (options.AuthorizationServerMetadataUrl is null && current.Discovery is { } cached && cached.Value.ValueKind == JsonValueKind.Object && cached.Value.TryGetProperty("authorizationServerUrl", out _))
         {
             if (Encoding.UTF8.GetByteCount(cached.ToString()) > resources.MaximumBytes) throw new McpOAuthProtocolException("metadata_bound", "Cached discovery exceeds its finite admission.");
             var issuer = McpDefaultOAuthProtocol.Text(cached.Value, "authorizationServerUrl", true)!;
@@ -160,7 +174,8 @@ public sealed class McpDefaultOAuthHost : IAsyncDisposable
         }
         Uri? resourceMetadata;
         lock (authorizationGate) resourceMetadata = challengedMetadata;
-        return await ObserveAsync("discovery:resource", () => new ValueTask<McpOAuthDiscoveredServer>(McpAdmittedOAuthDiscovery.DiscoverAsync(options.ServerUrl, exchange, resourceMetadata, token, resources.MaximumBytes)), token).ConfigureAwait(false);
+        return await ObserveAsync("discovery:resource", () => new ValueTask<McpOAuthDiscoveredServer>(McpAdmittedOAuthDiscovery.DiscoverAsync(options.ServerUrl, exchange, resourceMetadata, token, resources.MaximumBytes,
+            options.AuthorizationServerMetadataUrl)), token).ConfigureAwait(false);
     }
     private Uri? challengedMetadata;
     private async Task UnauthorizedAsync(McpHttpUnauthorizedContext context, CancellationToken token)
@@ -171,7 +186,9 @@ public sealed class McpDefaultOAuthHost : IAsyncDisposable
         string? Field(string name)
         {
             var match = Regex.Match(challenge, "(?:^|[,\\s])" + name + "=(?:\"([^\"]*)\"|([^\\s,]+))", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
-            return match.Success ? match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value : null;
+            // An empty value (`scope=""`) carries no information, so it counts as absent.
+            var found = match.Success ? match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value : null;
+            return string.IsNullOrEmpty(found) ? null : found;
         }
         var scheme = challenge.TrimStart().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
         var supported = string.Equals(scheme, "Bearer", StringComparison.OrdinalIgnoreCase) || string.Equals(scheme, "DPoP", StringComparison.OrdinalIgnoreCase);
@@ -188,7 +205,9 @@ public sealed class McpDefaultOAuthHost : IAsyncDisposable
             {
                 if (!skip && context.RejectedToken is not null && current.Tokens?.AccessToken is { } replacement && replacement != context.RejectedToken) return;
                 challengedMetadata = metadata;
-                original = sharedAuthorization = InvokeBorrowed(() => orchestrator.AuthorizeAsync(Options(scope: requestedScope, skipRefresh: skip), token));
+                // A step-up keeps the scope granted so far, since the challenge may list only the missing scopes.
+                var scope = skip ? McpOAuthScope.StepUp(current.Tokens?.Scope, requestedScope) : requestedScope;
+                original = sharedAuthorization = InvokeBorrowed(() => orchestrator.AuthorizeAsync(Options(scope: scope, skipRefresh: skip), token));
             }
         }
         var result = await ObserveAsync("orchestrator:shared-unauthorized", () => new ValueTask<McpOAuthOrchestrationResult>(original), token).ConfigureAwait(false);

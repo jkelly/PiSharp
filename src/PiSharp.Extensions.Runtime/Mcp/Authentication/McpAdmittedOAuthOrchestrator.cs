@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/oauth/flow.ts runFlow/authorizeMcp.
 using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
@@ -182,40 +183,55 @@ public sealed class McpAdmittedOAuthOrchestrator : IAsyncDisposable
     private async Task<McpOAuthAuthorizationOutcome> RunFlow(McpOAuthOrchestrationOptions options,
         List<McpOAuthOrchestrationOriginal> originals, CancellationToken token)
     {
+        // A configured metadata document is trusted as configured, so it must not travel in clear text.
+        if (options.AuthorizationServerMetadataUrl is { } configuredMetadata && !SecureEndpoint(configuredMetadata))
+            throw new McpOAuthProtocolException("insecure_endpoint", "OAuth authorization server metadata URL must be HTTPS or exact loopback.");
         var discovered = await Work("discover", () => dependencies.Discover(options, token), originals, token).ConfigureAwait(false);
         if (discovered is null) throw new McpOAuthProtocolException("metadata_invalid", "Admitted discovery returned no state.");
-        if (dependencies.SaveDiscovery is { } saveDiscovery)
+        // With a configured metadata URL, discovery is not cached, so changing the URL applies at once.
+        if (options.AuthorizationServerMetadataUrl is null && dependencies.SaveDiscovery is { } saveDiscovery)
             await Work("save-discovery", () => saveDiscovery(discovered, token), originals, token).ConfigureAwait(false);
         var resource = McpAdmittedOAuthDiscovery.SelectResource(options.ServerUrl, discovered.ResourceMetadata);
-        var scope = options.Scope ?? (discovered.ResourceMetadata is { } resourceMetadata &&
-            McpAdmittedOAuthDiscovery.Strings(resourceMetadata.Value, "scopes_supported", false) is { } scopes
-            ? string.Join(' ', scopes) : options.ClientMetadataScope);
+        // `||`, not `??`: an empty scope (for example from `scopes_supported: []`) falls through to the next source.
+        var supportedScopes = discovered.ResourceMetadata is { } resourceMetadata &&
+            McpAdmittedOAuthDiscovery.Strings(resourceMetadata.Value, "scopes_supported", false) is { } scopes ? string.Join(' ', scopes) : null;
+        var scope = !string.IsNullOrEmpty(options.Scope) ? options.Scope : !string.IsNullOrEmpty(supportedScopes) ? supportedScopes : options.ClientMetadataScope;
         var client = await Work("read-client", () => dependencies.ReadClient(token), originals, token).ConfigureAwait(false);
+        var metadata = discovered.AuthorizationServerMetadata;
+        McpOAuthClientMetadataDocument? document = null;
+        if (client is null && options.ClientMetadataDocument is { } describe)
+        {
+            Fence(token); document = InvokePhysical(() => describe(metadata));
+            if (document is not null && (document.Url is null || document.RedirectUrl is null ||
+                !Uri.TryCreate(document.Url, UriKind.Absolute, out var documentUrl) || documentUrl.Scheme != "https" || documentUrl.AbsolutePath == "/"))
+                throw new McpOAuthProtocolException("client_metadata_url", "Invalid OAuth client metadata URL");
+            // The document identifies the client; it is not stored.
+            if (document is not null) client = new(document.Url);
+        }
         if (client is null)
         {
             if (options.AuthorizationCode is { Length: > 0 }) throw new McpOAuthProtocolException("client_missing", "OAuth client information is missing during code exchange.");
-            if (discovered.AuthorizationServerMetadata is { } metadata && metadata.Value.TryGetProperty("client_id_metadata_document_supported", out var supported) && supported.ValueKind == JsonValueKind.True && options.ClientMetadataUrl is { } metadataUrl)
-            {
-                if (!metadataUrl.IsAbsoluteUri || metadataUrl.Scheme != "https" || metadataUrl.AbsolutePath == "/")
-                    throw new McpOAuthProtocolException("client_metadata_url", "Invalid admitted client metadata URL.");
-                client = new(metadataUrl.AbsoluteUri);
-                if (dependencies.SaveClient is { } saveMetadataClient)
-                    await Work("save-client", () => saveMetadataClient(client, token), originals, token).ConfigureAwait(false);
-            }
-            else
-            {
-                var saveRegisteredClient = dependencies.SaveClient ?? throw new McpOAuthProtocolException("client_persistence_missing", "OAuth client information cannot be persisted.");
-                client = await Work("register-client", () => dependencies.RegisterClient(options, discovered, scope, token), originals, token).ConfigureAwait(false);
-                if (client is null) throw new McpOAuthProtocolException("client_invalid", "Admitted registration returned no client.");
-                await Work("save-client", () => saveRegisteredClient(client, token), originals, token).ConfigureAwait(false);
-            }
+            var saveRegisteredClient = dependencies.SaveClient ?? throw new McpOAuthProtocolException("client_persistence_missing", "OAuth client information cannot be persisted.");
+            client = await Work("register-client", () => dependencies.RegisterClient(options, discovered, scope, token), originals, token).ConfigureAwait(false);
+            if (client is null) throw new McpOAuthProtocolException("client_invalid", "Admitted registration returned no client.");
+            await Work("save-client", () => saveRegisteredClient(client, token), originals, token).ConfigureAwait(false);
         }
-        var context = new McpOAuthOrchestrationContext(options, discovered, client, resource, scope);
+        // The document's redirect URI may differ from the installed one, for example by a server-specific path.
+        var context = new McpOAuthOrchestrationContext(options, discovered, client, resource, scope, RedirectUrl: document?.RedirectUrl);
         if (options.AuthorizationCode is { Length: > 0 } code)
         {
+            // RFC 9207: never send a code from another authorization server to this one.
+            if (metadata is { } issuerMetadata && (options.Iss is not null || issuerMetadata.Value.ValueKind == JsonValueKind.Object &&
+                issuerMetadata.Value.TryGetProperty("authorization_response_iss_parameter_supported", out var promised) && promised.ValueKind == JsonValueKind.True))
+            {
+                var issuer = issuerMetadata.Value.ValueKind == JsonValueKind.Object && issuerMetadata.Value.TryGetProperty("issuer", out var named) &&
+                    named.ValueKind == JsonValueKind.String ? named.GetString()! : "";
+                if (!string.Equals(options.Iss, issuer, StringComparison.Ordinal)) throw new McpOAuthIssuerMismatchException(issuer, options.Iss);
+            }
             var verifier = await Work("read-verifier", () => dependencies.ReadVerifier(token), originals, token).ConfigureAwait(false);
             var exchanged = await Work("exchange-code", () => dependencies.ExchangeCode(context, code, verifier, token), originals, token).ConfigureAwait(false);
-            await Work("save-tokens", () => dependencies.SaveTokens(exchanged, token), originals, token).ConfigureAwait(false);
+            // A response without `scope` grants the requested scope; recorded so a step-up can keep it.
+            await Work("save-tokens", () => dependencies.SaveTokens(McpOAuthScope.WithScope(exchanged, scope), token), originals, token).ConfigureAwait(false);
             return McpOAuthAuthorizationOutcome.Authorized;
         }
         var existing = options.SkipRefresh ? null : await Work("read-tokens", () => dependencies.ReadTokens(token), originals, token).ConfigureAwait(false);
@@ -224,7 +240,8 @@ public sealed class McpAdmittedOAuthOrchestrator : IAsyncDisposable
             try
             {
                 var refreshed = await Work("refresh", () => dependencies.Refresh(context, refreshToken, token), originals, token).ConfigureAwait(false);
-                await Work("save-tokens", () => dependencies.SaveTokens(refreshed, token), originals, token).ConfigureAwait(false);
+                // A refresh without `scope` keeps the scope of the grant (RFC 6749 §6).
+                await Work("save-tokens", () => dependencies.SaveTokens(McpOAuthScope.WithScope(refreshed, existing.Scope), token), originals, token).ConfigureAwait(false);
                 return McpOAuthAuthorizationOutcome.Authorized;
             }
             catch (McpOAuthFlowCanceledException) { throw; }
@@ -244,6 +261,8 @@ public sealed class McpAdmittedOAuthOrchestrator : IAsyncDisposable
         await Work("redirect", () => dependencies.Redirect(authorization.AuthorizationUrl, token), originals, token).ConfigureAwait(false);
         return McpOAuthAuthorizationOutcome.Redirect;
     }
+    private static bool SecureEndpoint(Uri endpoint) => endpoint.IsAbsoluteUri &&
+        (endpoint.Scheme == "https" || endpoint.Scheme == "http" && endpoint.IdnHost.ToLowerInvariant() is "localhost" or "127.0.0.1" or "::1" or "[::1]");
     public ValueTask DisposeAsync()
     {
         RejectReentry();

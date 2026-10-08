@@ -1,3 +1,5 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/extensions/mcp/oauth.ts createMcpAuthProvider (refresh)
+// and packages/mcp/src/oauth/types.ts parseOAuthTokens.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -201,7 +203,8 @@ public sealed class McpAdmittedOAuthRefreshAdapter
             var body = string.Join("&", fields.Select(field => Form(field.Key) + "=" + Form(field.Value)));
             if (Encoding.UTF8.GetByteCount(body) > maximumBytes) throw new McpOAuthProtocolException("request_bound", "OAuth refresh body exceeds its admitted finite bound.");
             var response = await McpAdmittedOAuthDiscovery.Exchange(new(endpoint, HttpMethod.Post, headers, body, McpOAuthExchangePurpose.RefreshToken), exchange, token, maximumBytes).ConfigureAwait(false);
-            var tokens = ParseTokens(response, refreshToken);
+            // A refresh without `scope` keeps the scope of the grant (RFC 6749 §6), so a later step-up can keep it.
+            var tokens = McpOAuthScope.WithScope(ParseTokens(response, refreshToken), stored.Tokens?.Scope);
             token.ThrowIfCancellationRequested();
             await McpOAuthAdmittedWork.Invoke("save-tokens", () => new ValueTask(state.SaveTokensAsync(tokens)), token).ConfigureAwait(false);
         }
@@ -301,7 +304,9 @@ public sealed class McpAdmittedOAuthRefreshAdapter
         if (response.Status is < 200 or >= 300) throw new McpOAuthProtocolException("server_error", "OAuth token endpoint HTTP failure.", response.Status, original: parsing);
         if (parsed is null || parsed.Value.ValueKind != JsonValueKind.Object) throw new McpOAuthProtocolException("token_invalid", "OAuth token endpoint must return a JSON object.", original: parsing);
         var value = parsed.Value; double? expires = null;
-        if (value.TryGetProperty("expires_in", out var expiry))
+        // `Number(null)` is 0, which would mark the token as expired at once, so `null` and `""` are absent.
+        if (value.TryGetProperty("expires_in", out var expiry) &&
+            !(expiry.ValueKind == JsonValueKind.Null || expiry.ValueKind == JsonValueKind.String && expiry.GetString()!.Length == 0))
         {
             expires = Number(expiry, arrayElement: false);
             if (!double.IsFinite(expires.Value)) throw new McpOAuthProtocolException("token_invalid", "OAuth expires_in must coerce to a finite number.");
