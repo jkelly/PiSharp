@@ -348,9 +348,9 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         var projection = AnthropicThinkingCompat(new AnthropicMessagesRequestOptions(MaximumTokens: maximum,
             ModelReasoning: definition.Raw.Value.GetProperty("reasoning").GetBoolean(),
             ModelSupportsImages: definition.DeclaresImageInput, ThinkingEnabled: false,
-            MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
+            MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
             CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw, summary);
-        var options = new AnthropicMessagesKeyAuthRequestOptions(MaxTokens: maximum, MaximumPayloadBytes: 1_048_576);
+        var options = new AnthropicMessagesKeyAuthRequestOptions(MaxTokens: maximum, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes);
         return summary
             ? AnthropicResolvedTransports.AcquireSummaryAsync(selected.Model, new Uri(definition.BaseUrl), authentication,
                 maximum, projection, options, handler, token)
@@ -413,9 +413,9 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         {
             var provider = NativeProviderFactory.CreateAnthropic(model, new Uri(definition.BaseUrl), credential,
                 AnthropicThinkingCompat(new(MaximumTokens: maximum, ModelReasoning: reasoning, ModelSupportsImages: definition.DeclaresImageInput,
-                    ThinkingEnabled: false, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
+                    ThinkingEnabled: false, MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
                     CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw, summary),
-                new(MaxTokens: maximum, MaximumPayloadBytes: 1_048_576), handler, summary ? null : definition.Raw);
+                new(MaxTokens: maximum, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes), handler, summary ? null : definition.Raw);
             return Own(provider);
         }
         if (model.Provider == "azure")
@@ -424,28 +424,28 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             var azure = Azure ?? throw new InvalidOperationException("Azure endpoint configuration missing.");
             if (model.Api == "azure-openai-responses")
                 return Own(NativeProviderFactory.CreateAzureResponses(model, credential, definition.Raw,
-                    new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576), maximum, azure, handler,
+                    new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes) { ModelSupportsImages = definition.DeclaresImageInput }, maximum, azure, handler,
                     fixedReasoningOff: summary));
             return Own(NativeProviderFactory.CreateAzureCompletions(model, credential, azure,
-                new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
-                    ToolDeclarations: new(MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576)) { ModelSupportsImages = definition.DeclaresImageInput },
+                new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
+                    ToolDeclarations: new(MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes)) { ModelSupportsImages = definition.DeclaresImageInput },
                 new(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
-                    MaximumPayloadBytes: 1_048_576) { ModelMetadata = definition.Raw }, handler, summary ? null : definition.Raw));
+                    MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { ModelMetadata = definition.Raw }, handler, summary ? null : definition.Raw));
         }
         if (model.Api == "openai-completions")
         {
             var endpoint = new Uri(definition.BaseUrl.TrimEnd('/') + "/chat/completions");
             var provider = NativeProviderFactory.CreateCompletions(model, endpoint, credential,
-                new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
-                    ToolDeclarations: new(MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576))
+                new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
+                    ToolDeclarations: new(MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes))
                     { ModelSupportsImages = definition.DeclaresImageInput },
                 new(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
-                    MaximumPayloadBytes: 1_048_576) { ModelMetadata = definition.Raw }, handler, summary ? null : definition.Raw);
+                    MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { ModelMetadata = definition.Raw }, handler, summary ? null : definition.Raw);
             return Own(provider);
         }
         var responses = NativeProviderFactory.CreateResponses(model, new Uri(definition.BaseUrl.TrimEnd('/') + "/responses"), credential,
-            new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576),
-            new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: 1_048_576), handler, summary ? null : definition.Raw);
+            new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes) { ModelSupportsImages = definition.DeclaresImageInput },
+            new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes), handler, summary ? null : definition.Raw);
         return Own(responses);
     }
     private IChatTransport Own(NativeHttpModelProvider provider)
@@ -461,21 +461,21 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         {
             case "openai-completions":
                 return NativeProviderFactory.CreateCatalogCompletions(model, definition.BaseUrl, credential,
-                    new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
-                        ToolDeclarations: new(MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576)) { ModelSupportsImages = definition.DeclaresImageInput },
+                    new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
+                        ToolDeclarations: new(MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes)) { ModelSupportsImages = definition.DeclaresImageInput },
                     new(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
-                        MaximumPayloadBytes: 1_048_576) { Headers = headers }, definition.Raw, handler, thinkingProfile: !summary);
+                        MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { Headers = headers }, definition.Raw, handler, thinkingProfile: !summary);
             case "openai-responses":
                 return NativeProviderFactory.CreateCatalogResponses(model, definition.BaseUrl, credential,
-                    new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576),
-                    new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: 1_048_576) { Headers = headers },
+                    new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes) { ModelSupportsImages = definition.DeclaresImageInput },
+                    new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { Headers = headers },
                     definition.Raw, handler, thinkingProfile: !summary);
             case "anthropic-messages":
                 return NativeProviderFactory.CreateCatalogAnthropic(model, definition.BaseUrl, credential,
                     AnthropicThinkingCompat(new(MaximumTokens: maximum, ModelReasoning: reasoning, ModelSupportsImages: definition.DeclaresImageInput,
-                        ThinkingEnabled: false, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
+                        ThinkingEnabled: false, MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
                         CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw, summary),
-                    new(MaxTokens: maximum, Headers: headers, MaximumPayloadBytes: 1_048_576), definition.Raw, handler, thinkingProfile: !summary);
+                    new(MaxTokens: maximum, Headers: headers, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes), definition.Raw, handler, thinkingProfile: !summary);
             case "google-generative-ai":
                 return NativeProviderFactory.CreateCatalogGoogle(model, credential, definition.Raw,
                     new PiSharp.AI.Protocols.GoogleGenerativeAI.GoogleGenerativeAIOptions(definition.Raw) { MaxTokens = maximum, Headers = headers }, handler);

@@ -25,6 +25,8 @@ internal static partial class Program
         if (args.Length != 0 && (args.Length != 2 || args[0] != "--report")) throw new ArgumentException("Use [--report <fresh path>].");
         var cases = new (string Id, Func<Task> Run)[]
         {
+            ("tools.read-image-pi-budget-end-to-end", ReadImageEndToEnd),
+            ("live.image-pi-budget-every-family", LiveImageEveryFamily),
             ("cli.tools.parse-patterns-modifiers-and-no-mcp", Sync(ParseToolFlags)),
             ("cli.tools.exact-upstream-errors-through-commands", CommandErrors),
             ("cli.provider-requires-model-exact-error", ProviderRequiresModel),

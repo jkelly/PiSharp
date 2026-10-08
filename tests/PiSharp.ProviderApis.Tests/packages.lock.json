@@ -15,6 +15,30 @@
           "Acornima": "1.7.0"
         }
       },
+      "SkiaSharp": {
+        "type": "Transitive",
+        "resolved": "4.152.1",
+        "contentHash": "p3rj8SVoa+2Tmx1EITE4jIwCDPcYjwXdZ3c9yM6l9wNn6572hwxzrth6WOBK0iGnAoTGoJBZuZpy8wYjbov6sw==",
+        "dependencies": {
+          "SkiaSharp.NativeAssets.Win32": "4.152.1",
+          "SkiaSharp.NativeAssets.macOS": "4.152.1"
+        }
+      },
+      "SkiaSharp.NativeAssets.Linux.NoDependencies": {
+        "type": "Transitive",
+        "resolved": "4.152.1",
+        "contentHash": "I/WMSZeE4QFFJoXGu5SNJVhWOBLZqtaUIN5wug3VaTJzpPEsk0t1GMrv0OG+ZoRrXExoW8RLo/bye+WkjVuEFQ=="
+      },
+      "SkiaSharp.NativeAssets.macOS": {
+        "type": "Transitive",
+        "resolved": "4.152.1",
+        "contentHash": "gKaE2zNHsPLjlA88ZClRNmtZlHNGEa/W4iPy5GpP1TtUELIXzrSr2udCbl1GWYFuCdA36IycBk5YhUuK1xi9UA=="
+      },
+      "SkiaSharp.NativeAssets.Win32": {
+        "type": "Transitive",
+        "resolved": "4.152.1",
+        "contentHash": "MLDP6XT8CHLHF6gZlpW06iswGNBlL/JB2+SKuSLz0Y0k1zzsfofNyUY6J6FC32A4/F67E9S8MwovRBL+ELw0lw=="
+      },
       "YamlDotNet": {
         "type": "Transitive",
         "resolved": "16.3.0",
@@ -43,6 +67,7 @@
           "PiSharp.PromptTemplates.Yaml": "[1.1.0.1, )",
           "PiSharp.Rpc": "[1.1.0.1, )",
           "PiSharp.Tools": "[1.1.0.1, )",
+          "PiSharp.Tools.Skia": "[1.1.0.1, )",
           "PiSharp.Tui": "[1.1.0.1, )"
         }
       },
@@ -109,6 +134,16 @@
         "dependencies": {
           "PiSharp.Agent": "[1.1.0.1, )",
           "PiSharp.Contracts": "[1.1.0.1, )"
+        }
+      },
+      "pisharp.tools.skia": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Tools": "[1.1.0.1, )",
+          "SkiaSharp": "[4.152.1, 4.152.1]",
+          "SkiaSharp.NativeAssets.Linux.NoDependencies": "[4.152.1, 4.152.1]",
+          "SkiaSharp.NativeAssets.Win32": "[4.152.1, 4.152.1]",
+          "SkiaSharp.NativeAssets.macOS": "[4.152.1, 4.152.1]"
         }
       },
       "pisharp.tui": {

@@ -72,9 +72,10 @@ internal static partial class Program
             try { return await records.Reader.ReadAsync(deadline.Token); }
             catch (ChannelClosedException) { throw new InvalidOperationException($"RPC host ended before {what}; exit {await Completion}; {Error}"); }
         }
-        public async Task Prompt(string id, string message)
+        public async Task Prompt(string id, string message, object[]? images = null)
         {
-            await connection.SendAsync(JsonData.Parse(JsonSerializer.Serialize(new { id, type = "prompt", message })), deadline.Token);
+            await connection.SendAsync(JsonData.Parse(images is null ? JsonSerializer.Serialize(new { id, type = "prompt", message })
+                : JsonSerializer.Serialize(new { id, type = "prompt", message, images })), deadline.Token);
             var responded = false;
             while (true)
             {

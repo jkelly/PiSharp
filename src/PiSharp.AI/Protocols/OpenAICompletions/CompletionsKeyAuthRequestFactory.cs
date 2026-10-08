@@ -17,7 +17,7 @@ public sealed record CompletionsKeyAuthRequestOptions(double? MaxTokens = null, 
     bool SupportsLongCacheRetention = true, string? SessionId = null, bool SendSessionAffinityHeaders = false,
     string SessionAffinityFormat = "openai", JsonData? ToolChoice = null, JsonData? ModelHeaders = null, JsonData? Headers = null,
     int MaximumKeyCharacters = 4096, int MaximumEndpointCharacters = 4096, int MaximumModelCharacters = 1024,
-    int MaximumPayloadBytes = 1_048_576, int MaximumPayloadDepth = 32, int MaximumHeaders = 128,
+    int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = 32, int MaximumHeaders = 128,
     int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768, double MaximumTokenMagnitude = 1_000_000,
     double MaximumTemperatureMagnitude = 2)
 {

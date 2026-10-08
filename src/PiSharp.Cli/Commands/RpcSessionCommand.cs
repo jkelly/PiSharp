@@ -29,7 +29,7 @@ public static class RpcSessionCommand
         "(--offline-script <absolute JSON> | --live [--provider <provider>] [--model <pattern>[:<thinking>]] [--models <patterns>] [--max-output-tokens 1..8192]) [--thinking off|minimal|low|medium|high|xhigh|max] [--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
         "[[--bash-executable <absolute file>] --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]] " + NativeExtensionConfiguration.Flags + " " + SessionCatalogCommand.Flags + " " + CreationFlags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags;
     public const string CreationFlags = "[--session-mode open|new-memory|new-lazy]";
-    private static readonly JsonlTransportOptions Framing = new(MaximumFrameBytes: 1_048_576, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
+    private static readonly JsonlTransportOptions Framing = new(MaximumFrameBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
     private sealed record Arguments(string Session, string Workspace, string? Script, bool Latest, string? Leaf,
         ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi, OfflineBashAuthorization? Bash,
         NativeExtensionConfiguration? Extension, bool SupportsImages, ImmutableArray<SessionCatalogStore> Stores, string SessionMode, SettingsModelSelection? Live,
@@ -94,11 +94,13 @@ public static class RpcSessionCommand
             if (mcpAdmission is null && !parsed.Tools.NoMcp && mcpHost is not null) mcpAdmission = mcpHost.CreateAdmission(parsed.Workspace, stderr, settings?.Values);
             backend = parsed.SessionMode == "open" ? null : new SessionStorageBackend(Path.GetDirectoryName(parsed.Session)!,
                 parsed.SessionMode == "new-memory" ? SessionStorageMode.InMemory : SessionStorageMode.LazyLocal,
-                new(MaximumFileBytes: 8_388_608));
+                new(MaximumFileBytes: PiPayloadBudget.SessionFileBytes, MaximumResidentBytes: PiPayloadBudget.SessionFileBytes));
             var turns = parsed.Script is null ? ImmutableArray<JsonData>.Empty :
                 await SessionCommands.ScriptAsync(parsed.Script, cancellationToken).ConfigureAwait(false);
             gate = OfflineGate.From(turns);
-            ui = parsed.Extension is null ? null : new(presentationObserver: presentation);
+            // Pending input commands may carry Pi-sized images; retain two maximal commands while a dialog is open.
+            ui = parsed.Extension is null ? null : new(new RpcExtensionUiOptions(MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes),
+                presentationObserver: presentation);
             IExtensionUiProvider? activationUi = ui is null ? null : decorateTerminalUi?.Invoke(ui) ?? ui;
             if (activationUi is not null && terminalInputAdmission is not null) activationUi = terminalInputAdmission.Decorate(activationUi);
             profile = await OfflineSessionProfile.CreateAsync(parsed.Workspace, parsed.Session, parsed.Script,
@@ -120,8 +122,9 @@ public static class RpcSessionCommand
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);
             var options = new PersistentAgentSessionOptions(UseLatestLeaf: parsed.Latest, SelectedLeafId: parsed.Leaf,
-                AgentOptions: new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024)),
-                SessionLogStoreOptions: new(ReaderOptions: new(MaximumInputBytes: 8_388_608, MaximumLines: 10_000, MaximumRecords: 10_000)));
+                AgentOptions: PiPayloadBudget.Agent(new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024))),
+                SessionLogStoreOptions: new(ReaderOptions: PiPayloadBudget.SessionReader(new(MaximumLines: 10_000, MaximumRecords: 10_000))),
+                ContextOptions: PiPayloadBudget.Context);
             string NextId() => "rpc-" + Guid.NewGuid().ToString("N");
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);
@@ -146,14 +149,15 @@ public static class RpcSessionCommand
             if (reloadAdmission is not null) profile.ConfigureReload(reloadAdmission);
             await profile.ApplyInitialToolSelectionAsync(session, cancellationToken).ConfigureAwait(false);
             observedInput = new InputObservation(stdin, gate);
-            var outputFraming = parsed.Bash is null ? Framing : Framing with { MaximumFrameBytes = 8 * 1024 * 1024 };
+            // Events and responses carry tool results with Pi-sized images (owner decision 0004).
+            var outputFraming = Framing with { MaximumFrameBytes = PiPayloadBudget.OutputRecordBytes };
             observedOutput = new OutputObservation(stdout, gate, outputFraming.MaximumFrameBytes);
             reader = new JsonlReader(observedInput, Framing);
             writer = new JsonlWriter(observedOutput, outputFraming);
             // The profile retains resource ownership across the terminal-stopped boundary. Dispatcher cleanup
             // already fences RPC/UI admission and joins its original run, reader, callbacks and writer.
             dispatcher = new(session, writer, Clock, [new(profile.SelectedModel, profile.SelectedModelWire)],
-                options: new(MaximumOutputBytes: outputFraming.MaximumFrameBytes),
+                options: new(MaximumCommandBytes: PiPayloadBudget.RpcCommandBytes, MaximumOutputBytes: outputFraming.MaximumFrameBytes),
                 sessionOwnership: RpcSessionOwnership.Borrowed, inputAdmission: profile.InputAdmission, extensionUi: ui,
                 extensionCommandCatalog: profile, sessionOwner: profile.Sessions,
                 sessionStartup: token => profile.StartLifecycleAsync(parsed.SessionMode == "open" ? "resume" : "new", token),

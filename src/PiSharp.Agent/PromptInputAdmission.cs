@@ -27,9 +27,13 @@ public sealed class PromptInputAdmissionException : Exception
         _ => "Prompt input is invalid."
     }) => Failure = failure;
 }
+/// <summary>Prompt admission bounds. Image and message defaults admit Pi-sized prompt images (owner decision 0004: a prompt
+/// carrying images of up to Pi's 4.5MB of base64 each, within one request entry); the text bound is unchanged.</summary>
 public sealed record PromptInputAdmissionOptions(int MaximumTextCharacters = 65_536, int MaximumImages = 16,
-    int MaximumImageCharacters = 262_144, int MaximumImageBytes = 1_048_576, int MaximumJsonDepth = 32,
-    int MaximumMessageCharacters = 1_048_576, int MaximumMessageBytes = 4_194_304)
+    int MaximumImageCharacters = PiSharp.AI.PiRequestBudget.RequestEntryCharacters,
+    int MaximumImageBytes = PiSharp.AI.PiRequestBudget.RequestEntryCharacters, int MaximumJsonDepth = 32,
+    int MaximumMessageCharacters = PiSharp.AI.PiRequestBudget.RequestEntryCharacters,
+    int MaximumMessageBytes = PiSharp.AI.PiRequestBudget.RequestPayloadBytes)
 {
     /// <summary>Explicit queue commands retain their supplied mode even while idle and never start a generation.</summary>
     public bool QueueOnly { get; init; }

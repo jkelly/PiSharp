@@ -23,7 +23,7 @@ public sealed class GoogleSimpleRequestFactory : IChatTransport
         ArgumentNullException.ThrowIfNull(client); ArgumentNullException.ThrowIfNull(model); ArgumentNullException.ThrowIfNull(options);
         if (options.DirectOptions is null) throw GoogleData.Fail(GoogleFailure.Configuration);
         options.DirectOptions.Validate();
-        if (options.MaximumContextMessages is < 1 or > 65_536 || options.MaximumContextCharacters is < 1 or > 8_388_608)
+        if (options.MaximumContextMessages is < 1 or > 65_536 || options.MaximumContextCharacters is < 1 or > PiRequestBudget.MaximumBound)
             throw GoogleData.Fail(GoogleFailure.Configuration);
         if (options.Reasoning is { } requested && !Levels.Contains(requested, StringComparer.Ordinal))
             throw GoogleData.Fail(GoogleFailure.UnsupportedValue);

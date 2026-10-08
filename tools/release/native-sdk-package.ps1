@@ -4,7 +4,7 @@ $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot '../packaging/distribution-validation.ps1')
 function Assert-PiSharpNativeSdkPackage {
     param([Parameter(Mandatory)][string]$Package,
-        [Parameter(Mandatory)][ValidateSet('PiSharp.Contracts','PiSharp.AI','PiSharp.Agent','PiSharp.Sessions','PiSharp.Tools','PiSharp.CodingAgent',
+        [Parameter(Mandatory)][ValidateSet('PiSharp.Contracts','PiSharp.AI','PiSharp.Agent','PiSharp.Sessions','PiSharp.Tools','PiSharp.Tools.Skia','PiSharp.CodingAgent',
             'PiSharp.PromptTemplates.Yaml','PiSharp.Rpc','PiSharp.Tui','PiSharp.Extensions.Abstractions','PiSharp.Extensions.Runtime',
             'PiSharp.Extensions.Agent','PiSharp.ExtensionHost','PiSharp.Compatibility.Node','PiSharp.Codemode')][string]$PackageId,
         [Parameter(Mandatory)][string]$Version,
@@ -18,6 +18,7 @@ function Assert-PiSharpNativeSdkPackage {
     $assembly='lib/net10.0/'+$PackageId+'.dll'
     $required=@($assembly,($PackageId+'.nuspec'),'LICENSE','README.md','THIRD-PARTY-NOTICES.md','provenance.json','[Content_Types].xml','_rels/.rels')
     if($PackageId-ceq'PiSharp.PromptTemplates.Yaml'){$required+='licenses/YamlDotNet.LICENSE.txt'}
+    if($PackageId-ceq'PiSharp.Tools.Skia'){$required+=@('licenses/SkiaSharp.LICENSE.txt','licenses/SkiaSharp.THIRD-PARTY-NOTICES.txt')}
     if($PackageId-ceq'PiSharp.Codemode'){$required+=@('licenses/Jint.LICENSE.txt','licenses/Jint.CREDITS.txt','licenses/Acornima.LICENSE.txt','licenses/Acornima.NOTICE.txt')}
     foreach($name in $required){if(-not$files.ContainsKey($name)){throw 'Required native SDK package member absent.'}}
     # SDK 10 deterministic pack names the core-properties part nuget.psmdcp; older packs use a random hex name.
@@ -54,6 +55,7 @@ function Assert-PiSharpNativeSdkPackage {
         'PiSharp.AI'=@('PiSharp.Contracts');'PiSharp.Sessions'=@('PiSharp.Contracts');'PiSharp.ExtensionHost'=@('PiSharp.Contracts')
         'PiSharp.Extensions.Abstractions'=@('PiSharp.Contracts');'PiSharp.Extensions.Runtime'=@('PiSharp.Extensions.Abstractions')
         'PiSharp.Agent'=@('PiSharp.Contracts','PiSharp.AI');'PiSharp.Tools'=@('PiSharp.Agent','PiSharp.Contracts')
+        'PiSharp.Tools.Skia'=@('PiSharp.Tools')
         'PiSharp.CodingAgent'=@('PiSharp.Agent','PiSharp.Sessions');'PiSharp.PromptTemplates.Yaml'=@('PiSharp.CodingAgent')
         'PiSharp.Rpc'=@('PiSharp.Contracts','PiSharp.CodingAgent','PiSharp.Extensions.Abstractions')
         'PiSharp.Extensions.Agent'=@('PiSharp.Agent','PiSharp.Extensions.Runtime')
@@ -62,6 +64,10 @@ function Assert-PiSharpNativeSdkPackage {
     }
     $external=@{}
     if($PackageId-ceq'PiSharp.PromptTemplates.Yaml'){$external['YamlDotNet']='16.3.0'}
+    # The read tool's image codec (owner decision 0004): SkiaSharp and its native assets, pinned exactly.
+    if($PackageId-ceq'PiSharp.Tools.Skia'){
+        foreach($id in @('SkiaSharp','SkiaSharp.NativeAssets.Win32','SkiaSharp.NativeAssets.macOS','SkiaSharp.NativeAssets.Linux.NoDependencies')){$external[$id]='4.152.1'}
+    }
     # Decision 0003: Jint is pinned exactly; its parser Acornima is transitive and not a package dependency of its own.
     if($PackageId-ceq'PiSharp.Codemode'){$external['Jint']='4.16.3'}
     $expected=[Collections.Generic.HashSet[string]]::new([string[]]@($siblings[$PackageId]+@($external.Keys)),[StringComparer]::Ordinal)

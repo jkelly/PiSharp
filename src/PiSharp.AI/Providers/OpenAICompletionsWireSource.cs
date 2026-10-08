@@ -16,7 +16,7 @@ public sealed record OpenAICompletionsTokenRates(decimal Input = 0, decimal Outp
 { public ImmutableArray<TokenRateTier> Tiers { get; init; } = []; }
 
 public sealed record OpenAICompletionsWireOptions(int MaximumChunks = 4096, int MaximumChunkCharacters = 65_536,
-    int MaximumInputCharacters = 1_048_576, int MaximumContentSlots = 64, int MaximumContentCharacters = 1_048_576,
+    int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = 64, int MaximumContentCharacters = PiRequestBudget.StreamCharacters,
     int MaximumJsonDepth = 32, bool SupportsFinishReason = true, OpenAICompletionsTokenRates? Rates = null)
 {
     /// <summary>Explicit bounded source-view capture; ordinary native progress remains compact.</summary>

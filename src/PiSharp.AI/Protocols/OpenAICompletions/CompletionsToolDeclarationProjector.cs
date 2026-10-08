@@ -26,9 +26,9 @@ public sealed class CompletionsRequestException : Exception
 }
 
 public sealed record CompletionsToolDeclarationProjectionOptions(bool SupportsStrictMode = false,
-    int MaximumMessages = 256, int MaximumEntryCharacters = 65_536, int MaximumInputCharacters = 1_048_576,
+    int MaximumMessages = 256, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
     int MaximumDeclarations = 1024, int MaximumActiveTools = 128, int MaximumJsonDepth = 32,
-    int MaximumOutputCharacters = 1_048_576, int MaximumOutputBytes = 1_048_576)
+    int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes)
 {
     public bool SupportsOpenAIGrammarTools { get; init; }
 }

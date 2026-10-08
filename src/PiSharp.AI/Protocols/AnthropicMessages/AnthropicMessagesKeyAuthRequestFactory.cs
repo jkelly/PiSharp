@@ -11,7 +11,7 @@ public sealed record AnthropicMessagesKeyAuthRequestOptions(double? MaxTokens = 
     JsonData? ModelHeaders = null, JsonData? Headers = null, JsonData? RuntimeHeaders = null,
     string? SessionId = null, bool SendSessionAffinityHeaders = false, string SessionAffinityHeader = "x-session-affinity",
     double MaximumTokenMagnitude = 1_000_000, int MaximumKeyCharacters = 4096, int MaximumBaseUriCharacters = 4096,
-    int MaximumPayloadBytes = 1_048_576, int MaximumPayloadDepth = 32, int MaximumHeaders = 128,
+    int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = 32, int MaximumHeaders = 128,
     int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768)
 {
     /// <summary>Pi abe508e1 anthropic-messages.ts createClient for provider github-copilot: the key travels as
