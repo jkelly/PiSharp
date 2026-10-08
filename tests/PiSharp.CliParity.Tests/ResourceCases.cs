@@ -99,7 +99,7 @@ internal static partial class Program
             var body = sandbox.Requests[0].Json;
             var system = string.Join("\n\n", body.GetProperty("system").EnumerateArray().Select(block => block.GetProperty("text").GetString()));
             var context = $"Project-specific instructions and guidelines:\n\n<project_instructions path=\"{Path.Combine(sandbox.Cwd, "AGENTS.md")}\">\nUse tabs.\n</project_instructions>";
-            var expected = ExpectedDefaultPrompt(sandbox, ["read", "bash", "edit", "write"], context, "Extra rule.");
+            var expected = ExpectedDefaultPrompt(sandbox, DefaultTools, context, "Extra rule.");
             var skills = "<skills>\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\n" +
                 "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n" +
                 $"<available_skills>\n  <skill>\n    <name>deploy</name>\n    <description>Deploy the app &lt;safely&gt;</description>\n    <location>{skill}</location>\n  </skill>\n</available_skills>\n</skills>";

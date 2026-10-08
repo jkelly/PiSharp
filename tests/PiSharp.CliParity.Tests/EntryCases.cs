@@ -17,6 +17,7 @@ internal static partial class Program
         ("entry.rpc-mode-dispatches-on-standard-streams", RpcMode),
         ("entry.interactive-mode-hands-the-session-to-the-frontend", Interactive),
         ("entry.export-writes-html-and-reports-the-path", Export),
+        ("entry.environment-variables-and-proxy-setting", EnvironmentVariables),
     ];
 
     // cli/file-processor.ts: text files wrapped in <file name="…">, images attached with an empty reference, empty files skipped;
@@ -129,6 +130,29 @@ internal static partial class Program
         Check(code == 1 && stderr == $"Error: File not found: {Path.Combine(sandbox.Cwd, "missing.jsonl")}\n", "missing: " + stderr);
     }
 
+    // main.ts and cli/setup.ts: PI_CODING_AGENT/AI_AGENT for children, --offline sets PI_OFFLINE and PI_SKIP_VERSION_CHECK,
+    // PI_STARTUP_BENCHMARK is interactive-only, PI_PACKAGE_DIR locates the documentation, httpProxy fills HTTP(S)_PROXY.
+    private static async Task EnvironmentVariables()
+    {
+        using var sandbox = new Sandbox("environment");
+        sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), "{\"httpProxy\":\" http://proxy.invalid:8080 \"}");
+        sandbox.Vars["PI_PACKAGE_DIR"] = Path.Combine(sandbox.Root, "package");
+        sandbox.Vars["HTTPS_PROXY"] = "http://kept.invalid";
+        using var stdout = new StringWriter(); using var stderr = new StringWriter();
+        var host = sandbox.Host(stdout, stderr, null) with { ApplicationDirectory = null };
+        var code = await PiCommand.RunAsync(["-p", "--offline", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "hi"], host, CancellationToken.None);
+        Equal(0, code, "exit; " + stderr);
+        Equal("true", sandbox.Vars["PI_CODING_AGENT"], "PI_CODING_AGENT"); Equal("pi", sandbox.Vars["AI_AGENT"], "AI_AGENT");
+        Equal("1", sandbox.Vars["PI_OFFLINE"], "PI_OFFLINE"); Equal("1", sandbox.Vars["PI_SKIP_VERSION_CHECK"], "PI_SKIP_VERSION_CHECK");
+        Equal("http://proxy.invalid:8080", sandbox.Vars["HTTP_PROXY"], "HTTP_PROXY from the trimmed setting");
+        Equal("http://kept.invalid", sandbox.Vars["HTTPS_PROXY"], "an existing HTTPS_PROXY is kept");
+        var system = sandbox.Requests[0].Json.GetProperty("system")[0].GetProperty("text").GetString()!;
+        Check(system.Contains("- Main documentation: " + Path.Join(sandbox.Root, "package", "README.md") + "\n", StringComparison.Ordinal), "PI_PACKAGE_DIR docs");
+        sandbox.Vars["PI_STARTUP_BENCHMARK"] = "yes";
+        var (benchCode, _, benchErr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "hi");
+        Check(benchCode == 1 && benchErr == "Error: PI_STARTUP_BENCHMARK only supports interactive mode\n", "benchmark: " + benchErr);
+    }
+
     /// <summary>Standard input that ends only after the host answered (an RPC client keeps stdin open until it is done).</summary>
     private sealed class GatedInput(Stream inner) : Stream
     {
@@ -176,7 +200,7 @@ internal static partial class Program
         Equal("session", header["type"]!.GetValue<string>(), "header type");
         var types = lines.Skip(1).Select(line => JsonNode.Parse(line)!["type"]!.GetValue<string>()).ToArray();
         Check(types.First() == "agent_start" && types.Last() == "agent_settled", "event order: " + string.Join(",", types));
-        Check(!types.Contains("response"), "no command responses");
+        Check(!types.Contains("response") && !types.Any(type => type.StartsWith("pisharp_", StringComparison.Ordinal)), "only session events: " + string.Join(",", types));
     }
 
     // system-prompt.ts buildSystemPromptSections with the default tools (read, bash, edit, write), joined as getSystemMessageText does.
@@ -189,8 +213,11 @@ internal static partial class Program
         var system = string.Join("\n\n", body.GetProperty("system").EnumerateArray().Select(block => block.GetProperty("text").GetString()));
         File.WriteAllText(Path.Combine(Path.GetTempPath(), "cliparity-system.txt"), system);
         File.WriteAllText(Path.Combine(Path.GetTempPath(), "cliparity-body.json"), sandbox.Requests[0].Body);
-        Equal(ExpectedDefaultPrompt(sandbox, ["read", "bash", "edit", "write"]), system, "system prompt");
+        Equal(ExpectedDefaultPrompt(sandbox, DefaultTools), system, "system prompt");
     }
+
+    /// <summary>Pi's default tools (read, bash, edit, write); bash runs only where PiSharp's process layer does (Windows in this build).</summary>
+    private static string[] DefaultTools => OperatingSystem.IsWindows() ? ["read", "bash", "edit", "write"] : ["read", "edit", "write"];
 
     /// <summary>The upstream default prompt for <paramref name="tools"/> (built-in snippets and guidelines), with no context files or skills.</summary>
     private static string ExpectedDefaultPrompt(Sandbox sandbox, string[] tools, string? projectContext = null, string? append = null)

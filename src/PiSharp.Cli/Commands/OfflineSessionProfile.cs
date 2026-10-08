@@ -655,8 +655,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         /// session, every session file of the protected session directories, and the extension package and snapshot roots.</summary>
         private bool IsPiProtected(string target) => IsReserved(target) ||
             ProtectedRoots.Any(root => Comparer.Equals(root, target) || Within(root, target)) ||
-            Pi!.ProtectedDirectories.Any(directory => Comparer.Equals(Path.GetDirectoryName(target), Path.TrimEndingDirectorySeparator(directory)) &&
-                target.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase));
+            target.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase) &&
+            (Pi!.ProtectedDirectories.Any(directory => Comparer.Equals(Path.GetDirectoryName(target), Path.TrimEndingDirectorySeparator(directory))) ||
+                Pi.ProtectedTrees.Any(root => Within(root, target)));
         private ToolActionAuthorization AuthorizePi(PreparedToolAction action)
         {
             bool allow;

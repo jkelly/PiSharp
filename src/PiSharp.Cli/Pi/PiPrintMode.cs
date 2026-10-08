@@ -32,7 +32,8 @@ internal static class PiPrintMode
         var connection = new BoundedRpcConnection(async (record, recordToken) =>
         {
             var type = record.Value.TryGetProperty("type", out var kind) ? kind.GetString() : null;
-            if (json && type != "response")
+            // Session events only: command responses and PiSharp's own RPC records (pisharp_*) are not part of Pi's JSON stream.
+            if (json && type != "response" && type?.StartsWith("pisharp_", StringComparison.Ordinal) != true)
             {
                 await outputGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
                 try { await stdout.WriteAsync((record.ToString() + "\n").AsMemory(), CancellationToken.None).ConfigureAwait(false); await stdout.FlushAsync(CancellationToken.None).ConfigureAwait(false); }

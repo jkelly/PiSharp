@@ -33,7 +33,11 @@ public static class RpcSessionCommand
     private sealed record Arguments(string Session, string Workspace, string? Script, bool Latest, string? Leaf,
         ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi, OfflineBashAuthorization? Bash,
         NativeExtensionConfiguration? Extension, bool SupportsImages, ImmutableArray<SessionCatalogStore> Stores, string SessionMode, SettingsModelSelection? Live,
-        PromptTemplateCliConfiguration Prompts, StartupSettingsRequest? Settings, string? Thinking, ToolSelectionCliOptions Tools, SkillCliConfiguration Skills);
+        PromptTemplateCliConfiguration Prompts, StartupSettingsRequest? Settings, string? Thinking, ToolSelectionCliOptions Tools, SkillCliConfiguration Skills)
+    {
+        /// <summary><c>--tool-policy pi|explicit</c> (decision 0004); these verbs default to explicit.</summary>
+        internal string? ToolPolicy { get; init; }
+    }
 
     public static Task<int> RunAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
         CancellationToken cancellationToken = default, PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
@@ -121,7 +125,8 @@ public static class RpcSessionCommand
                     (pi is null ? null : new InitialToolSelection(PiSharp.Tools.BuiltinToolPrompts.DefaultToolNames, true)),
                 mcpAdmission: parsed.Tools.NoMcp && !hostAdmission ? null : mcpAdmission,
                 toolSettings: PiSharp.Tools.BuiltinToolSettings.FromSettings(settings?.Values),
-                originalSystemPrompt: pi?.SystemPrompt, toolPolicy: pi?.ToolPolicy).ConfigureAwait(false);
+                originalSystemPrompt: pi?.SystemPrompt, toolPolicy: pi?.ToolPolicy ?? (parsed.ToolPolicy == "pi"
+                    ? new PiSharp.Cli.Pi.PiToolPolicy(PiSharp.Cli.Pi.PiToolPolicyMode.Pi) { ProtectedDirectories = [Path.GetDirectoryName(parsed.Session)!] } : null)).ConfigureAwait(false);
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();
@@ -321,7 +326,7 @@ public static class RpcSessionCommand
             if (key is not ("--session" or "--workspace" or "--offline-script" or "--offline-api" or "--offline-images" or "--provider" or "--model" or "--models" or "--max-output-tokens" or "--leaf" or "--allow-read" or "--allow-write" or
                 "--bash-executable" or "--bash-spill-root" or "--allow-bash-command" or "--bash-timeout" or "--session-store" or "--session-mode" or
                 "--extension-package" or "--extension-manifest" or "--extension-approval" or "--extension-snapshot-root" or "--enable-extension-tool" or "--deny-extension-tool" or "--enable-extension-command" or
-                "--user-settings" or "--project-settings" or "--steering-mode" or "--follow-up-mode" or "--thinking") ||
+                "--user-settings" or "--project-settings" or "--steering-mode" or "--follow-up-mode" or "--thinking" or "--tool-policy") ||
                 ++index >= args.Length) throw Invalid();
             var value = args[index];
             if (key == "--allow-read") reads.Add(SessionCommands.Absolute(value));
@@ -372,7 +377,8 @@ public static class RpcSessionCommand
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))) throw Invalid();
         return new(SessionCommands.Absolute(session), SessionCommands.Absolute(workspace), script is null ? null : SessionCommands.Absolute(script),
             !root && leaf is null, leaf, reads.ToImmutable(), writes.ToImmutable(), model.Api, bash, extension, imageInput == "true", stores.ToImmutable(), sessionMode, liveSelection,
-            new(prompts.ToImmutable()), SettingsStartupConfiguration.FromOptions(options), thinking, tools, new(skills.ToImmutable()));
+            new(prompts.ToImmutable()), SettingsStartupConfiguration.FromOptions(options), thinking, tools, new(skills.ToImmutable()))
+        { ToolPolicy = options.TryGetValue("--tool-policy", out var policy) ? policy is "pi" or "explicit" ? policy : throw Invalid() : null };
     }
     private static SessionCommandException Invalid() => new(SessionCommandFailure.InvalidArguments);
     private static bool Unicode(string value)

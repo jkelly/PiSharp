@@ -129,6 +129,7 @@ internal static partial class Program
             var tools = sandbox.Requests[0].Json.GetProperty("tools").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!).ToArray();
             Check(!tools.Contains("bash"), "no bash under the explicit policy: " + string.Join(",", tools));
         }),
+        ("tools.session-verbs-default-to-explicit-and-accept-tool-policy-pi", SessionVerbToolPolicy),
         ("tools.pi-policy-bash-runs-any-command-with-the-full-environment", async () =>
         {
             if (!OperatingSystem.IsWindows()) return; // The native process layer is Windows-only in this build (see the report).
@@ -145,6 +146,35 @@ internal static partial class Program
             finally { Environment.SetEnvironmentVariable("CLIPARITY_MARKER", null); }
         }),
     ];
+
+    // Decision 0004: the explicit session verbs default to the explicit policy and accept --tool-policy pi.
+    private static async Task SessionVerbToolPolicy()
+    {
+        using var sandbox = new Sandbox("verb-policy");
+        var outside = sandbox.Write("outside.txt", "verb outside");
+        foreach (var (policy, allowed) in new[] { ((string?)null, false), ("explicit", false), ("pi", true) })
+        {
+            sandbox.Requests.Clear();
+            sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("read", new { path = outside }) : AnthropicText("done");
+            string[] args = ["session", "rpc", "--session", Path.Combine(sandbox.Cwd, "verb.jsonl"), "--workspace", sandbox.Cwd, "--live", "--provider", "anthropic",
+                "--model", "claude-sonnet-4-5", "--session-mode", "new-memory", .. policy is null ? Array.Empty<string>() : ["--tool-policy", policy]];
+            var settled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var connection = new PiSharp.Cli.Interactive.BoundedRpcConnection((record, _) =>
+            {
+                if (record.Value.GetProperty("type").GetString() == "agent_settled") settled.TrySetResult();
+                return ValueTask.CompletedTask;
+            });
+            using var error = new StringWriter();
+            var host = PiSharp.Cli.Commands.RpcSessionCommand.RunWithPresentationAsync(args, connection.Input, connection.Output, error, null!, CancellationToken.None,
+                liveRuntime: sandbox.Runtime());
+            await connection.SendAsync(PiSharp.Contracts.JsonData.Parse("{\"id\":\"1\",\"type\":\"prompt\",\"message\":\"read\"}"), CancellationToken.None);
+            await settled.Task.WaitAsync(TimeSpan.FromSeconds(60));
+            connection.CompleteInput();
+            Equal(0, await host, "verb exit (" + policy + "); " + error);
+            await connection.DisposeAsync();
+            Equal(allowed, ToolResultText(sandbox.Requests[1]).Contains("verb outside", StringComparison.Ordinal), "policy " + (policy ?? "default"));
+        }
+    }
 
     /// <summary>The tool result text an Anthropic request carries back to the model.</summary>
     private static string ToolResultText(Seen request)

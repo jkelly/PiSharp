@@ -113,6 +113,10 @@ internal static class PiCommand
         // Source startupSettingsManager: SettingsManager.create(cwd, agentDir) reads the project layer (projectTrusted defaults to true).
         var startupSettings = PiSettings.Load(cwd, agentDir, projectTrusted: true);
         var startupDiagnostics = startupSettings.DrainDiagnostics();
+        // http-dispatcher.ts applyHttpProxySettings: the global httpProxy fills HTTP_PROXY and HTTPS_PROXY when they are unset.
+        if (startupSettings.Global["httpProxy"] is JsonValue proxyValue && proxyValue.TryGetValue<string>(out var proxy) && PiArgs.JsTrim(proxy) is { Length: > 0 } trimmedProxy)
+            foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY" })
+                if (host.GetEnvironment(name) is null) host.SetEnvironment(name, trimmedProxy);
 
         if (parsed.Help)
         {
@@ -234,21 +238,28 @@ internal static class PiCommand
 
         var allDiagnostics = Deduplicate([.. startupDiagnostics, .. runtimeDiagnostics]);
         if (appMode != PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
+        if (IsTruthyEnvFlag(host.GetEnvironment("PI_STARTUP_BENCHMARK")) && appMode != PiAppMode.Interactive)
+        { await Error("PI_STARTUP_BENCHMARK only supports interactive mode").ConfigureAwait(false); return 1; }
+        var packageDir = host.GetEnvironment("PI_PACKAGE_DIR") is { Length: > 0 } configuredPackage ? PiPaths.NormalizePath(configuredPackage, home) : null;
 
         var policyName = parsed.ToolPolicy ?? settings.ToolPolicy ?? "pi";
         var toolPolicy = policyName == "explicit" || !projectTrusted ? PiToolPolicy.Explicit : new PiToolPolicy(PiToolPolicyMode.Pi)
         {
-            ProtectedDirectories = [.. new[] { plan.SessionDirectory, Path.Join(agentDir, "sessions") }.OfType<string>().Select(Path.GetFullPath).Distinct(PiPaths.Comparer)]
+            ProtectedDirectories = [.. new[] { plan.SessionDirectory, Path.GetDirectoryName(plan.SessionPath) }.OfType<string>().Select(Path.GetFullPath).Distinct(PiPaths.Comparer)],
+            ProtectedTrees = [Path.GetFullPath(Path.Join(agentDir, "sessions"))]
         };
         var trustedDirectories = new Dictionary<string, bool>(PiPaths.Comparer) { [Path.GetFullPath(sessionCwd)] = projectTrusted };
         var options = new PiEntryOptions
         {
             ToolPolicy = toolPolicy, Settings = startupSnapshot, Selection = selection, LiveRuntime = runtime,
-            SystemPrompt = PiSystemPrompt.Admission(resources, skills?.Resources, host.ApplicationDirectory),
+            SystemPrompt = PiSystemPrompt.Admission(resources, skills?.Resources, host.ApplicationDirectory ?? packageDir),
             HeaderId = plan.HeaderId, HeaderTimestamp = plan.HeaderTimestamp, SessionName = sessionName,
             Skills = skills, PromptTemplates = prompts, ThinkingLevel = parsed.Thinking, ThinkingFromCli = parsed.Thinking is not null,
             InitialMessage = initialMessage, InitialImages = [.. initialImages.Select(image => image.ToJson())], InitialMessages = [.. parsed.Messages],
             Theme = startupSettings.Theme, TuiMode = parsed.TuiMode, Verbose = parsed.Verbose, Themes = resources.Themes,
+            // interactive-mode.ts: the header hides only for quietStartup true, the details for true or "header"; --verbose shows both.
+            ShowStartupHeader = parsed.Verbose || settings.QuietStartup is not true, ShowStartupDetails = parsed.Verbose || settings.QuietStartup is false,
+            MigratedAuthProviders = migrations.MigratedAuthProviders, DeprecationWarnings = migrations.DeprecationWarnings,
             ProjectTrusted = PiProjectTrust.Seam(trustedDirectories), StartupDiagnostics = allDiagnostics,
             ExtensionPaths = [.. (parsed.Extensions ?? []).Select(path => PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home) : path)],
             NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal)

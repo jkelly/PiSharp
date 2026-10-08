@@ -15,6 +15,9 @@ internal sealed partial class OfflineSessionProfile
     private static (BashTool? Bash, UserBashHost? UserBash, OwnedProcessCleanup? Cleanup, string? Shell) PiBash(
         PiSharp.Cli.Pi.PiToolPolicy policy, BuiltinToolSettings settings, string workspace, Func<BashSessionEnvironment?> session)
     {
+        // The native process runner is Windows-only in this build (NativeProcessRunner reports UnsupportedPlatform elsewhere, and
+        // PiSharp.Tools has no production Unix process-group admission yet), so bash is not offered where it cannot run.
+        if (!OperatingSystem.IsWindows()) return (null, null, null, null);
         ShellConfiguration shell;
         try { shell = ShellDiscovery.Resolve(settings.ShellPath); }
         catch (ShellDiscoveryException) { return (null, null, null, null); }

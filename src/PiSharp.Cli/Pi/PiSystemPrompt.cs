@@ -27,10 +27,11 @@ internal static class PiSystemPrompt
         KeyValuePair.Create(PiSharp.Codemode.CodemodeToolDefinition.Name, PiSharp.Codemode.CodemodeToolDefinition.PromptGuidelines)
     ];
 
-    /// <summary>Source getReadmePath/getDocsPath/getExamplesPath: PiSharp's documentation next to the application.</summary>
+    /// <summary>Source getReadmePath/getDocsPath/getExamplesPath under getPackageDir: <c>PI_PACKAGE_DIR</c> when set by the entry, else
+    /// PiSharp's documentation next to the application.</summary>
     internal static OriginalPromptDocumentation Documentation(string? applicationDirectory = null)
     {
-        var root = applicationDirectory ?? AppContext.BaseDirectory;
+        var root = Path.TrimEndingDirectorySeparator(applicationDirectory ?? AppContext.BaseDirectory);
         return new(Path.Join(root, "README.md"), Path.Join(root, "docs"), Path.Join(root, "examples"));
     }
 

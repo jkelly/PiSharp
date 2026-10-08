@@ -16,6 +16,8 @@ internal enum PiToolPolicyMode { Pi, Explicit }
 internal sealed record PiToolPolicy(PiToolPolicyMode Mode)
 {
     internal ImmutableArray<string> ProtectedDirectories { get; init; } = [];
+    /// <summary>Directories whose <c>.jsonl</c> files are protected at any depth (the agent directory's <c>sessions</c> tree).</summary>
+    internal ImmutableArray<string> ProtectedTrees { get; init; } = [];
     internal IReadOnlyDictionary<string, string>? Environment { get; init; }
     internal static PiToolPolicy Explicit { get; } = new(PiToolPolicyMode.Explicit);
 }
@@ -57,6 +59,11 @@ internal sealed record PiEntryOptions
     internal string? TuiMode { get; init; }
     internal bool Verbose { get; init; }
     internal ImmutableArray<PiTheme> Themes { get; init; } = [];
+    internal bool ShowStartupHeader { get; init; } = true;
+    internal bool ShowStartupDetails { get; init; } = true;
+    /// <summary>Source runMigrations results the interactive mode reports (migrated auth providers, deprecation warnings).</summary>
+    internal ImmutableArray<string> MigratedAuthProviders { get; init; } = [];
+    internal ImmutableArray<string> DeprecationWarnings { get; init; } = [];
     /// <summary>The project trust of the session cwd and of other directories the run resolved (IMPL-H, IMPL-E).</summary>
     internal Func<string, bool> ProjectTrusted { get; init; } = _ => false;
     internal ImmutableArray<PiDiagnostic> StartupDiagnostics { get; init; } = [];
