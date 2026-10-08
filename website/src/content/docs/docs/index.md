@@ -5,7 +5,7 @@ description: What PiSharp is, what it targets, and where to start.
 
 PiSharp is an independent native .NET implementation of the [Pi coding agent](https://pi.dev). It targets .NET 10, has no external package dependencies, and runs without Node.
 
-PiSharp's version is the Pi version it matches. The current baseline is **Pi v0.99.1**, pinned to commit `d86654a`. See [How versions work](/docs/versioning/).
+PiSharp's version is the Pi version it matches. The current baseline is **Pi v1.1.0**, pinned to commit `abe508e`. See [How versions work](/docs/versioning/).
 
 ## What's included
 

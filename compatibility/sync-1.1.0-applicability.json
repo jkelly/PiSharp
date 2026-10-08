@@ -104,7 +104,7 @@
             "endUtf16": 37105
           }
         },
-        "note": "Pending: compatibility/extensions/event-catalog.json is a whole v0.99.1 evidence inventory; refresh every event span at v1.1.0 together, not row by row."
+        "note": "Refreshed in compatibility/extensions/event-catalog.v1.1.0.json (spans match)."
       }
     },
     {
@@ -129,7 +129,7 @@
         "tests/PiSharp.CliSync.Tests"
       ],
       "outcome": "implemented",
-      "notes": "RPC, session events, JSON mode (after agent_end) and native extension observers carry aborted. Pending catalog refresh recorded in eventCatalogRefresh.",
+      "notes": "RPC, session events, JSON mode (after agent_end) and native extension observers carry aborted. The v1.1.0 event catalog carries the refreshed spans.",
       "eventCatalogRefresh": {
         "event:agent_settled": {
           "eventDeclaration": {
@@ -146,7 +146,7 @@
             "endUtf16": 56681
           }
         },
-        "note": "Pending: compatibility/extensions/event-catalog.json is a whole v0.99.1 evidence inventory; refresh every event span at v1.1.0 together, not row by row."
+        "note": "Refreshed in compatibility/extensions/event-catalog.v1.1.0.json (spans match)."
       }
     },
     {
@@ -168,7 +168,7 @@
         "tests/PiSharp.CliSync.Tests"
       ],
       "outcome": "implemented",
-      "notes": "ShellCommandExecutor ports bash-executor.ts (streaming with ANSI hold-back, 2x50KB rolling buffer, spill file, tail truncation); RPC bash/abort_bash with bash_execution_update, interactive !/!!. Needs --bash-executable/--bash-spill-root (Windows native runner). Not ported: user_bash extension interception and shellCommandPrefix (no PiSharp counterpart). RPC command inventory rows rpc.command.bash, rpc.command.abort_bash and rpc.event.bash_execution_update are now implemented; the inventory is pinned v0.99.1 evidence and is refreshed with the v1.1.0 surface refresh."
+      "notes": "ShellCommandExecutor ports bash-executor.ts (streaming with ANSI hold-back, 2x50KB rolling buffer, spill file, tail truncation); RPC bash/abort_bash with bash_execution_update, interactive !/!!. Needs --bash-executable/--bash-spill-root (Windows native runner). Not ported: user_bash extension interception and shellCommandPrefix (no PiSharp counterpart). RPC command inventory rows rpc.command.bash, rpc.command.abort_bash and rpc.event.bash_execution_update are now implemented; they are recorded in coding-agent-command-rpc-inventory.v1.1.0.json."
     },
     {
       "id": "ext.tool-renderer",
@@ -282,7 +282,7 @@
         "tests/PiSharp.CodingAgent.Tests"
       ],
       "outcome": "implemented",
-      "notes": "Reload and late registration keep tools pending. Owner decision (2026-10-08): follow upstream v1.1.0 on open and tree navigation: unbound transcript tools become pending and activate on registration; tools disabled or excluded stay off. As upstream, CLI sessions opened with an initial selection (flags, settings or MCP) apply that selection instead of restoring the transcript. The restored loadout is recorded at open or navigation (upstream records at the next prompt), because PiSharp resolves every later turn from the transcript. Also as upstream: a recorded tool whose declaration changed is restored by name with its current binding (on transcript restore, tree navigation and opens with initial names), a now-hidden recorded tool is skipped and stays pending, and navigating to a branch with no system message keeps the current tools. Unknown names in initial selections and explicit activation are still rejected."
+      "notes": "Reload and late registration keep tools pending. Owner decision (2026-10-08): follow upstream v1.1.0 on open and tree navigation: unbound transcript tools become pending and activate on registration; tools disabled or excluded stay off. As upstream, CLI sessions opened with an initial selection (flags, settings or MCP) apply that selection instead of restoring the transcript. The restored loadout is recorded at open or navigation (upstream records at the next prompt), because PiSharp resolves every later turn from the transcript. Also as upstream: a recorded tool whose declaration changed is restored by name with its current binding (on transcript restore, tree navigation and opens with initial names), a now-hidden recorded tool is skipped and stays pending, and navigating to a branch with no system message keeps the current tools. Owner decision (2026-10-08): as upstream, unknown or capped-out names in --tools, defaultTools, SDK initial names and explicit activation select nothing and never become pending; a --tools allowlisted MCP tool activates when it registers. A transcript or explicit system message with an unbound declaration stays strict. Deviations: upstream also activates codemode and deferred tools named in initial names (no codemode or tool_search yet); a background MCP publication does not re-activate an allowlisted tool the user has since turned off."
     },
     {
       "id": "prompt.hidden-tools",
@@ -727,14 +727,16 @@
       ],
       "change": "Grammar tool replay ids (ctc_) across providers.",
       "pisharp": [
-        "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTranscriptProjector.cs"
+        "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTranscriptProjector.cs",
+        "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesToolDeclarationProjector.cs",
+        "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTextToolTransport.cs"
       ],
       "status": "port",
       "workPackage": "2f",
       "release": "1.1.0",
-      "outcome": "remaining",
-      "test": "planned.sync.responses-ctc-replay-id",
-      "notes": "Found during 2f; not yet ported."
+      "outcome": "implemented",
+      "test": "tests/PiSharp.ProviderSync.Tests",
+      "notes": "Grammar tools become custom tools when compat.supportsOpenAIGrammarTools is set; transcripts replay custom_tool_call/custom_tool_call_output and keep an item id only for the same model with the matching prefix (fc_ for function_call, ctc_ for custom_tool_call); the stream maps custom_tool_call input events."
     },
     {
       "id": "provider.prompt-length-pricing",
@@ -744,15 +746,17 @@
       ],
       "change": "Prompt-length pricing tiers applied to cost.",
       "pisharp": [
+        "src/PiSharp.AI/Protocols/PromptLengthPricing.cs",
+        "src/PiSharp.AI/Providers/NativeProviderFactory.cs",
         "src/PiSharp.AI/Protocols/AnthropicMessages",
         "src/PiSharp.AI/Protocols/OpenAICompletions"
       ],
       "status": "port",
       "workPackage": "2f",
       "release": "1.1.0",
-      "outcome": "remaining",
-      "test": "planned.sync.prompt-length-pricing",
-      "notes": "Tiers apply in the Responses and Google cost paths only; Anthropic and Completions use flat rates (pre-existing gap, now visible with Haiku 5.5 above 100k input tokens)."
+      "outcome": "implemented",
+      "test": "tests/PiSharp.ProviderSync.Tests",
+      "notes": "One shared selection ported from models.ts calculateCost (input + cache read + cache write strictly above the threshold, highest threshold wins, 1 h cache writes at twice the tier input rate) for the Anthropic, Responses, Completions, Google and Mistral cost paths. Native Anthropic composition now binds catalog cost tiers and allowedFallbackModels costs."
     },
     {
       "id": "auth.refresh-after-deadline",
@@ -775,19 +779,16 @@
       "notes": "Owner decision (2026-10-08): persist a refresh that succeeds after its deadline, as upstream refreshStoredOAuthCredential does (RefreshTimeout only signals the refresh). Rotated refresh tokens are never discarded; serialization, the logout re-check and caller cancellation are unchanged."
     }
   ],
-  "catalogRefreshPending": {
-    "files": [
-      "compatibility/extensions/event-catalog.json",
-      "compatibility/coding-agent-command-rpc-inventory.json"
+  "catalogRefresh": {
+    "files": {
+      "compatibility/extensions/event-catalog.json": "compatibility/extensions/event-catalog.v1.1.0.json",
+      "compatibility/coding-agent-command-rpc-inventory.json": "compatibility/coding-agent-command-rpc-inventory.v1.1.0.json"
+    },
+    "generators": [
+      "tools/SurfaceInventory/build-event-catalog.mjs",
+      "tools/SurfaceInventory/build-command-rpc-inventory.mjs"
     ],
-    "reason": "Whole-file v0.99.1 evidence inventories pinned by other evidence; refresh them together at v1.1.0 rather than row by row.",
-    "newSurfaces": [
-      "event agent_settled.aborted (native emission exists)",
-      "event tool_execution_end.durationMs",
-      "rpc bash, abort_bash, bash_execution_update",
-      "stderr record mcp_diagnostic",
-      "failure codes LiveAuthenticationFailed, LiveAzureEndpoint",
-      "commands mcp add|remove|list|login|logout, /login, /logout"
-    ]
+    "test": "tools/SurfaceInventory/inventory-refresh.test.mjs",
+    "notes": "The v0.99.1 files stay byte-identical as pinned evidence (each generator reproduces them from baseline.lock.json); the v1.1.0 files are generated from target.lock.json with authored native-status overlays. See docs/compatibility/baseline.md."
   }
 }
