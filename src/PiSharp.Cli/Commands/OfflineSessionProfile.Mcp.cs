@@ -101,6 +101,7 @@ internal sealed partial class OfflineSessionProfile
                     admittedBinder?.Invoke(owner, attachment);
                     ownership.BindOwner(owner, attachment);
                 }, ServersPromptSource = AdmitMcpServersPromptSource(acquired.ServersPromptSource) };
+                if (!acquired.HostDiscoveryTargets.IsDefaultOrEmpty) _policy.AdmitHostDiscoveryTargets(acquired.HostDiscoveryTargets);
                 // Pi 1.1.0 ignores selected names the discovered catalog does not register; they are not validated here.
                 return acquired;
             }
