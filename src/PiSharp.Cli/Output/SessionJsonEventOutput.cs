@@ -141,7 +141,8 @@ public sealed class SessionJsonEventOutput : IAgentEventSink, ISessionOperationE
             {
                 ThrowIfFailed();
                 System.Collections.Immutable.ImmutableArray<JsonData> records;
-                try { records = _projector.Project(observation, _session.Snapshot, _historyLength); }
+                try { records = _projector.Project(observation, _session.Snapshot, _historyLength,
+                    observation is AgentLoopEnded ended && _session.WillRetryAfterAgentEnd(ended.Result)); }
                 catch (RpcDispatchException error) { throw Poison(error.Failure == RpcDispatchFailure.ResourceLimit ?
                     SessionJsonEventOutputFailure.ResourceLimit : SessionJsonEventOutputFailure.ProjectionFailed); }
                 catch (Exception) { throw Poison(SessionJsonEventOutputFailure.ProjectionFailed); }
@@ -152,11 +153,15 @@ public sealed class SessionJsonEventOutput : IAgentEventSink, ISessionOperationE
         finally { Leave(); _inside.Value = prior; }
     }
 
-    /// <summary>Source json mode: <c>agent_settled</c> with <c>aborted</c> once a session-level run has no automatic work left.</summary>
+    /// <summary>Source json mode: every session event as RPC emits it (toJsonEvent), including <c>agent_settled</c> with
+    /// <c>aborted</c> once a session-level run has no automatic work left.</summary>
     public async ValueTask EmitAsync(SessionOperationEvent observation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(observation);
-        if (observation is not SessionOperationSettled settled) return;
+        JsonData? sessionRecord;
+        try { sessionRecord = RpcSessionEventProjector.Project(observation, new(MaximumOutputBytes: _options.MaximumRecordBytes - 1)); }
+        catch (Exception) { throw Poison(SessionJsonEventOutputFailure.ProjectionFailed); }
+        if (sessionRecord is null) return;
         try
         {
             if (_inside.Value) throw new SessionJsonEventOutputException(SessionJsonEventOutputFailure.InvalidState);
@@ -175,8 +180,7 @@ public sealed class SessionJsonEventOutput : IAgentEventSink, ISessionOperationE
             try
             {
                 ThrowIfFailed();
-                await WriteAsync(JsonData.Parse(settled.Aborted ? """{"type":"agent_settled","aborted":true}""" :
-                    """{"type":"agent_settled","aborted":false}"""), cancellationToken).ConfigureAwait(false);
+                await WriteAsync(sessionRecord, cancellationToken).ConfigureAwait(false);
             }
             finally { _wire.Release(); }
         }

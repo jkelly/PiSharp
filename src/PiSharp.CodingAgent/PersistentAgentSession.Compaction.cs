@@ -187,16 +187,16 @@ public sealed partial class PersistentAgentSession
                         ? SessionSummaryRequestBuilder.TurnPrefix(plan, configuration.Model, log.Header.Id, request.SummaryOptions) : null;
                     if (provided is null)
                     {
-                        if (prefix is null) generated = await GenerateSummaryAsync(generator, history, work).ConfigureAwait(false);
+                        if (prefix is null) generated = await GenerateRetryingSummaryAsync(generator, history, work, "compaction", request.Reason).ConfigureAwait(false);
                         else
                         {
                             var priorText = plan.PreviousSummary ?? "No prior history."; TokenUsage? priorUsage = null;
                             if (!plan.MessagesToSummarize.IsEmpty)
                             {
-                                var result = await GenerateSummaryAsync(generator, history, work).ConfigureAwait(false);
+                                var result = await GenerateRetryingSummaryAsync(generator, history, work, "compaction", request.Reason).ConfigureAwait(false);
                                 ValidateGenerated(result); work.ThrowIfCancellationRequested(); priorText = result.Text; priorUsage = result.Usage;
                             }
-                            var resultPrefix = await GenerateSummaryAsync(generator, prefix, work).ConfigureAwait(false); ValidateGenerated(resultPrefix);
+                            var resultPrefix = await GenerateRetryingSummaryAsync(generator, prefix, work, "compaction", request.Reason).ConfigureAwait(false); ValidateGenerated(resultPrefix);
                             generated = new(priorText + "\n\n---\n\n**Turn Context (split turn):**\n\n" + resultPrefix.Text,
                                 priorUsage is null ? resultPrefix.Usage : CombineSummaryUsage(priorUsage, resultPrefix.Usage));
                         }
@@ -218,8 +218,8 @@ public sealed partial class PersistentAgentSession
                         if (branchPlan.Messages.IsEmpty) generated = new("No content to summarize", TokenUsage.Zero);
                         else
                         {
-                            var result = await GenerateSummaryAsync(generator, SessionSummaryRequestBuilder.Branch(branchPlan, configuration.Model,
-                                Guid.CreateVersion7().ToString(), branchRequest.SummaryOptions), work).ConfigureAwait(false);
+                            var result = await GenerateRetryingSummaryAsync(generator, SessionSummaryRequestBuilder.Branch(branchPlan, configuration.Model,
+                                Guid.CreateVersion7().ToString(), branchRequest.SummaryOptions), work, "branchSummary", null).ConfigureAwait(false);
                             ValidateGenerated(result); generated = result with { Text = SessionSummaryRequestBuilder.BranchPreamble + result.Text };
                         }
                     }

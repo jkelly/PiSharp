@@ -6,6 +6,7 @@ public sealed partial class RpcSessionDispatcher
 {
     private async ValueTask ObserveMetadataOrOperationAsync(SessionOperationEvent observation)
     {
+        if (await TryObserveSessionEventAsync(observation).ConfigureAwait(false)) return;
         if (observation is not SessionInfoChanged changed)
         {
             await ObserveOperationAsync(observation).ConfigureAwait(false); return;

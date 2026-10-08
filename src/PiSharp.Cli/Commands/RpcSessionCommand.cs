@@ -113,6 +113,9 @@ public static class RpcSessionCommand
                         eventName = diagnostic.EventName, ownerId = diagnostic.OwnerId, ownerGeneration = diagnostic.OwnerGeneration,
                         registrationId = diagnostic.RegistrationId, failure = diagnostic.Failure.ToString() }) + "\n").AsMemory(), token).ConfigureAwait(false);
                     await stderr.FlushAsync(token).ConfigureAwait(false);
+                    // Source RPC onError: an extension_error record on stdout once the dispatcher owns the output.
+                    if (dispatcher is { } rpc) await rpc.PublishExtensionErrorAsync(parsed.Extension?.Package ?? diagnostic.OwnerId,
+                        diagnostic.EventName, diagnostic.ErrorText).ConfigureAwait(false);
                 }, modelSupportsImages: parsed.SupportsImages, liveSelection: liveSelection, liveRuntime: liveRuntime,
                 toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings), mcpAdmission: parsed.Tools.NoMcp && !hostAdmission ? null : mcpAdmission,
                 toolSettings: PiSharp.Tools.BuiltinToolSettings.FromSettings(settings?.Values)).ConfigureAwait(false);

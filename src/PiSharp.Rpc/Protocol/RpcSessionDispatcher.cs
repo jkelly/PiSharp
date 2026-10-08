@@ -1082,7 +1082,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             await run.Ready.Task.ConfigureAwait(false);
             lock (_gate) if (_fatal is not null) throw _fatal;
             if (observation is AgentLoopInputMessageStarted) await PublishQueueAsync(force: false).ConfigureAwait(false);
-            var projected = _events.Project(observation, _session.Snapshot, run.HistoryLength);
+            var projected = _events.Project(observation, _session.Snapshot, run.HistoryLength,
+                observation is AgentLoopEnded ended && _session.WillRetryAfterAgentEnd(ended.Result));
             foreach (var record in projected) await WriteAsync(record).ConfigureAwait(false);
         }
         catch (Exception error) { SignalFatal(error is RpcDispatchException dispatch ? dispatch.Failure : RpcDispatchFailure.SessionRunFailed, error); throw; }

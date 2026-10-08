@@ -253,6 +253,14 @@ internal static class RpcCommandCodec
         using (var writer = new Utf8JsonWriter(bytes)) { writer.WriteStartObject(); fields(writer); writer.WriteEndObject(); }
         return JsonData.Parse(Encoding.UTF8.GetString(bytes.WrittenSpan));
     }
+    /// <summary>Source JSON.stringify text escaping (quotes as \", non-ASCII and HTML characters unescaped) for session event records.</summary>
+    internal static JsonData SourceEvent(string type, Action<Utf8JsonWriter>? fields, RpcDispatchOptions options)
+    {
+        var bytes = new BoundedBuffer(options.MaximumOutputBytes);
+        using (var writer = new Utf8JsonWriter(bytes, new JsonWriterOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
+        { writer.WriteStartObject(); writer.WriteString("type", type); fields?.Invoke(writer); writer.WriteEndObject(); }
+        return JsonData.Parse(Encoding.UTF8.GetString(bytes.WrittenSpan));
+    }
     internal static void Raw(Utf8JsonWriter writer, string field, JsonData value)
     { writer.WritePropertyName(field); writer.WriteRawValue(value.ToString()); }
     internal static void Messages(Utf8JsonWriter writer, string field, ImmutableArray<TranscriptEntry> messages, int maximum, int start = 0)

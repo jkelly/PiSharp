@@ -77,8 +77,20 @@ public static class NativeSessionDiagnosticProjector
         }
     }
 
+    // Pi records every adapter's failure diagnostics on the assistant message; any declared native adapter is recorded here.
     public static bool IsValid(NativeChatDiagnostic? diagnostic)=>diagnostic is null||
-        diagnostic.Adapter==NativeChatAdapter.OpenAICompletions&&Enum.IsDefined(diagnostic.Code);
+        AdapterName(diagnostic.Adapter) is not null&&Enum.IsDefined(diagnostic.Code);
+    /// <summary>Stable wire names of the declared native adapters; null for an undeclared value.</summary>
+    public static string? AdapterName(NativeChatAdapter adapter)=>adapter switch
+    {
+        NativeChatAdapter.OpenAICompletions=>"openai-completions",NativeChatAdapter.PiMessages=>"pi-messages",
+        NativeChatAdapter.GoogleGenerativeAI=>"google-generative-ai",NativeChatAdapter.MistralConversations=>"mistral-conversations",_=>null
+    };
+    private static bool TryAdapter(string? name,out NativeChatAdapter adapter)
+    {
+        foreach(var value in Enum.GetValues<NativeChatAdapter>())if(AdapterName(value)==name){adapter=value;return true;}
+        adapter=default;return false;
+    }
 
     public static JsonData RecordData(string assistantEntryId,long operationGeneration,
         NativeChatDiagnostic? diagnostic,NativeChatDiagnostic? cleanupDiagnostic)
@@ -148,9 +160,9 @@ public static class NativeSessionDiagnosticProjector
     {
         diagnostic=null;if(!data.TryGetProperty(name,out var carrier))return true;
         if(carrier.ValueKind!=JsonValueKind.Object||!carrier.TryGetProperty("adapter",out var adapter)||
-            adapter.ValueKind!=JsonValueKind.String||adapter.GetString()!="openai-completions"||
+            adapter.ValueKind!=JsonValueKind.String||!TryAdapter(adapter.GetString(),out var declared)||
             !carrier.TryGetProperty("code",out var code)||code.ValueKind!=JsonValueKind.String||!TryCode(code.GetString(),out var parsed))return false;
-        diagnostic=new(NativeChatAdapter.OpenAICompletions,parsed);return true;
+        diagnostic=new(declared,parsed);return true;
     }
     private static bool TryCode(string? text,out NativeChatFailureCode code)=>
         Enum.TryParse(text,false,out code)&&Enum.IsDefined(code)&&Enum.GetName(code)==text;
@@ -159,7 +171,7 @@ public static class NativeSessionDiagnosticProjector
     private static void WriteCarrier(Utf8JsonWriter writer,string name,NativeChatDiagnostic? diagnostic)
     {
         if(diagnostic is null)return;writer.WritePropertyName(name);writer.WriteStartObject();
-        writer.WriteString("adapter","openai-completions");writer.WriteString("code",diagnostic.Code.ToString());writer.WriteEndObject();
+        writer.WriteString("adapter",AdapterName(diagnostic.Adapter));writer.WriteString("code",diagnostic.Code.ToString());writer.WriteEndObject();
     }
     private static JsonData Encode(Action<Utf8JsonWriter> write)
     {

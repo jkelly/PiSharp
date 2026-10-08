@@ -57,7 +57,8 @@ public sealed partial class RpcSessionDispatcher
                     writer.WriteBoolean("isScoped", false);
                 }, _options.MaximumOutputBytes);
                 _ = RpcCommandCodec.Success(command, data, _options); // Bound the complete response before durable effects.
-                await _session.ConfigureAsync(new(Model: selected, ThinkingLevel: thinking), token).ConfigureAwait(false);
+                await _session.ConfigureAsync(new(Model: selected, ThinkingLevel: thinking)
+                { ModelSelectSource = command.Type == "cycle_model" ? "cycle" : "set" }, token).ConfigureAwait(false);
                 if (_session.AutomaticRetryConfigured) _session.SetAutomaticRetryContextWindow(retryWindow);
                 return data;
             }

@@ -33,7 +33,7 @@ public sealed partial class PersistentAgentSession
                 {
                     var request = SessionSummaryRequestBuilder.Branch(plan, revision.Configuration.Model,
                         revision.Log.Header.Id, new(CustomInstructions: options.CustomInstructions, ReplaceBranchInstructions: options.ReplaceInstructions));
-                    var actual = generator.GenerateAsync(request, token).AsTask();
+                    var actual = RetrySummaryAsync(() => generator.GenerateAsync(request, token), token, "branchSummary", null).AsTask();
                     var generated = await originals.Join(actual, "tree-summary-generator").ConfigureAwait(false);
                     ValidateGenerated(generated);
                     var (read, modified) = plan.FileOps.ComputeFileLists();

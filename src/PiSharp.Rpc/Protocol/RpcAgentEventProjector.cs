@@ -24,17 +24,18 @@ public sealed class RpcAgentEventProjector
     }
 
     /// <summary>Projects one sequential observation. End messages must follow the session's durable primary sink.</summary>
-    public ImmutableArray<JsonData> Project(AgentEvent observation, PersistentAgentSessionSnapshot snapshot, int historyLength)
+    /// <param name="willRetry">Source agent_end willRetry, decided by the session (<see cref="PersistentAgentSession.WillRetryAfterAgentEnd"/>).</param>
+    public ImmutableArray<JsonData> Project(AgentEvent observation, PersistentAgentSessionSnapshot snapshot, int historyLength, bool willRetry = false)
     {
         ArgumentNullException.ThrowIfNull(observation); ArgumentNullException.ThrowIfNull(snapshot);
         if (historyLength < 0) throw new ArgumentOutOfRangeException(nameof(historyLength));
         if (Interlocked.CompareExchange(ref _projecting, 1, 0) != 0)
             throw new InvalidOperationException("Concurrent event projection is unsupported.");
-        try { return ProjectCore(observation, snapshot, historyLength); }
+        try { return ProjectCore(observation, snapshot, historyLength, willRetry); }
         finally { Volatile.Write(ref _projecting, 0); }
     }
 
-    private ImmutableArray<JsonData> ProjectCore(AgentEvent observation, PersistentAgentSessionSnapshot snapshot, int historyLength)
+    private ImmutableArray<JsonData> ProjectCore(AgentEvent observation, PersistentAgentSessionSnapshot snapshot, int historyLength, bool willRetry)
     {
         JsonData Event(string kind, Action<Utf8JsonWriter>? fields = null) => RpcCommandCodec.Event(kind, fields, options);
         JsonData Message(string kind, JsonData body) => Event(kind, writer => RpcCommandCodec.Raw(writer, "message", body));
@@ -116,7 +117,7 @@ public sealed class RpcAgentEventProjector
                 return [Event("agent_end", writer =>
                 {
                     RpcCommandCodec.Messages(writer, "messages", end.Result.Transcript, options.MaximumReturnedMessages, historyLength);
-                    writer.WriteBoolean("willRetry", false);
+                    writer.WriteBoolean("willRetry", willRetry);
                 })];
             case TurnStreamObserved stream:
                 var delta = Delta(stream.Event);

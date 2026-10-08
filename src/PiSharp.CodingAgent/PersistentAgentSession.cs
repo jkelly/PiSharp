@@ -486,8 +486,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             writeAdmitted = true;
             var acknowledged = await _store.AppendAsync(entries.ToImmutable(), work).ConfigureAwait(false);
             if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+            ModelDescriptor previousModel; long generation;
             lock (_gate)
             {
+                previousModel = _configuration.Model; generation = _operationGeneration;
                 _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(prospective));
                 if (update.ActiveToolNames is not null)
                     SelectPendingToolsLocked(_configuration.Tools.Select(tool => tool.Name).ToImmutableArray(),
@@ -498,6 +500,13 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 _acknowledgedPromptRevision = promptPreparation?.Revision ?? _acknowledgedPromptRevision;
                 restoreActivation();
             }
+            // Source setModel/setThinkingLevel: thinking_level_changed (and thinking_level_select) when the level changed,
+            // then model_select when the model changed. Listener failures cannot undo the committed configuration.
+            writeAdmitted = false;
+            if (entries.Any(entry => entry.Type == "thinking_level_change"))
+                await EmitOperationAsync(new SessionThinkingLevelChanged(generation, prospective.ThinkingLevel, context.ThinkingLevel)).ConfigureAwait(false);
+            if (update.Model is { } selected && selected != previousModel)
+                await EmitOperationAsync(new SessionModelSelected(generation, selected, previousModel, update.ModelSelectSource ?? "set")).ConfigureAwait(false);
             return Snapshot with { IsConfiguring = false };
 
             void Add(string type, Action<Utf8JsonWriter> fields)
@@ -667,6 +676,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             var acknowledged = await _store.AppendAsync([entry], work).ConfigureAwait(false);
             if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             lock (_gate) { _acknowledgedLog = acknowledged.Snapshot; _context = prospective; }
+            // Source appendEntry emits entry_appended after the append; a listener failure cannot undo the committed entry.
+            writeAdmitted = false; await PublishAppendedAsync(acknowledged.Entries).ConfigureAwait(false);
             return new(acknowledged.Entries.Single(), acknowledged, prospective);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested || _closing.IsCancellationRequested || inputAbort.IsCancellationRequested)

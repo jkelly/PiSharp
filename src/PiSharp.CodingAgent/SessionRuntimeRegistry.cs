@@ -51,6 +51,8 @@ public sealed record SessionRuntimeUpdate(ModelDescriptor? Model = null, string?
 {
     /// <summary>Exact ordered model-active selection, committed at the existing durable idle boundary.</summary>
     public ImmutableArray<string>? ActiveToolNames { get; init; }
+    /// <summary>Source model_select source of a model change: "set" (default), "cycle" or "restore".</summary>
+    public string? ModelSelectSource { get; init; }
     /// <summary>Record <see cref="ActiveToolNames"/> even when the names are unchanged, replacing recorded declarations.</summary>
     internal bool ReplaceDeclarations { get; init; }
 }

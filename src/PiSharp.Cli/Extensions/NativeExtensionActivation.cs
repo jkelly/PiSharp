@@ -124,7 +124,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
                 registrationBridge is null ? null : scope => RetireConfiguredOwnerAsync(registrationBridge, mcpBridge, scope));
             await loadOriginal.ConfigureAwait(false);
             var snapshot = registry.CaptureSnapshot();
-            if (snapshot.Registrations.Any(entry => entry.Kind is not ("Tool" or "Command" or "InputHandler" or "ToolCallHandler" or "ToolResultHandler" or "Observation" or "SessionSwitchHandler" or "SessionCreationHandler" or "ContextHandler" or "ContextWithSystemHandler" or "BeforeAgentStartHandler" or "SessionBeforeTreeHandler" or "ToolRenderer")) ||
+            if (snapshot.Registrations.Any(entry => entry.Kind is not ("Tool" or "Command" or "InputHandler" or "ToolCallHandler" or "ToolResultHandler" or "Observation" or "SessionSwitchHandler" or "SessionCreationHandler" or "ContextHandler" or "ContextWithSystemHandler" or "BeforeAgentStartHandler" or "SessionBeforeTreeHandler" or "ToolRenderer" or "UserBashHandler")) ||
                 preflight.Configuration.EnabledTools.Any(name => snapshot.Tools.Count(tool => tool.Name == name) != 1) ||
                 preflight.Configuration.EnabledCommands.Any(name => snapshot.Commands.Count(command => command.Name == name) != 1))
                 throw new NativeExtensionException(NativeExtensionFailure.InvalidConfiguration);
@@ -184,6 +184,8 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         metadata.Attach(owner, owner.Current);
         var settled = new NativeAgentSettledObservationBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         settled.Attach(owner, owner.Current);
+        var sessionEvents = new NativeSessionEventBinding(_registry, Binding.Snapshot, _reportInputDiagnostic, ModelWire);
+        sessionEvents.Attach(owner, owner.Current);
         var replacementStart = new NativeReplacementSessionStartBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         _sessionViews.BeforeSwitch = new NativeSessionBeforeSwitchBinding(_registry, Binding.Snapshot, _closing.Token).BeforeSwitchAsync;
         _sessionViews.AfterSwitch = async replacement =>
@@ -191,6 +193,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             compaction.Attach(owner, replacement.Current);
             metadata.Attach(owner, replacement.Current);
             settled.Attach(owner, replacement.Current);
+            sessionEvents.Attach(owner, replacement.Current);
             await replacementStart.PublishAsync(owner, replacement).ConfigureAwait(false);
         };
         owner.BeforeReplacement = _sessionViews.BeforeSwitch;
