@@ -190,7 +190,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         SelectedModelDefinition = modelDefinition;
         _live = live; _client = live is null ? new HttpClient(handler) : null;
         IChatTransport transport;
-        if (live is not null) transport = live.CreateTransport();
+        if (live is not null) transport = WithCacheWarming(live.CreateTransport(), live, modelDefinition.Raw);
         else if (model.Api == "anthropic-messages")
         {
             var factory = new AnthropicMessagesKeyAuthRequestFactory(AnthropicBase, model,
@@ -515,6 +515,12 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         {
             if (extensionPreflight is not null) activation = await NativeExtensionActivation.LoadAsync(extensionPreflight, token, extensionUi, reportInputDiagnostic,
                 configuredInitializerInstallation: configuredInitializerInstallation, configuredExecInstallation: configuredExecInstallation).ConfigureAwait(false);
+            // Pi provider request hooks (before_provider_request/headers, after_provider_response, provider_stream_event).
+            if (liveSelection is not null && activation?.ProviderHttpHooks(liveSelection.Model) is { } providerHooks)
+            {
+                var hooked = liveRuntime ?? LiveSessionRuntime.Default;
+                liveRuntime = hooked with { CreateHttpHandler = () => providerHooks(hooked.CreateHttpHandler()) };
+            }
             if (resolvedAnthropicAuthentication is null && liveSelection is { Model.Provider: "anthropic" })
             {
                 var (anthropic, anthropicHandler, reresolve) = await liveSelection.ResolveAnthropicAsync(liveRuntime, token).ConfigureAwait(false);
