@@ -30,6 +30,7 @@ public sealed class McpPreparedServer : IAsyncDisposable
     private readonly ExtensionToolArgumentValidator validator;
     private readonly McpPreparedHookComposer composeHooks;
     private readonly McpServerRuntime runtime;
+    private readonly McpServerEntry serverEntry;
     private readonly SemaphoreSlim publications = new(1, 1);
     private readonly AsyncLocal<bool> inside = new();
     private readonly object admission = new();
@@ -56,7 +57,7 @@ public sealed class McpPreparedServer : IAsyncDisposable
         if (options.Generation != attachment.Generation || captured.InvocationOwnerGeneration != attachment.Generation ||
             !captured.UsesFinalActionPolicy(policy))
             throw new ArgumentException("MCP binding requires the captured attachment generation and native final-action policy.");
-        runtime = new(entry, options, channelFactory, PublishAsync);
+        runtime = new(entry, options, channelFactory, PublishAsync); serverEntry = entry;
         resource = owner.RegisterOwnedResource(attachment, CloseOwnedAsync, runtime.CloseAsync);
     }
 
@@ -100,6 +101,9 @@ public sealed class McpPreparedServer : IAsyncDisposable
     /// original records nothing at session_shutdown (production sessions set false), so a resumed session's loadout still names
     /// the tools and declares them again once the server connects.</summary>
     public bool DurableWithdrawalOnShutdown { get; init; } = true;
+    /// <summary>Whether calls return tools.ts convertMcpResult's tool result (model content, details, the CallToolResult as
+    /// structuredContent, isError) instead of the raw CallToolResult. Production sessions set it.</summary>
+    public bool ConvertResults { get; init; }
     public Task CloseAsync()
     {
         RefuseReentry();
@@ -264,7 +268,14 @@ public sealed class McpPreparedServer : IAsyncDisposable
             admitted.Add(settled.Task);
         }
         var prior = inside.Value; inside.Value = true;
-        try { return await runtime.CallToolAsync(toolName, arguments, invocation, token).ConfigureAwait(false); }
+        try
+        {
+            var raw = await runtime.CallToolAsync(toolName, arguments, invocation, token).ConfigureAwait(false);
+            if (!ConvertResults) return raw;
+            var readable = runtime.Snapshot.Catalog.HasResources && serverEntry.Config.Exposure != McpExposure.Hidden;
+            return await McpToolResults.ConvertAsync(serverEntry.Name, toolName, raw, readable,
+                (data, extension, cancellation) => McpResourceToolsPublisher.SaveAsync(data, extension, null!, cancellation), token).ConfigureAwait(false);
+        }
         finally { inside.Value = prior; lock (admission) admitted.Remove(settled.Task); settled.TrySetResult(); }
     }
 }

@@ -162,7 +162,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     var notifications = Notifications(actual.Name, serverLog, () => Volatile.Read(ref prepared), (name, error) => manager?.RefreshFailed(name, error));
                     // The original records nothing at session_shutdown, so a resumed session declares the tools again once the server connects.
                     var server = new McpPreparedServer(actual, registry, scope, owner, exactPolicy, ValidateArguments, Channels(actual, notifications),
-                        new McpRuntimeOptions(attachment.Generation, ClientVersion, Roots(currentCwd)), ComposeHooks) { DurableWithdrawalOnShutdown = false };
+                        new McpRuntimeOptions(attachment.Generation, ClientVersion, Roots(currentCwd)), ComposeHooks) { DurableWithdrawalOnShutdown = false, ConvertResults = true };
                     Volatile.Write(ref prepared, server);
                     return server;
                 }

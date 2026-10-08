@@ -263,7 +263,7 @@ public sealed class McpResourceTools
         var removed = 0;
         foreach (var rune in text[start.Length..(text.Length - end.Length)].EnumerateRunes()) removed++;
         var totalLines = text.Length == 0 ? 0 : text.Count(c => c == '\n') + (text.EndsWith('\n') ? 0 : 1);
-        var shown = $"Warning: truncated output (original token count: {(bytes.Length + 3) / 4})\nTotal output lines: {totalLines}\n\n{start}.{removed} chars truncated.{end}\n\n{where}";
+        var shown = $"Warning: truncated output (original token count: {(bytes.Length + 3) / 4})\nTotal output lines: {totalLines}\n\n{start}…{removed} chars truncated…{end}\n\n{where}";
         return new([Text(shown), .. content.Where(c => String(c.Value, "type", out var type) && type == "image")], structured, server, tool, path);
     }
     private static string Utf8Prefix(byte[] bytes, int length)

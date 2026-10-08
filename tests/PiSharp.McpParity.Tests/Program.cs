@@ -40,7 +40,8 @@ internal static partial class Program
             ("notifications.server-log-and-tool-list-changes", NotificationsLogAndToolListChanges),
             ("notifications.server-log-format-and-rotation", ServerLogFormatAndRotation),
             ("cli.mcp-list-resource-and-template-counts", ListResourceCounts),
-            ("prompt.servers-section-follows-manager-changes", ServersSectionFollowsManagerChanges)
+            ("prompt.servers-section-follows-manager-changes", ServersSectionFollowsManagerChanges),
+            ("results.call-tool-results-convert-for-the-model", ToolResultConversion)
         };
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
