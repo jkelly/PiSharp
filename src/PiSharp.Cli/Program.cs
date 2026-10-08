@@ -5,7 +5,7 @@ namespace PiSharp.Cli;
 
 internal static class Program
 {
-    private const string Usage = "Usage: PiSharp.Cli --offline-demo --workspace <new absolute directory> --session <new absolute JSONL file in workspace>; " + Commands.SessionCommands.Usage + "; " + Commands.RpcSessionCommand.Usage + "; " + Commands.InteractiveSessionCommand.Usage + "; " + Commands.TerminalSessionCommand.Usage + "; " + Commands.SessionCopyCommand.Usage + "; " + Commands.SessionCatalogCommand.Usage + "; " + Commands.SessionContextEditCommand.Usage + "; " + Commands.McpCommand.Usage;
+    private const string Usage = "Usage: PiSharp.Cli --offline-demo --workspace <new absolute directory> --session <new absolute JSONL file in workspace>; " + Commands.SessionCommands.Usage + "; " + Commands.RpcSessionCommand.Usage + "; " + Commands.InteractiveSessionCommand.Usage + "; " + Commands.TerminalSessionCommand.Usage + "; " + Commands.SessionCopyCommand.Usage + "; " + Commands.SessionCatalogCommand.Usage + "; " + Commands.SessionContextEditCommand.Usage + "; " + Commands.McpCommand.Usage + "; " + Models.ModelListing.Usage;
 
     private static async Task<int> Main(string[] args)
     {
@@ -16,6 +16,15 @@ internal static class Program
         catch (Exception) { return Fail("StandardOutputUnavailable", "Standard output could not be opened.", 1); }
         await using var ownedOutput = standardOutput;
         await using var output = new Utf8StreamTextWriter(standardOutput);
+        if (args is ["--list-models", ..])
+        {
+            using var listing = new CancellationTokenSource();
+            ConsoleCancelEventHandler stop = (_, observation) => { observation.Cancel = true; listing.Cancel(); };
+            Console.CancelKeyPress += stop;
+            try { return await Models.ModelListing.RunAsync(args, output, Console.Error, Commands.LiveSessionRuntime.Default, listing.Token).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (listing.IsCancellationRequested) { return Fail("Canceled", "Model listing canceled.", 1); }
+            finally { Console.CancelKeyPress -= stop; }
+        }
         if (args is ["--help"])
         {
             try

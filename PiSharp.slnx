@@ -146,4 +146,7 @@
   <Folder Name="/tests/sync-1.1.0.x/PiSharp.ToolSearch.Tests/">
     <Project Path="tests/PiSharp.ToolSearch.Tests/PiSharp.ToolSearch.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/parity/PiSharp.Models.Tests/">
+    <Project Path="tests/PiSharp.Models.Tests/PiSharp.Models.Tests.csproj" />
+  </Folder>
 </Solution>

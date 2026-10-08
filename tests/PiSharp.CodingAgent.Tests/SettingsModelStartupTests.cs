@@ -68,7 +68,8 @@ internal static class SettingsModelStartupTests
     {
         using var fixture = new Fixture();
         File.WriteAllText(fixture.User, "{\"defaultProvider\":\"openai\",\"defaultModel\":\"o3\",\"defaultThinkingLevel\":\"low\"}");
-        await using var host = new Host(fixture, ["--user-settings", fixture.User, "--model", "gpt-4", "--thinking", "high"]);
+        // Pi 1.1.0 resolveCliModel: a bare "gpt-4" is ambiguous (azure, openai) when both are authenticated, so the provider is explicit.
+        await using var host = new Host(fixture, ["--user-settings", fixture.User, "--provider", "openai", "--model", "gpt-4", "--thinking", "high"]);
         var state = (await host.Response("state", "get_state")).Value.GetProperty("data");
         Equal("gpt-4", state.GetProperty("model").GetProperty("id").GetString());
         Equal("off", state.GetProperty("thinkingLevel").GetString());
