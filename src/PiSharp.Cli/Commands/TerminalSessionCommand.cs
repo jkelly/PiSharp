@@ -43,7 +43,7 @@ public static class TerminalSessionCommand
             return (null, exception.Failure == NativeExtensionFailure.CleanupFailed ? 1 : 2);
         }
     }
-    public const string LiveUsage = "session terminal --live --provider openai|openrouter|anthropic --model <pinned model id> --session <absolute JSONL> --workspace <existing absolute directory> [--session-mode open|new-lazy|new-memory] [--max-output-tokens 1..8192] [existing exact tool grants]";
+    public const string LiveUsage = "session terminal --live --provider openai|openrouter|anthropic|mistral|azure --model <pinned model id> --session <absolute JSONL> --workspace <existing absolute directory> [--session-mode open|new-lazy|new-memory] [--max-output-tokens 1..8192] [existing exact tool grants]";
     public const string Usage = "session terminal --terminal-preview --session <existing absolute JSONL> --workspace <existing absolute directory> --offline-script <absolute JSON> [existing rpc options]; Windows terminal editor displays Unicode with inert controls; " + LiveUsage;
     public static Task<int> RunAsync(string[] args, IConsoleTerminal terminal, ITerminalViewportSource viewport,
         TextWriter error, CancellationToken token = default) =>

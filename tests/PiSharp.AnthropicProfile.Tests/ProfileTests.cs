@@ -135,9 +135,11 @@ internal static class ProfileTests
         var reads = 0; var creates = 0; OfflineSessionProfile? profile = null; var errors = new List<Exception>();
         try
         {
-            profile = await Join("legacy-profile-create", () => Create(root, handler, null, runtime: new(_ => { reads++; return "SYNTHETIC_KEY"; }, () => { creates++; return handler; })));
+            // Pi 1.1.0 resolution: the session's environment is read once per provider variable at start; ANTHROPIC_API_KEY alone
+            // (no stored credential, no AUTH_TOKEN/OAUTH_TOKEN) is sent as x-api-key.
+            profile = await Join("legacy-profile-create", () => Create(root, handler, null, runtime: new(name => { reads++; return name == "ANTHROPIC_API_KEY" ? "SYNTHETIC_KEY" : null; }, () => { creates++; return handler; })));
             await Join("legacy-profile-main", () => Drain(profile));
-            Check(reads == 1 && creates == 1 && handler.Captures.Single().Key == "SYNTHETIC_KEY");
+            Check(reads == LiveSessionRuntime.ProviderVariables.Length && creates == 1 && handler.Captures.Single().Key == "SYNTHETIC_KEY");
             await Join("legacy-original-send", () => handler.Sends.Single());
         }
         catch (Exception error) { errors.Add(error); }

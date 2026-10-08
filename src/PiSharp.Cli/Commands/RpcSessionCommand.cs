@@ -26,7 +26,7 @@ namespace PiSharp.Cli.Commands;
 public static class RpcSessionCommand
 {
     public const string Usage = "session rpc --session <existing absolute JSONL> --workspace <existing absolute directory> " +
-        "(--offline-script <absolute JSON> | --live [--provider openai|openrouter|anthropic] [--model <pinned model id>] [--max-output-tokens 1..8192]) [--thinking off|minimal|low|medium|high|xhigh|max] [--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
+        "(--offline-script <absolute JSON> | --live [--provider openai|openrouter|anthropic|mistral|azure] [--model <pinned model id>] [--max-output-tokens 1..8192]) [--thinking off|minimal|low|medium|high|xhigh|max] [--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
         "[--bash-executable <absolute file> --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]] " + NativeExtensionConfiguration.Flags + " " + SessionCatalogCommand.Flags + " " + CreationFlags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags;
     public const string CreationFlags = "[--session-mode open|new-memory|new-lazy]";
     private static readonly JsonlTransportOptions Framing = new(MaximumFrameBytes: 1_048_576, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
