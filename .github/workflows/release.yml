@@ -12,6 +12,10 @@ on:
         description: Version to build and validate (dry run, nothing is published)
         required: true
         default: '0.99.1'
+      skip_tests:
+        description: Skip the offline provider tests (dry runs only; tag releases always run them)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -46,6 +50,7 @@ jobs:
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
       - name: Run offline provider tests
+        if: github.event_name == 'push' || !inputs.skip_tests
         run: |
           for t in PiSharp.AzureResponses.Tests PiSharp.MistralConversations.Tests; do
             dotnet run --project "tests/$t/$t.csproj" -c Release \
