@@ -9,6 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.CodingAgent.Tests" />
     <InternalsVisibleTo Include="PiSharp.NodeCommandInputPackage.Tests" />
+    <InternalsVisibleTo Include="PiSharp.CliSync.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />

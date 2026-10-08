@@ -206,7 +206,9 @@ public sealed partial class SessionRuntimeRegistry
             nameCharacters += name.Length;
             if (!Identity(name)) throw Error(SessionRuntimeRegistryFailure.InvalidRegistration);
             if (_options.LifetimeToolSelection?.IsAllowed(name) == false) throw Error(SessionRuntimeRegistryFailure.UnknownTool);
-            if (seen.Add(name) && _tools.TryGetValue(name, out var tool) && tool.Exposure != ToolExposure.Hidden)
+            // Unnamed MCP tools kept by a --tools allowlist are declared only when tool_search can load them.
+            if (seen.Add(name) && _tools.TryGetValue(name, out var tool) && tool.Exposure != ToolExposure.Hidden &&
+                _options.LifetimeToolSelection?.IsActivatable(name, tool.Exposure, _tools.ContainsKey("tool_search")) != false)
                 selected.Add(name);
         }
         return selected.ToImmutable();
@@ -224,7 +226,7 @@ public sealed partial class SessionRuntimeRegistry
         return new("system", body);
     }
 
-    internal ToolLoadoutPresentation? PrepareActiveLoadout(ImmutableArray<string> names, CancellationToken token)
+    internal ToolLoadoutPresentation? PrepareActiveLoadout(ImmutableArray<string> names, CancellationToken token, bool report = true)
     {
         if (!_registeredTools.Any(tool => tool.PrepareLoadout is not null)) return null;
         var activeNames = names.ToImmutableHashSet(StringComparer.Ordinal);
@@ -232,7 +234,7 @@ public sealed partial class SessionRuntimeRegistry
             _registeredTools.Where(tool => ToolExposureSemantics.IsCallable(tool.Exposure, activeNames.Contains(Name(tool.Declaration.Value))))
                 .Select(Metadata).ToImmutableArray(), _registeredTools.Select(Metadata).ToImmutableArray());
         return ToolLoadoutPresentation.Prepare(loadout, (name, original) => _tools[name].PrepareLoadout?.Invoke(original),
-            _options.ReportLoadoutDiagnostic, _options.MaximumCharacters, token);
+            report ? _options.ReportLoadoutDiagnostic : null, _options.MaximumCharacters, token);
         static ToolLoadoutTool Metadata(SessionRegisteredTool tool) => new(tool.Declaration, tool.Exposure) { Namespace = tool.Namespace };
     }
 

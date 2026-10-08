@@ -13,8 +13,13 @@ public sealed class HostReloadPlanner<TPayload> where TPayload : class
 
     public HostReloadPlanner(HostReloadGeneration<TPayload> current, long candidateId, ResourceReloadPlan catalog,
         HostReloadOperations<TPayload> operations, CancellationToken hostLifetime, IEnumerable<string>? allowedTools = null,
-        IEnumerable<string>? excludedTools = null)
+        IEnumerable<string>? excludedTools = null,
+        Func<TPayload, TPayload, ImmutableArray<string>, ImmutableArray<HostReloadTool>, IEnumerable<string>>? selectActiveTools = null)
     {
+        // An explicit host selector (old payload, staged payload, previous active, reloaded tools) replaces the exact
+        // allow/exclude selection, for example to apply tool patterns and tools newly added to defaultTools.
+        if (selectActiveTools is not null && (allowedTools is not null || excludedTools is not null || selectActiveTools.GetInvocationList().Length != 1))
+            throw new ArgumentException("A tool selector replaces allow/exclude lists and must have one target.", nameof(selectActiveTools));
         ArgumentNullException.ThrowIfNull(current); ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(operations);
         if (candidateId <= current.Id) throw new ArgumentOutOfRangeException(nameof(candidateId));
@@ -57,8 +62,9 @@ public sealed class HostReloadPlanner<TPayload> where TPayload : class
                     var runtime = await JoinOriginal(operations.DescribeRuntimeAsync(payload, token)).ConfigureAwait(false);
                     ArgumentNullException.ThrowIfNull(runtime);
                     var flags = runtime.FlagDefaults.SetItems(current.Flags);
-                    var candidate = new HostReloadGeneration<TPayload>(candidateId, payload, flags,
-                        SelectActiveTools(current.ActiveTools, runtime.Tools, allowed, excluded), current.HasBindings);
+                    var active = selectActiveTools is null ? SelectActiveTools(current.ActiveTools, runtime.Tools, allowed, excluded) :
+                        SelectKnown(selectActiveTools(current.Payload, payload, current.ActiveTools, runtime.Tools), runtime.Tools);
+                    var candidate = new HostReloadGeneration<TPayload>(candidateId, payload, flags, active, current.HasBindings);
                     await JoinOriginal(operations.BuildRuntimeAsync(candidate, token)).ConfigureAwait(false);
                     return candidate;
                 }
@@ -125,6 +131,19 @@ public sealed class HostReloadPlanner<TPayload> where TPayload : class
                 throw new ArgumentException("Invalid or excessive tool allowlist.", nameof(names));
             result.Add(name);
         }
+        return result.ToImmutable();
+    }
+
+    // A host selector may only choose declarable reloaded tools, each once.
+    private static ImmutableArray<string> SelectKnown(IEnumerable<string> selected, ImmutableArray<HostReloadTool> tools)
+    {
+        ArgumentNullException.ThrowIfNull(selected);
+        var registry = tools.ToDictionary(tool => tool.Name, StringComparer.Ordinal);
+        var result = ImmutableArray.CreateBuilder<string>(); var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var name in selected)
+            if (name is null || !registry.TryGetValue(name, out var tool) || tool.Exposure is not (HostReloadToolExposure.Direct or HostReloadToolExposure.ModelOnly) || !seen.Add(name))
+                throw new InvalidOperationException("The host tool selector chose an unknown, undeclarable or duplicate tool.");
+            else result.Add(name);
         return result.ToImmutable();
     }
 

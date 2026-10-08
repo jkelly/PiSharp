@@ -41,6 +41,8 @@ public sealed class SessionCommandException : Exception
         SessionCommandFailure.UnsupportedBashPlatform => "The configured offline Bash backend requires Windows.",
         _ => "Session command failed; inspect durable state before retrying."
     }) => Failure = failure;
+    /// <summary>A failure whose message mirrors upstream CLI diagnostic text exactly.</summary>
+    internal SessionCommandException(SessionCommandFailure failure, string message) : base(message) => Failure = failure;
 }
 
 /// <summary>One-shot explicit-path native commands. Reports settlement, not upstream RPC prompt acceptance.</summary>
@@ -231,7 +233,7 @@ public static class SessionCommands
         await using var profile = await OfflineSessionProfile.CreateAsync(args.Workspace!, args.Session, args.Script, turns, args.Reads, args.Writes, token,
             offlineApi: args.OfflineApi, bash: args.Bash, extension: args.Extension,
             extensionUi: new UnavailableExtensionUiProvider(args.Json ? ExtensionUiMode.Json : ExtensionUiMode.Print),
-            modelSupportsImages: args.SupportsImages, toolSelection: ToolSelectionCliConfiguration.ResolveOptions(args.Tools, settings), mcpAdmission: mcpAdmission).ConfigureAwait(false);
+            modelSupportsImages: args.SupportsImages, toolSelection: ToolSelectionCliConfiguration.ResolveOptions(args.Tools, settings), mcpAdmission: args.Tools.NoMcp ? null : mcpAdmission).ConfigureAwait(false);
         profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
         profile.ConfigureEffectiveSettings(settings);
         profile.BindSettingsThinkingReads();

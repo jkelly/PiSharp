@@ -119,7 +119,11 @@ public static class TerminalSessionCommand
         using var inputCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
         using var resizeCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
         var focusOwner = new TerminalEditorFocusOwner(initiallyFocused: true);
-        var view = new TerminalSessionView(terminal, viewport, observeSourceFrame: null, focusOwner: focusOwner, keybindings: keybindings);
+        // OSC 7501 (Pi 1.1.0): without DA1 negotiation on this console profile, PI_PROGRAM_STATUS=1 alone enables reports.
+        var programStatusOverride = Environment.GetEnvironmentVariable("PI_PROGRAM_STATUS");
+        var view = new TerminalSessionView(terminal, viewport, observeSourceFrame: null, focusOwner: focusOwner, keybindings: keybindings)
+        { ProgramStatus = programStatusOverride == "1" ? new() : null, ProgramStatusOverride = programStatusOverride };
+        var programStatus = view.ProgramStatus is null ? null : new ProgramStatusReporter();
         var receipts = new TerminalSubmissionReceipts();
         using var frontend = new InteractiveSessionFrontend(view, nativePresentation: true, submissionReceipts: receipts);
         var selectList = new TerminalSelectListDialogController(frontend, view, keybindings);
@@ -136,10 +140,12 @@ public static class TerminalSessionCommand
         try
         {
             await view.StartAsync(token).ConfigureAwait(false);
+            if (programStatus is not null) await view.ReportProgramStatusAsync(programStatus.Report, token).ConfigureAwait(false);
             // Attach the existing input/focus owner before startup extensions can publish UI.
             reading = ReadTerminalAsync();
             var presentation = presentationObserver is null ? (IRpcExtensionUiPresentationObserver)frontend :
                 new ObservedPresentation(frontend, presentationObserver);
+            if (programStatus is not null) presentation = new ProgramStatusPresentation(presentation, programStatus, view);
             host = RunHostAsync(presentation);
             await frontend.StartAsync(inputCancellation.Token).ConfigureAwait(false);
             beginInput.TrySetResult();
@@ -307,6 +313,8 @@ public static class TerminalSessionCommand
         async ValueTask ObserveRecord(JsonData record, CancellationToken observedToken)
         {
             await frontend.ObserveAsync(record, observedToken).ConfigureAwait(false);
+            if (programStatus is not null && ProgramStatusReporter.Observes(record.Value))
+                await view.ReportProgramStatusAsync(() => programStatus.HandleEvent(record.Value), observedToken).ConfigureAwait(false);
             if (observer is not null) await observer(record, observedToken).ConfigureAwait(false);
         }
     }
@@ -323,6 +331,29 @@ public static class TerminalSessionCommand
             await frontend.RetiredAsync(retirement, token).ConfigureAwait(false);
             await observer.RetiredAsync(retirement, token).ConfigureAwait(false);
         }
+    }
+    // Pi interactive-mode.ts reports open extension dialogs as blocked: confirm waits for permission, the
+    // others for an answer, each with its title. Queued dialogs are keyed by request; the latest open one wins.
+    private sealed class ProgramStatusPresentation(IRpcExtensionUiPresentationObserver inner,
+        ProgramStatusReporter reporter, TerminalSessionView view) : IRpcExtensionUiPresentationObserver
+    {
+        public async ValueTask PublishedAsync(RpcExtensionUiPresentation presentation, CancellationToken token)
+        {
+            await inner.PublishedAsync(presentation, token).ConfigureAwait(false);
+            var request = presentation.Request.Value;
+            if (request.TryGetProperty("method", out var method) && method.GetString() is "select" or "confirm" or "input" or "editor")
+                await view.ReportProgramStatusAsync(() => reporter.SetBlocked(Source(presentation.Identity), new(
+                    method.GetString() == "confirm" ? Tui.Rendering.TerminalProgramBlockedKind.Permission : Tui.Rendering.TerminalProgramBlockedKind.Question,
+                    request.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String ? title.GetString()! : "")), token).ConfigureAwait(false);
+        }
+        public async ValueTask RetiredAsync(RpcExtensionUiRetirement retirement, CancellationToken token)
+        {
+            await inner.RetiredAsync(retirement, token).ConfigureAwait(false);
+            // Retirement may follow terminal stop, whose cleanup already cleared the status.
+            if (!view.IsClosing) await view.ReportProgramStatusAsync(() => reporter.SetBlocked(Source(retirement.Identity), null), token).ConfigureAwait(false);
+        }
+        private static string Source(RpcExtensionUiPresentationIdentity identity) =>
+            $"extension-dialog:{identity.SessionGeneration}:{identity.RequestId}";
     }
     // Only the actual receipt owner and contributors captured at its local wait may classify this cancellation.
     internal static bool IsOwnedReceiptWaitCancellation(Exception error, TerminalSubmissionReceipts owner, CancellationToken inputOwnerToken) =>

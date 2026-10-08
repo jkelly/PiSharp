@@ -244,6 +244,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             {
                 if (name.Length is < 1 or > 64 || name.Any(char.IsControl))
                 { _client?.Dispose(); throw new SessionCommandException(SessionCommandFailure.InvalidArguments); }
+                if (name.Contains('*')) continue; // Patterns select the matching registrations below.
                 if (deferCatalogValidation && !registrations.Any(value => value.Adapter.Name == name)) continue;
                 if (toolSelection.UseAvailableDefaults && !registrations.Any(value => value.Adapter.Name == name)) continue;
                 if (toolSelection.LifetimePolicy is not null && registrations.Any(value => value.Adapter.Name == name &&
@@ -256,6 +257,11 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 }
                 if (!selected.Contains(name)) selected.Add(name);
             }
+            // Naming or matching a tool with --tools activates it even when it is not active by default.
+            if (toolSelection.LifetimePolicy is { AllowedNames: not null } named)
+                foreach (var registration in registrations.Where(value => named.IsNamed(value.Adapter.Name) &&
+                    value.Exposure is ToolExposure.Direct or ToolExposure.ModelOnly))
+                    if (!selected.Contains(registration.Adapter.Name)) selected.Add(registration.Adapter.Name);
             if (toolSelection.IncludeDefaultExtensions && extension is not null)
                 foreach (var registration in registrations.Where(value => (toolSelection.LifetimePolicy?.IsAllowed(value.Adapter.Name) ?? true) &&
                     extension.EnabledAdapters.Any(adapter => adapter.Name == value.Adapter.Name) &&

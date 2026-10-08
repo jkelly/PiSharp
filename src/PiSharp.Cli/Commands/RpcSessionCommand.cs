@@ -103,7 +103,7 @@ public static class RpcSessionCommand
                         registrationId = diagnostic.RegistrationId, failure = diagnostic.Failure.ToString() }) + "\n").AsMemory(), token).ConfigureAwait(false);
                     await stderr.FlushAsync(token).ConfigureAwait(false);
                 }, modelSupportsImages: parsed.SupportsImages, liveSelection: liveSelection, liveRuntime: liveRuntime,
-                toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings), mcpAdmission: mcpAdmission).ConfigureAwait(false);
+                toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings), mcpAdmission: parsed.Tools.NoMcp ? null : mcpAdmission).ConfigureAwait(false);
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();
@@ -314,6 +314,10 @@ public static class RpcSessionCommand
         options.TryGetValue("--offline-script", out var script);
         options.TryGetValue("--provider", out var provider); options.TryGetValue("--model", out var liveModel);
         options.TryGetValue("--max-output-tokens", out var maximumTokens);
+        // Pi 1.0.0 main.ts: a provider only scopes the --model search; settings defaultModel never completes it.
+        if (provider is not null && liveModel is null)
+            throw new SessionCommandException(SessionCommandFailure.InvalidArguments,
+                $"--provider requires --model (for example: --provider {provider} --model <pattern>)");
         if (live ? script is not null || options.ContainsKey("--offline-api") || options.ContainsKey("--offline-images") :
             script is null || provider is not null || liveModel is not null || maximumTokens is not null) throw Invalid();
         options.TryGetValue("--thinking", out var thinking);

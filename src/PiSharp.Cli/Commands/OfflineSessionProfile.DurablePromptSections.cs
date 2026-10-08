@@ -28,7 +28,8 @@ internal sealed partial class OfflineSessionProfile
             }
         }
         if (snapshot.NativeLiteralBaseline) return null;
-        var selected = snapshot with { SelectedTools = request.SelectedTools, Input = snapshot.Input with { SelectedTools = request.SelectedTools } };
+        var selected = snapshot with { SelectedTools = request.SelectedTools,
+            Input = snapshot.Input with { SelectedTools = request.SelectedTools, HiddenTools = request.HiddenTools } };
         return new(slot is null ? snapshot : slot, OriginalSystemPromptBuilder.Sections(selected), () =>
         {
             if (!ReferenceEquals(Sessions, owner) || !ReferenceEquals(owner?.Current, expected))
