@@ -22,8 +22,8 @@ public sealed partial class MistralTextHttpSseTransport
                 throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral replay transcript.");
             if (entry.Role == "system")
             {
-                if (body.EnumerateObject().Any(field => field.Name is not ("role" or "content" or "timestamp" or "sections" or "toolsAdded" or "toolsRemoved")))
-                    throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral system field.");
+                // Pi v1.1.0 reads only the fields it uses and ignores any others (for example "offlineApi": null written
+                // by earlier sessions), so a resumed session replays instead of failing.
                 if (body.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
                     foreach (var part in content.EnumerateArray()) _ = ReadTextPart(part);
             }

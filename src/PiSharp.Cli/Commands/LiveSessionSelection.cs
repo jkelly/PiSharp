@@ -451,6 +451,12 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes), handler, summary ? null : definition.Raw);
         return Own(responses);
     }
+    /// <summary>cache-warmer.ts replay: the main route (same cache retention) with a one-token output cap.</summary>
+    internal IChatTransport CreateCacheWarmTransport()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _resolvedMain is not null ? new ResolvedTransport(this, 1, false) { Replay = true } : CreateTransport(1);
+    }
     private IChatTransport Own(NativeHttpModelProvider provider)
     { _providers.Add(provider); return provider.Transport; }
 
@@ -548,6 +554,8 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     private sealed class ResolvedTransport(LiveSessionConnection connection, int maximum, bool summary)
         : IChatTransport, IThinkingLevelTransport
     {
+        /// <summary>A cache-warming replay: a main-route lease (cache retention kept) at its own output cap.</summary>
+        internal bool Replay { get; init; }
         public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor model)
         {
             lock (connection._resolvedGate)
@@ -582,9 +590,9 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
                 {
                 var (main, authentication) = await connection.CurrentResolvedAsync(cancellationToken).ConfigureAwait(false);
                 var transport = main.Transport;
-                if (summary)
+                if (summary || Replay)
                 {
-                    summaryLease = await AcquireResolvedAsync(connection.Selected, authentication, connection.Handler, maximum, true, cancellationToken).ConfigureAwait(false);
+                    summaryLease = await AcquireResolvedAsync(connection.Selected, authentication, connection.Handler, maximum, summary, cancellationToken).ConfigureAwait(false);
                     transport = summaryLease.Transport;
                 }
                 enumerator = transport.StreamAsync(request, cancellationToken).GetAsyncEnumerator(cancellationToken);

@@ -13,7 +13,18 @@ internal static class Program
         if (args is [PiSharp.Codemode.CodemodeWorker.Argument])
             return await PiSharp.Codemode.CodemodeWorker.RunAsync(Console.OpenStandardInput(), Console.OpenStandardOutput()).ConfigureAwait(false);
         PiSharp.Codemode.CodemodeWorker.Default ??= PiSharp.Codemode.CodemodeWorkerLauncher.ForCurrentProcess();
-        if (args.Length > 0 && args[0] == "session") return await RunSessionAsync(args).ConfigureAwait(false);
+        // Pi interactive mode records an uncaught exception in crashes.json so the next start points at /bug (crash-log.ts).
+        // IMPL-I seam: the interactive host should pass its session file and extensions instead.
+        if (args is ["session", "terminal", ..])
+            AppDomain.CurrentDomain.UnhandledException += (_, crash) =>
+            {
+                if (crash.ExceptionObject is Exception error)
+                    Diagnostics.CrashReporting.ReportUncaughtException(error, Console.Error, [], null, Environment.CurrentDirectory);
+            };
+        // Pi rpc/print modes: SIGTERM and SIGHUP shut the host down gracefully, then exit 143 or 129.
+        if (args.Length > 0 && args[0] == "session")
+            return args is ["session", "terminal", ..] ? await RunSessionAsync(args).ConfigureAwait(false)
+                : ShutdownSignals.Process.Exit(await RunSessionAsync(args).ConfigureAwait(false));
         if (args.Length > 0 && args[0] == "mcp") return await RunMcpAsync(args[1..]).ConfigureAwait(false);
         // Pi's own command line (plain pisharp, -p, --mode json|rpc, --help, --list-models, ...); the offline demo keeps its form.
         if (args is not ["--offline-demo", ..]) return await RunPiAsync(args).ConfigureAwait(false);
@@ -128,6 +139,8 @@ internal static class Program
         using var cancellation = new CancellationTokenSource();
         ConsoleCancelEventHandler cancel = (_, observation) => { observation.Cancel = true; cancellation.Cancel(); };
         Console.CancelKeyPress += cancel;
+        using var signalled = args is ["session", "terminal", ..] ? default
+            : ShutdownSignals.Process.Token.Register(static state => ((CancellationTokenSource)state!).Cancel(), cancellation);
         try
         {
             if (args is ["session", "terminal", ..])
@@ -146,7 +159,8 @@ internal static class Program
                 try
                 {
                     await using (input.ConfigureAwait(false))
-                        return await Commands.RpcSessionCommand.RunHostedAsync(args, input, standardOutput, Console.Error, Mcp.McpSessionHost.CreateDefault(), cancellation.Token).ConfigureAwait(false);
+                        return await Commands.RpcSessionCommand.RunHostedAsync(args, input, standardOutput, Console.Error, Mcp.McpSessionHost.CreateDefault(), cancellation.Token,
+                            userShutdown: () => ShutdownSignals.Process.Received is not null).ConfigureAwait(false);
                 }
                 catch (Exception) { return Fail("RpcHostFailed", "RPC host failed after owned input cleanup; inspect durable state.", 1); }
             }

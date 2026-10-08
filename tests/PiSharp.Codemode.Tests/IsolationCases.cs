@@ -68,12 +68,45 @@ internal static partial class Program
         // is kept ready for the next script).
         Case("isolation.worker-processes-do-not-outlive-scripts", async () =>
         {
-            CodemodeProcessWorker.DiscardSpares();
+            // A script's result is delivered only after its worker has been killed and reaped, so once the spares are discarded no
+            // worker may be left. Spares started ahead in the background may still be landing, so discard until none is.
+            await CodemodeProcessWorker.DiscardSparesAsync();
             for (var i = 0; i < 6; i++) Failed(await RunIn(CodemodeWorker.Default, "while (true) {}", 300), CodemodeErrorKind.Timeout, "timeout " + i);
             for (var i = 0; i < 6; i++) Ok(await RunIn(CodemodeWorker.Default, "return 1"), "1", "run " + i);
             var deadline = DateTime.UtcNow.AddSeconds(20);
-            while (CodemodeProcessWorker.Running > 1 && DateTime.UtcNow < deadline) await Task.Delay(100);
-            Check(CodemodeProcessWorker.Running <= 1, "worker processes left: " + CodemodeProcessWorker.Running);
+            do { await CodemodeProcessWorker.DiscardSparesAsync(); if (CodemodeProcessWorker.Running == 0) break; await Task.Delay(100); }
+            while (DateTime.UtcNow < deadline);
+            Check(CodemodeProcessWorker.Running == 0, "worker processes left: " + CodemodeProcessWorker.Running);
+        }),
+        // A host that dies without terminating its workers (killed, crashed) closes their standard input: a worker that sees end
+        // of file exits even while its script spins, so it cannot outlive the host. Idle spares do the same.
+        Case("isolation.worker-ends-when-its-host-goes-away", async () =>
+        {
+            var launcher = CodemodeWorker.Default!;
+            foreach (var script in new[] { null, "while (true) {}" })
+            {
+                var info = new System.Diagnostics.ProcessStartInfo(launcher.FileName)
+                    { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+                foreach (var argument in launcher.Arguments) info.ArgumentList.Add(argument);
+                using var worker = System.Diagnostics.Process.Start(info)!;
+                try
+                {
+                    _ = worker.StandardError.BaseStream.CopyToAsync(System.IO.Stream.Null);
+                    if (script is not null)
+                    {
+                        worker.StandardInput.Write(CodemodeWireCodec.Encode(new CodemodeStartMessage(script, "[]", "[]", "{}", CodemodeLimits.DefaultMemoryLimitBytes,
+                            CodemodeLimits.DefaultTotalAllocationLimitBytes, CodemodeLimits.DefaultRecursionLimit)) + "\n");
+                        worker.StandardInput.Flush();
+                        var ready = await worker.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(60));
+                        Check(ready is not null && ready.Contains("\"ready\"", StringComparison.Ordinal), "script started: " + ready);
+                    }
+                    worker.StandardInput.Close();
+                    using var bound = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    try { await worker.WaitForExitAsync(bound.Token); } catch (OperationCanceledException) { }
+                    Check(worker.HasExited, (script ?? "idle spare") + ": the worker outlived its host's end of input");
+                }
+                finally { if (!worker.HasExited) { worker.Kill(entireProcessTree: true); await worker.WaitForExitAsync(); } }
+            }
         }),
         // host.ts "reports a broken bridge as a sandbox error" with fixtures/raw-worker.ts: a worker that answers the start message
         // with a hand-made payload. The test executable doubles as that raw worker.

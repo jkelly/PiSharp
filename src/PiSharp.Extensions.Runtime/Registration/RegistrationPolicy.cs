@@ -15,6 +15,8 @@ public sealed record ExtensionRegistryOptions
     public int MaximumJsonCharacters { get; init; } = 65_536;
     public int MaximumJsonDepth { get; init; } = 32;
     public int MaximumConcurrentDispatches { get; init; } = 32;
+    /// <summary>Bound of one host-built agent/session event observation (Pi events carry whole messages and context previews).</summary>
+    public int MaximumObservationCharacters { get; init; } = 67_108_864;
     public ImmutableArray<string> ReservedToolNames { get; init; } =
         ["read", "bash", "powershell", "edit", "write", "grep", "find", "ls"];
     public ImmutableArray<string> ReservedCommandNames { get; init; } =

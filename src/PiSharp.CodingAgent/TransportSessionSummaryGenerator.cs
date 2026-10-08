@@ -35,7 +35,7 @@ public sealed class TransportSessionSummaryGenerator(Func<SessionSummaryRequest,
                 // Provider errors and unrequested aborted terminals remain failed summaries.
                 if (terminal.Reason != terminal.Message.StopReason || terminal is StreamError &&
                     !(terminal.Reason == StopReason.Aborted && cancellationToken.IsCancellationRequested))
-                    throw new SessionCompactionException(SessionCompactionFailure.SummaryFailed);
+                    throw Failed(terminal.Message);
                 final = terminal.Message;
             }
         }
@@ -45,11 +45,21 @@ public sealed class TransportSessionSummaryGenerator(Func<SessionSummaryRequest,
         cancellationToken.ThrowIfCancellationRequested();
         if (final is null || final.StopReason is StopReason.Error or StopReason.Length or StopReason.Aborted or StopReason.Pending or StopReason.Deferred ||
             final.Content.IsDefault || final.Content.Any(content => content is ToolCallContent))
-            throw new SessionCompactionException(SessionCompactionFailure.SummaryFailed);
+            throw final is null ? new SessionCompactionException(SessionCompactionFailure.SummaryFailed) : Failed(final);
         // Validate owned usage and final wire envelope without persisting the assistant itself.
         _ = PiWireJson.WriteMessage(final);
         var text = string.Join('\n', final.Content.OfType<TextContent>().Select(content => content.Text));
         if (text.Length > 1_048_576) throw new SessionCompactionException(SessionCompactionFailure.ResourceLimit);
         return new(text, final.Usage);
+    }
+
+    /// <summary>Carries the response's provider error text so summarization retry can classify it as Pi does.</summary>
+    private static SessionCompactionException Failed(AssistantMessage message)
+    {
+        string? error = null;
+        if (message.StopReason == StopReason.Error && message.ExtraProperties?.TryGet("errorMessage", out var value) == true &&
+            value is { Value.ValueKind: JsonValueKind.String }) error = value.Value.GetString();
+        return new(SessionCompactionFailure.SummaryFailed)
+        { ProviderErrorMessage = message.StopReason == StopReason.Error ? error ?? "" : null, ProviderAborted = message.StopReason == StopReason.Aborted };
     }
 }

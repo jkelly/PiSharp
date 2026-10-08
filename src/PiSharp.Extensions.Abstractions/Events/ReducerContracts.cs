@@ -66,7 +66,21 @@ public enum ExtensionEventFailure { HandlerFailed, InvalidResult, LimitExceeded,
 
 /// <summary>Host-authored diagnostic codes; no plugin exception text or payload is copied into diagnostics.</summary>
 public sealed record ExtensionEventDiagnostic(string EventName, string OwnerId, long OwnerGeneration,
-    string RegistrationId, ExtensionEventFailure Failure);
+    string RegistrationId, ExtensionEventFailure Failure)
+{
+    /// <summary>Source ExtensionError.error: the handler's error message, when the dispatch path reports it (Pi reports
+    /// <c>err.message</c>). Null keeps the host-authored failure code only.</summary>
+    public string? Message { get; init; }
+    /// <summary>Source ExtensionError text: the handler message, or a host-authored description of the failure code.</summary>
+    public string ErrorText => Message ?? Failure switch
+    {
+        ExtensionEventFailure.InvalidResult => "Invalid extension handler result",
+        ExtensionEventFailure.LimitExceeded => "Extension handler exceeded a host limit",
+        ExtensionEventFailure.ReentrantLimit => "Extension handler exceeded the reentrant dispatch limit",
+        ExtensionEventFailure.LeadingSystemRemoved => "Extension handler removed the leading system message",
+        _ => "Extension handler failed"
+    };
+}
 
 /// <summary>Tool-call hook failure blocks the call. A requested cancellation remains cancellation.</summary>
 public sealed class ExtensionEventDispatchException : Exception

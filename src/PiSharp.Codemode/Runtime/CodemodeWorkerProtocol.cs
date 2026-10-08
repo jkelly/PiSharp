@@ -18,6 +18,9 @@ internal sealed record CodemodeOutputMessage(CodemodeOutputItem Item) : Codemode
 internal sealed record CodemodeDoneMessage(bool Ok, string? Value, string? Writes, string? Error) : CodemodeWorkerMessage;
 /// <summary>The engine failed outside the script's control.</summary>
 internal sealed record CodemodeCrashMessage(string Message) : CodemodeWorkerMessage;
+/// <summary>The engine is set up and the script starts now: the deadline counts from here, so starting a worker process is not
+/// charged to the script.</summary>
+internal sealed record CodemodeReadyMessage : CodemodeWorkerMessage;
 
 /// <summary>HostToWorkerMessage: <c>Payload</c> is the JSON result when ok, otherwise the error message.</summary>
 internal sealed record CodemodeResultMessage(long Id, bool Ok, string? Payload);
@@ -67,6 +70,8 @@ internal static class CodemodeWireCodec
                 Optional(writer, "writes", done.Writes); Optional(writer, "error", done.Error); break;
             case CodemodeCrashMessage crash:
                 writer.WriteString("type", "crash"); writer.WriteString("message", crash.Message); break;
+            case CodemodeReadyMessage:
+                writer.WriteString("type", "ready"); break;
             default: throw new ArgumentException("Unknown worker message.", nameof(message));
         }
     });
@@ -107,6 +112,7 @@ internal static class CodemodeWireCodec
             }),
             "done" => new CodemodeDoneMessage(value.GetProperty("ok").GetBoolean(), Text(value, "value", false), Text(value, "writes", false), Text(value, "error", false)),
             "crash" => new CodemodeCrashMessage(Text(value, "message")!),
+            "ready" => new CodemodeReadyMessage(),
             _ => throw new FormatException("Unknown message type.")
         };
     }

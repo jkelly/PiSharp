@@ -85,8 +85,9 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             new PiSharp.Cli.Extensions.Execution.NativeExtensionExecContextHost(facadeHost, () => execInstallation);
         IExtensionContextReadHost facadeCapabilities = configuredFacadeCapabilities ??
             new NativeExtensionRegistrationFacadeHost(facadeHost, registrationActions, executionContext);
+        var uiPrompts = uiProvider is null ? null : new NativeUiPromptEvents(uiProvider);
         var registry = new ExtensionRegistry(new() { MaximumOwners = 1, MaximumRegistrations = 64, MaximumRegistrationsPerOwner = 64 },
-            uiProvider ?? new UnavailableExtensionUiProvider(), sessionViews, facadeCapabilities);
+            uiPrompts ?? (IExtensionUiProvider)new UnavailableExtensionUiProvider(), sessionViews, facadeCapabilities);
         var loader = new PluginAssemblyLoader(new() { SnapshotParentDirectory = preflight.Configuration.SnapshotRoot,
             MaximumOwnedPackages = 1 });
         NativeExtensionRegistrationBridge? registrationBridge = null;
@@ -124,13 +125,14 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
                 registrationBridge is null ? null : scope => RetireConfiguredOwnerAsync(registrationBridge, mcpBridge, scope));
             await loadOriginal.ConfigureAwait(false);
             var snapshot = registry.CaptureSnapshot();
-            if (snapshot.Registrations.Any(entry => entry.Kind is not ("Tool" or "Command" or "InputHandler" or "ToolCallHandler" or "ToolResultHandler" or "Observation" or "SessionSwitchHandler" or "SessionCreationHandler" or "ContextHandler" or "ContextWithSystemHandler" or "BeforeAgentStartHandler" or "SessionBeforeTreeHandler" or "ToolRenderer")) ||
+            if (snapshot.Registrations.Any(entry => entry.Kind is not ("Tool" or "Command" or "InputHandler" or "ToolCallHandler" or "ToolResultHandler" or "Observation" or "SessionSwitchHandler" or "SessionCreationHandler" or "ContextHandler" or "ContextWithSystemHandler" or "BeforeAgentStartHandler" or "SessionBeforeTreeHandler" or "ToolRenderer" or "UserBashHandler" or "EventHandler")) ||
                 preflight.Configuration.EnabledTools.Any(name => snapshot.Tools.Count(tool => tool.Name == name) != 1) ||
                 preflight.Configuration.EnabledCommands.Any(name => snapshot.Commands.Count(command => command.Name == name) != 1))
                 throw new NativeExtensionException(NativeExtensionFailure.InvalidConfiguration);
             var schemas = snapshot.Tools.ToImmutableDictionary(tool => tool.Name, tool => NativeToolObjectSchema.Read(tool.Parameters), StringComparer.Ordinal);
             token.ThrowIfCancellationRequested();
-            admittedActivation = new(preflight.Configuration, registry, loader, snapshot, schemas, sessionViews, reportInputDiagnostic, facadeHost, registrationBridge);
+            admittedActivation = new(preflight.Configuration, registry, loader, snapshot, schemas, sessionViews, reportInputDiagnostic, facadeHost, registrationBridge)
+                { UiPrompts = uiPrompts };
             return admittedActivation;
         }
         catch (Exception original)
@@ -162,6 +164,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             ReportLoadoutDiagnostic = CaptureLoadoutDiagnostic
         }, sessionCancellationToken: _closing.Token);
         _loadoutDiagnostics?.Bind(Binding.Snapshot);
+        UiPrompts?.Bind(_registry, Binding.Snapshot, _reportInputDiagnostic);
         // Capture exactly the binding revision, never a second per-operation handler set.
         var input = new RegisteredExtensionInputAdmission(_registry, Binding.Snapshot, sessionCancellationToken: _closing.Token,
             reportDiagnostic: _reportInputDiagnostic);
@@ -184,6 +187,8 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         metadata.Attach(owner, owner.Current);
         var settled = new NativeAgentSettledObservationBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         settled.Attach(owner, owner.Current);
+        var sessionEvents = new NativeSessionEventBinding(_registry, Binding.Snapshot, _reportInputDiagnostic, ModelWire);
+        sessionEvents.Attach(owner, owner.Current);
         var replacementStart = new NativeReplacementSessionStartBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         _sessionViews.BeforeSwitch = new NativeSessionBeforeSwitchBinding(_registry, Binding.Snapshot, _closing.Token).BeforeSwitchAsync;
         _sessionViews.AfterSwitch = async replacement =>
@@ -191,6 +196,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             compaction.Attach(owner, replacement.Current);
             metadata.Attach(owner, replacement.Current);
             settled.Attach(owner, replacement.Current);
+            sessionEvents.Attach(owner, replacement.Current);
             await replacementStart.PublishAsync(owner, replacement).ConfigureAwait(false);
         };
         owner.BeforeReplacement = _sessionViews.BeforeSwitch;

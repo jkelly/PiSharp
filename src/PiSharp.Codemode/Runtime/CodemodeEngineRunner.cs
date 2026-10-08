@@ -137,6 +137,7 @@ internal sealed class CodemodeEngineRunner(CodemodeStartMessage start, Action<Co
             // The prefix shares the first line with the script so reported line numbers match the script as written.
             try { function = engine.Evaluate("(async (tools, console) => {" + start.Code + "\n})", "codemode.js"); }
             catch (JavaScriptException error) { post(new CodemodeDoneMessage(false, null, null, DescribeException(error))); return; }
+            post(new CodemodeReadyMessage());
             engine.Call(run, api, [function]);
             Drain();
             foreach (var result in inbox.GetConsumingEnumerable(stop))
