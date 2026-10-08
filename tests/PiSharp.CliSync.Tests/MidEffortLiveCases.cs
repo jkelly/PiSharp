@@ -68,9 +68,11 @@ internal static partial class Program
         Names(["low", "max"], levels!, "providerThinkingLevel");
 
         // The summary route carries no level metadata and runs thinking off: a managed model still sends managed "high" effort
-        // (buildParams ignores thinkingEnabled for it), while an unmanaged model keeps its disabled thinking.
+        // (buildParams ignores thinkingEnabled for it), an unmanaged model keeps its disabled thinking, and an unmanaged model whose
+        // thinkingLevelMap.off is null (claude-fable-5) sends no thinking field at all.
         const string managed = """{"type":"adaptive","display":"summarized","block_binding":{"prefix_mismatch_behavior":"drop_block"}}""";
-        foreach (var (model, thinking, effort) in new[] { (id, managed, "high"), ("claude-sonnet-4-5", """{"type":"disabled"}""", (string?)null) })
+        foreach (var (model, thinking, effort) in new[] { (id, managed, "high"), ("claude-sonnet-4-5", """{"type":"disabled"}""", (string?)null),
+            ("claude-fable-5", (string?)null, (string?)null) })
         {
             var endpoint = new LiveEndpoint(_ => ManagedStream(model));
             var selection = LiveSessionSelection.Parse("anthropic", model, null);
@@ -87,6 +89,9 @@ internal static partial class Program
             Equal(thinking, body.TryGetProperty("thinking", out var sent) ? sent.GetRawText() : null, model + " summary thinking");
             Equal(effort is null ? null : "[{\"role\":\"user\",\"content\":\"summarize\"}," + Marker(effort) + "]",
                 effort is null ? null : body.GetProperty("messages").GetRawText(), model + " summary messages");
+            if (effort is null)
+                Equal("{\"model\":\"" + model + "\",\"messages\":[{\"role\":\"user\",\"content\":\"summarize\"}],\"max_tokens\":" + connection.MaximumOutputTokens + ",\"stream\":true" +
+                    (thinking is null ? "" : ",\"thinking\":" + thinking) + "}", endpoint.Snapshot().Single().Body, model + " summary body");
         }
     });
 }

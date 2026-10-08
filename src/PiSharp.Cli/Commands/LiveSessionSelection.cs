@@ -249,7 +249,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             ModelReasoning: definition.Raw.Value.GetProperty("reasoning").GetBoolean(),
             ModelSupportsImages: definition.DeclaresImageInput, ThinkingEnabled: false,
             MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
-            CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw);
+            CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw, summary);
         var options = new AnthropicMessagesKeyAuthRequestOptions(MaxTokens: maximum, MaximumPayloadBytes: 1_048_576);
         return summary
             ? AnthropicResolvedTransports.AcquireSummaryAsync(selected.Model, new Uri(definition.BaseUrl), authentication,
@@ -259,10 +259,21 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     }
     /// <summary>Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT) anthropic-messages.ts buildParams: a
     /// <c>compat.supportsMidConvoEffort</c> model always sends managed adaptive thinking with its effort markers, including on the
-    /// summary route, which carries no level metadata and would otherwise send disabled thinking the model cannot accept.</summary>
-    private static AnthropicMessagesRequestOptions AnthropicThinkingCompat(AnthropicMessagesRequestOptions projection, JsonData raw) =>
-        projection with { SupportsMidConversationEffort = raw.Value.TryGetProperty("compat", out var compat) && compat.ValueKind == System.Text.Json.JsonValueKind.Object &&
-            compat.TryGetProperty("supportsMidConvoEffort", out var mid) && mid.ValueKind == System.Text.Json.JsonValueKind.True };
+    /// summary route, which carries no level metadata and would otherwise send disabled thinking the model cannot accept.
+    /// Disabled thinking is sent only when <c>thinkingLevelMap.off !== null</c>; the metadata-free summary route of such a model
+    /// therefore omits thinking entirely, which it expresses by projecting without reasoning (no off level is advertised).</summary>
+    private static AnthropicMessagesRequestOptions AnthropicThinkingCompat(AnthropicMessagesRequestOptions projection, JsonData raw, bool summary)
+    {
+        var value = raw.Value;
+        var supportsOff = !(value.TryGetProperty("thinkingLevelMap", out var map) && map.ValueKind == System.Text.Json.JsonValueKind.Object &&
+            map.TryGetProperty("off", out var off) && off.ValueKind == System.Text.Json.JsonValueKind.Null);
+        return projection with
+        {
+            SupportsMidConversationEffort = value.TryGetProperty("compat", out var compat) && compat.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                compat.TryGetProperty("supportsMidConvoEffort", out var mid) && mid.ValueKind == System.Text.Json.JsonValueKind.True,
+            SupportsThinkingOff = supportsOff, ModelReasoning = projection.ModelReasoning && (supportsOff || !summary)
+        };
+    }
     internal int MaximumOutputTokens => selection.MaximumOutputTokens;
     internal IChatTransport CreateTransport(int? outputTokens = null, bool summary = false)
     {
@@ -300,7 +311,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             var provider = NativeProviderFactory.CreateAnthropic(model, new Uri(definition.BaseUrl), credential,
                 AnthropicThinkingCompat(new(MaximumTokens: maximum, ModelReasoning: reasoning, ModelSupportsImages: definition.DeclaresImageInput,
                     ThinkingEnabled: false, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
-                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw),
+                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw, summary),
                 new(MaxTokens: maximum, MaximumPayloadBytes: 1_048_576), handler, summary ? null : definition.Raw);
             return Own(provider);
         }

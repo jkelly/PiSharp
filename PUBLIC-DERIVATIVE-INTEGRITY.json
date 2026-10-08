@@ -6845,8 +6845,8 @@
       "originalSha256": "1cc1f963b182130573e2dd45979f528f8ffa78a1d0c65446314949d53afc6502"
     },
     {
-      "currentSha256": "2d15cf5b2fd81fcc758bdc0f1868fa8a0a1fa2c6abf1285b8306f4535079bfa6",
-      "currentBytes": 32618,
+      "currentSha256": "7b2ab6f6fa3299b953f418ff5609ab199d472d1ec2d423a70a67039d6a7ab30c",
+      "currentBytes": 33351,
       "originalBytes": 20703,
       "path": "src/PiSharp.Cli/Commands/LiveSessionSelection.cs",
       "originalSha256": "5816304a452e0b1b0c5f4fd3deba4dce78a84414747ffe270186fdcc118d8315"
