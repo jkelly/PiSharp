@@ -28,13 +28,15 @@ The optional `liveRuntime` seam in `Program.RunTerminalHostAsync`, `TerminalSess
 
 ## Embedded catalog provenance
 
-The three resources are copied byte-for-byte from `package/dist/providers/data/{openai,openrouter,anthropic}.json` in the existing admitted `pi-ai-0.99.1.tgz`, package SHA256 `f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3`. Extraction was read-only archive data processing, without importing or executing JavaScript/TypeScript, acquiring another package or making a source capture. Runtime admission verifies each complete shard hash before FrozenModelCatalog parsing:
+The three resources are copied byte-for-byte from `package/dist/providers/data/{openai,openrouter,anthropic}.json` in `@earendil-works/pi-ai@1.1.0` (`earendil-works-pi-ai-1.1.0.tgz`, obtained with `npm pack`), package SHA256 `6caab33cec57480ed02c57fe37428a030a77cc2a0662814b435a5cf8932ad829`. The tarball matches the registry's `dist.integrity` `sha512-1T7LAkc/5Bvc0v6w4vAGVdCrli0o/E0pEmYKTnixu95vSFArBjvbhS/G4ZwI0RUePgf0Imcu0VyqlM4EcXxqfw==` (`dist.shasum` `7729247848ae3c5481cd66367790472ab4a6e4f3`), and each shard matches its hash in the package's `providers/data/.manifest.json`. Extraction was read-only archive data processing, without importing or executing JavaScript/TypeScript or making a source capture. Runtime admission verifies each complete shard hash before FrozenModelCatalog parsing:
 
 | Resource | SHA256 |
 | --- | --- |
-| anthropic.json | 3ff00b68990382e42626ebd1b65dcc28ae3cad9e6faa8920331ba92f067f1b3a |
-| openai.json | ca5ec1028efc512502591bf2562a2a6dc330f26a5f4c4a08c8a149a43c5bd7da |
-| openrouter.json | b49405ced089750d475945738a91ac669fa00e04d574da7720935bcfe16ba272 |
+| anthropic.json | aa4342dfb96feb1619794113619d6630088d6ac544c547a4f9899a0a7f26419b |
+| openai.json | f4c1ac9f8f84cb9f2a952b0ceec51c90a38b31b4cdf33200e018ece9d408e95f |
+| openrouter.json | c86aa3b95d412465dac54cb902402cbdb40f47a1fe33f12b002913834724d8f0 |
+
+History: until the Pi 1.1.0 sync the resources were copied the same way from the admitted `pi-ai-0.99.1.tgz`, package SHA256 `f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3`, with shard hashes anthropic.json `3ff00b68990382e42626ebd1b65dcc28ae3cad9e6faa8920331ba92f067f1b3a`, openai.json `ca5ec1028efc512502591bf2562a2a6dc330f26a5f4c4a08c8a149a43c5bd7da` and openrouter.json `b49405ced089750d475945738a91ac669fa00e04d574da7720935bcfe16ba272`. The 1.1.0 shards add Claude Haiku 5.5 (with a prompt-length pricing tier), the GPT-6 Luna classifier and further OpenRouter chat/classifier entries. `Models/mistral.json` keeps its separate v0.99.1 source-catalog provenance (see mistral-cli-selection.md).
 
 The retained Pi MIT notice applies; see THIRD-PARTY-NOTICES.md. These pinned catalog declarations retain source metadata and are not live model recommendations, up-to-date pricing claims or service capability qualification. No model is selected by default. Actual provider API/compatibility behavior and the final launch command need the provider lane's review and separate evidence.
 

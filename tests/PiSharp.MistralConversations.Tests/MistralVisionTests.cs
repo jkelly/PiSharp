@@ -107,7 +107,7 @@ internal static class MistralVisionTests
             var row = Metadata(supports ? new JsonArray("text", "image") : new JsonArray("text")); var original = row.ToString();
             var captured = await Capture([User(Image())], Options with { SupportsImages = !supports }, row);
             var part = Success(captured)[0].GetProperty("content")[0];
-            Check(part.GetProperty("type").GetString() == (supports ? "image_url" : "text") && captured.Wire!.Value.GetProperty("max_tokens").GetDouble() == 704 && row.ToString() == original);
+            Check(part.GetProperty("type").GetString() == (supports ? "image_url" : "text") && captured.Wire!.Value.GetProperty("max_tokens").GetDouble() == 532 && row.ToString() == original);
         }
         var absent = JsonNode.Parse(Metadata(new JsonArray("text", "image")).ToString())!.AsObject(); absent.Remove("input");
         Check(Success(await Capture([User(Image())], Options, JsonData.Parse(absent.ToJsonString())))[0].GetProperty("content")[0].GetProperty("type").GetString() == "text");

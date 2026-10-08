@@ -134,18 +134,19 @@ internal static class Program
         TranscriptEntry Assistant(long timestamp, int total, StopReason stop = StopReason.Stop) => new("assistant", PiWireJson.WriteMessage(
             new(Model.Api, Model.Provider, Model.Id, timestamp, [new TextContent("old")], new(70, 20, 5, 5, total, new(0, 0, 0, 0, 0)), stop)));
         var system = new TranscriptEntry("system", JsonData.Parse("""{"role":"system","content":"prefix","timestamp":3}"""));
+        // Pi 1.1.0 estimate.ts divides characters by 3.5 instead of 4 (for example "12345678" is 3 tokens, text plus image 1373).
         var current = Resolve(Options(window: 5000), User(), Assistant(2, 100), User("12345678", 3));
-        Check(current.ContextEstimate == new AnthropicMessagesContextUsageEstimate(102, 100, 2, 1) && current.MaxTokens == 802, "Applicable usage plus trailing estimation differs.");
+        Check(current.ContextEstimate == new AnthropicMessagesContextUsageEstimate(103, 100, 3, 1) && current.MaxTokens == 801, "Applicable usage plus trailing estimation differs.");
         Check(Resolve(Options(), User(), Assistant(2, 0)).ContextEstimate == new AnthropicMessagesContextUsageEstimate(100, 100, 0, 1), "Zero total fallback differs.");
         Check(Resolve(Options(), system, Assistant(2, 100)).ContextEstimate == new AnthropicMessagesContextUsageEstimate(3, 0, 3, null), "Newer prefix must invalidate stale usage.");
         foreach (var stop in new[] { StopReason.Error, StopReason.Aborted })
             Check(Resolve(Options(), User(), Assistant(2, 100, stop)).ContextEstimate.Tokens == 2, "Failed usage was selected.");
         var content = new TranscriptEntry("user", JsonData.Parse("""{"role":"user","content":[{"type":"text","text":"abcd"},{"type":"image","data":"inert","mimeType":"image/png"}],"timestamp":1}"""));
-        Check(Resolve(Options(), content).ContextEstimate.Tokens == 1201, "Image estimate differs.");
+        Check(Resolve(Options(), content).ContextEstimate.Tokens == 1373, "Image estimate differs.");
         var tool = new TranscriptEntry("assistant", JsonData.Parse("""{"role":"assistant","content":[{"type":"thinking","thinking":"abc"},{"type":"toolCall","name":"x","arguments":{"n":1}}],"timestamp":1,"stopReason":"error","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0}}"""));
-        Check(Resolve(Options(), tool).ContextEstimate.Tokens == 3, "Thinking/tool JSON estimate differs.");
+        Check(Resolve(Options(), tool).ContextEstimate.Tokens == 4, "Thinking/tool JSON estimate differs.");
         var sections = new TranscriptEntry("system", JsonData.Parse("""{"role":"system","content":"a","sections":{"part":"b","removed":null},"toolsAdded":["x"],"toolsRemoved":["y"],"timestamp":1}"""));
-        Check(Resolve(Options(), sections).ContextEstimate.Tokens == 5, "System sections/declaration estimates differ.");
+        Check(Resolve(Options(), sections).ContextEstimate.Tokens == 6, "System sections/declaration estimates differ.");
         var bounded = Resolve(Options("high", window: 5000), User());
         Check(bounded.MaxTokens == 903 && bounded.ThinkingBudgetTokens == 0, "Second context clamp/answer room differs.");
         return Task.CompletedTask;
@@ -268,7 +269,7 @@ internal static class Program
         await agent.PromptAsync(User("12345678", 124));
         Check(handler.Bodies.Count == 2 && retained.Messages.Length == 2 && agent.Snapshot.Messages.Length == 4, "Successive Agent prompts differ.");
         using var second = JsonDocument.Parse(handler.Bodies[1]);
-        Check(second.RootElement.GetProperty("max_tokens").GetInt32() == 890, "Current usage plus trailing input was not resolved again.");
+        Check(second.RootElement.GetProperty("max_tokens").GetInt32() == 889, "Current usage plus trailing input was not resolved again.");
         Check(second.RootElement.GetProperty("messages").GetArrayLength() == 3 && first.WireBody.ToString() == before, "Canonical replay changed.");
         Check(handler.AllBodies.All(value => value.Disposed && value.AsyncDisposeCalls == 1), "Agent successive original owners were not joined.");
         foreach (var request in handler.Requests) await DisposedRequest(request);

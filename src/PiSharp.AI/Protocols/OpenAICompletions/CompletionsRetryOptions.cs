@@ -1,3 +1,5 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/provider-retry.ts.
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -17,22 +19,24 @@ public sealed record CompletionsRetryOptions(int MaxRetries = 0, int MaxRetryDel
     public int MaximumRequestHeaderCharacters { get; init; } = 32_768;
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
     public Action<CompletionsRetryObservation>? OnRetry { get; init; }
+    /// <summary>HTTP statuses that fail at once although the default policy, including x-should-retry: true, would retry them.</summary>
+    public ImmutableArray<int> NoRetryStatuses { get; init; } = [];
 
     internal void Validate()
     {
         if (MaxRetries is < 0 or > 32 || MaxRetryDelayMilliseconds < 0 || MaximumRequestBodyBytes is < 2 or > 8_388_608 ||
             MaximumRequestHeaders is < 1 or > 4096 || MaximumRequestOptions is < 1 or > 4096 ||
-            MaximumRequestHeaderCharacters is < 1 or > 1_048_576 || TimeProvider is null)
+            MaximumRequestHeaderCharacters is < 1 or > 1_048_576 || TimeProvider is null || NoRetryStatuses.IsDefault || NoRetryStatuses.Length > 4096)
             throw new ArgumentOutOfRangeException(nameof(CompletionsRetryOptions), "Invalid Completions retry limits.");
     }
 }
 
 internal static partial class CompletionsRetryPolicy
 {
-    internal static bool Retryable(int? status, string? directive = null) => directive switch
+    internal static bool Retryable(CompletionsRetryOptions options, int? status, string? directive = null) => directive switch
     {
         "true" => true, "false" => false, _ => status is null or 408 or 409 or 429 || status >= 500
-    };
+    } && !(status is { } code && options.NoRetryStatuses.Contains(code));
 
     internal static string? Header(HttpResponseMessage response, string name, int maximumCharacters)
     {
@@ -49,16 +53,17 @@ internal static partial class CompletionsRetryPolicy
 
     internal static TimeSpan Delay(CompletionsRetryOptions options, int retryIndex, HttpResponseMessage? response, int maximumHeaderCharacters)
     {
+        // Only finite server delays apply. Infinite values and unparseable dates fall through to exponential backoff.
         double delay;
         var milliseconds = response is null ? null : Header(response, "retry-after-ms", maximumHeaderCharacters);
-        if (!string.IsNullOrEmpty(milliseconds) && TryFloat(milliseconds, out delay)) return ServerDelay(options, delay);
+        if (!string.IsNullOrEmpty(milliseconds) && TryFloat(milliseconds, out delay) && double.IsFinite(delay)) return ServerDelay(options, delay);
         var retryAfter = response is null ? null : Header(response, "retry-after", maximumHeaderCharacters);
         if (!string.IsNullOrEmpty(retryAfter))
         {
             if (TryFloat(retryAfter, out var seconds)) delay = seconds * 1000;
             else delay = DateTimeOffset.TryParse(retryAfter, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date)
-                ? (date - options.TimeProvider.GetUtcNow()).TotalMilliseconds : 0;
-            return ServerDelay(options, delay);
+                ? (date - options.TimeProvider.GetUtcNow()).TotalMilliseconds : double.NaN;
+            if (double.IsFinite(delay)) return ServerDelay(options, delay);
         }
         return TimeSpan.FromMilliseconds(Math.Min(500 * Math.Pow(2, retryIndex), 8000) * (1 - Random.Shared.NextDouble() * 0.25));
     }
@@ -67,9 +72,8 @@ internal static partial class CompletionsRetryPolicy
     {
         if (options.MaxRetryDelayMilliseconds > 0 && milliseconds > options.MaxRetryDelayMilliseconds)
             throw new StreamProtocolException("Completions server retry delay exceeds configured limits.");
-        if (double.IsNegativeInfinity(milliseconds)) return TimeSpan.Zero;
-        // A native timer cannot safely represent JS's overflowing/infinite timeout behavior.
-        if (!double.IsFinite(milliseconds) || milliseconds > int.MaxValue - 1)
+        // A native timer cannot safely represent JS's overflowing timeout behavior.
+        if (milliseconds > int.MaxValue - 1)
             throw new StreamLimitException("Completions retry delay exceeds native timer limits.");
         return TimeSpan.FromMilliseconds(Math.Max(0, milliseconds));
     }

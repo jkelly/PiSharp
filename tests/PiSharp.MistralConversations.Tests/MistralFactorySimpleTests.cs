@@ -15,6 +15,7 @@ internal static class MistralFactorySimpleTests
     private static JsonData Metadata(double window = 5000, double maximum = 1000) => JsonData.Parse(JsonSerializer.Serialize(new
     { id = Model.Id, api = Model.Api, provider = Model.Provider, contextWindow = window, maxTokens = maximum, reasoning = false }));
     private static TranscriptEntry User(string text, long timestamp = 1) => new("user", JsonData.Parse(JsonSerializer.Serialize(new { role = "user", content = text, timestamp })));
+    // Pi 1.1.0 estimate.ts: 3.5 characters per token, so 200 characters estimate ceil(200 / 3.5) = 58 tokens (50 at four).
     private static ChatRequest Request => new(Model, [User(new string('x', 200))]);
     public static (string Name, Func<Task> Run)[] Cases() =>
     [
@@ -43,7 +44,7 @@ internal static class MistralFactorySimpleTests
             Check(await Done(direct.Transport, Request));
         using (var simple = NativeProviderFactory.CreateMistralSimple(Model, Endpoint, "fake-key", row, supplied, handler))
             Check(await Done(simple.Transport, Request));
-        Check(maxima.SequenceEqual([1000d, 854d]) && supplied.MaxTokens == 1000 && row.ToString() == frozen && !handler.Disposed);
+        Check(maxima.SequenceEqual([1000d, 846d]) && supplied.MaxTokens == 1000 && row.ToString() == frozen && !handler.Disposed);
         // Both clients have been disposed, but the injected handler remains owned and usable by this fixture.
         using var third = NativeProviderFactory.CreateMistral(Model, Endpoint, "fake-key", supplied, handler);
         Check(await Done(third.Transport, Request) && handler.Calls == 3);
@@ -52,10 +53,10 @@ internal static class MistralFactorySimpleTests
     {
         using var client = new HttpClient(new Handler(_ => throw new InvalidOperationException("No HTTP in resolution fixture.")));
         foreach (var (window, supplied, expected) in new (double, double?, double)[]
-        { (5000, null, 854), (5000, 100, 100), (4000, null, 1), (0, null, 1000), (-1, 0, 1), (5000, 0, 0) })
+        { (5000, null, 846), (5000, 100, 100), (4000, null, 1), (0, null, 1000), (-1, 0, 1), (5000, 0, 0) })
         {
             var transport = new MistralSimpleHttpSseTransport(client, Model, Metadata(window), Options with { ApiKey = "fake-key", MaxTokens = supplied });
-            Check(transport.Resolve(Request) == new MistralSimpleResolution(50, expected));
+            Check(transport.Resolve(Request) == new MistralSimpleResolution(58, expected));
         }
         return Task.CompletedTask;
     }
@@ -66,11 +67,11 @@ internal static class MistralFactorySimpleTests
         TranscriptEntry Assistant(long timestamp, string stop, long total) => new("assistant", JsonData.Parse(JsonSerializer.Serialize(new
         { role = "assistant", timestamp, stopReason = stop, content = new[] { new { type = "text", text = "abcd" } },
             usage = new { totalTokens = total, input = 80, output = 20, cacheRead = 0, cacheWrite = 0 } })));
-        Check(transport.Resolve(new(Model, [User("abcd"), Assistant(2, "stop", 120), User("abcdefgh", 3)])).ContextTokens == 122);
-        Check(transport.Resolve(new(Model, [User("abcd"), Assistant(2, "stop", 0), User("abcdefgh", 3)])).ContextTokens == 102);
-        Check(transport.Resolve(new(Model, [User("abcd", 10), Assistant(2, "stop", 120), User("abcdefgh", 11)])).ContextTokens == 4);
+        Check(transport.Resolve(new(Model, [User("abcd"), Assistant(2, "stop", 120), User("abcdefgh", 3)])).ContextTokens == 123);
+        Check(transport.Resolve(new(Model, [User("abcd"), Assistant(2, "stop", 0), User("abcdefgh", 3)])).ContextTokens == 103);
+        Check(transport.Resolve(new(Model, [User("abcd", 10), Assistant(2, "stop", 120), User("abcdefgh", 11)])).ContextTokens == 7);
         foreach (var stop in new[] { "error", "aborted" })
-            Check(transport.Resolve(new(Model, [User("abcd"), Assistant(2, stop, 120), User("abcdefgh", 3)])).ContextTokens == 4);
+            Check(transport.Resolve(new(Model, [User("abcd"), Assistant(2, stop, 120), User("abcdefgh", 3)])).ContextTokens == 7);
         return Task.CompletedTask;
     }
     private static async Task HeaderAffinity()

@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/overflow.ts.
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using PiSharp.Contracts;
@@ -12,7 +13,7 @@ public static class SessionRecoveryClassifier
     private const string Space = @"[\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]";
     private static readonly Regex[] Overflow = new[]
     {
-        @"prompt (?:is )?too long", @"request_too_large", @"input is too long for requested model",
+        @"prompt (?:is )?too long", @"prompt exceeds max length", @"request_too_large", @"input is too long for requested model",
         @"exceeds the context window", @"exceeds (?:the )?(?:model'?s )?maximum context length(?: of [\d,]+ tokens?|\s*\([\d,]+\))",
         @"input token count.*exceeds the maximum", @"maximum prompt length is \d+", @"reduce the length of the messages",
         @"maximum context length is \d+ tokens", @"exceeds (?:the )?maximum allowed input length of [\d,]+ tokens?",

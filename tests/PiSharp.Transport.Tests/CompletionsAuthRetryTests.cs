@@ -90,11 +90,14 @@ internal static class CompletionsAuthRetryTests
     {
         foreach (var row in new[] {
             (Ms: "1.5tail", After: "60", Expected: 1.5), (Ms: "invalid", After: "0.002tail", Expected: 2d),
-            (Ms: "-12", After: (string?)null, Expected: 0d), (Ms: "-Infinity", After: (string?)null, Expected: 0d),
-            (Ms: (string?)null, After: "invalid-date", Expected: 0d),
+            (Ms: "-12", After: (string?)null, Expected: 0d),
             (Ms: (string?)null, After: "Sat, 03 Oct 2026 00:00:01 GMT", Expected: 1000d),
             (Ms: (string?)null, After: "Fri, 02 Oct 2026 23:59:59 GMT", Expected: 0d),
-            (Ms: "60001", After: (string?)null, Expected: 60001d) })
+            (Ms: "60001", After: (string?)null, Expected: 60001d),
+            // Pi 0.99.2 (provider-retry.ts): infinite values and unparseable dates use exponential backoff (-1 marks the jitter range).
+            (Ms: "-Infinity", After: (string?)null, Expected: -1d), (Ms: (string?)null, After: "invalid-date", Expected: -1d),
+            (Ms: "Infinity", After: (string?)null, Expected: -1d), (Ms: "1e999", After: (string?)null, Expected: -1d),
+            (Ms: (string?)null, After: "Infinity", Expected: -1d) })
         {
             var clock = new Clock();
             using var fixture = new Fixture([429, 200], new(1, row.Expected > 60000 ? 0 : 60000) { TimeProvider = clock });
@@ -102,16 +105,16 @@ internal static class CompletionsAuthRetryTests
             if (row.Ms is not null) fixture.ResponseHeaders["retry-after-ms"] = row.Ms;
             if (row.After is not null) fixture.ResponseHeaders["retry-after"] = row.After;
             var task = fixture.Complete();
-            if (row.Expected > 0)
+            if (row.Expected is > 0 or < 0)
             {
                 await clock.Entered.Task.WaitAsync(Deadline); Check(fixture.Handler.Sends == 1 && fixture.Handler.Responses.Single().Disposals == 1, "Delay began before rejected ownership closed.");
                 clock.Release();
             }
-            var result = await task;
-            Check(result.Message.StopReason == StopReason.Stop && fixture.Decisions.Single().Delay.TotalMilliseconds == row.Expected && fixture.Handler.Sends == 2, "Pinned source delay precedence/parser/date behavior differs.");
+            var result = await task; var actual = fixture.Decisions.Single().Delay.TotalMilliseconds;
+            Check(result.Message.StopReason == StopReason.Stop && (row.Expected < 0 ? actual is >= 375 and <= 500 : actual == row.Expected) && fixture.Handler.Sends == 2, "Pinned source delay precedence/parser/date behavior differs.");
             Closed(fixture);
         }
-        foreach (var delay in new[] { "60001", "Infinity", "1e999" })
+        foreach (var delay in new[] { "60001" })
         {
             using var fixture = new Fixture([429], new(2, 20)); fixture.ResponseHeaders["retry-after-ms"] = delay;
             var result = await fixture.Complete(); Check(result.Message.StopReason == StopReason.Error && fixture.Handler.Sends == 1 && fixture.Decisions.Count == 0, "Server delay cap permitted a next attempt."); Closed(fixture); Clean(result);

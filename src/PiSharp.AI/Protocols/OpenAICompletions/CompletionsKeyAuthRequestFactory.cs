@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openai-completions.ts (buildParams sampling merge).
 using System.Collections.Immutable;
 using System.Net.Http.Headers;
 using System.Text;
@@ -53,7 +54,7 @@ public sealed class CompletionsKeyAuthRequestFactory
     private readonly bool _zaiToolStream;
     private readonly CompletionsToolDeclarationProjectionOptions _toolProjectionOptions;
     private readonly string? _cacheControlFormat;
-    private readonly JsonData? _openRouterRouting, _modelSamplingParams, _samplingParams, _priority;
+    private readonly JsonData? _openRouterRouting, _modelSamplingParams, _levelSamplingParams, _samplingParams, _priority;
     /// <summary>Resolved existing wire configuration for this bound model. Callers may clone it to set stream resource limits.</summary>
     public OpenAICompletionsWireOptions ResolvedWireOptions { get; }
 
@@ -91,6 +92,12 @@ public sealed class CompletionsKeyAuthRequestFactory
             _options = binding.Options; _projectionOptions = binding.Projection;
             _cacheControlFormat = binding.CacheControlFormat; _openRouterRouting = binding.Routing;
             _modelSamplingParams = binding.Sampling; _priority = binding.Priority; ResolvedWireOptions = binding.Wire;
+            if (binding.SamplingByLevel is { } byLevel)
+            {
+                if (!ThinkingLevelSampling.TrySelect(byLevel.Value, binding.Projection.Reasoning, binding.Options.ThinkingLevelMap?.Value ?? default,
+                    _options.ReasoningEffort ?? "off", out var selected)) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
+                if (selected.ValueKind == JsonValueKind.Object) _levelSamplingParams = JsonData.FromElement(selected);
+            }
             _thinkingFormat = binding.ThinkingFormat; _thinkingTokenBudgetField = binding.BudgetField;
             _modelMaxTokens = binding.MaxTokens; _chatTemplateKwargs = binding.TemplateKwargs;
             _chatTemplateArgs = binding.TemplateArgs; _zaiToolStream = binding.ToolStream;
@@ -212,7 +219,8 @@ public sealed class CompletionsKeyAuthRequestFactory
         if (_toolChoice is not null) Add("tool_choice", _toolChoice);
         AddThinkingFields(Add, cancellationToken);
         if (_openRouterRouting is not null) Add("provider", _openRouterRouting);
-        foreach (var sampling in new[] { _modelSamplingParams, _samplingParams })
+        // Model defaults, then the effective thinking level's overrides, then request keys; later values win per key.
+        foreach (var sampling in new[] { _modelSamplingParams, _levelSamplingParams, _samplingParams })
             if (sampling is not null) foreach (var property in CompletionsJson.Properties(sampling.Value))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -287,7 +295,8 @@ public sealed class CompletionsKeyAuthRequestFactory
 
     private sealed record BoundModel(CompletionsKeyAuthRequestOptions Options, CompletionsTranscriptProjectionOptions Projection,
         string? CacheControlFormat, JsonData? Routing, JsonData? Sampling, JsonData? Priority, OpenAICompletionsWireOptions Wire,
-        string ThinkingFormat, string? BudgetField, double? MaxTokens, JsonData? TemplateKwargs, JsonData? TemplateArgs, bool ToolStream);
+        string ThinkingFormat, string? BudgetField, double? MaxTokens, JsonData? TemplateKwargs, JsonData? TemplateArgs, bool ToolStream,
+        JsonData? SamplingByLevel = null);
 
     private JsonData? ReadOwnedObject(JsonData? source)
     {
@@ -419,7 +428,8 @@ public sealed class CompletionsKeyAuthRequestFactory
             return new(options, projection, cacheFormat, Object(compat, "openRouterRouting"), Object(model, "samplingParams"), priority,
                 new(SupportsFinishReason: Flag("supportsFinishReason", true), Rates: new(Rate("input"), Rate("output"), Rate("cacheRead"), Rate("cacheWrite")))
                     { SupportsOpenAIGrammarTools = grammarTools }, thinkingFormat, budgetField, modelMaxTokens,
-                Object(compat, "chatTemplateKwargs"), Object(compat, "chatTemplateArgs"), Flag("zaiToolStream", false));
+                Object(compat, "chatTemplateKwargs"), Object(compat, "chatTemplateArgs"), Flag("zaiToolStream", false),
+                Object(model, "samplingParamsByThinkingLevel"));
         }
         catch (CompletionsRequestException error) when (error.Failure is CompletionsRequestFailure.InvalidTranscript or CompletionsRequestFailure.InvalidRequest)
         { throw Fail(CompletionsRequestFailure.InvalidConfiguration); }
