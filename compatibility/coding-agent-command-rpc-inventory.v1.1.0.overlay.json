@@ -1,0 +1,3663 @@
+{
+  "$comment": "Authored native status for the v1.1.0 command/RPC inventory, applied by tools/SurfaceInventory/build-command-rpc-inventory.mjs --overlay. Assessed against PiSharp sources at 95e3c29a7db9434704819f856f20e0bf30f1938f. A row counts as Implemented only when an authored test case exercises it; tests are authored and registered, not executed by the refresh.",
+  "nativeStatusPolicy": {
+    "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+    "vocabulary": {
+      "Implemented": "PiSharp implements the surface and at least one authored test case exercises it.",
+      "Partial": "Implemented with a narrower scope or only partly tested; see note.",
+      "ImplementedNoTest": "Present in PiSharp sources with no authored test; not counted as implemented.",
+      "DifferentSurface": "PiSharp offers the capability through a different native command or option; see note.",
+      "NotImplemented": "No PiSharp counterpart."
+    },
+    "unassessedRows": "SDK root and module export rows are TypeScript declarations; their native C# mapping needs a reviewed mapping record, so they carry no nativeStatus and stay Deferred/Unverified.",
+    "implementationEvidenceState": "AuthoredTests marks rows whose nativeStatus cites authored test cases; implementationAcceptance stays Deferred until an upstream/native differential or independent acceptance exists.",
+    "counts": {
+      "Implemented": 119,
+      "Partial": 11,
+      "DifferentSurface": 9,
+      "ImplementedNoTest": 5,
+      "NotImplemented": 61
+    }
+  },
+  "nativeOnlySurfaces": [
+    {
+      "id": "pisharp.stderr.mcp_diagnostic",
+      "kind": "stderr-json-record",
+      "upstreamCounterpart": null,
+      "shape": "{\"schemaVersion\":1,\"type\":\"mcp_diagnostic\",\"message\":string}",
+      "sources": [
+        "src/PiSharp.Cli/Mcp/McpSessionHost.cs"
+      ],
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "mcp.session.global-config-direct-background-failure-report-and-no-mcp",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/McpSessionCases.cs"
+          }
+        ],
+        "note": "Project-trust notice and \"MCP servers need attention:\" problems; none with --no-mcp."
+      }
+    },
+    {
+      "id": "pisharp.failure.LiveAuthenticationFailed",
+      "kind": "cli-failure-code",
+      "upstreamCounterpart": null,
+      "sources": [
+        "src/PiSharp.Cli/Commands/LiveSessionSelection.cs"
+      ],
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "auth.anthropic.live-route-stored-key-env-precedence-and-federation",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/LiveRouteCases.cs"
+          }
+        ],
+        "note": "The refused stored !command key path asserts the code; the OAuth refresh failure path is untested."
+      }
+    },
+    {
+      "id": "pisharp.failure.LiveAzureEndpoint",
+      "kind": "cli-failure-code",
+      "upstreamCounterpart": null,
+      "sources": [
+        "src/PiSharp.Cli/Commands/LiveSessionSelection.cs"
+      ],
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "provider.azure.live-route-responses-completions-and-endpoint-errors",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/LiveRouteCases.cs"
+          }
+        ],
+        "note": "The test asserts exit 2 and the endpoint message, not the LiveAzureEndpoint code string."
+      }
+    }
+  ],
+  "rows": {
+    "cli.flag.tools": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Settings/ToolSelectionCliConfiguration.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "cli.tools.parse-patterns-modifiers-and-no-mcp",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/ToolSelectionCases.cs"
+          },
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "cli.tools.exact-upstream-errors-through-commands",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/ToolSelectionCases.cs"
+          },
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "cli.tools.resolve-modifiers-from-available-defaults",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/ToolSelectionCases.cs"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/ToolSelectionCliFlagTests.cs",
+            "case": "startup tools CLI disable aliases and explicit precedence"
+          }
+        ],
+        "note": "Patterns, mcp__ retention and +name/-name modifiers on the session rpc/terminal verbs, with upstream error text in the PiSharp JSON error envelope (exit 2)."
+      },
+      "implementationEvidenceState": "AuthoredTests",
+      "observed": {
+        "statement": "Splits comma-separated values, trims and removes empty names, then validates the list with getToolListError: an invalid list adds an error diagnostic and leaves tools unset (v1.1.0)."
+      }
+    },
+    "cli.flag.exclude-tools": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Settings/ToolSelectionCliConfiguration.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "cli.tools.parse-patterns-modifiers-and-no-mcp",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/ToolSelectionCases.cs"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/ToolSelectionCliFlagTests.cs",
+            "case": "startup tools CLI exclusions ordered replacement and missing values"
+          }
+        ],
+        "note": "On the session rpc/terminal verbs."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.flag.no-tools": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Settings/ToolSelectionCliConfiguration.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/ToolSelectionCliFlagTests.cs",
+            "case": "startup tools CLI disable aliases and explicit precedence"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/ToolSelectionCliFlagTests.cs",
+            "case": "startup tools CLI actual disabled create and inspect rejection"
+          }
+        ],
+        "note": "On the session rpc/terminal verbs."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.flag.no-builtin-tools": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Settings/ToolSelectionCliConfiguration.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/ToolSelectionCliFlagTests.cs",
+            "case": "startup tools CLI disable aliases and explicit precedence"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/ToolSelectionCliFlagTests.cs",
+            "case": "startup tools CLI actual disabled create and inspect rejection"
+          }
+        ],
+        "note": "On the session rpc/terminal verbs."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.flag.no-mcp": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Settings/ToolSelectionCliConfiguration.cs",
+          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs",
+          "src/PiSharp.Cli/Commands/SessionCommands.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "cli.tools.parse-patterns-modifiers-and-no-mcp",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/ToolSelectionCases.cs"
+          },
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "mcp.session.global-config-direct-background-failure-report-and-no-mcp",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/McpSessionCases.cs"
+          }
+        ],
+        "note": "New in v1.1.0. Parsed on the session verbs; no MCP servers connect and no mcp_diagnostic records are written."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.flag.provider": {
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs",
+          "src/PiSharp.Cli/Commands/TerminalSessionCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "cli.provider-requires-model-exact-error",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/ToolSelectionCases.cs"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SettingsModelStartupTests.cs",
+            "case": "settings model startup actual RPC startup CLI overrides settings model and thinking",
+            "sourcePrefix": "settings model startup ",
+            "sourceSuffix": "actual RPC startup CLI overrides settings model and thinking"
+          }
+        ],
+        "note": "Only with session rpc/terminal --live; provider limited to openai, openrouter, anthropic, mistral and azure. --provider without --model fails as in v1.1.0 main.ts."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.flag.model": {
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs",
+          "src/PiSharp.Cli/Commands/TerminalSessionCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "cli.provider-requires-model-exact-error",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/ToolSelectionCases.cs"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SettingsModelStartupTests.cs",
+            "case": "settings model startup actual RPC startup CLI overrides settings model and thinking",
+            "sourcePrefix": "settings model startup ",
+            "sourceSuffix": "actual RPC startup CLI overrides settings model and thinking"
+          }
+        ],
+        "note": "Only with session rpc/terminal --live; provider limited to openai, openrouter, anthropic, mistral and azure. --provider without --model fails as in v1.1.0 main.ts."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.flag.thinking": {
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SettingsModelStartupTests.cs",
+            "case": "settings model startup actual RPC startup CLI overrides settings model and thinking",
+            "sourcePrefix": "settings model startup ",
+            "sourceSuffix": "actual RPC startup CLI overrides settings model and thinking"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SettingsModelStartupTests.cs",
+            "case": "settings model startup durable resume preserves recorded thinking until explicit CLI override",
+            "sourcePrefix": "settings model startup ",
+            "sourceSuffix": "durable resume preserves recorded thinking until explicit CLI override"
+          }
+        ],
+        "note": "session rpc/terminal only."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.flag.skill": {
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Skills/SkillCliConfiguration.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SkillCliHostTests.cs",
+            "case": "skill CLI host actual one-shot selected content reaches model and repeat resume does not duplicate descriptions",
+            "sourcePrefix": "skill CLI host ",
+            "sourceSuffix": "actual one-shot selected content reaches model and repeat resume does not duplicate descriptions"
+          }
+        ],
+        "note": "Absolute approved paths only; repeatable."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.flag.prompt-template": {
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Prompts/PromptTemplateCliConfiguration.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/PromptTemplateCliAdapterTests.cs",
+            "case": "prompt template CLI adapter consume repeatable selections only at the parser option boundary",
+            "sourcePrefix": "prompt template CLI adapter ",
+            "sourceSuffix": "consume repeatable selections only at the parser option boundary"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/PromptTemplateCliAdapterTests.cs",
+            "case": "prompt template CLI adapter reject missing and relative flag values",
+            "sourcePrefix": "prompt template CLI adapter ",
+            "sourceSuffix": "reject missing and relative flag values"
+          }
+        ],
+        "note": "Absolute paths only; repeatable."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.flag.session": {
+      "nativeStatus": {
+        "status": "DifferentSurface",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/SessionCommands.cs"
+        ],
+        "tests": [],
+        "note": "PiSharp --session is a required absolute JSONL path on every session verb, not an upstream session selector."
+      }
+    },
+    "cli.flag.print": {
+      "nativeStatus": {
+        "status": "DifferentSurface",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/SessionCommands.cs",
+          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionPrintCommandTests.cs",
+            "case": "Print CLI rejects malformed output modes before durable acquisition and preserves default report"
+          }
+        ],
+        "note": "Print/JSON are `session prompt|resume --output report|print|json`; RPC is the `session rpc` verb."
+      }
+    },
+    "cli.flag.mode": {
+      "nativeStatus": {
+        "status": "DifferentSurface",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/SessionCommands.cs",
+          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionPrintCommandTests.cs",
+            "case": "Print CLI rejects malformed output modes before durable acquisition and preserves default report"
+          }
+        ],
+        "note": "Print/JSON are `session prompt|resume --output report|print|json`; RPC is the `session rpc` verb."
+      }
+    },
+    "cli.flag.extension": {
+      "nativeStatus": {
+        "status": "DifferentSurface",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Extensions/NativeExtensionConfiguration.cs"
+        ],
+        "tests": [],
+        "note": "Native packages use --extension-package/--extension-manifest/--extension-approval and related flags."
+      }
+    },
+    "cli.flag.no-session": {
+      "nativeStatus": {
+        "status": "DifferentSurface",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs"
+        ],
+        "tests": [],
+        "note": "Closest equivalent: --session-mode new-memory|new-lazy|open."
+      }
+    },
+    "cli.flag.resume": {
+      "nativeStatus": {
+        "status": "DifferentSurface",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/SessionCommands.cs"
+        ],
+        "tests": [],
+        "note": "The `session resume` verb with --leaf/--root; no -r/-c."
+      }
+    },
+    "cli.flag.continue": {
+      "nativeStatus": {
+        "status": "DifferentSurface",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/SessionCommands.cs"
+        ],
+        "tests": [],
+        "note": "The `session resume` verb with --leaf/--root; no -r/-c."
+      }
+    },
+    "cli.flag.help": {
+      "nativeStatus": {
+        "status": "ImplementedNoTest",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Program.cs"
+        ],
+        "tests": [],
+        "note": "Only the bare `--help` form; no -h; untested."
+      }
+    },
+    "cli.flag.version": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.api-key": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.system-prompt": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.append-system-prompt": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.name": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.session-id": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.fork": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.session-dir": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.models": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      },
+      "observed": {
+        "statement": "Splits comma-separated values, trims and removes empty patterns (v1.1.0; v0.99.1 retained empty elements)."
+      }
+    },
+    "cli.flag.export": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.no-extensions": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.theme": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.use-theme": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.no-skills": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.no-prompt-templates": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.no-themes": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.no-context-files": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.list-models": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.tui-mode": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.verbose": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.approve": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.no-approve": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.offline": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.flag.delimiter": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.grammar.file": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Program.cs"
+        ],
+        "tests": [],
+        "note": "Unknown keys fail as InvalidArguments; messages go through --message."
+      }
+    },
+    "cli.grammar.extension-long-option": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Program.cs"
+        ],
+        "tests": [],
+        "note": "Unknown keys fail as InvalidArguments; messages go through --message."
+      }
+    },
+    "cli.grammar.unknown-short-option": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Program.cs"
+        ],
+        "tests": [],
+        "note": "Unknown keys fail as InvalidArguments; messages go through --message."
+      }
+    },
+    "cli.grammar.message": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Program.cs"
+        ],
+        "tests": [],
+        "note": "Unknown keys fail as InvalidArguments; messages go through --message."
+      }
+    },
+    "cli.help.command.mcp": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/McpCommand.cs",
+          "src/PiSharp.Cli/Mcp/Authentication/McpSignIn.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.McpSync.Tests",
+            "file": "tests/PiSharp.McpSync.Tests/CommandCases.cs",
+            "case": "cli.mcp-add-replace-local-and-errors"
+          },
+          {
+            "suite": "tests/PiSharp.McpSync.Tests",
+            "file": "tests/PiSharp.McpSync.Tests/CommandCases.cs",
+            "case": "cli.mcp-remove-global-local-and-hints"
+          },
+          {
+            "suite": "tests/PiSharp.McpSync.Tests",
+            "file": "tests/PiSharp.McpSync.Tests/CommandCases.cs",
+            "case": "cli.mcp-list-text-json-and-exit-code"
+          },
+          {
+            "suite": "tests/PiSharp.McpSync.Tests",
+            "file": "tests/PiSharp.McpSync.Tests/CompletionCases.cs",
+            "case": "cli.mcp-login-browser-callback-end-to-end"
+          },
+          {
+            "suite": "tests/PiSharp.McpSync.Tests",
+            "file": "tests/PiSharp.McpSync.Tests/CompletionCases.cs",
+            "case": "cli.mcp-login-refreshes-without-the-browser"
+          },
+          {
+            "suite": "tests/PiSharp.McpSync.Tests",
+            "file": "tests/PiSharp.McpSync.Tests/CompletionCases.cs",
+            "case": "cli.mcp-login-pasted-redirect-url"
+          },
+          {
+            "suite": "tests/PiSharp.McpSync.Tests",
+            "file": "tests/PiSharp.McpSync.Tests/CompletionCases.cs",
+            "case": "cli.mcp-login-timeout-covers-the-whole-sign-in"
+          },
+          {
+            "suite": "tests/PiSharp.McpSync.Tests",
+            "file": "tests/PiSharp.McpSync.Tests/CompletionCases.cs",
+            "case": "cli.mcp-logout-removes-stored-credentials"
+          },
+          {
+            "suite": "tests/PiSharp.McpSync.Tests",
+            "file": "tests/PiSharp.McpSync.Tests/CompletionCases.cs",
+            "case": "cli.mcp-help-usage-and-errors"
+          }
+        ],
+        "note": "mcp add|remove|list|login|logout with upstream texts (sync row mcp.oauth)."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.help.flag.local": {
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/McpCommand.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.McpSync.Tests",
+            "file": "tests/PiSharp.McpSync.Tests/CommandCases.cs",
+            "case": "cli.mcp-add-replace-local-and-errors"
+          },
+          {
+            "suite": "tests/PiSharp.McpSync.Tests",
+            "file": "tests/PiSharp.McpSync.Tests/CommandCases.cs",
+            "case": "cli.mcp-remove-global-local-and-hints"
+          }
+        ],
+        "note": "Only on mcp add/remove; package install/remove do not exist."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.help.command.install": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.help.command.remove": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.help.command.uninstall": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.help.command.update": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.help.command.list": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.help.command.config": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.help.command.auth": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.help.auth-example.print-api-key": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.help.auth-example.print-bearer-token": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "No PiSharp CLI counterpart."
+      }
+    },
+    "cli.slash.login": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs",
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.Login.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "auth.anthropic.login-copy-code-stores-auth-json-and-refreshes",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/LoginCases.cs"
+          },
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "auth.anthropic.login-browser-pasted-redirect-and-state-mismatch",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/LoginCases.cs"
+          }
+        ],
+        "note": "Anthropic only (browser and copy-code); other providers report that no login provider matches."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.slash.logout": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "auth.logout-selects-and-removes-stored-credentials",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/LogoutCases.cs"
+          }
+        ],
+        "note": "Over the shared auth.json."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.slash.new": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeSessionCreationWorkflowTests.cs",
+            "case": "native session checkpoint lifecycle cooked frontend restores fork draft and routes new clone tree"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.slash.clone": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeSessionCreationWorkflowTests.cs",
+            "case": "native session checkpoint lifecycle cooked frontend restores fork draft and routes new clone tree"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.slash.tree": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeSessionCreationWorkflowTests.cs",
+            "case": "native session checkpoint lifecycle cooked frontend restores fork draft and routes new clone tree"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.slash.fork": {
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeSessionCreationWorkflowTests.cs",
+            "case": "native session checkpoint lifecycle cooked frontend restores fork draft and routes new clone tree"
+          }
+        ],
+        "note": "/fork needs an entry id; /fork-at is PiSharp-specific."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.slash.compact": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionCompactionCommandTests.cs",
+            "case": "compaction frontend cooked commands capture generation null boundary and auto configuration"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.slash.resume": {
+      "nativeStatus": {
+        "status": "DifferentSurface",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionCatalogFrontendTests.cs",
+            "case": "catalog-frontend.numbered-resume-root-leaf-and-safe-display"
+          }
+        ],
+        "note": "/resume <n|key> [leaf|@root] after /sessions."
+      }
+    },
+    "cli.slash.quit": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionLifecycleFrontendTests.cs",
+            "case": "session-lifecycle-frontend actual memory cooked prompt uses shared RPC and joins shutdown"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.slash.reload": {
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Commands/OfflineSessionProfile.Reload.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/CliReloadRoutingTests.cs",
+            "case": "CLI actual RPC caller routes reload through attached owner and closes candidate runtime"
+          }
+        ],
+        "note": "Handled as the RPC prompt /reload; the cooked frontend has no dedicated branch."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "cli.slash.settings": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.model": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.thinking": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.scoped-models": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.export": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.import": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.share": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.bug": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.copy": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.name": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.session": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.changelog": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.hotkeys": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "cli.slash.trust": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs"
+        ],
+        "tests": [],
+        "note": "Falls through to \"[command] unavailable\"."
+      }
+    },
+    "rpc.command.prompt": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.prompt.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.steer": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.steer.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.follow_up": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.follow_up.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.abort": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.abort.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.clear_queue": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.clear_queue.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.set_steering_mode": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.set_steering_mode.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.set_follow_up_mode": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.set_follow_up_mode.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-queues-modes-abort-retention-clear-and-late-continuation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.new_session": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+            "case": "rpc.lifecycle-postcommit-notification-error-retains-fresh-file-and-current-identity"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+            "case": "rpc.lifecycle-queue-publication-orders-authority-switch-and-joins-held-writes"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.new_session.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+            "case": "rpc.lifecycle-postcommit-notification-error-retains-fresh-file-and-current-identity"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+            "case": "rpc.lifecycle-queue-publication-orders-authority-switch-and-joins-held-writes"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.get_state": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.get_state.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.get_entries": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.get_entries.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.get_last_assistant_text": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.get_last_assistant_text.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.get_messages": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.get_messages.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.set_model": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.ordered-inventory-durable-selection-and-cycle",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "ordered-inventory-durable-selection-and-cycle"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.singleton-cycle-null-and-same-model-ack",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "singleton-cycle-null-and-same-model-ack"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.set_model.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.ordered-inventory-durable-selection-and-cycle",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "ordered-inventory-durable-selection-and-cycle"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.singleton-cycle-null-and-same-model-ack",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "singleton-cycle-null-and-same-model-ack"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.cycle_model": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.ordered-inventory-durable-selection-and-cycle",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "ordered-inventory-durable-selection-and-cycle"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.singleton-cycle-null-and-same-model-ack",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "singleton-cycle-null-and-same-model-ack"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.cycle_model.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.ordered-inventory-durable-selection-and-cycle",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "ordered-inventory-durable-selection-and-cycle"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.singleton-cycle-null-and-same-model-ack",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "singleton-cycle-null-and-same-model-ack"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.get_available_models": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.ordered-inventory-durable-selection-and-cycle",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "ordered-inventory-durable-selection-and-cycle"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.singleton-cycle-null-and-same-model-ack",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "singleton-cycle-null-and-same-model-ack"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.get_available_models.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.ordered-inventory-durable-selection-and-cycle",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "ordered-inventory-durable-selection-and-cycle"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.singleton-cycle-null-and-same-model-ack",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "singleton-cycle-null-and-same-model-ack"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.set_thinking_level": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.thinking-shapes-clamps-and-explicit-runtime-prerequisite",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "thinking-shapes-clamps-and-explicit-runtime-prerequisite"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.set_thinking_level.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.thinking-shapes-clamps-and-explicit-runtime-prerequisite",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "thinking-shapes-clamps-and-explicit-runtime-prerequisite"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.cycle_thinking_level": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.thinking-shapes-clamps-and-explicit-runtime-prerequisite",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "thinking-shapes-clamps-and-explicit-runtime-prerequisite"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.cycle_thinking_level.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.thinking-shapes-clamps-and-explicit-runtime-prerequisite",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "thinking-shapes-clamps-and-explicit-runtime-prerequisite"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.get_available_thinking_levels": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.thinking-shapes-clamps-and-explicit-runtime-prerequisite",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "thinking-shapes-clamps-and-explicit-runtime-prerequisite"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.get_available_thinking_levels.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+            "case": "rpc.model-thinking.thinking-shapes-clamps-and-explicit-runtime-prerequisite",
+            "sourcePrefix": "rpc.model-thinking.",
+            "sourceSuffix": "thinking-shapes-clamps-and-explicit-runtime-prerequisite"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.compact": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Compaction.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcUpstreamCompactionTests.cs",
+            "case": "rpc.upstream-compaction.manual-result-events-durable-append-and-focus",
+            "sourcePrefix": "rpc.upstream-compaction.",
+            "sourceSuffix": "manual-result-events-durable-append-and-focus"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.compact.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Compaction.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcUpstreamCompactionTests.cs",
+            "case": "rpc.upstream-compaction.manual-result-events-durable-append-and-focus",
+            "sourcePrefix": "rpc.upstream-compaction.",
+            "sourceSuffix": "manual-result-events-durable-append-and-focus"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.set_auto_compaction": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Compaction.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcUpstreamCompactionTests.cs",
+            "case": "rpc.upstream-compaction.toggle-drives-actual-automatic-threshold-and-replacement-reset",
+            "sourcePrefix": "rpc.upstream-compaction.",
+            "sourceSuffix": "toggle-drives-actual-automatic-threshold-and-replacement-reset"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.set_auto_compaction.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Compaction.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcUpstreamCompactionTests.cs",
+            "case": "rpc.upstream-compaction.toggle-drives-actual-automatic-threshold-and-replacement-reset",
+            "sourcePrefix": "rpc.upstream-compaction.",
+            "sourceSuffix": "toggle-drives-actual-automatic-threshold-and-replacement-reset"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.set_auto_retry": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Retry.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/CleanRetryIntegrationTests.cs",
+            "case": "clean retry integration RPC strict flags state cancellation and original terminal output join"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.set_auto_retry.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Retry.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/CleanRetryIntegrationTests.cs",
+            "case": "clean retry integration RPC strict flags state cancellation and original terminal output join"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.abort_retry": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Retry.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-errors-bounds-parse-recovery-backpressure-and-awaited-owned-cleanup"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/CleanRetryIntegrationTests.cs",
+            "case": "clean retry integration RPC strict flags state cancellation and original terminal output join"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.abort_retry.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Retry.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-errors-bounds-parse-recovery-backpressure-and-awaited-owned-cleanup"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/CleanRetryIntegrationTests.cs",
+            "case": "clean retry integration RPC strict flags state cancellation and original terminal output join"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.bash": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.UserBash.cs",
+          "src/PiSharp.CodingAgent/PersistentAgentSession.UserBash.cs",
+          "src/PiSharp.Tools/Processes/ShellCommandExecutor.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/UserBashTests.cs",
+            "case": "wire.rpc-bash.split-ansi-updates-response-and-record-byte-exact"
+          },
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/UserBashTests.cs",
+            "case": "wire.rpc-bash.excluded-abort-truncation-and-spill"
+          },
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/SettledBashCases.cs"
+          }
+        ],
+        "note": "Implemented in the v1.1.0 sync (row wire.rpc-bash-ansi). Needs --bash-executable/--bash-spill-root. user_bash extension interception and shellCommandPrefix are not ported."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.bash.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.UserBash.cs",
+          "src/PiSharp.CodingAgent/PersistentAgentSession.UserBash.cs",
+          "src/PiSharp.Tools/Processes/ShellCommandExecutor.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/UserBashTests.cs",
+            "case": "wire.rpc-bash.split-ansi-updates-response-and-record-byte-exact"
+          },
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/UserBashTests.cs",
+            "case": "wire.rpc-bash.excluded-abort-truncation-and-spill"
+          },
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/SettledBashCases.cs"
+          }
+        ],
+        "note": "Implemented in the v1.1.0 sync (row wire.rpc-bash-ansi). Needs --bash-executable/--bash-spill-root. user_bash extension interception and shellCommandPrefix are not ported."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.abort_bash": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.UserBash.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/UserBashTests.cs",
+            "case": "wire.rpc-bash.split-ansi-updates-response-and-record-byte-exact"
+          },
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/UserBashTests.cs",
+            "case": "wire.rpc-bash.excluded-abort-truncation-and-spill"
+          },
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/SettledBashCases.cs"
+          }
+        ],
+        "note": "Implemented in the v1.1.0 sync (row wire.rpc-bash-ansi)."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.abort_bash.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.UserBash.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/UserBashTests.cs",
+            "case": "wire.rpc-bash.split-ansi-updates-response-and-record-byte-exact"
+          },
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/UserBashTests.cs",
+            "case": "wire.rpc-bash.excluded-abort-truncation-and-spill"
+          },
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/SettledBashCases.cs"
+          }
+        ],
+        "note": "Implemented in the v1.1.0 sync (row wire.rpc-bash-ansi)."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.get_session_stats": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.SessionMetadata.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionMetadataTests.cs",
+            "case": "rpc.session-metadata.whole-session-accounting-and-selected-context",
+            "sourcePrefix": "rpc.session-metadata.",
+            "sourceSuffix": "whole-session-accounting-and-selected-context"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionMetadataTests.cs",
+            "case": "rpc.session-metadata.name-sanitization-append-reopen-and-stale-owner",
+            "sourcePrefix": "rpc.session-metadata.",
+            "sourceSuffix": "name-sanitization-append-reopen-and-stale-owner"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.get_session_stats.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.SessionMetadata.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionMetadataTests.cs",
+            "case": "rpc.session-metadata.whole-session-accounting-and-selected-context",
+            "sourcePrefix": "rpc.session-metadata.",
+            "sourceSuffix": "whole-session-accounting-and-selected-context"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionMetadataTests.cs",
+            "case": "rpc.session-metadata.name-sanitization-append-reopen-and-stale-owner",
+            "sourcePrefix": "rpc.session-metadata.",
+            "sourceSuffix": "name-sanitization-append-reopen-and-stale-owner"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.set_session_name": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.SessionMetadata.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionMetadataTests.cs",
+            "case": "rpc.session-metadata.whole-session-accounting-and-selected-context",
+            "sourcePrefix": "rpc.session-metadata.",
+            "sourceSuffix": "whole-session-accounting-and-selected-context"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionMetadataTests.cs",
+            "case": "rpc.session-metadata.name-sanitization-append-reopen-and-stale-owner",
+            "sourcePrefix": "rpc.session-metadata.",
+            "sourceSuffix": "name-sanitization-append-reopen-and-stale-owner"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.set_session_name.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.SessionMetadata.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionMetadataTests.cs",
+            "case": "rpc.session-metadata.whole-session-accounting-and-selected-context",
+            "sourcePrefix": "rpc.session-metadata.",
+            "sourceSuffix": "whole-session-accounting-and-selected-context"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionMetadataTests.cs",
+            "case": "rpc.session-metadata.name-sanitization-append-reopen-and-stale-owner",
+            "sourcePrefix": "rpc.session-metadata.",
+            "sourceSuffix": "name-sanitization-append-reopen-and-stale-owner"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.export_html": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ExportHtml.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcHtmlExportTests.cs",
+            "case": "rpc.export-html.actual-policy-write-full-captured-forest-selected-leaf-and-correlated-path",
+            "sourcePrefix": "rpc.export-html.",
+            "sourceSuffix": "actual-policy-write-full-captured-forest-selected-leaf-and-correlated-path"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.export_html.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ExportHtml.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcHtmlExportTests.cs",
+            "case": "rpc.export-html.actual-policy-write-full-captured-forest-selected-leaf-and-correlated-path",
+            "sourcePrefix": "rpc.export-html.",
+            "sourceSuffix": "actual-policy-write-full-captured-forest-selected-leaf-and-correlated-path"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.switch_session": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Navigation.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionCatalogTests.cs",
+            "case": "rpc.catalog-resume-and-switch-output-response-and-event-budgets-precede-source-retirement"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.switch_session.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Navigation.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionCatalogTests.cs",
+            "case": "rpc.catalog-resume-and-switch-output-response-and-event-budgets-precede-source-retirement"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.fork": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeSessionCreationWorkflowTests.cs",
+            "case": "native session checkpoint lifecycle RPC new fork clone tree and selected branch use actual durable files"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.fork.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeSessionCreationWorkflowTests.cs",
+            "case": "native session checkpoint lifecycle RPC new fork clone tree and selected branch use actual durable files"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.clone": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeSessionCreationWorkflowTests.cs",
+            "case": "native session checkpoint lifecycle RPC new fork clone tree and selected branch use actual durable files"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.clone.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeSessionCreationWorkflowTests.cs",
+            "case": "native session checkpoint lifecycle RPC new fork clone tree and selected branch use actual durable files"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.get_fork_messages": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+            "case": "rpc.lifecycle-tree-chronological-labels-opaque-shapes-and-depth-budget-have-no-effects"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.get_fork_messages.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+            "case": "rpc.lifecycle-tree-chronological-labels-opaque-shapes-and-depth-budget-have-no-effects"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.get_tree": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+            "case": "rpc.lifecycle-tree-chronological-labels-opaque-shapes-and-depth-budget-have-no-effects"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.get_tree.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+            "case": "rpc.lifecycle-tree-chronological-labels-opaque-shapes-and-depth-budget-have-no-effects"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.command.get_commands": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/PromptTemplateWorkflowTests.cs",
+            "case": "prompt template workflow RPC loads YAML lists prompts expands idle queues and reaches offline request",
+            "sourcePrefix": "prompt template workflow ",
+            "sourceSuffix": "RPC loads YAML lists prompts expands idle queues and reaches offline request"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SkillCliHostTests.cs",
+            "case": "skill CLI host actual RPC command catalog stays inert until explicit prompt",
+            "sourcePrefix": "skill CLI host ",
+            "sourceSuffix": "actual RPC command catalog stays inert until explicit prompt"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.get_commands.success": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/PromptTemplateWorkflowTests.cs",
+            "case": "prompt template workflow RPC loads YAML lists prompts expands idle queues and reaches offline request",
+            "sourcePrefix": "prompt template workflow ",
+            "sourceSuffix": "RPC loads YAML lists prompts expands idle queues and reaches offline request"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SkillCliHostTests.cs",
+            "case": "skill CLI host actual RPC command catalog stays inert until explicit prompt",
+            "sourcePrefix": "skill CLI host ",
+            "sourceSuffix": "actual RPC command catalog stays inert until explicit prompt"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.response.error": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-errors-bounds-parse-recovery-backpressure-and-awaited-owned-cleanup"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.request.select": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-real-extension-four-dialogs-notifications-and-durable-next-turn"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeCliExtensionUiTests.cs",
+            "case": "native CLI UI published dialogs/notifications share RPC and durable final policy across reopen"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.request.confirm": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-real-extension-four-dialogs-notifications-and-durable-next-turn"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeCliExtensionUiTests.cs",
+            "case": "native CLI UI published dialogs/notifications share RPC and durable final policy across reopen"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.request.input": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-real-extension-four-dialogs-notifications-and-durable-next-turn"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeCliExtensionUiTests.cs",
+            "case": "native CLI UI published dialogs/notifications share RPC and durable final policy across reopen"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.request.editor": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-real-extension-four-dialogs-notifications-and-durable-next-turn"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeCliExtensionUiTests.cs",
+            "case": "native CLI UI published dialogs/notifications share RPC and durable final policy across reopen"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.request.notify": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-real-extension-four-dialogs-notifications-and-durable-next-turn"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeCliExtensionUiTests.cs",
+            "case": "native CLI UI published dialogs/notifications share RPC and durable final policy across reopen"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.request.setStatus": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-real-extension-four-dialogs-notifications-and-durable-next-turn"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeCliExtensionUiTests.cs",
+            "case": "native CLI UI published dialogs/notifications share RPC and durable final policy across reopen"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.request.setWidget": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-real-extension-four-dialogs-notifications-and-durable-next-turn"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeCliExtensionUiTests.cs",
+            "case": "native CLI UI published dialogs/notifications share RPC and durable final policy across reopen"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.request.setTitle": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-real-extension-four-dialogs-notifications-and-durable-next-turn"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeCliExtensionUiTests.cs",
+            "case": "native CLI UI published dialogs/notifications share RPC and durable final policy across reopen"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.request.set_editor_text": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-real-extension-four-dialogs-notifications-and-durable-next-turn"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeCliExtensionUiTests.cs",
+            "case": "native CLI UI published dialogs/notifications share RPC and durable final policy across reopen"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.response.value": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-real-extension-four-dialogs-notifications-and-durable-next-turn"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-duplicate-null-missing-stale-owner-and-registered-reducer-contexts"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.response.confirmed": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-real-extension-four-dialogs-notifications-and-durable-next-turn"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-duplicate-null-missing-stale-owner-and-registered-reducer-contexts"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.ui.response.cancelled": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCodec.cs",
+          "src/PiSharp.Rpc/Ui/RpcExtensionUiCoordinator.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcExtensionUiTests.cs",
+            "case": "rpc.ui-duplicate-null-missing-stale-owner-and-registered-reducer-contexts"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeCliExtensionUiTests.cs",
+            "case": "native CLI UI unknown/duplicate/null/cancelled replies cannot authorize another request"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.agent_start": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RegisteredInputRpcTests.cs",
+            "case": "rpc.registered-input-started-ack-waits-real-entry-and-flush-before-events-and-provider"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.turn_start": {
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionJsonEventCommandTests.cs",
+            "case": "JSON CLI Responses actual tools header delta records durable reopen resume and branch"
+          }
+        ],
+        "note": "Asserted in JSON mode only; no RPC-level test."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.turn_end": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-tool-progress-flush-backpressure-correlation-and-durable-exclusion"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.message_start": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-durable-checkpoints-precede-end-events-tools-and-next-request"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.message_end": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-durable-checkpoints-precede-end-events-tools-and-next-request"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.message_update": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.tool_execution_start": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/RpcSessionCommandTests.cs",
+            "case": "RPC compiled host executes authorized file tools with canonical durable entries and shared LF output"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.tool_execution_update": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-tool-progress-flush-backpressure-correlation-and-durable-exclusion"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.tool_execution_end": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs",
+          "src/PiSharp.Agent/ToolInvoker.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-durable-checkpoints-precede-end-events-tools-and-next-request"
+          },
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/SettledTests.cs",
+            "case": "wire.duration.session-rpc-events-jsonl-and-reopen-round-trip"
+          },
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/DurationTests.cs",
+            "case": "wire.duration.scheduler-times-plain-execute-and-tool-result-json"
+          }
+        ],
+        "note": "v1.1.0 durationMs: written last and only when present (row wire.duration)."
+      },
+      "implementationEvidenceState": "AuthoredTests",
+      "observed": {
+        "statement": "Forwarded unchanged by toJsonEvent; AgentSessionEvent WithParentToolCallId adds optional parentToolCallId to tool execution events. v1.1.0 adds optional durationMs."
+      }
+    },
+    "rpc.event.agent_end": {
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          }
+        ],
+        "note": "willRetry is always false."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.agent_settled": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs",
+          "src/PiSharp.Cli/Output/SessionJsonEventOutput.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/SettledTests.cs",
+            "case": "wire.agent-settled.rpc-and-session-aborted-flag"
+          },
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/SettledTests.cs",
+            "case": "wire.duration.session-rpc-events-jsonl-and-reopen-round-trip"
+          },
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "wire.agent-settled.json-mode-record-with-aborted",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/SettledBashCases.cs"
+          }
+        ],
+        "note": "v1.1.0 aborted: true after a real RPC abort and false otherwise (row wire.agent-settled-aborted)."
+      },
+      "implementationEvidenceState": "AuthoredTests",
+      "observed": {
+        "statement": "Declared AgentSessionEvent member, now carrying aborted: boolean (v1.1.0); forwarded unchanged by toJsonEvent. No runtime ordering evidence recorded."
+      }
+    },
+    "rpc.event.queue_update": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs",
+          "src/PiSharp.Rpc/Protocol/RpcQueueRestorationPlan.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcQueueRestorationTests.cs",
+            "case": "rpc.queue-restore.fifo-duplicates-draft-and-repeated-action",
+            "sourcePrefix": "rpc.queue-restore.",
+            "sourceSuffix": "fifo-duplicates-draft-and-repeated-action"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.compaction_start": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/OriginalCompactionEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/OriginalCompactionWireTests.cs",
+            "case": "rpc.original-compaction-wire.all-three-pinned-start-reasons",
+            "sourcePrefix": "rpc.original-compaction-wire.",
+            "sourceSuffix": "all-three-pinned-start-reasons"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/OriginalCompactionWireTests.cs",
+            "case": "rpc.original-compaction-wire.success-result-fields-order-and-actual-values",
+            "sourcePrefix": "rpc.original-compaction-wire.",
+            "sourceSuffix": "success-result-fields-order-and-actual-values"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.compaction_end": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/OriginalCompactionEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/OriginalCompactionWireTests.cs",
+            "case": "rpc.original-compaction-wire.all-three-pinned-start-reasons",
+            "sourcePrefix": "rpc.original-compaction-wire.",
+            "sourceSuffix": "all-three-pinned-start-reasons"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/OriginalCompactionWireTests.cs",
+            "case": "rpc.original-compaction-wire.success-result-fields-order-and-actual-values",
+            "sourcePrefix": "rpc.original-compaction-wire.",
+            "sourceSuffix": "success-result-fields-order-and-actual-values"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.session_info_changed": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.SessionInfoChanged.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionInfoChangedTests.cs",
+            "case": "native session-info-changed actual RPC durable event then extension then response with repeated and undefined names",
+            "sourcePrefix": "native session-info-changed ",
+            "sourceSuffix": "actual RPC durable event then extension then response with repeated and undefined names"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.auto_retry_end": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Retry.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/CleanRetryIntegrationTests.cs",
+            "case": "clean retry integration RPC strict flags state cancellation and original terminal output join"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.auto_retry_start": {
+      "nativeStatus": {
+        "status": "ImplementedNoTest",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.Retry.cs"
+        ],
+        "tests": [],
+        "note": "Emitted; no wire-level assertion."
+      }
+    },
+    "rpc.event.bash_execution_update": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.UserBash.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/UserBashTests.cs",
+            "case": "wire.rpc-bash.split-ansi-updates-response-and-record-byte-exact"
+          },
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/UserBashTests.cs",
+            "case": "wire.rpc-bash.excluded-abort-truncation-and-spill"
+          },
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/SettledBashCases.cs"
+          }
+        ],
+        "note": "Implemented in the v1.1.0 sync (row wire.rpc-bash-ansi); id omitted when the command had none."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.entry_appended": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "Not emitted by PiSharp."
+      }
+    },
+    "rpc.event.thinking_level_changed": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "Not emitted by PiSharp."
+      }
+    },
+    "rpc.event.summarization_retry_scheduled": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "Not emitted by PiSharp."
+      }
+    },
+    "rpc.event.summarization_retry_attempt_start.branchSummary": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "Not emitted by PiSharp."
+      }
+    },
+    "rpc.event.summarization_retry_attempt_start.compaction": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "Not emitted by PiSharp."
+      }
+    },
+    "rpc.event.summarization_retry_finished": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "Not emitted by PiSharp."
+      }
+    },
+    "rpc.event.extension_error": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [],
+        "tests": [],
+        "note": "Not emitted by PiSharp."
+      }
+    },
+    "rpc.event.message_update.assistant.thinking_start": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/ResponsesCheckpointProjectionTests.cs",
+            "case": "rpc.responses-checkpoint-public-projection-and-final-state"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.message_update.assistant.thinking_delta": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/ResponsesCheckpointProjectionTests.cs",
+            "case": "rpc.responses-checkpoint-public-projection-and-final-state"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.message_update.assistant.thinking_end": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/ResponsesCheckpointProjectionTests.cs",
+            "case": "rpc.responses-checkpoint-public-projection-and-final-state"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.message_update.assistant.toolcall_start": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/CompletionsSourceEventProjectionTests.cs",
+            "case": "rpc.completions-default-provisional-start-header-suppression-and-final-policy"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.message_update.assistant.toolcall_delta": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/CompletionsSourceEventProjectionTests.cs",
+            "case": "rpc.completions-default-provisional-start-header-suppression-and-final-policy"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.message_update.assistant.toolcall_end": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/CompletionsSourceEventProjectionTests.cs",
+            "case": "rpc.completions-default-provisional-start-header-suppression-and-final-policy"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.message_update.assistant.text_delta": {
+      "nativeStatus": {
+        "status": "Partial",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionJsonEventCommandTests.cs",
+            "case": "JSON CLI Responses actual tools header delta records durable reopen resume and branch"
+          }
+        ],
+        "note": "Asserted through the shared projector in JSON mode only."
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.event.message_update.assistant.text_start": {
+      "nativeStatus": {
+        "status": "ImplementedNoTest",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [],
+        "note": "Projected; no RPC-level assertion."
+      }
+    },
+    "rpc.event.message_update.assistant.text_end": {
+      "nativeStatus": {
+        "status": "ImplementedNoTest",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [],
+        "note": "Projected; no RPC-level assertion."
+      }
+    },
+    "rpc.event.message_update.assistant.start": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [],
+        "note": "Not projected as message_update; upstream emission of these nested members inside message_update is itself unverified."
+      }
+    },
+    "rpc.event.message_update.assistant.done": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [],
+        "note": "Not projected as message_update; upstream emission of these nested members inside message_update is itself unverified."
+      }
+    },
+    "rpc.event.message_update.assistant.error": {
+      "nativeStatus": {
+        "status": "NotImplemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs"
+        ],
+        "tests": [],
+        "note": "Not projected as message_update; upstream emission of these nested members inside message_update is itself unverified."
+      }
+    },
+    "rpc.wiring.output-framing": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/JsonlWriter.cs",
+          "src/PiSharp.Rpc/JsonlRecordFormatter.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/JsonlTransportTests.cs",
+            "case": "jsonl.complete-raw-token-writes-and-pre-effect-validation"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.wiring.input-framing": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/JsonlReader.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/JsonlTransportTests.cs",
+            "case": "jsonl.every-byte-fragmentation-lf-crlf-unicode-and-owned-records"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/JsonlTransportTests.cs",
+            "case": "jsonl.exact-frame-depth-utf8-json-duplicate-and-final-frame-admission"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.wiring.parse-errors": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RecoverableJsonlReaderTests.cs",
+            "case": "rpc-jsonl.recoverable-malformed-and-blank-frames-resume-with-owned-raw-records"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-errors-bounds-parse-recovery-backpressure-and-awaited-owned-cleanup"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.wiring.concurrent-input": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-real-async-prompt-state-raw-messages-and-generated-only-events"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-errors-bounds-parse-recovery-backpressure-and-awaited-owned-cleanup"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.wiring.backpressure": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/JsonlWriter.cs",
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/JsonlTransportTests.cs",
+            "case": "jsonl.bounded-pending-writers-await-backpressure-without-interleaving"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-errors-bounds-parse-recovery-backpressure-and-awaited-owned-cleanup"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.wiring.shutdown-eof": {
+      "nativeStatus": {
+        "status": "Implemented",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs"
+        ],
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RpcSessionDispatcherTests.cs",
+            "case": "rpc.dispatch-errors-bounds-parse-recovery-backpressure-and-awaited-owned-cleanup"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/RpcSessionCommandTests.cs",
+            "case": "RPC compiled active EOF awaits aborted assistant/events and closes acknowledged durable writer"
+          }
+        ]
+      },
+      "implementationEvidenceState": "AuthoredTests"
+    },
+    "rpc.wiring.shutdown-signals": {
+      "nativeStatus": {
+        "status": "ImplementedNoTest",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Program.cs"
+        ],
+        "tests": [],
+        "note": "Console.CancelKeyPress only; no SIGTERM/SIGHUP handling; no signal test."
+      }
+    },
+    "rpc.wiring.mode-selection": {
+      "nativeStatus": {
+        "status": "DifferentSurface",
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "sources": [
+          "src/PiSharp.Cli/Program.cs",
+          "src/PiSharp.Cli/Commands/RpcSessionCommand.cs",
+          "src/PiSharp.Cli/Commands/SessionCommands.cs"
+        ],
+        "tests": [],
+        "note": "Modes are explicit verbs/options (session rpc, session chat/terminal, --output report|print|json); no TTY-based selection."
+      }
+    }
+  }
+}

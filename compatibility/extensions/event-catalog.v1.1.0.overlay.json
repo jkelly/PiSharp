@@ -1,0 +1,544 @@
+{
+  "$comment": "Authored native status for the v1.1.0 event catalog, applied by tools/SurfaceInventory/build-event-catalog.mjs --overlay. Assessed against PiSharp sources at 95e3c29a7db9434704819f856f20e0bf30f1938f. Tests are authored and registered (except where noted), not executed by the refresh.",
+  "nativeProfile": {
+    "registryIntegrated": true,
+    "agentIntegrated": true,
+    "actualExecution": "Typed reducers and observations are registered through IExtensionRegistry and bound into the agent/session host; see each event nativeEvidence. Authored tests are cited, not executed by this refresh.",
+    "statusVocabulary": {
+      "ImplementedWithAuthoredTests": "Native registration and host emission exist and an authored, registered test case exercises them.",
+      "PartialRegistryTestOnly": "Host emission exists; only registry-level behavior is tested.",
+      "EmittedTestsNotRegistered": "Host emission exists; the authored tests are not run by any test Program.cs.",
+      "WireOnlyNotDispatchedToExtensions": "The event exists on RPC/JSON output only; native extension handlers do not receive it.",
+      "Deferred": "No native registration or emission."
+    }
+  },
+  "dynamicEventBus": {
+    "nativeEvidence": {
+      "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+      "registration": "IExtensionEventBusRegistry.Events (IExtensionEventBus Emit/On; IAsyncExtensionEventBus OnAsync/OnValueTask/Drain)",
+      "hostEmission": "Extension-to-extension only; the host publishes nothing on the bus",
+      "tests": [
+        {
+          "suite": "tests/PiSharp.SdkEventBus.Tests",
+          "file": "tests/PiSharp.SdkEventBus.Tests/Program.cs",
+          "case": "ordered synchronous delivery preserves payload identity and null"
+        },
+        {
+          "suite": "tests/PiSharp.SdkAsyncEventBus.Tests",
+          "file": "tests/PiSharp.SdkAsyncEventBus.Tests/Program.cs",
+          "case": "drain snapshots exclude later emissions"
+        }
+      ]
+    },
+    "actualStatus": {
+      "native": "ImplementedWithAuthoredTests"
+    }
+  },
+  "events": {
+    "input": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.RegisterInputHandler",
+        "hostEmission": "RegisteredExtensionInputAdmission through the profile runtime view and RPC input admission",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/EventReducerTests.cs",
+            "case": "input transforms compose, preserve nullish images and stop when handled"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredExtensionInputTests.cs",
+            "case": "registered input transforms reach actual durable checkpoint, provider history and reopen"
+          },
+          {
+            "suite": "tests/PiSharp.Rpc.Tests",
+            "file": "tests/PiSharp.Rpc.Tests/RegisteredInputRpcTests.cs",
+            "case": "rpc.registered-input-real-two-hook-transform-images-continue-durability-and-reopen"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "tool_call": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.RegisterToolCallHandler",
+        "hostEmission": "ExtensionAgentBinding.PreparedHooks (RegisteredExtensionToolHooks) into PreparedToolHooks",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/EventReducerTests.cs",
+            "case": "tool argument replacements compose and the first block stops dispatch"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredEventDispatchTests.cs",
+            "case": "registered tool calls retain exact replacements and first-block decisions"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeExtensionSessionCommandTests.cs",
+            "case": "native published call hooks cannot bypass final schema or native file policy"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "tool_result": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.RegisterToolResultHandler",
+        "hostEmission": "Same PreparedHooks path as tool_call",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/EventReducerTests.cs",
+            "case": "tool-result patches compose and content redaction clears stale structured content"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredEventDispatchTests.cs",
+            "case": "registered tool result patches preserve null and complete result admission"
+          },
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/RegisteredExtensionToolTests.cs",
+            "case": "registered result projection retains raw status and nullish source after-hook behavior"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "before_agent_start": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.RegisterBeforeAgentStartHandler",
+        "hostEmission": "ExtensionAgentBinding.ContextHooks.BeforePrompt",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
+            "case": "before-agent-start.once per prompt with ordered snapshots and continuation projection",
+            "sourcePrefix": "before-agent-start.",
+            "sourceSuffix": "once per prompt with ordered snapshots and continuation projection"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeHookOnlyActivationTests.cs",
+            "case": "native before-start actual CLI persists custom messages and preserves user history"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "context": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.RegisterContextHandler",
+        "hostEmission": "ExtensionAgentBinding.ContextHooks.TransformRequestMessages",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/ContextWithSystemTests.cs",
+            "case": "context-with-system.conversation phase precedes full phase and snapshots new full handlers",
+            "sourcePrefix": "context-with-system.",
+            "sourceSuffix": "conversation phase precedes full phase and snapshots new full handlers"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeHookOnlyActivationTests.cs",
+            "case": "native request-context actual CLI preserves history and transforms provider input"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "context_with_system": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.RegisterContextWithSystemHandler",
+        "hostEmission": "Same path as context, after the conversation phase",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/ContextWithSystemTests.cs",
+            "case": "context-with-system.conversation phase precedes full phase and snapshots new full handlers",
+            "sourcePrefix": "context-with-system.",
+            "sourceSuffix": "conversation phase precedes full phase and snapshots new full handlers"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeHookOnlyActivationTests.cs",
+            "case": "native request-context actual CLI preserves history and transforms provider input"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_start": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.Observe (topic session_start)",
+        "hostEmission": "NativeExtensionActivation.DispatchSessionStartAsync at startup/reload; NativeReplacementSessionStartBinding on replacement",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/ReplacementSessionStartTests.cs",
+            "case": "replacement session-start actual switch resume new fork-before and fork-at publish exact previous path and fresh context",
+            "sourcePrefix": "replacement session-start ",
+            "sourceSuffix": "actual switch resume new fork-before and fork-at publish exact previous path and fresh context"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/ProfileRuntimeViewNativeTests.cs",
+            "case": "profile view actual native reload targets old activation and final quit targets new activation"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_info_changed": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.Observe (topic session_info_changed)",
+        "hostEmission": "NativeSessionInfoChangedBinding",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionInfoChangedTests.cs",
+            "case": "native session-info-changed actual RPC durable event then extension then response with repeated and undefined names",
+            "sourcePrefix": "native session-info-changed ",
+            "sourceSuffix": "actual RPC durable event then extension then response with repeated and undefined names"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_before_switch": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionSessionLifecycleRegistry.RegisterSessionSwitchHandler (typed veto) and Observe",
+        "hostEmission": "NativeSessionBeforeSwitchBinding (resume/switch: veto then observation); AttachOwner.BeforeCreation for reason \"new\"",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeBeforeSwitchPayloadTests.cs",
+            "case": "native before-switch payload actual switch catalog resume and SDK switch expose exact source payload before publication",
+            "sourcePrefix": "native before-switch payload ",
+            "sourceSuffix": "actual switch catalog resume and SDK switch expose exact source payload before publication"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeSdkSessionResumeTests.cs",
+            "case": "native-sdk-session-resume typed veto closes target and preserves both existing files"
+          }
+        ],
+        "gaps": [
+          "The reason \"new\" observation from BeforeCreation is not asserted."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests",
+        "nativeReducer": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_before_fork": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionSessionCreationRegistry.RegisterSessionCreationHandler (typed veto for fork/new/clone) and Observe",
+        "hostEmission": "NativeExtensionActivation emits session_before_fork{entryId,position}",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/SessionCreationRegistryTests.cs",
+            "case": "session-creation-registry. typed veto is ordered and failure remains distinct from cancellation"
+          }
+        ],
+        "gaps": [
+          "No test asserts the session_before_fork observation; the typed veto is tested at registry level only."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "PartialRegistryTestOnly",
+        "nativeReducer": "PartialRegistryTestOnly"
+      }
+    },
+    "session_compact": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.Observe (topic session_compact)",
+        "hostEmission": "NativeSessionCompactionObservationBinding",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/SessionCompactObservationTests.cs",
+            "case": "session-compact observation manual payload is exact immutable checkpoint after acknowledged context installation",
+            "sourcePrefix": "session-compact observation ",
+            "sourceSuffix": "manual payload is exact immutable checkpoint after acknowledged context installation"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_shutdown": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.Observe (topic session_shutdown)",
+        "hostEmission": "NativeSessionShutdownBinding (owner.BeforeRetirement) and quit/reload DispatchSessionShutdownAsync",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.Extensions.ContractTests",
+            "file": "tests/PiSharp.Extensions.ContractTests/SessionShutdownRegistryTests.cs",
+            "case": "session-shutdown-registry. reason and destination are preserved and malformed events are rejected",
+            "sourcePrefix": "session-shutdown-registry.",
+            "sourceSuffix": " reason and destination are preserved and malformed events are rejected"
+          },
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/NativeShutdownPlacementTests.cs",
+            "case": "native shutdown placement actual offline RPC notifies after terminal join before native disposal",
+            "sourcePrefix": "native shutdown placement ",
+            "sourceSuffix": "actual offline RPC notifies after terminal join before native disposal"
+          }
+        ],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "session_before_tree": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionSessionTreeLifecycleRegistry.RegisterSessionBeforeTreeHandler",
+        "hostEmission": "NativeExtensionActivation.DispatchBeforeTreeAsync through OfflineSessionProfile.RegisteredTree",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/RegisteredSessionTreeRouteTests.cs",
+            "case": "registered tree veto preserves state and has no after observation"
+          }
+        ],
+        "gaps": [
+          "RegisteredSessionTreeRouteTests and RegisteredTreeCancellationClassificationTests are authored but no test Program.cs runs their Cases(); not counted as implemented."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "EmittedTestsNotRegistered"
+      }
+    },
+    "session_tree": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.Observe (topic session_tree)",
+        "hostEmission": "NativeSessionTreeObservationBinding (selected tree only)",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CodingAgent.Tests",
+            "file": "tests/PiSharp.CodingAgent.Tests/RegisteredSessionTreeRouteTests.cs",
+            "case": "registered tree provided summary label and actual fresh facade"
+          }
+        ],
+        "gaps": [
+          "The covering tests are not registered in any test Program.cs; not counted as implemented."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "EmittedTestsNotRegistered"
+      }
+    },
+    "agent_settled": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "IExtensionRegistry.Observe (topic agent_settled)",
+        "hostEmission": "NativeAgentSettledObservationBinding dispatches {\"type\":\"agent_settled\",\"aborted\":bool} from PersistentAgentSession SessionOperationSettled.Aborted",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.CliSync.Tests",
+            "file": "tests/PiSharp.CliSync.Tests/Program.cs",
+            "case": "wire.agent-settled.native-extension-observation-and-reported-failure",
+            "implementationFile": "tests/PiSharp.CliSync.Tests/SettledBashCases.cs"
+          },
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/SettledTests.cs",
+            "case": "wire.agent-settled.rpc-and-session-aborted-flag"
+          }
+        ],
+        "gaps": [
+          "v1.1.0 AgentSettledEvent.aborted: the native observer test asserts aborted:false only; aborted:true is asserted on the session record and RPC output."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "ImplementedWithAuthoredTests"
+      }
+    },
+    "tool_execution_end": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "none",
+        "hostEmission": "RPC/JSON projection only (RpcAgentEventProjector), including v1.1.0 durationMs; no native extension dispatch",
+        "tests": [
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/SettledTests.cs",
+            "case": "wire.duration.session-rpc-events-jsonl-and-reopen-round-trip"
+          },
+          {
+            "suite": "tests/PiSharp.WireSync.Tests",
+            "file": "tests/PiSharp.WireSync.Tests/DurationTests.cs",
+            "case": "wire.duration.scheduler-times-plain-execute-and-tool-result-json"
+          }
+        ],
+        "gaps": [
+          "v1.1.0 ToolExecutionEndEvent.durationMs reaches RPC/JSON output and tool renderers (ExtensionToolRenderContext.DurationMs), not extension event handlers."
+        ]
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+      }
+    },
+    "agent_start": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "none",
+        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
+        "tests": [],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+      }
+    },
+    "agent_end": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "none",
+        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
+        "tests": [],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+      }
+    },
+    "turn_start": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "none",
+        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
+        "tests": [],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+      }
+    },
+    "turn_end": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "none",
+        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
+        "tests": [],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+      }
+    },
+    "message_start": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "none",
+        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
+        "tests": [],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+      }
+    },
+    "message_update": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "none",
+        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
+        "tests": [],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+      }
+    },
+    "message_end": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "none",
+        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
+        "tests": [],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+      }
+    },
+    "tool_execution_start": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "none",
+        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
+        "tests": [],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+      }
+    },
+    "tool_execution_update": {
+      "nativeEvidence": {
+        "assessedAt": "95e3c29a7db9434704819f856f20e0bf30f1938f",
+        "registration": "none",
+        "hostEmission": "RPC/JSON projection only; no native extension dispatch",
+        "tests": [],
+        "gaps": []
+      },
+      "actualStatus": {
+        "nativeHostIntegration": "WireOnlyNotDispatchedToExtensions"
+      }
+    }
+  }
+}
