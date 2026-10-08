@@ -51,13 +51,14 @@ internal sealed class ProviderLiveAuthentication
         return oauthOverride?.Invoke(context) ?? provider.OAuth!.Create(context);
     }
 
-    public async ValueTask<ProviderResolvedAuth?> ResolveAsync(CancellationToken cancellationToken)
+    /// <summary>getAuth(provider, { minOAuthValidityMs }): <paramref name="minimumOAuthValidityMilliseconds"/> raises the OAuth refresh window.</summary>
+    public async ValueTask<ProviderResolvedAuth?> ResolveAsync(CancellationToken cancellationToken, long? minimumOAuthValidityMilliseconds = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var stored = store is null ? null : await store.ReadEntryAsync(provider.Id, cancellationToken).ConfigureAwait(false);
         if (stored is { Type: "oauth" } && provider.OAuth is not null)
         {
-            var credential = await lifecycle!.ResolveAsync(provider.Id, cancellationToken: cancellationToken).ConfigureAwait(false);
+            var credential = await lifecycle!.ResolveAsync(provider.Id, minimumOAuthValidityMilliseconds, cancellationToken).ConfigureAwait(false);
             if (credential is null) return null; // logged out meanwhile
             LastCredential = credential;
             using var http = createHttp();

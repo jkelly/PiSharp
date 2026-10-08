@@ -77,7 +77,9 @@ internal static class RpcCommandCodec
                 throw new RpcCommandException(id, name, "Queue restoration requires a captured positive integer generation.");
             return new(id, name, Message: Required("currentText", 65_536), ExpectedGeneration: expected);
         }
-        if (name == "export_html") return new(id, name, Message: Optional("outputPath", Math.Min(options.MaximumPromptCharacters, 4096)));
+        // Pi: an absent, null or empty outputPath selects the default file name.
+        if (name == "export_html") return new(id, name, Message: body.TryGetProperty("outputPath", out var output) && output.ValueKind == JsonValueKind.Null
+            ? null : Optional("outputPath", Math.Min(options.MaximumPromptCharacters, 4096)));
         if (name == "compact") return new(id, name,
             Compaction: new(SummaryOptions: new(CustomInstructions: Optional("customInstructions", Math.Min(options.MaximumPromptCharacters, 65_536)))));
         if (name is "set_auto_compaction" or "set_auto_retry")

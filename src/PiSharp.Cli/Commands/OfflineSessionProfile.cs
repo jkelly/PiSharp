@@ -269,7 +269,10 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                     if (!selected.Contains(registration.Adapter.Name)) selected.Add(registration.Adapter.Name);
             _initialActiveTools = selected.ToImmutable();
         }
-        ExportHtmlWriter = new([tools.Select(["write"])[0].Adapter], policy, options: invokerOptions);
+        // Pi writes the whole export page (template, vendored scripts and the session as base64): the export writer keeps the final
+        // write policy and the shared write queue, with content bounds sized for the page instead of the model write tool's.
+        ExportHtmlWriter = new([tools.CreateWriteAdapter(new(MaximumWriteBytes: 64 * 1024 * 1024, MaximumArgumentCharacters: 8 * 1024 * 1024))], policy,
+            options: invokerOptions with { MaximumArgumentCharacters = 8 * 1024 * 1024, MaximumActionCharacters = 8 * 1024 * 1024 + 16_384 });
         var lifetimeSelection = toolSelection?.LifetimePolicy;
         if (deferCatalogValidation && toolSelection is not null && lifetimeSelection is null)
             lifetimeSelection = PiSharp.CodingAgent.ToolSelection.AllowedToolSelection.Create(configuredDefaults: toolSelection.Names);
