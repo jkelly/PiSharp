@@ -7,7 +7,7 @@ internal static class Program
     private static async Task<int> Main(string[] args)
     {
         if (args.Length != 0 && (args.Length != 2 || args[0] != "--report")) throw new ArgumentException("Use [--report <fresh path>].");
-        var cases = DurationTests.Cases().Concat(SettledTests.Cases()).Concat(ShellTests.Cases())
+        var cases = DurationTests.Cases().Concat(SettledTests.Cases()).Concat(ShellTests.Cases()).Concat(UserBashTests.Cases())
             .Concat(ExtensionTests.Cases()).Concat(ToolTests.Cases()).ToArray();
         var results = new List<object>(); var failures = 0;
         foreach (var (id, run) in cases)
