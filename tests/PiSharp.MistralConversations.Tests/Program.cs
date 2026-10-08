@@ -159,8 +159,12 @@ internal static class Program
         });
         await Check("response-unsupported-modes-and-resource-limits", async () =>
         {
-            var body = new Body(Frames("{\"choices\":[{\"delta\":{\"content\":[{\"type\":\"unsupported\",\"thinking\":[]}]}}]}")); using var h = new Handler((_, _) => Task.FromResult(Response(body))); using var client = new HttpClient(h);
+            // Pi d86654a ignores streamed content items whose type is not text/thinking, so an unknown item is not a failure;
+            // a non-string, non-array content delta remains unsupported.
+            var body = new Body(Frames("{\"choices\":[{\"delta\":{\"content\":7}}]}")); using var h = new Handler((_, _) => Task.FromResult(Response(body))); using var client = new HttpClient(h);
             var events = await Collect(new MistralTextHttpSseTransport(client, Model, Options)); Require(body.Released && Terminal(events).NativeDiagnostic?.Code == NativeChatFailureCode.UnsupportedFeature);
+            var ignoredBody = new Body(Frames("{\"choices\":[{\"delta\":{\"content\":[{\"type\":\"unsupported\",\"thinking\":[]},\"Hello\"]}}]}", Finish())); using var ignoredHandler = new Handler((_, _) => Task.FromResult(Response(ignoredBody))); using var ignoredClient = new HttpClient(ignoredHandler);
+            events = await Collect(new MistralTextHttpSseTransport(ignoredClient, Model, Options)); Require(ignoredBody.Released && Terminal(events) is StreamDone && events.OfType<TextDelta>().Single().Delta == "Hello");
             var limitedBody = new Body(Frames(Text, Finish())); using var limitedHandler = new Handler((_, _) => Task.FromResult(Response(limitedBody))); using var limitedClient = new HttpClient(limitedHandler);
             events = await Collect(new MistralTextHttpSseTransport(limitedClient, Model, Options with { MaximumFrameCharacters = 10 })); Require(limitedBody.Released && Terminal(events).NativeDiagnostic?.Code == NativeChatFailureCode.ResourceLimit);
         });
@@ -246,15 +250,16 @@ internal static class Program
         });
         await Check("atomic-chunk-failure-before-first-published-text", async () =>
         {
-            foreach (var unsupported in new[] { true, false }) foreach (var throughClient in new[] { true, false })
+            foreach (var malformed in new[] { true, false }) foreach (var throughClient in new[] { true, false })
             {
-                var parts = unsupported ? "[{\"type\":\"text\",\"text\":\"Hi\"},{\"type\":\"unsupported\",\"thinking\":[]}]" : JsonSerializer.Serialize(new[] { new string('x', 40), new string('y', 40) });
+                // Unknown item types are ignored like Pi; a non-array thinking item still rejects the whole chunk.
+                var parts = malformed ? "[{\"type\":\"text\",\"text\":\"Hi\"},{\"type\":\"thinking\",\"thinking\":\"not-an-array\"}]" : JsonSerializer.Serialize(new[] { new string('x', 40), new string('y', 40) });
                 var body = new Body(Frames("{\"choices\":[{\"delta\":{\"content\":" + parts + "}}]}"));
                 using var h = new Handler((_, _) => Task.FromResult(Response(body))); using var client = new HttpClient(h);
                 var transport = new MistralTextHttpSseTransport(client, Model, Options with { MaximumContentCharacters = 64 });
                 var request = new ChatRequest(Model, [new("user", JsonData.Parse("{\"content\":\"x\"}"))]);
-                var expected = unsupported ? NativeChatFailureCode.UnsupportedFeature : NativeChatFailureCode.ResourceLimit;
-                var subcase = (unsupported ? "unsupported" : "resource") + (throughClient ? "-client" : "-stream");
+                var expected = malformed ? NativeChatFailureCode.MalformedStream : NativeChatFailureCode.ResourceLimit;
+                var subcase = (malformed ? "malformed" : "resource") + (throughClient ? "-client" : "-stream");
                 if (throughClient) { var result = await new ChatClient(transport).CompleteAsync(request); Require(result.NativeDiagnostic?.Code == expected && result.Message.Content.Length == 0, subcase: subcase); }
                 else { var events = await Collect(transport, request); Require(Terminal(events).NativeDiagnostic?.Code == expected && !events.OfType<TextStarted>().Any() && !events.OfType<TextDelta>().Any() && !events.OfType<TextEnded>().Any(), subcase: subcase); }
                 Require(h.Calls == 1 && body.Released, subcase: subcase);
@@ -264,11 +269,11 @@ internal static class Program
         {
             foreach (var throughClient in new[] { true, false })
             {
-                var bad = "{\"choices\":[{\"delta\":{\"content\":[\"unpublished\",{\"type\":\"unsupported\",\"thinking\":[]}]}}]}";
+                var bad = "{\"choices\":[{\"delta\":{\"content\":[\"unpublished\",{\"type\":\"thinking\",\"thinking\":\"not-an-array\"}]}}]}";
                 var body = new Body(Frames(Text, bad)); using var h = new Handler((_, _) => Task.FromResult(Response(body))); using var client = new HttpClient(h);
                 var transport = new MistralTextHttpSseTransport(client, Model, Options);
-                if (throughClient) { var result = await new ChatClient(transport).CompleteAsync(Request); Require(result.NativeDiagnostic?.Code == NativeChatFailureCode.UnsupportedFeature && result.Message.Content is [TextContent { Text: "Hello" }]); }
-                else { var events = await Collect(transport); Require(Terminal(events).NativeDiagnostic?.Code == NativeChatFailureCode.UnsupportedFeature && events.OfType<TextDelta>().Single().Delta == "Hello" && events[^2] is TextEnded { Content: "Hello" }); }
+                if (throughClient) { var result = await new ChatClient(transport).CompleteAsync(Request); Require(result.NativeDiagnostic?.Code == NativeChatFailureCode.MalformedStream && result.Message.Content is [TextContent { Text: "Hello" }]); }
+                else { var events = await Collect(transport); Require(Terminal(events).NativeDiagnostic?.Code == NativeChatFailureCode.MalformedStream && events.OfType<TextDelta>().Single().Delta == "Hello" && events[^2] is TextEnded { Content: "Hello" }); }
                 Require(body.Released);
             }
         });

@@ -249,14 +249,18 @@ internal static class Program
         try { await entered.Task.WaitAsync(Deadline); Equal(0, events.Count); Equal(0, body.ReadCalls); release.TrySetResult(); await operation.WaitAsync(Deadline); }
         finally { release.TrySetResult(); await operation; }
         Equal(4, dtos); Check(events.Last() is StreamDone && body.Disposed, "Hooked stream failed.");
-        foreach (var rejectResponse in new[] { true, false })
+        // Callback exception types that overlap transport failures must still classify as callback failures.
+        foreach (var rejectResponse in new[] { true, false }) foreach (var callbackError in new Func<Exception>[] {
+            () => new InvalidOperationException("fixture private callback"), () => new JsonException("fixture private callback"),
+            () => new OperationCanceledException("fixture private callback") })
         {
             var failingBody = new Body(Wire()); using var failingHandler = new Handler(failingBody); using var failingClient = new HttpClient(failingHandler);
-            var hooks = rejectResponse ? new AzureResponsesHooks(OnResponse: (_, _, _) => throw new InvalidOperationException("fixture private callback"))
-                : new AzureResponsesHooks(OnProviderStreamEvent: (_, _, _) => throw new InvalidOperationException("fixture private callback"));
+            var hooks = rejectResponse ? new AzureResponsesHooks(OnResponse: (_, _, _) => throw callbackError())
+                : new AzureResponsesHooks(OnProviderStreamEvent: (_, _, _) => throw callbackError());
             var failed = await Drain(Transport(failingClient, Options() with { Hooks = hooks }).StreamAsync(Request()));
-            Check(failed.Last() is StreamError && (rejectResponse ? failed.All(frame => frame is not StreamStarted) : failed[0] is StreamStarted), "Hook/start order differs.");
+            Check(failed.Last() is StreamError { Reason: StopReason.Error } && (rejectResponse ? failed.All(frame => frame is not StreamStarted) : failed[0] is StreamStarted), "Hook/start order differs.");
             Check(!Error(failed).Contains("private", StringComparison.Ordinal) && failingHandler.ContentDisposed, "Callback diagnostics/cleanup differ.");
+            Equal("Azure Responses request failed.", Error(failed));
             await RequestDisposed(failingHandler.Requests.Single());
         }
     }
