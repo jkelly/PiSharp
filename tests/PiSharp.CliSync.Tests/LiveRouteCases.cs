@@ -217,6 +217,12 @@ internal static partial class Program
         Equal(2, await refused.Finish(), "missing credential exit");
         Check(refused.Error.ToString().Contains("\"MissingLiveApiKey\"", StringComparison.Ordinal), "missing credential code: " + refused.Error);
         Check(none.Snapshot().Length == 0 && !Directory.Exists(Path.Combine(root, "absent")), "no request and no auth.json directory");
+        // A stored key command is not run (deviation): the session is refused with the reason.
+        await File.WriteAllTextAsync(authPath, "{\"anthropic\":{\"type\":\"api_key\",\"key\":\"!pass show anthropic\"}}");
+        await using var command = new LiveRpc(LiveArgs(root, "anthropic", "claude-sonnet-4-5"), new(Env(("ANTHROPIC_API_KEY", "env-key")), () => none, authPath));
+        Equal(2, await command.Finish(), "stored command exit");
+        Check(command.Error.ToString().Contains("\"LiveAuthenticationFailed\"", StringComparison.Ordinal) &&
+            command.Error.ToString().Contains("are not run by PiSharp", StringComparison.Ordinal), "stored command refused: " + command.Error);
     });
 
     // provider.azure-rename: provider azure on the live route. The pinned azure.json shard routes azure-openai-responses to the Azure

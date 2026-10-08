@@ -105,7 +105,14 @@ internal sealed class LiveSessionSelection
         if (Model.Provider != "anthropic") throw new ArgumentException("Anthropic resolution requires an Anthropic selection.");
         runtime ??= LiveSessionRuntime.Default;
         var authentication = runtime.CreateAnthropicAuthentication(runtime.CreateEnvironment());
-        var resolved = await authentication.ResolveAsync(cancellationToken).ConfigureAwait(false);
+        AuthenticationResolution resolved;
+        // Source ModelsError texts: a failed refresh or an unreadable store refuses the session with its reason.
+        try { resolved = await authentication.ResolveAsync(cancellationToken).ConfigureAwait(false); }
+        catch (PiSharp.AI.Authentication.OAuth.OAuthLifecycleException error) when (error.Failure == PiSharp.AI.Authentication.OAuth.OAuthLifecycleFailure.Refresh)
+        { throw new LiveSessionException("LiveAuthenticationFailed", "OAuth refresh failed for anthropic"); }
+        catch (Exception error) when (error is PiSharp.AI.Authentication.OAuth.OAuthLifecycleException or InvalidDataException or InvalidOperationException or IOException)
+        { throw new LiveSessionException("LiveAuthenticationFailed", error is PiSharp.AI.Authentication.OAuth.OAuthLifecycleException
+            ? "Credential store read failed for anthropic" : error.Message); }
         if (resolved is not { Diagnostic: AuthenticationDiagnostic.Resolved, Authentication: not null })
             throw new LiveSessionException("MissingLiveApiKey", "Run /login, or set ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN, ANTHROPIC_OAUTH_TOKEN, or the workload identity federation variables) before launching the live session.");
         return (resolved, runtime.CreateHttpHandler(), authentication.ResolveAsync);
