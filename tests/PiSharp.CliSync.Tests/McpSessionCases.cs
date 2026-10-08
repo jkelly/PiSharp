@@ -50,8 +50,8 @@ internal static partial class Program
 
     // mcp.exposure-and-prompt + mcp.oauth: the global mcp.json is read at session start. The direct server's tool reaches the first
     // request; a failing direct server is reported and left out (the session still starts); a codemode server connects in the
-    // background when discovery tools exist and is reported and skipped without them; disabled servers and the project file are
-    // not used; --no-mcp connects nothing.
+    // background when a codemode implementation exists and is reported and skipped without one (deferred servers connect with the
+    // built-in tool_search, see PiSharp.ToolSearch.Tests); disabled servers and the project file are not used; --no-mcp connects nothing.
     private static Task McpProductionSession() => WithLiveRoot("mcp-session", async root =>
     {
         var agent = Path.Combine(root, "agent"); Directory.CreateDirectory(agent);
@@ -107,11 +107,11 @@ internal static partial class Program
         Check(channels.Values.SelectMany(bag => bag).All(channel => channel.Closes == 1), "every MCP channel closed with the session");
         Check(!channels.ContainsKey("off"), "disabled server not connected");
 
-        // Without discovery tools (PiSharp's production default) the codemode server is reported and never connected.
+        // Without a codemode implementation (PiSharp's production default) the codemode server is reported and never connected.
         channels.Clear();
         (requests, error) = await Session(Host(discovery: false));
         Check(requests.All(request => ToolNames(request).Contains("mcp__docs__search")), "direct tool without discovery");
-        Names([projectNotice, "MCP servers need attention:\n  later: not connected: its codemode or tool_search tools need discovery tools PiSharp does not implement yet; set \"exposure\": \"direct\" to use it\n  broken: failed: initialize refused"],
+        Names([projectNotice, "MCP servers need attention:\n  later: not connected: its codemode tools need the codemode tool, which PiSharp does not implement yet; set \"exposure\": \"deferred\" or \"direct\" to use it\n  broken: failed: initialize refused"],
             McpDiagnostics(error), "startup report without discovery");
         Check(!channels.ContainsKey("later"), "codemode server not connected without discovery");
 

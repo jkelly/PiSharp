@@ -5,5 +5,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.CliSync.Tests" />
+    <InternalsVisibleTo Include="PiSharp.ToolSearch.Tests" />
   </ItemGroup>
 </Project>

@@ -11,6 +11,10 @@ namespace PiSharp.Cli.Mcp;
 public delegate ValueTask<JsonData> McpAdmittedCodemodeExecutor(string code, IExtensionToolInvocationContext invocation, CancellationToken token);
 /// <summary>Explicitly admitted search plus durable activation implementation. The factory supplies no ranker.</summary>
 public delegate ValueTask<JsonData> McpAdmittedToolSearchExecutor(string query, double? limit, IExtensionToolInvocationContext invocation, CancellationToken token);
+/// <summary>A search executor that also receives the actual attachment its definition was bound to, whose catalog it searches
+/// and whose selection it changes.</summary>
+internal delegate ValueTask<JsonData> McpBoundToolSearchExecutor(string query, double? limit, AgentSessionAttachment attachment,
+    IExtensionToolInvocationContext invocation, CancellationToken token);
 
 public sealed class McpDiscoveryExecutableDefinition
 {
@@ -39,16 +43,22 @@ public sealed class McpDiscoveryExecutableDefinition
         McpAdmittedToolSearchExecutor admittedExecutor, Func<ToolLoadout, ToolLoadoutChanges?>? prepareLoadout = null)
     {
         Single(admittedExecutor);
+        return CreateToolSearch(registrationId, description, (query, limit, _, invocation, token) => admittedExecutor(query, limit, invocation, token), prepareLoadout);
+    }
+    internal static McpDiscoveryExecutableDefinition CreateToolSearch(string registrationId, string description,
+        McpBoundToolSearchExecutor admittedExecutor, Func<ToolLoadout, ToolLoadoutChanges?>? prepareLoadout = null)
+    {
+        Single(admittedExecutor);
         var fence = new ExecutionFence();
         ValueTask<JsonData> Execute(JsonData arguments, IExtensionToolContext context, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
             if (context is not IExtensionToolInvocationContext invocation || invocation.SessionGeneration <= 0) throw new InvalidOperationException("Search requires the native captured invocation pipeline.");
-            fence.Validate(invocation);
+            var attachment = fence.Validate(invocation);
             var query = arguments.Value.GetProperty("query").GetString() ?? throw new ArgumentException("A query string is required.");
             double? limit = arguments.Value.TryGetProperty("limit", out var supplied) ? supplied.GetDouble() : null;
             if (limit is { } value && !double.IsFinite(value)) throw new ArgumentException("A finite search limit is required.");
-            return admittedExecutor(query, limit, invocation, token);
+            return admittedExecutor(query, limit, attachment, invocation, token);
         }
         return new(McpDiscoveryKind.ToolSearch, McpDiscoveryToolIdentity.CreateToolSearch(registrationId, description, Execute, prepareLoadout), fence);
     }
@@ -79,7 +89,7 @@ public sealed class McpDiscoveryExecutableDefinition
                 owner = actualOwner; attachment = actualAttachment;
             }
         }
-        internal void Validate(IExtensionToolInvocationContext invocation)
+        internal AgentSessionAttachment Validate(IExtensionToolInvocationContext invocation)
         {
             ReplaceableAgentSession? capturedOwner; AgentSessionAttachment? captured; string? capturedScope; long capturedScopeGeneration;
             lock (gate) { capturedOwner = owner; captured = attachment; capturedScope = scopeOwner; capturedScopeGeneration = scopeGeneration; }
@@ -87,6 +97,7 @@ public sealed class McpDiscoveryExecutableDefinition
                 !ReferenceEquals(capturedOwner.Current, captured) || invocation.SessionGeneration != captured.Generation ||
                 invocation.OwnerId != capturedScope || invocation.OwnerGeneration != capturedScopeGeneration)
                 throw new InvalidOperationException("Discovery implementation is unbound or belongs to a retired attachment.");
+            return captured;
         }
     }
 }

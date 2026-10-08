@@ -90,9 +90,14 @@ public sealed class McpPreparedDiscoveryIdentity
         }
         if (plan.NeedsCodemode && !kinds.Contains(McpDiscoveryKind.Codemode))
             throw new InvalidOperationException("MCP exposure requires an admitted executable codemode implementation.");
-        if (plan.NeedsToolSearch && !kinds.Contains(McpDiscoveryKind.ToolSearch))
+        if (NeedsToolSearch(plan, current) && !kinds.Contains(McpDiscoveryKind.ToolSearch))
             throw new InvalidOperationException("MCP exposure requires an admitted executable tool_search implementation.");
     }
+
+    /// <summary>`deferred` tools need tool_search unless the tool selection (--tools/--exclude-tools) leaves it out, which leaves
+    /// them unreachable as in the original, where tool_search is then not registered.</summary>
+    private static bool NeedsToolSearch(McpToolCatalogPlan plan, SessionRuntimeRegistry current) =>
+        plan.NeedsToolSearch && current.LifetimeToolSelection?.IsAllowed(McpDiscoveryToolIdentity.ToolSearchName) != false;
 
     internal static void ValidateBound(McpToolCatalogPlan plan, SessionRuntimeRegistry current,
         long actualAttachmentGeneration, ImmutableArray<McpPreparedDiscoveryIdentity> admitted)
@@ -104,7 +109,7 @@ public sealed class McpPreparedDiscoveryIdentity
             identity.Validate(current, bound: true);
         }
         if (plan.NeedsCodemode && !admitted.Any(identity => identity.Kind == McpDiscoveryKind.Codemode) ||
-            plan.NeedsToolSearch && !admitted.Any(identity => identity.Kind == McpDiscoveryKind.ToolSearch))
+            NeedsToolSearch(plan, current) && !admitted.Any(identity => identity.Kind == McpDiscoveryKind.ToolSearch))
             throw new InvalidOperationException("Bound MCP exposure requires its actual discovery implementations.");
     }
     internal void BindSemanticOwner(ReplaceableAgentSession owner, AgentSessionAttachment attachment) => semantic.Bind(owner, attachment);

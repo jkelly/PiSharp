@@ -31,9 +31,10 @@ namespace PiSharp.Cli.Mcp;
 /// Servers with direct tools connect before the session opens; a server that fails is reported and left out, so the session
 /// still starts (the original reports it and continues). The other servers connect in the background. Stdio servers inherit
 /// the process environment; HTTP servers that use OAuth read and refresh their tokens in the durable <c>mcp-auth.json</c> store.
-/// The project <c>.pi/mcp.json</c> is not read: PiSharp has no project-trust store. Servers whose tools are reached through
-/// codemode or tool_search need discovery tools PiSharp does not implement; without <see cref="Discovery"/> they are reported
-/// and not connected.
+/// The project <c>.pi/mcp.json</c> is not read: PiSharp has no project-trust store. Servers with `deferred` tools connect in the
+/// background and the built-in <c>tool_search</c> (<see cref="McpToolSearch"/>) loads their tools. Servers whose tools are
+/// reached through codemode need the codemode tool PiSharp does not implement yet; without <see cref="Discovery"/> they are
+/// reported and not connected.
 /// </summary>
 internal sealed record McpSessionHost(string AgentDirectory, string HomeDirectory, Func<IEnumerable<KeyValuePair<string, string>>> ProcessEnvironment)
 {
@@ -46,7 +47,8 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     public IMcpOAuthCredentialBackend? Credentials { get; init; }
     /// <summary>A replacement channel for a server (tests); null keeps the stdio or HTTP channel of its config.</summary>
     public Func<McpServerEntry, McpAdmittedChannelFactory?>? CreateChannel { get; init; }
-    /// <summary>Executable codemode/tool_search definitions for one generation; null: PiSharp has none, so servers that need them are skipped.</summary>
+    /// <summary>Executable codemode/tool_search definitions for one generation (tests); null: PiSharp has no codemode, so servers that
+    /// need it are skipped. The built-in tool_search is added when a server has `deferred` tools and none is supplied here.</summary>
     public Func<long, ImmutableArray<McpDiscoveryExecutableDefinition>>? Discovery { get; init; }
     public Func<double> UnixMilliseconds { get; init; } = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     /// <summary>Each background connection once it connected (its tools published) or failed.</summary>
@@ -81,8 +83,8 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         var admitted = ImmutableArray.CreateBuilder<McpServerEntry>();
         foreach (var entry in loaded.Servers.Where(entry => entry.Config.Enabled))
         {
-            if (Discovery is null && McpConfigurationReader.HasIndirectTools(entry.Config))
-            { problems.Add($"{entry.Name}: not connected: its codemode or tool_search tools need discovery tools PiSharp does not implement yet; set \"exposure\": \"direct\" to use it"); continue; }
+            if (Discovery is null && McpConfigurationReader.ConfiguredExposures(entry.Config).Contains(McpExposure.Codemode))
+            { problems.Add($"{entry.Name}: not connected: its codemode tools need the codemode tool, which PiSharp does not implement yet; set \"exposure\": \"deferred\" or \"direct\" to use it"); continue; }
             if (entry.Config.AuthProvider is not null)
             { problems.Add($"{entry.Name}: not connected: auth.provider is not supported by PiSharp"); continue; }
             admitted.Add(entry);
@@ -123,13 +125,27 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                             new McpRuntimeOptions(attachment.Generation, ClientVersion, Roots(currentCwd)), ComposeHooks);
                     })).ToImmutableArray();
                 McpDiscoveryCatalogPreparation prepare = (_, registry) => new(registry, []);
-                if (Discovery?.Invoke(generation) is { IsDefaultOrEmpty: false } definitions)
+                var definitions = Discovery?.Invoke(generation) is { IsDefault: false } supplied ? supplied : [];
+                // The original registers tool_search with every session and the MCP extension activates it for `deferred` servers;
+                // here it is registered (active) for them. A tool selection that leaves tool_search out leaves their tools unreachable.
+                if (catalog.Servers.Any(entry => McpConfigurationReader.ConfiguredExposures(entry.Config).Contains(McpExposure.Deferred)) &&
+                    !definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch))
+                {
+                    if (nativeRegistry.LifetimeToolSelection?.IsAllowed(McpToolSearch.Name) != false) definitions = definitions.Add(McpToolSearch.Create());
+                    else if (generation == 1 && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode))
+                        reporter.Notice("MCP tools are only reachable from the codemode or tool_search tool, but neither is active; they cannot be called.");
+                }
+                ImmutableArray<(string, string)> hostTargets = [];
+                if (!definitions.IsEmpty)
                 {
                     var discoveryRegistry = new ExtensionRegistry();
                     discovery = new Disposer(() => discoveryRegistry.DisposeAsync());
                     var scope = await discoveryRegistry.ActivateAsync("mcp-discovery", new EmptyExtension(), token).ConfigureAwait(false);
                     prepare = new McpRegisteredProfileDiscoveryAdmission(discoveryRegistry, scope, definitions, exactPolicy, generation,
                         ValidateArguments, ComposeHooks).Prepare;
+                    // The built-in tool_search is host code that only changes the session's tool selection: the profile admits its exact action.
+                    if (definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch && definition.Descriptor.RegistrationId == McpToolSearch.RegistrationId))
+                        hostTargets = [(McpToolSearch.Name, $"{scope.OwnerId}/{scope.OwnerGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture)}/{McpToolSearch.RegistrationId}")];
                 }
                 reporter.Problems(generationProblems);
                 var included = preOpen.Select(row => row.Entry).Concat(background.Select(row => catalog.Servers.Single(entry => entry.Name == row.Name)))
@@ -140,7 +156,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                         (actual, registry, _) => Task.FromResult(owned.Release(row.Capture, registry))))],
                     autoEnableCodemode, prepare)
                 {
-                    BackgroundServers = background,
+                    BackgroundServers = background, HostDiscoveryTargets = hostTargets,
                     ServersPromptSource = new McpServersPromptSource(),
                     ReportBackgroundConnection = report =>
                     {
@@ -171,9 +187,10 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     private static void Same(McpServerEntry actual, McpServerEntry admitted)
     { if (!ReferenceEquals(actual, admitted)) throw new InvalidOperationException("MCP admission belongs to the exact configured server entry."); }
 
-    /// <summary>The MCP server validates its own arguments; the host admits any JSON object.</summary>
+    /// <summary>The MCP server validates its own arguments; the host admits any JSON object. tool_search admits its schema.</summary>
     private static ValueTask<bool> ValidateArguments(ExtensionToolRegistrationInfo tool, JsonData arguments, CancellationToken token) =>
-        ValueTask.FromResult(arguments.Value.ValueKind == JsonValueKind.Object);
+        ValueTask.FromResult(arguments.Value.ValueKind == JsonValueKind.Object &&
+            (tool.Name != McpToolSearch.Name || McpToolSearch.ValidArguments(arguments)));
 
     private static IPreparedToolHooks? ComposeHooks(SessionRuntimeRegistry current, ExtensionAgentBinding binding) =>
         binding.PreparedHooks ?? current.PreparedToolHooks;
