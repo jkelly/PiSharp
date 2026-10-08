@@ -25,10 +25,10 @@ public sealed record ExtensionModelRequestOptions
 
 /// <summary>
 /// Optional capability of the admitted host: the session's model registry for classifier and image models
-/// (upstream <c>ctx.modelRegistry</c>). Models travel as their catalog JSON objects without <c>headers</c>.
-/// <c>classify</c> and <c>generateImages</c> resolve the model by type, provider and id in the host registry and use the
-/// registry's entry, so a supplied <c>baseUrl</c> or <c>headers</c> never receives the provider's credentials. They
-/// never throw for provider failures: those arrive as error or aborted results.
+/// (upstream <c>ctx.modelRegistry</c>). Models travel as their catalog JSON objects. <c>classify</c> and
+/// <c>generateImages</c> use the supplied model object as given (api, provider, id, baseUrl, headers, cost) and apply the
+/// resolved auth of its <c>provider</c>, as Pi does for trusted extensions: a custom <c>baseUrl</c> receives that provider's
+/// credentials. They never throw for provider failures: those arrive as error or aborted results.
 /// </summary>
 public interface IExtensionModelOperationsHost : IExtensionContextReadHost
 {

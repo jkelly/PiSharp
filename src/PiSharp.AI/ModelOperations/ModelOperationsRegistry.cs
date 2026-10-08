@@ -23,7 +23,12 @@ public sealed class ModelOperationsException(ModelOperationsErrorCode code, stri
 
 /// <summary>An auth lookup for one provider. <see cref="ApiKey"/> is an explicit request key that takes the place of a
 /// stored api_key credential (auth/resolve.ts overrides); <see cref="Env"/> overlays the provider environment.</summary>
-public sealed record ProviderAuthRequest(string Provider, string? ApiKey = null, ImmutableDictionary<string, string>? Env = null);
+public sealed record ProviderAuthRequest(string Provider, string? ApiKey = null, ImmutableDictionary<string, string>? Env = null)
+{
+    /// <summary>An availability check (models.ts <c>checkProviderAuth</c>): a stored OAuth credential counts as configured
+    /// without being refreshed, and only <see cref="ProviderAuthResult.IsOAuth"/> and non-null matter.</summary>
+    public bool Check { get; init; }
+}
 
 /// <summary>auth/types.ts <c>AuthResult</c>: request auth for one provider. Secrets never appear in ToString.</summary>
 public sealed record ProviderAuthResult(string? ApiKey)
@@ -309,7 +314,7 @@ public sealed class ModelOperationsRegistry
         var available = ImmutableArray.CreateBuilder<OperationModel>();
         foreach (var entry in provider is null ? GetProviders() : GetProvider(provider) is { } one ? [one] : [])
         {
-            var resolved = await auth(new(entry.Id), cancellationToken).ConfigureAwait(false);
+            var resolved = await auth(new(entry.Id) { Check = true }, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             if (resolved is null) continue;
             var models = entry.FilterAllModels?.Invoke(entry.Models, resolved) ?? entry.Models;
@@ -318,8 +323,10 @@ public sealed class ModelOperationsRegistry
         return available.ToImmutable();
     }
 
-    /// <summary>models.ts <c>Models.classify</c>: checks the model accepts the context, resolves provider auth (explicit
-    /// option values win per field) and dispatches on <c>model.api</c>. Never throws for request failures.</summary>
+    /// <summary>coding-agent model-runtime.ts <c>classify</c> (pi-ai <c>Models.classify</c>): the supplied model is used as
+    /// given. It must accept the context; then the auth of <c>model.provider</c> is resolved and applied (explicit option values
+    /// win per field, a resolved base URL replaces the model's) and the call dispatches on <c>model.api</c> among that
+    /// provider's classifier APIs. Never throws for request failures.</summary>
     public async Task<ClassifierResult> ClassifyAsync(ClassifierModel model, ClassifierContext context, ClassifierOptions? options = null,
         CancellationToken cancellationToken = default)
     {
@@ -329,9 +336,9 @@ public sealed class ModelOperationsRegistry
             if (context.ImageList.Length != 0 && !model.AcceptsImages)
                 throw new ModelOperationsException(ModelOperationsErrorCode.Provider, $"Model {model.Provider}/{model.Id} does not accept image input");
             var provider = RequireProvider(model);
+            var (requestModel, requestOptions) = await ApplyAuthAsync(provider, model, options ?? new ClassifierOptions(), cancellationToken).ConfigureAwait(false);
             if (provider.Classifiers.IsEmpty)
                 throw new ModelOperationsException(ModelOperationsErrorCode.Provider, $"Provider {model.Provider} does not support classification");
-            var (requestModel, requestOptions) = await ApplyAuthAsync(provider, model, options ?? new ClassifierOptions(), cancellationToken).ConfigureAwait(false);
             if (!provider.Classifiers.TryGetValue(model.Api, out var implementation))
                 throw new ModelOperationsException(ModelOperationsErrorCode.Provider, $"Provider {provider.Id} has no classifier implementation for \"{model.Api}\"");
             return await implementation.ClassifyAsync(requestModel, context, requestOptions, cancellationToken).ConfigureAwait(false);
@@ -344,8 +351,8 @@ public sealed class ModelOperationsRegistry
         }
     }
 
-    /// <summary>models.ts <c>Models.generateImages</c>: resolves provider auth and dispatches on <c>model.api</c>. Never
-    /// throws for request failures.</summary>
+    /// <summary>coding-agent model-runtime.ts <c>generateImages</c>: the supplied model is used as given with the auth of
+    /// <c>model.provider</c> applied, then the call dispatches on <c>model.api</c>. Never throws for request failures.</summary>
     public async Task<AssistantImages> GenerateImagesAsync(ImageModel model, ImagesContext context, ImagesOptions? options = null,
         CancellationToken cancellationToken = default)
     {
@@ -353,9 +360,9 @@ public sealed class ModelOperationsRegistry
         try
         {
             var provider = RequireProvider(model);
+            var (requestModel, requestOptions) = await ApplyAuthAsync(provider, model, options ?? new ImagesOptions(), cancellationToken).ConfigureAwait(false);
             if (provider.Images.IsEmpty)
                 throw new ModelOperationsException(ModelOperationsErrorCode.Provider, $"Provider {model.Provider} does not support image generation");
-            var (requestModel, requestOptions) = await ApplyAuthAsync(provider, model, options ?? new ImagesOptions(), cancellationToken).ConfigureAwait(false);
             if (!provider.Images.TryGetValue(model.Api, out var implementation))
                 throw new ModelOperationsException(ModelOperationsErrorCode.Provider, $"Provider {provider.Id} has no image generation implementation for \"{model.Api}\"");
             return await implementation.GenerateImagesAsync(requestModel, context, requestOptions, cancellationToken).ConfigureAwait(false);
