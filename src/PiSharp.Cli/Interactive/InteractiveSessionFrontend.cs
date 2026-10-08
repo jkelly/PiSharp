@@ -489,6 +489,7 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
         {
             var id = "chat-" + (++sequence).ToString(CultureInfo.InvariantCulture);
             if (line == "/quit") quit = true;
+            else if ((loginPrompt is not null || dialog is null && !draft.IsEditing) && TryLoginLineLocked(line, out display)) localAcknowledged = true;
             // Source Esc precedence: a streaming run is aborted first, otherwise a running user bash command.
             else if (line == "/abort" && !terminalStreaming && pendingBash is not null) command = new { id, type = "abort_bash" };
             else if (dialog is null && !draft.IsEditing && UserBashLine(line) is { } bash)
@@ -734,6 +735,7 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
     public void Dispose()
     {
         // The command joins its input loop and the host's actual output callbacks before closing this view.
+        CancelLogin();
         lock (state) { queueRestoration?.Completion.TrySetCanceled(); queueRestoration = null; ClearDialogs(); draft.Clear(); statuses.Clear(); widgets.Clear(); completionRequests.Clear(); ResetAssistantPresentation(); send = null; }
         ready.TrySetCanceled(); rendering.Dispose();
     }

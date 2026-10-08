@@ -48,6 +48,8 @@ internal static partial class Program
             ("osc7501.channel-override-negotiation-and-restart", Sync(Channel)),
             ("osc7501.reporter-run-dialog-and-compaction-lifecycle", Sync(Reporter)),
             ("osc7501.terminal-view-start-report-and-stop", TerminalView),
+            ("auth.anthropic.login-copy-code-stores-auth-json-and-refreshes", LoginStoresAndRefreshes),
+            ("auth.anthropic.login-browser-pasted-redirect-and-state-mismatch", BrowserLoginPastedRedirect),
             ("wire.agent-settled.json-mode-record-with-aborted", JsonModeAgentSettled),
             ("wire.agent-settled.native-extension-observation-and-reported-failure", ExtensionAgentSettled),
             ("wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas", InteractiveUserBash)

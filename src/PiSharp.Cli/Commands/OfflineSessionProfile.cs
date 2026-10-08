@@ -402,6 +402,10 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         }
         if (registeredMcpAdmission is not null && mcpAdmission is not null)
             throw new ArgumentException("Choose one explicit MCP profile admission.");
+        if (resolvedAnthropicAuthentication is null && resolvedAnthropicHandler is null && liveSelection is { Model.Provider: "anthropic" } &&
+            (liveRuntime ?? LiveSessionRuntime.Default) is { ResolveStoredAnthropic: { } resolveStored } storedRuntime &&
+            await resolveStored(token).ConfigureAwait(false) is { } storedAnthropic)
+        { resolvedAnthropicAuthentication = storedAnthropic; resolvedAnthropicHandler = storedRuntime.CreateHttpHandler(); }
         // Explicit admitted resolution uses no environment lookup; reject invalid composition before profile effects.
         if (resolvedAnthropicAuthentication is not null &&
             (liveSelection is null || liveSelection.Model.Provider != "anthropic" || liveSelection.Model.Api != "anthropic-messages" ||

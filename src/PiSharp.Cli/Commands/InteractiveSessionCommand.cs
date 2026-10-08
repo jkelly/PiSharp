@@ -16,6 +16,7 @@ public static class InteractiveSessionCommand
         using var hostCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
         using var inputCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
         using var frontend = new InteractiveSessionFrontend(output, nativePresentation: true);
+        frontend.BindLogin(PiSharp.Cli.Authentication.ProviderLoginHost.CreateDefault());
         await using var connection = new BoundedRpcConnection(frontend.ObserveAsync); frontend.Bind(connection.SendAsync);
         var rpcArgs = args.ToArray(); rpcArgs[1] = "rpc";
         var host = RpcSessionCommand.RunWithPresentationAsync(rpcArgs, connection.Input, connection.Output, error, frontend, hostCancellation.Token);

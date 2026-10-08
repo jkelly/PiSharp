@@ -13,9 +13,12 @@ using PiSharp.Contracts;
 
 namespace PiSharp.Cli.Commands;
 
-internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment, Func<HttpMessageHandler?> CreateHttpHandler)
+internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment, Func<HttpMessageHandler?> CreateHttpHandler,
+    Func<CancellationToken, ValueTask<AuthenticationResolution?>>? ResolveStoredAnthropic = null)
 {
-    internal static LiveSessionRuntime Default { get; } = new(Environment.GetEnvironmentVariable, () => null);
+    // A stored auth.json credential (written by /login) owns the Anthropic provider; the environment is read only without one.
+    internal static LiveSessionRuntime Default { get; } = new(Environment.GetEnvironmentVariable, () => null,
+        PiSharp.Cli.Authentication.StoredAnthropicAuthentication.ResolveDefaultAsync);
 }
 internal sealed class LiveSessionException(string code, string message) : Exception(message)
 { internal string Code { get; } = code; }
