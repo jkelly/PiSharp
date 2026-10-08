@@ -275,14 +275,22 @@ internal static partial class Program
             Directory.SetLastWriteTimeUtc(backend.LockPath, DateTime.UtcNow - TimeSpan.FromMinutes(1));
             Equal(1, backend.WithLock(current => (1, (string?)null)));
             Check(!Directory.Exists(backend.LockPath) && !File.Exists(backend.LockPath));
-            // Separate instances (as separate processes would) never lose each other's updates.
+            // Separate instances (as separate processes would) never lose each other's updates. Like upstream's
+            // acquireLockSyncWithRetry, an update gives up after 10 x 20 ms while another holds the lock; a busy runner can
+            // exceed that, so a writer that gave up (and changed nothing) tries again.
             var counter = Path.Combine(root, "counter.json");
             await Task.WhenAll(Enumerable.Range(0, 3).Select(_ => Task.Run(() =>
             {
                 var own = new McpOAuthFileCredentialBackend(counter);
                 for (var index = 0; index < 20; index++)
-                    own.WithLock(current => (0, (string?)(int.Parse(current == "{}" ? "0" : current!, System.Globalization.CultureInfo.InvariantCulture) + 1)
-                        .ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                    for (var attempt = 1; ; attempt++)
+                        try
+                        {
+                            own.WithLock(current => (0, (string?)(int.Parse(current == "{}" ? "0" : current!, System.Globalization.CultureInfo.InvariantCulture) + 1)
+                                .ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                            break;
+                        }
+                        catch (IOException error) when (attempt < 50 && error.Message.StartsWith("The MCP credential store is locked", StringComparison.Ordinal)) { }
             })));
             Equal("60", File.ReadAllText(counter));
         }
