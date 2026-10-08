@@ -92,9 +92,13 @@ public sealed class AzureResponsesTransport : IChatTransport
                     if (progress is StreamTerminalEvent final)
                     {
                         terminal = final;
+                        // The mapper settles source failures (limits, malformed data, cancellation, hooks) as a StreamError
+                        // carrying the raw exception text. Classify the original exception instead, so diagnostics stay
+                        // bounded and private callback text never escapes; provider-reported failures keep their message.
                         if (final is StreamError)
-                            failure = new AzureSettledFailure(final.Message.ExtraProperties?.TryGet("errorMessage", out var detail) == true && detail!.Value.ValueKind == JsonValueKind.String
-                                ? detail.Value.GetString()! : "Azure Responses stream did not complete.");
+                            failure = final.NativeSourceException ?? new AzureSettledFailure(
+                                final.Message.ExtraProperties?.TryGet("errorMessage", out var detail) == true && detail!.Value.ValueKind == JsonValueKind.String
+                                    ? detail.Value.GetString()! : "Azure Responses stream did not complete.");
                         break;
                     }
                     reducer.Apply(progress);
