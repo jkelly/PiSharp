@@ -40,6 +40,13 @@ public static partial class NativeProviderFactory
         requestOptions ??= openRouter
             ? new(MaxTokensField: "max_tokens", SupportsStore: false, SupportsLongCacheRetention: false)
             : new();
+        return BindCompletions(model, endpoint, explicitApiKey, projectionOptions, requestOptions, handler, modelMetadata);
+    }
+
+    private static NativeHttpModelProvider BindCompletions(ModelDescriptor model, Uri endpoint, string explicitApiKey,
+        CompletionsTranscriptProjectionOptions projectionOptions, CompletionsKeyAuthRequestOptions requestOptions,
+        HttpMessageHandler? handler, JsonData? modelMetadata)
+    {
         var factory = new CompletionsKeyAuthRequestFactory(endpoint, model, projectionOptions, requestOptions);
         var profile = modelMetadata is null ? null : new NativeThinkingProfile(model, modelMetadata, projectionOptions.Reasoning);
         if (profile is not null) profile.ConstrainCompletions(new(endpoint, model, projectionOptions,

@@ -4,8 +4,11 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using PiSharp.AI;
 using PiSharp.AI.Authentication;
 using PiSharp.AI.Authentication.OAuth;
+using PiSharp.AI.Protocols.AnthropicMessages;
+using PiSharp.AI.Providers;
 using PiSharp.Contracts;
 using R = PiSharp.AI.Authentication.InjectedAuthenticationResolver;
 
@@ -31,7 +34,9 @@ internal static class Program
             ("federation.keys-auth-token-and-stored-key-keep-precedence", FederationPrecedence),
             ("federation.cancellation-between-federation-lookups", FederationCancellation),
             ("federation.configure-provider-and-request-auth-selection", FederationConfigure),
-            ("federation.secretless-result-is-rejected-by-key-transport-adapter", FederationAdapter),
+            ("federation.secretless-result-is-admitted-with-its-configuration-and-no-send", FederationAdapter),
+            ("federation.resolved-provider-exchanges-once-and-sends-bearer-oauth-beta-messages", FederationResolvedProvider),
+            ("federation.option-owned-authorization-header-wins-over-federation", FederationOptionHeaderWins),
             ("federation.exchange-request-body-headers-and-expiry", FederationExchange),
             ("federation.exchange-failures-are-redacted-and-bounded", FederationExchangeFailures),
             ("federation.token-cache-advisory-mandatory-invalidate-coalesce", FederationCache),
@@ -291,12 +296,108 @@ internal static class Program
     private static async Task FederationAdapter()
     {
         var resolution = await R.ResolveAnthropicApiKeyAsync(new Lookup(Env(FederationVariables())), NoCredential);
-        var calls = 0;
-        await Throws<ArgumentException>(async () => await AnthropicInjectedTransportAdapter.AcquireAsync(
-            new ModelDescriptor("claude-test", "anthropic-messages", "anthropic"), resolution,
-            (_, _, _) => { calls++; throw new InvalidOperationException("Unexpected acquisition."); }));
-        Require(calls == 0);
+        var model = new ModelDescriptor("claude-test", "anthropic-messages", "anthropic");
+        AnthropicInjectedAuthenticationBinding? bound = null; var fake = Respond("{}");
+        await using (var lease = await AnthropicInjectedTransportAdapter.AcquireAsync(model, resolution, (selected, binding, _) =>
+        {
+            bound = binding;
+            var provider = AnthropicResolvedProviderFactory.Create(selected, new Uri("https://api.anthropic.com/"), binding, new(1024), handler: fake);
+            return ValueTask.FromResult(new AnthropicTransportAdmission(selected, provider.Transport, new Owner(provider)));
+        }))
+            Require(lease.Model == model);
+        Require(bound is { Kind: AuthenticationKind.WorkloadIdentityFederation, ApiKey: null, UseOAuthProjection: false } && bound.Headers.IsEmpty);
+        Require(bound!.Federation == new AnthropicFederationConfiguration("org-test", "wrkspc_test", "fdrl_test", "svac_test", "/tmp/identity.jwt"));
+        Require(fake.Requests.Count == 0, "Acquisition neither exchanges nor sends.");
+        Require(!bound.ToString().Contains("fdrl", StringComparison.Ordinal) && !bound.ToString().Contains("org-test", StringComparison.Ordinal));
+        // The secretless federation result still never reaches the key-only factory.
+        await Throws<ArgumentException>(() => { using var _ = NativeProviderFactory.CreateAnthropic(model, new Uri("https://api.anthropic.com/"),
+            resolution.Authentication!.Secret, new(1024), handler: fake); return Task.CompletedTask; });
     }
+
+    private sealed class Owner(NativeHttpModelProvider provider) : IAsyncDisposable
+    { public ValueTask DisposeAsync() { provider.Dispose(); return ValueTask.CompletedTask; } }
+    private static readonly ModelDescriptor FederatedModel = new("claude-federated", "anthropic-messages", "anthropic");
+    private static ChatRequest FederatedRequest(string text) => new(FederatedModel,
+        [new("system", JsonData.Parse("""{"role":"system","content":[{"type":"text","text":"Authored system"}]}""")),
+         new("user", JsonData.Parse("{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":" + JsonSerializer.Serialize(text) + "}]}"))]);
+    private static HttpResponseMessage MessagesStream()
+    {
+        static string Frame(string type, object value) => "event: " + type + "\ndata: " + JsonSerializer.Serialize(value) + "\n\n";
+        var stream = Frame("message_start", new { type = "message_start", message = new { id = "authored-response", role = "assistant", model = FederatedModel.Id, content = Array.Empty<object>(), usage = new { input_tokens = 2, output_tokens = 0 } } })
+            + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = new { type = "text", text = "" } })
+            + Frame("content_block_delta", new { type = "content_block_delta", index = 0, delta = new { type = "text_delta", text = "ok" } })
+            + Frame("content_block_stop", new { type = "content_block_stop", index = 0 })
+            + Frame("message_delta", new { type = "message_delta", delta = new { stop_reason = "end_turn" }, usage = new { output_tokens = 1 } })
+            + Frame("message_stop", new { type = "message_stop" });
+        return new(HttpStatusCode.OK) { Content = new StringContent(stream, Encoding.UTF8, "text/event-stream") };
+    }
+    private static async Task<int> Drain(AnthropicInjectedTransportLease lease, ChatRequest request)
+    { var frames = 0; await foreach (var _ in lease.Transport.StreamAsync(request)) frames++; return frames; }
+    private static Fake FederatedEndpoints(Func<int> nextToken) => new((seen, _) => Task.FromResult(seen.Url == "https://api.anthropic.com/v1/oauth/token"
+        ? Json($$"""{"access_token":"federated-{{nextToken()}}","expires_in":3600,"token_type":"Bearer"}""")
+        : seen.Url == "https://api.anthropic.com/v1/messages?beta=true" ? MessagesStream() : throw new InvalidOperationException("Unexpected URL.")));
+    private static async Task<AuthenticationResolution> ResolveFederation(string path) =>
+        await R.ResolveAnthropicApiKeyAsync(new Lookup(Env((R.AnthropicFederationRuleId, "fdrl_test"), (R.AnthropicOrganizationId, "org-test"),
+            (R.AnthropicServiceAccountId, "svac_test"), (R.AnthropicIdentityTokenFile, path), (R.AnthropicWorkspaceId, "wrkspc_test"))), NoCredential);
+
+    // Pi abe508e1 anthropic-messages.ts createClient: federation shares the API-key path's default headers and body; the SDK's
+    // token auth adds Authorization: Bearer and the oauth-2025-04-20 beta (2i port of @anthropic-ai/sdk 0.129.0).
+    private static Task FederationResolvedProvider() => WithIdentityFile("header.payload.signature\n", async path =>
+    {
+        var resolution = await ResolveFederation(path);
+        Require(resolution.Authentication is { Kind: AuthenticationKind.WorkloadIdentityFederation });
+        var exchanges = 0; var fake = FederatedEndpoints(() => ++exchanges);
+        var projection = new AnthropicMessagesRequestOptions(MaximumTokens: 1024, MaximumMessages: 64, MaximumEntryCharacters: 65_536,
+            CacheRetention: AnthropicCacheRetention.Short);
+        var options = new AnthropicMessagesKeyAuthRequestOptions(MaxTokens: 1024);
+        await using (var lease = await AnthropicResolvedTransports.AcquireMainAsync(FederatedModel, new Uri("https://api.anthropic.com/"), resolution,
+            projection, options, handler: fake))
+        {
+            Require(fake.Requests.Count == 0, "No exchange before the first request.");
+            Require(await Drain(lease, FederatedRequest("first")) > 0);
+            Require(await Drain(lease, FederatedRequest("second")) > 0);
+        }
+        Require(exchanges == 1 && fake.Requests.Count == 3, "One exchange serves both requests of the provider client.");
+        var exchange = fake.Requests[0];
+        Require(exchange.Method == "POST" && exchange.Url == "https://api.anthropic.com/v1/oauth/token" && exchange.ContentType == "application/json");
+        BodyEqual("""{"grant_type":"urn:ietf:params:oauth:grant-type:jwt-bearer","assertion":"header.payload.signature","federation_rule_id":"fdrl_test","organization_id":"org-test","service_account_id":"svac_test","workspace_id":"wrkspc_test"}""", exchange.Body);
+        Equal("oauth-2025-04-20,oidc-federation-2026-04-01", exchange.Headers["anthropic-beta"]);
+        Require(!exchange.Headers.ContainsKey("Authorization") && !exchange.Headers.ContainsKey("x-api-key"));
+        foreach (var (seen, text) in new[] { (fake.Requests[1], "first"), (fake.Requests[2], "second") })
+        {
+            Require(seen.Method == "POST" && seen.Url == "https://api.anthropic.com/v1/messages?beta=true" && seen.ContentType == "application/json");
+            Equal("Accept=application/json|anthropic-beta=oauth-2025-04-20|anthropic-dangerous-direct-browser-access=true|anthropic-version=2023-06-01|Authorization=Bearer federated-1|User-Agent=PiSharp",
+                string.Join("|", seen.Headers.OrderBy(header => header.Key, StringComparer.OrdinalIgnoreCase).Select(header => header.Key + "=" + header.Value)));
+            BodyEqual($$$"""{"model":"claude-federated","messages":[{"role":"user","content":[{"type":"text","text":"{{{text}}}","cache_control":{"type":"ephemeral"}}]}],"max_tokens":1024,"stream":true,"system":[{"type":"text","text":"Authored system","cache_control":{"type":"ephemeral"}}]}""", seen.Body);
+        }
+
+        // The same request on the API-key path differs only by the credential header and the OAuth beta.
+        var keyed = await R.ResolveAnthropicApiKeyAsync(new Lookup(Env((R.AnthropicApiKey, "AUTHORED_KEY"))), NoCredential);
+        var keyFake = new Fake((_, _) => Task.FromResult(MessagesStream()));
+        await using (var lease = await AnthropicResolvedTransports.AcquireMainAsync(FederatedModel, new Uri("https://api.anthropic.com/"), keyed,
+            projection, options, handler: keyFake))
+            await Drain(lease, FederatedRequest("first"));
+        var key = keyFake.Requests.Single();
+        BodyEqual(fake.Requests[1].Body!, key.Body);
+        Equal("AUTHORED_KEY", key.Headers["x-api-key"]); Require(!key.Headers.ContainsKey("Authorization"));
+        Equal(fake.Requests[1].Headers["anthropic-beta"], key.Headers.TryGetValue("anthropic-beta", out var keyBeta) ? keyBeta + ", oauth-2025-04-20" : "oauth-2025-04-20");
+        Equal(string.Join("|", fake.Requests[1].Headers.Keys.Where(name => name is not ("Authorization" or "anthropic-beta")).Order(StringComparer.OrdinalIgnoreCase)),
+            string.Join("|", key.Headers.Keys.Where(name => name is not ("x-api-key" or "anthropic-beta")).Order(StringComparer.OrdinalIgnoreCase)));
+    });
+
+    // hasRequestAuth(apiKey, options.headers): a request-owned authorization header disables federation, as upstream.
+    private static Task FederationOptionHeaderWins() => WithIdentityFile("header.payload.signature", async path =>
+    {
+        var resolution = await ResolveFederation(path);
+        var exchanges = 0; var fake = FederatedEndpoints(() => ++exchanges);
+        await using (var lease = await AnthropicResolvedTransports.AcquireMainAsync(FederatedModel, new Uri("https://api.anthropic.com/"), resolution,
+            new(1024), new(Headers: JsonData.Parse("""{"authorization":"Bearer option-owned"}""")), handler: fake))
+            await Drain(lease, FederatedRequest("first"));
+        Require(exchanges == 0);
+        var seen = fake.Requests.Single();
+        Equal("Bearer option-owned", seen.Headers["authorization"]);
+        Require(!(seen.Headers.TryGetValue("anthropic-beta", out var beta) && beta.Contains("oauth-2025-04-20", StringComparison.Ordinal)));
+    });
 
     // ---- federation exchange ----
     private static async Task WithIdentityFile(string content, Func<string, Task> run)

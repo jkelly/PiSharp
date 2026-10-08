@@ -31,6 +31,9 @@ public sealed record CompletionsKeyAuthRequestOptions(double? MaxTokens = null, 
     public JsonData? SamplingParams { get; init; }
     /// <summary>Source minimal/low/medium/high token budgets; xhigh and max use the high budget.</summary>
     public JsonData? ThinkingBudgets { get; init; }
+    /// <summary>The body's model field when it differs from the catalog id, as Pi abe508e1 providers/azure.ts withDeploymentName
+    /// sends an Azure deployment name. The model identity, metadata binding and hooks keep the catalog id.</summary>
+    public string? RequestModelId { get; init; }
 }
 
 /// <summary>Pure configured key request construction. No send, environment, clock, credential discovery or retry.</summary>
@@ -74,10 +77,13 @@ public sealed class CompletionsKeyAuthRequestFactory
             !Enum.IsDefined(_options.CacheRetention) || _options.MaxTokensField is not ("max_tokens" or "max_completion_tokens") ||
             _options.SessionAffinityFormat is not ("openai" or "openai-nosession" or "openrouter") ||
             _options.ReasoningFormat is { } format && !Enum.IsDefined(format)) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
+        if (_options.RequestModelId is { } requestModel && !Identity(requestModel)) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
         if (endpoint.AbsoluteUri.Length > _options.MaximumEndpointCharacters || expectedModel.Id.Length > _options.MaximumModelCharacters ||
+            _options.RequestModelId?.Length > _options.MaximumModelCharacters ||
             expectedModel.Provider.Length > _options.MaximumModelCharacters || Math.Abs(_options.MaxTokens ?? 0) > _options.MaximumTokenMagnitude ||
             Math.Abs(_options.Temperature ?? 0) > _options.MaximumTemperatureMagnitude) throw Fail(CompletionsRequestFailure.ResourceLimit);
         CompletionsJson.Unicode(expectedModel.Id); CompletionsJson.Unicode(expectedModel.Provider);
+        if (_options.RequestModelId is { } deployment) CompletionsJson.Unicode(deployment);
         if (_options.ReasoningEffort is not (null or "minimal" or "low" or "medium" or "high" or "xhigh" or "max"))
             throw Fail(CompletionsRequestFailure.UnsupportedContent);
         _endpoint = endpoint; _model = expectedModel;
@@ -204,7 +210,7 @@ public sealed class CompletionsKeyAuthRequestFactory
             else { fieldIndices.Add(name, fields.Count); fields.Add(new(name, value)); }
         }
         JsonData Text(string text) => JsonData.Parse(JsonSerializer.Serialize(text, CompletionsJson.Output));
-        Add("model", Text(_model.Id)); Add("messages", messages); Add("stream", JsonData.Parse("true"));
+        Add("model", Text(_options.RequestModelId ?? _model.Id)); Add("messages", messages); Add("stream", JsonData.Parse("true"));
         if (_cacheKey is not null && (_endpoint.AbsoluteUri.Contains("api.openai.com", StringComparison.Ordinal) && _options.CacheRetention != CompletionsCacheRetention.None ||
             _options.CacheRetention == CompletionsCacheRetention.Long && _options.SupportsLongCacheRetention)) Add("prompt_cache_key", Text(_cacheKey));
         if (_options.CacheRetention == CompletionsCacheRetention.Long && _options.SupportsLongCacheRetention) Add("prompt_cache_retention", Text("24h"));

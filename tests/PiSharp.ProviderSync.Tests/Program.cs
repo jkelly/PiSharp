@@ -42,6 +42,7 @@ internal static class Program
             ("sampling.responses-model-level-request-precedence-and-metadata-binding", ResponsesSampling),
             ("sampling.azure-responses-level-precedence", AzureSampling),
             ("azure.provider-rename-environment-and-legacy-provider-id", AzureRename),
+            ("azure.foundry-chat-completions-endpoint-deployment-auth-and-full-bodies", AzureFoundryCompletions),
             ("retry.busy-capacity-and-stream-cancel-classification", RetryClassification),
             ("retry.zai-cn-overflow-classification", OverflowClassification),
             ("retry.mistral-finish-reason-error-is-retryable", MistralFinishError),
@@ -274,6 +275,70 @@ internal static class Program
         return Task.CompletedTask;
     }
 
+    // providers/azure.ts (1.0.3): openai-completions under provider azure. The catalog entry is the @earendil-works/pi-ai@1.1.0
+    // azure.json chat:deepseek-v4-pro shard entry byte-for-byte; azure-openai-config.ts resolves the endpoint and deployment, and
+    // openai-completions.ts createClient sends the OpenAI client's Bearer key (no api-key header, no api-version query).
+    private const string DeepSeekV4Pro = """{"id":"deepseek-v4-pro","name":"DeepSeek V4 Pro","api":"openai-completions","baseUrl":"","provider":"azure","reasoning":true,"input":["text"],"cost":{"input":1.925,"output":3.828,"cacheRead":0.165,"cacheWrite":0},"contextWindow":1000000,"maxTokens":384000,"compat":{"supportsStrictMode":true,"requiresReasoningContentOnAssistantMessages":true,"thinkingFormat":"openai","supportsDeveloperRole":false,"supportsMidConvoSystemMessages":true,"supportsLongCacheRetention":false},"thinkingLevelMap":{"minimal":null,"low":"low","medium":"medium","high":"high","xhigh":null,"max":null},"type":"chat"}""";
+
+    private static async Task AzureFoundryCompletions()
+    {
+        var seen = new List<(string Url, string Headers, string Body)>();
+        using var handler = new Handler(async request =>
+        {
+            seen.Add((request.RequestUri!.AbsoluteUri, string.Join("|", request.Headers.Concat(request.Content!.Headers)
+                .Select(header => header.Key.ToLowerInvariant() + "=" + string.Join(",", header.Value)).Order(StringComparer.Ordinal)),
+                await request.Content.ReadAsStringAsync()));
+            return Sse("""{"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}""");
+        });
+        var environment = new ProviderEnvironmentSnapshot(new Dictionary<string, string?>
+        {
+            ["AZURE_OPENAI_API_KEY"] = Key, ["AZURE_OPENAI_RESOURCE_NAME"] = "pisharp-fixture",
+            ["AZURE_OPENAI_DEPLOYMENT_NAME_MAP"] = " other=x , deepseek-v4-pro=ds-v4-deployment=ignored,", ["AZURE_OPENAI_API_VERSION"] = "2025-04-01-preview"
+        });
+        var key = InjectedAuthenticationResolver.GetEnvApiKey("azure", environment).Authentication!.Secret;
+        var model = new ModelDescriptor("deepseek-v4-pro", "openai-completions", "azure");
+        var system = Entry("""{"role":"system","content":"Base","timestamp":0}""");
+        async Task<(string Url, string Headers, string Body)> Send(AzureEndpointOptions azure, CompletionsKeyAuthRequestOptions options, JsonData? metadata, ModelDescriptor? selected = null)
+        {
+            selected ??= model;
+            using var provider = NativeProviderFactory.CreateAzureCompletions(selected, key, azure, requestOptions: options, handler: handler, modelMetadata: metadata);
+            await foreach (var _ in provider.Transport.StreamAsync(new(selected, [system, Ask], 1))) { }
+            return seen[^1];
+        }
+        const string headers = "accept=application/json|authorization=Bearer inert-provider-sync-key|content-type=application/json|user-agent=PiSharp|x-stainless-retry-count=0";
+        var metadata = JsonData.Parse(DeepSeekV4Pro);
+        // Resource name + deployment map; the model's compat sends the system prompt as "system" and reasoning_effort for openai thinking.
+        var catalog = await Send(new() { Environment = environment }, new(MaxTokens: 4096, ReasoningEffort: "high") { ModelMetadata = metadata }, metadata);
+        Equal("https://pisharp-fixture.openai.azure.com/openai/v1/chat/completions", catalog.Url);
+        Equal(headers, catalog.Headers);
+        BodyEqual("""{"model":"ds-v4-deployment","messages":[{"role":"system","content":"Base"},{"role":"user","content":"ask"}],"stream":true,"stream_options":{"include_usage":true},"store":false,"max_completion_tokens":4096,"reasoning_effort":"high"}""", catalog.Body);
+        // An explicit deployment and base URL win; an Azure host with /openai normalizes to /openai/v1. No effort and no "off" mapping sends no reasoning_effort.
+        var explicitBase = await Send(new() { AzureBaseUrl = " https://foundry.services.ai.azure.com/openai/ ", AzureDeploymentName = "explicit-deployment", Environment = environment },
+            new() { ModelMetadata = metadata }, metadata);
+        Equal("https://foundry.services.ai.azure.com/openai/v1/chat/completions", explicitBase.Url);
+        BodyEqual("""{"model":"explicit-deployment","messages":[{"role":"system","content":"Base"},{"role":"user","content":"ask"}],"stream":true,"stream_options":{"include_usage":true},"store":false}""", explicitBase.Body);
+        // A user model (models.json, api openai-completions under azure) without catalog metadata keeps its id and its own base URL path.
+        var user = new ModelDescriptor("user-model", "openai-completions", "azure");
+        var userMetadata = JsonData.Parse("""{"id":"user-model","api":"openai-completions","provider":"azure","baseUrl":"https://proxy.fixture.invalid/v1/","reasoning":false,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}""");
+        var custom = await Send(new(), new() { ModelMetadata = userMetadata }, null, user);
+        Equal("https://proxy.fixture.invalid/v1/chat/completions", custom.Url);
+        Equal(headers, custom.Headers);
+        BodyEqual("""{"model":"user-model","messages":[{"role":"system","content":"Base"},{"role":"user","content":"ask"}],"stream":true,"stream_options":{"include_usage":true},"store":false}""", custom.Body);
+        // Without any endpoint the composition fails before a client exists, with upstream's message and no configured value.
+        var missing = false;
+        try { using var _ = NativeProviderFactory.CreateAzureCompletions(model, key, new(), handler: handler, modelMetadata: metadata); }
+        catch (ArgumentException error) when (error.Message.StartsWith("Azure OpenAI base URL is required.", StringComparison.Ordinal)) { missing = true; }
+        Check(missing && seen.Count == 3, "An unconfigured Azure endpoint was admitted.");
+        foreach (var rejected in new AzureEndpointOptions[] { new() { AzureResourceName = "bad.host/x" }, new() { AzureBaseUrl = "https://proxy.fixture.invalid/v1?x=1" } })
+        {
+            var refused = false;
+            try { using var _ = NativeProviderFactory.CreateAzureCompletions(model, key, rejected, handler: handler, modelMetadata: metadata); }
+            catch (ArgumentException) { refused = true; }
+            Check(refused, "A malformed Azure endpoint was admitted.");
+        }
+        Equal("deepseek-v4-pro", AzureOpenAIConfiguration.ResolveDeploymentName("deepseek-v4-pro", new() { Environment = new([KeyValuePair.Create<string, string?>("AZURE_OPENAI_DEPLOYMENT_NAME_MAP", "deepseek-v4-pro=")]) }));
+    }
+
     // ---------------------------------------------------------------- 4. Retry and overflow classification
 
     private static Task RetryClassification()
@@ -471,7 +536,7 @@ internal static class Program
         var anthropic = Shard("anthropic", "aa4342dfb96feb1619794113619d6630088d6ac544c547a4f9899a0a7f26419b");
         var openai = Shard("openai", "f4c1ac9f8f84cb9f2a952b0ceec51c90a38b31b4cdf33200e018ece9d408e95f");
         var openrouter = Shard("openrouter", "c86aa3b95d412465dac54cb902402cbdb40f47a1fe33f12b002913834724d8f0");
-        _ = Shard("mistral", "10f33bff9adf1248f7e6848e5890c265399f1f94e5b42cfdc28c109d547af98d"); // Separate v0.99.1 source provenance, unchanged.
+        var mistral = Shard("mistral", "fcd37c7b178416f86954efdacbb45726d10f102fd1211062792691e62fcf327c");
         Check(anthropic.TryGetModel(CatalogModelType.Chat, "claude-haiku-5-5", out var haiku), "Claude Haiku 5.5 missing.");
         Equal("anthropic-messages", haiku!.DeclaredApi);
         Equal("""[{"inputTokensAbove":100000,"input":0.5,"output":2.5,"cacheRead":0.05,"cacheWrite":0.625}]""", haiku.Cost.Value.GetProperty("tiers").GetRawText());
@@ -481,6 +546,14 @@ internal static class Program
         Check(openrouter.TryGetModel(CatalogModelType.Chat, "anthropic/claude-haiku-5.5", out _), "OpenRouter Haiku 5.5 missing.");
         Check(anthropic.TryGetModel(CatalogModelType.Chat, "claude-sonnet-4-5", out _) && openai.TryGetModel(CatalogModelType.Chat, "gpt-4o", out _),
             "Models used by existing CLI selections disappeared.");
+        // mistral.json replaced its v0.99.1 source-catalog copy (10f33bff...): 32 -> 40 chat rows, none removed.
+        Equal(40, mistral.Models.Length);
+        foreach (var added in new[] { "codestral-2508", "glm-5-2", "labs-leanstral-1-5-1", "ministral-14b-2512", "ministral-3b-2512", "ministral-8b-2512", "mistral-large-4", "voxtral-small-2507" })
+            Check(mistral.TryGetModel(CatalogModelType.Chat, added, out var row) && row!.DeclaredApi == "mistral-conversations", "Mistral 1.1.0 addition missing: " + added);
+        Check(mistral.TryGetModel(CatalogModelType.Chat, "magistral-medium-latest", out var magistral) && magistral!.DeclaresImageInput, "Magistral Medium lost image input.");
+        Equal("""{"off":"none","minimal":null,"low":null,"medium":null,"high":"high","xhigh":null,"max":null}""", magistral!.Raw.Value.GetProperty("thinkingLevelMap").GetRawText());
+        Check(mistral.TryGetModel(CatalogModelType.Chat, "open-mistral-7b", out _) && mistral.TryGetModel(CatalogModelType.Chat, "codestral-latest", out _),
+            "Mistral models used by existing CLI selections disappeared.");
         return Task.CompletedTask;
     }
 
