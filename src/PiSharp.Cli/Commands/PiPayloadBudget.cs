@@ -27,6 +27,8 @@ internal static class PiPayloadBudget
     public const int SessionFileBytes = 64 * 1024 * 1024;
     /// <summary>One RPC or JSON-mode output record (a tool_execution_end carrying an image).</summary>
     public const int OutputRecordBytes = 32 * 1024 * 1024;
+    /// <summary>One RPC input command (a prompt carrying Pi-sized images).</summary>
+    public const int RpcCommandBytes = 32 * 1024 * 1024;
 
     /// <summary>Tool result admission for the agent loop and its canonical retained values.</summary>
     public static ToolResultValueOptions ToolResults { get; } = ToolResultValueOptions.ExecutionBoundary with

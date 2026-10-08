@@ -13,7 +13,7 @@ public sealed record ResponsesKeyAuthRequestOptions(
     JsonData? PayloadOverrides = null,
     int MaximumOutputTokens = 1_000_000, int MaximumKeyCharacters = 4096,
     int MaximumEndpointCharacters = 4096, int MaximumModelCharacters = 1024,
-    int MaximumPayloadBytes = 1_048_576, int MaximumPayloadDepth = 32,
+    int MaximumPayloadBytes = PiRequestBudget.RequestPayloadBytes, int MaximumPayloadDepth = 32,
     string? SessionId = null, double? Temperature = null,
     int MaximumSessionIdCharacters = 4096, double MaximumTemperatureMagnitude = 2,
     string? ReasoningEffort = null, string? ReasoningSummary = null, JsonData? ThinkingLevelMap = null,

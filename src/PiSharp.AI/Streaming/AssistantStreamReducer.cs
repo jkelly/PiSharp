@@ -5,7 +5,7 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI;
 
-public sealed record StreamLimits(int MaximumBlocks = 256, int MaximumCharacters = 1_048_576);
+public sealed record StreamLimits(int MaximumBlocks = 256, int MaximumCharacters = PiRequestBudget.StreamCharacters);
 
 /// <summary>One stream owns one reducer. Events remain immutable; only per-block accumulators change.</summary>
 public sealed class AssistantStreamReducer

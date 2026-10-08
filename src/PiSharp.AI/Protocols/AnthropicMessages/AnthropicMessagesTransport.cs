@@ -12,8 +12,8 @@ public sealed record AnthropicTokenRates(decimal Input = 0, decimal Output = 0, 
 { public ImmutableArray<TokenRateTier> Tiers { get; init; } = []; }
 public sealed record AnthropicFallbackModel(string Provider, string Model, AnthropicTokenRates Rates);
 public sealed record AnthropicMessagesOptions(int MaximumEvents = 4096, int MaximumEventCharacters = 65_536,
-    int MaximumInputCharacters = 1_048_576, int MaximumContentSlots = 64, int MaximumContentCharacters = 1_048_576,
-    int MaximumSignatureCharacters = 1_048_576, int MaximumJsonDepth = 32, AnthropicTokenRates? Rates = null,
+    int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = 64, int MaximumContentCharacters = PiRequestBudget.StreamCharacters,
+    int MaximumSignatureCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = 32, AnthropicTokenRates? Rates = null,
     ImmutableArray<AnthropicFallbackModel> AllowedFallbackModels = default, bool OAuthToolNames = false,
     int MaximumToolDeclarations = 1024, int MaximumActiveTools = 128)
 {

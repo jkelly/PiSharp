@@ -10,9 +10,9 @@ public sealed record CompletionsTranscriptProjectionOptions(bool Reasoning = fal
     bool SupportsMidConversationSystemMessages = false, bool RequiresAssistantAfterToolResult = false,
     bool RequiresToolResultName = false, bool RequiresThinkingAsText = false,
     bool RequiresReasoningContentOnAssistantMessages = false, CompletionsToolDeclarationProjectionOptions? ToolDeclarations = null,
-    int MaximumMessages = 256, int MaximumEntryCharacters = 65_536, int MaximumInputCharacters = 1_048_576,
+    int MaximumMessages = 256, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
     int MaximumContentBlocks = 1024, int MaximumOutputMessages = 1024, int MaximumJsonDepth = 32,
-    int MaximumOutputCharacters = 1_048_576, int MaximumOutputBytes = 1_048_576)
+    int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes)
 {
     // ModelDescriptor currently contains identity only. Keep capability local to this provider,
     // without changing its existing positional constructor/deconstruction contract.

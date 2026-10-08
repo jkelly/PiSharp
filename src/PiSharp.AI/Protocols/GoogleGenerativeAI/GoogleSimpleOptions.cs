@@ -8,7 +8,7 @@ public sealed record GoogleSimpleOptions(GoogleGenerativeAIOptions DirectOptions
 {
     public JsonData? ThinkingBudgets { get; init; }
     public int MaximumContextMessages { get; init; } = 4096;
-    public int MaximumContextCharacters { get; init; } = 8_388_608;
+    public int MaximumContextCharacters { get; init; } = PiRequestBudget.RequestPayloadBytes;
     public override string ToString() => nameof(GoogleSimpleOptions);
 }
 

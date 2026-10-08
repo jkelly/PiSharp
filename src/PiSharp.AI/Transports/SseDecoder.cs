@@ -17,7 +17,7 @@ public sealed class SseDecodeException(SseDecodeFailure failure, string message)
 public sealed record SseDecoderOptions(
     int ReadBufferBytes = 4096,
     int MaximumLineCharacters = 65_536,
-    int MaximumEventCharacters = 1_048_576,
+    int MaximumEventCharacters = PiRequestBudget.StreamCharacters,
     bool RejectInvalidUtf8 = false,
     SseEofBehavior EofBehavior = SseEofBehavior.DiscardPendingEvent)
 {

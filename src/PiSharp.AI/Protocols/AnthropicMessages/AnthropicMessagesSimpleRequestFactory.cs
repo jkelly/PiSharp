@@ -24,7 +24,7 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
         ArgumentNullException.ThrowIfNull(client);
         if (baseUri is null || model is null || options is null || options.ModelMetadata is null || options.ProjectionOptions is null ||
             options.KeyAuthOptions is null || options.HttpOptions is null || model.Api != "anthropic-messages" ||
-            options.MaximumContextMessages is < 1 or > 65_536 || options.MaximumContextCharacters is < 2 or > 8_388_608 ||
+            options.MaximumContextMessages is < 1 or > 65_536 || options.MaximumContextCharacters is < 2 or > PiRequestBudget.MaximumBound ||
             options.ModelMetadata.ToString().Length > options.MaximumContextCharacters ||
             options.MaxTokens is <= 0 || options.Reasoning is { } level && !Levels.Contains(level, StringComparer.Ordinal))
             throw Fail(AnthropicMessagesSimpleFailure.InvalidConfiguration);

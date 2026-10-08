@@ -26,6 +26,7 @@ internal static partial class Program
         var cases = new (string Id, Func<Task> Run)[]
         {
             ("tools.read-image-pi-budget-end-to-end", ReadImageEndToEnd),
+            ("live.image-pi-budget-every-family", LiveImageEveryFamily),
             ("cli.tools.parse-patterns-modifiers-and-no-mcp", Sync(ParseToolFlags)),
             ("cli.tools.exact-upstream-errors-through-commands", CommandErrors),
             ("cli.provider-requires-model-exact-error", ProviderRequiresModel),

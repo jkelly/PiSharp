@@ -13,7 +13,7 @@ public sealed record CompletionsRetryObservation(int RetryIndex, int? Status, Ti
 /// <summary>Explicit bounded outer retries. Zero retries preserves one send; zero server-delay cap disables that cap.</summary>
 public sealed record CompletionsRetryOptions(int MaxRetries = 0, int MaxRetryDelayMilliseconds = 60_000)
 {
-    public int MaximumRequestBodyBytes { get; init; } = 1_048_576;
+    public int MaximumRequestBodyBytes { get; init; } = PiRequestBudget.RequestPayloadBytes;
     public int MaximumRequestHeaders { get; init; } = 128;
     public int MaximumRequestOptions { get; init; } = 128;
     public int MaximumRequestHeaderCharacters { get; init; } = 32_768;
@@ -24,7 +24,7 @@ public sealed record CompletionsRetryOptions(int MaxRetries = 0, int MaxRetryDel
 
     internal void Validate()
     {
-        if (MaxRetries is < 0 or > 32 || MaxRetryDelayMilliseconds < 0 || MaximumRequestBodyBytes is < 2 or > 8_388_608 ||
+        if (MaxRetries is < 0 or > 32 || MaxRetryDelayMilliseconds < 0 || MaximumRequestBodyBytes is < 2 or > PiRequestBudget.MaximumBound ||
             MaximumRequestHeaders is < 1 or > 4096 || MaximumRequestOptions is < 1 or > 4096 ||
             MaximumRequestHeaderCharacters is < 1 or > 1_048_576 || TimeProvider is null || NoRetryStatuses.IsDefault || NoRetryStatuses.Length > 4096)
             throw new ArgumentOutOfRangeException(nameof(CompletionsRetryOptions), "Invalid Completions retry limits.");

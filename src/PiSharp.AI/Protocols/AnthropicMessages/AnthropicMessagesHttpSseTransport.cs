@@ -7,7 +7,7 @@ using PiSharp.Contracts;
 namespace PiSharp.AI.Protocols.AnthropicMessages;
 
 public sealed record AnthropicMessagesHttpSseOptions(int MaximumDataEvents = 4096, int MaximumDataCharacters = 65_536,
-    long MaximumTotalDataCharacters = 1_048_576, int MaximumJsonDepth = 32, SseDecoderOptions? Framing = null);
+    long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters, int MaximumJsonDepth = 32, SseDecoderOptions? Framing = null);
 
 /// <summary>One configured HTTP/SSE send per enumeration, composed with the accepted Anthropic DTO mapper. Borrows the client.</summary>
 public sealed class AnthropicMessagesHttpSseTransport : IChatTransport

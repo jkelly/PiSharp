@@ -157,7 +157,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                     MaximumMessages: 512, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes),
                 new(MaxTokens: summary.MaximumOutputTokens, SessionId: summary.SessionId, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
             return new AnthropicMessagesHttpSseTransport(_client!, (request, token) => MarkSummary(factory.Create(request, InertKey, token), summary),
-                new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
+                new(MaximumDataEvents: 256, MaximumTotalDataCharacters: PiSharp.AI.PiRequestBudget.StreamTotalCharacters));
         }
         if (SelectedModel.Api == "openai-completions")
         {
@@ -168,14 +168,15 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 new(MaxTokens: summary.MaximumOutputTokens, SupportsReasoningEffort: false, CacheRetention: CompletionsCacheRetention.None,
                     SessionId: summary.SessionId, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
             return new CompletionsHttpSseTransport(_client!, (request, token) => MarkSummary(factory.Create(request, InertKey, token), summary),
-                new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
+                new(MaximumDataEvents: 256, MaximumTotalDataCharacters: PiSharp.AI.PiRequestBudget.StreamTotalCharacters));
         }
         var responses = new ResponsesKeyAuthRequestFactory(Endpoint, SelectedModel,
-            new(Reasoning: false, MaximumMessages: 512, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes),
+            new(Reasoning: false, MaximumMessages: 512, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes)
+                { ModelSupportsImages = SelectedModelDefinition.DeclaresImageInput },
             new(SupportsMaxOutputTokens: true, MaxOutputTokens: (int)summary.MaximumOutputTokens, SessionId: summary.SessionId,
                 MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
         return new ResponsesHttpSseTransport(_client!, request => MarkSummary(responses.Create(request, InertKey), summary),
-            new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
+            new(MaximumDataEvents: 256, MaximumTotalDataCharacters: PiSharp.AI.PiRequestBudget.StreamTotalCharacters));
     }
 
     private OfflineSessionProfile(string workspace, BuiltinToolCatalog tools, FilePolicy policy, Handler handler, ModelDescriptor model,
@@ -197,7 +198,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                     MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes),
                 new(MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
             transport = new AnthropicMessagesHttpSseTransport(_client!, (request, token) => factory.Create(request, InertKey, token),
-                new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
+                new(MaximumDataEvents: 256, MaximumTotalDataCharacters: PiSharp.AI.PiRequestBudget.StreamTotalCharacters));
         }
         else if (model.Api == "openai-completions")
         {
@@ -208,15 +209,16 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                     { ModelSupportsImages = modelDefinition.DeclaresImageInput },
                 new(MaxTokens: 8192, SupportsReasoningEffort: false, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
             transport = new CompletionsHttpSseTransport(_client!, (request, token) => factory.Create(request, InertKey, token),
-                new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
+                new(MaximumDataEvents: 256, MaximumTotalDataCharacters: PiSharp.AI.PiRequestBudget.StreamTotalCharacters));
         }
         else
         {
             var factory = new ResponsesKeyAuthRequestFactory(Endpoint, model,
-                new(Reasoning: false, MaximumMessages: 512, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes),
+                new(Reasoning: false, MaximumMessages: 512, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes)
+                { ModelSupportsImages = modelDefinition.DeclaresImageInput },
                 new(MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
             transport = new ResponsesHttpSseTransport(_client!, request => factory.Create(request, InertKey),
-                new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
+                new(MaximumDataEvents: 256, MaximumTotalDataCharacters: PiSharp.AI.PiRequestBudget.StreamTotalCharacters));
         }
         // Preserve the explicit profile defaults; durable activation can now select edit alongside ls.
         var defaults = bash is null ? tools.Select(["read", "write"]) : tools.Select(["read", "write", "bash"]);
@@ -291,6 +293,13 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             timestamp = 0, toolsAdded = (_initialActiveTools is { } active ? active.Select(name => registrations.Single(value => value.Adapter.Name == name)) :
                 registrations.Where(value => ToolExposureSemantics.ActivatesOnRegistration(value.Exposure,
                 value.DefaultActive))).Select(value => value.Declaration.Value).ToArray(), offlineApi = live is null ? model.Api : null }));
+        // A live session's system message carries no offlineApi field (it was written as null): strict replays such as the
+        // Mistral route admit only Pi's system fields.
+        if (live is not null)
+        {
+            var withoutOfflineApi = System.Text.Json.Nodes.JsonNode.Parse(InitialSystem.ToString())!.AsObject();
+            withoutOfflineApi.Remove("offlineApi"); InitialSystem = JsonData.Parse(withoutOfflineApi.ToJsonString());
+        }
         if (originalSystemPrompt is not null)
         {
             var built = System.Text.Json.Nodes.JsonNode.Parse(OriginalSystemPromptBuilder.Message(startupOriginalPrompt, 0, allowForce: false).ToString())!.AsObject();

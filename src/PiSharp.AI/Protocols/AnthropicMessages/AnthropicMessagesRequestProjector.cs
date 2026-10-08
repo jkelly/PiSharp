@@ -38,10 +38,10 @@ public sealed record AnthropicMessagesRequestOptions(
     bool OAuthProjection = false, bool InterleavedThinking = true, bool SupportsMidConversationSystemMessages = false,
     ImmutableArray<string> AllowedFallbackModels = default, ImmutableArray<string> BetaFeatures = default,
     JsonData? ToolChoice = null, string? UserId = null,
-    int MaximumMessages = 256, int MaximumEntryCharacters = 65_536, int MaximumInputCharacters = 1_048_576,
+    int MaximumMessages = 256, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
     int MaximumContentBlocks = 1024, int MaximumDeclarations = 1024, int MaximumActiveTools = 128,
     int MaximumProjectedMessages = 1024, int MaximumJsonDepth = 32,
-    int MaximumOutputCharacters = 1_048_576, int MaximumOutputBytes = 1_048_576,
+    int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes,
     bool SupportsMidConversationToolChanges = false, bool SupportsMidConversationEffort = false)
 {
     /// <summary>Upstream stream(): the effort a managed (compat.supportsMidConvoEffort) response records as providerThinkingLevel.</summary>

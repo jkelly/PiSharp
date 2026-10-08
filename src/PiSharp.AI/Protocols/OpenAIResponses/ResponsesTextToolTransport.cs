@@ -47,8 +47,8 @@ public sealed record ResponsesTokenRates(decimal Input = 0, decimal Output = 0, 
 
 public sealed record ResponsesTextToolOptions(
     int MaximumEvents = 4096, int MaximumEventCharacters = 65_536,
-    int MaximumInputCharacters = 1_048_576, int MaximumContentSlots = 64,
-    int MaximumContentCharacters = 1_048_576, int MaximumJsonDepth = 32,
+    int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = 64,
+    int MaximumContentCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = 32,
     ResponsesTokenRates? Rates = null, string? ServiceTier = null)
 {
     /// <summary>Model compat <c>supportsOpenAIGrammarTools</c>: selects each custom tool call's grammar input property.</summary>

@@ -21,12 +21,12 @@ public sealed record PiMessagesOptions(JsonData ModelMetadata, string? ApiKey = 
     /// <summary>Optional reader acquisition seam; returns an invocation-owned stream or an absent body.</summary>
     public Func<HttpResponseMessage, CancellationToken, ValueTask<Stream?>>? BodyReaderFactory { get; init; }
     public int ReadBufferBytes { get; init; } = 4096;
-    public int MaximumFrameCharacters { get; init; } = 1_048_576;
+    public int MaximumFrameCharacters { get; init; } = PiRequestBudget.StreamCharacters;
     public int MaximumDataEvents { get; init; } = 4096;
-    public long MaximumTotalDataCharacters { get; init; } = 8_388_608;
-    public int MaximumPayloadBytes { get; init; } = 1_048_576;
+    public long MaximumTotalDataCharacters { get; init; } = PiRequestBudget.StreamTotalCharacters;
+    public int MaximumPayloadBytes { get; init; } = PiRequestBudget.RequestPayloadBytes;
     public int MaximumContentSlots { get; init; } = 256;
-    public int MaximumContentCharacters { get; init; } = 1_048_576;
+    public int MaximumContentCharacters { get; init; } = PiRequestBudget.StreamCharacters;
     public int MaximumJsonDepth { get; init; } = 32;
     public int MaximumHeaders { get; init; } = 128;
     public int MaximumHeaderCharacters { get; init; } = 8192;
@@ -36,9 +36,9 @@ public sealed record PiMessagesOptions(JsonData ModelMetadata, string? ApiKey = 
 
     internal void Validate()
     {
-        if (ModelMetadata is null || Hooks is null || ReadBufferBytes is < 1 or > 65_536 || MaximumFrameCharacters is < 1 or > 8_388_608 ||
-            MaximumDataEvents is < 1 or > 65_536 || MaximumTotalDataCharacters is < 1 or > 67_108_864 || MaximumPayloadBytes is < 1 or > 8_388_608 ||
-            MaximumContentSlots is < 1 or > 256 || MaximumContentCharacters is < 1 or > 8_388_608 || MaximumJsonDepth is < 1 or > 64 ||
+        if (ModelMetadata is null || Hooks is null || ReadBufferBytes is < 1 or > 65_536 || MaximumFrameCharacters is < 1 or > PiRequestBudget.MaximumBound ||
+            MaximumDataEvents is < 1 or > 65_536 || MaximumTotalDataCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumPayloadBytes is < 1 or > PiRequestBudget.MaximumBound ||
+            MaximumContentSlots is < 1 or > 256 || MaximumContentCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumJsonDepth is < 1 or > 64 ||
             MaximumHeaders is < 1 or > 4096 || MaximumHeaderCharacters is < 1 or > 65_536 || MaximumResponseErrorBytes is < 1 or > 8_388_608)
             throw new ArgumentOutOfRangeException(nameof(PiMessagesOptions), "Invalid Pi Messages limits.");
         if (Temperature is { } temperature && !double.IsFinite(temperature) || MaxTokens is { } maximum && !double.IsFinite(maximum))

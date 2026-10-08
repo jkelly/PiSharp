@@ -109,7 +109,7 @@ internal static class GooglePreterminalDiagnosticCases
         foreach (var cancel in new[] { false, true })
         {
             var prefix = """{"candidates":[{"content":{"parts":[{"functionCall":{"id":"one","name":"inspect","args":{}}}]}}]}""";
-            var text = JsonSerializer.Serialize(new string('x', 1_048_577));
+            var text = JsonSerializer.Serialize(new string('x', PiSharp.AI.PiRequestBudget.StreamCharacters + 1));
             var wire = "data: " + prefix + "\n\ndata: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":" + text +
                 "}]},\"finishReason\":\"STOP\"}]}\n\n";
             var body = new OwnedBody(wire) { FailCleanup = failCleanup }; var executor = new Executor();
@@ -119,8 +119,8 @@ internal static class GooglePreterminalDiagnosticCases
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
             });
             using var client = new HttpClient(handler);
-            var options = new GoogleGenerativeAIOptions(Metadata, PrivateText) { MaximumContentCharacters = 8_388_608,
-                MaximumFrameCharacters = 8_388_608, MaximumPayloadBytes = 8_388_608 };
+            var options = new GoogleGenerativeAIOptions(Metadata, PrivateText) { MaximumContentCharacters = 2 * PiSharp.AI.PiRequestBudget.StreamCharacters,
+                MaximumFrameCharacters = 2 * PiSharp.AI.PiRequestBudget.StreamCharacters, MaximumPayloadBytes = 2 * PiSharp.AI.PiRequestBudget.StreamCharacters };
             await using var agent = new NativeAgent(new(Model, new GoogleGenerativeAIHttpTransport(client, Model, options),
                 [new("inspect", executor)], Hooks: new(FinishTurnDecision: (_, _) => ValueTask.FromResult(AgentLoopFinishAction.End))), () => 123,
                 new Sink((value, _) => { if (value is TurnStreamObserved { Event: StreamTerminalEvent terminal }) observed = terminal; return ValueTask.CompletedTask; }),
