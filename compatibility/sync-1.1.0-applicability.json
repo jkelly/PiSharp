@@ -79,7 +79,33 @@
       "status": "port",
       "workPackage": "2a",
       "release": "1.1.0",
-      "test": "planned.sync.wire-duration"
+      "test": "tests/PiSharp.WireSync.Tests",
+      "outcome": "implemented",
+      "notes": "Typed durationMs on assistant messages (ChatRun, injected TimeProvider), tool results and tool_execution_end. Timing is opt-in below PersistentAgentSession so existing byte-exact outputs are unchanged.",
+      "eventCatalogRefresh": {
+        "event:tool_execution_end": {
+          "eventDeclaration": {
+            "startLine": 1087,
+            "endLine": 1097,
+            "startUtf16": 39003,
+            "endUtf16": 39381,
+            "sha256": "c0c205bae010163ce8067d4e1df32d7bddf477cd906dcd52c933d48121993a62"
+          },
+          "subscription": {
+            "startLine": 1630,
+            "endLine": 1630,
+            "startUtf16": 57521,
+            "endUtf16": 57615
+          },
+          "dispatcher": {
+            "startLine": 1089,
+            "endLine": 1120,
+            "startUtf16": 36082,
+            "endUtf16": 37105
+          }
+        },
+        "note": "Pending: compatibility/extensions/event-catalog.json is a whole v0.99.1 evidence inventory; refresh every event span at v1.1.0 together, not row by row."
+      }
     },
     {
       "id": "wire.agent-settled-aborted",
@@ -98,7 +124,27 @@
       "status": "port",
       "workPackage": "2a",
       "release": "1.1.0",
-      "test": "planned.sync.agent-settled-aborted"
+      "test": "tests/PiSharp.WireSync.Tests",
+      "outcome": "partial",
+      "notes": "RPC and session events carry aborted. Remaining: JSON mode never emitted agent_settled (gap predates v1.1.0); no native extension agent_settled emission (catalog: native Deferred).",
+      "eventCatalogRefresh": {
+        "event:agent_settled": {
+          "eventDeclaration": {
+            "startLine": 1005,
+            "endLine": 1009,
+            "startUtf16": 36822,
+            "endUtf16": 36982,
+            "sha256": "4b51e82e51e5f8e68ed93c5dab372e9a10daff27dbee6c2b0cdbca6638afda49"
+          },
+          "subscription": {
+            "startLine": 1620,
+            "endLine": 1620,
+            "startUtf16": 56596,
+            "endUtf16": 56681
+          }
+        },
+        "note": "Pending: compatibility/extensions/event-catalog.json is a whole v0.99.1 evidence inventory; refresh every event span at v1.1.0 together, not row by row."
+      }
     },
     {
       "id": "wire.rpc-bash-ansi",
@@ -114,7 +160,9 @@
       "status": "port",
       "workPackage": "2a",
       "release": "1.1.0",
-      "test": "planned.sync.bash-ansi-holdback"
+      "test": "tests/PiSharp.WireSync.Tests",
+      "outcome": "partial",
+      "notes": "ShellAnsiText/ShellTextStream ported; no PiSharp IUserBashExecutor host consumes it yet."
     },
     {
       "id": "ext.tool-renderer",
@@ -132,7 +180,9 @@
       "status": "port",
       "workPackage": "2b",
       "release": "1.1.0",
-      "test": "planned.sync.tool-renderer"
+      "test": "tests/PiSharp.WireSync.Tests",
+      "outcome": "implemented",
+      "notes": "registerToolRenderer resolvers in load order, then the tool, then the host fallback. The Node bridge does not bridge registerToolRenderer; the TUI does not yet consult ResolveToolRenderers."
     },
     {
       "id": "ext.loadout-namespace",
@@ -148,7 +198,9 @@
       "status": "port",
       "workPackage": "2b",
       "release": "1.1.0",
-      "test": "planned.sync.loadout-guidelines"
+      "test": "tests/PiSharp.WireSync.Tests",
+      "outcome": "implemented",
+      "notes": "ToolNamespace.Instructions (MCP server instructions wired at merge) and ToolLoadout.GetPromptGuidelines. Built-in tools do not yet supply PromptGuidelines."
     },
     {
       "id": "ext.command-validation",
@@ -163,7 +215,9 @@
       "status": "verify",
       "workPackage": "2b",
       "release": "1.1.0",
-      "test": "planned.sync.command-validation"
+      "test": "tests/PiSharp.WireSync.Tests",
+      "outcome": "already-equivalent",
+      "notes": "Native registration already rejects a missing name or handler and fails the load."
     },
     {
       "id": "cli.tool-selection",
@@ -181,7 +235,9 @@
       "status": "port",
       "workPackage": "2c",
       "release": "1.1.0",
-      "test": "planned.sync.tool-selection"
+      "test": "tests/PiSharp.CliSync.Tests",
+      "outcome": "implemented",
+      "notes": "Patterns, MCP retention, +/- modifiers with upstream error text, --no-mcp. Errors keep the PiSharp JSON envelope (exit 2)."
     },
     {
       "id": "cli.provider-model",
@@ -197,7 +253,9 @@
       "status": "port",
       "workPackage": "2c",
       "release": "1.1.0",
-      "test": "planned.sync.provider-model-args"
+      "test": "tests/PiSharp.CliSync.Tests",
+      "outcome": "implemented",
+      "notes": "--provider requires --model. Not applicable: PiSharp has no --models flag."
     },
     {
       "id": "cli.reload-tools",
@@ -213,7 +271,9 @@
       "status": "verify",
       "workPackage": "2c",
       "release": "1.1.0",
-      "test": "planned.sync.reload-tools"
+      "test": "tests/PiSharp.CliSync.Tests",
+      "outcome": "partial",
+      "notes": "/reload enables tools newly added to defaultTools. Remaining: restored-but-unregistered tools staying pending."
     },
     {
       "id": "prompt.hidden-tools",
@@ -229,7 +289,9 @@
       "status": "port",
       "workPackage": "2d",
       "release": "1.1.0",
-      "test": "planned.sync.system-prompt"
+      "test": "tests/PiSharp.CliSync.Tests",
+      "outcome": "implemented",
+      "notes": "Hidden tools excluded from the tool list, rules and skills hint; indirect hint; exact codemode docs line."
     },
     {
       "id": "tools.read-structured",
@@ -244,7 +306,9 @@
       "status": "port",
       "workPackage": "2e",
       "release": "1.1.0",
-      "test": "planned.sync.read-structured"
+      "test": "tests/PiSharp.WireSync.Tests",
+      "outcome": "implemented",
+      "notes": "structuredContent on successful reads; the image form is reachable via ToReadOutput (PiSharp read is text-only)."
     },
     {
       "id": "tools.bash-schema-and-spill",
@@ -261,7 +325,9 @@
       "status": "port",
       "workPackage": "2e",
       "release": "1.1.0",
-      "test": "planned.sync.bash-spill"
+      "test": "tests/PiSharp.WireSync.Tests",
+      "outcome": "implemented",
+      "notes": "Output schema metadata; exclusive create with 0600 on Unix; Windows inherits the per-run directory ACL."
     },
     {
       "id": "provider.anthropic-inline-tools",
@@ -276,7 +342,9 @@
       "status": "port",
       "workPackage": "2f",
       "release": "1.1.0",
-      "test": "planned.sync.anthropic-inline-tools"
+      "test": "tests/PiSharp.ProviderSync.Tests",
+      "outcome": "implemented",
+      "notes": "Beta inline-tools-2026-09-15 with tool_addition definitions, including redefinitions; strict-keyword fallback for prefer, failure for require."
     },
     {
       "id": "provider.sampling-by-thinking",
@@ -296,7 +364,9 @@
       "status": "port",
       "workPackage": "2f",
       "release": "1.1.0",
-      "test": "planned.sync.sampling-by-thinking"
+      "test": "tests/PiSharp.ProviderSync.Tests",
+      "outcome": "implemented",
+      "notes": "ThinkingLevelSampling merges model, clamped level and request params for Completions, Responses and Azure."
     },
     {
       "id": "provider.azure-rename",
@@ -314,7 +384,9 @@
       "status": "port",
       "workPackage": "2f",
       "release": "1.1.0",
-      "test": "planned.sync.azure-rename"
+      "test": "tests/PiSharp.ProviderSync.Tests",
+      "outcome": "partial",
+      "notes": "Provider id azure (tool-call pairing, AZURE_OPENAI_API_KEY mapping); the old id is neither rejected nor aliased, as upstream. Remaining: Foundry Chat Completions under azure via openai-completions (no Azure catalog or CLI route)."
     },
     {
       "id": "provider.retry-classification",
@@ -335,7 +407,9 @@
       "status": "port",
       "workPackage": "2f",
       "release": "1.1.0",
-      "test": "planned.sync.retry-classification"
+      "test": "tests/PiSharp.ProviderSync.Tests",
+      "outcome": "implemented",
+      "notes": "Busy/capacity/canceled retries, exponential fallback for unparseable Retry-After, NoRetryStatuses, Mistral finish_reason error, Z.AI CN overflow."
     },
     {
       "id": "provider.token-estimate",
@@ -352,7 +426,9 @@
       "status": "port",
       "workPackage": "2f",
       "release": "1.1.0",
-      "test": "planned.sync.token-estimate"
+      "test": "tests/PiSharp.ProviderSync.Tests",
+      "outcome": "implemented",
+      "notes": "3.5 characters per token in the Anthropic, Google and Mistral request estimators; compaction stays at 4 as upstream."
     },
     {
       "id": "provider.catalog",
@@ -368,7 +444,9 @@
       "status": "port",
       "workPackage": "2f",
       "release": "1.1.0",
-      "test": "planned.sync.catalog"
+      "test": "tests/PiSharp.ProviderSync.Tests",
+      "outcome": "partial",
+      "notes": "openai, openrouter and anthropic shards copied byte-for-byte from @earendil-works/pi-ai 1.1.0 (tarball SHA256 6caab33cec57480ed02c57fe37428a030a77cc2a0662814b435a5cf8932ad829). Remaining: mistral.json keeps its separate v0.99.1 provenance."
     },
     {
       "id": "provider.google-user-agent",
@@ -384,7 +462,9 @@
       "status": "verify",
       "workPackage": "2f",
       "release": "1.1.0",
-      "test": "planned.sync.google-user-agent"
+      "test": "tests/PiSharp.ProviderSync.Tests",
+      "outcome": "verified-deviation",
+      "notes": "Kept pi/1.1.0: upstream sends host OS details that cannot be reproduced reliably; pinned in a test, and model and caller headers still override it."
     },
     {
       "id": "mcp.names",
@@ -400,7 +480,9 @@
       "status": "port",
       "workPackage": "2g",
       "release": "1.1.0",
-      "test": "planned.sync.mcp-names"
+      "test": "tests/PiSharp.McpSync.Tests",
+      "outcome": "implemented",
+      "notes": "Sanitized names, order-independent hash suffixes, -/_ server conflicts rejected at load, compose and registration."
     },
     {
       "id": "mcp.exposure-and-prompt",
@@ -417,7 +499,9 @@
       "status": "port",
       "workPackage": "2g",
       "release": "1.1.0",
-      "test": "planned.sync.mcp-exposure"
+      "test": "tests/PiSharp.McpSync.Tests",
+      "outcome": "partial",
+      "notes": "codemode-deferred alias, server description, .pi/mcp.json overrides with authority limits, McpServersSection render and append-only diff. Remaining: wiring mcp_servers into prompts (no structured section diff in PiSharp) and background connection (servers connect before open)."
     },
     {
       "id": "mcp.oauth",
@@ -434,7 +518,9 @@
       "status": "port",
       "workPackage": "2g",
       "release": "1.1.0",
-      "test": "planned.sync.mcp-oauth"
+      "test": "tests/PiSharp.McpSync.Tests",
+      "outcome": "partial",
+      "notes": "authServerMetadataUrl, RFC 9207 iss, step-up scope union, name+URL credential store with one-time migration, cimd, application_type, provider-token auth, 15 s timeouts, HTTPS except loopback. Remaining: pi mcp login --timeout (no mcp CLI), default client_name, durable mcp-auth.json backend wiring."
     },
     {
       "id": "tui.keybindings",
@@ -449,7 +535,9 @@
       "status": "port",
       "workPackage": "2h",
       "release": "1.1.0",
-      "test": "planned.sync.keybindings"
+      "test": "tests/PiSharp.CliSync.Tests",
+      "outcome": "implemented",
+      "notes": "Home/End editor-only; tui.altScreen.top/bottom on Ctrl+Home/Ctrl+End."
     },
     {
       "id": "tui.settings",
@@ -465,7 +553,9 @@
       "status": "verify",
       "workPackage": "2h",
       "release": "1.1.0",
-      "test": "planned.sync.tui-settings"
+      "test": "tests/PiSharp.CliSync.Tests",
+      "outcome": "not-applicable",
+      "notes": "PiSharp has no quietStartup, outputPad, tuiMode or upstream-style fullscreen transcript."
     },
     {
       "id": "tui.program-status",
@@ -483,7 +573,9 @@
       "status": "port",
       "workPackage": "2h",
       "release": "1.1.0",
-      "test": "planned.sync.program-status"
+      "test": "tests/PiSharp.CliSync.Tests",
+      "outcome": "implemented",
+      "notes": "OSC 7501 encoder, query/confirm handling and reporter; enabled by PI_PROGRAM_STATUS=1 on the Windows console profile."
     },
     {
       "id": "auth.anthropic",
@@ -499,7 +591,9 @@
       "status": "port",
       "workPackage": "2i",
       "release": "1.1.0",
-      "test": "planned.sync.anthropic-auth"
+      "test": "tests/PiSharp.AnthropicAuthSync.Tests",
+      "outcome": "partial",
+      "notes": "Federation precedence, exchange, token cache and handler; copy-code and browser OAuth with port fallback; refresh persists after caller cancellation. Remaining: wiring federation into the Anthropic request path, and a /login surface."
     },
     {
       "id": "gap.tool-search",
@@ -603,6 +697,58 @@
       "change": "Nix packaging and npm/managed-installer policy.",
       "status": "exclude",
       "decision": "docs/decisions/0002-pi-1.1.0-sync.md"
+    },
+    {
+      "id": "provider.responses-ctc-replay-id",
+      "since": "1.0.0",
+      "upstream": [
+        "packages/ai/src/api/openai-responses-shared.ts"
+      ],
+      "change": "Grammar tool replay ids (ctc_) across providers.",
+      "pisharp": [
+        "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTranscriptProjector.cs"
+      ],
+      "status": "port",
+      "workPackage": "2f",
+      "release": "1.1.0",
+      "outcome": "remaining",
+      "test": "planned.sync.responses-ctc-replay-id",
+      "notes": "Found during 2f; not yet ported."
+    },
+    {
+      "id": "provider.prompt-length-pricing",
+      "since": "1.1.0",
+      "upstream": [
+        "packages/ai/src/models.ts"
+      ],
+      "change": "Prompt-length pricing tiers applied to cost.",
+      "pisharp": [
+        "src/PiSharp.AI/Protocols/AnthropicMessages",
+        "src/PiSharp.AI/Protocols/OpenAICompletions"
+      ],
+      "status": "port",
+      "workPackage": "2f",
+      "release": "1.1.0",
+      "outcome": "remaining",
+      "test": "planned.sync.prompt-length-pricing",
+      "notes": "Tiers apply in the Responses and Google cost paths only; Anthropic and Completions use flat rates (pre-existing gap, now visible with Haiku 5.5 above 100k input tokens)."
+    },
+    {
+      "id": "auth.refresh-after-deadline",
+      "since": "1.0.3",
+      "upstream": [
+        "packages/ai/src/auth/resolve.ts"
+      ],
+      "change": "Upstream persists a refresh that succeeds after its timeout.",
+      "pisharp": [
+        "src/PiSharp.AI/Authentication/OAuth/StoredOAuthLifecycle.cs"
+      ],
+      "status": "verify",
+      "workPackage": "2i",
+      "release": "1.1.0",
+      "outcome": "deviation-pending-decision",
+      "test": "tests/PiSharp.AnthropicAuthSync.Tests",
+      "notes": "PiSharp keeps refusing to publish a refresh that completes after the 15 s deadline; owner decision pending."
     }
   ]
 }

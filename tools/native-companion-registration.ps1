@@ -173,11 +173,11 @@ function Get-NativeAnthropicSimpleSourcePins {
     # a separately reviewed successor, not changed pinned expectations.
     return @(
         @{ relative = 'docs/contracts/anthropic-simple-options.md'; bytes = 7416; sha256 = 'e696955cdfd1b23f2c380e520961a0090eacd95a2d49f645cccd6282d6431d60' },
-        @{ relative = 'src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesSimpleContextEstimator.cs'; bytes = 6497; sha256 = 'e657de745c9dafd9a65172ca68815f1c089750ad1670a714716b4f175cd813b5' },
+        @{ relative = 'src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesSimpleContextEstimator.cs'; bytes = 6693; sha256 = 'f697ab389b1dee37ffdc367c0784b17eec6d31be634773c739eafced6d681f9b' },
         @{ relative = 'src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesSimpleOptions.cs'; bytes = 1937; sha256 = 'b1ca92bc83c58ddac42ee2114da84f63ab2d5d238c6d017fa8547c0e99037dd8' },
         @{ relative = 'src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesSimpleRequestFactory.cs'; bytes = 9024; sha256 = 'd699c33da5236b1295033f1652f0b61283a7097ea8d76677d1a3c23f58b761d0' },
         @{ relative = 'tests/PiSharp.AnthropicSimple.Tests/PiSharp.AnthropicSimple.Tests.csproj'; bytes = 208; sha256 = 'dd80069b3545d6291634e031ed2740773ad0af1535420f5ac44ef6451c0218c2' },
-        @{ relative = 'tests/PiSharp.AnthropicSimple.Tests/Program.cs'; bytes = 29918; sha256 = '7b8ee07428f8ac5f236cd50f22b6c2d2955e9fef478c36fb1c5dd2dd43993c15' },
+        @{ relative = 'tests/PiSharp.AnthropicSimple.Tests/Program.cs'; bytes = 30049; sha256 = '69ef753929e575064df63ae432d2b5458142e0e7bfeb50052d18f94308e02220' },
         @{ relative = 'tests/PiSharp.AnthropicSimple.Tests/packages.lock.json'; bytes = 443; sha256 = '2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9' },
         @{ relative = 'tests/PiSharp.AnthropicSimple.Tests/source-inventory.json'; bytes = 1338; sha256 = 'bfa6cb9280c250b76cb5ef9db97fb50737e62f14517d83ed614238cd6d81634c' }
     )
@@ -204,14 +204,14 @@ function Get-NativeAzureResponsesSourcePins {
     # Exact independently reviewed source be0ae03455f37aca0252d2bdda48c356f381c08c; includes the composed shared Mistral routing where applicable.
     return @(
         @{ relative = 'compatibility/azure-responses-explicit-adapter.json'; bytes = 827; sha256 = '7b7928753e6281069bb493c286237ff59a46a039560c6e415324bfd6ba50e950' },
-        @{ relative = 'docs/contracts/azure-responses-explicit-adapter.md'; bytes = 9581; sha256 = '21f09b579fc91c4597050839737687749d939099a1631dac3e56fb031cf6b000' },
+        @{ relative = 'docs/contracts/azure-responses-explicit-adapter.md'; bytes = 10693; sha256 = '730ed61331a599a554fef00e0bafefb21bf88022fc6a4c09557c11c79d74bf17' },
         @{ relative = 'src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesOptions.cs'; bytes = 3211; sha256 = '0e5f45c1ebc18d2a498fe034f7b1a4de36a933e9c191a274cd216e0251085f47' },
-        @{ relative = 'src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesRequestFactory.cs'; bytes = 16446; sha256 = '1d92957cbfb337e13a470c4e0d5d7b68ea6a64874d619524e329b8816f4e3d61' },
+        @{ relative = 'src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesRequestFactory.cs'; bytes = 17420; sha256 = '0c93b621385caf6ece3877236f343f14fd876cbd44fe7129c811d7726963a062' },
         @{ relative = 'src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesTransport.cs'; bytes = 14136; sha256 = '78986051ee53abcfb5758ecb22e157750464f3f532a74b00b8d5bcce83ca0b1d' },
         @{ relative = 'tests/PiSharp.AzureResponses.Tests/PiSharp.AzureResponses.Tests.csproj'; bytes = 208; sha256 = 'dd80069b3545d6291634e031ed2740773ad0af1535420f5ac44ef6451c0218c2' },
         @{ relative = 'tests/PiSharp.AzureResponses.Tests/Program.cs'; bytes = 41056; sha256 = '428a6f44edff56ea5c5872c36616258370446580a9ba38d8985575416fdd9358' },
         @{ relative = 'tests/PiSharp.AzureResponses.Tests/packages.lock.json'; bytes = 443; sha256 = '2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9' },
-        @{ relative = 'tests/PiSharp.AzureResponses.Tests/source-inventory.json'; bytes = 5179; sha256 = '7ec09dfcf3a5e7d079143ce5ca9139990cfef7686fd7f536b34ddf85ec19ccc0' }
+        @{ relative = 'tests/PiSharp.AzureResponses.Tests/source-inventory.json'; bytes = 5338; sha256 = '6b86896531bb84a040584adf68bf676b83b6dc8b9e0055996c7696bbd6d104f4' }
     )
 }
 
@@ -240,8 +240,8 @@ function Get-NativeMistralTextSourcePins {
         @{ relative = 'src/PiSharp.AI/Protocols/MistralConversations/MistralTextOptions.cs'; bytes = 3350; sha256 = '1f33fe7969c92fcc6ebe35b970442e5204d21a0fc50d1d6c960b52bbb056d881' },
         @{ relative = 'src/PiSharp.AI/Protocols/MistralConversations/TextState.cs'; bytes = 8098; sha256 = '1c67a3f0e95eb0e6190c2154d8ff017d293ef9c607a515111f9b5608e621c9eb' },
         @{ relative = 'src/PiSharp.AI/Protocols/MistralConversations/integration.proposed.json'; bytes = 3273; sha256 = '597371cc7759bf7364e7395f5153d52b70a2ab01b89dacc5de9e748eab0c2e91' },
-        @{ relative = 'src/PiSharp.AI/Protocols/MistralConversations/source-inventory.json'; bytes = 7821; sha256 = 'b5253689591cc2bc2d95dbfe5c587b72f3aae3ae75ddd0c1b0679dbc12a91663' },
-        @{ relative = 'src/PiSharp.AI/Streaming/ChatRun.cs'; bytes = 27695; sha256 = '92f41b8df5d23d76d1516bb170715354100249d5dd697cf38c100161d37098d8' },
+        @{ relative = 'src/PiSharp.AI/Protocols/MistralConversations/source-inventory.json'; bytes = 7822; sha256 = '03c8bcc30506bb106dfb1aa4aee2efb8d62383f5f65ac873f1a2d29f2f641510' },
+        @{ relative = 'src/PiSharp.AI/Streaming/ChatRun.cs'; bytes = 29223; sha256 = '11eb6d6bc714b20ec40bbb8815057679f6a134485f9f26fdaa7d7b2c633ca646' },
         @{ relative = 'src/PiSharp.Contracts/Streaming/NativeChatDiagnostic.cs'; bytes = 753; sha256 = 'f28ac557a79af342a2f97b3f5bd570406469678565c9a247a235fd79e90dfac6' },
         @{ relative = 'tests/PiSharp.MistralConversations.Tests/PiSharp.MistralConversations.Tests.csproj'; bytes = 202; sha256 = '5b39ed009ad7fad5a5972ae64105cad9242c73b3a0a050dac5b0f972f3594582' },
         @{ relative = 'tests/PiSharp.MistralConversations.Tests/Program.cs'; bytes = 33082; sha256 = '12039a755daa8e6293b00661f1ab4d7f61793ab95ada5c3a823987cca1af7d9a' },
@@ -269,9 +269,9 @@ function Assert-NativeMistralTextSourcePins {
 function Get-NativeAuthenticationSourcePins {
     # Exact reviewed auth 94596916, merged at 0274fbff; all nine source/provenance files remain frozen.
     return @(
-        @{ relative = 'src/PiSharp.AI/Authentication/AuthenticationResolution.cs'; bytes = 1939; sha256 = '2351e20752c2d6a4f22b06985165b7f76703aa43e2c831f383432e04b713ea4c' },
-        @{ relative = 'src/PiSharp.AI/Authentication/HANDOFF.md'; bytes = 8698; sha256 = 'be2ade70016cbef1be0584f8d323534a6c3918312702a039533e5d9428c88c6f' },
-        @{ relative = 'src/PiSharp.AI/Authentication/InjectedAuthenticationResolver.cs'; bytes = 7234; sha256 = '3687f0d3f993c73a6a1c8326a3978662bd09b025f31014dae2a683dacab4d48b' },
+        @{ relative = 'src/PiSharp.AI/Authentication/AuthenticationResolution.cs'; bytes = 2134; sha256 = '50ad2fb5cba43742ed9ce47b25c7c42ffe250444dea4629e8513459e716e919c' },
+        @{ relative = 'src/PiSharp.AI/Authentication/HANDOFF.md'; bytes = 11058; sha256 = '9926b3267945237c23efad8ccf2b24e22622b24fd423992bde997570b740c5a9' },
+        @{ relative = 'src/PiSharp.AI/Authentication/InjectedAuthenticationResolver.cs'; bytes = 9107; sha256 = '2d43d713f61f806afff0c011e97adaf606b288eed47588158dd39c32ae50e019' },
         @{ relative = 'src/PiSharp.AI/Authentication/ProviderEnvironmentSnapshot.cs'; bytes = 1566; sha256 = 'f84a7899d641844f4474248f361180b5080420874c18b3db61e5086c69784996' },
         @{ relative = 'src/PiSharp.AI/Authentication/integration-additions.proposed.json'; bytes = 7946; sha256 = '4b503b3e21a1fdaad3c6a9b4482983905f7d0da82fefee27d361f9f8f2f68c81' },
         @{ relative = 'src/PiSharp.AI/Authentication/source-inventory.json'; bytes = 1329; sha256 = '09cb5fcf91ad5f205748ef9875eae4ddaed4b3f70752f9d5701ae1d73fb5cf88' },

@@ -1,25 +1,30 @@
 {
   "schemaVersion": 1,
-  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
-  "sourceVersion": "0.99.1",
+  "sourceSha": "abe508e1b89912adde45528136c3221eb69acdd7",
+  "sourceVersion": "1.1.0",
   "base": "4b63271a13e10505ab0e648592021050155454d1",
   "baseTree": "993e39dbc5a502d670846edee0f9e55a849cfe63",
   "basis": "READ_ONLY_PINNED_LOCAL_SOURCE_TEXT; AUTHORED_EXPECTATIONS; NO_SOURCE_EXECUTION",
   "files": [
     {
       "path": "packages/ai/src/api/azure-openai-responses.ts",
-      "bytes": 12324,
-      "sha256": "1ba1e70c6424bcc482dbb1a29ffe143fa3754fcff6cbc64afe7363c514050dcb"
+      "bytes": 9503,
+      "sha256": "91fefcb7ff00d3db7a91180667d913b4f767a64fcc55ce8993493291f769f600"
     },
     {
-      "path": "packages/ai/src/providers/azure-openai-responses.ts",
-      "bytes": 628,
-      "sha256": "76e9f5cde761fcd516370d4d99519e4658e0db1029518746d0d0c0550ce54fa5"
+      "path": "packages/ai/src/providers/azure.ts",
+      "bytes": 2300,
+      "sha256": "6eca38c6ef2adcf814d3fab93c580a520240d90eac750609761b3e581d2f8545"
+    },
+    {
+      "path": "packages/ai/src/api/azure-openai-config.ts",
+      "bytes": 3427,
+      "sha256": "309852e8fb4eb5c0939ff4ae134fc756fb43d608e0e8927c3360c0a7478c982d"
     },
     {
       "path": "packages/ai/src/api/openai-responses-shared.ts",
-      "bytes": 30902,
-      "sha256": "85db12efcd109d505c98846e34c45cb4a3260edcee88ef28c8afd1db20eac26a"
+      "bytes": 31005,
+      "sha256": "09100e0bfe8fa4ad212312956930f4a9e70cd29ca823d2e1f1c97f87b4541afe"
     },
     {
       "path": "packages/ai/src/api/openai-prompt-cache.ts",
@@ -33,13 +38,13 @@
     },
     {
       "path": "packages/ai/src/utils/transcript.ts",
-      "bytes": 9403,
-      "sha256": "cad0c126cdfadc1b4f430cc5a95b1c9285ecd1ee9957642d7773b1357bbc9ac5"
+      "bytes": 9602,
+      "sha256": "e0814f35bdcc93b017fa45589a6920e46b5480b88fba01ef93e5d2d4e815f0f2"
     },
     {
       "path": "packages/ai/package.json",
-      "bytes": 2636,
-      "sha256": "86a8ccb86ce00af196fc7d48417f82e99c6da40c68d8d138ace2a4f0fda4090d"
+      "bytes": 2721,
+      "sha256": "a8f10d5157b335379ae00edf9c25ae7a15bfc0f3a76107d4376a3779bb5b2995"
     },
     {
       "path": "packages/ai/src/utils/pi-user-agent.ts",
@@ -53,8 +58,8 @@
     },
     {
       "path": "packages/ai/src/utils/provider-retry.ts",
-      "bytes": 4034,
-      "sha256": "d0f68cfe9fe6a5d4be778eaefedc0b453021f89026810691dcd1479371dca699"
+      "bytes": 4289,
+      "sha256": "91350009509d50845ff0c609bf98bd8818081b6fcc64d034e6d45522f41db9ab"
     }
   ],
   "sdk": {

@@ -128,4 +128,19 @@
   <Folder Name="/tests/companions/PiSharp.MistralConversations.Tests/">
     <Project Path="tests/PiSharp.MistralConversations.Tests/PiSharp.MistralConversations.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/sync-1.1.0/PiSharp.AnthropicAuthSync.Tests/">
+    <Project Path="tests/PiSharp.AnthropicAuthSync.Tests/PiSharp.AnthropicAuthSync.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/sync-1.1.0/PiSharp.McpSync.Tests/">
+    <Project Path="tests/PiSharp.McpSync.Tests/PiSharp.McpSync.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/sync-1.1.0/PiSharp.ProviderSync.Tests/">
+    <Project Path="tests/PiSharp.ProviderSync.Tests/PiSharp.ProviderSync.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/sync-1.1.0/PiSharp.WireSync.Tests/">
+    <Project Path="tests/PiSharp.WireSync.Tests/PiSharp.WireSync.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/sync-1.1.0/PiSharp.CliSync.Tests/">
+    <Project Path="tests/PiSharp.CliSync.Tests/PiSharp.CliSync.Tests.csproj" />
+  </Folder>
 </Solution>

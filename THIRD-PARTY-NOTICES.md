@@ -99,6 +99,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Pi v1.1.0 sync adaptations
+
+Native Anthropic workload identity federation (`src/PiSharp.AI/Authentication/AnthropicWorkloadIdentityFederation.cs`) adapts the token exchange, token cache and bearer handling of the Anthropic TypeScript SDK, `@anthropic-ai/sdk` 0.129.0 (`src/lib/credentials/{oidc-federation,token-cache,types,identity-token}.ts` and the token-auth part of `client.ts`), which is distributed under the MIT License by Anthropic, PBC. No SDK code or package is bundled; the adaptation is a native reimplementation covered by authored offline tests.
+
+Native shell output sanitizing (`src/PiSharp.Tools/Processes/ShellAnsiText.cs`) adapts the patterns of `ansi-regex` and `strip-ansi`, MIT License, Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com), as used by Pi `packages/coding-agent/src/utils/ansi.ts`.
+
+Both MIT licenses grant the same permissions, under the same conditions, as the Pi MIT notice above.
+
 ## Anthropic SDK reviewed development oracle
 
 The eight exact upstream-locked packages in [the actual scoped restore receipt](compatibility/anthropic-oracle-setup.json) are development-oracle dependencies only. The receipt retains every observed packaged LICENSE/NOTICE text verbatim and its byte hash, including the SDK's root MIT license and internal qs BSD-3-Clause notice. Packages are @anthropic-ai/sdk0.124.0, @babel/runtime7.29.2, @stablelib/base641.0.1, fast-sha2561.3.0, json-schema-to-ts3.1.1, partial-json0.1.7, standardwebhooks1.1.1 and ts-algebra2.0.0. No package is bundled into the native product.
