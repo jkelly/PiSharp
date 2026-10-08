@@ -103,21 +103,28 @@ public sealed partial class PersistentAgentSession
                 editorText = TreeContentText(target.WireBody.Value.GetProperty("content"), work);
             }
             var prospective = _projector.Project(revision.Log.Entries, newLeaf, work);
-            // Source navigateTree -> _restoreToolsFromTranscript: the target's loadout is restored; its unbound tools are left
-            // out, recorded as removed with the navigation and kept pending (when allowed) until they register.
-            ImmutableArray<string> unbound = [];
-            AgentConfiguration configuration;
+            // Source navigateTree -> _restoreToolsFromTranscript: the target's loadout is restored by name with the current
+            // bindings, and left-out tools stay pending (when allowed). A restored loadout that differs from the record is
+            // recorded with the navigation. A target with no system message keeps the current tools (`if (!current) return`):
+            // nothing is written; they stay the logical selection and are recorded at the next request, as the source does.
+            ImmutableArray<string> pendingTools = []; PiSharp.Contracts.TranscriptEntry? restoredRecord = null;
+            PendingActivation? keptTools = null;
+            var configuration = revision.Configuration;
             if (_registry is { } registry)
-                (configuration, unbound) = await PrepareAndDrainLoadoutAsync(() =>
+            {
+                var current = GetToolActivationSelection().Names;
+                var keepCurrent = !current.IsEmpty && !prospective.LlmMessages.Any(message => message.Role == "system");
+                var (restoredLoadout, keptPresentation) = await PrepareAndDrainLoadoutAsync(() => (registry.ResolveRestored(prospective, revision.Configuration.Model, work),
+                    keepCurrent ? registry.PrepareActiveLoadout(registry.NormalizeActiveTools(current, work), work) : null), work).ConfigureAwait(false);
+                configuration = restoredLoadout.Selection.Configuration;
+                if (keepCurrent) keptTools = new(0, registry.NormalizeActiveTools(current, work), keptPresentation);
+                else
                 {
-                    var (restored, missing) = registry.ResolveRestored(prospective, revision.Configuration.Model, work);
-                    return (restored.Configuration, missing);
-                }, work).ConfigureAwait(false);
-            else configuration = revision.Configuration;
-            var restoredTools = configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
-            var restoredRecord = unbound.IsEmpty ? null
-                : _registry!.CreateActivationMessage(restoredTools, RecordedActiveToolNames(prospective, work), _clock(), work);
-            var pendingTools = unbound.IsEmpty ? [] : _registry!.PendingRestoredTools(unbound);
+                    pendingTools = restoredLoadout.Pending;
+                    if (restoredLoadout.RequiresRecord) restoredRecord = registry.CreateActivationMessage(configuration.Tools.Select(tool => tool.Name).ToImmutableArray(),
+                        RecordedActiveToolNames(prospective, work), _clock(), work, replaceDeclarations: true);
+                }
+            }
             ValidateRuntimeContext(prospective, configuration);
             var messages = SessionContextProjector.AgentMessages(prospective);
             await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
@@ -187,6 +194,8 @@ public sealed partial class PersistentAgentSession
                     _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(configuration), messages);
                     _configuration = configuration; _context = prospective; _acknowledgedLog = publishedLog;
                     restoreActivation();
+                    // The kept tools remain the logical selection; the next request boundary records them.
+                    if (keptTools is not null) _pendingActivation = keptTools with { Epoch = _activationEpoch };
                     // Source _restoreToolsFromTranscript replaces the pending set with the target's unregistered tools.
                     _pendingToolNames = pendingTools;
                     selected = new(SessionTreeNavigationDisposition.Selected,

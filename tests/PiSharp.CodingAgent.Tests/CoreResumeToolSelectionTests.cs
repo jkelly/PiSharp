@@ -14,7 +14,7 @@ internal static class CoreResumeToolSelectionTests
     internal static IEnumerable<(string Name, Func<Task> Run)> Cases() =>
     [
         (StartupToolSelectionTests.Prefix + "core initial read and empty precede unavailable restored binding", Initial),
-        (StartupToolSelectionTests.Prefix + "core absent restored binding is pending; unknown initial and retained mismatched declaration fail without mutation", Rejection),
+        (StartupToolSelectionTests.Prefix + "core absent restored binding is pending, changed declaration is replaced, unknown initial fails without mutation", Rejection),
         (StartupToolSelectionTests.Prefix + "core held failed initial reporter joins runtime before release without append", Reporter),
         (StartupToolSelectionTests.Prefix + "core lifetime cap survives owner bind and later durable logical activation", Activation),
         (StartupToolSelectionTests.Prefix + "core lifetime cap filters refreshed replacement catalog and rejects widening factory", Replacement),
@@ -55,15 +55,28 @@ internal static class CoreResumeToolSelectionTests
             var after = await Bytes(path); Check(after.Length > before.Length && after.Take(before.Length).SequenceEqual(before), "Restored loadout rewrote history or skipped its record.");
             Check(profile.UsedTurns == 0 && profile.Actions.Length == 0, "Resume restoration inferred or executed a tool.");
         }
-        // Initial names that are not registered, and a retained mismatched declaration, are still rejected.
-        foreach (var kind in new[] { "unknown", "mismatch" })
+        // Pi 1.1.0 restores by name with the current binding: a recorded declaration that differs from it is replaced, with
+        // or without initial names, and the current declaration is recorded before use.
+        foreach (var initial in new ImmutableArray<string>?[] { null, ["read"] })
         {
             using var f = new StartupSettingsTests.Fixture(); await using var profile = await Profile(f);
-            var path = Path.Combine(f.Root, "old.jsonl"); await Seed(path, f.Root, kind == "mismatch" ? "read" : "legacy"); var before = await Bytes(path);
-            ImmutableArray<string> initial = kind == "unknown" ? ["missing"] : ["read"];
+            var path = Path.Combine(f.Root, "old.jsonl"); await Seed(path, f.Root, "read"); var before = await Bytes(path);
             var registry = Registry(profile, f.Root, new() { InitialActiveToolNames = initial }); var ids = 0;
+            await using var session = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "replaced-" + ++ids, fallbackModel: profile.SelectedModel);
+            Names(session, "read"); Check(session.PendingToolNames.IsEmpty, "Registered restored tool became pending.");
+            var record = session.Snapshot.Log.Entries[^1].WireBody.Value.GetProperty("message");
+            Check(record.GetProperty("toolsAdded").EnumerateArray().Single().GetProperty("description").GetString() ==
+                registry.RegisteredTools.Single(tool => tool.Adapter.Name == "read").Declaration.Value.GetProperty("description").GetString(),
+                "Restored loadout did not record the current declaration.");
+            var after = await Bytes(path); Check(after.Length > before.Length && after.Take(before.Length).SequenceEqual(before), "Replaced declaration rewrote history or skipped its record.");
+        }
+        // Initial names that are not registered are still rejected.
+        {
+            using var f = new StartupSettingsTests.Fixture(); await using var profile = await Profile(f);
+            var path = Path.Combine(f.Root, "old.jsonl"); await Seed(path, f.Root, "legacy"); var before = await Bytes(path);
+            var registry = Registry(profile, f.Root, new() { InitialActiveToolNames = ["missing"] }); var ids = 0;
             var error = await Failure(PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "reject-" + ++ids, fallbackModel: profile.SelectedModel));
-            Check(error is SessionRuntimeRegistryException binding && binding.Failure == (kind == "mismatch" ? SessionRuntimeRegistryFailure.DeclarationMismatch : SessionRuntimeRegistryFailure.UnknownTool), "Wrong binding rejection.");
+            Check(error is SessionRuntimeRegistryException { Failure: SessionRuntimeRegistryFailure.UnknownTool }, "Wrong binding rejection.");
             var after = await Bytes(path); Check(before.SequenceEqual(after), "Rejected effective binding changed durable bytes.");
             await using var reopened = await SessionLogStore.OpenAsync(path);
         }

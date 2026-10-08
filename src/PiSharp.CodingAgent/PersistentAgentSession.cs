@@ -306,9 +306,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             acquired.Claim(); runtime = acquired;
             var registry = runtime.Registry.RetainToolSelection(configured.LifetimeToolSelection);
             cancellationToken.ThrowIfCancellationRequested();
-            // Without initial names the transcript's loadout is restored; its unbound tools are left out (Pi 0.99.2).
-            var (selection, unbound) = await registry.PrepareAndDrainAsync(() => registry.ResolveRestored(context, fallbackModel, cancellationToken,
+            // Without initial names the transcript's loadout is restored by name with the current bindings (Pi 0.99.2).
+            var loadout = await registry.PrepareAndDrainAsync(() => registry.ResolveRestored(context, fallbackModel, cancellationToken,
                 registry.InitialActiveToolNames), cancellationToken).ConfigureAwait(false);
+            var selection = loadout.Selection;
             var bridge = new Bridge();
             agent = new(selection.Configuration, clock, bridge, configured.AgentOptions);
             agent.ReplaceMessages(SessionContextProjector.AgentMessages(context));
@@ -318,10 +319,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             { _registry = registry, _runtimeLease = runtime };
             var restored = selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
             if (registry.InitialActiveToolNames is not null)
-                await opened.SetActiveToolsAsync(restored, cancellationToken).ConfigureAwait(false);
+                await opened.ConfigureAsync(new() { ActiveToolNames = restored, ReplaceDeclarations = loadout.RequiresRecord }, cancellationToken).ConfigureAwait(false);
             // Restored tools that are not registered yet, such as MCP tools whose server is still connecting, stay pending.
-            else if (!unbound.IsEmpty)
-                await opened.RecordRestoredToolsAsync(restored, registry.PendingRestoredTools(unbound), cancellationToken).ConfigureAwait(false);
+            else if (loadout.RequiresRecord)
+                await opened.RecordRestoredToolsAsync(restored, loadout.Pending, cancellationToken).ConfigureAwait(false);
             return opened;
         }
         catch (Exception admission)
@@ -435,7 +436,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             if (update.ThinkingLevel is { } level && level != context.ThinkingLevel)
                 Add("thinking_level_change", writer => writer.WriteString("thinkingLevel", level));
             var systemUpdate = update.ActiveToolNames is { } activeNames
-                ? _registry!.CreateActivationMessage(activeNames, RecordedActiveToolNames(context, work), _clock(), work)
+                ? _registry!.CreateActivationMessage(activeNames, RecordedActiveToolNames(context, work), _clock(), work, update.ReplaceDeclarations)
                 : update.SystemMessage;
             SessionPromptSectionPreparation? promptPreparation = null;
             if (update.SystemMessage is null)

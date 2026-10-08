@@ -19,7 +19,7 @@ internal static class McpPreOpenCaptureTests
     internal static (string Name, Func<Task> Run)[] Cases() =>
     [
         ("MCP pre-open held actual discovery precedes registry transfer", HeldDiscovery),
-        ("MCP pre-open schema rejection joins original channel cleanup before failing open", RejectedHistoricalSchema),
+        ("MCP pre-open historical schema is restored by name with the actual discovery schema", RestoredHistoricalSchema),
         ("MCP pre-open calls require exact actual attachment and native final policy", Binding),
         ("MCP pre-open rejects substituted adapter and unreserved attachment generation", RejectedBinding),
         ("MCP pre-open transferred runtime release joins owning shutdown without close reentry", OwningRuntimeRelease),
@@ -186,9 +186,6 @@ internal static class McpPreOpenCaptureTests
             }
         }
     }
-    private static bool ContainsSchemaFailure(Exception error) =>
-        error is SessionRuntimeRegistryException { Failure: SessionRuntimeRegistryFailure.DeclarationMismatch } ||
-        error is AggregateException aggregate && aggregate.InnerExceptions.Any(ContainsSchemaFailure);
     private static void Reject(Action action)
     { try { action(); } catch (InvalidOperationException) { return; } throw new InvalidOperationException("Unexpected admission."); }
     private static async Task Join(Exception? primary, params Func<Task>[] operations)
@@ -222,23 +219,20 @@ internal static class McpPreOpenCaptureTests
             await Join(primary, async () => { capture ??= await acquire; }, () => capture?.CloseAsync() ?? Task.CompletedTask, () => f.Extensions.DisposeAsync().AsTask());
         }
     }
-    private static async Task RejectedHistoricalSchema()
+    // Pi 1.1.0 _restoreToolsFromTranscript restores by name with the current binding: the historical schema is replaced by the
+    // actual discovery schema (recorded before use) instead of failing the open.
+    private static async Task RestoredHistoricalSchema()
     {
-        var f = await Fixture.Create(); var capture = await f.Acquire(); f.Channel.HoldClose = true;
-        var open = f.Open(capture, wrongSchema: true); Exception? primary = null;
+        var f = await Fixture.Create(); var capture = await f.Acquire(); var session = await f.Open(capture, wrongSchema: true);
+        var owner = new ReplaceableAgentSession(session, (_, _) => Task.FromException<PersistentAgentSession>(new InvalidOperationException("No replacement acquisition granted.")));
+        Exception? primary = null;
         try
         {
-            await f.Channel.CloseEntered.Task;
-            Check(!open.IsCompleted && f.Channel.Calls == 0 && f.Channel.Closes == 1);
-            f.Channel.CloseRelease.TrySetResult(); Check(ContainsSchemaFailure(await Failure(open)));
-            Check(f.Extensions.CaptureSnapshot().Tools.IsEmpty && ReferenceEquals(capture.CloseAsync(), capture.CloseAsync()));
-        }
+            Check(session.GetActiveTools().SequenceEqual(["mcp__demo__a"]) && f.Channel.Calls == 0 && f.Channel.Closes == 0);
+            var recorded = session.Snapshot.Log.Entries[^1].WireBody.Value.GetProperty("message").GetProperty("toolsAdded")[0];
+            Check(recorded.GetProperty("parameters").GetProperty("properties").GetProperty("value").GetProperty("type").GetString() == "string");        }
         catch (Exception error) { primary = error; }
-        finally
-        {
-            f.Channel.CloseRelease.TrySetResult();
-            await Join(primary, async () => { Check(ContainsSchemaFailure(await Failure(open))); }, capture.CloseAsync, () => f.Extensions.DisposeAsync().AsTask());
-        }
+        finally { await Join(primary, capture.CloseAsync, () => owner.DisposeAsync().AsTask(), () => f.Extensions.DisposeAsync().AsTask()); }
     }
     private static async Task Binding()
     {
