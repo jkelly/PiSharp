@@ -39,8 +39,7 @@ internal sealed partial class OfflineSessionProfile
             },
             (kind, provider, model, usage, note) => owned.AppendUsageEntryAsync(kind, provider, model, usage, note),
             () => owned.Snapshot.Context.Ancestry,
-            () => CacheWarmingModes.Resolve(CaptureStartupEffectiveSettings()?.Values is { } values && values.Value.ValueKind == JsonValueKind.Object &&
-                values.Value.TryGetProperty("cacheWarming", out var mode) && mode.ValueKind == JsonValueKind.String ? mode.GetString() : null),
+            () => CacheWarmingModes.Resolve(CurrentSettingsValue("cacheWarming")),
             async decision =>
             {
                 if (_extension is not { } extension) return decision.Action;
@@ -50,6 +49,18 @@ internal sealed partial class OfflineSessionProfile
         _ = owned.SubscribeOperationEvents(new SettledSink(warmer));
         return warmer;
     });
+
+    /// <summary>A string setting of the current attachment's effective settings (null when unset or unavailable).</summary>
+    private string? CurrentSettingsValue(string name)
+    {
+        try
+        {
+            var settings = Sessions is { } owner ? CaptureEffectiveSettings(owner.Current) : CaptureStartupEffectiveSettings();
+            return settings?.Values is { } values && values.Value.ValueKind == JsonValueKind.Object &&
+                values.Value.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+        }
+        catch (InvalidOperationException) { return null; }
+    }
 
     private sealed class SettledSink(CacheWarmer warmer) : ISessionOperationEventSink
     {
@@ -68,6 +79,12 @@ internal sealed partial class OfflineSessionProfile
             main is IThinkingLevelTransport levels ? levels.GetSupportedThinkingLevels(descriptor) : ["off"];
         public IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default)
         {
+            // Cache warming is best effort: it never affects the request it observes.
+            try { StartWarming(request); } catch (Exception) when (!cancellationToken.IsCancellationRequested) { }
+            return main.StreamAsync(request, cancellationToken);
+        }
+        private void StartWarming(ChatRequest request)
+        {
             if (model is not null && profile.Sessions?.Current.Session is { } session)
             {
                 var warmer = profile.WarmerFor(session, live);
@@ -81,7 +98,6 @@ internal sealed partial class OfflineSessionProfile
                     return true;
                 });
             }
-            return main.StreamAsync(request, cancellationToken);
         }
         private static CacheWarmModel? TryModel(JsonData wire)
         {
