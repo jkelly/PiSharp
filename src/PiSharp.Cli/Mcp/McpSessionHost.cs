@@ -93,12 +93,11 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         return async (currentCwd, generation, nativeRegistry, exactPolicy, token) =>
         {
             var generationProblems = generation == 1 ? new List<string>(problems) : [];
-            var owned = new OwnedResources(CreateHttpHandler); IAsyncDisposable discovery = new Disposer(() => ValueTask.CompletedTask);
+            var owned = new OwnedResources(CreateClient); IAsyncDisposable discovery = new Disposer(() => ValueTask.CompletedTask);
             try
             {
                 var options = new McpRuntimeOptions(generation, ClientVersion, Roots(currentCwd));
-                McpAdmittedChannelFactory Channels(McpServerEntry entry) => CreateChannel?.Invoke(entry) ?? (entry.Config.Transport == McpTransportKind.Http
-                    ? HttpChannel(entry, options, owned) : StdioChannel(entry, currentCwd, environment));
+                McpAdmittedChannelFactory Channels(McpServerEntry entry) => Channel(entry, currentCwd, options, () => owned.Client, environment);
                 // Servers with direct tools: connected here, in catalog order, so a failure leaves only that server out.
                 var preOpen = new List<(McpServerEntry Entry, McpPreOpenServerCapture Capture)>();
                 var current = nativeRegistry;
@@ -189,7 +188,17 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         return "failed: " + (first.Length == 0 ? "unknown error" : first);
     }
 
-    private McpAdmittedChannelFactory HttpChannel(McpServerEntry entry, McpRuntimeOptions options, OwnedResources owned)
+    /// <summary>createDefaultTransport: the server's stdio or streamable HTTP channel (or the <see cref="CreateChannel"/> replacement).</summary>
+    internal McpAdmittedChannelFactory Channel(McpServerEntry entry, string cwd, McpRuntimeOptions options, Func<HttpClient> client,
+        Dictionary<string, string>? inherited = null) =>
+        CreateChannel?.Invoke(entry) ?? (entry.Config.Transport == McpTransportKind.Http
+            ? HttpChannel(entry, options, client()) : StdioChannel(entry, cwd, inherited ?? InheritedEnvironment()));
+
+    /// <summary>A client for HTTP servers and their OAuth requests; an injected handler stays the caller's.</summary>
+    internal HttpClient CreateClient() => new(CreateHttpHandler?.Invoke() ?? new SocketsHttpHandler { AllowAutoRedirect = false }, disposeHandler: CreateHttpHandler is null)
+    { Timeout = Timeout.InfiniteTimeSpan };
+
+    private McpAdmittedChannelFactory HttpChannel(McpServerEntry entry, McpRuntimeOptions options, HttpClient client)
     {
         var raw = entry.Config.Raw.Value;
         var url = new Uri(raw.GetProperty("url").GetString()!);
@@ -198,7 +207,6 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
             foreach (var header in configured.EnumerateObject())
                 headers[header.Name] = Resolve(header.Value.GetString() ?? "", $"MCP server \"{entry.Name}\" header \"{header.Name}\"");
         var binding = new McpHttpBinding(url, headers.ToImmutable(), new(OpenGetStream: true, DeleteSessionOnClose: true, MaximumReconnects: 5));
-        var client = owned.Client;
         McpAdmittedHttpAuthentication? authentication = null;
         if (McpConfigurationReader.UsesOAuth(entry.Config))
         {
@@ -256,13 +264,11 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         value.StartsWith("~/", StringComparison.Ordinal) || OperatingSystem.IsWindows() && value.StartsWith("~\\", StringComparison.Ordinal)
             ? Path.Combine(HomeDirectory, value[2..]) : value;
 
-    /// <summary>resolveConfigValueOrThrow for non-command values; commands (`!…`) are not run.</summary>
+    /// <summary>resolveConfigValueOrThrow over the process environment; commands (`!…`) are not run.</summary>
     private string Resolve(string value, string description)
     {
-        if (ConfigValueTemplate.IsCommand(value)) throw new InvalidOperationException($"{description}: command values (\"!command\") are not run by PiSharp.");
         var environment = InheritedEnvironment();
-        return ConfigValueTemplate.Resolve(value, null, name => environment.GetValueOrDefault(name))
-            ?? throw new InvalidOperationException($"{description} references an unset environment variable.");
+        return PiSharp.Cli.Commands.McpCommand.ResolveConfigValue(value, description, name => environment.GetValueOrDefault(name));
     }
 
     private sealed class EmptyExtension : IPiSharpExtension
@@ -278,7 +284,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     }
 
     /// <summary>The generation's native resources: server registries, captures not handed to the activation and the HTTP client.</summary>
-    private sealed class OwnedResources(Func<HttpMessageHandler>? createHandler) : IAsyncDisposable
+    private sealed class OwnedResources(Func<HttpClient> createClient) : IAsyncDisposable
     {
         private readonly object gate = new();
         private readonly List<ExtensionRegistry> registries = [];
@@ -292,7 +298,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                 lock (gate)
                 {
                     ObjectDisposedException.ThrowIf(closed, this);
-                    return client ??= new HttpClient(createHandler?.Invoke() ?? new SocketsHttpHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
+                    return client ??= createClient();
                 }
             }
         }

@@ -40,6 +40,13 @@ internal sealed partial class InteractiveSessionFrontend
             }
             loginPrompt = null; prompt.Answer.TrySetResult(line); return true;
         }
+        if (line == "/logout")
+        {
+            if (loginHost is null) display = "No stored credentials to remove. /logout only removes credentials saved by /login; environment variables and models.json config are unchanged.";
+            else if (!loginRun.IsCompleted) display = "[warning] A login is already in progress.";
+            else loginRun = RunLogoutAsync(loginHost);
+            return true;
+        }
         if (line != "/login" && !line.StartsWith("/login ", StringComparison.Ordinal)) return false;
         var provider = line.Length > 7 ? line[7..].Trim() : "";
         if (loginHost is null) display = "No login providers available.";
@@ -81,6 +88,63 @@ internal sealed partial class InteractiveSessionFrontend
         cancellation.Dispose();
         try { await rendered.ConfigureAwait(false); } catch (Exception) { /* A closed view only loses the login outcome line. */ }
     }
+
+    /// <summary>Source showOAuthSelector("logout"): the providers with a stored <c>auth.json</c> credential, sorted by name; the selected
+    /// one is deleted. The running session's next request resolves its auth again, so it stops using the removed credential.</summary>
+    private async Task RunLogoutAsync(ProviderLoginHost host)
+    {
+        await Task.Yield();
+        string? outcome;
+        try
+        {
+            IReadOnlyList<(string Provider, string Type)> stored;
+            using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15)))
+            {
+                try { stored = await host.Store.ListAsync(timeout.Token).ConfigureAwait(false); }
+                catch (Exception error) when (error is not OperationCanceledException || timeout.IsCancellationRequested)
+                { throw new LogoutReadException(error.Message); }
+            }
+            if (stored.Count == 0)
+                outcome = "No stored credentials to remove. /logout only removes credentials saved by /login; environment variables and models.json config are unchanged.";
+            else
+            {
+                var providers = stored.Select(row => (row.Provider, row.Type, Name: ProviderName(row.Provider)))
+                    .OrderBy(row => row.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+                var options = providers.Select(row => new AnthropicOAuthLoginOption(row.Provider, row.Name + " ✓ configured")).ToList();
+                var prompt = new LoginPrompt(new(TaskCreationOptions.RunContinuationsAsynchronously), options);
+                lock (state)
+                {
+                    loginPrompt?.Answer.TrySetCanceled(); loginPrompt = prompt;
+                    QueueLoginRenderLocked("Select provider to logout:\n" + string.Join('\n', options.Select((option, index) =>
+                        (index + 1).ToString(CultureInfo.InvariantCulture) + ": " + option.Label)) + "\n(Enter a number to select, /cancel to cancel)");
+                }
+                var answer = await prompt.Answer.Task.ConfigureAwait(false);
+                var selected = providers.Single(row => row.Provider == answer);
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                try
+                {
+                    await host.Store.DeleteAsync(selected.Provider, timeout.Token).ConfigureAwait(false);
+                    outcome = selected.Type == "oauth" ? "Logged out of " + selected.Name
+                        : "Removed stored API key for " + selected.Name + ". Environment variables and models.json config are unchanged.";
+                }
+                catch (Exception error) { outcome = "[error] Logout failed: " + error.Message; }
+            }
+        }
+        catch (LogoutReadException error) { outcome = "[error] Could not read stored credentials: " + error.Message; }
+        catch (Exception error) when (error is OperationCanceledException || error.Message == "Login cancelled") { outcome = null; } // The selector closes without a message.
+        Task rendered;
+        lock (state) { loginPrompt?.Answer.TrySetCanceled(); loginPrompt = null; rendered = outcome is null ? Task.CompletedTask : QueueLoginRenderLocked(outcome); }
+        try { await rendered.ConfigureAwait(false); } catch (Exception) { /* A closed view only loses the logout outcome line. */ }
+    }
+
+    private sealed class LogoutReadException(string message) : Exception(message);
+
+    /// <summary>The provider's display name (Provider.name) for the providers PiSharp knows; otherwise its id.</summary>
+    private static string ProviderName(string provider) => provider switch
+    {
+        ProviderLoginHost.AnthropicProvider => ProviderLoginHost.AnthropicName, "openai" => "OpenAI", "openrouter" => "OpenRouter",
+        "mistral" => "Mistral", "azure" => "Azure", _ => provider
+    };
 
     /// <summary>Caller holds <c>state</c>. Login lines render in order, after any line already queued.</summary>
     private Task QueueLoginRenderLocked(string text)
