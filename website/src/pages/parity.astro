@@ -10,6 +10,21 @@ const statusLabel: Record<string, string> = {
 	'wont-port': "Won't port",
 	unknown: 'Not yet assessed',
 };
+
+const statusMeaning: Record<string, string> = {
+	ported: 'Works and is covered by PiSharp tests.',
+	partial: 'Works, with the gaps named in the notes.',
+	planned: 'Not built yet. On the roadmap.',
+	'wont-port': 'Left out of scope on purpose.',
+	unknown: 'Status not yet determined.',
+};
+
+const assessedOn = new Date(`${parity.assessedOn}T00:00:00Z`).toLocaleDateString('en-GB', {
+	day: 'numeric',
+	month: 'long',
+	year: 'numeric',
+	timeZone: 'UTC',
+});
 ---
 
 <SitePage title="Parity" description="How close PiSharp is to Pi, across three separate compatibility promises.">
@@ -17,6 +32,9 @@ const statusLabel: Record<string, string> = {
 		<div class="ps-eyebrow">Parity</div>
 		<h1 class="ps-h1">How close to <em>Pi</em> are we?</h1>
 		<p class="ps-lede">PiSharp makes three separate promises and tracks each one separately. The baseline below is read from the port's pinned compatibility lock file.</p>
+		<p class="ps-muted assessed">
+			Statuses are assessed against the {parity.baseline} baseline, from PiSharp's own test suites and its <a href={links.compatibility}>compatibility inventories</a>. Last assessed on {assessedOn}. "Ported" means PiSharp's tests pass; side-by-side comparisons against Pi's own output are still to come.
+		</p>
 	</div>
 
 	<div class="strip">
@@ -44,7 +62,14 @@ const statusLabel: Record<string, string> = {
 
 	<div class="legend">
 		<span class="ps-mono" style="font-size: 0.7rem; letter-spacing: 0.14em; color: var(--sl-color-gray-3)">LEGEND</span>
-		{Object.entries(statusLabel).map(([tone, label]) => <span class="ps-chip" data-tone={tone}>{label}</span>)}
+		{
+			Object.entries(statusLabel).map(([tone, label]) => (
+				<span class="legend-item">
+					<span class="ps-chip" data-tone={tone}>{label}</span>
+					<span class="ps-muted">{statusMeaning[tone]}</span>
+				</span>
+			))
+		}
 	</div>
 
 	{
@@ -81,11 +106,12 @@ const statusLabel: Record<string, string> = {
 		</div>
 		<ol class="phases">
 			{
-				parity.phases.map((ph, i) => (
+				parity.phases.map((ph: { title: string; status: string; notes?: string }, i) => (
 					<li class="ps-card">
 						<span class="ps-mono" style="font-size: 0.75rem; letter-spacing: 0.14em; color: var(--ps-blue)">PHASE {i + 1}</span>
 						<span style="font-weight: 600; color: var(--sl-color-white)">{ph.title}</span>
 						<span class="ps-chip" data-tone={ph.status} style="align-self: flex-start">{statusLabel[ph.status] ?? ph.status}</span>
+						{ph.notes && <span class="ps-muted" style="font-size: 0.9rem">{ph.notes}</span>}
 					</li>
 				))
 			}
@@ -166,9 +192,20 @@ const statusLabel: Record<string, string> = {
 	.legend {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.6rem 1rem;
+		gap: 0.6rem 1.4rem;
 		align-items: center;
 		margin-bottom: 1rem;
+	}
+	.legend-item {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.85rem;
+	}
+	.assessed {
+		max-width: 48rem;
+		font-size: 0.95rem;
+		margin-top: 1rem;
 	}
 	.road-head {
 		display: flex;
