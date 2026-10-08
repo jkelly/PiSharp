@@ -51,7 +51,10 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
             {
                 foreach (var (provider, _) in await store.ListAsync(cancellationToken).ConfigureAwait(false))
                     if (await store.ReadEntryAsync(provider, cancellationToken).ConfigureAwait(false) is { } entry)
-                        stored[provider] = new(entry.Type, entry.Key, entry.Environment);
+                        stored[provider] = new(entry.Type, entry.Key, entry.Environment,
+                            // github-copilot filterModels: the OAuth credential's availableModelIds (IMPL-A1 keeps JSON-valued fields).
+                            entry.Type == "oauth" && PiSharp.AI.Authentication.OAuth.GitHubCopilotOAuth.AvailableModels(
+                                await store.ReadAsync(provider, cancellationToken).ConfigureAwait(false)) is { } ids ? [.. ids] : null);
             }
             catch (Exception error) when (error is InvalidDataException or IOException or UnauthorizedAccessException or PiSharp.AI.Authentication.OAuth.OAuthLifecycleException)
             { stored.Clear(); } // An unreadable store leaves the environment as the only credential source, as for availability upstream.
@@ -69,6 +72,11 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
     internal PiSharp.Cli.Authentication.AnthropicLiveAuthentication CreateAnthropicAuthentication(PiSharp.Cli.Authentication.LiveProcessEnvironment environment) =>
         new(AuthPath is null ? null : new PiSharp.Cli.Authentication.AuthJsonCredentialStore(AuthPath, Time), environment,
             CreateAuthHttp ?? (() => new HttpClient()), Time);
+
+    /// <summary>The home directory the AWS shared config and SSO cache are read from (null: the user profile).</summary>
+    internal string? HomeDirectory { get; init; }
+    /// <summary>Replaces a provider's OAuth flow (tests); null uses the catalog flow.</summary>
+    internal Func<string, PiSharp.Cli.Authentication.OAuthFlowContext, PiSharp.AI.Authentication.OAuth.IProviderOAuth>? OAuthFlows { get; init; }
 }
 internal sealed class LiveSessionException(string code, string message) : Exception(message)
 { internal string Code { get; } = code; }
@@ -87,7 +95,8 @@ internal sealed class LiveSessionSelection
     {
         "anthropic" => api == "anthropic-messages", "mistral" => api == "mistral-conversations",
         "azure" => api is "azure-openai-responses" or "openai-completions",
-        "openai-codex" or "github-copilot" or "amazon-bedrock" or "cloudflare-workers-ai" or "cloudflare-ai-gateway" => false,
+        // IMPL-A1: per-request auth routes (Bedrock SigV4, Codex OAuth, Copilot tokens, Cloudflare ids).
+        _ when LiveProviderRoute.Handles(provider) => LiveProviderRoute.SupportsApi(provider, api),
         _ => api is "openai-completions" or "openai-responses" or "anthropic-messages" or "google-generative-ai" or "pi-messages" or "mistral-conversations"
     };
     internal FrozenCatalogModel Definition { get; }
@@ -176,9 +185,19 @@ internal sealed class LiveSessionSelection
         return (resolved, runtime.CreateHttpHandler(), authentication.ResolveAsync);
     }
 
+    /// <summary>A selection over explicit catalog metadata (fixture rows for providers whose pinned catalog is not shipped).</summary>
+    internal static LiveSessionSelection FromDefinition(FrozenCatalogModel definition, int maximumOutputTokens)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        if (!SupportedApi(definition.Provider, definition.DeclaredApi) || maximumOutputTokens is < 1 or > 8192)
+            throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
+        return new(definition, maximumOutputTokens);
+    }
+
     internal LiveSessionConnection Connect(LiveSessionRuntime? runtime)
     {
         runtime ??= LiveSessionRuntime.Default;
+        if (LiveProviderRoute.TryConnect(this, runtime) is { } routed) return routed;
         var environment = runtime.CreateEnvironment();
         string? key; IReadOnlyDictionary<string, string>? headers = null;
         if (Registry is null && FixedRouteProviders.Contains(Model.Provider))
@@ -272,6 +291,8 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     internal AzureEndpointOptions? Azure { get; init; }
     /// <summary>Resolved models.json provider/model headers and <c>authHeader</c> (getApiKeyAndHeaders), sent with every request.</summary>
     internal IReadOnlyDictionary<string, string>? RequestHeaders { get; init; }
+    /// <summary>The per-request auth route of amazon-bedrock, openai-codex, github-copilot, the Cloudflare providers and stored OAuth.</summary>
+    internal LiveProviderRoute? ProviderRoute { get; init; }
     internal static async ValueTask<LiveSessionConnection> ConnectResolvedAsync(LiveSessionSelection selected,
         AuthenticationResolution authentication, HttpMessageHandler? handler, CancellationToken token,
         Func<CancellationToken, ValueTask<AuthenticationResolution>>? reresolve = null)
@@ -371,6 +392,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         var model = selection.Model; var definition = selection.Definition;
         var maximum = outputTokens ?? MaximumOutputTokens;
         var reasoning = definition.Raw.Value.GetProperty("reasoning").GetBoolean();
+        if (ProviderRoute is { } route) return Own(route.Create(handler, maximum, summary));
         if (model.Provider is not ("azure" or "anthropic") && !(selection.FixedRoute && RequestHeaders is null))
             return Own(CreateCatalogProvider(maximum, reasoning, summary));
         if (model.Api == "mistral-conversations")

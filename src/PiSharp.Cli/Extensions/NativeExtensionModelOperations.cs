@@ -1,14 +1,15 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/model-registry.ts (classify,
 // generateImages, getModelsOfType, findOfType, getAvailableOfType), core/model-runtime.ts (prepareRequest),
-// core/auth-storage.ts (stored credentials) and packages/coding-agent/src/extensions/codemode/execute.ts (toModelInfo:
-// headers are not exposed; models are resolved by provider and id).
+// core/auth-storage.ts (stored credentials), packages/ai/src/auth/resolve.ts (resolveProviderAuth, resolveStoredOAuth) and
+// packages/ai/src/models.ts (checkProviderAuth).
 using System.Collections.Immutable;
-using System.Reflection;
 using System.Text.Json;
 using PiSharp.AI.Authentication;
+using PiSharp.AI.Authentication.OAuth;
 using PiSharp.AI.Catalogs;
 using PiSharp.AI.ModelOperations;
 using PiSharp.Cli.Authentication;
+using PiSharp.Cli.Models;
 using PiSharp.Contracts;
 using PiSharp.Contracts.ModelOperations;
 using PiSharp.Extensions.Facade.Context;
@@ -16,28 +17,29 @@ using PiSharp.Extensions.Facade.Context;
 namespace PiSharp.Cli.Extensions;
 
 /// <summary>
-/// The extension view of a <see cref="ModelOperationsRegistry"/>: models as catalog JSON without <c>headers</c>, and
-/// classification and image generation for a model resolved by type, provider and id in the registry, so a supplied
-/// <c>baseUrl</c> or <c>headers</c> never receives the provider's credentials. Every failure is an error result.
+/// The extension view of a <see cref="ModelOperationsRegistry"/> (upstream <c>ctx.modelRegistry</c>): models as their catalog
+/// JSON objects, and classification and image generation for the model object the extension passes, used as given (its
+/// api, provider, id, baseUrl, headers and cost). As in Pi, the auth of <c>model.provider</c> is resolved and applied to
+/// it, so a trusted extension may send a provider's credentials to its own base URL (owner decision 0004).
 /// </summary>
 public sealed class NativeExtensionModelOperations(ModelOperationsRegistry registry)
 {
     public ModelOperationsRegistry Registry { get; } = registry ?? throw new ArgumentNullException(nameof(registry));
 
     public ImmutableArray<JsonData> GetModelsOfType(ModelType type, string? provider) =>
-        [.. Registry.GetModelsOfType(type, provider).Select(model => model.ToPublicJson())];
+        [.. Registry.GetModelsOfType(type, provider).Select(model => model.ToJson())];
 
-    public JsonData? GetModelOfType(ModelType type, string provider, string id) => Registry.GetModelOfType(type, provider, id)?.ToPublicJson();
+    public JsonData? GetModelOfType(ModelType type, string provider, string id) => Registry.GetModelOfType(type, provider, id)?.ToJson();
 
     public async Task<ImmutableArray<JsonData>> GetAvailableOfTypeAsync(ModelType type, string? provider, CancellationToken cancellationToken) =>
-        [.. (await Registry.GetAvailableOfTypeAsync(type, provider, cancellationToken).ConfigureAwait(false)).Select(model => model.ToPublicJson())];
+        [.. (await Registry.GetAvailableOfTypeAsync(type, provider, cancellationToken).ConfigureAwait(false)).Select(model => model.ToJson())];
 
     public async Task<ClassifierResult> ClassifyAsync(JsonData model, ClassifierContext context, ExtensionModelRequestOptions? options,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model); ArgumentNullException.ThrowIfNull(context);
-        var (resolved, error) = Resolve(model, ModelType.Classifier, "classifier");
-        if (resolved is not ClassifierModel classifier)
+        var (parsed, error) = Parse(model, ModelType.Classifier);
+        if (parsed is not ClassifierModel classifier)
             return new ClassifierResult(Text(model, "api"), Text(model, "provider"), Text(model, "id"), [], ModelOperationStopReason.Error,
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) { ErrorMessage = error };
         return await Registry.ClassifyAsync(classifier, context, new ClassifierOptions
@@ -51,8 +53,8 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model); ArgumentNullException.ThrowIfNull(context);
-        var (resolved, error) = Resolve(model, ModelType.Image, "image");
-        if (resolved is not ImageModel image)
+        var (parsed, error) = Parse(model, ModelType.Image);
+        if (parsed is not ImageModel image)
             return new AssistantImages(Text(model, "api"), Text(model, "provider"), Text(model, "id"), [], ModelOperationStopReason.Error,
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) { ErrorMessage = error };
         return await Registry.GenerateImagesAsync(image, context, new ImagesOptions
@@ -62,62 +64,113 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
         }, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>The registry's entry for the supplied model's provider and id, with upstream's wrong-type and unknown-model
-    /// messages (utils/model-operations.ts <c>assertClassifierModel</c>/<c>assertImageModel</c>).</summary>
-    private (OperationModel? Model, string Error) Resolve(JsonData model, ModelType type, string name)
+    /// <summary>The supplied model object as a typed model, with utils/model-operations.ts <c>assertClassifierModel</c>/
+    /// <c>assertImageModel</c> messages (a model without <c>type</c> is a chat model).</summary>
+    private static (OperationModel? Model, string Error) Parse(JsonData model, ModelType type)
     {
-        var provider = Text(model, "provider"); var id = Text(model, "id");
-        if (provider.Length == 0 || id.Length == 0) return (null, $"Expected {(name == "image" ? "an" : "a")} {name} model with a provider and an id");
-        if (Registry.GetProvider(provider) is null) return (null, $"Unknown provider: {provider}");
-        if (Registry.GetModelOfType(type, provider, id) is { } found) return (found, "");
-        return Registry.GetAllModels(provider).Any(entry => entry.Id == id)
-            ? (null, $"Model {provider}/{id} is not {(name == "image" ? "an" : "a")} {name} model")
-            : (null, $"Unknown {name} model \"{provider}/{id}\"");
+        OperationModel parsed;
+        try { parsed = OperationModel.FromJson(model); }
+        catch (FormatException error) { return (null, error.Message); }
+        if (parsed.Type == type) return (parsed, "");
+        return (null, $"Model {parsed.Provider}/{parsed.Id} is not {(type == ModelType.Image ? "an image" : "a classifier")} model");
     }
 
     private static string Text(JsonData model, string name) =>
         model.Value.ValueKind == JsonValueKind.Object && model.Value.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()! : "";
 
-    /// <summary>The CLI's registry: every embedded provider catalog shard (<c>PiSharp.Cli.Models.*.json</c>) as the
-    /// built-in providers, with auth resolved per request as upstream resolveProviderAuth does for api-key providers: a
-    /// stored <c>auth.json</c> credential owns the provider (an api_key credential supplies its key and env, an OAuth
-    /// credential its access token, marked OAuth), else the provider's environment variable.</summary>
-    public static ModelOperationsRegistry CreateDefaultRegistry(Func<string, string?> readEnvironment, string? authPath)
+    /// <summary>
+    /// The CLI's registry: every embedded, hash-verified provider catalog shard as the built-in providers, with auth resolved
+    /// per request as upstream resolveProviderAuth does. A stored <c>auth.json</c> credential owns the provider: an api_key
+    /// credential supplies its key and env; an OAuth credential is refreshed through <see cref="StoredOAuthLifecycle"/> when
+    /// it expires within five minutes (the rotation is persisted) and its access token travels in the apiKey channel, for the
+    /// providers with an OAuth refresh (<see cref="DefaultOAuthRefreshes"/>; <paramref name="oauthRefreshes"/> replaces the set). An
+    /// OAuth credential of a provider without one, or of another type, leaves the provider unconfigured, with no environment
+    /// fallback. Without a stored credential the provider's environment variable applies.
+    /// </summary>
+    public static ModelOperationsRegistry CreateDefaultRegistry(Func<string, string?> readEnvironment, string? authPath,
+        Func<HttpMessageInvoker>? createAuthHttp = null, TimeProvider? timeProvider = null,
+        IReadOnlyDictionary<string, IAdmittedOAuthRefresh>? oauthRefreshes = null)
     {
         ArgumentNullException.ThrowIfNull(readEnvironment);
         var catalogs = new List<FrozenModelCatalog>();
-        var assembly = typeof(NativeExtensionModelOperations).Assembly;
-        const string prefix = "PiSharp.Cli.Models.";
-        foreach (var name in assembly.GetManifestResourceNames().Where(name => name.StartsWith(prefix, StringComparison.Ordinal) &&
-            name.EndsWith(".json", StringComparison.Ordinal)).Order(StringComparer.Ordinal))
+        foreach (var provider in BuiltinModelCatalog.ShardHashes.Keys.Order(StringComparer.Ordinal))
         {
-            using var stream = assembly.GetManifestResourceStream(name)!; using var buffer = new MemoryStream(); stream.CopyTo(buffer);
-            try { catalogs.Add(FrozenModelCatalog.ReadProviderJson(name[prefix.Length..^".json".Length], buffer.ToArray())); }
-            catch (CatalogReadException) { }
+            try { catalogs.Add(BuiltinModelCatalog.Get(provider)); }
+            catch (Exception error) when (error is BuiltinCatalogException or CatalogReadException) { }
         }
-        var store = authPath is null ? null : new AuthJsonCredentialStore(authPath);
+        var store = authPath is null ? null : new AuthJsonCredentialStore(authPath, timeProvider);
+        createAuthHttp ??= () => new HttpClient();
+        var refreshes = new ProviderOAuthRefreshes(oauthRefreshes ?? DefaultOAuthRefreshes(readEnvironment, createAuthHttp, timeProvider));
+        var lifecycle = store is null ? null : new StoredOAuthLifecycle(store, refreshes, timeProvider);
         var standard = ModelOperationsAuth.Standard(readEnvironment, store is null ? null : async (provider, token) =>
         {
             var entry = await store.ReadEntryAsync(provider, token).ConfigureAwait(false);
             if (entry is not { Type: "api_key" }) return null;
-            if (entry.Key is { Length: > 0 } configured && ConfigValueTemplate.IsCommand(configured))
-                throw new InvalidOperationException("Stored API key commands (\"!command\") are not run by PiSharp; store the key value instead.");
             return new StoredApiKeyCredential(entry.Key is null ? null : ConfigValueTemplate.Resolve(entry.Key, entry.Environment, readEnvironment),
                 entry.Environment is null ? null : new ProviderEnvironmentSnapshot(scoped: entry.Environment.Select(pair => KeyValuePair.Create(pair.Key, (string?)pair.Value))));
         });
         return ModelOperationsRegistry.CreateBuiltin(catalogs, async (request, token) =>
         {
+            // auth/resolve.ts: an explicit key bypasses the store; otherwise a stored credential owns the provider.
             if (store is not null && request.ApiKey is null && await store.ReadEntryAsync(request.Provider, token).ConfigureAwait(false) is { } entry)
             {
-                // A stored credential owns the provider: no environment fallback for an OAuth or unknown entry. OAuth
-                // tokens travel in the apiKey channel; refreshing them is the chat route's (not done here).
                 if (entry.Type == "oauth")
-                    return await store.ReadAsync(request.Provider, token).ConfigureAwait(false) is { } oauth
-                        ? new ProviderAuthResult(oauth.Access) { IsOAuth = true } : null;
+                {
+                    if (!refreshes.Supports(request.Provider)) return null;
+                    // checkProviderAuth: a stored OAuth credential is configured without being refreshed.
+                    if (request.Check) return new ProviderAuthResult(null) { IsOAuth = true };
+                    OAuthCredentialSnapshot? credential;
+                    try { credential = await lifecycle!.ResolveAsync(request.Provider, cancellationToken: token).ConfigureAwait(false); }
+                    catch (OAuthLifecycleException error)
+                    {
+                        throw new ModelOperationsException(ModelOperationsErrorCode.Auth, error.Failure switch
+                        {
+                            OAuthLifecycleFailure.Refresh => WithCause($"OAuth refresh failed for {request.Provider}", error.OriginalException),
+                            OAuthLifecycleFailure.Read => $"Credential store read failed for {request.Provider}",
+                            _ => $"Credential store modify failed for {request.Provider}"
+                        });
+                    }
+                    // Logged out meanwhile: no silent environment fallback.
+                    return credential is null ? null : new ProviderAuthResult(credential.Access) { IsOAuth = true };
+                }
                 if (entry.Type != "api_key") return null;
             }
             return await standard(request, token).ConfigureAwait(false);
         });
+    }
+
+    /// <summary>models-error.ts <c>withCauseDetail</c>: the underlying reason joins the message unless it is already in it.</summary>
+    private static string WithCause(string message, Exception? cause) =>
+        cause?.Message.Trim() is { Length: > 0 } detail && !message.Contains(detail, StringComparison.Ordinal) ? $"{message}: {detail}" : message;
+
+    /// <summary>A refresh over a fresh HTTP client per refresh, disposed afterwards.</summary>
+    /// <summary>
+    /// The stored-OAuth refresh of every upstream provider with an OAuth method (auth/oauth/load.ts): anthropic, openai
+    /// (ChatGPT) and openrouter as above, and openai-codex, github-copilot, kimi-coding, meta, radius and xai through their
+    /// <see cref="ProviderAuthCatalog"/> flows (the same refresh /login and the live route use).
+    /// </summary>
+    internal static Dictionary<string, IAdmittedOAuthRefresh> DefaultOAuthRefreshes(Func<string, string?> readEnvironment,
+        Func<HttpMessageInvoker> createAuthHttp, TimeProvider? timeProvider)
+    {
+        var refreshes = new Dictionary<string, IAdmittedOAuthRefresh>(StringComparer.Ordinal)
+        {
+            ["anthropic"] = new FreshClientRefresh(http => new AnthropicOAuth(http, timeProvider), createAuthHttp),
+            ["openai"] = new FreshClientRefresh(http => new OpenAIChatGPTOAuthRefresh(http, timeProvider), createAuthHttp),
+            ["openrouter"] = OpenRouterOAuthRefresh.Instance
+        };
+        foreach (var entry in ProviderAuthCatalog.All)
+            if (entry.OAuth is { } oauth && !refreshes.ContainsKey(entry.Id))
+                refreshes[entry.Id] = new FreshClientRefresh(http => oauth.Create(new OAuthFlowContext(http, readEnvironment, timeProvider, null, 0, null)), createAuthHttp);
+        return refreshes;
+    }
+
+    private sealed class FreshClientRefresh(Func<HttpMessageInvoker, IAdmittedOAuthRefresh> create, Func<HttpMessageInvoker> createHttp) : IAdmittedOAuthRefresh
+    {
+        public async Task<OAuthCredentialSnapshot> RefreshAsync(string provider, OAuthCredentialSnapshot current, CancellationToken cancellationToken)
+        {
+            using var http = createHttp();
+            return await create(http).RefreshAsync(provider, current, cancellationToken).ConfigureAwait(false);
+        }
     }
 }

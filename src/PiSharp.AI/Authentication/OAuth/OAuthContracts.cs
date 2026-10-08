@@ -16,10 +16,22 @@ public sealed class OAuthCredentialSnapshot
         ProviderData = (providerData ?? new Dictionary<string, string>()).ToImmutableDictionary(StringComparer.Ordinal);
     }
 
+    /// <summary>A credential whose provider fields also hold non-string JSON values (auth.json keeps every field a flow returns,
+    /// e.g. GitHub Copilot's availableModelIds array or Sign in with ChatGPT's scopes).</summary>
+    public OAuthCredentialSnapshot(string access, string refresh, long expiresUnixMilliseconds,
+        IReadOnlyDictionary<string, string>? providerData, IReadOnlyDictionary<string, PiSharp.Contracts.JsonData>? providerJson)
+        : this(access, refresh, expiresUnixMilliseconds, providerData)
+    {
+        ProviderJson = (providerJson ?? new Dictionary<string, PiSharp.Contracts.JsonData>()).ToImmutableDictionary(StringComparer.Ordinal);
+    }
+
     [JsonIgnore] public string Access { get; }
     [JsonIgnore] public string Refresh { get; }
     public long ExpiresUnixMilliseconds { get; }
     [JsonIgnore] public System.Collections.Immutable.ImmutableDictionary<string, string> ProviderData { get; }
+    /// <summary>Non-string provider fields, as owned JSON values. Empty for flows that store only strings.</summary>
+    [JsonIgnore] public System.Collections.Immutable.ImmutableDictionary<string, PiSharp.Contracts.JsonData> ProviderJson { get; } =
+        System.Collections.Immutable.ImmutableDictionary<string, PiSharp.Contracts.JsonData>.Empty;
     public override string ToString() => "OAuth credential snapshot (material withheld)";
 }
 

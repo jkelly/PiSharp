@@ -89,6 +89,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     private Task? _disposal;
     private bool _disposed;
     private bool _configuring;
+    /// <summary>The idle signal of a tool catalog publication in progress (an MCP server that connected in the background).</summary>
+    private TaskCompletionSource? _catalogPublication;
     private bool _appendingExtensionEntry;
     private bool _editingContext;
     private bool _compacting;
@@ -894,6 +896,11 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         input = PromptInputValue.Own(input, options);
         if (options?.QueueOnly == true && input.StreamingBehavior is null)
             throw new PromptInputAdmissionException(PromptInputAdmissionFailure.InvalidInput);
+        // Pi applies a background MCP server's tools between prompts without refusing input: input that arrives while such a
+        // catalog publication is committing waits for it, then is admitted as usual.
+        TaskCompletionSource? publication;
+        lock (_gate) publication = _configuring && _catalogPublication is { } pending && ReferenceEquals(_active, pending) ? pending : null;
+        if (publication is not null) return AfterPublicationAsync(publication.Task, input, admission, options, cancellationToken);
         var reservation = new InputSubmission();
         try
         {
@@ -910,6 +917,13 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         }
         catch { reservation.Abort.Dispose(); throw; }
         return SubmitInputCoreAsync(input, admission, options, cancellationToken, reservation);
+    }
+
+    private async Task<SubmittedInputResult> AfterPublicationAsync(Task publication, PromptInput input, IPromptInputAdmission? admission,
+        PromptInputAdmissionOptions? options, CancellationToken cancellationToken)
+    {
+        await publication.WaitAsync(cancellationToken).ConfigureAwait(false);
+        return await SubmitInputAsync(input, admission, options, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<SubmittedInputResult> SubmitInputCoreAsync(PromptInput input, IPromptInputAdmission? admission,

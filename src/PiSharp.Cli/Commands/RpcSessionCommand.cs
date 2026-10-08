@@ -91,7 +91,7 @@ public static class RpcSessionCommand
             var liveSelection = parsed.Live is null ? null : await parsed.Live.ResolveAsync(settings, liveRuntime ?? LiveSessionRuntime.Default, stderr,
                 parsed.SessionMode == "open", cancellationToken).ConfigureAwait(false);
             // Production sessions read the global mcp.json once at start; --no-mcp connects nothing.
-            if (mcpAdmission is null && !parsed.Tools.NoMcp && mcpHost is not null) mcpAdmission = mcpHost.CreateAdmission(parsed.Workspace, stderr);
+            if (mcpAdmission is null && !parsed.Tools.NoMcp && mcpHost is not null) mcpAdmission = mcpHost.CreateAdmission(parsed.Workspace, stderr, settings?.Values);
             backend = parsed.SessionMode == "open" ? null : new SessionStorageBackend(Path.GetDirectoryName(parsed.Session)!,
                 parsed.SessionMode == "new-memory" ? SessionStorageMode.InMemory : SessionStorageMode.LazyLocal,
                 new(MaximumFileBytes: PiPayloadBudget.SessionFileBytes, MaximumResidentBytes: PiPayloadBudget.SessionFileBytes));
@@ -165,6 +165,8 @@ public static class RpcSessionCommand
                 postInputSettlement: profile.DrainLifecycleHandoffsAsync,
                 postRunSettlement: profile.DrainLifecycleHandoffsAsync, userBash: profile.UserBash);
             profile.ConfigureLifecycleModeStop(lifecycleStop.CancelAsync);
+            // The dispatcher took ownership of the idle session: background MCP servers may publish their tools from now on.
+            if (mcpHost is not null && mcpAdmission is not null) mcpHost.HostStarted(mcpAdmission);
             await dispatcher.RunAsync(reader, lifecycleRun.Token).ConfigureAwait(false);
         }
         catch (Exception error) { operationFailure = error; }

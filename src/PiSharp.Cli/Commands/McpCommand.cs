@@ -492,41 +492,8 @@ internal static class McpCommand
         catch (Exception) { /* The URL is printed; the user can open it. */ }
     }
 
-    /// <summary>resolve-config-value.ts templates: `$NAME` and `${NAME}` from the environment, `$$` and `$!` escapes.
-    /// `!command` values are not run by PiSharp.</summary>
-    internal static string ResolveConfigValue(string config, string description, Func<string, string?> environment)
-    {
-        if (config.StartsWith('!')) throw new InvalidOperationException($"Failed to resolve {description}: PiSharp does not run shell commands for config values.");
-        var resolved = new StringBuilder(); var missing = new List<string>(); var index = 0;
-        void Env(string variable)
-        {
-            if (environment(variable) is { Length: > 0 } value) resolved.Append(value);
-            else if (!missing.Contains(variable)) missing.Add(variable);
-        }
-        while (index < config.Length)
-        {
-            var dollar = config.IndexOf('$', index);
-            if (dollar < 0) { resolved.Append(config, index, config.Length - index); break; }
-            resolved.Append(config, index, dollar - index);
-            var next = dollar + 1 < config.Length ? config[dollar + 1] : '\0';
-            if (next is '$' or '!') { resolved.Append(next); index = dollar + 2; continue; }
-            if (next == '{')
-            {
-                var end = config.IndexOf('}', dollar + 2);
-                if (end < 0) { resolved.Append('$'); index = dollar + 1; continue; }
-                var variable = config[(dollar + 2)..end];
-                if (EnvName().IsMatch(variable)) Env(variable); else resolved.Append(config, dollar, end + 1 - dollar);
-                index = end + 1; continue;
-            }
-            var match = EnvPrefix().Match(config, dollar + 1);
-            if (match.Success) { Env(match.Value); index = dollar + 1 + match.Length; continue; }
-            resolved.Append('$'); index = dollar + 1;
-        }
-        if (missing.Count == 1) throw new InvalidOperationException($"Failed to resolve {description} from environment variable: {missing[0]}");
-        if (missing.Count > 1) throw new InvalidOperationException($"Failed to resolve {description} from environment variables: {string.Join(", ", missing)}");
-        return resolved.ToString();
-    }
-
-    private static Regex EnvName() => new("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.CultureInvariant);
-    private static Regex EnvPrefix() => new(@"\G[A-Za-z_][A-Za-z0-9_]*", RegexOptions.CultureInvariant);
+    /// <summary>resolve-config-value.ts resolveConfigValueOrThrow: `$NAME` and `${NAME}` from the environment, `$$` and `$!`
+    /// escapes, and `!command` run through the shell (owner decision 0004), with the upstream error texts.</summary>
+    internal static string ResolveConfigValue(string config, string description, Func<string, string?> environment) =>
+        new PiSharp.Cli.Models.ConfigValueResolver(environment).ResolveOrThrow(config, description);
 }

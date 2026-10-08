@@ -91,23 +91,46 @@ internal static partial class Program
             Equal("1", http.Requests[0].Headers["x-extension"], "extension header");
             Equal("Bearer env-openrouter", http.Requests[1].Headers["authorization"], "image auth");
         }),
-        ("extension.models-resolve-by-identity-so-credentials-stay-on-catalog-endpoints", async () =>
+        ("extension.supplied-models-are-used-as-given-with-their-provider-credentials", async () =>
         {
-            var http = FakeHttp.Always(() => FakeHttp.Json("""{"answers":[{"type":"predicate","name":"approved","probability":0.8}]}"""));
+            var http = new FakeHttp((request, _, _) => Task.FromResult(request.Url.EndsWith("/decisions", StringComparison.Ordinal)
+                ? FakeHttp.Json("""{"answers":[{"type":"predicate","name":"approved","probability":0.8}]}""") : FakeHttp.Json(ImageResponse)));
             var operations = ExtensionOperations(http);
             var luna = operations.GetModelOfType(ModelType.Classifier, "openai", "gpt-6-luna")!;
-            var moved = System.Text.Json.Nodes.JsonNode.Parse(luna.ToString())!.AsObject(); moved["baseUrl"] = "https://attacker.test/v1";
-            moved["headers"] = new System.Text.Json.Nodes.JsonObject { ["authorization"] = "Bearer stolen" };
-            var result = await operations.ClassifyAsync(JsonData.Parse(moved.ToJsonString()), ApprovalContext, null, default);
-            Equal(ModelOperationStopReason.Stop, result.StopReason, result.ErrorMessage ?? "stop");
-            Equal("https://api.openai.com/v1/decisions", http.Requests[0].Url, "catalog endpoint");
-            Equal("Bearer env-openai", http.Requests[0].Headers["authorization"], "catalog auth");
+            Equal(OperationModel.FromJson(luna).ToJson().ToString(), luna.ToString(), "catalog JSON as the registry holds it");
+            // A custom base URL and headers: Pi resolves model.provider's auth and applies it to the model as given.
+            var custom = System.Text.Json.Nodes.JsonNode.Parse(luna.ToString())!.AsObject();
+            custom["id"] = "my-decider"; custom["baseUrl"] = "https://gateway.example/openai/v1/";
+            custom["headers"] = new System.Text.Json.Nodes.JsonObject { ["x-gateway"] = "g1" };
+            var result = await operations.ClassifyAsync(JsonData.Parse(custom.ToJsonString()), ApprovalContext,
+                new ExtensionModelRequestOptions { Headers = [new("x-extension", "1")] }, default);
+            Equal(ModelOperationStopReason.Stop, result.StopReason, result.ErrorMessage ?? "custom classifier");
+            Equal("my-decider", result.Model, "result names the supplied model");
+            Equal("https://gateway.example/openai/v1/decisions", http.Requests[0].Url, "supplied base URL");
+            Equal("Bearer env-openai", http.Requests[0].Headers["authorization"], "openai credentials applied");
+            Equal("g1", http.Requests[0].Headers["x-gateway"], "model header"); Equal("1", http.Requests[0].Headers["x-extension"], "request header");
+            Equal("my-decider", http.Requests[0].Json.GetProperty("model").GetString(), "supplied id");
+            var image = System.Text.Json.Nodes.JsonNode.Parse("""
+                {"type":"image","id":"house/painter","name":"Painter","api":"openrouter-images","provider":"openrouter","baseUrl":"https://images.example/api","input":["text"],"output":["image"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"headers":{"Authorization":"Bearer model-owned"}}
+                """)!;
+            var generated = await operations.GenerateImagesAsync(JsonData.Parse(image.ToJsonString()), DogPrompt, null, default);
+            Equal(ModelOperationStopReason.Stop, generated.StopReason, generated.ErrorMessage ?? "custom image model");
+            Equal("https://images.example/api/chat/completions", http.Requests[1].Url, "image base URL");
+            // As in Pi, a model's own Authorization header replaces the bearer the provider key would add.
+            Equal("Bearer model-owned", http.Requests[1].Headers["authorization"], "model authorization header wins");
+            // A model's provider decides the credentials and the API implementations available to it.
+            custom["api"] = "typesafe-system-one";
+            Equal("Provider openai has no classifier implementation for \"typesafe-system-one\"",
+                (await operations.ClassifyAsync(JsonData.Parse(custom.ToJsonString()), ApprovalContext, null, default)).ErrorMessage, "provider apis");
             Equal("Model openai/gpt-6-luna is not an image model", (await operations.GenerateImagesAsync(luna, DogPrompt, null, default)).ErrorMessage, "wrong type");
-            Equal("Unknown classifier model \"openai/nope\"", (await operations.ClassifyAsync(JsonData.Parse("""{"provider":"openai","id":"nope"}"""), ApprovalContext, null, default)).ErrorMessage, "unknown");
-            Equal("Unknown provider: ghost", (await operations.ClassifyAsync(JsonData.Parse("""{"provider":"ghost","id":"x"}"""), ApprovalContext, null, default)).ErrorMessage, "ghost");
-            Equal("Expected a classifier model with a provider and an id", (await operations.ClassifyAsync(JsonData.Parse("{}"), ApprovalContext, null, default)).ErrorMessage, "shape");
-            Equal(1, http.Requests.Count, "only the resolved call was sent");
-            Check(operations.GetModelsOfType(ModelType.Image, "openrouter").All(model => !model.Value.TryGetProperty("headers", out _)), "headers are not exposed");
+            Equal("Model openai/x is not a classifier model", (await operations.ClassifyAsync(JsonData.Parse(
+                """{"id":"x","api":"openai-decisions","provider":"openai","baseUrl":"","input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}"""),
+                ApprovalContext, null, default)).ErrorMessage, "untyped models are chat models");
+            Equal("Unknown provider: ghost", (await operations.ClassifyAsync(JsonData.Parse(
+                """{"type":"classifier","id":"x","api":"openai-decisions","provider":"ghost","baseUrl":"https://ghost.test","input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"contextWindow":1}"""),
+                ApprovalContext, null, default)).ErrorMessage, "ghost");
+            Equal("Model id must be a string.", (await operations.ClassifyAsync(JsonData.Parse("{}"), ApprovalContext, null, default)).ErrorMessage, "shape");
+            Equal(2, http.Requests.Count, "only the two valid calls were sent");
         }),
         ("extension.hosts-without-the-capability-and-closed-callbacks-refuse", async () =>
         {

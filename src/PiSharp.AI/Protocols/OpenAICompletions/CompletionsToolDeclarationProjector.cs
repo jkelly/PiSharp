@@ -247,6 +247,7 @@ internal static class CompletionsJson
         {
             return JsonData.Parse(EcmaScriptJsonProjection.Project(data, new(MaximumInputCharacters: maximumCharacters,
                 MaximumInputBytes: maximumBytes, MaximumOutputCharacters: maximumCharacters, MaximumOutputBytes: maximumBytes,
+                // A single string (an image data URL) may use the whole configured budget (owner decision 0004: Pi's request budgets).
                 MaximumDepth: maximumDepth, MaximumStringCharacters: maximumCharacters), token));
         }
         catch (EcmaScriptJsonProjectionException error)

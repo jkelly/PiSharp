@@ -1,15 +1,16 @@
 using PiSharp.Cli.Models;
 
-// Ported from packages/coding-agent/test/resolve-config-value.test.ts (v1.1.0), with the PiSharp command switch.
+// Ported from packages/coding-agent/test/resolve-config-value.test.ts (v1.1.0). Commands run as upstream (owner decision 0004).
 internal static partial class Program
 {
     private static IEnumerable<(string, Func<Task>)> ConfigValueCases() =>
     [
         ("config-value.literals-templates-and-escapes", Sync(ConfigTemplates)),
         ("config-value.scoped-environment-before-process", Sync(ConfigScoped)),
-        ("config-value.commands-refused-by-default-switch", Sync(ConfigRefused)),
-        ("config-value.commands-run-trimmed-and-cached-when-enabled", Sync(ConfigCommands)),
-        ("config-value.platform-shell-runner", Sync(ConfigShell)),
+        ("config-value.shell-commands-trimmed-and-failures-unresolved", Sync(ConfigShellCommands)),
+        ("config-value.shell-commands-cached-until-cleared-and-uncached-rerun", ConfigShellCaching),
+        ("config-value.windows-default-shell-fallback", Sync(ConfigDefaultShellFallback)),
+        ("config-value.injected-runner-caching", Sync(ConfigCommands)),
         ("config-value.resolve-or-throw-messages", Sync(ConfigErrors)),
     ];
 
@@ -45,25 +46,65 @@ internal static partial class Program
         Equal("second", dynamic.Resolve("$DYN"), "environment values are not cached");
     }
 
-    private static void ConfigRefused()
+    private static bool HasBash()
     {
-        Check(!ConfigValueCommands.RunByDefault, "the switch defaults to the PiSharp refusal");
-        var runs = 0;
-        var resolver = new ConfigValueResolver(Env(), runCommand: _ => { runs++; return "x"; });
-        Check(!resolver.RunsCommands, "default resolver refuses");
-        Throws<ConfigValueCommandRefusedException>(() => resolver.Resolve("!echo key"), "refused");
-        var error = Throws<ConfigValueCommandRefusedException>(() => resolver.ResolveOrThrow("!echo key", "API key for provider \"p\""), "refused with description");
-        Equal("Failed to resolve API key for provider \"p\" from shell command: PiSharp does not run shell commands for config values; store the value or an environment reference instead.",
-            error.Message, "refusal message");
-        Equal(0, runs, "nothing ran");
-        Check(ConfigValueResolver.IsCommand("!x") && !ConfigValueResolver.IsCommand("$!x"), "command detection");
+        try { PiSharp.Tools.Processes.ShellDiscovery.Resolve(); return true; }
+        catch (PiSharp.Tools.Processes.ShellDiscoveryException) { return false; }
+    }
+
+    // Upstream "executes shell commands and trims their output" and "returns undefined when command resolution fails". The configured
+    // shell is bash (Git Bash on Windows), so the upstream command texts run unchanged.
+    private static void ConfigShellCommands()
+    {
+        if (OperatingSystem.IsWindows() && !HasBash()) return; // The default-shell fallback case covers hosts without bash.
+        var resolver = new ConfigValueResolver(Env());
+        var tag = Guid.NewGuid().ToString("N");
+        Equal("spaced-key", resolver.Resolve("!echo '  spaced-key  ' # " + tag), "trimmed stdout");
+        Equal("line1\nline2", resolver.Resolve("!printf 'line1\\nline2' # " + tag), "multiline output");
+        Equal("hello-world", resolver.Resolve("!echo 'hello world' | tr ' ' '-' # " + tag), "shell features");
+        foreach (var command in new[] { "!exit 1", "!nonexistent-command-12345", "!printf ''" })
+            Equal<string?>(null, resolver.ResolveUncached(command), command);
+        Equal("Failed to resolve API key for provider \"p\" from shell command: exit 1",
+            Throws<InvalidOperationException>(() => resolver.ResolveOrThrow("!exit 1", "API key for provider \"p\""), "failing command").Message, "failure text");
+    }
+
+    // Upstream "caches successful and failed commands until explicitly cleared" and "uncached resolution executes a command on every call".
+    private static Task ConfigShellCaching() => WithTemp("config-cache", root =>
+    {
+        if (OperatingSystem.IsWindows() && !HasBash()) return Task.CompletedTask;
+        var counter = Path.Combine(root, "counter"); File.WriteAllText(counter, "0");
+        var escaped = counter.Replace('\\', '/').Replace("\"", "\\\"", StringComparison.Ordinal);
+        var resolver = new ConfigValueResolver(Env());
+        var success = $"!sh -c 'count=$(cat \"{escaped}\"); echo $((count + 1)) > \"{escaped}\"; echo value'";
+        Equal("value", resolver.Resolve(success), "first"); Equal("value", resolver.Resolve(success), "cached");
+        Equal("1", File.ReadAllText(counter).Trim(), "ran once");
+        resolver.ClearCache();
+        Equal("value", resolver.Resolve(success), "after clear"); Equal("2", File.ReadAllText(counter).Trim(), "ran again");
+        var failure = $"!sh -c 'count=$(cat \"{escaped}\"); echo $((count + 1)) > \"{escaped}\"; exit 1'";
+        Equal<string?>(null, resolver.Resolve(failure), "failure"); Equal<string?>(null, resolver.Resolve(failure), "failure cached");
+        Equal("3", File.ReadAllText(counter).Trim(), "failure ran once");
+        Equal("value", resolver.ResolveUncached(success), "uncached 1"); Equal("value", resolver.ResolveUncached(success), "uncached 2");
+        Equal("5", File.ReadAllText(counter).Trim(), "uncached runs every call");
+        resolver.ClearCache();
+        return Task.CompletedTask;
+    });
+
+    // executeCommandUncached on Windows: without a configured (bash) shell the command falls back to execSync's default shell (cmd.exe).
+    private static void ConfigDefaultShellFallback()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var host = new PiSharp.Tools.Processes.ShellHost(true, name => name == "ComSpec" ? Environment.GetEnvironmentVariable("ComSpec") : null,
+            _ => false, Path.GetTempPath());
+        Equal("fallback-value", ConfigValueResolver.RunShellCommand("echo fallback-value", host), "cmd fallback");
+        Equal<string?>(null, ConfigValueResolver.RunShellCommand("exit 1", host), "cmd failure");
     }
 
     private static void ConfigCommands()
     {
         var runs = new List<string>();
         var outputs = new Queue<string?>(["value", "value-2", null, "uncached-1", "uncached-2"]);
-        var resolver = new ConfigValueResolver(Env(), runCommands: true, runCommand: command => { runs.Add(command); return outputs.Dequeue(); });
+        var resolver = new ConfigValueResolver(Env(), command => { runs.Add(command); return outputs.Dequeue(); });
+        Check(ConfigValueResolver.IsCommand("!x") && !ConfigValueResolver.IsCommand("$!x"), "command detection");
         Equal("value", resolver.Resolve("!fetch key"), "first run");
         Equal("value", resolver.Resolve("!fetch key"), "cached");
         resolver.ClearCache();
@@ -72,16 +113,7 @@ internal static partial class Program
         Equal("uncached-1", resolver.ResolveUncached("!again"), "uncached"); Equal("uncached-2", resolver.ResolveUncached("!again"), "uncached runs again");
         Names(["fetch key", "fetch key", "fail", "again", "again"], runs, "command text without !");
         Equal("Failed to resolve token from shell command: broken",
-            Throws<InvalidOperationException>(() => new ConfigValueResolver(Env(), true, _ => null).ResolveOrThrow("!broken", "token"), "failed command").Message, "failed command message");
-    }
-
-    private static void ConfigShell()
-    {
-        var resolver = new ConfigValueResolver(Env(), runCommands: true);
-        Equal("spaced-key", resolver.Resolve(OperatingSystem.IsWindows() ? "!echo   spaced-key  " : "!echo '  spaced-key  '"), "trimmed stdout");
-        Equal<string?>(null, resolver.Resolve("!exit 1"), "non-zero exit");
-        Equal<string?>(null, resolver.Resolve("!nonexistent-command-12345"), "missing command");
-        if (!OperatingSystem.IsWindows()) Equal("hello-world", resolver.Resolve("!echo 'hello world' | tr ' ' '-'"), "shell features");
+            Throws<InvalidOperationException>(() => new ConfigValueResolver(Env(), _ => null).ResolveOrThrow("!broken", "token"), "failed command").Message, "failed command message");
     }
 
     private static void ConfigErrors()

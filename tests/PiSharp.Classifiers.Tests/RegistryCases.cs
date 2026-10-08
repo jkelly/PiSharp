@@ -203,6 +203,55 @@ internal static partial class Program
                 Equal("Bearer templated", http.Requests[0].Headers["authorization"], "stored key template resolves from the environment");
             }
             finally { directory.Delete(recursive: true); }
+        }),
+        ("registry.cli-stored-oauth-is-refreshed-persisted-and-owns-the-provider", async () =>
+        {
+            var directory = Directory.CreateTempSubdirectory("pisharp-classifiers-oauth-");
+            try
+            {
+                var auth = Path.Combine(directory.FullName, "auth.json");
+                await File.WriteAllTextAsync(auth, """{"openai":{"type":"oauth","access":"stale-access","refresh":"old-refresh","expires":1000,"clientId":"client-7","scopes":["openid"]},"typesafe":{"type":"oauth","access":"t","refresh":"r","expires":9999999999999}}""");
+                var tokenServer = FakeHttp.Always(() => FakeHttp.Json("""{"access_token":"fresh-access","refresh_token":"new-refresh","expires_in":3600,"scope":"openid resource.invoke chatgpt.tokens.use.direct","token_type":"Bearer"}"""));
+                var env = new Dictionary<string, string> { ["OPENAI_API_KEY"] = "env-openai", ["TYPESAFE_API_KEY"] = "env-typesafe" };
+                var registry = PiSharp.Cli.Extensions.NativeExtensionModelOperations.CreateDefaultRegistry(name => env.GetValueOrDefault(name), auth, () => tokenServer.Client);
+                var luna = (ClassifierModel)registry.GetModelOfType(ModelType.Classifier, "openai", "gpt-6-luna")!;
+                var decisions = FakeHttp.Always(() => FakeHttp.Json("""{"answers":[{"type":"predicate","name":"approved","probability":0.8}]}"""));
+                // Listing never refreshes: a stored OAuth credential counts as configured.
+                Equal(0, (await registry.GetAvailableOfTypeAsync(ModelType.Classifier, "openai")).Length, "ChatGPT OAuth lists no Decisions models");
+                Equal(0, tokenServer.Requests.Count, "no refresh while listing");
+                var result = await registry.ClassifyAsync(luna, ApprovalContext, new ClassifierOptions { Http = decisions.Client });
+                Equal(ModelOperationStopReason.Stop, result.StopReason, result.ErrorMessage ?? "refreshed");
+                Equal("Bearer fresh-access", decisions.Requests[0].Headers["authorization"], "refreshed access token");
+                Equal(1, tokenServer.Requests.Count, "one refresh");
+                Equal("https://auth.openai.com/api/accounts/oauth/token", tokenServer.Requests[0].Url, "token url");
+                Equal("application/x-www-form-urlencoded", tokenServer.Requests[0].Headers["content-type"], "form");
+                Equal("application/json", tokenServer.Requests[0].Headers["accept"], "accept");
+                Body("grant_type=refresh_token&client_id=client-7&refresh_token=old-refresh&resource=https%3A%2F%2Fapi.openai.com%2Fv1", tokenServer.Requests[0].Body, "refresh form");
+                var stored = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(auth))!["openai"]!;
+                Equal("fresh-access", stored["access"]!.GetValue<string>(), "rotation persisted");
+                Equal("new-refresh", stored["refresh"]!.GetValue<string>(), "refresh token rotated");
+                Equal("client-7", stored["clientId"]!.GetValue<string>(), "client id kept");
+                Check(stored["expires"]!.GetValue<double>() > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 3_000_000, "new expiry minus the three-minute margin");
+                // The refreshed token is reused without another refresh.
+                await registry.ClassifyAsync(luna, ApprovalContext, new ClassifierOptions { Http = decisions.Client });
+                Equal(1, tokenServer.Requests.Count, "fresh token reused"); Equal("Bearer fresh-access", decisions.Requests[1].Headers["authorization"], "reused");
+                // A stored OAuth credential of a provider without an OAuth refresh owns it: no environment fallback.
+                var jev = new ClassifierModel("jev", "Jev", "typesafe-system-one", "typesafe", "https://api.typesafe.ai/v1", ["text"], ModelCost.Free, 1000);
+                Equal("Provider is not configured: typesafe", (await registry.ClassifyAsync(jev, ApprovalContext, new ClassifierOptions { Http = decisions.Client })).ErrorMessage, "typesafe oauth");
+                var systemOne = FakeHttp.Always(() => FakeHttp.Json("""{"answers":{"approved":{"type":"noul","noul":0.5}}}"""));
+                var explicitKey = await registry.ClassifyAsync(jev, ApprovalContext, new ClassifierOptions { Http = systemOne.Client, ApiKey = "explicit" });
+                Equal(ModelOperationStopReason.Stop, explicitKey.StopReason, explicitKey.ErrorMessage ?? "explicit key");
+                Equal("Bearer explicit", systemOne.Requests[0].Headers["authorization"], "an explicit key bypasses the store");
+                // A failed refresh is an error result with upstream's message and cause.
+                await File.WriteAllTextAsync(auth, """{"openai":{"type":"oauth","access":"stale-access","refresh":"old-refresh","expires":1000,"clientId":"client-7"}}""");
+                var failing = FakeHttp.Always(() => FakeHttp.Text("invalid_grant", HttpStatusCode.BadRequest));
+                var broken = PiSharp.Cli.Extensions.NativeExtensionModelOperations.CreateDefaultRegistry(name => env.GetValueOrDefault(name), auth, () => failing.Client);
+                var failed = await broken.ClassifyAsync(luna, ApprovalContext, new ClassifierOptions { Http = decisions.Client });
+                Equal(ModelOperationStopReason.Error, failed.StopReason, "refresh failure");
+                Equal("OAuth refresh failed for openai: OpenAI OAuth token request failed (400): invalid_grant", failed.ErrorMessage, "refresh message");
+                Equal(2, decisions.Requests.Count, "nothing sent with a failed refresh");
+            }
+            finally { directory.Delete(recursive: true); }
         })
     ];
 }

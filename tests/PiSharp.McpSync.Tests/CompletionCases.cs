@@ -371,12 +371,14 @@ internal static partial class Program
             Equal((1, "", $"No MCP server named \"nope\". {Path.Combine(options.Cwd, ".pi", "mcp.json")} is ignored because PiSharp does not read project trust. Configured: docs, keyed, local.\n"),
                 await Mcp(options, "login", "nope"));
             Equal((1, "", "No MCP server named \"docs\". Configured: none.\n"), await Mcp(CliFixture("{}").Options with { }, "login", "docs"));
-            // Client secrets resolve like the original's config values; shell commands are not run.
+            // Client secrets resolve like the original's config values, `!command` values included (decision 0004).
             Equal("a-s3cret$!", McpCommand.ResolveConfigValue("a-${SECRET}$$$!", "secret", name => name == "SECRET" ? "s3cret" : null));
             Equal("x$", McpCommand.ResolveConfigValue("x$", "secret", _ => null));
             Equal("Failed to resolve d from environment variables: A, B",
                 Throws<InvalidOperationException>(() => McpCommand.ResolveConfigValue("$A-${B}", "d", _ => null)).Message);
-            Check(Throws<InvalidOperationException>(() => McpCommand.ResolveConfigValue("!pass show x", "d", _ => "x")).Message.StartsWith("Failed to resolve d:", StringComparison.Ordinal));
+            Equal("mcp-secret", McpCommand.ResolveConfigValue("!echo mcp-secret", "d", _ => null));
+            Equal("Failed to resolve d from shell command: exit 1",
+                Throws<InvalidOperationException>(() => McpCommand.ResolveConfigValue("!exit 1", "d", _ => "x")).Message);
         }
         finally { Delete(root); }
     }

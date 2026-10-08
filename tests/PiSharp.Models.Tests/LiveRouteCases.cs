@@ -60,7 +60,7 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> LiveRouteCases() =>
     [
         ("live.one-model-per-provider-against-fake-http", LiveEveryProvider),
-        ("live.unsupported-apis-refuse-before-any-request", LiveUnsupported),
+        ("live.provider-api-routes-are-available-before-any-request", LiveUnsupported),
         ("live.models-json-custom-provider-headers-and-auth-header", LiveCustomProvider),
         ("live.cli-patterns-fallback-thinking-and-ambiguity", LivePatterns),
         ("live.scoped-models-and-settings-defaults", LiveScoped),
@@ -91,7 +91,8 @@ internal static partial class Program
         var routed = new List<string>();
         foreach (var provider in BuiltinProviders.All)
         {
-            if (LiveModelFor(provider.Id) is not { } id) continue;
+            // IMPL-A1's provider APIs (AWS, OAuth and Cloudflare/Vertex routes) are pinned by PiSharp.ProviderApis.Tests.
+            if (ProviderApiRoutes.Contains(provider.Id) || LiveModelFor(provider.Id) is not { } id) continue;
             var variable = ProviderEnvironmentKeys.GetApiKeyVariables(provider.Id)![^1];
             var key = "test-key-" + provider.Id;
             var endpoint = new LiveEndpoint(seen => Respond(seen, id));
@@ -124,6 +125,9 @@ internal static partial class Program
         LiveRoutes.AddRange(routed);
     }
 
+    private static readonly string[] ProviderApiRoutes = ["amazon-bedrock", "openai-codex", "github-copilot", "cloudflare-workers-ai", "cloudflare-ai-gateway", "google-vertex"];
+
+    /// <summary>The APIs IMPL-A1 added are no longer refused with LiveApiUnavailable; selection itself sends nothing.</summary>
     private static async Task LiveUnsupported()
     {
         foreach (var (provider, variable) in new[] { ("amazon-bedrock", "AWS_PROFILE"), ("openai-codex", "OPENAI_API_KEY"), ("github-copilot", "COPILOT_GITHUB_TOKEN"),
@@ -132,10 +136,8 @@ internal static partial class Program
             var id = ModelResolver.DefaultModelFor(provider)!;
             var endpoint = new LiveEndpoint(seen => Respond(seen, id));
             var runtime = new LiveSessionRuntime(Env((variable, "k")), () => endpoint);
-            var error = await ThrowsAsync<LiveSessionException>(() => new SettingsModelSelection(null, provider + "/" + id, null)
-                .ResolveAsync(null, runtime, null, false, CancellationToken.None), provider);
-            Equal("LiveApiUnavailable", error.Code, provider + " code");
-            Check(error.Message.Contains("has no live route in PiSharp yet", StringComparison.Ordinal), error.Message);
+            try { await new SettingsModelSelection(null, provider + "/" + id, null).ResolveAsync(null, runtime, null, false, CancellationToken.None); }
+            catch (LiveSessionException error) { Check(error.Code != "LiveApiUnavailable", provider + " still has no live route: " + error.Message); }
             Equal(0, endpoint.Snapshot().Length, provider + " requests");
         }
         // resolveCliModel knows providers from chat models only: a classifier-only provider is unknown to --provider.
@@ -241,6 +243,6 @@ internal static partial class Program
         Check(parsed.Model == new ModelDescriptor("deepseek-v4-pro", "openai-completions", "deepseek") && parsed.Entry is null, "pinned parse for a new provider");
         Equal("UnknownLiveModel", Throws<LiveSessionException>(() => LiveSessionSelection.Parse("openai", "gpt-4o-mini-missing", null), "exact only").Code, "exact");
         Throws<SessionCommandException>(() => LiveSessionSelection.Parse("not-a-provider", "x", null), "unknown provider");
-        Equal("UnknownLiveModel", Throws<LiveSessionException>(() => LiveSessionSelection.Parse("google-vertex", "gemini-3.1-pro-preview", null), "vertex").Code, "no vertex route");
+        Equal("google-vertex", LiveSessionSelection.Parse("google-vertex", "gemini-3.1-pro-preview", null).Model.Api, "vertex route (IMPL-A1)");
     }
 }

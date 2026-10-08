@@ -55,7 +55,7 @@ public sealed partial class PersistentAgentSession
             var state = _agent.Snapshot;
             if (!state.PendingInputs.IsEmpty || state.SteeringCount != 0 || state.FollowUpCount != 0)
                 throw new InvalidOperationException("Catalog publication cannot replace queued input declarations.");
-            idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle; _configuring = true;
+            idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle; _configuring = true; _catalogPublication = idle;
         }
         // Owned retirement publications (reload, resource withdrawal) keep the previous active names pending.
         return PublishToolCatalogCoreAsync(expected, replacement, activeNames, publishPreparedRegistry, cancellationToken, idle, restorePrevious || reservation is not null);
@@ -126,7 +126,7 @@ public sealed partial class PersistentAgentSession
         finally
         {
             if (commitHeld) _commits.Release();
-            lock (_gate) if (ReferenceEquals(_active, idle)) { _active = null; _configuring = false; }
+            lock (_gate) { if (ReferenceEquals(_active, idle)) { _active = null; _configuring = false; } if (ReferenceEquals(_catalogPublication, idle)) _catalogPublication = null; }
             idle.TrySetResult(); _configurationCallback.Value = prior;
         }
     }

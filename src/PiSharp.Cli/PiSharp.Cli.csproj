@@ -13,6 +13,7 @@
     <InternalsVisibleTo Include="PiSharp.McpSync.Tests" />
     <InternalsVisibleTo Include="PiSharp.ToolSearch.Tests" />
     <InternalsVisibleTo Include="PiSharp.Models.Tests" />
+    <InternalsVisibleTo Include="PiSharp.Codemode.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
@@ -23,6 +24,7 @@
     <ProjectReference Include="../PiSharp.Tui/PiSharp.Tui.csproj" />
     <ProjectReference Include="../PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
     <ProjectReference Include="../PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
+    <ProjectReference Include="../PiSharp.Codemode/PiSharp.Codemode.csproj" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Models/*.json" LogicalName="PiSharp.Cli.Models.%(Filename)%(Extension)" />
@@ -34,5 +36,6 @@
   </ItemGroup>
   <ItemGroup Condition="'$(EnablePromptTemplateYaml)' == 'true'">
     <None Include="../../third-party/YamlDotNet.LICENSE.txt" Link="licenses/YamlDotNet.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <None Include="../../third-party/Jint.LICENSE.txt;../../third-party/Jint.CREDITS.txt;../../third-party/Acornima.LICENSE.txt;../../third-party/Acornima.NOTICE.txt" Link="licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
 </Project>
