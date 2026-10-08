@@ -278,10 +278,11 @@
       "workPackage": "2c",
       "release": "1.1.0",
       "test": [
-        "tests/PiSharp.CliSync.Tests"
+        "tests/PiSharp.CliSync.Tests",
+        "tests/PiSharp.CodingAgent.Tests"
       ],
-      "outcome": "partial",
-      "notes": "Tools left out by a reload stay pending and activate when they register (including late MCP servers). Owner decision pending: tools restored from the transcript when a session is opened are still rejected when unbound (SessionRuntimeRegistryFailure.UnknownTool), a deliberate PiSharp contract that existing tests pin."
+      "outcome": "implemented",
+      "notes": "Reload and late registration keep tools pending. Owner decision (2026-10-08): follow upstream v1.1.0 on open and tree navigation: unbound transcript tools become pending and activate on registration; tools disabled or excluded stay off. As upstream, CLI sessions opened with an initial selection (flags, settings or MCP) apply that selection instead of restoring the transcript. The restored loadout is recorded at open or navigation (upstream records at the next prompt), because PiSharp resolves every later turn from the transcript. Also as upstream: a recorded tool whose declaration changed is restored by name with its current binding (on transcript restore, tree navigation and opens with initial names), a now-hidden recorded tool is skipped and stays pending, and navigating to a branch with no system message keeps the current tools. Unknown names in initial selections and explicit activation are still rejected."
     },
     {
       "id": "prompt.hidden-tools",
@@ -763,12 +764,15 @@
       "pisharp": [
         "src/PiSharp.AI/Authentication/OAuth/StoredOAuthLifecycle.cs"
       ],
-      "status": "verify",
+      "status": "port",
       "workPackage": "2i",
       "release": "1.1.0",
-      "outcome": "deviation-pending-decision",
-      "test": "tests/PiSharp.AnthropicAuthSync.Tests",
-      "notes": "PiSharp keeps refusing to publish a refresh that completes after the 15 s deadline; owner decision pending."
+      "outcome": "implemented",
+      "test": [
+        "tests/PiSharp.Authentication.Tests",
+        "tests/PiSharp.AnthropicAuthSync.Tests"
+      ],
+      "notes": "Owner decision (2026-10-08): persist a refresh that succeeds after its deadline, as upstream refreshStoredOAuthCredential does (RefreshTimeout only signals the refresh). Rotated refresh tokens are never discarded; serialization, the logout re-check and caller cancellation are unchanged."
     }
   ],
   "catalogRefreshPending": {

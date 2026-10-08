@@ -270,7 +270,7 @@ function Get-NativeAuthenticationSourcePins {
     # Exact reviewed auth 94596916, merged at 0274fbff; all nine source/provenance files remain frozen.
     return @(
         @{ relative = 'src/PiSharp.AI/Authentication/AuthenticationResolution.cs'; bytes = 2134; sha256 = '50ad2fb5cba43742ed9ce47b25c7c42ffe250444dea4629e8513459e716e919c' },
-        @{ relative = 'src/PiSharp.AI/Authentication/HANDOFF.md'; bytes = 11883; sha256 = '867358ed9588d31042a024907085b1f7d3927ff43fcf1decff0245c7e62fb873' },
+        @{ relative = 'src/PiSharp.AI/Authentication/HANDOFF.md'; bytes = 12108; sha256 = '005670036a4b03a9fc95b47b4de922c5218d28021eb2a050e86ce3abf4bd4720' },
         @{ relative = 'src/PiSharp.AI/Authentication/InjectedAuthenticationResolver.cs'; bytes = 9107; sha256 = '2d43d713f61f806afff0c011e97adaf606b288eed47588158dd39c32ae50e019' },
         @{ relative = 'src/PiSharp.AI/Authentication/ProviderEnvironmentSnapshot.cs'; bytes = 1566; sha256 = 'f84a7899d641844f4474248f361180b5080420874c18b3db61e5086c69784996' },
         @{ relative = 'src/PiSharp.AI/Authentication/integration-additions.proposed.json'; bytes = 7946; sha256 = '4b503b3e21a1fdaad3c6a9b4482983905f7d0da82fefee27d361f9f8f2f68c81' },
