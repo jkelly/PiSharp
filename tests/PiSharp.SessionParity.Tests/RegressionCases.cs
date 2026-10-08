@@ -12,7 +12,7 @@ using static EventFixture;
 // reads only the system fields it uses (packages/ai/src/api/mistral-conversations.ts), so stored extra fields never fail a resume.
 internal static partial class Program
 {
-    private static IEnumerable<(string, Func<Task>)> DiagnosticsCases() =>
+    private static IEnumerable<(string, Func<Task>)> RegressionCases() =>
     [
         Case("diagnostics.projector.records-and-reads-every-declared-adapter", DiagnosticAdapters),
         Case("diagnostics.rpc-host.mistral-failure-is-recorded-and-the-host-survives", MistralFailureThroughRpc),

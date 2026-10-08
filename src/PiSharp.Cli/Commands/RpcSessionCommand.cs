@@ -41,9 +41,10 @@ public static class RpcSessionCommand
         RunCoreAsync(args, stdin, stdout, stderr, null, cancellationToken, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission);
 
     /// <summary>The production entry: the session's MCP servers come from <paramref name="mcpHost"/> (the global mcp.json).</summary>
+    /// <param name="userShutdown">True when the cancellation is a requested shutdown (Pi SIGTERM/SIGHUP), not a failure.</param>
     internal static Task<int> RunHostedAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
-        PiSharp.Cli.Mcp.McpSessionHost mcpHost, CancellationToken cancellationToken = default) =>
-        RunCoreAsync(args, stdin, stdout, stderr, null, cancellationToken, mcpHost: mcpHost ?? throw new ArgumentNullException(nameof(mcpHost)));
+        PiSharp.Cli.Mcp.McpSessionHost mcpHost, CancellationToken cancellationToken = default, Func<bool>? userShutdown = null) =>
+        RunCoreAsync(args, stdin, stdout, stderr, null, cancellationToken, userShutdown, mcpHost: mcpHost ?? throw new ArgumentNullException(nameof(mcpHost)));
 
     /// <summary>Same host lifecycle with injected reads for explicitly selected settings files.</summary>
     public static Task<int> RunWithSettingsAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
