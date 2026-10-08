@@ -386,7 +386,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         NativeExtensionInitializerInstallation? configuredInitializerInstallation = null,
         PiSharp.Cli.Mcp.McpApplicationInitializerAdmission? applicationMcpHost = null,
         Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null,
-        OriginalSystemPromptAdmission? originalSystemPrompt = null, BuiltinToolSettings? toolSettings = null)
+        OriginalSystemPromptAdmission? originalSystemPrompt = null, BuiltinToolSettings? toolSettings = null,
+        PiSharp.Cli.Pi.PiToolPolicy? toolPolicy = null)
     {
         toolSettings ??= BuiltinToolSettings.Default;
         if (configuredExecInstallation is not null && (extension is null || configuredExecInstallation.GetInvocationList().Length != 1))
@@ -505,7 +506,12 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             { CommandPrefix = toolSettings.ShellCommandPrefix, SessionEnvironment = () => CurrentBashSession(bashOwner) });
             userBash = new(new(new NativeShellOperations(shell, environment, canonicalSpill, unboundedOutput), canonicalSpill), toolSettings.ShellCommandPrefix);
         }
-        var policy = new FilePolicy(canonicalWorkspace, reads, writes, reserved, grant, grepHost);
+        var piPolicy = toolPolicy is { Mode: PiSharp.Cli.Pi.PiToolPolicyMode.Pi } ? toolPolicy : null;
+        string? piShell = null;
+        if (piPolicy is not null && bashTool is null)
+            (bashTool, userBash, processCleanup, piShell) = PiBash(piPolicy, toolSettings, canonicalWorkspace, () => CurrentBashSession(bashOwner));
+        var policy = new FilePolicy(canonicalWorkspace, reads, writes, reserved, grant, grepHost)
+        { Pi = piPolicy, PiShell = piShell, ProtectedRoots = [.. extension is null ? [] : new[] { extension.Package, extension.SnapshotRoot }] };
         var grepReader = grepHost is null ? null : new AdmittedGrepContextReader(canonicalWorkspace,
             grepHost.ContextOperations, policy.AuthorizeGrepContextAsync);
         NativeExtensionActivation? activation = null;
@@ -634,12 +640,40 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         public void AdmitMcpCalls(long generation, PiSharp.Cli.Mcp.McpCallGrants grants) =>
             ImmutableInterlocked.Update(ref mcpGrants, current => current.SetItem(generation, grants));
         public Func<string?>? ActiveSessionPath { get; set; }
+        /// <summary>The <c>pi</c> tool policy (decision 0004): any path and any bash command, except the protected targets.</summary>
+        public PiSharp.Cli.Pi.PiToolPolicy? Pi { get; init; }
+        public string? PiShell { get; init; }
+        public ImmutableArray<string> ProtectedRoots { get; init; } = [];
         public static bool Within(string root, string target) =>
             target.StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, Comparison);
         private bool IsReserved(string target)
         {
             var activePath = ActiveSessionPath?.Invoke();
             return reserved.Contains(target) || activePath is not null && Comparer.Equals(SessionCommands.Absolute(activePath), target);
+        }
+        /// <summary>Protected under the <c>pi</c> policy: the reserved files (session, script, extension manifest and approval), the active
+        /// session, every session file of the protected session directories, and the extension package and snapshot roots.</summary>
+        private bool IsPiProtected(string target) => IsReserved(target) ||
+            ProtectedRoots.Any(root => Comparer.Equals(root, target) || Within(root, target)) ||
+            Pi!.ProtectedDirectories.Any(directory => Comparer.Equals(Path.GetDirectoryName(target), Path.TrimEndingDirectorySeparator(directory)) &&
+                target.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase));
+        private ToolActionAuthorization AuthorizePi(PreparedToolAction action)
+        {
+            bool allow;
+            if (action.ToolName == "bash")
+                allow = action.Operation == "bash" && action.Kind == PreparedToolActionKind.Command && PiShell is not null &&
+                    Comparer.Equals(action.Target, PiShell);
+            else
+            {
+                string? target = null;
+                try { target = SessionCommands.Absolute(action.Target); } catch (SessionCommandException) { }
+                allow = action.Kind == PreparedToolActionKind.Path && target is not null &&
+                    action.CommandArguments.IsEmpty && action.Environment.Count == 0 && !IsPiProtected(target) &&
+                    !IsPiProtected(PiSharp.Cli.Pi.PiPaths.Canonicalize(target)) &&
+                    (action.ToolName, action.Operation) is ("read", "read") or ("ls", "ls") or ("edit", "edit") or ("write", "write");
+            }
+            Actions.Add(new { action.ToolName, action.Operation, action.Target, allowed = allow, policy = "pi" });
+            return new(allow);
         }
         public async ValueTask<bool> AuthorizeGrepContextAsync(string path, int maximumBytes, CancellationToken token)
         {
@@ -665,6 +699,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 Actions.Add(new { action.ToolName, action.Operation, action.Target, allowed = granted });
                 return new(granted);
             }
+            if (Pi is not null && action.ToolName is "bash" or "read" or "ls" or "edit" or "write") return AuthorizePi(action);
             if (action.ToolName == "bash")
             {
                 var granted = bash is not null && await bash.AuthorizeAsync(action, token).ConfigureAwait(false);

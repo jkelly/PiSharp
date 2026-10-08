@@ -32,10 +32,22 @@ internal sealed partial class OfflineSessionProfile
         _skillDiagnostic = Report;
         _skills = capture;
     }
+    /// <summary>Skills a Pi-style entry already placed in the original system prompt (its <c>skills</c> section): the binding serves
+    /// <c>/skill:name</c> input only, and no native skills section is written.</summary>
+    private bool _skillsInOriginalPrompt;
+    internal void AdoptOriginalPromptSkills(SkillCliBinding capture)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        RequireStartupViewMutable();
+        if (_skills is not null) throw new InvalidOperationException("Skills are already captured.");
+        _skillsInOriginalPrompt = true; _skillDiagnostic = static (_, _) => ValueTask.CompletedTask;
+        _skills = capture;
+    }
     internal Task ApplySkillsAsync(PersistentAgentSession session, CancellationToken token) =>
         ApplySkillsFromViewAsync(session, CaptureRuntimeView(), token);
     private async Task ApplySkillsFromViewAsync(PersistentAgentSession session, ProfileRuntimeView view, CancellationToken token)
     {
+        if (_skillsInOriginalPrompt) return;
         using var use = view.Lifetime.Enter();
         var catalog = view.Skills?.Resources.FormatForPrompt();
         var effective = new SessionSystemReplay().Replay(session.Snapshot.Agent.Messages).CurrentMessage;

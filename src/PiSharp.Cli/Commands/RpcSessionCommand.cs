@@ -87,9 +87,12 @@ public static class RpcSessionCommand
             cancellationToken.ThrowIfCancellationRequested();
             if (!stdin.CanRead || !stdout.CanWrite) throw Invalid();
             if (!Directory.Exists(parsed.Workspace)) throw new SessionCommandException(SessionCommandFailure.WorkspaceMissing);
-            var settings = await SettingsStartupConfiguration.LoadAsync(parsed.Settings, stderr, settingsFileSystem, cancellationToken).ConfigureAwait(false);
-            var liveSelection = parsed.Live is null ? null : await parsed.Live.ResolveAsync(settings, liveRuntime ?? LiveSessionRuntime.Default, stderr,
-                parsed.SessionMode == "open", cancellationToken).ConfigureAwait(false);
+            // A Pi-style entry (plain pisharp, -p, --mode json|rpc) already resolved settings, model, prompt and tool policy.
+            var pi = PiSharp.Cli.Pi.PiEntryOptions.Current;
+            liveRuntime ??= pi?.LiveRuntime;
+            var settings = pi?.Settings ?? await SettingsStartupConfiguration.LoadAsync(parsed.Settings, stderr, settingsFileSystem, cancellationToken).ConfigureAwait(false);
+            var liveSelection = pi?.Selection ?? (parsed.Live is null ? null : await parsed.Live.ResolveAsync(settings, liveRuntime ?? LiveSessionRuntime.Default, stderr,
+                parsed.SessionMode == "open", cancellationToken).ConfigureAwait(false));
             // Production sessions read the global mcp.json once at start (--no-mcp connects nothing); every session gets the built-in codemode.
             var hostAdmission = mcpAdmission is null && mcpHost is not null;
             if (hostAdmission) mcpAdmission = mcpHost!.CreateAdmission(parsed.Workspace, stderr, settings?.Values, parsed.Tools.NoMcp);
@@ -114,12 +117,16 @@ public static class RpcSessionCommand
                         registrationId = diagnostic.RegistrationId, failure = diagnostic.Failure.ToString() }) + "\n").AsMemory(), token).ConfigureAwait(false);
                     await stderr.FlushAsync(token).ConfigureAwait(false);
                 }, modelSupportsImages: parsed.SupportsImages, liveSelection: liveSelection, liveRuntime: liveRuntime,
-                toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings), mcpAdmission: parsed.Tools.NoMcp && !hostAdmission ? null : mcpAdmission,
-                toolSettings: PiSharp.Tools.BuiltinToolSettings.FromSettings(settings?.Values)).ConfigureAwait(false);
+                toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings) ??
+                    (pi is null ? null : new InitialToolSelection(PiSharp.Tools.BuiltinToolPrompts.DefaultToolNames, true)),
+                mcpAdmission: parsed.Tools.NoMcp && !hostAdmission ? null : mcpAdmission,
+                toolSettings: PiSharp.Tools.BuiltinToolSettings.FromSettings(settings?.Values),
+                originalSystemPrompt: pi?.SystemPrompt, toolPolicy: pi?.ToolPolicy).ConfigureAwait(false);
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();
-            await profile.LoadSkillsAsync(parsed.Skills, stderr, cancellationToken).ConfigureAwait(false);
+            if (pi?.Skills is { } piSkills) profile.AdoptOriginalPromptSkills(piSkills);
+            else await profile.LoadSkillsAsync(parsed.Skills, stderr, cancellationToken).ConfigureAwait(false);
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);
             var options = new PersistentAgentSessionOptions(UseLatestLeaf: parsed.Latest, SelectedLeafId: parsed.Leaf,
@@ -133,7 +140,7 @@ public static class RpcSessionCommand
             session = parsed.SessionMode == "open"
                 ? await lifecycle.OpenAsync(new(parsed.Session, parsed.Latest, parsed.Leaf), profile.SelectedModel, cancellationToken).ConfigureAwait(false)
                 : await lifecycle.CreateAsync(parsed.Session, new PiSharp.Sessions.Serialization.SessionEntryCodec().Parse(JsonSerializer.Serialize(new
-                    { type = "session", version = 3, id = NextId(), timestamp = DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("O", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
+                    { type = "session", version = 3, id = pi?.HeaderId ?? NextId(), timestamp = pi?.HeaderTimestamp ?? DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("O", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
                     profile.SelectedModel, cancellationToken).ConfigureAwait(false);
             if (parsed.SessionMode != "open") await session.ConfigureAsync(new(SystemMessage: new("system", profile.InitialSystem)), cancellationToken).ConfigureAwait(false);
             if (!string.Equals(SessionCommands.Absolute(session.WorkingDirectory), profile.Workspace,
@@ -143,7 +150,8 @@ public static class RpcSessionCommand
                 parsed.SessionMode == "open", session.GetSupportedThinkingLevels());
             if (thinking is not null && thinking != session.Snapshot.Context.ThinkingLevel)
                 await session.ConfigureAsync(new(ThinkingLevel: thinking), cancellationToken).ConfigureAwait(false);
-            await profile.LoadPromptTemplatesAsync(parsed.Prompts, stderr, cancellationToken).ConfigureAwait(false);
+            await profile.LoadPromptTemplatesAsync(pi?.PromptTemplates ?? parsed.Prompts, pi is null ? stderr : TextWriter.Null, cancellationToken).ConfigureAwait(false);
+            if (pi?.SessionName is { } sessionName) await session.SetSessionNameAsync(session.Snapshot.Log.Header.Id, sessionName, cancellationToken).ConfigureAwait(false);
             if (parsed.SessionMode == "open") await profile.ApplySkillsAsync(session, cancellationToken).ConfigureAwait(false);
             if (settings is not null) { session.SteeringMode = settings.SteeringMode; session.FollowUpMode = settings.FollowUpMode; }
             await profile.AttachOwnerAsync(session, options, Clock, NextId, parsed.Stores.IsEmpty ? null : parsed.Stores, lifecycle).ConfigureAwait(false);

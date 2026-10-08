@@ -160,4 +160,7 @@
   <Folder Name="/tests/parity/PiSharp.Codemode.Tests/">
     <Project Path="tests/PiSharp.Codemode.Tests/PiSharp.Codemode.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/parity/PiSharp.CliParity.Tests/">
+    <Project Path="tests/PiSharp.CliParity.Tests/PiSharp.CliParity.Tests.csproj" />
+  </Folder>
 </Solution>
