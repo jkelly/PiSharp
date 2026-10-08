@@ -44,6 +44,31 @@ internal static partial class McpToolResults
         return JsonData.Parse(JsonSerializer.Serialize(output, new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
     }
 
+    /// <summary>A call that failed, as the original's agent loop reports a tool that threw: an error result with the error's message.
+    /// A server that needs a sign-in names how to sign in (runtime.ts signInRequiredMessage).</summary>
+    internal static JsonData Failure(PiSharp.Extensions.Mcp.Configuration.McpServerEntry entry, string tool, Exception failure)
+    {
+        string? message = null;
+        for (Exception? current = failure; current is not null && message is null; current = current.InnerException)
+            if (current is PiSharp.Extensions.Mcp.Authentication.McpOAuthAuthorizationRequiredException)
+                message = PiSharp.Extensions.Runtime.Mcp.Authentication.McpProviderTokenAuthentication.SignInRequiredMessage(entry);
+        if (message is null)
+        {
+            var current = failure;
+            while (true)
+            {
+                if (current is AggregateException { InnerExceptions.Count: 1 } single) current = single.InnerExceptions[0];
+                else if (current is PiSharp.Extensions.Mcp.Resources.McpResourceCallbackException { InnerException: { } wrapped }) current = wrapped;
+                else break;
+            }
+            message = current.Message.Length == 0 ? $"MCP tool {entry.Name}/{tool} failed" : current.Message;
+        }
+        return JsonData.Parse(JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["content"] = new[] { Text(message) }, ["details"] = new Dictionary<string, object?> { ["server"] = entry.Name, ["tool"] = tool }, ["isError"] = true
+        }, new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
+    }
+
     private static async Task<IEnumerable<object>> BlockAsync(string server, JsonElement block, bool readableResources, Saver save, CancellationToken token)
     {
         var type = String(block, "type");

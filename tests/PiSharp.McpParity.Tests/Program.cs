@@ -41,7 +41,11 @@ internal static partial class Program
             ("notifications.server-log-format-and-rotation", ServerLogFormatAndRotation),
             ("cli.mcp-list-resource-and-template-counts", ListResourceCounts),
             ("prompt.servers-section-follows-manager-changes", ServersSectionFollowsManagerChanges),
-            ("results.call-tool-results-convert-for-the-model", ToolResultConversion)
+            ("results.call-tool-results-convert-for-the-model", ToolResultConversion),
+            ("retry.http-connect-retried-twice-after-transient-errors", ConnectRetries),
+            ("retry.http-connect-fails-after-the-retries", ConnectRetriesExhausted),
+            ("retry.expired-session-call-and-transient-read-retried", CallAndReadRetries),
+            ("retry.tool-calls-are-not-retried-after-transient-errors", CallsAreNotRetried)
         };
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)

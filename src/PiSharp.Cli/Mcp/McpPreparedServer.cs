@@ -270,8 +270,12 @@ public sealed class McpPreparedServer : IAsyncDisposable
         var prior = inside.Value; inside.Value = true;
         try
         {
-            var raw = await runtime.CallToolAsync(toolName, arguments, invocation, token).ConfigureAwait(false);
-            if (!ConvertResults) return raw;
+            if (!ConvertResults) return await runtime.CallToolAsync(toolName, arguments, invocation, token).ConfigureAwait(false);
+            JsonData raw;
+            try { raw = await runtime.CallToolAsync(toolName, arguments, invocation, token).ConfigureAwait(false); }
+            // A call that fails reaches the model as an error with the reason, as the original's tool pipeline reports a thrown error.
+            catch (Exception failure) when (!token.IsCancellationRequested && failure is not OperationCanceledException)
+            { return McpToolResults.Failure(serverEntry, toolName, failure); }
             var readable = runtime.Snapshot.Catalog.HasResources && serverEntry.Config.Exposure != McpExposure.Hidden;
             return await McpToolResults.ConvertAsync(serverEntry.Name, toolName, raw, readable,
                 (data, extension, cancellation) => McpResourceToolsPublisher.SaveAsync(data, extension, null!, cancellation), token).ConfigureAwait(false);
