@@ -369,7 +369,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         var linked = CancellationTokenSource.CreateLinkedTokenSource(lifetime, _closing.Token);
         try
         {
-            var registry = _registry.BindInvocationOwner(new(generation, linked.Token));
+            // Pi sets no limit on the nested calls of codemode scripts.
+            var registry = _registry.BindInvocationOwner(new(generation, linked.Token) { UncountedNestedCallTools = ["codemode"] });
             var selection = registry.Resolve(_context, _configuration.Model);
             _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(_context));
             _configuration = selection.Configuration;
@@ -898,6 +899,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             throw new PromptInputAdmissionException(PromptInputAdmissionFailure.InvalidInput);
         // Pi applies a background MCP server's tools between prompts without refusing input: input that arrives while such a
         // catalog publication is committing waits for it, then is admitted as usual.
+        // A host gate (MCP servers a codemode script may need) runs before idle input is admitted.
+        if (BeforeInputAdmission is { } before && !_gatedInput.Value) { bool idle; lock (_gate) idle = _active is null && _inputSubmission is null; if (idle) return GatedAsync(before, input, admission, options, cancellationToken); }
         TaskCompletionSource? publication;
         lock (_gate) publication = _configuring && _catalogPublication is { } pending && ReferenceEquals(_active, pending) ? pending : null;
         if (publication is not null) return AfterPublicationAsync(publication.Task, input, admission, options, cancellationToken);
@@ -917,6 +920,19 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         }
         catch { reservation.Abort.Dispose(); throw; }
         return SubmitInputCoreAsync(input, admission, options, cancellationToken, reservation);
+    }
+
+    /// <summary>Awaited before idle input is admitted, with the input's cancellation; set by the session host.</summary>
+    public Func<CancellationToken, Task>? BeforeInputAdmission { get; set; }
+    private readonly AsyncLocal<bool> _gatedInput = new();
+
+    private async Task<SubmittedInputResult> GatedAsync(Func<CancellationToken, Task> before, PromptInput input, IPromptInputAdmission? admission,
+        PromptInputAdmissionOptions? options, CancellationToken cancellationToken)
+    {
+        await before(cancellationToken).ConfigureAwait(false);
+        _gatedInput.Value = true;
+        try { return await SubmitInputAsync(input, admission, options, cancellationToken).ConfigureAwait(false); }
+        finally { _gatedInput.Value = false; }
     }
 
     private async Task<SubmittedInputResult> AfterPublicationAsync(Task publication, PromptInput input, IPromptInputAdmission? admission,

@@ -13,10 +13,14 @@ public sealed record ToolInvocationScopeOptions(long SessionGeneration, Cancella
 {
     public ToolExecutionMode ExecutionMode { get; init; } = ToolExecutionMode.Parallel;
     public ImmutableHashSet<string> SequentialTools { get; init; } = ImmutableHashSet<string>.Empty;
+    /// <summary>Tools whose nested call trees are not limited by <see cref="MaximumDepth"/> or <see cref="MaximumNestedCalls"/>, because the original sets
+    /// no limit on them (codemode scripts). Cancellation, deadlines and the session lifetime still apply.</summary>
+    public ImmutableHashSet<string> UncountedNestedCallTools { get; init; } = ImmutableHashSet<string>.Empty;
     internal void Validate()
     {
         if (SessionGeneration <= 0 || MaximumDepth is < 1 or > 64 || MaximumNestedCalls is < 1 or > 4096 ||
-            !Enum.IsDefined(ExecutionMode) || SequentialTools is null || SequentialTools.Count > 4096)
+            !Enum.IsDefined(ExecutionMode) || SequentialTools is null || SequentialTools.Count > 4096 ||
+            UncountedNestedCallTools is null || UncountedNestedCallTools.Count > 4096)
             throw new ArgumentOutOfRangeException(nameof(ToolInvocationScopeOptions));
     }
 }
@@ -37,6 +41,8 @@ public sealed class ToolInvocationContext
     internal ToolProgressBudget? ProgressBudget { get; }
     public string ToolCallId => Invocation.Call.Id;
     public string RootToolCallId { get; }
+    /// <summary>Name of the tool call at the root of this nested tree.</summary>
+    public string RootToolName { get; }
     public string? ParentToolCallId { get; }
     public int CallDepth { get; }
     public long SessionGeneration => options.SessionGeneration;
@@ -54,6 +60,7 @@ public sealed class ToolInvocationContext
         Invocation = invocation; this.options = options; this.execute = execute;
         OperationCancellationToken = token; Tools = tools; ParentToolCallId = parent?.ToolCallId;
         RootToolCallId = parent?.RootToolCallId ?? invocation.Call.Id;
+        RootToolName = parent?.RootToolName ?? invocation.Call.Name;
         CallDepth = parent is null ? 0 : parent.CallDepth + 1;
         Record = parent?.Record ?? new(options.MaximumNestedCalls, maximumRecordedArgumentDepth);
         HoldsExclusiveQueue = holdsExclusiveQueue;
@@ -77,12 +84,12 @@ public sealed class ToolInvocationContext
                 return Rejected(call, ToolFailureKind.Blocked, "Nested tool invocation context is inactive.");
             if (onProgress is null || onProgress.GetInvocationList().Length != 1)
                 return Rejected(call, ToolFailureKind.InvalidArguments, "Nested tool update callback is invalid.");
-            if (CallDepth >= options.MaximumDepth || !Record.Admit())
+            if (!options.UncountedNestedCallTools.Contains(RootToolName) && (CallDepth >= options.MaximumDepth || !Record.Admit()))
                 return Rejected(call, ToolFailureKind.Blocked, "Nested tool invocation depth or call limit exceeded.");
             pending.Add(child = new());
         }
         // Publish the actual task after releasing the state lock; CloseAsync also waits for publication.
-        try { child.Work = execute(this, call, onProgress, cancellationToken); }
+        try { child.Work = execute(this, call, onProgress, cancellationToken); _ = Settled(child); }
         catch (Exception)
         {
             child.Work = Task.FromResult(new ToolOutcome(new(Invocation.AssistantMessage with { Content = [call], StopReason = StopReason.ToolUse }, call, 0),
@@ -90,6 +97,13 @@ public sealed class ToolInvocationContext
         }
         finally { child.Published.TrySetResult(); }
         return new(child.Work!);
+    }
+
+    /// <summary>A settled child leaves the pending list, so a tree with any number of calls keeps only its running ones.</summary>
+    private async Task Settled(Child child)
+    {
+        try { await child.Work!.ConfigureAwait(false); } catch (Exception) { }
+        lock (gate) pending.Remove(child);
     }
 
     private ValueTask<ToolOutcome> Rejected(ToolCallContent call, ToolFailureKind kind, string message)

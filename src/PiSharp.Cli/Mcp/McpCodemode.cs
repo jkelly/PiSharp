@@ -24,7 +24,7 @@ internal static class McpCodemode
         """{"type":"object","properties":{"content":{"type":"array","items":{"type":"object"}},"isError":{"type":"boolean"},"_meta":{"type":"object"}},"required":["content"]}""");
 
     /// <summary>A fresh definition for one generation; each binds to exactly one attachment.</summary>
-    internal static McpDiscoveryExecutableDefinition Create(CodemodeMode mode, int? inlineBudget, Func<ICodemodeModelRuntime?> models)
+    internal static McpDiscoveryExecutableDefinition Create(CodemodeMode mode, int? inlineBudget, Func<ICodemodeModelRuntime?> models, bool defaultActive = true)
     {
         var withModels = true;
         return McpDiscoveryExecutableDefinition.CreateCodemode(RegistrationId, CodemodeToolDefinition.CreateDescription([], withModels),
@@ -32,7 +32,7 @@ internal static class McpCodemode
             loadout => CodemodeToolDefinition.PrepareLoadout(loadout, mode, withModels, inlineBudget, tool => OutputSchema(tool.Name, tool.Namespace)),
             descriptor => descriptor with
             {
-                PromptGuidelines = CodemodeToolDefinition.PromptGuidelines,
+                DefaultActive = defaultActive, PromptGuidelines = CodemodeToolDefinition.PromptGuidelines,
                 ConstrainedSampling = CodemodeToolDefinition.ConstrainedSampling,
                 Renderers = CodemodeRenderer.Renderers
             });

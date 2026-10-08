@@ -64,6 +64,10 @@ public sealed record CodemodeSandboxOptions
     public long MemoryLimitBytes { get; init; } = CodemodeLimits.DefaultMemoryLimitBytes;
     /// <summary>Allocation budget of the whole execution, in bytes. Default 1 GiB.</summary>
     public long TotalAllocationLimitBytes { get; init; } = CodemodeLimits.DefaultTotalAllocationLimitBytes;
+    /// <summary>How each script's worker process starts (host.ts: a worker per execution). Defaults to
+    /// <see cref="CodemodeWorker.Default"/>; null runs the engine on a thread of this process, which deep native recursion
+    /// can crash.</summary>
+    public CodemodeWorkerLauncher? Worker { get; init; } = CodemodeWorker.Default;
     /// <summary>Maximum JavaScript call depth. Default 10000.</summary>
     public int RecursionLimit { get; init; } = CodemodeLimits.DefaultRecursionLimit;
 }

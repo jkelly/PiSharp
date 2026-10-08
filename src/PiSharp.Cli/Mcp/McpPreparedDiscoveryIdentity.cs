@@ -52,7 +52,7 @@ public sealed class McpPreparedDiscoveryIdentity
         if (!ReferenceEquals(snapshot, admittedBinding.Snapshot) || !ReferenceEquals(snapshot, semantic.Snapshot)) throw new InvalidOperationException("Discovery requires the exact current semantic/prepared snapshot.");
         var name = kind == McpDiscoveryKind.Codemode ? McpDiscoveryToolIdentity.CodemodeName : McpDiscoveryToolIdentity.ToolSearchName;
         var tool = snapshot.Tools.SingleOrDefault(tool => tool.Name == name && tool.OwnerId == scope.OwnerId && tool.OwnerGeneration == scope.OwnerGeneration && tool.RegistrationId == semantic.RegistrationId);
-        if (tool is null || tool.Exposure != PiSharp.Contracts.ToolExposure.ModelOnly || !tool.DefaultActive ||
+        if (tool is null || tool.Exposure != PiSharp.Contracts.ToolExposure.ModelOnly || !tool.DefaultActive && kind != McpDiscoveryKind.Codemode ||
             !(kind == McpDiscoveryKind.Codemode ? McpDiscoveryToolIdentity.IsCodemodeTool(tool.Name, tool.Parameters) :
                 McpDiscoveryToolIdentity.IsToolSearchTool(tool.Name, tool.Parameters)))
             throw new InvalidOperationException("Discovery metadata is foreign, ordinary or an impostor.");
@@ -73,7 +73,7 @@ public sealed class McpPreparedDiscoveryIdentity
                 current.InvocationOwnerGeneration is { } actual && actual != sessionGeneration) ||
             !current.UsesFinalActionPolicy(policy) || !current.UsesCapturedToolBinding(adapter.Name, declaration, adapter) ||
             !current.RegisteredTools.Any(tool => ReferenceEquals(tool.Declaration, declaration) &&
-                tool.Exposure == ToolExposure.ModelOnly && tool.DefaultActive))
+                tool.Exposure == ToolExposure.ModelOnly && (tool.DefaultActive || Kind == McpDiscoveryKind.Codemode)))
             throw new InvalidOperationException("Discovery identity belongs to a stale or foreign owner/catalog/adapter.");
     }
 
