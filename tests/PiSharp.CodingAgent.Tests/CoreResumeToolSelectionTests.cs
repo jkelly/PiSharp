@@ -14,7 +14,7 @@ internal static class CoreResumeToolSelectionTests
     internal static IEnumerable<(string Name, Func<Task> Run)> Cases() =>
     [
         (StartupToolSelectionTests.Prefix + "core initial read and empty precede unavailable restored binding", Initial),
-        (StartupToolSelectionTests.Prefix + "core absent restored binding is pending, changed declaration is replaced, unknown initial fails without mutation", Rejection),
+        (StartupToolSelectionTests.Prefix + "core absent restored binding is pending, changed declaration is replaced, unknown initial is ignored", Rejection),
         (StartupToolSelectionTests.Prefix + "core held failed initial reporter joins runtime before release without append", Reporter),
         (StartupToolSelectionTests.Prefix + "core lifetime cap survives owner bind and later durable logical activation", Activation),
         (StartupToolSelectionTests.Prefix + "core lifetime cap filters refreshed replacement catalog and rejects widening factory", Replacement),
@@ -70,15 +70,15 @@ internal static class CoreResumeToolSelectionTests
                 "Restored loadout did not record the current declaration.");
             var after = await Bytes(path); Check(after.Length > before.Length && after.Take(before.Length).SequenceEqual(before), "Replaced declaration rewrote history or skipped its record.");
         }
-        // Initial names that are not registered are still rejected.
+        // Pi 1.1.0 _buildRuntime/_applyToolLoadout: initial names that are not registered are dropped, not rejected, and unlike
+        // restored names they do not become pending. The initial selection replaces the recorded loadout before use.
         {
             using var f = new StartupSettingsTests.Fixture(); await using var profile = await Profile(f);
             var path = Path.Combine(f.Root, "old.jsonl"); await Seed(path, f.Root, "legacy"); var before = await Bytes(path);
-            var registry = Registry(profile, f.Root, new() { InitialActiveToolNames = ["missing"] }); var ids = 0;
-            var error = await Failure(PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "reject-" + ++ids, fallbackModel: profile.SelectedModel));
-            Check(error is SessionRuntimeRegistryException { Failure: SessionRuntimeRegistryFailure.UnknownTool }, "Wrong binding rejection.");
-            var after = await Bytes(path); Check(before.SequenceEqual(after), "Rejected effective binding changed durable bytes.");
-            await using var reopened = await SessionLogStore.OpenAsync(path);
+            var registry = Registry(profile, f.Root, new() { InitialActiveToolNames = ["missing", "read"] }); var ids = 0;
+            await using var session = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "ignored-" + ++ids, fallbackModel: profile.SelectedModel);
+            Names(session, "read"); Check(session.PendingToolNames.IsEmpty, "Unknown initial name became pending.");
+            var after = await Bytes(path); Check(after.Length > before.Length && after.Take(before.Length).SequenceEqual(before), "Initial selection rewrote history or skipped its record.");
         }
     }
     private static async Task Reporter()
@@ -109,12 +109,15 @@ internal static class CoreResumeToolSelectionTests
         var session = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "cap-" + ++ids, fallbackModel: profile.SelectedModel);
         await using var owner = new ReplaceableAgentSession(session, (_, _) => throw new InvalidOperationException("No replacement expected."));
         var log = session.Snapshot.Log; var before = await Bytes(path);
-        foreach (var activation in new Func<Task>[] { () => session.SetActiveToolsAsync(["write"]), () => Task.FromResult(session.ScheduleToolActivation(["write"])) })
+        // Pi 1.1.0 setActiveToolsByName (also the extension setActiveTools facade) ignores the capped-out name instead of
+        // rejecting it: the selection stays read and nothing is appended or kept pending.
+        foreach (var activation in new Func<Task>[] { () => session.SetActiveToolsAsync(["read", "write"]), () => Task.FromResult(session.ScheduleToolActivation(["write", "read"])) })
         {
-            var error = await Failure(Call(activation)); Check(error is SessionRuntimeRegistryException { Failure: SessionRuntimeRegistryFailure.UnknownTool }, "Lifetime activation widened cap.");
-            Names(session, "read"); Check(session.Snapshot.Log.Sequence == log.Sequence && session.Snapshot.Fault is null, "Denied activation changed acknowledged live state.");
+            await Call(activation); Check(session.GetToolActivationSelection().Names.SequenceEqual(["read"]), "Lifetime activation widened cap.");
+            Names(session, "read"); Check(session.Snapshot.Log.Sequence == log.Sequence && session.Snapshot.Fault is null && session.PendingToolNames.IsEmpty,
+                "Ignored activation changed acknowledged live state.");
         }
-        var after = await Bytes(path); Check(before.SequenceEqual(after), "Denied activation durably changed selection.");
+        var after = await Bytes(path); Check(before.SequenceEqual(after), "Ignored activation durably changed selection.");
         await session.SetActiveToolsAsync([]); await session.SetActiveToolsAsync(["read"]); Names(session, "read");
         foreach (var exposure in new[] { ToolExposure.Hidden, ToolExposure.Codemode, ToolExposure.Deferred })
         {
@@ -134,7 +137,8 @@ internal static class CoreResumeToolSelectionTests
         var initial = await lifecycle.OpenAsync(new(first), profile.SelectedModel); await using var owner = lifecycle.Attach(initial); var prior = owner.Current;
         var replacement = await owner.SwitchAsync(prior, new(second)); Check(replacement is not null && owner.Current.Generation == prior.Generation + 1, "Actual refreshed catalog replacement failed.");
         Names(owner.Current.Session, "read"); var state = owner.Current.Session.Snapshot; var before = await Bytes(second);
-        Check(await Failure(owner.Current.Session.SetActiveToolsAsync(["write"])) is SessionRuntimeRegistryException { Failure: SessionRuntimeRegistryFailure.UnknownTool }, "Refreshed registry discarded retained cap.");
+        // The capped-out name is ignored (Pi 1.1.0 setActiveToolsByName), so the retained cap keeps write out without a record.
+        await owner.Current.Session.SetActiveToolsAsync(["read", "write"]); Names(owner.Current.Session, "read");
         var after = await Bytes(second); Check(before.SequenceEqual(after) && state.Log.Sequence == owner.Current.Session.Snapshot.Log.Sequence, "Refreshed denied activation changed destination.");
         var third = Path.Combine(f.Root, "third.jsonl"); await Seed(third, f.Root, "legacy");
         // A custom factory is required to carry the exact immutable policy before opening, rather than widen after old retirement.
@@ -268,8 +272,8 @@ internal static class CoreResumeToolSelectionTests
             {
                 await session.SetActiveToolsAsync(["hidden", "code", "deferred"]); Names(session, "code", "deferred");
                 var state = session.Snapshot; var before = await Bytes(path);
-                Check(await Failure(session.SetActiveToolsAsync(["direct"])) is SessionRuntimeRegistryException { Failure: SessionRuntimeRegistryFailure.UnknownTool },
-                    "Explicit script activation allowed an unrelated tool outside the cap.");
+                // Pi 1.1.0 ignores the capped-out name: the unchanged selection appends nothing.
+                await session.SetActiveToolsAsync(["code", "deferred", "direct"]);
                 var after = await Bytes(path); Check(before.SequenceEqual(after) && state.Log.Sequence == session.Snapshot.Log.Sequence && session.Snapshot.Fault is null,
                     "Forbidden capped activation changed authoritative state.");
                 Names(session, "code", "deferred");
@@ -280,8 +284,7 @@ internal static class CoreResumeToolSelectionTests
             await using var emptySession = await PersistentAgentSession.CreateAsync(emptyPath, ExposureHeader(emptyPath, f.Root), empty, profile.SelectedModel,
                 () => 1, () => "empty-" + ++ids);
             var emptyBefore = await Bytes(emptyPath); var emptyState = emptySession.Snapshot;
-            Check(await Failure(emptySession.SetActiveToolsAsync(["code"])) is SessionRuntimeRegistryException { Failure: SessionRuntimeRegistryFailure.UnknownTool },
-                "Legacy script activation escaped an exact empty cap.");
+            await emptySession.SetActiveToolsAsync(["code"]); // Ignored under the exact empty cap, as Pi 1.1.0 does.
             var emptyAfter = await Bytes(emptyPath); Check(emptyBefore.SequenceEqual(emptyAfter) && emptyState.Log.Sequence == emptySession.Snapshot.Log.Sequence,
                 "Empty-cap refusal appended a loadout."); Names(emptySession);
         }

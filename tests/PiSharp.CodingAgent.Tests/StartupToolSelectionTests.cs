@@ -19,7 +19,7 @@ internal static class StartupToolSelectionTests
         (Prefix + "pinned plain modifier malformed and empty projection", Projection),
         (Prefix + "merged modifiers preserve ordered user project semantics", Merge),
         (Prefix + "RPC CLI precedence aliases ordering duplicates and explicit empty", RpcSelection),
-        (Prefix + "unknown unavailable names and missing CLI values reject", Invalid),
+        (Prefix + "unknown unavailable names are ignored and missing CLI values reject", Invalid),
         (Prefix + "resumed RPC settings override recorded tools and absent leaves them", Resume),
         (Prefix + "one shot create and resume apply settings and CLI empty", OneShot),
         (Prefix + "unavailable recorded Bash is pending without override and explicit selection resumes safely", ResumeAdmissionBoundary),
@@ -71,11 +71,19 @@ internal static class StartupToolSelectionTests
     }
     private static async Task Invalid()
     {
-        foreach (var flags in new[] { new[] { "--tools", "unknown" }, new[] { "--tools", "bash" },
-            new[] { "--tools", "find" }, new[] { "--tools", "grep" }, new[] { "--tools", "+read" }, new[] { "-t" } })
+        // Pi 1.1.0 sdk.ts passes --tools names as initialActiveToolNames and _applyToolLoadout drops the ones that are not
+        // registered: unknown names and tools this profile does not register (unauthorized Bash, find, grep) are ignored, not
+        // rejected. A +name list changes the defaults, whose unregistered bash is ignored the same way.
+        foreach (var (flags, expected) in new (string[] Flags, string[] Expected)[] { (["--tools", "unknown"], []), (["--tools", "bash"], []),
+            (["--tools", "find,read"], ["read"]), (["--tools", "grep,unknown,edit"], ["edit"]), (["--tools", "+read"], ["read", "edit", "write"]) })
         {
             using var fixture = new StartupSettingsTests.Fixture();
-            await using var host = new StartupSettingsTests.Host(fixture, null, flags, "new-lazy");
+            await Create(fixture, flags); Names(expected, await DurableTools(fixture));
+        }
+        // A flag without its value is still a CLI argument error (args.ts reports `-t` as an unknown option).
+        {
+            using var fixture = new StartupSettingsTests.Fixture();
+            await using var host = new StartupSettingsTests.Host(fixture, null, ["-t"], "new-lazy");
             Equal(2, await host.Completion); Equal(false, File.Exists(Path.Combine(fixture.Root, "session.jsonl")));
             Equal(true, host.Error.ToString().Contains("InvalidArguments", StringComparison.Ordinal));
         }

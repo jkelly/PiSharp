@@ -10,7 +10,6 @@ internal sealed record InitialToolSelection(ImmutableArray<string> Names, bool I
 {
     /// <summary>Captured CLI cap for the core owner's atomic initial-admission integration.</summary>
     internal AllowedToolSelection? LifetimePolicy { get; init; }
-    internal bool UseAvailableDefaults { get; init; }
 }
 
 internal sealed record ToolSelectionCliOptions(ImmutableArray<string>? Tools = null,
@@ -63,10 +62,8 @@ internal static class ToolSelectionCliConfiguration
             var policy = AllowedToolSelection.Create(cli.Tools, cli.Excluded,
                 cli.NoTools ? NoToolsMode.All : cli.NoBuiltinTools ? NoToolsMode.Builtin : NoToolsMode.None,
                 configuredDefaults: configured);
-            // A +name/-name list changes the built-in defaults; like them, unavailable names are skipped.
-            var modifiers = !policy.DefaultToolModifiers.IsEmpty;
-            return new(policy.InitialNames, policy.IncludeDefaultExtensions)
-            { LifetimePolicy = policy, UseAvailableDefaults = (cli.Tools is null || modifiers) && configured is null };
+            // Names that are not registered are ignored when the session applies the selection, as Pi 1.1.0 does.
+            return new(policy.InitialNames, policy.IncludeDefaultExtensions) { LifetimePolicy = policy };
         }
         catch (ArgumentException) { throw new SessionCommandException(SessionCommandFailure.InvalidArguments); }
     }
@@ -78,8 +75,7 @@ internal static class ToolSelectionCliConfiguration
             {
                 var defaults = settings is null ? null : StartupToolSelection.Resolve(settings.Values);
                 var policy = AllowedToolSelection.Create(names, configuredDefaults: defaults);
-                return new(policy.InitialNames, policy.IncludeDefaultExtensions)
-                { LifetimePolicy = policy, UseAvailableDefaults = !policy.DefaultToolModifiers.IsEmpty && defaults is null };
+                return new(policy.InitialNames, policy.IncludeDefaultExtensions) { LifetimePolicy = policy };
             }
             catch (ArgumentException) { throw new SessionCommandException(SessionCommandFailure.InvalidArguments); }
         }

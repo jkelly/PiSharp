@@ -383,7 +383,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         return GetToolActivationSelection().Names;
     }
 
-    /// <summary>Host-owned activation at the durable idle boundary. Unknown and hidden names are ignored.
+    /// <summary>Host-owned activation at the durable idle boundary. Unknown and hidden names, and names the lifetime
+    /// selection keeps out, are ignored (source setActiveToolsByName); they do not become pending.
     /// An in-flight run, pending input, retired owner or cancelled request cannot publish a new loadout.</summary>
     public Task<PersistentAgentSessionSnapshot> SetActiveToolsAsync(ImmutableArray<string> names,
         CancellationToken cancellationToken = default) => ConfigureAsync(new() { ActiveToolNames = names }, cancellationToken);

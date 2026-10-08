@@ -94,7 +94,6 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     internal async ValueTask AttachSessionAsync(PersistentAgentSession session, string reason, CancellationToken token)
     { await AttachOwnerAsync(session).ConfigureAwait(false); await StartLifecycleAsync(reason, token).ConfigureAwait(false); }
     private readonly ImmutableArray<string>? _initialActiveTools;
-    private readonly ImmutableArray<string>? _deferredCatalogNames;
     internal async Task ApplyInitialToolSelectionAsync(PersistentAgentSession session, CancellationToken token)
     {
         if (mcpRuntime is not null)
@@ -241,23 +240,16 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         }
         if (toolSelection is not null)
         {
-            if (deferCatalogValidation && !toolSelection.UseAvailableDefaults) _deferredCatalogNames = toolSelection.Names;
             var selected = ImmutableArray.CreateBuilder<string>();
             foreach (var name in toolSelection.Names)
             {
                 if (name.Length is < 1 or > 64 || name.Any(char.IsControl))
                 { _client?.Dispose(); throw new SessionCommandException(SessionCommandFailure.InvalidArguments); }
-                if (name.Contains('*')) continue; // Patterns select the matching registrations below.
-                if (deferCatalogValidation && !registrations.Any(value => value.Adapter.Name == name)) continue;
-                if (toolSelection.UseAvailableDefaults && !registrations.Any(value => value.Adapter.Name == name)) continue;
-                if (toolSelection.LifetimePolicy is not null && registrations.Any(value => value.Adapter.Name == name &&
-                    value.Exposure is not (ToolExposure.Direct or ToolExposure.ModelOnly))) continue;
-                if (name.Length is < 1 or > 64 || !registrations.Any(value => value.Adapter.Name == name &&
-                    value.Exposure is ToolExposure.Direct or ToolExposure.ModelOnly))
-                {
-                    _client?.Dispose();
-                    throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
-                }
+                // Patterns select the matching registrations below. Pi 1.1.0 sdk.ts passes the names as initialActiveToolNames
+                // and _applyToolLoadout drops names that are not registered (or not declarable here) without an error; MCP tools
+                // the allowlist names activate when they register later (_refreshToolRegistry).
+                if (name.Contains('*') || !registrations.Any(value => value.Adapter.Name == name &&
+                    value.Exposure is ToolExposure.Direct or ToolExposure.ModelOnly)) continue;
                 if (!selected.Contains(name)) selected.Add(name);
             }
             // Naming or matching a tool with --tools activates it even when it is not active by default.

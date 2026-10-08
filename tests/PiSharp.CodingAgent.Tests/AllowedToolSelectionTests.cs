@@ -19,7 +19,7 @@ internal static class AllowedToolSelectionTests
         (StartupToolSelectionTests.Prefix + "policy hidden model-only script-only default extension selection", Exposures),
         (StartupToolSelectionTests.Prefix + "policy filters each catalog refresh and ordinal names", Refresh),
         (StartupToolSelectionTests.Prefix + "CLI captures lifetime explicit cap without settings cap", CliCapture),
-        (StartupToolSelectionTests.Prefix + "filtered real registry denies later activation without durable mutation", Registry)
+        (StartupToolSelectionTests.Prefix + "filtered real registry ignores later activation of a filtered tool", Registry)
     ];
     private static void Check(bool value, string reason) { if (!value) throw new InvalidOperationException(reason); }
     private static void Names(IEnumerable<string> expected, IEnumerable<string> actual) =>
@@ -95,15 +95,18 @@ internal static class AllowedToolSelectionTests
         await session.SetActiveToolsAsync(["read"], stop.Token); Names(["read"], session.GetActiveTools());
         var acknowledged = session.Snapshot;
         var before = await ReadAcknowledgedBytes(path, acknowledged.Log.CommittedByteLength, stop.Token);
-        try { await session.SetActiveToolsAsync(["write"], stop.Token); throw new InvalidOperationException("Filtered binding reactivated."); }
-        catch (SessionRuntimeRegistryException error) { Check(error.Failure == SessionRuntimeRegistryFailure.UnknownTool, "Wrong rejection."); }
-        var rejected = session.Snapshot;
-        Check(acknowledged.Log.CommittedByteLength == rejected.Log.CommittedByteLength &&
-            acknowledged.Log.Sequence == rejected.Log.Sequence && acknowledged.Context.LeafId == rejected.Context.LeafId,
-            "Rejected activation changed acknowledged durable state.");
-        var after = await ReadAcknowledgedBytes(path, rejected.Log.CommittedByteLength, stop.Token);
-        Check(before.SequenceEqual(after), "Rejected activation mutated durable bytes.");
-        Names(["read"], session.GetActiveTools());
+        // Pi 1.1.0 setActiveToolsByName ignores names the --tools cap kept out of the registry instead of rejecting them,
+        // so the filtered write binding is not reactivated and the unchanged selection appends nothing.
+        await session.SetActiveToolsAsync(["read", "write"], stop.Token);
+        var ignored = session.Snapshot;
+        Check(acknowledged.Log.CommittedByteLength == ignored.Log.CommittedByteLength &&
+            acknowledged.Log.Sequence == ignored.Log.Sequence && acknowledged.Context.LeafId == ignored.Context.LeafId,
+            "Ignored activation changed acknowledged durable state.");
+        var after = await ReadAcknowledgedBytes(path, ignored.Log.CommittedByteLength, stop.Token);
+        Check(before.SequenceEqual(after), "Ignored activation mutated durable bytes.");
+        Names(["read"], session.GetActiveTools()); Check(session.PendingToolNames.IsEmpty, "Filtered binding became pending.");
+        // Selecting only the filtered tool is the empty selection, as upstream applies it.
+        await session.SetActiveToolsAsync(["write"], stop.Token); Names([], session.GetActiveTools());
     }
     private static async Task<byte[]> ReadAcknowledgedBytes(string path, long committedLength, CancellationToken token)
     {
