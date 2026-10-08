@@ -79,10 +79,9 @@ internal static partial class Program
     {
         var selection = ToolSelectionCliConfiguration.ResolveOptions(new(ImmutableArray.Create("+grep", "-edit")), null)!;
         Names(["read", "bash", "write", "grep"], selection.Names, "modifier initial names");
-        Check(selection.UseAvailableDefaults && selection.IncludeDefaultExtensions && selection.LifetimePolicy!.AllowedNames is null,
-            "Modifiers became a lifetime cap or strict selection.");
+        Check(selection.IncludeDefaultExtensions && selection.LifetimePolicy!.AllowedNames is null, "Modifiers became a lifetime cap.");
         var plain = ToolSelectionCliConfiguration.ResolveOptions(new(ImmutableArray.Create("read", "mcp__srv__*")), null)!;
-        Check(!plain.UseAvailableDefaults && !plain.IncludeDefaultExtensions && plain.LifetimePolicy!.AllowedNames!.Count == 2, "Plain list cap changed.");
+        Check(!plain.IncludeDefaultExtensions && plain.LifetimePolicy!.AllowedNames!.Count == 2, "Plain list cap changed.");
         var none = ToolSelectionCliConfiguration.ResolveOptions(new(NoTools: true) { NoMcp = true }, null)!;
         Check(none.Names.IsEmpty && !none.LifetimePolicy!.IsAllowed("mcp__srv__x"), "--no-tools kept MCP tools.");
     }

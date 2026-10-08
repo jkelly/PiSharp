@@ -211,8 +211,10 @@ public sealed partial class SessionRuntimeRegistry
                 throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
             nameCharacters += name.Length;
             if (!Identity(name)) throw Error(SessionRuntimeRegistryFailure.InvalidRegistration);
-            if (_options.LifetimeToolSelection?.IsAllowed(name) == false) throw Error(SessionRuntimeRegistryFailure.UnknownTool);
-            // Unnamed MCP tools kept by a --tools allowlist are declared only when tool_search can load them.
+            // Source setActiveToolsByName/_applyToolLoadout: unknown names, hidden tools and names --tools/--exclude-tools keep
+            // out of the registry are ignored (not rejected, not pending). Unnamed MCP tools kept by a --tools allowlist are
+            // declared only when tool_search can load them.
+            if (_options.LifetimeToolSelection?.IsAllowed(name) == false) continue;
             if (seen.Add(name) && _tools.TryGetValue(name, out var tool) && tool.Exposure != ToolExposure.Hidden &&
                 _options.LifetimeToolSelection?.IsActivatable(name, tool.Exposure, _tools.ContainsKey("tool_search")) != false)
                 selected.Add(name);
@@ -350,8 +352,9 @@ public sealed partial class SessionRuntimeRegistry
                 if (name is null || !Identity(name)) throw Error(SessionRuntimeRegistryFailure.InvalidRegistration);
                 if (name.Length > _options.MaximumCharacters - initialCharacters) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
                 initialCharacters += name.Length;
-                if (_options.LifetimeToolSelection?.IsAllowed(name) == false) continue;
-                if (!_tools.TryGetValue(name, out var tool)) throw Error(SessionRuntimeRegistryFailure.UnknownTool);
+                // Source constructor/_buildRuntime: initial names that are not registered are dropped by _applyToolLoadout,
+                // and they do not become pending (only restored and reloaded loadouts do).
+                if (_options.LifetimeToolSelection?.IsAllowed(name) == false || !_tools.TryGetValue(name, out var tool)) continue;
                 if (tool.Exposure is not (ToolExposure.Direct or ToolExposure.ModelOnly)) continue;
                 // A recorded declaration that remains selected must match its binding, unless a restored loadout replaces it.
                 if (active.TryGetValue(name, out var recorded) && !Same(recorded.Value, tool.Declaration.Value, cancellationToken))

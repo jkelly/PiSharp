@@ -21,7 +21,7 @@ internal static class McpProfileReviewTests
         ("mcp-profile-review. explicit and configured discovered create names activate durably", Create),
         ("mcp-profile-review. explicit discovered resume whitelist reaches actual provider request", Resume),
         ("mcp-profile-review. explicit discovered RPC whitelist reaches bound startup", Rpc),
-        ("mcp-profile-review. unknown create resume RPC names join held acquired cleanup", Unknown),
+        ("mcp-profile-review. unknown create resume RPC names are ignored and discovery rejection joins held acquired cleanup", Unknown),
         ("mcp-profile-review. summary and context-edit operation failures withdraw before writer close", ExceptionalCommands),
         ("mcp-profile-review. operation and distinct cleanup originals survive repeated owner joins", FaultIdentity)
     ];
@@ -76,42 +76,79 @@ internal static class McpProfileReviewTests
     }
     private static async Task Unknown()
     {
+        // Pi 1.1.0 sdk.ts/_applyToolLoadout ignore selected names the discovered catalog does not register: create, resume and RPC
+        // startup succeed and declare no tool for the unknown name (an mcp__ entry filters the unnamed echo tool).
+        foreach (var command in new[] { "create", "resume" })
+        {
+            using var files = new Files(); if (command != "create") await files.Seed();
+            var host = new Admission(); host.Release.TrySetResult();
+            var result = await Command(files, command, host, command == "create" ? ["--tools", "mcp__profile__missing"] :
+                ["--tools", "mcp__profile__missing", "--offline-script", files.Script, "--message", "next"]);
+            Check(result.Code == 0 && result.Error == "", $"Unknown {command} selection was rejected.");
+            Check(!await Declared(files, "toolsAdded"), $"Unknown {command} selection declared an unnamed MCP tool.");
+            if (command == "resume")
+            {
+                using var report = JsonDocument.Parse(result.Output);
+                Check(report.RootElement.GetProperty("requests")[0].GetProperty("toolNames").GetArrayLength() == 0, "Unknown resume selection declared tools.");
+            }
+            host.AssertClosed();
+        }
+        {
+            using var files = new Files(); await files.Seed(); var host = new Admission(); host.Release.TrySetResult();
+            var state = Gate(); JsonData? received = null;
+            await using var connection = new BoundedRpcConnection((record, token) =>
+            { if (record.Value.TryGetProperty("id", out var id) && id.GetString() == "state") { received = record; state.TrySetResult(); } return ValueTask.CompletedTask; });
+            var error = new StringWriter();
+            var original = RpcSessionCommand.RunAsync(files.Args("rpc", "--offline-script", files.Script, "--tools", "mcp__profile__missing"),
+                connection.Input, connection.Output, error, mcpAdmission: host.Acquire);
+            Exception? assertion = null;
+            try
+            {
+                await connection.SendAsync(JsonData.Parse("{\"id\":\"state\",\"type\":\"get_state\"}"), CancellationToken.None);
+                Check(ReferenceEquals(await Task.WhenAny(state.Task, original), state.Task) && received!.Value.GetProperty("success").GetBoolean(),
+                    "Unknown RPC selection did not bind before state acknowledgment.");
+            }
+            catch (Exception failure) { assertion = failure; }
+            finally { connection.CompleteInput(); }
+            var code = await original; if (assertion is not null) throw assertion;
+            Check(code == 0 && error.ToString() == "", "Unknown RPC selection was rejected."); host.AssertClosed();
+        }
+        // A startup the discovered catalog rejects (an authored fixture rejection at the same discovery preparation point) still
+        // joins the held acquired cleanup before it reports its failure.
         foreach (var command in new[] { "create", "resume", "rpc" })
         {
             using var files = new Files(); if (command != "create") await files.Seed();
-            var host = new Admission(); var output = new StringWriter(); var error = new StringWriter();
+            var host = new Admission { RejectDiscovery = true }; var output = new StringWriter(); var error = new StringWriter();
             using var input = new MemoryStream(); using var rpcOutput = new MemoryStream();
-            string[] tail = command == "create" ? ["--tools", "mcp__profile__missing"] :
-                command == "resume" ? ["--tools", "mcp__profile__missing", "--offline-script", files.Script, "--message", "next"] :
-                ["--tools", "mcp__profile__missing", "--offline-script", files.Script];
+            string[] tail = command == "create" ? [] : command == "resume" ? ["--offline-script", files.Script, "--message", "next"] : ["--offline-script", files.Script];
             var original = command == "rpc" ? RpcSessionCommand.RunAsync(files.Args(command, tail), input, rpcOutput, error, mcpAdmission: host.Acquire) :
                 SessionCommands.RunAsync(files.Args(command, tail), output, error, mcpAdmission: host.Acquire);
             Exception? assertion = null;
             try
             {
-                Check(ReferenceEquals(await Task.WhenAny(host.Closing.Task, original), host.Closing.Task), "Unknown selection rejected before discovering and joining the actual admitted catalog.");
+                Check(ReferenceEquals(await Task.WhenAny(host.Closing.Task, original), host.Closing.Task), "Rejected startup did not discover and join the actual admitted catalog.");
                 Check(!original.IsCompleted && host.Initializes == 1 && host.Lists == 1 && host.NativeCloses == 0,
-                    "Unknown selection escaped held capture cleanup or acquired a writer prematurely.");
-                if (command == "create") Check(!File.Exists(files.Session), "Invalid actual catalog acquired a durable session writer.");
+                    "Rejected startup escaped held capture cleanup or acquired a writer prematurely.");
+                if (command == "create") Check(!File.Exists(files.Session), "Rejected actual catalog acquired a durable session writer.");
             }
             catch (Exception failure) { assertion = failure; }
             finally { host.Release.TrySetResult(); }
             var code = await original; if (assertion is not null) throw assertion;
             var publicCode = PublicFailureCode(error.ToString());
             Console.Error.WriteLine("DIAGNOSTIC " + JsonSerializer.Serialize(new
-            { source = "mcp-profile-review.unknown-startup", variant = command, exitCode = code, publicCode }));
+            { source = "mcp-profile-review.rejected-startup", variant = command, exitCode = code, publicCode }));
             host.AssertClosed();
             var diagnostic = $"variant={command}; exit={code}; publicCode={publicCode}";
-            Check(code == 2, "Unknown actual catalog exit mismatch; " + diagnostic);
-            Check(error.ToString().Contains("InvalidArguments", StringComparison.Ordinal), "Unknown actual catalog code mismatch; " + diagnostic);
+            Check(code == 2, "Rejected actual catalog exit mismatch; " + diagnostic);
+            Check(error.ToString().Contains("InvalidArguments", StringComparison.Ordinal), "Rejected actual catalog code mismatch; " + diagnostic);
             if (command == "rpc")
             {
                 using var failure = JsonDocument.Parse(error.ToString());
                 Check(failure.RootElement.GetProperty("cleanupFailureCount").GetInt32() == 0 && rpcOutput.Length == 0,
-                    "Unknown RPC startup added cleanup failures or output frames.");
+                    "Rejected RPC startup added cleanup failures or output frames.");
             }
         }
-        var extensionHost = new Admission();
+        var extensionHost = new Admission { RejectDiscovery = true };
         await NativeShutdownPlacementTests.RejectedStartup(extensionHost.Acquire, extensionHost.Closing.Task,
             () => extensionHost.Release.TrySetResult(), extensionHost.AssertClosed);
     }
@@ -231,6 +268,8 @@ internal static class McpProfileReviewTests
         internal readonly TaskCompletionSource Closing = Gate(), Release = Gate();
         internal int Initializes, Lists, Closes, NativeCloses, DiscoveryCloses;
         internal Exception? StopFault, DiscoveryFault; private Task? close;
+        /// <summary>Reject the discovered catalog with InvalidArguments, as a startup-time catalog validation would.</summary>
+        internal bool RejectDiscovery;
         internal async ValueTask<McpSessionRuntimeAdmission> Acquire(string cwd, long generation, SessionRuntimeRegistry native, IToolActionPolicy policy, CancellationToken token)
         {
             var extensions = new ExtensionRegistry(); var scope = await extensions.ActivateAsync("review-profile", new EmptyExtension());
@@ -240,7 +279,11 @@ internal static class McpProfileReviewTests
                 [new("profile", actual => Check(ReferenceEquals(actual, entry), "Entry changed."), (actual, current, cancellation) =>
                     McpPreOpenServerCapture.AcquireAsync(actual, extensions, scope, current, policy, (name, arguments, validation) => ValueTask.FromResult(true),
                         (configured, acquireToken) => ValueTask.FromResult<IMcpAdmittedRequestChannel>(this), new(generation, "0.99.1"),
-                        (registry, binding) => binding.PreparedHooks ?? registry.PreparedToolHooks, cancellation))], false, (plan, current) => new(current, []));
+                        (registry, binding) => binding.PreparedHooks ?? registry.PreparedToolHooks, cancellation))], false, (plan, current) =>
+                {
+                    if (RejectDiscovery) throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
+                    return new(current, []);
+                });
         }
         public ValueTask StartAsync(CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask NotifyAsync(string method, JsonData? parameters, CancellationToken token) => ValueTask.CompletedTask;
