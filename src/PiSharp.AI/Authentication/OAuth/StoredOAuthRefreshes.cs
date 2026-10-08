@@ -9,10 +9,12 @@ namespace PiSharp.AI.Authentication.OAuth;
 /// Sign in with ChatGPT token refresh (provider <c>openai</c>): <c>POST https://auth.openai.com/api/accounts/oauth/token</c>
 /// with the form <c>grant_type=refresh_token</c>, the issued <c>client_id</c> stored with the credential, the refresh token and
 /// <c>resource=https://api.openai.com/v1</c>. The new token must carry the <c>chatgpt.tokens.use.direct</c> scope; it expires
-/// three minutes before the reported lifetime ends. The credential keeps its <c>clientId</c>; the granted scopes are checked
-/// but not stored, because the credential store keeps string fields only.
+/// three minutes before the reported lifetime ends. The credential keeps its <c>clientId</c> and the granted <c>scopes</c>
+/// array (credentialFromTokenResponse). This is the single ChatGPT token refresh; <see cref="OpenAIChatGPTOAuth"/> (login)
+/// refreshes through it and builds its login credential with <see cref="CredentialFromTokenResponse"/>.
 /// </summary>
-public sealed class OpenAIChatGPTOAuthRefresh(HttpMessageInvoker http, TimeProvider? timeProvider = null) : IAdmittedOAuthRefresh
+public sealed class OpenAIChatGPTOAuthRefresh(HttpMessageInvoker http, TimeProvider? timeProvider = null, string tokenUrl = OpenAIChatGPTOAuthRefresh.TokenUrl)
+    : IAdmittedOAuthRefresh
 {
     public const string TokenUrl = "https://auth.openai.com/api/accounts/oauth/token";
     private const string Resource = "https://api.openai.com/v1";
@@ -26,7 +28,7 @@ public sealed class OpenAIChatGPTOAuthRefresh(HttpMessageInvoker http, TimeProvi
         ArgumentNullException.ThrowIfNull(current);
         if (!current.ProviderData.TryGetValue("clientId", out var clientId) || string.IsNullOrWhiteSpace(clientId))
             throw new InvalidOperationException("Stored OpenAI OAuth credential does not contain an issued client ID; reconnect ChatGPT");
-        using var request = new HttpRequestMessage(HttpMethod.Post, TokenUrl)
+        using var request = new HttpRequestMessage(HttpMethod.Post, tokenUrl)
         {
             Content = new FormUrlEncodedContent([new("grant_type", "refresh_token"), new("client_id", clientId),
                 new("refresh_token", current.Refresh), new("resource", Resource)])
@@ -39,6 +41,12 @@ public sealed class OpenAIChatGPTOAuthRefresh(HttpMessageInvoker http, TimeProvi
         JsonElement token;
         try { using var document = JsonDocument.Parse(text); token = document.RootElement.Clone(); }
         catch (JsonException) { throw new InvalidOperationException("OpenAI OAuth token response must be an object"); }
+        return CredentialFromTokenResponse(token, clientId, time.GetUtcNow().ToUnixTimeMilliseconds());
+    }
+
+    /// <summary>credentialFromTokenResponse: validates the token response and builds the stored credential.</summary>
+    public static OAuthCredentialSnapshot CredentialFromTokenResponse(JsonElement token, string clientId, long nowUnixMilliseconds)
+    {
         if (token.ValueKind != JsonValueKind.Object) throw new InvalidOperationException("OpenAI OAuth token response must be an object");
         string Required(string field) => token.TryGetProperty(field, out var value) && value.ValueKind == JsonValueKind.String &&
             value.GetString()!.Trim().Length != 0 ? value.GetString()! : throw new InvalidOperationException($"OpenAI OAuth token response has invalid {field}");
@@ -46,10 +54,12 @@ public sealed class OpenAIChatGPTOAuthRefresh(HttpMessageInvoker http, TimeProvi
         if (!token.TryGetProperty("expires_in", out var expiresIn) || expiresIn.ValueKind != JsonValueKind.Number ||
             !expiresIn.TryGetDouble(out var seconds) || !double.IsFinite(seconds) || seconds <= 0)
             throw new InvalidOperationException("OpenAI OAuth token response has invalid expires_in");
-        if (!scope.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Contains(DirectTokenScope, StringComparer.Ordinal))
+        var scopes = scope.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        if (!scopes.Contains(DirectTokenScope, StringComparer.Ordinal))
             throw new InvalidOperationException($"OpenAI OAuth grant did not include {DirectTokenScope}");
-        var expires = time.GetUtcNow().ToUnixTimeMilliseconds() + (long)(seconds * 1000) - ExpiryMarginMilliseconds;
-        return new(access, refresh, expires, new Dictionary<string, string> { ["clientId"] = clientId });
+        var expires = nowUnixMilliseconds + (long)(seconds * 1000) - ExpiryMarginMilliseconds;
+        return new(access, refresh, expires, new Dictionary<string, string> { ["clientId"] = clientId },
+            new Dictionary<string, PiSharp.Contracts.JsonData> { ["scopes"] = PiSharp.Contracts.JsonData.Parse(JsonSerializer.Serialize(scopes)) });
     }
 
     public override string ToString() => "OpenAIChatGPTOAuthRefresh";

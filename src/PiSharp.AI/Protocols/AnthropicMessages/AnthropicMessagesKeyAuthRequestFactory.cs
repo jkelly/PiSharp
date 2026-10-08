@@ -12,7 +12,12 @@ public sealed record AnthropicMessagesKeyAuthRequestOptions(double? MaxTokens = 
     string? SessionId = null, bool SendSessionAffinityHeaders = false, string SessionAffinityHeader = "x-session-affinity",
     double MaximumTokenMagnitude = 1_000_000, int MaximumKeyCharacters = 4096, int MaximumBaseUriCharacters = 4096,
     int MaximumPayloadBytes = 1_048_576, int MaximumPayloadDepth = 32, int MaximumHeaders = 128,
-    int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768);
+    int MaximumHeaderCharacters = 8192, int MaximumTotalHeaderCharacters = 32_768)
+{
+    /// <summary>Pi abe508e1 anthropic-messages.ts createClient for provider github-copilot: the key travels as
+    /// <c>Authorization: Bearer</c> (the SDK's authToken) instead of x-api-key.</summary>
+    public bool BearerAuthorization { get; init; }
+}
 public enum AnthropicMessagesKeyAuthRequestFailure { InvalidConfiguration, InvalidRequest, InvalidKey, UnsupportedOptions, ResourceLimit }
 public sealed class AnthropicMessagesKeyAuthRequestException : Exception
 {
@@ -51,7 +56,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         if (baseUri.AbsoluteUri.Length > _options.MaximumBaseUriCharacters ||
             Math.Abs(_options.MaxTokens ?? projectionOptions.MaximumTokens) > _options.MaximumTokenMagnitude)
             throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
-        if (projectionOptions.OAuthProjection || expectedModel.Provider == "github-copilot")
+        if (projectionOptions.OAuthProjection || expectedModel.Provider == "github-copilot" && !_options.BearerAuthorization)
             throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
         // SDK buildURL appends the resource path to a configured base path rather than replacing it.
         try { _endpoint = new Uri(baseUri.AbsoluteUri.TrimEnd('/') + "/v1/messages?beta=true"); }
@@ -169,13 +174,15 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
     }
     private Dictionary<string,string> PreparedHeaders(JsonData projected, string explicitApiKey)
     {
-        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["x-api-key"] = explicitApiKey };
+        var keyHeader = _options.BearerAuthorization ? "authorization" : "x-api-key";
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        { [keyHeader] = _options.BearerAuthorization ? "Bearer " + explicitApiKey : explicitApiKey };
         foreach (var pair in _headers)
             if (pair.Value is null) headers.Remove(pair.Key); else headers[pair.Key] = pair.Value.Trim(' ', '\t');
         headers["content-type"] = "application/json"; // SDK's JSON encoder body headers override client defaults.
         if (projected.Value.TryGetProperty("betas", out var betas))
             headers["anthropic-beta"] = string.Join(',', betas.EnumerateArray().Select(value => value.GetString()));
-        if (!headers.TryGetValue("x-api-key", out var admittedKey) || admittedKey.Length == 0)
+        if (!headers.TryGetValue(keyHeader, out var admittedKey) || admittedKey.Length == 0)
             throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
         CheckHeaders(headers);
         return headers;

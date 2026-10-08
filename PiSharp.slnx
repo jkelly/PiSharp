@@ -153,6 +153,9 @@
   <Folder Name="/tests/parity/PiSharp.Models.Tests/">
     <Project Path="tests/PiSharp.Models.Tests/PiSharp.Models.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/parity/PiSharp.ProviderApis.Tests/">
+    <Project Path="tests/PiSharp.ProviderApis.Tests/PiSharp.ProviderApis.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/parity/PiSharp.Codemode.Tests/">
     <Project Path="tests/PiSharp.Codemode.Tests/PiSharp.Codemode.Tests.csproj" />
   </Folder>

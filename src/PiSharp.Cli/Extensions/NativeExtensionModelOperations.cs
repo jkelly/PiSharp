@@ -84,7 +84,7 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
     /// per request as upstream resolveProviderAuth does. A stored <c>auth.json</c> credential owns the provider: an api_key
     /// credential supplies its key and env; an OAuth credential is refreshed through <see cref="StoredOAuthLifecycle"/> when
     /// it expires within five minutes (the rotation is persisted) and its access token travels in the apiKey channel, for the
-    /// providers with an OAuth refresh (anthropic, openai, openrouter; <paramref name="oauthRefreshes"/> replaces the set). An
+    /// providers with an OAuth refresh (<see cref="DefaultOAuthRefreshes"/>; <paramref name="oauthRefreshes"/> replaces the set). An
     /// OAuth credential of a provider without one, or of another type, leaves the provider unconfigured, with no environment
     /// fallback. Without a stored credential the provider's environment variable applies.
     /// </summary>
@@ -101,12 +101,7 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
         }
         var store = authPath is null ? null : new AuthJsonCredentialStore(authPath, timeProvider);
         createAuthHttp ??= () => new HttpClient();
-        var refreshes = new ProviderOAuthRefreshes(oauthRefreshes ?? new Dictionary<string, IAdmittedOAuthRefresh>(StringComparer.Ordinal)
-        {
-            ["anthropic"] = new FreshClientRefresh(http => new AnthropicOAuth(http, timeProvider), createAuthHttp),
-            ["openai"] = new FreshClientRefresh(http => new OpenAIChatGPTOAuthRefresh(http, timeProvider), createAuthHttp),
-            ["openrouter"] = OpenRouterOAuthRefresh.Instance
-        });
+        var refreshes = new ProviderOAuthRefreshes(oauthRefreshes ?? DefaultOAuthRefreshes(readEnvironment, createAuthHttp, timeProvider));
         var lifecycle = store is null ? null : new StoredOAuthLifecycle(store, refreshes, timeProvider);
         var standard = ModelOperationsAuth.Standard(readEnvironment, store is null ? null : async (provider, token) =>
         {
@@ -150,6 +145,26 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
         cause?.Message.Trim() is { Length: > 0 } detail && !message.Contains(detail, StringComparison.Ordinal) ? $"{message}: {detail}" : message;
 
     /// <summary>A refresh over a fresh HTTP client per refresh, disposed afterwards.</summary>
+    /// <summary>
+    /// The stored-OAuth refresh of every upstream provider with an OAuth method (auth/oauth/load.ts): anthropic, openai
+    /// (ChatGPT) and openrouter as above, and openai-codex, github-copilot, kimi-coding, meta, radius and xai through their
+    /// <see cref="ProviderAuthCatalog"/> flows (the same refresh /login and the live route use).
+    /// </summary>
+    internal static Dictionary<string, IAdmittedOAuthRefresh> DefaultOAuthRefreshes(Func<string, string?> readEnvironment,
+        Func<HttpMessageInvoker> createAuthHttp, TimeProvider? timeProvider)
+    {
+        var refreshes = new Dictionary<string, IAdmittedOAuthRefresh>(StringComparer.Ordinal)
+        {
+            ["anthropic"] = new FreshClientRefresh(http => new AnthropicOAuth(http, timeProvider), createAuthHttp),
+            ["openai"] = new FreshClientRefresh(http => new OpenAIChatGPTOAuthRefresh(http, timeProvider), createAuthHttp),
+            ["openrouter"] = OpenRouterOAuthRefresh.Instance
+        };
+        foreach (var entry in ProviderAuthCatalog.All)
+            if (entry.OAuth is { } oauth && !refreshes.ContainsKey(entry.Id))
+                refreshes[entry.Id] = new FreshClientRefresh(http => oauth.Create(new OAuthFlowContext(http, readEnvironment, timeProvider, null, 0, null)), createAuthHttp);
+        return refreshes;
+    }
+
     private sealed class FreshClientRefresh(Func<HttpMessageInvoker, IAdmittedOAuthRefresh> create, Func<HttpMessageInvoker> createHttp) : IAdmittedOAuthRefresh
     {
         public async Task<OAuthCredentialSnapshot> RefreshAsync(string provider, OAuthCredentialSnapshot current, CancellationToken cancellationToken)

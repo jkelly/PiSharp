@@ -10,6 +10,9 @@ public sealed record GoogleVertexOptions(Uri Endpoint, [property: JsonIgnore] st
     GoogleGenerativeAIOptions Projection)
 {
     public override string ToString() => nameof(GoogleVertexOptions);
+    /// <summary>Pi abe508e1 google-vertex.ts createClientWithApiKey: the token is a Vertex API key sent as x-goog-api-key
+    /// (express mode) instead of an OAuth access token in Authorization.</summary>
+    public bool ApiKeyMode { get; init; }
     internal void Validate(ModelDescriptor model)
     {
         ArgumentNullException.ThrowIfNull(Endpoint); ArgumentNullException.ThrowIfNull(Projection);
