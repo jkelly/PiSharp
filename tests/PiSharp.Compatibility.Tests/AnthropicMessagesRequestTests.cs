@@ -44,17 +44,23 @@ static class AnthropicMessagesRequestTests
         SupportsMidConversationToolChanges: true, CacheRetention: AnthropicCacheRetention.None);
     private static void ExactJson(string expected, JsonElement actual) => Assert(JsonElement.DeepEquals(JsonData.Parse(expected).Value, actual), "Exact authored wire mismatch: " + actual.GetRawText());
 
+    // Pi abe508e1b89912adde45528136c3221eb69acdd7 (1.0.1): inline-tools-2026-09-15 replaces mid-conversation-tool-changes-2026-07-01.
+    // Later tools are defined by value in tool_addition blocks; the request-level list stays initial tools plus placeholder.
+    private const string Placeholder = """{"name":"__pi_deferred_placeholder__","description":"Reserved placeholder. Never available. Never call this.","input_schema":{"type":"object","properties":{},"required":[]},"defer_loading":true}""";
+    private static string Definition(string name, string description, string schema = """{"type":"object","properties":{},"required":[]}""", string extra = ""","eager_input_streaming":true""") =>
+        """{"type":"tool_addition","tool":{"type":"tool_definition","definition":{"name":""" + "\"" + name + "\",\"description\":\"" + description + "\",\"input_schema\":" + schema + extra + "}}}";
+
     public static Task NativeToolChangesExactWire()
     {
         var request = Request(Entry(InitialRead), Entry("""{"role":"user","content":"Question"}"""), Entry(ReplaceRead),
             Assistant([new TextContent("Reply")]), Entry("""{"role":"system","toolsRemoved":[{"name":"write"}]}"""));
         var before = request.Messages.Select(entry => entry.WireBody.ToString()).ToArray();
         var actual = Project(request, NativeOptions).Value;
-        ExactJson("""{"model":"fixture-model","messages":[{"role":"user","content":"Question"},{"role":"system","content":[{"type":"tool_removal","tool":{"type":"tool_reference","name":"read"}},{"type":"tool_addition","tool":{"type":"tool_reference","name":"write"}}]},{"role":"assistant","content":[{"type":"text","text":"Reply"}]},{"role":"system","content":[{"type":"tool_removal","tool":{"type":"tool_reference","name":"write"}}]}],"max_tokens":128,"stream":true,"system":[{"type":"text","text":"Base"}],"tools":[{"name":"read","description":"Read","input_schema":{"type":"object","properties":{},"required":[]},"eager_input_streaming":true},{"name":"__pi_deferred_placeholder__","description":"Reserved placeholder. Never available. Never call this.","input_schema":{"type":"object","properties":{},"required":[]},"defer_loading":true},{"name":"write","description":"Write","input_schema":{"type":"object","properties":{},"required":[]},"eager_input_streaming":true,"defer_loading":true}],"betas":["mid-conversation-tool-changes-2026-07-01"]}""", actual);
+        ExactJson("""{"model":"fixture-model","messages":[{"role":"user","content":"Question"},{"role":"system","content":[{"type":"tool_removal","tool":{"type":"tool_reference","name":"read"}},""" + Definition("write", "Write") + """]},{"role":"assistant","content":[{"type":"text","text":"Reply"}]},{"role":"system","content":[{"type":"tool_removal","tool":{"type":"tool_reference","name":"write"}}]}],"max_tokens":128,"stream":true,"system":[{"type":"text","text":"Base"}],"tools":[{"name":"read","description":"Read","input_schema":{"type":"object","properties":{},"required":[]},"eager_input_streaming":true},""" + Placeholder + """],"betas":["inline-tools-2026-09-15"]}""", actual);
         for (var index = 0; index < before.Length; index++) Equal(before[index], request.Messages[index].WireBody.ToString());
-        // The prefix already contains the stable placeholder before any late declaration exists.
+        // The prefix already contains the stable placeholder before any later tool exists, and later tools never extend it.
         var first = Project(Request(Entry(InitialRead)), NativeOptions).Value.GetProperty("tools");
-        Equal(2, first.GetArrayLength()); Equal("__pi_deferred_placeholder__", first[1].GetProperty("name").GetString());
+        ExactJson(actual.GetProperty("tools").GetRawText(), first);
         return Task.CompletedTask;
     }
 
@@ -65,13 +71,14 @@ static class AnthropicMessagesRequestTests
         foreach (var retention in new[] { AnthropicCacheRetention.Short, AnthropicCacheRetention.Long })
         {
             var actual = Project(Request(initial, update), NativeOptions with { CacheRetention = retention }).Value;
-            var tools = actual.GetProperty("tools"); Equal(4, tools.GetArrayLength());
+            var tools = actual.GetProperty("tools"); Equal(3, tools.GetArrayLength());
             var cache = retention == AnthropicCacheRetention.Long ? """{"type":"ephemeral","ttl":"1h"}""" : """{"type":"ephemeral"}""";
             ExactJson(cache, tools[1].GetProperty("cache_control"));
-            foreach (var index in new[] { 0, 2, 3 }) Assert(!tools[index].TryGetProperty("cache_control", out _), "Cache breakpoint moved into deferred declarations.");
+            foreach (var index in new[] { 0, 2 }) Assert(!tools[index].TryGetProperty("cache_control", out _), "Cache breakpoint moved off the last initial tool.");
             var refs = actual.GetProperty("messages")[0].GetProperty("content");
             Assert(!refs[0].TryGetProperty("cache_control", out _), "Removal acquired a premature breakpoint.");
             ExactJson(cache, refs[1].GetProperty("cache_control"));
+            Assert(!refs[1].GetProperty("tool").GetProperty("definition").TryGetProperty("cache_control", out _), "Inline definition acquired a tool breakpoint.");
         }
         var disabled = Project(Request(initial, update), NativeOptions with { CacheRetention = AnthropicCacheRetention.Long, SupportsCacheControlOnTools = false }).Value;
         Assert(disabled.GetProperty("tools").EnumerateArray().All(tool => !tool.TryGetProperty("cache_control", out _)), "Tool cache capability ignored.");
@@ -84,25 +91,33 @@ static class AnthropicMessagesRequestTests
         var same = Entry("""{"role":"system","toolsAdded":[{"parameters":{},"description":"Read","name":"read","opaque":"ignored"}]}""");
         var repeated = Project(Request(Entry(InitialRead), same), NativeOptions).Value;
         Equal(2, repeated.GetProperty("tools").GetArrayLength());
-        ExactJson("""[{"role":"system","content":[{"type":"tool_addition","tool":{"type":"tool_reference","name":"read"}}]}]""", repeated.GetProperty("messages"));
+        ExactJson("""[{"role":"system","content":[""" + Definition("read", "Read") + "]}]", repeated.GetProperty("messages"));
         var readded = Project(Request(Entry(InitialRead), Entry("""{"role":"system","toolsRemoved":[{"name":"read"}]}"""), same), NativeOptions).Value;
         Equal(2, readded.GetProperty("messages").GetArrayLength()); Equal(2, readded.GetProperty("tools").GetArrayLength());
-        foreach (var changed in new[]
+        // Redefinitions no longer fall back to the static tool list: each is sent inline under the same name.
+        foreach (var (changed, definition) in new[]
         {
-            """{"role":"system","toolsAdded":[{"name":"read","description":"Changed","parameters":{}}]}""",
-            """{"role":"system","toolsAdded":[{"name":"read","description":"Read","parameters":{"properties":{"x":{"type":"string"}}}}]}""",
-            """{"role":"system","toolsAdded":[{"name":"read","description":"Read","parameters":{},"constrainedSampling":false}]}"""
+            ("""{"role":"system","toolsAdded":[{"name":"read","description":"Changed","parameters":{}}]}""", Definition("read", "Changed")),
+            ("""{"role":"system","toolsAdded":[{"name":"read","description":"Read","parameters":{"properties":{"x":{"type":"string"}}}}]}""",
+                Definition("read", "Read", """{"type":"object","properties":{"x":{"type":"string"}},"required":[]}""")),
+            ("""{"role":"system","toolsAdded":[{"name":"read","description":"Read","parameters":{},"constrainedSampling":false}]}""", Definition("read", "Read")),
+            // A removal in the same record as the new definition is dropped: the definition replaces the old tool.
+            ("""{"role":"system","toolsRemoved":[{"name":"read"}],"toolsAdded":[{"name":"read","description":"Changed","parameters":{}}]}""", Definition("read", "Changed"))
         })
         {
             var request = Request(Entry(InitialRead), Entry(changed));
             var actual = Project(request, NativeOptions).Value;
-            ExactJson(Project(request, NativeOptions with { SupportsMidConversationToolChanges = false }).ToString(), actual);
-            Equal(1, actual.GetProperty("tools").GetArrayLength()); Equal(0, actual.GetProperty("messages").GetArrayLength());
-            Assert(!actual.TryGetProperty("betas", out _), "Redefinition enabled native tool beta.");
+            ExactJson("""[{"name":"read","description":"Read","input_schema":{"type":"object","properties":{},"required":[]},"eager_input_streaming":true},""" + Placeholder + "]", actual.GetProperty("tools"));
+            ExactJson("""[{"role":"system","content":[""" + definition + "]}]", actual.GetProperty("messages"));
+            ExactJson("""["inline-tools-2026-09-15"]""", actual.GetProperty("betas"));
+            var fallback = Project(request, NativeOptions with { SupportsMidConversationToolChanges = false }).Value;
+            Equal(1, fallback.GetProperty("tools").GetArrayLength()); Equal(0, fallback.GetProperty("messages").GetArrayLength());
+            Assert(!fallback.TryGetProperty("betas", out _), "Disabled capability enabled native tool beta.");
         }
         var ordered = Entry("""{"role":"system","toolsAdded":[{"name":"read","description":"Read","parameters":{"title":"T","type":"object"}}]}""");
         var reordered = Entry("""{"role":"system","toolsAdded":[{"name":"read","description":"Read","parameters":{"type":"object","title":"T"}}]}""");
-        Equal(1, Project(Request(ordered, reordered), NativeOptions).Value.GetProperty("tools").GetArrayLength());
+        var keyOrder = Project(Request(ordered, reordered), NativeOptions).Value;
+        Equal(2, keyOrder.GetProperty("tools").GetArrayLength()); Equal(1, keyOrder.GetProperty("messages")[0].GetProperty("content").GetArrayLength());
         var numeric = """{"role":"system","toolsAdded":[{"name":"read","description":"Read","parameters":{"properties":{"x":{"type":"number","minimum":1.0}}}}]}""";
         Equal(2, Project(Request(Entry(numeric), Entry(numeric.Replace("1.0", "1"))), NativeOptions).Value.GetProperty("tools").GetArrayLength());
         foreach (var options in new[] { NativeOptions with { SupportsMidConversationSystemMessages = false }, NativeOptions with { SupportsMidConversationToolChanges = false } })
@@ -121,20 +136,26 @@ static class AnthropicMessagesRequestTests
         var messages = actual.GetProperty("messages"); Equal(5, messages.GetArrayLength());
         Equal("Read", messages[0].GetProperty("content")[0].GetProperty("name").GetString());
         Equal("tool_result", messages[1].GetProperty("content")[0].GetProperty("type").GetString());
-        ExactJson("""[{"type":"tool_removal","tool":{"type":"tool_reference","name":"Read"}},{"type":"tool_addition","tool":{"type":"tool_reference","name":"Write"}}]""", messages[3].GetProperty("content"));
-        Equal("Read", actual.GetProperty("tools")[0].GetProperty("name").GetString()); Equal("Write", actual.GetProperty("tools")[2].GetProperty("name").GetString());
-        var collision = ReplaceRead.Replace("write", "Read");
-        Throws(AnthropicRequestFailure.IdentityCollision, () => Project(Request(Entry(InitialRead), Entry(collision)), NativeOptions with { OAuthProjection = true }));
+        ExactJson("""[{"type":"tool_removal","tool":{"type":"tool_reference","name":"Read"}},""" + Definition("Write", "Write") + "]", messages[3].GetProperty("content"));
+        Equal("Read", actual.GetProperty("tools")[0].GetProperty("name").GetString()); Equal(2, actual.GetProperty("tools").GetArrayLength());
+        // Removing "read" and defining "Read" project to one OAuth name; the inline definition replaces it without a static-list collision.
+        var renamed = Project(Request(Entry(InitialRead), Entry(ReplaceRead.Replace("write", "Read"))), NativeOptions with { OAuthProjection = true }).Value;
+        ExactJson("""[{"role":"system","content":[{"type":"tool_removal","tool":{"type":"tool_reference","name":"Read"}},""" + Definition("Read", "Write") + "]}]", renamed.GetProperty("messages"));
+        // Native hardening: a record cannot define two tools under one projected name or the reserved placeholder.
+        var collision = Entry("""{"role":"system","toolsAdded":[{"name":"write","description":"one","parameters":{}},{"name":"Write","description":"two","parameters":{}}]}""");
+        Throws(AnthropicRequestFailure.IdentityCollision, () => Project(Request(Entry(InitialRead), collision), NativeOptions with { OAuthProjection = true }));
         Throws(AnthropicRequestFailure.IdentityCollision, () => Project(Request(Entry(InitialRead.Replace("read", "__pi_deferred_placeholder__"))), NativeOptions));
-        // A growing union plus placeholder must fit, even if current active tools fit.
-        Throws(AnthropicRequestFailure.ResourceLimit, () => Project(Request(Entry(InitialRead), Entry(ReplaceRead)), NativeOptions with { MaximumActiveTools = 2 }));
-        Equal(3, Project(Request(Entry(InitialRead), Entry(ReplaceRead)), NativeOptions with { MaximumActiveTools = 3 }).Value.GetProperty("tools").GetArrayLength());
+        Throws(AnthropicRequestFailure.IdentityCollision, () => Project(Request(Entry(InitialRead), Entry(ReplaceRead.Replace("write", "__pi_deferred_placeholder__"))), NativeOptions));
+        // The fixed initial tools plus placeholder must fit; later definitions no longer grow the request-level list.
+        Throws(AnthropicRequestFailure.ResourceLimit, () => Project(Request(Entry(InitialRead), Entry(ReplaceRead)), NativeOptions with { MaximumActiveTools = 1 }));
+        Equal(2, Project(Request(Entry(InitialRead), Entry(ReplaceRead)), NativeOptions with { MaximumActiveTools = 2 }).Value.GetProperty("tools").GetArrayLength());
         Throws(AnthropicRequestFailure.ResourceLimit, () => Project(Request(Entry(InitialRead), Entry(ReplaceRead)), NativeOptions with { MaximumContentBlocks = 1 }));
         Throws(AnthropicRequestFailure.ResourceLimit, () => Project(Request(Entry(InitialRead), Entry(ReplaceRead)), NativeOptions with { MaximumOutputBytes = 32 }));
         var strict = Entry("""{"role":"system","toolsAdded":[{"name":"write","description":"Write","parameters":{"type":"object","properties":{"x":{"type":"string"}}},"constrainedSampling":{"type":"json_schema","strict":"require"}}]}""");
         var strictTool = Project(Request(Entry(InitialRead), strict), NativeOptions with { SupportsStrictTools = true, SupportsEagerToolInputStreaming = false }).Value;
-        ExactJson("""{"name":"write","description":"Write","input_schema":{"type":"object","properties":{"x":{"anyOf":[{"type":"string"},{"type":"null"}]}},"required":["x"],"additionalProperties":false},"strict":true,"defer_loading":true}""", strictTool.GetProperty("tools")[2]);
-        ExactJson("""["fine-grained-tool-streaming-2025-05-14","mid-conversation-tool-changes-2026-07-01"]""", strictTool.GetProperty("betas"));
+        ExactJson(Definition("write", "Write", """{"type":"object","properties":{"x":{"anyOf":[{"type":"string"},{"type":"null"}]}},"required":["x"],"additionalProperties":false}""", ""","strict":true"""),
+            strictTool.GetProperty("messages")[0].GetProperty("content")[0]);
+        ExactJson("""["fine-grained-tool-streaming-2025-05-14","inline-tools-2026-09-15"]""", strictTool.GetProperty("betas"));
         return Task.CompletedTask;
     }
 
@@ -146,7 +167,7 @@ static class AnthropicMessagesRequestTests
         using var published = factory.Create(request, "authored-inert-key-noncredential");
         var actual = JsonData.Parse(await published.Content!.ReadAsStringAsync()).Value;
         var body = JsonNodeWithoutBetas(expected);
-        ExactJson(body, actual); Equal("mid-conversation-tool-changes-2026-07-01", published.Headers.GetValues("anthropic-beta").Single());
+        ExactJson(body, actual); Equal("inline-tools-2026-09-15", published.Headers.GetValues("anthropic-beta").Single());
         foreach (var header in new[] { "null", "\"custom-beta\"" })
         {
             var overrideFactory = new AnthropicMessagesKeyAuthRequestFactory(new Uri("https://authored.invalid"), Model, NativeOptions,

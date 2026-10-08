@@ -1,4 +1,4 @@
-// Pi v0.99.1 d86654abb8862e201933517d6f1fce9f88dd117f: api/simple-options.ts and utils/estimate.ts.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/simple-options.ts and packages/ai/src/utils/estimate.ts.
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text;
@@ -12,6 +12,8 @@ public sealed record MistralSimpleResolution(double ContextTokens, double MaxTok
 /// <summary>Pure Simple resolution followed by the existing direct HTTP/SSE consumer. Borrows the client and immutable complete model row.</summary>
 public sealed class MistralSimpleHttpSseTransport : IChatTransport, IThinkingLevelTransport
 {
+    // Pi 1.1.0 estimate.ts CHARS_PER_TOKEN; session compaction keeps its own four-character estimate.
+    internal const double CharsPerToken = 3.5;
     private readonly HttpClient _client;
     private readonly ModelDescriptor _model;
     private readonly MistralTextOptions _options;
@@ -115,13 +117,13 @@ public sealed class MistralSimpleHttpSseTransport : IChatTransport, IThinkingLev
                 string.Join("\n", content.EnumerateArray().Where(block => block.GetProperty("type").GetString() == "text").Select(block => block.GetProperty("text").GetString()!)) };
             if (body.TryGetProperty("sections", out var sections) && sections.ValueKind != JsonValueKind.Null)
                 foreach (var section in sections.EnumerateObject()) if (section.Value.ValueKind != JsonValueKind.Null) parts.Add(section.Value.GetString()!);
-            var tokens = Math.Ceiling(string.Join("\n\n", parts.Where(part => part.Length > 0)).Length / 4d);
+            var tokens = Math.Ceiling(string.Join("\n\n", parts.Where(part => part.Length > 0)).Length / CharsPerToken);
             foreach (var name in new[] { "toolsAdded", "toolsRemoved" })
                 if (body.TryGetProperty(name, out var tools) && tools.ValueKind != JsonValueKind.Null && tools.GetArrayLength() > 0)
-                    tokens += Math.Ceiling(JsonText(tools).Length / 4d);
+                    tokens += Math.Ceiling(JsonText(tools).Length / CharsPerToken);
             return tokens;
         }
-        if (content.ValueKind == JsonValueKind.String && entry.Role is "user" or "toolResult") return Math.Ceiling(content.GetString()!.Length / 4d);
+        if (content.ValueKind == JsonValueKind.String && entry.Role is "user" or "toolResult") return Math.Ceiling(content.GetString()!.Length / CharsPerToken);
         double characters = 0;
         foreach (var block in content.EnumerateArray()) characters += block.GetProperty("type").GetString() switch
         {
@@ -131,7 +133,7 @@ public sealed class MistralSimpleHttpSseTransport : IChatTransport, IThinkingLev
             "image" when entry.Role is "user" or "toolResult" => 4800,
             _ => throw Invalid()
         };
-        return Math.Ceiling(characters / 4);
+        return Math.Ceiling(characters / CharsPerToken);
     }
     private string JsonText(JsonElement value) => EcmaScriptJsonProjection.Project(JsonData.FromElement(value), new(
         MaximumInputCharacters: _options.MaximumContentCharacters, MaximumInputBytes: _options.MaximumContentCharacters * 4,

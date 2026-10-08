@@ -24,6 +24,8 @@ public sealed record ResponsesKeyAuthRequestOptions(
     public JsonData? ModelHeaders { get; init; }
     public JsonData? Headers { get; init; }
     public JsonData? ModelSamplingParams { get; init; }
+    /// <summary>Source model samplingParamsByThinkingLevel; the effective level's entry merges between model and request parameters.</summary>
+    public JsonData? ModelSamplingParamsByThinkingLevel { get; init; }
     public JsonData? SamplingParams { get; init; }
     public string SessionAffinityFormat { get; init; } = "openai";
     public int MaximumHeaders { get; init; } = 128;
@@ -68,6 +70,7 @@ public sealed class ResponsesKeyAuthRequestFactory
     private readonly string _reasoningSuffix;
     private readonly string _toolChoiceSuffix;
     private readonly string _cacheRetention;
+    private readonly JsonData? _levelSamplingParams;
     internal sealed record ServiceTierBinding(string? RequestedTier);
     internal static readonly HttpRequestOptionsKey<ServiceTierBinding> RequestedServiceTierKey = new("PiSharp.Responses.RequestedServiceTier");
     internal string? RequestedServiceTier => _options.ServiceTier;
@@ -112,6 +115,15 @@ public sealed class ResponsesKeyAuthRequestFactory
             throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
         _toolChoiceSuffix = ToolChoiceField();
         _reasoningSuffix = ReasoningFields(projectionOptions.Reasoning, expectedModel.Provider);
+        if (_options.ModelSamplingParamsByThinkingLevel is { } byLevel)
+        {
+            if (Encoding.UTF8.GetByteCount(byLevel.ToString()) > _options.MaximumPayloadBytes) throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
+            // A reasoning summary without an effort requests "medium", as in the reasoning fields.
+            var level = _options.ReasoningEffort ?? (_options.ReasoningSummary is not null ? "medium" : "off");
+            if (!ThinkingLevelSampling.TrySelect(byLevel.Value, projectionOptions.Reasoning, _options.ThinkingLevelMap?.Value ?? default, level, out var selected))
+                throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
+            if (selected.ValueKind == JsonValueKind.Object) _levelSamplingParams = JsonData.FromElement(selected);
+        }
         _cacheRetention = _options.CacheRetention ?? (_options.Environment?.GetValue("PI_CACHE_RETENTION") == "long" ? "long" : "short");
         var session = _cacheRetention == "none" ? null : ClampSessionId(_options.SessionId);
         try { _projector = new(projectionOptions); }
@@ -169,10 +181,11 @@ public sealed class ResponsesKeyAuthRequestFactory
         if (bytes > _options.MaximumPayloadBytes) throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
         cancellationToken.ThrowIfCancellationRequested();
         var payload = Encoding.UTF8.GetBytes(Prefix + _modelJson + InputField + input + _suffix + toolField + _toolChoiceSuffix + _reasoningSuffix + "}");
-        if (_options.ModelSamplingParams is not null || _options.SamplingParams is not null)
+        if (_options.ModelSamplingParams is not null || _levelSamplingParams is not null || _options.SamplingParams is not null)
         {
             var root = JsonNode.Parse(payload)!.AsObject();
-            foreach (var sampling in new[] { _options.ModelSamplingParams, _options.SamplingParams })
+            // Pi abe508e1b89912adde45528136c3221eb69acdd7 openai-responses.ts buildParams: model, effective level, then request keys.
+            foreach (var sampling in new[] { _options.ModelSamplingParams, _levelSamplingParams, _options.SamplingParams })
             {
                 if (sampling is null || sampling.Value.ValueKind == JsonValueKind.Null) continue;
                 if (sampling.Value.ValueKind != JsonValueKind.Object) throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);

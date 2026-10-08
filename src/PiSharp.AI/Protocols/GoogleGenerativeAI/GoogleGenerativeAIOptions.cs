@@ -17,6 +17,8 @@ public sealed record GoogleGenerativeAIOptions(JsonData ModelMetadata, string? A
     /// <summary>Native timing seams. They do not enter SDK parameters or Pi wire JSON.</summary>
     public TimeProvider RetryTimeProvider { get; init; } = TimeProvider.System;
     public Func<double> RetryJitterSample { get; init; } = Random.Shared.NextDouble;
+    /// <summary>Pi abe508e1 provider-retry.ts noRetryStatuses: statuses that fail at once although they would be retried.</summary>
+    public System.Collections.Immutable.ImmutableArray<int> NoRetryStatuses { get; init; } = [];
     public GoogleGenerativeAIHooks Hooks { get; init; } = new();
     public Func<HttpResponseMessage, CancellationToken, ValueTask<Stream?>>? BodyReaderFactory { get; init; }
     public int ReadBufferBytes { get; init; } = 4096;
@@ -33,7 +35,8 @@ public sealed record GoogleGenerativeAIOptions(JsonData ModelMetadata, string? A
     internal void Validate()
     {
         if (ModelMetadata is null || Hooks is null || MaxRetries is < 0 or > 32 || MaxRetryDelayMilliseconds < 0 ||
-            RetryTimeProvider is null || RetryJitterSample is null || ReadBufferBytes is < 1 or > 65536 ||
+            RetryTimeProvider is null || RetryJitterSample is null || NoRetryStatuses.IsDefault || NoRetryStatuses.Length > 4096 ||
+            ReadBufferBytes is < 1 or > 65536 ||
             MaximumFrameCharacters is < 1 or > 8388608 || MaximumPayloadBytes is < 1 or > 8388608 ||
             MaximumEvents is < 1 or > 65536 || MaximumStreamCharacters is < 1 or > 67108864 ||
             MaximumContentSlots is < 1 or > 256 || MaximumContentCharacters is < 1 or > 8388608 ||

@@ -1,4 +1,4 @@
-// Pi d86654abb8862e201933517d6f1fce9f88dd117f (MIT): api/azure-openai-responses.ts.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/azure-openai-responses.ts and packages/ai/src/api/azure-openai-config.ts.
 using System.Collections.Immutable;
 using System.Net.Http.Headers;
 using System.Text;
@@ -55,7 +55,8 @@ public sealed class AzureResponsesRequestFactory
                 SupportsDeveloperRole = Flag(compat, "supportsDeveloperRole", true),
                 SupportsMidConversationSystemMessages = Flag(compat, "supportsMidConvoSystemMessages", false),
                 ToolDeclarations = (options.Projection.ToolDeclarations ?? new()) with { SupportsStrictMode = Flag(compat, "supportsStrictMode", true) },
-                AllowedToolCallProviders = ImmutableHashSet.Create(StringComparer.Ordinal, "openai", "openai-codex", "opencode", "azure-openai-responses")
+                // Pi 1.0.3 renamed the provider to "azure"; a model still declaring "azure-openai-responses" normalizes ids like any other provider.
+                AllowedToolCallProviders = ImmutableHashSet.Create(StringComparer.Ordinal, "openai", "openai-codex", "opencode", "azure")
             });
             DeploymentName = Truthy(options.AzureDeploymentName) ?? DeploymentMap(Value("AZURE_OPENAI_DEPLOYMENT_NAME_MAP")) ?? model.Id;
             Bound(DeploymentName); ValidateUnicode(DeploymentName);
@@ -107,7 +108,17 @@ public sealed class AzureResponsesRequestFactory
             else if (!(map.ValueKind == JsonValueKind.Object && map.TryGetProperty("off", out var off) && off.ValueKind == JsonValueKind.Null))
                 root["reasoning"] = new JsonObject { ["effort"] = Map("off", "none") };
         }
+        // Last so model and request sampling parameters override named fields: model defaults, then the effective
+        // thinking level's overrides (a summary without an effort requests "medium"), then request keys.
         MergeSampling(root, _metadata.TryGetProperty("samplingParams", out var modelSampling) ? modelSampling : default);
+        if (_metadata.TryGetProperty("samplingParamsByThinkingLevel", out var byLevel))
+        {
+            if (!ThinkingLevelSampling.TrySelect(byLevel, _metadata.GetProperty("reasoning").GetBoolean(),
+                _metadata.TryGetProperty("thinkingLevelMap", out var levelMap) ? levelMap : default,
+                _options.ReasoningEffort ?? (_options.ReasoningSummary is not null ? "medium" : "off"), out var levelSampling))
+                throw Fail(AzureResponsesFailure.Configuration);
+            MergeSampling(root, levelSampling);
+        }
         MergeSampling(root, _options.SamplingParams?.Value ?? default);
         return AdmitPayload(JsonData.Parse(root.ToJsonString()), token);
     }

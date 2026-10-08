@@ -51,6 +51,7 @@ public static partial class NativeProviderFactory
             {
                 ModelHeaders = metadata.Value.TryGetProperty("headers", out var headers) ? JsonData.Parse(headers.GetRawText()) : null,
                 ModelSamplingParams = metadata.Value.TryGetProperty("samplingParams", out var sampling) ? JsonData.Parse(sampling.GetRawText()) : null,
+                ModelSamplingParamsByThinkingLevel = metadata.Value.TryGetProperty("samplingParamsByThinkingLevel", out var byLevel) ? JsonData.Parse(byLevel.GetRawText()) : null,
                 SupportsMaxOutputTokens = Flag("supportsMaxOutputTokens", true),
                 SessionAffinityFormat = compat.ValueKind == JsonValueKind.Object && compat.TryGetProperty("sessionAffinityFormat", out var affinity) && affinity.ValueKind != JsonValueKind.Null
                     ? affinity.GetString() ?? "openai" : "openai",

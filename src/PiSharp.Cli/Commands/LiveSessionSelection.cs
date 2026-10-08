@@ -25,10 +25,10 @@ internal sealed class LiveSessionSelection
 {
     private static readonly ImmutableDictionary<string, string> CatalogHashes = new Dictionary<string, string>
     {
-        ["anthropic"] = "3ff00b68990382e42626ebd1b65dcc28ae3cad9e6faa8920331ba92f067f1b3a",
-        ["openai"] = "ca5ec1028efc512502591bf2562a2a6dc330f26a5f4c4a08c8a149a43c5bd7da",
+        ["anthropic"] = "aa4342dfb96feb1619794113619d6630088d6ac544c547a4f9899a0a7f26419b",
+        ["openai"] = "f4c1ac9f8f84cb9f2a952b0ceec51c90a38b31b4cdf33200e018ece9d408e95f",
         ["mistral"] = "10f33bff9adf1248f7e6848e5890c265399f1f94e5b42cfdc28c109d547af98d",
-        ["openrouter"] = "b49405ced089750d475945738a91ac669fa00e04d574da7720935bcfe16ba272"
+        ["openrouter"] = "c86aa3b95d412465dac54cb902402cbdb40f47a1fe33f12b002913834724d8f0"
     }.ToImmutableDictionary(StringComparer.Ordinal);
     internal FrozenCatalogModel Definition { get; }
     internal ModelDescriptor Model { get; }

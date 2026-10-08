@@ -19,7 +19,7 @@ public static class InjectedAuthenticationResolver
         ["github-copilot"] = "COPILOT_GITHUB_TOKEN",
         ["ant-ling"] = "ANT_LING_API_KEY", ["qwen-token-plan"] = "QWEN_TOKEN_PLAN_API_KEY",
         ["qwen-token-plan-cn"] = "QWEN_TOKEN_PLAN_CN_API_KEY", ["qwen-token-plan-individual"] = "QWEN_TOKEN_PLAN_API_KEY",
-        ["openai"] = "OPENAI_API_KEY", ["azure-openai-responses"] = "AZURE_OPENAI_API_KEY",
+        ["openai"] = "OPENAI_API_KEY", ["azure"] = "AZURE_OPENAI_API_KEY", // Pi abe508e1 env-api-keys.ts: renamed from azure-openai-responses in 1.0.3.
         ["nvidia"] = "NVIDIA_API_KEY", ["deepseek"] = "DEEPSEEK_API_KEY", ["google"] = "GEMINI_API_KEY",
         ["google-vertex"] = "GOOGLE_CLOUD_API_KEY", ["groq"] = "GROQ_API_KEY", ["cerebras"] = "CEREBRAS_API_KEY",
         ["xai"] = "XAI_API_KEY", ["typesafe"] = "TYPESAFE_API_KEY", ["radius"] = "RADIUS_API_KEY",

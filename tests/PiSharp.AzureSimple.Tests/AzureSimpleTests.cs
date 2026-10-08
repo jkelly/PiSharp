@@ -46,10 +46,11 @@ internal static class AzureSimpleTests
         using var handler = new Handler(); using var client = new HttpClient(handler, false);
         AzureResponsesSimpleResolution Resolve(double context, double? cap = null) => new AzureResponsesSimpleTransport(client, Model,
             new(Direct(context) with { MaxTokens = cap }, Key)).Resolve(Request(User("abcd", 1)));
-        Check(Resolve(4100).MaxTokens == 3 && Resolve(4090).MaxTokens == 1);
+        // Pi 1.1.0 estimate.ts: "abcd" is ceil(4 / 3.5) = 2 tokens (1 at four characters per token).
+        Check(Resolve(4100).MaxTokens == 2 && Resolve(4090).MaxTokens == 1);
         Check(Resolve(0, -3).MaxTokens == 1 && Resolve(8192, -3).MaxTokens == -3);
         Check(Resolve(8192, 0).MaxTokens == 0 && Resolve(8192, 12.5).MaxTokens == 12.5);
-        Check(Resolve(4100, 100).ContextEstimate.Tokens == 1 && handler.Calls == 0);
+        Check(Resolve(4100, 100).ContextEstimate.Tokens == 2 && handler.Calls == 0);
         var unicode = new AzureResponsesSimpleTransport(client, Model, new(Direct(), Key)).Resolve(Request(User("😀abc", 1)));
         Check(unicode.ContextEstimate.Tokens == 2);
         var bounded = new AzureResponsesSimpleTransport(client, Model, new AzureResponsesSimpleOptions(Direct(), Key) { MaximumContextCharacters = 1 });
