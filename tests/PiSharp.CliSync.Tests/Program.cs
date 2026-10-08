@@ -41,6 +41,7 @@ internal static partial class Program
             ("prompt.skills-hint-reader-fallback-and-indirect", Sync(SkillsHint)),
             ("prompt.unhidden-docs-line-and-options", Sync(DocsAndOptions)),
             ("prompt.registry-passes-prepared-hidden-declarations", Sync(RegistryHidden)),
+            ("prompt.mcp-servers-section-first-prompt-append-and-removal", McpServersPromptSection),
             ("keybindings.home-end-editor-only-defaults", Sync(Keybindings)),
             ("osc7501.format-byte-sequences", Sync(FormatStatus)),
             ("osc7501.query-and-reply-detection", Sync(Replies)),

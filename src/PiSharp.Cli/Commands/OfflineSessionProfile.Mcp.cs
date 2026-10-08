@@ -103,7 +103,7 @@ internal sealed partial class OfflineSessionProfile
                 {
                     admittedBinder?.Invoke(owner, attachment);
                     ownership.BindOwner(owner, attachment);
-                }};
+                }, ServersPromptSource = AdmitMcpServersPromptSource(acquired.ServersPromptSource) };
                 if (_deferredCatalogNames is not { } requested) return acquired;
                 var prepare = acquired.PrepareDiscovery;
                 return acquired with { PrepareDiscovery = (plan, current) =>
