@@ -15,7 +15,15 @@ public sealed record ResponsesTranscriptProjectionOptions(
     int MaximumContentBlocks = 1024, int MaximumJsonDepth = 32,
     int MaximumOutputItems = 1024, int MaximumOutputCharacters = 1_048_576,
     ResponsesToolDeclarationProjectionOptions? ToolDeclarations = null,
-    bool SynthesizeMissingToolResults = false);
+    bool SynthesizeMissingToolResults = false)
+{
+    /// <summary>
+    /// Null keeps the text-only profile (image blocks are unsupported content). True projects user and tool-result images as
+    /// <c>input_image</c> data URLs; false downgrades them to Pi's non-vision placeholders
+    /// (Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openai-responses-shared.ts, api/transform-messages.ts).
+    /// </summary>
+    public bool? ModelSupportsImages { get; init; }
+}
 
 public enum ResponsesProjectionFailure
 {
@@ -128,7 +136,12 @@ public sealed class ResponsesTranscriptProjector
                     if (assistant.StopReason is StopReason.Pending or StopReason.Deferred) throw Failure(ResponsesProjectionFailure.InvalidTranscript);
                     entries.Add(new(entry.Role, entry.WireBody, assistant));
                 }
-                else { _ = ContentText(body, entry.Role == "toolResult"); entries.Add(new(entry.Role, entry.WireBody)); }
+                else
+                {
+                    if (options.ModelSupportsImages is null || entry.Role == "system") _ = ContentText(body, entry.Role == "toolResult");
+                    else _ = MediaParts(body, entry.Role == "toolResult");
+                    entries.Add(new(entry.Role, entry.WireBody));
+                }
             }
             // Pi abe508 openai-responses.ts: grammar input properties come from every tool the transcript declared.
             _grammarInputs = ResponsesGrammar.InputProperties(request, options.ToolDeclarations?.SupportsOpenAIGrammarTools == true, token);
@@ -152,7 +165,11 @@ public sealed class ResponsesTranscriptProjector
                 {
                     var body = entry.Body.Value; var content = body.GetProperty("content"); var parts = new JsonArray();
                     if (content.ValueKind == JsonValueKind.String) parts.Add(new JsonObject { ["type"] = "input_text", ["text"] = Text(content) });
-                    else foreach (var part in content.EnumerateArray()) parts.Add(new JsonObject { ["type"] = "input_text", ["text"] = String(part, "text") });
+                    else if (options.ModelSupportsImages is null)
+                        foreach (var part in content.EnumerateArray()) parts.Add(new JsonObject { ["type"] = "input_text", ["text"] = String(part, "text") });
+                    else foreach (var part in MediaParts(body, false))
+                        parts.Add(part.Data is null ? new JsonObject { ["type"] = "input_text", ["text"] = part.Text }
+                            : new JsonObject { ["type"] = "input_image", ["detail"] = "auto", ["image_url"] = "data:" + part.Text + ";base64," + part.Data });
                     if (parts.Count == 0) continue;
                     Add(new JsonObject { ["role"] = "user", ["content"] = parts });
                 }
@@ -163,9 +180,8 @@ public sealed class ResponsesTranscriptProjector
                 }
                 else
                 {
-                    var output = ContentText(entry.Body.Value, true);
                     Add(new JsonObject { ["type"] = _grammarInputs.ContainsKey(String(entry.Body.Value, "toolName")) ? "custom_tool_call_output" : "function_call_output",
-                        ["call_id"] = CallParts(String(entry.Body.Value, "toolCallId")).Call, ["output"] = output.Length == 0 ? "(no tool output)" : output });
+                        ["call_id"] = CallParts(String(entry.Body.Value, "toolCallId")).Call, ["output"] = ToolOutput(entry.Body.Value) });
                 }
                 if (!leadingSystem) messageIndex++;
             }
@@ -458,6 +474,43 @@ public sealed class ResponsesTranscriptProjector
             }
             else if (value.ValueKind == JsonValueKind.String) CheckString(Text(value));
         }
+        // Pi abe508 openai-responses-shared.ts convertToolResultOutput (after transform-messages.ts downgradeUnsupportedImages).
+        private JsonNode ToolOutput(JsonElement body)
+        {
+            if (options.ModelSupportsImages is null) { var text = ContentText(body, true); return text.Length == 0 ? "(no tool output)" : text; }
+            var parts = MediaParts(body, true);
+            var result = string.Join('\n', parts.Where(part => part.Data is null).Select(part => part.Text));
+            var images = parts.Where(part => part.Data is not null).ToList();
+            if (images.Count == 0 || options.ModelSupportsImages != true) return result.Length != 0 ? result : images.Count > 0 ? "(see attached image)" : "(no tool output)";
+            var output = new JsonArray();
+            if (result.Length != 0) output.Add(new JsonObject { ["type"] = "input_text", ["text"] = result });
+            foreach (var image in images) output.Add(new JsonObject { ["type"] = "input_image", ["detail"] = "auto", ["image_url"] = "data:" + image.Text + ";base64," + image.Data });
+            return output;
+        }
+
+        /// <summary>Text (Data null) and image (Text = MIME type) parts; a non-vision model's images become Pi's placeholders.</summary>
+        private List<(string Text, string? Data)> MediaParts(JsonElement body, bool tool)
+        {
+            var content = body.GetProperty("content"); var result = new List<(string Text, string? Data)>();
+            if (!tool && content.ValueKind == JsonValueKind.String) { result.Add((Text(content), null)); return result; }
+            if (content.ValueKind != JsonValueKind.Array) throw Failure(ResponsesProjectionFailure.InvalidTranscript);
+            var placeholder = tool ? "(tool image omitted: model does not support images)" : "(image omitted: model does not support images)";
+            var previousWasPlaceholder = false;
+            foreach (var part in content.EnumerateArray())
+                switch (String(part, "type"))
+                {
+                    case "text":
+                        var text = String(part, "text"); result.Add((text, null)); previousWasPlaceholder = text == placeholder; break;
+                    case "image":
+                        var mime = String(part, "mimeType"); var data = String(part, "data");
+                        if (options.ModelSupportsImages == true) result.Add((mime, data));
+                        else { if (!previousWasPlaceholder) result.Add((placeholder, null)); previousWasPlaceholder = true; }
+                        break;
+                    default: throw Failure(ResponsesProjectionFailure.UnsupportedContent);
+                }
+            return result;
+        }
+
         private static string ContentText(JsonElement body, bool arrayOnly)
         {
             var content = body.GetProperty("content");

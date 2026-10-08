@@ -186,7 +186,7 @@ public static partial class NativeProviderFactory
                 return BindRouteResponses(model, endpoint, key, new(Reasoning: reasoning, MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
                     MaximumInputCharacters: budget, MaximumOutputCharacters: budget,
                     ToolDeclarations: new(MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
-                        MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget)),
+                        MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget)) { ModelSupportsImages = images },
                     new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId) { ModelHeaders = modelHeaders },
                     handler, summary ? null : metadata);
             }

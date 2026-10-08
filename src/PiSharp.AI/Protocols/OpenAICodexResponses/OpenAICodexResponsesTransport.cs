@@ -147,7 +147,11 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             MaximumInputCharacters: Budget, MaximumOutputCharacters: Budget,
             ToolDeclarations: new(SupportsStrictMode: _strictMode, Strict: null, MaximumMessages: _options.MaximumMessages,
                 MaximumEntryCharacters: _options.MaximumEntryCharacters, MaximumInputCharacters: Budget,
-                MaximumOutputCharacters: Budget, MaximumOutputBytes: Budget) { SupportsOpenAIGrammarTools = _grammar });
+                MaximumOutputCharacters: Budget, MaximumOutputBytes: Budget) { SupportsOpenAIGrammarTools = _grammar })
+        {
+            ModelSupportsImages = _metadata.TryGetProperty("input", out var inputs) && inputs.ValueKind == JsonValueKind.Array &&
+                inputs.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String && item.GetString() == "image")
+        };
         var projector = new ResponsesTranscriptProjector(projection);
         var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString());
         var tools = JsonNode.Parse(projector.ProjectTools(request, CancellationToken.None).ToString()) as JsonArray;
