@@ -2,27 +2,14 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using PiSharp.Tools.Processes;
 
 namespace PiSharp.Cli.Models;
 
 /// <summary>
-/// The single switch for <c>!command</c> configuration values (models.json <c>apiKey</c> and header values). Upstream runs the
-/// command through a shell and uses its trimmed stdout. PiSharp's policy refuses stored commands; this switch keeps that
-/// refusal until the owner decides otherwise. Flipping it to <see langword="true"/> enables the upstream behaviour everywhere
-/// this resolver is used.
-/// </summary>
-internal static class ConfigValueCommands
-{
-    internal const bool RunByDefault = false;
-}
-
-/// <summary>A config value that PiSharp's policy refuses to run.</summary>
-internal sealed class ConfigValueCommandRefusedException(string message) : InvalidOperationException(message);
-
-/// <summary>
-/// Source resolve-config-value.ts: <c>!cmd</c> runs a shell command (when allowed) and uses its trimmed stdout (cached per process
-/// for <see cref="Resolve"/>); <c>$NAME</c> and <c>${NAME}</c> interpolate the scoped then the process environment; <c>$$</c> and
-/// <c>$!</c> escape; anything else is a literal.
+/// Source resolve-config-value.ts: <c>!cmd</c> runs a shell command and uses its trimmed stdout (cached for the process by
+/// <see cref="Resolve"/>, rerun by <see cref="ResolveUncached"/>); <c>$NAME</c> and <c>${NAME}</c> interpolate the scoped then the
+/// process environment; <c>$$</c> and <c>$!</c> escape; anything else is a literal. Owner decision 0004: commands run as in Pi.
 /// </summary>
 internal sealed class ConfigValueResolver
 {
@@ -30,22 +17,24 @@ internal sealed class ConfigValueResolver
     private sealed record Literal(string Value) : Part;
     private sealed record Env(string Name) : Part;
 
+    /// <summary>Source commandResultCache: one process-wide cache for the real shell runner.</summary>
+    private static readonly ConcurrentDictionary<string, string?> SharedCommandCache = new(StringComparer.Ordinal);
     private readonly Func<string, string?> process;
-    private readonly bool runCommands;
     private readonly Func<string, string?> runCommand;
-    private readonly ConcurrentDictionary<string, string?> commandCache = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, string?> commandCache;
 
     /// <param name="processEnvironment">The process environment reader; an empty value is absent.</param>
-    /// <param name="runCommands">Null takes <see cref="ConfigValueCommands.RunByDefault"/>.</param>
-    /// <param name="runCommand">The command runner (the command text without <c>!</c>); defaults to the platform shell.</param>
-    internal ConfigValueResolver(Func<string, string?> processEnvironment, bool? runCommands = null, Func<string, string?>? runCommand = null)
+    /// <param name="runCommand">A command runner (the command text without <c>!</c>) with its own cache; null runs the platform shell
+    /// (<see cref="RunShellCommand(string)"/>) with the process-wide cache.</param>
+    internal ConfigValueResolver(Func<string, string?> processEnvironment, Func<string, string?>? runCommand = null)
     {
         process = processEnvironment ?? throw new ArgumentNullException(nameof(processEnvironment));
-        this.runCommands = runCommands ?? ConfigValueCommands.RunByDefault;
         this.runCommand = runCommand ?? RunShellCommand;
+        commandCache = runCommand is null ? SharedCommandCache : new(StringComparer.Ordinal);
     }
 
-    internal bool RunsCommands => runCommands;
+    /// <summary>The process-environment resolver with the real shell runner (auth.json keys, MCP values).</summary>
+    internal static ConfigValueResolver Process { get; } = new(Environment.GetEnvironmentVariable);
 
     internal static bool IsCommand(string config) => config.StartsWith('!');
 
@@ -119,14 +108,10 @@ internal sealed class ConfigValueResolver
         return resolved.ToString();
     }
 
-    private string? Execute(string config, bool cached)
-    {
-        if (!runCommands)
-            throw new ConfigValueCommandRefusedException("PiSharp does not run shell commands for config values; store the value or an environment reference instead.");
-        return cached ? commandCache.GetOrAdd(config, key => runCommand(key[1..])) : runCommand(config[1..]);
-    }
+    private string? Execute(string config, bool cached) =>
+        cached ? commandCache.GetOrAdd(config, key => runCommand(key[1..])) : runCommand(config[1..]);
 
-    /// <summary>Source resolveConfigValue (commands cached for the resolver's lifetime).</summary>
+    /// <summary>Source resolveConfigValue (successful and failed commands cached until <see cref="ClearCache"/>).</summary>
     internal string? Resolve(string config, IReadOnlyDictionary<string, string>? env = null) =>
         IsCommand(config) ? Execute(config, cached: true) : ResolveTemplate(config, env);
 
@@ -134,14 +119,10 @@ internal sealed class ConfigValueResolver
     internal string? ResolveUncached(string config, IReadOnlyDictionary<string, string>? env = null) =>
         IsCommand(config) ? Execute(config, cached: false) : ResolveTemplate(config, env);
 
-    /// <summary>Source resolveConfigValueOrThrow, with the upstream messages. A refused command throws
-    /// <see cref="ConfigValueCommandRefusedException"/> naming the value's description.</summary>
+    /// <summary>Source resolveConfigValueOrThrow (uncached), with the upstream messages.</summary>
     internal string ResolveOrThrow(string config, string description, IReadOnlyDictionary<string, string>? env = null)
     {
-        string? value;
-        try { value = ResolveUncached(config, env); }
-        catch (ConfigValueCommandRefusedException error)
-        { throw new ConfigValueCommandRefusedException($"Failed to resolve {description} from shell command: {error.Message}"); }
+        var value = ResolveUncached(config, env);
         if (value is not null) return value;
         if (IsCommand(config)) throw new InvalidOperationException($"Failed to resolve {description} from shell command: {config[1..]}");
         var missing = GetMissingEnvVarNames(config, env);
@@ -172,28 +153,59 @@ internal sealed class ConfigValueResolver
     /// <summary>Source clearConfigValueCache.</summary>
     internal void ClearCache() => commandCache.Clear();
 
-    /// <summary>execSync with the platform default shell (<c>/bin/sh -c</c>, or <c>cmd.exe /d /s /c</c> on Windows): 10 s timeout,
-    /// stdin and stderr ignored, a non-zero exit or empty output resolves nothing.</summary>
-    internal static string? RunShellCommand(string command)
+    /// <summary>
+    /// Source executeCommandUncached: on Windows the configured shell first (getShellConfig without a shellPath: Git Bash under
+    /// ProgramFiles, then bash on PATH; legacy WSL bash reads the command from standard input) and execSync's default shell only when
+    /// that shell cannot start; elsewhere execSync's <c>/bin/sh -c</c>. Ten-second timeout, stdin and stderr ignored; a failure, a
+    /// non-zero exit or empty output resolves nothing.
+    /// </summary>
+    internal static string? RunShellCommand(string command) => RunShellCommand(command, ShellHost.Current);
+
+    internal static string? RunShellCommand(string command, ShellHost host)
     {
-        var info = OperatingSystem.IsWindows()
-            ? new ProcessStartInfo(Environment.GetEnvironmentVariable("ComSpec") is { Length: > 0 } comSpec ? comSpec : "cmd.exe")
-            { Arguments = "/d /s /c \"" + command + "\"" }
+        if (!host.IsWindows) return RunDefaultShell(command, windows: false, host);
+        var (executed, value) = RunConfiguredShell(command, host);
+        return executed ? value : RunDefaultShell(command, windows: true, host);
+    }
+
+    /// <summary>Source executeWithConfiguredShell: (executed, value). No shell found or a shell that cannot start (ENOENT) is not
+    /// executed; a timeout or any other failure is executed without a value.</summary>
+    private static (bool Executed, string? Value) RunConfiguredShell(string command, ShellHost host)
+    {
+        ShellConfiguration shell;
+        try { shell = ShellDiscovery.Resolve(host: host); }
+        catch (ShellDiscoveryException) { return (false, null); }
+        var info = new ProcessStartInfo(shell.Shell);
+        foreach (var argument in shell.CommandArguments(command)) info.ArgumentList.Add(argument);
+        try { return (true, Run(info, shell.CommandTransport == ShellCommandTransport.Stdin ? command : null)); }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception or FileNotFoundException) { return (false, null); }
+        catch (Exception error) when (error is IOException or InvalidOperationException) { return (true, null); }
+    }
+
+    /// <summary>Source executeWithDefaultShell (execSync): <c>%ComSpec% /d /s /c "command"</c> on Windows, <c>/bin/sh -c</c> elsewhere.</summary>
+    private static string? RunDefaultShell(string command, bool windows, ShellHost host)
+    {
+        var info = windows
+            ? new ProcessStartInfo(host.GetEnvironmentVariable("ComSpec") is { Length: > 0 } comSpec ? comSpec : "cmd.exe") { Arguments = "/d /s /c \"" + command + "\"" }
             : new ProcessStartInfo("/bin/sh") { ArgumentList = { "-c", command } };
+        try { return Run(info, null); }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception or FileNotFoundException or IOException or InvalidOperationException) { return null; }
+    }
+
+    /// <summary>One command process: stdout captured as UTF-8, stderr discarded, stdin closed (or given the command), killed after 10 s.
+    /// The trimmed output, or null for a timeout, a non-zero exit or empty output.</summary>
+    private static string? Run(ProcessStartInfo info, string? input)
+    {
         info.RedirectStandardOutput = true; info.RedirectStandardError = true; info.RedirectStandardInput = true;
         info.UseShellExecute = false; info.CreateNoWindow = true; info.StandardOutputEncoding = Encoding.UTF8;
-        try
-        {
-            using var child = Process.Start(info);
-            if (child is null) return null;
-            child.StandardInput.Close();
-            var output = child.StandardOutput.ReadToEndAsync();
-            _ = child.StandardError.ReadToEndAsync();
-            if (!child.WaitForExit(10_000)) { try { child.Kill(entireProcessTree: true); } catch (InvalidOperationException) { } return null; }
-            if (child.ExitCode != 0) return null;
-            var text = output.GetAwaiter().GetResult().Trim();
-            return text.Length == 0 ? null : text;
-        }
-        catch (Exception error) when (error is System.ComponentModel.Win32Exception or IOException or InvalidOperationException) { return null; }
+        using var child = System.Diagnostics.Process.Start(info) ?? throw new System.ComponentModel.Win32Exception("The command shell did not start.");
+        try { if (input is not null) child.StandardInput.Write(input); child.StandardInput.Close(); } catch (IOException) { }
+        var output = child.StandardOutput.ReadToEndAsync();
+        _ = child.StandardError.ReadToEndAsync();
+        if (!child.WaitForExit(10_000)) { try { child.Kill(entireProcessTree: true); } catch (InvalidOperationException) { } return null; }
+        child.WaitForExit();
+        if (child.ExitCode != 0) return null;
+        var text = output.GetAwaiter().GetResult().Trim();
+        return text.Length == 0 ? null : text;
     }
 }

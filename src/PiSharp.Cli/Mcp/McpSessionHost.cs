@@ -284,7 +284,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         value.StartsWith("~/", StringComparison.Ordinal) || OperatingSystem.IsWindows() && value.StartsWith("~\\", StringComparison.Ordinal)
             ? Path.Combine(HomeDirectory, value[2..]) : value;
 
-    /// <summary>resolveConfigValueOrThrow over the process environment; commands (`!…`) are not run.</summary>
+    /// <summary>resolveConfigValueOrThrow over the process environment, `!command` values included.</summary>
     private string Resolve(string value, string description)
     {
         var environment = InheritedEnvironment();
