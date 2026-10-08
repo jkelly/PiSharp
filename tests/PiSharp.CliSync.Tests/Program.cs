@@ -37,6 +37,7 @@ internal static partial class Program
             ("reload.default-tools-additions-only", Sync(ReloadAdditions)),
             ("reload.modifiers-allowlists-and-patterns", Sync(ReloadPolicies)),
             ("reload.planner-host-selector", ReloadPlannerSelector),
+            ("reload.pending-tools-activate-on-late-registration", PendingReloadTools),
             ("prompt.hidden-tools-byte-exact-sections", Sync(HiddenPrompt)),
             ("prompt.skills-hint-reader-fallback-and-indirect", Sync(SkillsHint)),
             ("prompt.unhidden-docs-line-and-options", Sync(DocsAndOptions)),
