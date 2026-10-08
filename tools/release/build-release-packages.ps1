@@ -67,8 +67,14 @@ foreach ($library in $libraries) {
         "-p:CustomAfterMicrosoftCommonTargets=$(Join-Path $repo 'tools/release/PiSharp.NativeSdk.targets')" `
         "-p:PiSharpProvenanceFile=$sdkProvenance"
     $package = Join-Path $out "$library.$Version.nupkg"
-    $report = Assert-PiSharpNativeSdkPackage -Package $package -PackageId $library -Version $Version -SourceCommit $SourceCommit `
-        -Repo $repo -BuildAssembly (Join-Path $repo "src/$library/bin/Release/net10.0/$library.dll")
+    try {
+        $report = Assert-PiSharpNativeSdkPackage -Package $package -PackageId $library -Version $Version -SourceCommit $SourceCommit `
+            -Repo $repo -BuildAssembly (Join-Path $repo "src/$library/bin/Release/net10.0/$library.dll")
+    } catch {
+        $zip = [IO.Compression.ZipFile]::OpenRead($package)
+        try { Write-Host "Package members of $library`:"; $zip.Entries | ForEach-Object { Write-Host "  $($_.FullName)" } } finally { $zip.Dispose() }
+        throw
+    }
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $reports "$library.json") -Encoding utf8NoBOM
     Write-Host "Validated $library $Version"
     Write-Host '::endgroup::'
