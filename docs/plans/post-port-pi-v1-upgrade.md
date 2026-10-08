@@ -1,16 +1,16 @@
-# PiSharp post-port upstream upgrade: v0.99.1 to v1.0.2
+# PiSharp upstream upgrade: v0.99.1 to v1.1.0
 
-**Status: PLANNED / DEFERRED until the current v0.99.1 port is complete.**
+**Status: APPROVED, IN PROGRESS.** [Decision 0002](../decisions/0002-pi-1.1.0-sync.md) retargets this backlog to Pi v1.1.0 and starts it now, superseding the earlier rule that deferred it until the v0.99.1 port was complete. Every open v0.99.1 gap carries forward unchanged.
 
-This document saves the future upgrade backlog. It does not change PiSharp's current target, authorize implementation, assert that any listed behavior is absent from PiSharp, or claim upgrade acceptance. Audit every item against the completed port before deciding whether it needs a change, an additional test, or an explicit scope exclusion. No upgrades are implemented by this plan.
+This document is the upgrade backlog. It does not claim upgrade acceptance or assert that any listed behavior is absent from PiSharp. Audit every item before deciding whether it needs a change, an additional test, or an explicit scope exclusion. The per-row source pins, PiSharp locations, status and owning tests live in [sync-1.1.0-applicability.json](../../compatibility/sync-1.1.0-applicability.json).
 
-## Frozen comparison and execution gate
+## Frozen comparison
 
-The current baseline is Pi **v0.99.1**, released September 29, 2026, commit [`d86654abb8862e201933517d6f1fce9f88dd117f`](https://github.com/earendil-works/pi/commit/d86654abb8862e201933517d6f1fce9f88dd117f). The candidate future target is **v1.0.2**, released October 4, 2026 at 00:56:36 UTC, commit [`cd32f7725fdbddbaecdff5b1e68491563394e0ca`](https://github.com/earendil-works/pi/commit/cd32f7725fdbddbaecdff5b1e68491563394e0ca).
+The previous baseline is Pi **v0.99.1**, released September 29, 2026, commit [`d86654abb8862e201933517d6f1fce9f88dd117f`](https://github.com/earendil-works/pi/commit/d86654abb8862e201933517d6f1fce9f88dd117f). The approved target is **v1.1.0**, released October 7, 2026, commit [`abe508e1b89912adde45528136c3221eb69acdd7`](https://github.com/earendil-works/pi/commit/abe508e1b89912adde45528136c3221eb69acdd7), tree `77d78fae728879c16550b1f874785aed7851233c`.
 
-The recorded comparison review covers **123 commits and 759 changed paths**, with much of the path churn in experimental durable work. These counts describe the compared refs, not PiSharp's required workload. Recheck the latest upstream release at execution time, choose the approved target explicitly, and freeze its exact commit, source hashes, licenses and reference inputs before implementation. Never silently retarget the current baseline or replace its evidence.
+The comparison covers **227 commits and 968 changed files** (182 added, 342 deleted, 444 modified). Most of the churn is the removed `pi-agent-core` harness and the excluded `pi-durable` and `pi-env` packages. These counts describe the compared refs, not PiSharp's required workload. The re-freeze is source-level: freeze v1.1.0's commit, source hashes and licenses in a new baseline lock, and keep the v0.99.1 evidence as historical. Never replace or relabel that evidence.
 
-Official release sequence: [v0.99.2](https://github.com/earendil-works/pi/releases/tag/v0.99.2), [v1.0.0](https://github.com/earendil-works/pi/releases/tag/v1.0.0), [v1.0.1](https://github.com/earendil-works/pi/releases/tag/v1.0.1), and [v1.0.2](https://github.com/earendil-works/pi/releases/tag/v1.0.2). Review the [official comparison](https://github.com/earendil-works/pi/compare/v0.99.1...v1.0.2), pinned [coding-agent changelog](https://github.com/earendil-works/pi/blob/cd32f7725fdbddbaecdff5b1e68491563394e0ca/packages/coding-agent/CHANGELOG.md), and pinned [AI changelog](https://github.com/earendil-works/pi/blob/cd32f7725fdbddbaecdff5b1e68491563394e0ca/packages/ai/CHANGELOG.md).
+Official release sequence: [v0.99.2](https://github.com/earendil-works/pi/releases/tag/v0.99.2), [v1.0.0](https://github.com/earendil-works/pi/releases/tag/v1.0.0), [v1.0.1](https://github.com/earendil-works/pi/releases/tag/v1.0.1), [v1.0.2](https://github.com/earendil-works/pi/releases/tag/v1.0.2), [v1.0.3](https://github.com/earendil-works/pi/releases/tag/v1.0.3), [v1.0.4](https://github.com/earendil-works/pi/releases/tag/v1.0.4) and [v1.1.0](https://github.com/earendil-works/pi/releases/tag/v1.1.0). Review the [official comparison](https://github.com/earendil-works/pi/compare/v0.99.1...v1.1.0), pinned [coding-agent changelog](https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/CHANGELOG.md), and pinned [AI changelog](https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/CHANGELOG.md).
 
 For each applicable checklist, record the upstream source pin, existing PiSharp behavior, required delta, owner, test inputs and acceptance evidence. Authored tests and observed upstream behavior remain distinct. A checked box requires reviewable evidence; this saved backlog starts entirely unchecked.
 
@@ -84,19 +84,28 @@ Sources: [model reference](https://github.com/earendil-works/pi/blob/cd32f7725fd
 
 Source: [dependency and installation-policy changes](https://github.com/earendil-works/pi/releases/tag/v1.0.1).
 
+## 10. v1.0.3 to v1.1.0 additions
+
+- [ ] **Azure provider rename (breaking).** Provider id `azure-openai-responses` becomes `azure`; the api id and `AZURE_OPENAI_*` variables are unchanged. Foundry Chat Completions go through `openai-completions` under `azure`. Add migration notes for `auth.json`, `models.json` and `settings.json`.
+- [ ] **Wire additions.** Optional `durationMs` on assistant messages, tool results and `tool_execution_end`; `aborted` on `agent_settled`; RPC `bash` output holds back ANSI escapes split across chunks.
+- [ ] **Tool selection.** `--tools`/`--exclude-tools` accept `*` patterns; `--tools` keeps MCP tools unless an entry starts with `mcp__`; `+name`/`-name` modifiers are rejected when mixed with plain names; new `--no-mcp`.
+- [ ] **Tools and prompt.** Structured `read` output including images; hidden tools excluded from the system prompt rules and skills hint; owner-only (`0600`) output spill files.
+- [ ] **Terminal.** Home/End are editor-only and fullscreen top/bottom move to Ctrl+Home/Ctrl+End. OSC 7501 program status via `PI_PROGRAM_STATUS`.
+- [ ] **AI utilities.** 3.5 characters per token in the request estimators; `server_busy` and Mistral `finish_reason:"error"` retries; prompt-length pricing tiers; Claude Haiku 5.5 and GPT-6 Luna in the catalog.
+- [ ] **Acceptance.** Use authored offline tests per row, with full request bodies pinned through fake HTTP handlers, and keep existing regressions passing.
+
 ## Preserved scope and execution order
 
-The recorded source comparison found the stock Agent loop, session JSONL, compaction and RPC unchanged at these refs. Do not invent a migration for them; reverify the applicable source hashes when refreezing and preserve their current regression coverage. Experimental `pi-durable` is outside the approved port scope despite its large contribution to the comparison. Upstream image generation versus PiSharp Extras requires a future explicit scope decision; neither inclusion nor equivalence is implied here. Nix support is optional and needs its own applicability decision.
+The recorded source comparison found the stock Agent loop, session JSONL, compaction and RPC unchanged at these refs. Do not invent a migration for them; reverify the applicable source hashes when refreezing and preserve their current regression coverage. `pi-durable`, `pi-env`, the experimental client/server modes and Nix packaging are excluded by [decision 0002](../decisions/0002-pi-1.1.0-sync.md). Codemode, `tool_search`, classifiers and image generation were already gaps in the port at v0.99.1. They are ported on the 1.1.0 baseline as 1.1.0.x releases, with codemode on Jint per [decision 0003](../decisions/0003-codemode-javascript-engine.md).
 
-Execute only after the current baseline is complete:
+Execution order:
 
-1. Finish and accept the v0.99.1 port; preserve its evidence.
-2. Recheck latest upstream, approve and refreeze the chosen target.
-3. Build the source-linked applicability matrix for all nine checklists.
-4. Review authentication and security boundaries first.
-5. Implement and qualify applicable provider changes.
-6. Qualify MCP and extension SDK changes, including optional bridges only if admitted.
-7. Qualify CLI/UI and catalog changes.
-8. Review packaging, optional dependencies and the full applicable regression gate.
+1. Re-freeze the baseline at v1.1.0 (source-level) and move the target pins.
+2. Review authentication and security boundaries (§1, §3 OAuth, §10 Azure).
+3. Implement and qualify applicable provider changes (§2, §10).
+4. Qualify MCP and extension SDK changes (§3, §5).
+5. Qualify CLI/UI, tool, prompt and catalog changes (§4, §7, §8, §10).
+6. Run the full applicable regression gate, then release PiSharp 1.1.0.
+7. Close the gaps as 1.1.0.x: `tool_search`, then classifiers and image generation, then codemode (§6, §9).
 
-A future upgrade is complete only with reviewed implementation and fresh acceptance on its frozen target. This document is a saved plan, not a release, migration, publication instruction or evidence of completed work.
+The upgrade is complete only with reviewed implementation and fresh acceptance on the frozen v1.1.0 target.
