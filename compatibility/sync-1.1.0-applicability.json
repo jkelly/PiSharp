@@ -282,7 +282,7 @@
         "tests/PiSharp.CodingAgent.Tests"
       ],
       "outcome": "implemented",
-      "notes": "Reload and late registration keep tools pending. Owner decision (2026-10-08): follow upstream v1.1.0 on open and tree navigation: unbound transcript tools become pending and activate on registration; tools disabled or excluded stay off. As upstream, CLI sessions opened with an initial selection (flags, settings or MCP) apply that selection instead of restoring the transcript. The restored loadout is recorded at open or navigation (upstream records at the next prompt), because PiSharp resolves every later turn from the transcript. Also as upstream: a recorded tool whose declaration changed is restored by name with its current binding (on transcript restore, tree navigation and opens with initial names), a now-hidden recorded tool is skipped and stays pending, and navigating to a branch with no system message keeps the current tools. Owner decision (2026-10-08): as upstream, unknown or capped-out names in --tools, defaultTools, SDK initial names and explicit activation select nothing and never become pending; a --tools allowlisted MCP tool activates when it registers. A transcript or explicit system message with an unbound declaration stays strict. Deviations: upstream also activates codemode and deferred tools named in initial names (no codemode or tool_search yet); a background MCP publication does not re-activate an allowlisted tool the user has since turned off."
+      "notes": "Reload and late registration keep tools pending. Owner decision (2026-10-08): follow upstream v1.1.0 on open and tree navigation: unbound transcript tools become pending and activate on registration; tools disabled or excluded stay off. As upstream, CLI sessions opened with an initial selection (flags, settings or MCP) apply that selection instead of restoring the transcript. The restored loadout is recorded at open or navigation (upstream records at the next prompt), because PiSharp resolves every later turn from the transcript. Also as upstream: a recorded tool whose declaration changed is restored by name with its current binding (on transcript restore, tree navigation and opens with initial names), a now-hidden recorded tool is skipped and stays pending, and navigating to a branch with no system message keeps the current tools. Owner decision (2026-10-08): as upstream, unknown or capped-out names in --tools, defaultTools, SDK initial names and explicit activation select nothing and never become pending; a --tools allowlisted MCP tool activates when it registers. A transcript or explicit system message with an unbound declaration stays strict. Deviations: upstream also activates codemode and deferred tools named in initial names (no codemode yet; deferred tools named in initial names are still not activated); a background MCP publication does not re-activate an allowlisted tool the user has since turned off."
     },
     {
       "id": "prompt.hidden-tools",
@@ -513,10 +513,11 @@
       "release": "1.1.0",
       "test": [
         "tests/PiSharp.McpSync.Tests",
-        "tests/PiSharp.CliSync.Tests"
+        "tests/PiSharp.CliSync.Tests",
+        "tests/PiSharp.ToolSearch.Tests"
       ],
       "outcome": "partial",
-      "notes": "Implemented: codemode-deferred alias, description, .pi/mcp.json override rules, mcp_servers section through the existing append-on-change sections, background connection for non-direct servers, production sessions load <agent dir>/mcp.json and honour --no-mcp. Remaining: servers needing codemode or tool_search cannot connect in production until those ship (1.1.0.x); late tools publish at the next idle point; no 10 s cap on direct servers; background servers have no resource tools; project .pi/mcp.json is unread (no project-trust store); a session closing during a background catalog publication can still fault (core session race)."
+      "notes": "Implemented: codemode-deferred alias, description, .pi/mcp.json override rules, mcp_servers section through the existing append-on-change sections, background connection for non-direct servers, production sessions load <agent dir>/mcp.json and honour --no-mcp. 1.1.0.1: servers with deferred tools connect in production; the built-in tool_search (active for them; --tools/--exclude-tools without it leaves them unreachable with upstream's warning) loads their tools; MCP tool calls are admitted for servers of the session's generation, as Pi trusts mcp.json (no approval step, as upstream; 1.1.0 denied every MCP call). Remaining: servers needing codemode cannot connect until codemode ships (1.1.0.3); tool_search does not wait for background servers and late tools publish at the next idle point; the live/terminal routes send a literal system prompt, so mcp_servers renders only with the original-system-prompt profile; session close durably withdraws background servers' tools; no 10 s cap on direct servers; background servers have no resource tools; project .pi/mcp.json is unread; close during background publication can still fault."
     },
     {
       "id": "mcp.oauth",
@@ -624,12 +625,17 @@
       ],
       "change": "Pre-existing port gap: BM25 tool_search and deferred exposure.",
       "pisharp": [
-        "src/PiSharp.Extensions.Abstractions/Mcp/Discovery"
+        "src/PiSharp.Extensions.Abstractions/Mcp/Discovery/ToolSearchRanker.cs",
+        "src/PiSharp.Cli/Mcp/McpToolSearch.cs",
+        "src/PiSharp.Cli/Mcp/McpSessionHost.cs",
+        "src/PiSharp.Cli/Mcp/McpCallGrants.cs"
       ],
       "status": "port",
       "workPackage": "4a",
       "release": "1.1.0.1",
-      "test": "planned.gap.tool-search"
+      "test": "tests/PiSharp.ToolSearch.Tests",
+      "outcome": "partial",
+      "notes": "BM25 ranking, schema, description, result text and errors ported from tool-search/tool.ts; matches activate at the next request boundary and are recorded in the transcript. Deviations: tool_search is registered (active) only when an admitted MCP server has deferred tools, where upstream always registers it inactive; it does not wait for background servers; invalid arguments are refused without TypeBox's message text; promptSnippet is not rendered. Responses tool_search_call anchoring (openai-responses-shared.ts) is not ported: PiSharp records full-replacement loadouts, so no transcript is additive and no request would change."
     },
     {
       "id": "gap.classifiers-images",

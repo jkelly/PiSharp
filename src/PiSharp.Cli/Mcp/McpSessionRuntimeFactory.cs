@@ -44,6 +44,9 @@ public sealed record McpSessionRuntimeAdmission(SessionRuntimeRegistry NativeReg
     public McpServersPromptSource? ServersPromptSource { get; init; }
     /// <summary>Each background connection that connected or failed, reported once without blocking the session.</summary>
     public Action<McpBackgroundConnectionReport>? ReportBackgroundConnection { get; init; }
+    /// <summary>The generation's MCP call grants: the tools of its admitted servers and host tools such as the built-in
+    /// tool_search. The profile's final-action policy admits their exact invoke actions for this generation only.</summary>
+    public McpCallGrants? CallGrants { get; init; }
 }
 
 /// <summary>Assembles explicitly admitted native and MCP resources before historical resolution.</summary>

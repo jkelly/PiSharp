@@ -71,13 +71,19 @@
         {
           "area": "MCP",
           "status": "partial",
-          "notes": "Stdio and HTTP servers, OAuth, and the mcp add, remove, list, login and logout commands. The project .pi/mcp.json is not read, and servers that need codemode or tool_search cannot connect yet.",
-          "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.McpSync.Tests"
+          "notes": "Stdio and HTTP servers, OAuth, the mcp add, remove, list, login and logout commands, and deferred servers through tool_search. Tools of configured servers can be called, as in Pi. The project .pi/mcp.json is not read, and servers that need codemode can't connect yet.",
+          "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ToolSearch.Tests"
         },
         {
-          "area": "Codemode and tool_search",
+          "area": "tool_search",
+          "status": "partial",
+          "notes": "Pi's BM25 search loads deferred MCP tools for the next call. It is only available when a configured server has deferred tools, and it doesn't wait for servers that are still connecting.",
+          "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ToolSearch.Tests"
+        },
+        {
+          "area": "Codemode",
           "status": "planned",
-          "notes": "Not started. tool_search is planned for 1.1.0.1 and codemode for 1.1.0.3.",
+          "notes": "Not started. Planned for 1.1.0.3, on the Jint JavaScript engine.",
           "evidence": "https://github.com/jkelly/PiSharp/blob/main/compatibility/sync-1.1.0-applicability.json"
         }
       ]
@@ -224,8 +230,8 @@
     },
     {
       "title": "1.1.0.x gap releases",
-      "status": "planned",
-      "notes": "tool_search (1.1.0.1), classifiers and image generation (1.1.0.2), codemode (1.1.0.3)."
+      "status": "partial",
+      "notes": "tool_search (1.1.0.1) shipped; classifiers and image generation (1.1.0.2) and codemode (1.1.0.3) to come."
     }
   ]
 }
