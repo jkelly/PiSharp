@@ -16,6 +16,17 @@ internal sealed partial class OfflineSessionProfile
     private IPreparedToolHooks NormalizedToolHooks(IPreparedToolHooks? extensionHooks) =>
         new ImageNormalizingToolHooks(extensionHooks, () => ImageSettings.AutoResizeImages, PiSharp.Tools.Skia.SkiaImageCodec.Instance);
 
+    /// <summary>The current session as a virtual selection's routing target (IMPL-E seam: hosts that admit registerVirtualModel route
+    /// through <see cref="PiSharp.Cli.Models.VirtualModelRoutingTransport"/> with this session).</summary>
+    internal PiSharp.Cli.Models.IVirtualModelSession? CurrentVirtualModelSession() =>
+        Sessions?.Current.Session is { } session ? new VirtualSession(session) : null;
+    private sealed class VirtualSession(PiSharp.CodingAgent.PersistentAgentSession session) : PiSharp.Cli.Models.IVirtualModelSession
+    {
+        public IReadOnlyList<PiSharp.Sessions.Serialization.SessionEntry> Branch => session.Snapshot.Context.Ancestry;
+        public Task AppendStateAsync(PiSharp.Contracts.JsonData data, CancellationToken cancellationToken) =>
+            session.AppendRunCustomEntryAsync(PiSharp.Cli.Models.VirtualModels.StateEntry, data, cancellationToken);
+    }
+
     /// <summary>Binds the native generation's session-event seams: model objects for model_select and its user_bash handlers
     /// (consulted by the user Bash host before local execution).</summary>
     private void BindSessionEventSeams(NativeExtensionActivation extension)
