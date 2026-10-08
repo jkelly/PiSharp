@@ -27,7 +27,7 @@ internal sealed class LiveSessionSelection
     {
         ["anthropic"] = "aa4342dfb96feb1619794113619d6630088d6ac544c547a4f9899a0a7f26419b",
         ["openai"] = "f4c1ac9f8f84cb9f2a952b0ceec51c90a38b31b4cdf33200e018ece9d408e95f",
-        ["mistral"] = "10f33bff9adf1248f7e6848e5890c265399f1f94e5b42cfdc28c109d547af98d",
+        ["mistral"] = "fcd37c7b178416f86954efdacbb45726d10f102fd1211062792691e62fcf327c",
         ["openrouter"] = "c86aa3b95d412465dac54cb902402cbdb40f47a1fe33f12b002913834724d8f0"
     }.ToImmutableDictionary(StringComparer.Ordinal);
     internal FrozenCatalogModel Definition { get; }

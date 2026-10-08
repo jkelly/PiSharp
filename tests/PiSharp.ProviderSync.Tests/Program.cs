@@ -536,7 +536,7 @@ internal static class Program
         var anthropic = Shard("anthropic", "aa4342dfb96feb1619794113619d6630088d6ac544c547a4f9899a0a7f26419b");
         var openai = Shard("openai", "f4c1ac9f8f84cb9f2a952b0ceec51c90a38b31b4cdf33200e018ece9d408e95f");
         var openrouter = Shard("openrouter", "c86aa3b95d412465dac54cb902402cbdb40f47a1fe33f12b002913834724d8f0");
-        _ = Shard("mistral", "10f33bff9adf1248f7e6848e5890c265399f1f94e5b42cfdc28c109d547af98d"); // Separate v0.99.1 source provenance, unchanged.
+        var mistral = Shard("mistral", "fcd37c7b178416f86954efdacbb45726d10f102fd1211062792691e62fcf327c");
         Check(anthropic.TryGetModel(CatalogModelType.Chat, "claude-haiku-5-5", out var haiku), "Claude Haiku 5.5 missing.");
         Equal("anthropic-messages", haiku!.DeclaredApi);
         Equal("""[{"inputTokensAbove":100000,"input":0.5,"output":2.5,"cacheRead":0.05,"cacheWrite":0.625}]""", haiku.Cost.Value.GetProperty("tiers").GetRawText());
@@ -546,6 +546,14 @@ internal static class Program
         Check(openrouter.TryGetModel(CatalogModelType.Chat, "anthropic/claude-haiku-5.5", out _), "OpenRouter Haiku 5.5 missing.");
         Check(anthropic.TryGetModel(CatalogModelType.Chat, "claude-sonnet-4-5", out _) && openai.TryGetModel(CatalogModelType.Chat, "gpt-4o", out _),
             "Models used by existing CLI selections disappeared.");
+        // mistral.json replaced its v0.99.1 source-catalog copy (10f33bff...): 32 -> 40 chat rows, none removed.
+        Equal(40, mistral.Models.Length);
+        foreach (var added in new[] { "codestral-2508", "glm-5-2", "labs-leanstral-1-5-1", "ministral-14b-2512", "ministral-3b-2512", "ministral-8b-2512", "mistral-large-4", "voxtral-small-2507" })
+            Check(mistral.TryGetModel(CatalogModelType.Chat, added, out var row) && row!.DeclaredApi == "mistral-conversations", "Mistral 1.1.0 addition missing: " + added);
+        Check(mistral.TryGetModel(CatalogModelType.Chat, "magistral-medium-latest", out var magistral) && magistral!.DeclaresImageInput, "Magistral Medium lost image input.");
+        Equal("""{"off":"none","minimal":null,"low":null,"medium":null,"high":"high","xhigh":null,"max":null}""", magistral!.Raw.Value.GetProperty("thinkingLevelMap").GetRawText());
+        Check(mistral.TryGetModel(CatalogModelType.Chat, "open-mistral-7b", out _) && mistral.TryGetModel(CatalogModelType.Chat, "codestral-latest", out _),
+            "Mistral models used by existing CLI selections disappeared.");
         return Task.CompletedTask;
     }
 
