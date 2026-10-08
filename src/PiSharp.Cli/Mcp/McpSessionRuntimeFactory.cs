@@ -47,6 +47,10 @@ public sealed record McpSessionRuntimeAdmission(SessionRuntimeRegistry NativeReg
     /// <summary>The generation's MCP call grants: the tools of its admitted servers and host tools such as the built-in
     /// tool_search. The profile's final-action policy admits their exact invoke actions for this generation only.</summary>
     public McpCallGrants? CallGrants { get; init; }
+    /// <summary>Background connections start once this completes (the host started dispatching, like the original's
+    /// session_start), so a fast server never publishes its tools while the host is still taking ownership of the idle
+    /// session. Null starts them when the attachment binds.</summary>
+    public Task? ConnectAfter { get; init; }
 }
 
 /// <summary>Assembles explicitly admitted native and MCP resources before historical resolution.</summary>
@@ -111,7 +115,7 @@ public sealed class McpSessionRuntimeFactory
             token.ThrowIfCancellationRequested();
             admission.ServersPromptSource?.Publish(generation, admission.Catalog, activation.ServerSnapshots);
             var connections = background.IsEmpty ? null :
-                new McpBackgroundConnections(background, generation, admission.ServersPromptSource, admission.ReportBackgroundConnection);
+                new McpBackgroundConnections(background, generation, admission.ServersPromptSource, admission.ReportBackgroundConnection) { ConnectAfter = admission.ConnectAfter };
             transferred = activation.TransferRuntimeOwnership();
             return new SessionRuntimeLease(activation.Registry.WithInitialToolSelectionFromCatalog(),
                 new Resources(transferred, admission.DiscoveryResources, admission.NativeResources), (owner, attachment) =>

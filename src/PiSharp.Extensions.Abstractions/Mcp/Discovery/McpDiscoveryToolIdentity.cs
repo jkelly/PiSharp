@@ -8,8 +8,9 @@ public static class McpDiscoveryToolIdentity
 {
     public const string CodemodeName = "codemode";
     public const string ToolSearchName = "tool_search";
+    /// <summary>Pi 1.1.0 extensions/codemode/tool.ts codemodeSchema.</summary>
     public static JsonData CodemodeSchema { get; } = JsonData.Parse("""
-        {"type":"object","properties":{"code":{"type":"string","description":"Raw JavaScript source. Top-level await and return work. May start with a `// @options: {\"max_output_tokens\": 1000}` line."}},"required":["code"]}
+        {"type":"object","properties":{"code":{"type":"string","description":"Raw JavaScript source."}},"required":["code"]}
         """);
     public static JsonData ToolSearchSchema { get; } = JsonData.Parse("""
         {"type":"object","properties":{"query":{"type":"string","description":"Search query for deferred tools."},"limit":{"type":"number","description":"Maximum number of tools to return. Defaults to 8."}},"required":["query"]}

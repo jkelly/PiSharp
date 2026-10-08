@@ -20,6 +20,8 @@ public sealed record ExtensionToolRegistrationInfo(string OwnerId, long OwnerGen
     public bool DefaultActive { get; init; } = true;
     public bool HasLoadoutPreparation { get; init; }
     public ImmutableArray<string> PromptGuidelines { get; init; } = [];
+    /// <summary>The descriptor's constrainedSampling, written into the model-facing declaration.</summary>
+    public JsonData? ConstrainedSampling { get; init; }
 }
 
 public sealed record ExtensionCommandRegistrationInfo(string OwnerId, long OwnerGeneration,
@@ -76,7 +78,8 @@ public sealed class ExtensionRegistrySnapshot
                 entry.RegistrationId, entry.Name, descriptor.Description, descriptor.Parameters)
                 { HasInitialArgumentPreparation = descriptor.PrepareInitialArgumentsAsync is not null,
                     Exposure = descriptor.Exposure, Namespace = descriptor.Namespace, DefaultActive = descriptor.DefaultActive,
-                    HasLoadoutPreparation = descriptor.PrepareLoadout is not null, PromptGuidelines = descriptor.PromptGuidelines };
+                    HasLoadoutPreparation = descriptor.PrepareLoadout is not null, PromptGuidelines = descriptor.PromptGuidelines,
+                    ConstrainedSampling = descriptor.ConstrainedSampling };
         }).ToImmutableArray();
         ToolRenderers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.ToolRenderer)).ToImmutableArray();
     }

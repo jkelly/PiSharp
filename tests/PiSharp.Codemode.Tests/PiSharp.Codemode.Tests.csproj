@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Codemode/PiSharp.Codemode.csproj" />
+  </ItemGroup>
+</Project>

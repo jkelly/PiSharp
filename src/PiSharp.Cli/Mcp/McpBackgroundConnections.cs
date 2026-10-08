@@ -33,6 +33,8 @@ public sealed class McpBackgroundConnections
     private readonly CancellationTokenSource stop = new();
     private readonly object gate = new();
     private Task? running;
+    /// <summary>Connections wait for this before connecting; see <see cref="McpSessionRuntimeAdmission.ConnectAfter"/>.</summary>
+    internal Task? ConnectAfter { get; init; }
 
     internal McpBackgroundConnections(ImmutableArray<(McpServerEntry Entry, McpBackgroundServerFactory Bind)> servers, long generation,
         McpServersPromptSource? section, Action<McpBackgroundConnectionReport>? report)
@@ -94,6 +96,7 @@ public sealed class McpBackgroundConnections
         try
         {
             stop.Token.ThrowIfCancellationRequested();
+            if (ConnectAfter is { } started) await started.WaitAsync(stop.Token).ConfigureAwait(false);
             var server = await bind(entry, owner, attachment, stop.Token).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("Background admission returned no server.");
             snapshot = await server.ConnectAsync(stop.Token).ConfigureAwait(false);

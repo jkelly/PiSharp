@@ -213,9 +213,22 @@ internal static partial class Program
         Equal(new ProviderAuthStatus(true, "stored"), stored.GetProviderAuthStatus("keyless"), "stored status");
         Check(stored.HasConfiguredAuth("keyless"), "stored credential authenticates a custom provider");
         Equal("stored-key", stored.ResolveRequestAuth(stored.Find("keyless", "e")!, out _)!.ApiKey, "stored key wins");
-        var refused = registry.ResolveRequestAuth(registry.Find("command", "d")!, out var error);
-        Check(refused is null && error!.StartsWith("Failed to resolve API key for provider \"command\" from shell command: PiSharp does not run shell commands", StringComparison.Ordinal),
-            "command refused by default: " + error);
+        // provider-composer.ts: a models.json `!command` apiKey runs (uncached, per request) and its trimmed stdout is the key; a stored
+        // auth.json `!command` key runs too (auth-storage read). A command that resolves nothing reports the upstream text.
+        var runs = new List<string>();
+        var commands = ModelRegistry.Create(new()
+        {
+            Environment = Env(), ModelsPath = path, RunCommand = command => { runs.Add(command); return command == "print-key" ? "cmd-key" : command == "stored-cmd" ? "stored-cmd-key" : null; },
+            StoredCredentials = new Dictionary<string, ProviderStoredCredential> { ["keyless"] = new("api_key", "!stored-cmd"), ["literal"] = new("api_key", "!fails") }
+        });
+        Equal("cmd-key", commands.ResolveRequestAuth(commands.Find("command", "d")!, out _)!.ApiKey, "models.json command key");
+        commands.ResolveRequestAuth(commands.Find("command", "d")!, out _);
+        Equal(2, runs.Count(command => command == "print-key"), "models.json commands run on every request");
+        Equal("stored-cmd-key", commands.ResolveRequestAuth(commands.Find("keyless", "e")!, out _)!.ApiKey, "stored command key");
+        Check(!commands.HasConfiguredAuth("literal"), "a stored command that resolves nothing does not authenticate, and skips the models.json key");
+        var failed = ModelRegistry.Create(new() { Environment = Env(), ModelsPath = path, RunCommand = _ => null });
+        Check(failed.ResolveRequestAuth(failed.Find("command", "d")!, out var error) is null &&
+            error == "Failed to resolve API key for provider \"command\" from shell command: print-key", "failed command: " + error);
     }
 
     private static void RequestAuth(string path)
