@@ -141,6 +141,9 @@ public static partial class NativeProviderFactory
         var routeHeaders = ImmutableDictionary.CreateBuilder<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, value) in dynamicHeaders) routeHeaders[name] = value;
         foreach (var (name, value) in auth.Headers ?? ImmutableDictionary<string, string?>.Empty) routeHeaders[name] = value;
+        // Header-owned Authorization auth (Kimi Code OAuth) carries no apiKey: the SDK sends no x-api-key.
+        if (string.IsNullOrEmpty(auth.ApiKey) && routeHeaders.TryGetValue("Authorization", out var bearer) && bearer is not null && !routeHeaders.ContainsKey("x-api-key"))
+            routeHeaders["x-api-key"] = null;
         var callerHeaders = model.Provider is "opencode" or "opencode-go"
             ? ProviderHeaderPolicies.WithOpenCodeSessionHeader(options.SessionId, options.Headers) : options.Headers;
         foreach (var (name, value) in callerHeaders ?? ImmutableDictionary<string, string?>.Empty) routeHeaders[name] = value;

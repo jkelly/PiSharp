@@ -26,7 +26,7 @@ namespace PiSharp.Cli.Commands;
 public static class RpcSessionCommand
 {
     public const string Usage = "session rpc --session <existing absolute JSONL> --workspace <existing absolute directory> " +
-        "(--offline-script <absolute JSON> | --live [--provider openai|openrouter|anthropic|mistral|azure] [--model <pinned model id>] [--max-output-tokens 1..8192]) [--thinking off|minimal|low|medium|high|xhigh|max] [--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
+        "(--offline-script <absolute JSON> | --live [--provider <provider>] [--model <pattern>[:<thinking>]] [--models <patterns>] [--max-output-tokens 1..8192]) [--thinking off|minimal|low|medium|high|xhigh|max] [--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
         "[--bash-executable <absolute file> --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]] " + NativeExtensionConfiguration.Flags + " " + SessionCatalogCommand.Flags + " " + CreationFlags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags;
     public const string CreationFlags = "[--session-mode open|new-memory|new-lazy]";
     private static readonly JsonlTransportOptions Framing = new(MaximumFrameBytes: 1_048_576, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
@@ -88,7 +88,8 @@ public static class RpcSessionCommand
             if (!stdin.CanRead || !stdout.CanWrite) throw Invalid();
             if (!Directory.Exists(parsed.Workspace)) throw new SessionCommandException(SessionCommandFailure.WorkspaceMissing);
             var settings = await SettingsStartupConfiguration.LoadAsync(parsed.Settings, stderr, settingsFileSystem, cancellationToken).ConfigureAwait(false);
-            var liveSelection = parsed.Live?.Resolve(settings);
+            var liveSelection = parsed.Live is null ? null : await parsed.Live.ResolveAsync(settings, liveRuntime ?? LiveSessionRuntime.Default, stderr,
+                parsed.SessionMode == "open", cancellationToken).ConfigureAwait(false);
             // Production sessions read the global mcp.json once at start; --no-mcp connects nothing.
             if (mcpAdmission is null && !parsed.Tools.NoMcp && mcpHost is not null) mcpAdmission = mcpHost.CreateAdmission(parsed.Workspace, stderr);
             backend = parsed.SessionMode == "open" ? null : new SessionStorageBackend(Path.GetDirectoryName(parsed.Session)!,
@@ -133,7 +134,7 @@ public static class RpcSessionCommand
             if (!string.Equals(SessionCommands.Absolute(session.WorkingDirectory), profile.Workspace,
                 OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                 throw new SessionCommandException(SessionCommandFailure.WorkspaceMismatch);
-            var thinking = SettingsModelSelection.Thinking(settings, session.Snapshot.Agent.Model, parsed.Thinking,
+            var thinking = SettingsModelSelection.Thinking(settings, session.Snapshot.Agent.Model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel,
                 parsed.SessionMode == "open", session.GetSupportedThinkingLevels());
             if (thinking is not null && thinking != session.Snapshot.Context.ThinkingLevel)
                 await session.ConfigureAsync(new(ThinkingLevel: thinking), cancellationToken).ConfigureAwait(false);
@@ -301,7 +302,7 @@ public static class RpcSessionCommand
             var key = args[index];
             if (key == "--live") { if (live) throw Invalid(); live = true; continue; }
             if (key == "--root") { if (root) throw Invalid(); root = true; continue; }
-            if (key is not ("--session" or "--workspace" or "--offline-script" or "--offline-api" or "--offline-images" or "--provider" or "--model" or "--max-output-tokens" or "--leaf" or "--allow-read" or "--allow-write" or
+            if (key is not ("--session" or "--workspace" or "--offline-script" or "--offline-api" or "--offline-images" or "--provider" or "--model" or "--models" or "--max-output-tokens" or "--leaf" or "--allow-read" or "--allow-write" or
                 "--bash-executable" or "--bash-spill-root" or "--allow-bash-command" or "--bash-timeout" or "--session-store" or "--session-mode" or
                 "--extension-package" or "--extension-manifest" or "--extension-approval" or "--extension-snapshot-root" or "--enable-extension-tool" or "--deny-extension-tool" or "--enable-extension-command" or
                 "--user-settings" or "--project-settings" or "--steering-mode" or "--follow-up-mode" or "--thinking") ||
@@ -325,12 +326,14 @@ public static class RpcSessionCommand
         if (provider is not null && liveModel is null)
             throw new SessionCommandException(SessionCommandFailure.InvalidArguments,
                 $"--provider requires --model (for example: --provider {provider} --model <pattern>)");
+        options.TryGetValue("--models", out var modelPatterns);
         if (live ? script is not null || options.ContainsKey("--offline-api") || options.ContainsKey("--offline-images") :
-            script is null || provider is not null || liveModel is not null || maximumTokens is not null) throw Invalid();
+            script is null || provider is not null || liveModel is not null || maximumTokens is not null || modelPatterns is not null) throw Invalid();
         options.TryGetValue("--thinking", out var thinking);
         if (thinking is not null && !PiSharp.AI.ThinkingLevels.Ordered.Contains(thinking, StringComparer.Ordinal)) throw Invalid();
-        // Capture preferences without settings IO. Resolve through the pinned catalog after the one settings read.
-        var liveSelection = live ? new SettingsModelSelection(provider, liveModel, maximumTokens) : null;
+        // Capture preferences without settings IO. Resolve through the model registry after the one settings read.
+        var liveSelection = live ? new SettingsModelSelection(provider, liveModel, maximumTokens)
+            { ModelPatterns = modelPatterns is null ? null : PiSharp.Cli.Models.ModelResolver.SplitPatterns(modelPatterns), CliThinking = thinking } : null;
         options.TryGetValue("--leaf", out var leaf);
         options.TryGetValue("--session-mode", out var sessionMode); sessionMode ??= "open";
         if (sessionMode is not ("open" or "new-memory" or "new-lazy") || sessionMode != "open" && (root || leaf is not null)) throw Invalid();

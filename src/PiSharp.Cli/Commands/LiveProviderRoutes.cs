@@ -57,7 +57,10 @@ internal sealed class LiveProviderRoute
         var provider = selection.Model.Provider;
         if (provider == "anthropic" || ProviderAuthCatalog.Find(provider) is not { } entry) return null;
         var store = runtime.AuthPath is null ? null : new AuthJsonCredentialStore(runtime.AuthPath, runtime.Time);
-        if (!Handles(provider) && (provider == "azure" || store is null || !File.Exists(store.AuthPath))) return null;
+        // Other providers: only a stored OAuth credential (/login) is resolved here; stored api_key entries, models.json and the
+        // environment are the catalog registry's (getApiKeyAndHeaders).
+        if (!Handles(provider) && (provider == "azure" || entry.OAuth is null || store is null || !File.Exists(store.AuthPath) ||
+            store.ReadEntryAsync(provider, CancellationToken.None).GetAwaiter().GetResult() is not { Type: "oauth" })) return null;
         var environment = runtime.CreateEnvironment();
         var authentication = new ProviderLiveAuthentication(entry, store, environment, runtime.CreateAuthHttp ?? (() => new HttpClient()), runtime.Time,
             runtime.OAuthFlows is { } flows ? context => flows(provider, context) : null);
@@ -69,9 +72,13 @@ internal sealed class LiveProviderRoute
         { throw new LiveSessionException("LiveAuthenticationFailed", error is OAuthLifecycleException ? "Credential store read failed for " + provider : error.Message); }
         if (!Handles(provider))
         {
-            // A stored credential owns the provider; without one the environment-key route applies.
-            if (store!.ReadEntryAsync(provider, CancellationToken.None).GetAwaiter().GetResult() is null) return null;
-            if (resolved?.ApiKey is not { Length: > 0 } key || key.Length > 4096 || key.Any(char.IsControl))
+            // A stored OAuth credential owns the provider. Anthropic Messages, Completions and Responses resolve it before every request
+            // (refresh included); other APIs bind the access token for the session.
+            if (resolved is null || resolved.ApiKey is null && resolved.Headers is null)
+                throw new LiveSessionException("MissingLiveApiKey", "Provider is not configured: " + provider);
+            if (selection.Model.Api is "anthropic-messages" or "openai-completions" or "openai-responses")
+                return new(selection, runtime.CreateHttpHandler(), string.Empty) { ProviderRoute = new LiveProviderRoute(selection, authentication, runtime, environment) };
+            if (resolved.ApiKey is not { Length: > 0 } key || key.Length > 4096 || key.Any(char.IsControl))
                 throw new LiveSessionException("MissingLiveApiKey", "Provider is not configured: " + provider);
             return new(selection, runtime.CreateHttpHandler(), key);
         }
