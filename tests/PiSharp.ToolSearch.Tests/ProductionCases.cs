@@ -238,10 +238,9 @@ internal static partial class Program
             .Where(entry => entry.TryGetProperty("message", out var message) && message.TryGetProperty("toolsAdded", out _))
             .Select(entry => entry.GetProperty("message").GetProperty("toolsAdded").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!).ToArray()).ToArray();
         var history = string.Join(" | ", recorded.Select(names => string.Join(",", names)));
-        Names(["read", "write", "tool_search", "mcp__docs__search"], recorded[^2], "loaded tool recorded in the session file: " + history);
-        // PiSharp deviation (pre-existing): closing the session withdraws the background server's tools durably, so the file's
-        // last loadout no longer names them; upstream records nothing at shutdown.
-        Names(["read", "write", "tool_search"], recorded[^1], "shutdown withdrawal of the background server's tools: " + history);
+        // IMPL-H: like upstream (session_shutdown records nothing), closing the session no longer withdraws the background server's
+        // tools durably, so the file's last loadout still names the loaded tool.
+        Names(["read", "write", "tool_search", "mcp__docs__search"], recorded[^1], "loaded tool recorded in the session file, not withdrawn at shutdown: " + history);
         Equal(1, fixture.Servers.Single().Closes, "server closed with the session");
     });
 

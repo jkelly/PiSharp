@@ -64,6 +64,14 @@ public sealed class McpPreparedServer : IAsyncDisposable
         => RunAsync(() => runtime.ConnectAsync(token), token);
     public Task<McpRuntimeSnapshot> RefreshToolsAsync(CancellationToken token = default)
         => RunAsync(() => runtime.RefreshToolsAsync(token), token);
+    /// <summary>Drops the connection and connects again, republishing the tools (`/mcp` reconnect, after a sign-in).</summary>
+    public Task<McpRuntimeSnapshot> ReconnectAsync(CancellationToken token = default)
+        => RunAsync(() => runtime.ReconnectAsync(token), token);
+    /// <summary>Drops the connection without reconnecting (sign-out); the tools stay registered and the next call reconnects.</summary>
+    public Task DisconnectAsync(CancellationToken token = default)
+        => RunAsync(async () => { await runtime.DisconnectAsync(token).ConfigureAwait(false); return runtime.Snapshot; }, token);
+    /// <summary>The runtime's current catalog state (connected, tools, instructions, resources).</summary>
+    public McpRuntimeSnapshot Snapshot => runtime.Snapshot;
     /// <summary>Called by the actual prepared resource dispatch after its resource-scope admission.
     /// The resource scope can differ from this server's tool scope; both belong to the captured attachment.</summary>
     public McpResourceServer CaptureResourceServer(IExtensionToolInvocationContext invocation)
@@ -81,6 +89,10 @@ public sealed class McpPreparedServer : IAsyncDisposable
         }
     }
     public bool CatalogWithdrawalAcknowledged { get { lock (admission) return withdrawalAcknowledged; } }
+    /// <summary>Whether closing with the owner's shutdown records the withdrawal of this server's tools in the session. The
+    /// original records nothing at session_shutdown (production sessions set false), so a resumed session's loadout still names
+    /// the tools and declares them again once the server connects.</summary>
+    public bool DurableWithdrawalOnShutdown { get; init; } = true;
     public Task CloseAsync()
     {
         RefuseReentry();
@@ -122,10 +134,12 @@ public sealed class McpPreparedServer : IAsyncDisposable
             // The owning stop phase already initiated and joined the actual runtime close before this reservation.
             // Its original failure is retained by the resource owner; do not count it again in withdrawal.
             await Task.WhenAll(originals).ConfigureAwait(false);
-            var withdrew = registrationIds.IsEmpty;
+            // index.ts session_shutdown records nothing: the tools leave with the session. Only a close while the session
+            // continues (disable, reconnect with a new configuration, reload) withdraws them durably.
+            var withdrew = registrationIds.IsEmpty || transaction.IsSessionShutdown && !DurableWithdrawalOnShutdown;
             // Withdrawal is host-owned; runtime close only marks its borrowed metadata disconnected.
             // Last committed ownership is retained until the same durable catalog boundary acknowledges.
-            if (!registrationIds.IsEmpty)
+            if (!withdrew)
             {
                 try
                 {

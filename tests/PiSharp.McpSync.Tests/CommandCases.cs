@@ -34,9 +34,11 @@ internal static partial class Program
                 "        \"remote\": {\n            \"url\": \"https://remote.example.test/mcp\",\n            \"headers\": {\n                \"X-Team\": \"a=b\",\n                \"Authorization\": \"Bearer ${REMOTE_TOKEN}\"\n            }\n        },\n" +
                 "        \"signin\": {\n            \"url\": \"https://signin.example.test/mcp\",\n            \"oauth\": {\n                \"clientId\": \"client\",\n                \"callbackPort\": 8123\n            }\n        }\n    }\n}\n",
                 File.ReadAllText(global).ReplaceLineEndings("\n"));
-            // -l writes the project file, which PiSharp does not read.
-            Equal((0, $"Added project MCP server \"local\" in {project}.\n{project} is ignored because PiSharp does not read project trust.\nCheck it with: PiSharp.Cli mcp list\n", ""),
+            // -l writes the project file, which is read only once the project is trusted.
+            Equal((0, $"Added project MCP server \"local\" in {project}.\nThe project is not trusted, so {project} is ignored until you start PiSharp.Cli in the project and trust it.\nCheck it with: PiSharp.Cli mcp list\n", ""),
                 await Mcp(options, "add", "local", "-l", "--", "local-server"));
+            Equal((0, $"Replaced project MCP server \"local\" in {project}.\nCheck it with: PiSharp.Cli mcp list\n", ""),
+                await Mcp(options with { IsProjectTrusted = cwd => cwd == options.Cwd }, "add", "local", "-l", "--", "local-server"));
             Equal("{\n  \"mcpServers\": {\n    \"local\": {\n      \"command\": \"local-server\"\n    }\n  }\n}\n", File.ReadAllText(project).ReplaceLineEndings("\n"));
 
             const string Hint = "Use \"PiSharp.Cli mcp --help\" for usage.\n";

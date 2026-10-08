@@ -31,7 +31,7 @@ internal static partial class Program
     private static IEnumerable<(string Id, Func<Task> Run)> CompletionCases() =>
     [
         ("exposure.background-connection-late-tools-section-and-failures", BackgroundConnection),
-        ("exposure.background-partition-keeps-direct-servers-pre-open", BackgroundPartition),
+        ("exposure.background-partition-moves-admitted-servers-including-direct", BackgroundPartition),
         ("oauth.default-client-name-from-config-or-app-name", DefaultClientName),
         ("oauth.mcp-auth-json-location-lock-modes-and-durability", FileBackend),
         ("cli.mcp-help-usage-and-errors", McpCliErrors),
@@ -195,12 +195,14 @@ internal static partial class Program
         var catalog = new McpServerCatalog([direct, indirect, disabled, unadmitted], []);
         static (McpServerCatalog, ImmutableArray<(McpServerEntry Entry, McpBackgroundServerFactory Bind)>) Partition(McpServerCatalog input,
             params McpBackgroundServerAdmission[] admissions) => McpBackgroundConnections.Partition(input, [.. admissions]);
-        // Background admissions move only enabled servers without direct tools; the rest keep their pre-open admission.
+        // Background admissions move only enabled admitted servers; the rest keep their pre-open admission.
         var (preOpen, background) = Partition(catalog, new("indirect", entry => validated.Add(entry.Name), none), new("disabled", entry => validated.Add(entry.Name), none));
         Equal("direct,disabled,unadmitted", string.Join(',', preOpen.Servers.Select(entry => entry.Name)));
         Equal("indirect", string.Join(',', background.Select(row => row.Item1.Name))); Equal("indirect", string.Join(',', validated));
-        // Servers with direct tools are what the first prompt waits for, so they cannot connect in the background.
-        Throws<InvalidOperationException>(() => Partition(new([mixed], []), new McpBackgroundServerAdmission("mixed", _ => { }, none)));
+        // IMPL-H: servers with direct tools connect in the background too, as in the original; the first prompt waits up to 10 s
+        // for them (McpBackgroundConnections.BeforeInputAsync, PiSharp.McpParity.Tests).
+        var (none2, mixedBackground) = Partition(new([mixed], []), new McpBackgroundServerAdmission("mixed", _ => { }, none));
+        Check(none2.Servers.IsEmpty && mixedBackground.Single().Item1.Name == "mixed");
         Throws<ArgumentException>(() => Partition(catalog, new McpBackgroundServerAdmission("indirect", _ => { }, none), new McpBackgroundServerAdmission("indirect", _ => { }, none)));
         // Without background admissions every server stays pre-open, as before.
         Check(ReferenceEquals(catalog, Partition(catalog).Item1));
@@ -335,6 +337,8 @@ internal static partial class Program
         }
         internal static HttpResponseMessage Default(HttpRequestMessage request, string body) => request.RequestUri!.AbsolutePath switch
         {
+            // The MCP server itself: it accepts only the tokens this authorization server issued, and offers one tool.
+            "/mcp" => McpEndpoint(request, body),
             // Dynamic registration echoes the proposed redirect URIs, like a real server.
             "/register" => Response(201, "{\"client_id\":\"registered\",\"redirect_uris\":" +
                 JsonDocument.Parse(body).RootElement.GetProperty("redirect_uris").GetRawText() + "}"),
@@ -342,6 +346,29 @@ internal static partial class Program
                 "\",\"token_type\":\"Bearer\",\"refresh_token\":\"refresh-1\",\"expires_in\":3600}"),
             _ => DiscoveryResponse(request.RequestUri!, "{}")
         };
+        internal static HttpResponseMessage McpEndpoint(HttpRequestMessage request, string body)
+        {
+            if (request.Method == HttpMethod.Get) return new(HttpStatusCode.MethodNotAllowed);
+            if (request.Method == HttpMethod.Delete) return new(HttpStatusCode.OK);
+            if (request.Headers.Authorization?.ToString() is not { } authorization || !authorization.StartsWith("Bearer issued-", StringComparison.Ordinal))
+            {
+                var denied = new HttpResponseMessage(HttpStatusCode.Unauthorized);
+                denied.Headers.TryAddWithoutValidation("WWW-Authenticate", "Bearer resource_metadata=\"https://mcp.example.test/.well-known/oauth-protected-resource/mcp\"");
+                return denied;
+            }
+            using var json = JsonDocument.Parse(body);
+            if (!json.RootElement.TryGetProperty("id", out var id)) return new(HttpStatusCode.Accepted);
+            var method = json.RootElement.GetProperty("method").GetString();
+            var result = method switch
+            {
+                "initialize" => """{"protocolVersion":"2025-11-25","serverInfo":{"name":"docs","version":"1"},"capabilities":{"tools":{}}}""",
+                "tools/list" => """{"tools":[{"name":"lookup","description":"Looks up.","inputSchema":{"type":"object"}}]}""",
+                _ => "{}"
+            };
+            var response = Response(200, "{\"jsonrpc\":\"2.0\",\"id\":" + id.GetRawText() + ",\"result\":" + result + "}");
+            if (method == "initialize") response.Headers.Add("Mcp-Session-Id", "session-1");
+            return response;
+        }
     }
 
     private static async Task McpCliErrors()
@@ -366,10 +393,13 @@ internal static partial class Program
             Equal((1, "", "No MCP server named \"nope\". Configured: docs, keyed, local.\n"), await Mcp(options, "login", "nope"));
             Equal((1, "", "MCP server \"keyed\" does not use OAuth. Only HTTP servers without an Authorization header do.\n"), await Mcp(options, "login", "keyed"));
             Equal((1, "", "MCP server \"local\" does not use OAuth. Only HTTP servers without an Authorization header do.\n"), await Mcp(options, "logout", "local"));
-            // A project mcp.json is not read without project trust, and the message says so.
-            Directory.CreateDirectory(Path.Combine(options.Cwd, ".pi")); File.WriteAllText(Path.Combine(options.Cwd, ".pi", "mcp.json"), "{}");
-            Equal((1, "", $"No MCP server named \"nope\". {Path.Combine(options.Cwd, ".pi", "mcp.json")} is ignored because PiSharp does not read project trust. Configured: docs, keyed, local.\n"),
+            // A project mcp.json is not read without project trust, and the message says so; a trusted project's servers are listed.
+            Directory.CreateDirectory(Path.Combine(options.Cwd, ".pi"));
+            File.WriteAllText(Path.Combine(options.Cwd, ".pi", "mcp.json"), "{\"mcpServers\":{\"team\":{\"command\":\"team-server\"},\"local\":{\"enabled\":false}}}");
+            Equal((1, "", $"No MCP server named \"nope\". {Path.Combine(options.Cwd, ".pi", "mcp.json")} is ignored because the project is not trusted. Start PiSharp.Cli in the project to trust it. Configured: docs, keyed, local.\n"),
                 await Mcp(options, "login", "nope"));
+            Equal((1, "", "No MCP server named \"nope\". Configured: docs, keyed, local, team.\n"),
+                await Mcp(options with { IsProjectTrusted = cwd => cwd == options.Cwd }, "login", "nope"));
             Equal((1, "", "No MCP server named \"docs\". Configured: none.\n"), await Mcp(CliFixture("{}").Options with { }, "login", "docs"));
             // Client secrets resolve like the original's config values, `!command` values included (decision 0004).
             Equal("a-s3cret$!", McpCommand.ResolveConfigValue("a-${SECRET}$$$!", "secret", name => name == "SECRET" ? "s3cret" : null));
@@ -422,7 +452,12 @@ internal static partial class Program
             var (code, output, error) = await Mcp(options, "login", "docs", "--timeout", "30");
             Equal((0, ""), (code, error));
             Check(opened is not null && opened.StartsWith(Issuer + "authorize?", StringComparison.Ordinal), opened);
-            Equal($"Sign in to MCP server \"docs\" in your browser:\n{opened}\nSigned in to MCP server \"docs\".\n", output);
+            // IMPL-H (cli.ts login): the command connects first (the server answers 401), signs in, connects again and reports the tools.
+            Equal($"Sign in to MCP server \"docs\" in your browser:\n{opened}\nSigned in to MCP server \"docs\" (1 tools).\n", output);
+            Check(server.Log.Where(row => row.Uri.AbsolutePath == "/mcp" && row.Method == "POST").Select(row => JsonDocument.Parse(row.Body).RootElement.GetProperty("method").GetString())
+                .SequenceEqual(["initialize", "initialize", "notifications/initialized", "tools/list"]), "connect first, then again after the sign-in");
+            // Signed in already: the command connects and reports it without a browser.
+            Equal((0, "Already signed in to MCP server \"docs\" (1 tools).\n", ""), await Mcp(options with { OpenUrl = _ => throw new InvalidOperationException("No browser expected.") }, "login", "docs"));
             var authorize = new Uri(opened!);
             var redirect = Query(authorize, "redirect_uri")!;
             Check(System.Text.RegularExpressions.Regex.IsMatch(redirect, @"^http://127\.0\.0\.1:\d+/callback$"), redirect);
@@ -463,12 +498,13 @@ internal static partial class Program
                 { ClientInformation = JsonData.Parse("{\"client_id\":\"admitted-client\",\"redirect_uris\":[\"" + redirect + "\"]}") });
             var server = new FakeAuthorizationServer(); var opened = 0;
             var result = await Mcp(options with { HttpHandler = server, OpenUrl = _ => opened++ }, "login", "docs");
-            // The stored refresh token signs in again without the browser; the registered client is kept.
-            Equal((0, "Signed in to MCP server \"docs\".\n", ""), result); Equal(0, opened);
-            var refresh = server.Log.Single().Body;
+            // The connection refreshes the rejected token with the stored refresh token, so the command reports the server as signed in
+            // without the browser (cli.ts login connects first); the registered client is kept.
+            Equal((0, "Already signed in to MCP server \"docs\" (1 tools).\n", ""), result); Equal(0, opened);
+            var refresh = server.Log.Single(row => row.Uri.AbsolutePath == "/token").Body;
             Check(refresh.StartsWith("grant_type=refresh_token&refresh_token=refresh-0", StringComparison.Ordinal), refresh);
             var saved = (await store.LoadAsync())!;
-            Equal("issued-refresh", saved.Tokens!.AccessToken); Equal("read", saved.Tokens.Scope); Equal(null, saved.OAuthState);
+            Equal("issued-refresh", saved.Tokens!.AccessToken); Equal("read", saved.Tokens.Scope);
         }
         finally { Delete(root); }
     }

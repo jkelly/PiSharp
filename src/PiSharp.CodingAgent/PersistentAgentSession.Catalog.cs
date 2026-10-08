@@ -97,7 +97,9 @@ public sealed partial class PersistentAgentSession
             await using (var probe = new NativeAgent(selection.Configuration, _clock, new NoopSink(), _agentOptions))
                 probe.ConfigureAndReplaceMessages(selection.Configuration, SessionContextProjector.AgentMessages(prospective));
             work.ThrowIfCancellationRequested(); writeAdmitted = true;
-            var acknowledged = await _store.AppendAsync([entry], work).ConfigureAwait(false);
+            // Once admitted, finish the original append and publish its acknowledgment even if the owner closes meanwhile (an MCP
+            // server publishing its catalog while the session shuts down): a cancelled append would fault the session.
+            var acknowledged = await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
             if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             lock (_gate)
             {

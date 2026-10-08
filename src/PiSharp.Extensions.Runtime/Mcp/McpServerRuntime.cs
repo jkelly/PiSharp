@@ -192,6 +192,26 @@ public sealed class McpServerRuntime : IAsyncDisposable
     public Task<McpRuntimeSnapshot> ConnectAsync(CancellationToken cancellationToken = default) => RunAsync(async token =>
     { await GetConnectionAsync(token).ConfigureAwait(false); return Snapshot; }, cancellationToken);
 
+    /// <summary>runtime.ts reconnect: drop the current connection (joining its close) and connect again, republishing the
+    /// tools, for example after a sign-in or from the `/mcp` manager.</summary>
+    public Task<McpRuntimeSnapshot> ReconnectAsync(CancellationToken cancellationToken = default) => RunAsync(async token =>
+    {
+        await DisconnectCoreAsync().ConfigureAwait(false);
+        await GetConnectionAsync(token).ConfigureAwait(false); return Snapshot;
+    }, cancellationToken);
+
+    /// <summary>runtime.ts signOut: drop the current connection without reconnecting; the next call connects again.</summary>
+    public Task DisconnectAsync(CancellationToken cancellationToken = default) => RunAsync(async _ =>
+    { await DisconnectCoreAsync().ConfigureAwait(false); return true; }, cancellationToken);
+
+    private async Task DisconnectCoreAsync()
+    {
+        Lazy<Task<Connection>>? pending; lock (gate) pending = opening;
+        if (pending is not null) try { await pending.Value.ConfigureAwait(false); } catch (Exception) { /* The failed attempt left no connection. */ }
+        Connection? current; lock (gate) current = connection;
+        if (current is not null) await RetireDisconnectedAsync(current).ConfigureAwait(false);
+    }
+
     public Task<McpRuntimeSnapshot> RefreshToolsAsync(CancellationToken cancellationToken = default) => RunAsync(async token =>
     {
         await refreshGate.WaitAsync(token).ConfigureAwait(false);

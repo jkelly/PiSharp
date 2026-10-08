@@ -191,7 +191,7 @@ public sealed partial class ReplaceableAgentSession
         PersistentAgentSession.ReplacementReservation? reservation)
     {
         lock (gate) { if (lease.BodyStarted) return; lease.BodyStarted = true; }
-        var tx = new OwnedResourceRetirementTransaction(this, lease.Attachment, reservation);
+        var tx = new OwnedResourceRetirementTransaction(this, lease.Attachment, reservation) { IsSessionShutdown = inShutdown.Value };
         var prior = resourceTransaction.Value; resourceTransaction.Value = tx;
         var faults = new List<Exception>();
         BeginOwnedResourceStop(lease);
@@ -219,6 +219,8 @@ public sealed partial class ReplaceableAgentSession
         internal bool Alive = true, BodyEnded;
         internal Task? Publication;
         public AgentSessionAttachment Attachment { get; }
+        /// <summary>Whether the owner retires this resource because it shuts down, rather than for a replacement or an explicit close.</summary>
+        public bool IsSessionShutdown { get; internal init; }
         internal OwnedResourceRetirementTransaction(ReplaceableAgentSession owner, AgentSessionAttachment attachment,
             PersistentAgentSession.ReplacementReservation? reservation)
         { this.owner = owner; Attachment = attachment; this.reservation = reservation; }

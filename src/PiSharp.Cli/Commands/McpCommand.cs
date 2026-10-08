@@ -39,6 +39,9 @@ internal sealed record McpCommandOptions(string Cwd, string AgentDirectory)
     public string HomeDirectory { get; init; } = "";
     /// <summary>A replacement channel for a server (tests); null keeps the stdio or HTTP channel of its config.</summary>
     public Func<McpServerEntry, McpAdmittedChannelFactory?>? CreateChannel { get; init; }
+    /// <summary>The stored trust decision for the project (cli.ts: <c>new ProjectTrustStore(agentDir).get(cwd) === true</c>); the
+    /// project trust store supplies it. Without a stored decision the project is not trusted.</summary>
+    public Func<string, bool> IsProjectTrusted { get; init; } = _ => false;
 
     internal McpSessionHost CreateSessionHost() => new(AgentDirectory, HomeDirectory, ProcessEnvironment)
     { CreateHttpHandler = HttpHandler is { } handler ? () => handler : null, Credentials = Credentials, CreateChannel = CreateChannel };
@@ -62,7 +65,7 @@ internal static class McpCommand
         $"  {AppName} mcp logout <server>",
         "",
         "Configure and check MCP servers and sign in to OAuth servers without starting a session.",
-        "Reads ~/.pi/agent/mcp.json (PiSharp does not read project trust, so .pi/mcp.json is not used).",
+        "Reads ~/.pi/agent/mcp.json and, in trusted projects, .pi/mcp.json.",
         "",
         "Commands:",
         "  add <server>            Add or replace a server in mcp.json",
@@ -125,10 +128,18 @@ internal static class McpCommand
         if (command is not ("list" or "login" or "logout")) { Error($"Unknown mcp command \"{command}\".\n{HelpHint}"); return 1; }
 
         McpLoadedConfiguration loaded;
-        try { loaded = McpConfigurationReader.Load(File.Exists(globalConfig) ? new(globalConfig, File.ReadAllText(globalConfig)) : null, null, false); }
-        catch (IOException readError) { Error($"Could not read {globalConfig}: {readError.Message}"); return 1; }
-        // PiSharp reads no project trust store, so the project's mcp.json is never used.
-        var untrustedNote = File.Exists(projectConfig) ? $"{projectConfig} is ignored because PiSharp does not read project trust." : null;
+        var projectTrusted = options.IsProjectTrusted(options.Cwd);
+        var reading = globalConfig;
+        try
+        {
+            var global = File.Exists(globalConfig) ? new McpConfigurationDocument(globalConfig, File.ReadAllText(globalConfig)) : null;
+            reading = projectConfig;
+            loaded = McpConfigurationReader.Load(global,
+                projectTrusted && File.Exists(projectConfig) ? new(projectConfig, File.ReadAllText(projectConfig)) : null, projectTrusted);
+        }
+        catch (IOException readError) { Error($"Could not read {reading}: {readError.Message}"); return 1; }
+        var untrustedNote = !projectTrusted && File.Exists(projectConfig)
+            ? $"{projectConfig} is ignored because the project is not trusted. Start {AppName} in the project to trust it." : null;
         var credentials = new McpOAuthCredentialStore(options.Credentials ?? McpOAuthFileCredentialBackend.InAgentDirectory(options.AgentDirectory));
 
         if (command == "list")
@@ -279,7 +290,8 @@ internal static class McpCommand
         catch (Exception addError) when (addError is IOException or UnauthorizedAccessException or InvalidDataException or JsonException)
         { error($"Could not update {path}: {addError.Message}"); return 1; }
         log($"{(replaced ? "Replaced" : "Added")} {scope} MCP server \"{name}\" in {path}.");
-        if (project) log($"{path} is ignored because PiSharp does not read project trust.");
+        if (project && !options.IsProjectTrusted(options.Cwd))
+            log($"The project is not trusted, so {path} is ignored until you start {AppName} in the project and trust it.");
         // HTTP servers without an Authorization header may use OAuth.
         var mayNeedSignIn = valid.Transport == McpTransportKind.Http && !(valid.Raw.Value.TryGetProperty("headers", out var written) &&
             written.EnumerateObject().Any(header => header.Name.Equals("authorization", StringComparison.OrdinalIgnoreCase)));
@@ -321,7 +333,7 @@ internal static class McpCommand
 
     /// <summary>Source editMcpServers: read an `mcp.json` (empty when missing), let <paramref name="edit"/> change its `mcpServers`, and
     /// write it back with its own indentation when the edit returns true. Other content is kept.</summary>
-    private static void EditMcpServers(string path, Func<JsonObject?, JsonObject, bool> edit)
+    internal static void EditMcpServers(string path, Func<JsonObject?, JsonObject, bool> edit)
     {
         var text = File.Exists(path) ? File.ReadAllText(path) : null;
         var parsed = text is null ? new JsonObject() : JsonNode.Parse(text);
@@ -425,6 +437,12 @@ internal static class McpCommand
         McpCommandOptions options, Action<string> log, Action<string> error, CancellationToken token)
     {
         var name = entry.Name;
+        var host = options.CreateSessionHost();
+        using var connectionClient = host.CreateClient();
+        // Connecting first answers whether a sign-in is needed.
+        var connected = await ConnectAsync(entry, host, connectionClient, options, token).ConfigureAwait(false);
+        if (connected.Tools is { } already) { log($"Already signed in to MCP server \"{name}\" ({already} tools)."); return 0; }
+        if (!connected.NeedsSignIn) { error($"MCP server \"{name}\" failed to connect: {connected.Error}"); return 1; }
         McpOAuthSettings settings;
         try { settings = McpOAuthSettings.From(entry, (value, description) => ResolveConfigValue(value, description, options.Environment)); }
         catch (InvalidOperationException resolveError) { error($"Sign-in to MCP server \"{name}\" failed: {resolveError.Message}"); return 1; }
@@ -451,9 +469,37 @@ internal static class McpCommand
                 : $"Sign-in to MCP server \"{name}\" failed: {Message(signInError)}");
             return 1;
         }
-        // The original reconnects here and reports the tool count; this command does not connect to the server.
-        log($"Signed in to MCP server \"{name}\".");
+        var reconnected = await ConnectAsync(entry, host, connectionClient, options, token).ConfigureAwait(false);
+        if (reconnected.Tools is not { } count)
+        {
+            error("Signed in, but " + (reconnected.NeedsSignIn ? McpProviderTokenAuthentication.SignInRequiredMessage(entry)
+                : $"MCP server \"{name}\" failed to connect: {reconnected.Error}"));
+            return 1;
+        }
+        log($"Signed in to MCP server \"{name}\" ({count} tools).");
         return 0;
+    }
+
+    /// <summary>One connection to the server, closed again: its tool count, or whether it needs a sign-in, or its error.</summary>
+    private static async Task<(int? Tools, bool NeedsSignIn, string? Error)> ConnectAsync(McpServerEntry entry, McpSessionHost host, HttpClient client,
+        McpCommandOptions options, CancellationToken token)
+    {
+        McpServerRuntime? runtime = null;
+        try
+        {
+            var runtimeOptions = new McpRuntimeOptions(1, McpSessionHost.ClientVersion);
+            runtime = new McpServerRuntime(entry, runtimeOptions, host.Channel(entry, options.Cwd, runtimeOptions, () => client),
+                (publication, _) => ValueTask.FromResult(new McpCatalogPublicationReceipt(publication.Current.Generation, publication.Current.Revision, true)));
+            var snapshot = await runtime.ConnectAsync(token).ConfigureAwait(false);
+            return (snapshot.Catalog.Tools.Length, false, null);
+        }
+        catch (Exception failure) when (!token.IsCancellationRequested)
+        {
+            for (Exception? current = failure; current is not null; current = current.InnerException)
+                if (current is PiSharp.Extensions.Mcp.Authentication.McpOAuthAuthorizationRequiredException) return (null, true, null);
+            return (null, false, failure is AggregateException { InnerExceptions.Count: 1 } single ? single.InnerExceptions[0].Message : failure.Message);
+        }
+        finally { if (runtime is not null) try { await runtime.CloseAsync().ConfigureAwait(false); } catch (Exception) { } }
     }
 
     private static string Message(Exception error)
@@ -482,7 +528,7 @@ internal static class McpCommand
         catch (OperationCanceledException) { return null; }
     }
 
-    private static void OpenBrowser(string url)
+    internal static void OpenBrowser(string url)
     {
         try
         {

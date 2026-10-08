@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using PiSharp.Agent;
 using PiSharp.CodingAgent;
 using PiSharp.Extensions.Mcp.Configuration;
+using PiSharp.Extensions.Mcp.Runtime;
 
 namespace PiSharp.Cli.Mcp;
 
@@ -51,6 +52,16 @@ public sealed record McpSessionRuntimeAdmission(SessionRuntimeRegistry NativeReg
     /// session_start), so a fast server never publishes its tools while the host is still taking ownership of the idle
     /// session. Null starts them when the attachment binds.</summary>
     public Task? ConnectAfter { get; init; }
+    /// <summary>How long the first prompt waits for background servers with `direct` tools; null is the original's 10 s.</summary>
+    public TimeSpan? StartupWait { get; init; }
+    /// <summary>Informational notices of the background connections, such as servers still connecting after the startup wait.</summary>
+    public Action<string>? Notify { get; init; }
+    /// <summary>Called once every background server connected or failed, unless the attachment retired first.</summary>
+    public Action? BackgroundSettled { get; init; }
+    /// <summary>Called for each background server that connected, before the prompts waiting for it proceed.</summary>
+    public Func<McpServerEntry, McpPreparedServer, McpRuntimeSnapshot, CancellationToken, Task>? BackgroundConnected { get; init; }
+    /// <summary>Called on the bound attachment after the background connections started (the `/mcp` manager binds here).</summary>
+    public Action<ReplaceableAgentSession, AgentSessionAttachment, McpBackgroundConnections?>? BindManager { get; init; }
 }
 
 /// <summary>Assembles explicitly admitted native and MCP resources before historical resolution.</summary>
@@ -115,23 +126,24 @@ public sealed class McpSessionRuntimeFactory
             token.ThrowIfCancellationRequested();
             admission.ServersPromptSource?.Publish(generation, admission.Catalog, activation.ServerSnapshots);
             var connections = background.IsEmpty ? null :
-                new McpBackgroundConnections(background, generation, admission.ServersPromptSource, admission.ReportBackgroundConnection) { ConnectAfter = admission.ConnectAfter };
+                new McpBackgroundConnections(background, generation, admission.ServersPromptSource, admission.ReportBackgroundConnection)
+                {
+                    ConnectAfter = admission.ConnectAfter, StartupWait = admission.StartupWait ?? McpBackgroundConnections.DefaultStartupWait,
+                    Notify = admission.Notify, AllSettled = admission.BackgroundSettled, Connected = admission.BackgroundConnected
+                };
             transferred = activation.TransferRuntimeOwnership();
             return new SessionRuntimeLease(activation.Registry.WithInitialToolSelectionFromCatalog(),
                 new Resources(transferred, admission.DiscoveryResources, admission.NativeResources), (owner, attachment) =>
                 {
                     activation.BindOwner(owner, attachment);
                     admission.BindProfileView?.Invoke(owner, attachment);
-                    connections?.Start(owner, attachment);
-                    // extensions/mcp/index.ts scriptNeedsServer: codemode scripts wait for the servers they reach. PiSharp publishes a
-                    // server's tools between runs, so the wait happens before a prompt is admitted while codemode is active.
+                    // extensions/mcp/index.ts waitForDirectServers and the tool_call waits (scriptNeedsServer, tool_search). PiSharp
+                    // publishes a server's tools between runs, so the waits happen before a prompt is admitted.
                     if (connections is not null)
-                        attachment.Session.BeforeInputAdmission = async token =>
-                        {
-                            if (!attachment.Session.GetActiveTools().Contains(PiSharp.Extensions.Mcp.Discovery.McpDiscoveryToolIdentity.CodemodeName, StringComparer.Ordinal)) return;
-                            await connections.WhenSettled(entry => McpConfigurationReader.ConfiguredExposures(entry.Config).Contains(McpExposure.Codemode))
-                                .WaitAsync(token).ConfigureAwait(false);
-                        };
+                        attachment.Session.BeforeInputAdmission = token => connections.BeforeInputAsync(attachment.Session, token);
+                    // The manager and the resource tools bind before any server can connect.
+                    admission.BindManager?.Invoke(owner, attachment, connections);
+                    connections?.Start(owner, attachment);
                 });
         }
         catch (Exception original)
