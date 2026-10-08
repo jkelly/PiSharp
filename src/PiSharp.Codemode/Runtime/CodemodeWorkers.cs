@@ -134,28 +134,48 @@ internal sealed class CodemodeThreadWorker : ICodemodeWorker
     }
 }
 
-/// <summary>The engine in a child process. One process runs one script; the next one is started ahead so it is ready.</summary>
+/// <summary>The engine in a child process. One process runs one script; the next one is started ahead so it is ready.
+/// Every worker this process starts is tracked until its exit has been observed: a retired worker is killed (SIGKILL on Unix,
+/// TerminateProcess on Windows), its standard input is closed and its exit is waited for, so it is reaped before the
+/// <see cref="Process"/> is disposed and never lingers as a zombie or an orphan. A worker whose host dies gets EOF and exits.</summary>
 internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : ICodemodeWorker
 {
     private static readonly ConcurrentDictionary<CodemodeWorkerLauncher, Process> Spares = new();
-    private static int running;
-    /// <summary>Live worker processes, spares included (tests).</summary>
-    internal static int Running => Volatile.Read(ref running);
+    private static readonly ConcurrentDictionary<Process, byte> Live = new(ReferenceEqualityComparer.Instance);
+    private static int exitHooked;
+
+    /// <summary>Worker processes started and not yet retired and reaped, spares included (tests).</summary>
+    internal static int Running => Live.Count;
 
     private readonly object gate = new();
     private Process? process;
     private Task reading = Task.CompletedTask;
     private bool terminating;
 
-    /// <summary>Stops the spare workers kept ready for the next script.</summary>
-    internal static void DiscardSpares()
+    /// <summary>Stops the spare workers kept ready for the next script and waits until they are gone.</summary>
+    internal static Task DiscardSparesAsync() =>
+        Task.WhenAll(Spares.Keys.Select(key => Spares.TryRemove(key, out var spare) ? RetireAsync(spare) : Task.CompletedTask));
+
+    /// <summary>Kill, close its input, wait for the exit (which reaps it), then forget and dispose. Killing first means closing the
+    /// pipe can never wait on a worker that stopped reading.</summary>
+    private static async Task RetireAsync(Process worker)
     {
-        foreach (var launcher in Spares.Keys)
-            if (Spares.TryRemove(launcher, out var spare)) { try { spare.Kill(true); } catch (Exception) { } spare.Dispose(); }
+        try { if (!worker.HasExited) worker.Kill(entireProcessTree: true); } catch (Exception) { }
+        try { worker.StandardInput.Close(); } catch (Exception) { }
+        try { await worker.WaitForExitAsync().ConfigureAwait(false); } catch (Exception) { }
+        Live.TryRemove(worker, out _);
+        worker.Dispose();
     }
 
     private static Process Launch(CodemodeWorkerLauncher launcher)
     {
+        if (Interlocked.Exchange(ref exitHooked, 1) == 0)
+            // A normal host exit takes its spares down at once instead of leaving them to notice EOF.
+            AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+            {
+                foreach (var key in Spares.Keys)
+                    if (Spares.TryRemove(key, out var spare)) { try { spare.Kill(entireProcessTree: true); } catch (Exception) { } }
+            };
         var info = new ProcessStartInfo(launcher.FileName)
         {
             RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false,
@@ -163,10 +183,9 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
         };
         foreach (var argument in launcher.Arguments) info.ArgumentList.Add(argument);
         foreach (var (name, value) in launcher.Environment ?? ImmutableDictionary<string, string>.Empty) info.Environment[name] = value;
-        var started = Process.Start(info) ?? throw new InvalidOperationException("The codemode worker process did not start.");
-        Interlocked.Increment(ref running);
-        started.EnableRaisingEvents = true;
-        started.Exited += (_, _) => Interlocked.Decrement(ref running);
+        var started = new Process { StartInfo = info, EnableRaisingEvents = true };
+        if (!started.Start()) { started.Dispose(); throw new InvalidOperationException("The codemode worker process did not start."); }
+        Live[started] = 0;
         // Engine diagnostics belong to no one: drain and discard standard error, as the original discards QuickJS's.
         _ = started.StandardError.BaseStream.CopyToAsync(Stream.Null);
         started.StandardInput.NewLine = "\n";
@@ -179,14 +198,14 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
         if (Spares.TryRemove(launcher, out var candidate))
         {
             if (!candidate.HasExited) spare = candidate;
-            else candidate.Dispose();
+            else _ = RetireAsync(candidate);
         }
         _ = Task.Run(() =>
         {
             try
             {
                 var next = Launch(launcher);
-                if (!Spares.TryAdd(launcher, next)) { try { next.Kill(true); } catch (Exception) { } next.Dispose(); }
+                if (!Spares.TryAdd(launcher, next)) _ = RetireAsync(next);
             }
             catch (Exception) { }
         });
@@ -231,9 +250,7 @@ internal sealed class CodemodeProcessWorker(CodemodeWorkerLauncher launcher) : I
         Process? target;
         lock (gate) { terminating = true; target = process; }
         if (target is null) return;
-        try { target.Kill(entireProcessTree: true); } catch (Exception) { }
-        try { await target.WaitForExitAsync().ConfigureAwait(false); } catch (Exception) { }
+        await RetireAsync(target).ConfigureAwait(false);
         try { await reading.ConfigureAwait(false); } catch (Exception) { }
-        target.Dispose();
     }
 }
