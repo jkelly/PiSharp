@@ -56,3 +56,5 @@ compatibility/semantic-full-structural-openai.plan.json -text
 /PUBLIC-DERIVATIVE-INTEGRITY.json -text
 /PUBLIC-SNAPSHOT-MANIFEST.json -text
 src/PiSharp.Codemode/Runtime/*.js text eol=lf
+# Pi v1.1.0 HTML export assets are embedded byte-for-byte (upstream blob SHAs are pinned by tests).
+src/PiSharp.CodingAgent/Export/Assets/** -text

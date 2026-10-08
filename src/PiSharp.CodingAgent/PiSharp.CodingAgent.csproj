@@ -7,5 +7,11 @@
     <InternalsVisibleTo Include="PiSharp.CliSync.Tests" />
     <InternalsVisibleTo Include="PiSharp.ToolSearch.Tests" />
     <InternalsVisibleTo Include="PiSharp.Codemode.Tests" />
+    <InternalsVisibleTo Include="PiSharp.SessionParity.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Pi v1.1.0 export-html template, application script, vendored libraries and built-in themes, byte-for-byte. -->
+    <EmbeddedResource Include="Export/Assets/*.html;Export/Assets/*.css;Export/Assets/*.js;Export/Assets/*.json" LogicalName="PiSharp.CodingAgent.Export.Assets.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Export/Assets/vendor/*.js" LogicalName="PiSharp.CodingAgent.Export.Assets.vendor.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>
