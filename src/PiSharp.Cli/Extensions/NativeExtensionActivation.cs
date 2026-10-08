@@ -61,7 +61,8 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         IExtensionRegistrationActionHost? configuredRegistrationActions = null,
         PromptTemplateCatalogSnapshot? configuredPromptTemplates = null,
         NativeExtensionInitializerInstallation? configuredInitializerInstallation = null,
-        Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null)
+        Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null,
+        PiSharp.Cli.Mcp.McpRegisteredServers? mcpServers = null)
     {
         if (configuredExecInstallation is not null && configuredExecInstallation.GetInvocationList().Length != 1)
             throw new ArgumentException("One explicitly supplied execution installation factory required.");
@@ -88,6 +89,8 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         var uiPrompts = uiProvider is null ? null : new NativeUiPromptEvents(uiProvider);
         var registry = new ExtensionRegistry(new() { MaximumOwners = 1, MaximumRegistrations = 64, MaximumRegistrationsPerOwner = 64 },
             uiPrompts ?? (IExtensionUiProvider)new UnavailableExtensionUiProvider(), sessionViews, facadeCapabilities);
+        // pi.registerMcpServer(): registrations made while the extension loads are read when the session starts.
+        if (mcpServers is not null) { registry.McpServerHost = mcpServers; mcpServers.OwnerPath = _ => preflight.Configuration.Package; }
         var loader = new PluginAssemblyLoader(new() { SnapshotParentDirectory = preflight.Configuration.SnapshotRoot,
             MaximumOwnedPackages = 1 });
         NativeExtensionRegistrationBridge? registrationBridge = null;
@@ -132,7 +135,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             var schemas = snapshot.Tools.ToImmutableDictionary(tool => tool.Name, tool => NativeToolObjectSchema.Read(tool.Parameters), StringComparer.Ordinal);
             token.ThrowIfCancellationRequested();
             admittedActivation = new(preflight.Configuration, registry, loader, snapshot, schemas, sessionViews, reportInputDiagnostic, facadeHost, registrationBridge)
-                { UiPrompts = uiPrompts };
+                { UiPrompts = uiPrompts, McpServers = mcpServers };
             return admittedActivation;
         }
         catch (Exception original)
@@ -165,6 +168,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         }, sessionCancellationToken: _closing.Token);
         _loadoutDiagnostics?.Bind(Binding.Snapshot);
         UiPrompts?.Bind(_registry, Binding.Snapshot, _reportInputDiagnostic);
+        BindMcpServersChange();
         // Capture exactly the binding revision, never a second per-operation handler set.
         var input = new RegisteredExtensionInputAdmission(_registry, Binding.Snapshot, sessionCancellationToken: _closing.Token,
             reportDiagnostic: _reportInputDiagnostic);

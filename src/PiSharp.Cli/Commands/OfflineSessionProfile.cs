@@ -389,7 +389,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         NativeExtensionInitializerInstallation? configuredInitializerInstallation = null,
         PiSharp.Cli.Mcp.McpApplicationInitializerAdmission? applicationMcpHost = null,
         Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null,
-        OriginalSystemPromptAdmission? originalSystemPrompt = null, BuiltinToolSettings? toolSettings = null)
+        OriginalSystemPromptAdmission? originalSystemPrompt = null, BuiltinToolSettings? toolSettings = null,
+        PiSharp.Cli.Mcp.McpRegisteredServers? mcpRegistrations = null)
     {
         toolSettings ??= BuiltinToolSettings.Default;
         if (configuredExecInstallation is not null && (extension is null || configuredExecInstallation.GetInvocationList().Length != 1))
@@ -517,7 +518,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         try
         {
             if (extensionPreflight is not null) activation = await NativeExtensionActivation.LoadAsync(extensionPreflight, token, extensionUi, reportInputDiagnostic,
-                configuredInitializerInstallation: configuredInitializerInstallation, configuredExecInstallation: configuredExecInstallation).ConfigureAwait(false);
+                configuredInitializerInstallation: configuredInitializerInstallation, configuredExecInstallation: configuredExecInstallation, mcpServers: mcpRegistrations).ConfigureAwait(false);
             // Pi provider request hooks (before_provider_request/headers, after_provider_response, provider_stream_event).
             if (liveSelection is not null && activation?.ProviderHttpHooks(liveSelection.Model) is { } providerHooks)
             {

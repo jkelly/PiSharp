@@ -76,6 +76,8 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     /// <summary>Each generation's server manager once its session is bound: the seam for the terminal's `/mcp` view and the slash
     /// command (<see cref="McpServerManager.ManageAsync"/>, <see cref="McpServerManager.ExecuteCommandAsync"/>).</summary>
     public Action<McpServerManager>? ObserveManager { get; init; }
+    /// <summary>The servers native extensions register (<c>pi.registerMcpServer()</c>); the host passes it to the extensions it loads.</summary>
+    public McpRegisteredServers Registrations { get; init; } = new();
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<McpProfileRuntimeAdmission, TaskCompletionSource> hostStarts = new();
 
     /// <summary>The host started dispatching on the session the admission opened: its background servers may connect now.</summary>
@@ -127,7 +129,19 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
             if (trusted) trustedProject = projectConfig;
             if (!configured.Any(entry => entry.Config.Enabled)) { reporter.Problems(problems); problems.Clear(); }
         }
-        var admitted = configured.Where(entry => entry.Config.Enabled).ToImmutableArray();
+        // index.ts registeredServers: the servers extensions registered, except names mcp.json defines, which take precedence.
+        (ImmutableArray<McpServerEntry> Servers, ImmutableArray<string> Overridden) WithRegistered()
+        {
+            if (noMcp) return (configured, []);
+            var registered = new List<McpServerEntry>(); var overriddenNames = new List<string>();
+            foreach (var server in Registrations.List())
+            {
+                if (configured.FirstOrDefault(entry => McpCatalogPlanner.Namespace(entry.Name) == McpCatalogPlanner.Namespace(server.Name)) is { } defined)
+                { overriddenNames.Add($"\"{server.Name}\" registered by {server.ExtensionPath} is overridden by \"{defined.Name}\" in {defined.Source}"); continue; }
+                registered.Add(new(server.Name, server.Config, server.ExtensionPath, McpConfigurationScope.Extension));
+            }
+            return ([.. configured, .. registered], [.. overriddenNames]);
+        }
         var environment = InheritedEnvironment();
         var autoEnableCodemode = configuredAutoEnable ?? true;
         var (codemodeMode, inlineBudget) = PiSharp.Codemode.CodemodeToolDefinition.ReadSettings(settings?.Value);
@@ -140,6 +154,9 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         McpProfileRuntimeAdmission admission = async (currentCwd, generation, nativeRegistry, exactPolicy, token) =>
         {
             var generationProblems = generation == 1 ? new List<string>(problems) : [];
+            // Registrations made while the extensions loaded connect with the configured servers; later ones are applied by the manager.
+            var (generationServers, overridden) = WithRegistered();
+            var admitted = generationServers.Where(entry => entry.Config.Enabled).ToImmutableArray();
             var failures = new List<string>();
             var owned = new OwnedResources(CreateClient); IAsyncDisposable discovery = new Disposer(() => ValueTask.CompletedTask);
             // Pi trusts the servers of mcp.json: the profile's final-action policy admits the tools of this generation's servers.
@@ -215,12 +232,12 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     if (definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode && definition.Descriptor.RegistrationId == McpCodemode.RegistrationId))
                         grants.AdmitExact(McpCodemode.Name, $"{scope.OwnerId}/{scope.OwnerGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture)}/{McpCodemode.RegistrationId}");
                 }
-                manager = new McpServerManager(configured, configErrors, trustedProject, new(Bind, resources, credentials, CreateClient,
+                manager = new McpServerManager(generationServers, configErrors, trustedProject, new(Bind, resources, credentials, CreateClient,
                     Resolve, OpenUrl ?? PiSharp.Cli.Commands.McpCommand.OpenBrowser, AgentDirectory)
                 {
                     AutoEnableCodemode = autoEnableCodemode,
                     ServersChanged = servers => promptSource.ReplaceServers(generation, [.. servers.Where(server => server.Config.Enabled)])
-                });
+                }) { Overridden = overridden };
                 return new McpSessionRuntimeAdmission(nativeRegistry, owned, discovery, exactPolicy, new McpServerCatalog(admitted, []), [],
                     autoEnableCodemode, prepare)
                 {
@@ -255,6 +272,13 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                             await manager.ReconnectSignedInAsync(cancellation).ConfigureAwait(false);
                             if (gate is not null) await gate(cancellation).ConfigureAwait(false);
                         };
+                        // index.ts mcp_servers_change: servers registered or unregistered during the session connect or close right away.
+                        if (!noMcp)
+                        {
+                            // Applied outside the registering callback, whose ambient session state must not flow into the connection work.
+                            var subscription = Registrations.Subscribe(() => { using (ExecutionContext.SuppressFlow()) _ = Task.Run(() => manager.ApplyRegistrationsAsync(WithRegistered())); });
+                            owner.RegisterOwnedResource(attachment, _ => { subscription.Dispose(); return Task.CompletedTask; }, () => { subscription.Dispose(); return Task.CompletedTask; });
+                        }
                         try { ObserveManager?.Invoke(manager); }
                         catch (Exception) { /* An observer must not affect the session. */ }
                     }

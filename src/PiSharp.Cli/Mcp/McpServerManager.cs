@@ -125,6 +125,8 @@ public sealed class McpServerManager
     public ImmutableArray<string> ConfigErrors { get; }
     /// <summary>The trusted project's mcp.json, where project overrides are saved; null when the project is not trusted.</summary>
     public string? ProjectConfig { get; }
+    /// <summary>Registered servers that mcp.json overrides, shown in the status and the manager.</summary>
+    public ImmutableArray<string> Overridden { get; internal set; } = [];
 
     /// <summary>Subscribes to changes of any server's state; dispose the result to unsubscribe.</summary>
     public IDisposable Subscribe(Action listener)
@@ -166,6 +168,40 @@ public sealed class McpServerManager
             slot.Server = server; slot.State = ConnectionState.Connecting; slot.Error = null;
         }
         Changed();
+    }
+
+    private readonly SemaphoreSlim registrations = new(1, 1);
+
+    /// <summary>index.ts mcp_servers_change: the servers extensions registered changed during the session. Unregistered servers and
+    /// servers registered again with another config are closed and dropped (their tools become unreachable); new ones are added and
+    /// connect right away.</summary>
+    internal async Task ApplyRegistrationsAsync((ImmutableArray<McpServerEntry> Servers, ImmutableArray<string> Overridden) current)
+    {
+        await registrations.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (Session() is null) return;
+            var next = current.Servers.Where(entry => entry.Scope == McpConfigurationScope.Extension).ToDictionary(entry => entry.Name, StringComparer.Ordinal);
+            Slot[] removed; Slot[] added;
+            lock (gate)
+            {
+                removed = [.. servers.Where(slot => slot.Entry.Scope == McpConfigurationScope.Extension &&
+                    (!next.TryGetValue(slot.Entry.Name, out var entry) || entry.Config.Raw.ToString() != slot.Entry.Config.Raw.ToString() || entry.Source != slot.Entry.Source))];
+                foreach (var slot in removed) servers.Remove(slot);
+                added = [.. next.Values.Where(entry => !servers.Any(slot => slot.Entry.Name == entry.Name)).Select(entry => new Slot(entry))];
+                servers.AddRange(added);
+                Overridden = current.Overridden;
+            }
+            Changed();
+            foreach (var slot in removed) try { await CloseServerAsync(slot).ConfigureAwait(false); } catch (Exception) { /* The state is gone with the slot. */ }
+            ImmutableArray<McpServerEntry> entries; lock (gate) entries = [.. servers.Select(slot => slot.Entry)];
+            try { dependencies.ServersChanged?.Invoke(entries); } catch (Exception) { /* The section follows on the next change. */ }
+            await Task.WhenAll(added.Where(IsEnabled).Select(slot => StartAsync(slot, CancellationToken.None))).ConfigureAwait(false);
+            EnsureDiscoveryActive();
+            Changed();
+        }
+        catch (Exception) { /* A session that ended meanwhile keeps nothing to apply. */ }
+        finally { registrations.Release(); }
     }
 
     /// <summary>runtime.ts refreshTools: a changed tool list could not be read; the state shows why.</summary>
@@ -568,7 +604,7 @@ public sealed class McpServerManager
     // Manager menus (`/mcp` in the terminal)
     // ---------------------------------------------------------------------------------------------
 
-    private IEnumerable<string> Notices() => ConfigErrors.Select(error => "config: " + error);
+    private IEnumerable<string> Notices() => ConfigErrors.Select(error => "config: " + error).Concat(Overridden.Select(line => "overridden: " + line));
 
     private string NoServers() =>
         $"No MCP servers configured. Add them to {Path.GetFullPath(Path.Combine(dependencies.AgentDirectory, "mcp.json"))} or .pi/mcp.json.";
@@ -746,7 +782,7 @@ public sealed class McpServerManager
     {
         lock (gate)
         {
-            if (servers.Count == 0 && ConfigErrors.IsEmpty) return NoServers();
+            if (servers.Count == 0 && ConfigErrors.IsEmpty && Overridden.IsEmpty) return NoServers();
             var lines = servers.Select(slot =>
             {
                 var name = slot.Entry.Name; var exposure = ExposureName(slot.Entry.Config.Exposure);
@@ -758,6 +794,7 @@ public sealed class McpServerManager
                 return $"{name}: {state}{tools} ({exposure}){error}";
             }).ToList();
             lines.AddRange(ConfigErrors.Select(error => "config error: " + error));
+            lines.AddRange(Overridden.Select(line => "overridden: " + line));
             return string.Join("\n", lines);
         }
     }

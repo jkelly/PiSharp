@@ -45,7 +45,9 @@ internal static partial class Program
             ("retry.http-connect-retried-twice-after-transient-errors", ConnectRetries),
             ("retry.http-connect-fails-after-the-retries", ConnectRetriesExhausted),
             ("retry.expired-session-call-and-transient-read-retried", CallAndReadRetries),
-            ("retry.tool-calls-are-not-retried-after-transient-errors", CallsAreNotRetried)
+            ("retry.tool-calls-are-not-retried-after-transient-errors", CallsAreNotRetried),
+            ("registration.native-api-validation-ownership-and-change-event", NativeRegistrationApiAndEvent),
+            ("registration.registered-servers-connect-override-and-disconnect", RegisteredServersConnect)
         };
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
