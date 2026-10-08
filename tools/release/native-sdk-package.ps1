@@ -13,7 +13,8 @@ function Assert-PiSharpNativeSdkPackage {
         [Parameter(Mandatory)][string]$BuildAssembly)
     # A fourth numeric segment marks a C#-only patch on an unchanged Pi baseline.
     if($Version-cnotmatch'^[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$'){throw 'Explicit SDK SemVer required.'}
-    $files=Get-PiSharpArchiveInventory -Path $Package
+    $nodeBridge=$PackageId-ceq'PiSharp.Compatibility.Node'
+    $files=Get-PiSharpArchiveInventory -Path $Package -AllowNodeBridge:$nodeBridge
     $assembly='lib/net10.0/'+$PackageId+'.dll'
     $required=@($assembly,($PackageId+'.nuspec'),'LICENSE','README.md','THIRD-PARTY-NOTICES.md','provenance.json','[Content_Types].xml','_rels/.rels')
     if($PackageId-ceq'PiSharp.PromptTemplates.Yaml'){$required+='licenses/YamlDotNet.LICENSE.txt'}
@@ -68,5 +69,5 @@ function Assert-PiSharpNativeSdkPackage {
     }
     return [pscustomobject]@{schemaVersion=1;packageId=$PackageId;version=$Version;sourceCommit=$SourceCommit;
         archiveSha256=(Get-FileHash -LiteralPath $Package -Algorithm SHA256).Hash.ToLowerInvariant();files=@($files.Values);
-        packageConsumptionProven=$false;releaseAccepted=$false;nodeFreePayload=$true}
+        packageConsumptionProven=$false;releaseAccepted=$false;nodeFreePayload=(-not$nodeBridge)}
 }

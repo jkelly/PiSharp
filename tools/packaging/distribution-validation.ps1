@@ -3,7 +3,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 function Get-PiSharpArchiveInventory {
-    param([Parameter(Mandatory)][string]$Path)
+    # -AllowNodeBridge admits only the optional bridge's own PiSharp.Compatibility.Node.* members;
+    # Node/npm executables, node_modules and credential files stay forbidden.
+    param([Parameter(Mandatory)][string]$Path, [switch]$AllowNodeBridge)
     $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Path).Path)
     $files = [Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
     $folded = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
@@ -26,7 +28,8 @@ function Get-PiSharpArchiveInventory {
             $total += $entry.Length
             if ($entry.Length -gt 512MB -or $total -gt 2GB) { throw 'Archive uncompressed size limit exceeded.' }
             if ($name -match '(?i)(^|/)(node_modules|node|node\.exe|npm|npm\.cmd|npx|npx\.cmd)(/|$)' -or
-                $name -match '(?i)(PiSharp\.Compatibility\.Node\.|\.(pfx|p12|key)$|(^|/)\.env($|\.))') {
+                $name -match '(?i)(\.(pfx|p12|key)$|(^|/)\.env($|\.))' -or
+                (-not $AllowNodeBridge -and $name -match '(?i)PiSharp\.Compatibility\.Node\.')) {
                 throw "Forbidden native distribution payload: $name"
             }
             $stream = $entry.Open()
