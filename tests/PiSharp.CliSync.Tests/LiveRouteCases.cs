@@ -230,12 +230,18 @@ internal static partial class Program
         Equal(2, await refused.Finish(), "missing credential exit");
         Check(refused.Error.ToString().Contains("\"MissingLiveApiKey\"", StringComparison.Ordinal), "missing credential code: " + refused.Error);
         Check(none.Snapshot().Length == 0 && !Directory.Exists(Path.Combine(root, "absent")), "no request and no auth.json directory");
-        // A stored key command is not run (deviation): the session is refused with the reason.
-        await File.WriteAllTextAsync(authPath, "{\"anthropic\":{\"type\":\"api_key\",\"key\":\"!pass show anthropic\"}}");
-        await using var command = new LiveRpc(LiveArgs(root, "anthropic", "claude-sonnet-4-5"), new(Env(("ANTHROPIC_API_KEY", "env-key")), () => none, authPath));
-        Equal(2, await command.Finish(), "stored command exit");
-        Check(command.Error.ToString().Contains("\"LiveAuthenticationFailed\"", StringComparison.Ordinal) &&
-            command.Error.ToString().Contains("are not run by PiSharp", StringComparison.Ordinal), "stored command refused: " + command.Error);
+        // auth-storage.ts read: a stored `!command` key runs through the shell and its trimmed stdout is the key (owner decision 0004).
+        await File.WriteAllTextAsync(authPath, "{\"anthropic\":{\"type\":\"api_key\",\"key\":\"!echo stored-command-key\"}}");
+        var commandEndpoint = new LiveEndpoint(seen => seen.Url == MessagesUrl ? AnthropicStream() : throw new InvalidOperationException("Unexpected URL " + seen.Url));
+        await using (var command = new LiveRpc(LiveArgs(root, "anthropic", "claude-sonnet-4-5"), new(Env(("ANTHROPIC_API_KEY", "env-key")), () => commandEndpoint, authPath)))
+            await RunPrompts(command, "command");
+        Equal("stored-command-key", commandEndpoint.Snapshot().Single().Headers["x-api-key"], "stored command key");
+        // A command that resolves nothing leaves the stored key absent, so anthropicApiKeyAuth falls back to the environment.
+        await File.WriteAllTextAsync(authPath, "{\"anthropic\":{\"type\":\"api_key\",\"key\":\"!exit 1\"}}");
+        var failedEndpoint = new LiveEndpoint(seen => seen.Url == MessagesUrl ? AnthropicStream() : throw new InvalidOperationException("Unexpected URL " + seen.Url));
+        await using (var failed = new LiveRpc(LiveArgs(root, "anthropic", "claude-sonnet-4-5"), new(Env(("ANTHROPIC_API_KEY", "env-key")), () => failedEndpoint, authPath)))
+            await RunPrompts(failed, "failed command");
+        Equal("env-key", failedEndpoint.Snapshot().Single().Headers["x-api-key"], "failed command falls back to the environment");
     });
 
     // provider.azure-rename: provider azure on the live route. The pinned azure.json shard routes azure-openai-responses to the Azure

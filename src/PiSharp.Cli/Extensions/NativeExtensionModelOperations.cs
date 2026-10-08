@@ -101,8 +101,6 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
         {
             var entry = await store.ReadEntryAsync(provider, token).ConfigureAwait(false);
             if (entry is not { Type: "api_key" }) return null;
-            if (entry.Key is { Length: > 0 } configured && ConfigValueTemplate.IsCommand(configured))
-                throw new InvalidOperationException("Stored API key commands (\"!command\") are not run by PiSharp; store the key value instead.");
             return new StoredApiKeyCredential(entry.Key is null ? null : ConfigValueTemplate.Resolve(entry.Key, entry.Environment, readEnvironment),
                 entry.Environment is null ? null : new ProviderEnvironmentSnapshot(scoped: entry.Environment.Select(pair => KeyValuePair.Create(pair.Key, (string?)pair.Value))));
         });

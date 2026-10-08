@@ -17,7 +17,6 @@ internal sealed record ModelRegistryOptions
     internal string? ModelsPath { get; init; }
     internal Func<string, string?> Environment { get; init; } = _ => null;
     internal IReadOnlyDictionary<string, ProviderStoredCredential> StoredCredentials { get; init; } = ImmutableDictionary<string, ProviderStoredCredential>.Empty;
-    internal bool? RunConfigCommands { get; init; }
     internal Func<string, string?>? RunCommand { get; init; }
     internal IModelsStore? ModelsStore { get; init; }
     internal Func<HttpClient>? CreateCatalogClient { get; init; }
@@ -52,7 +51,7 @@ internal sealed class ModelRegistry
     private ModelRegistry(ModelRegistryOptions options)
     {
         this.options = options;
-        Values = new(options.Environment, options.RunConfigCommands, options.RunCommand);
+        Values = new(options.Environment, options.RunCommand);
         config = ModelsJsonConfig.Load(options.ModelsPath);
         var client = options.CreateCatalogClient ?? (() => new HttpClient());
         foreach (var provider in BuiltinProviders.All.Where(provider => provider.Id != "radius"))
@@ -185,7 +184,11 @@ internal sealed class ModelRegistry
         return models;
     }
 
-    private ProviderStoredCredential? Stored(string provider) => options.StoredCredentials.TryGetValue(provider, out var stored) ? stored : null;
+    /// <summary>auth-storage.ts read: a stored api_key's key is resolved as a config value (templates with its env, and <c>!command</c>
+    /// through the cached shell runner); an unresolved key reads as absent.</summary>
+    private ProviderStoredCredential? Stored(string provider) =>
+        !options.StoredCredentials.TryGetValue(provider, out var stored) ? null :
+        stored is { Type: "api_key", Key: { } key } ? stored with { Key = Values.Resolve(key, stored.Environment) } : stored;
 
     /// <summary>Source hasConfiguredAuth: the provider's auth check passes. Checks are cached until the next rebuild.</summary>
     internal bool HasConfiguredAuth(string provider) => CheckAuth(provider) is not null;
@@ -239,8 +242,8 @@ internal sealed class ModelRegistry
     internal JsonObject? GetProviderConfig(string provider) => config.GetProvider(provider);
 
     /// <summary>
-    /// Source getApiKeyAndHeaders for a key-auth request: the stored api_key, then models.json <c>apiKey</c> (env templates; commands
-    /// under <see cref="ConfigValueCommands"/>), then the built-in environment variable; then provider and model headers and
+    /// Source getApiKeyAndHeaders for a key-auth request: the stored api_key (its environment fallback when the key does not resolve),
+    /// then models.json <c>apiKey</c> (env templates and <c>!command</c>), then the built-in environment variable; then provider and model headers and
     /// <c>authHeader</c>. Returns null with <paramref name="error"/> set when no usable key exists.
     /// </summary>
     internal ModelRequestAuth? ResolveRequestAuth(RegistryModel model, out string? error)
@@ -256,9 +259,10 @@ internal sealed class ModelRegistry
             if (stored?.Type == "oauth")
             { error = $"Stored OAuth credentials for \"{providerId}\" are not available on this route; use an API key."; return null; }
             if (stored is { Type: "api_key", Key: { Length: > 0 } storedKey }) { key = storedKey; env = stored.Environment; source = "stored credential"; }
-            else if (ModelProviderComposer.ApiKey(providerConfig) is { } rawKey)
+            // composeApiKeyAuth: a stored credential (even one whose key does not resolve) skips models.json apiKey.
+            else if (stored is not { Type: "api_key" } && ModelProviderComposer.ApiKey(providerConfig) is { } rawKey)
             { key = Values.ResolveOrThrow(rawKey, $"API key for provider \"{providerId}\"", stored?.Environment); source = "configured API key"; }
-            else if (builtin is not null)
+            if (key is null && builtin is not null)
             {
                 // envApiKeyAuth: the first set variable. Ambient (AWS, Vertex ADC), Cloudflare and Anthropic auth have their own routes.
                 foreach (var name in builtin.ApiKeyVariables)
