@@ -14,6 +14,8 @@ public sealed record ToolInvocation(AssistantMessage AssistantMessage, ToolCallC
     /// <summary>Host-owned nested-call authority; absent on the legacy invocation path.</summary>
     public ToolInvocationContext? Context { get; internal init; }
     internal IAgentEventSink? EventSink { get; init; }
+    /// <summary>The batch's opt-in monotonic clock; finalized executors time the tool's own execution with it.</summary>
+    internal TimeProvider? Clock { get; init; }
     public string? ParentToolCallId => Context?.ParentToolCallId;
 }
 
@@ -99,6 +101,8 @@ public sealed record ToolOutcome(ToolInvocation Invocation, ToolResult Result)
     public JsonData? NestedUsage { get; init; }
     /// <summary>Execution/after-hook error disposition, independent of the result object's own isError property.</summary>
     public bool IsError { get; init; } = Result.IsError;
+    /// <summary>Milliseconds the tool's execution took, measured with a monotonic clock; null when the tool did not run.</summary>
+    public long? DurationMs { get; init; }
 }
 
 /// <summary>Native transcript value, not a Pi wire serializer or a durable commit acknowledgement.</summary>
@@ -128,6 +132,8 @@ public sealed record ToolResultMessage
     /// <summary>Bounded record of brokered descendants; descendants are never independent transcript messages.</summary>
     public JsonData? NestedCalls { get; init; }
     public bool IsError { get; init; }
+    /// <summary>Milliseconds the tool's execution took; absent for tools that did not run and legacy results.</summary>
+    public long? DurationMs { get; init; }
     internal ToolResultValueOptions ValueOptions { get; init; } = ToolResultValueOptions.ExecutionBoundary;
     internal object OwnedContent => _content;
     internal ToolResultMessage WithoutDetails() => this with { _hasDetails = false };

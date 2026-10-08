@@ -30,6 +30,9 @@ public sealed record AgentOptions(AgentLoopOptions? Loop = null, AgentPendingInp
     ToolProgressDeliveryOptions? ProgressDelivery = null)
 {
     public ToolResultValueOptions ResultValues { get; init; } = ToolResultValueOptions.ExecutionBoundary;
+    /// <summary>Opt-in monotonic clock for assistant response and tool execution durations (durationMs). Null records
+    /// none, preserving the earlier messages and events exactly; session hosts supply the system clock.</summary>
+    public TimeProvider? TimeProvider { get; init; }
 }
 public enum AgentFailureKind { RunFault, Canceled, ChatFailure }
 public sealed record AgentSnapshot(long Generation, ModelDescriptor Model, ImmutableArray<ToolDefinition> Tools,
@@ -314,8 +317,9 @@ public sealed class Agent : IAsyncDisposable
                 return hooks.FinalTransformRequestMessages is not { } final ? result :
                     await InCallbackAsync(run, () => final(result, cancellation)).ConfigureAwait(false);
             }
-            var turn = new TurnRunner(new ChatClient(config.Transport, _options.StreamCapacity),
-                new ToolBatchScheduler(config.Tools, config.ToolHooks, config.ExecutionMode, _progressOptions, _options.ResultValues), config.ThinkingLevel);
+            var turn = new TurnRunner(new ChatClient(config.Transport, _options.StreamCapacity) { TimeProvider = _options.TimeProvider },
+                new ToolBatchScheduler(config.Tools, config.ToolHooks, config.ExecutionMode, _progressOptions, _options.ResultValues)
+                { TimeProvider = _options.TimeProvider }, config.ThinkingLevel);
             async ValueTask<AgentLoopRequestPreparation?> PrepareBoundary(AgentRequestBoundary boundary, CancellationToken cancellation, int attempt = 0)
             {
                 if (attempt >= 16) throw new InvalidOperationException("Request boundary revision retry limit exceeded.");
@@ -339,8 +343,9 @@ public sealed class Agent : IAsyncDisposable
                 if (update.AdditionalSystemMessages.Any(message => message.Role != "system") ||
                     (long)boundary.Snapshot.Transcript.Length + boundary.PendingInputs.Length + update.AdditionalSystemMessages.Length + 1 > _loopOptions.MaximumTranscriptMessages)
                     throw new ArgumentException("Invalid boundary system update.");
-                var nextRunner = new TurnRunner(new ChatClient(admitted.Transport, _options.StreamCapacity),
-                    new ToolBatchScheduler(admitted.Tools, admitted.ToolHooks, admitted.ExecutionMode, _progressOptions, _options.ResultValues), admitted.ThinkingLevel);
+                var nextRunner = new TurnRunner(new ChatClient(admitted.Transport, _options.StreamCapacity) { TimeProvider = _options.TimeProvider },
+                    new ToolBatchScheduler(admitted.Tools, admitted.ToolHooks, admitted.ExecutionMode, _progressOptions, _options.ResultValues)
+                    { TimeProvider = _options.TimeProvider }, admitted.ThinkingLevel);
                 cancellation.ThrowIfCancellationRequested();
                 var published = false;
                 try { await InCallbackAsync(run, () => update.PublishAsync(() =>

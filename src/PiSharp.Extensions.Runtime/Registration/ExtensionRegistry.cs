@@ -59,6 +59,7 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             AvailableFeatures = AvailableFeatures.Remove(ExtensionSessionActionFeatures.ContextEdits);
         if (sessionProvider is IExtensionSessionToolActivationProvider)
             AvailableFeatures = AvailableFeatures.Add(ExtensionToolActivationFeatures.Feature);
+        AvailableFeatures = AvailableFeatures.Add(ExtensionToolRendererFeatures.Feature);
         RegistrationPolicy.ValidateOptions(this.options);
         snapshot = new(identity, revision, []);
     }
@@ -95,13 +96,62 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             descriptor.PrepareInitialArgumentsAsync?.GetInvocationList().Length > 1 ||
             descriptor.PrepareLoadout?.GetInvocationList().Length > 1 || !Enum.IsDefined(descriptor.Exposure) ||
             descriptor.Namespace is { } grouping && (!RegistrationPolicy.Description(grouping.Name, options) ||
-                grouping.Description is not null && !RegistrationPolicy.Description(grouping.Description, options)) ||
+                grouping.Description is not null && !RegistrationPolicy.Description(grouping.Description, options) ||
+                grouping.Instructions is not null && !RegistrationPolicy.Description(grouping.Instructions, options)) ||
+            descriptor.PromptGuidelines.IsDefault || descriptor.PromptGuidelines.Length > options.MaximumRegistrationsPerOwner ||
+            descriptor.PromptGuidelines.Any(guideline => !RegistrationPolicy.Description(guideline, options)) ||
+            descriptor.Renderers is { } renderers && (renderers.RenderShell is { } shell && !Enum.IsDefined(shell) ||
+                renderers.RenderCall?.GetInvocationList().Length > 1 || renderers.RenderResult?.GetInvocationList().Length > 1) ||
             !RegistrationPolicy.Json(descriptor.Parameters, options, requireObject: true))
             throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, scope.OwnerId, operation);
         return Add(scope, descriptor.RegistrationId, descriptor.Name, RegistrationKind.Tool, descriptor,
             (long)descriptor.RegistrationId.Length + descriptor.Name.Length + descriptor.Description.Length + descriptor.Parameters.ToString().Length +
-                (descriptor.Namespace?.Name.Length ?? 0) + (descriptor.Namespace?.Description?.Length ?? 0),
+                (descriptor.Namespace?.Name.Length ?? 0) + (descriptor.Namespace?.Description?.Length ?? 0) +
+                (descriptor.Namespace?.Instructions?.Length ?? 0) + descriptor.PromptGuidelines.Sum(guideline => (long)guideline.Length),
             operation);
+    }
+
+    /// <summary>Source registerToolRenderer: one resolver, consulted in extension load order then registration order.</summary>
+    internal IExtensionRegistration Register(RegistrationScope scope, ExtensionToolRendererDescriptor descriptor)
+    {
+        const string operation = "register-tool-renderer";
+        if (descriptor is null || !ValidNames(descriptor.RegistrationId, ToolRendererTopic) || descriptor.Resolve is null ||
+            descriptor.Resolve.GetInvocationList().Length != 1)
+            throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, scope.OwnerId, operation);
+        return Add(scope, descriptor.RegistrationId, ToolRendererTopic, RegistrationKind.ToolRenderer, descriptor,
+            descriptor.RegistrationId.Length, operation);
+    }
+
+    private const string ToolRendererTopic = "tool_renderer";
+
+    /// <summary>
+    /// Source ExtensionRunner.resolveToolRenderers: the renderers for calls to <paramref name="toolName"/>, from the captured
+    /// resolvers in load order, then the registered tool's own renderers, then <paramref name="fallback"/> (for example a
+    /// built-in tool's renderers). Each resolver runs once at most, under its owner's callback lease.
+    /// </summary>
+    public ExtensionToolRenderers? ResolveToolRenderers(ExtensionRegistrySnapshot captured, string toolName,
+        Func<ExtensionToolRenderers?>? fallback = null, CancellationToken operationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(captured);
+        if (!RegistrationPolicy.Description(toolName, options) || toolName.Length == 0)
+            throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, "registry", "resolve-tool-renderers");
+        var admission = Admit(captured, RegistrationKind.ToolRenderer, ToolRendererTopic, "resolve-tool-renderers", operationToken, default);
+        try
+        {
+            var tool = captured.Entries.FirstOrDefault(entry => entry.Kind == RegistrationKind.Tool && entry.Name == toolName);
+            ExtensionToolRenderers? Base() => tool is not null ? ((ExtensionToolDescriptor)tool.Descriptor).Renderers ?? fallback?.Invoke() : fallback?.Invoke();
+            ExtensionToolRenderers? Resolve(int index)
+            {
+                if (index >= admission.Length) return Base();
+                var (scope, entry) = admission[index];
+                operationToken.ThrowIfCancellationRequested();
+                scope.ExtensionLifetimeCancellationToken.ThrowIfCancellationRequested();
+                using var frame = new CallbackFrame(scope);
+                return ((ExtensionToolRendererDescriptor)entry.Descriptor).Resolve(toolName, () => Resolve(index + 1));
+            }
+            return Resolve(0);
+        }
+        finally { ReleaseAdmission(admission); }
     }
 
     internal IExtensionRegistration Register(RegistrationScope scope, ExtensionCommandDescriptor descriptor)

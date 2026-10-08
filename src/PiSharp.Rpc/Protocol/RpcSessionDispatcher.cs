@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (agent_settled).
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Agent;
@@ -1011,8 +1012,9 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 finally { _transitions.Release(); _inputCommands.Release(); ready?.TrySetResult(); }
             }
             await PublishQueueAsync(force: false).ConfigureAwait(false);
-            bool fatal; lock (_gate) fatal = _fatal is not null;
-            if (!fatal) await WriteAsync(RpcCommandCodec.Event("agent_settled", null, _options)).ConfigureAwait(false);
+            bool fatal, aborted; lock (_gate) { fatal = _fatal is not null; aborted = run.AbortRequested; }
+            // aborted reports whether this session-level run ended because an abort was requested while it ran.
+            if (!fatal) await WriteAsync(RpcCommandCodec.Event("agent_settled", writer => writer.WriteBoolean("aborted", aborted), _options)).ConfigureAwait(false);
         }
         catch (Exception error) { SignalFatal(error is RpcDispatchException dispatch ? dispatch.Failure : RpcDispatchFailure.SessionRunFailed, error); }
         finally

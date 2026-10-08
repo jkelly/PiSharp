@@ -120,7 +120,7 @@ public sealed class ExtensionAgentBinding
         Tools = ActiveRegistrations.Select(tool => new ToolDefinition(tool.Name, invoker)).ToImmutableArray();
 
         ToolLoadoutTool Metadata(ExtensionToolRegistrationInfo tool) => new(RegisteredToolDeclarations[Snapshot.Tools.IndexOf(tool)], tool.Exposure)
-            { Namespace = tool.Namespace };
+            { Namespace = tool.Namespace, PromptGuidelines = tool.PromptGuidelines };
     }
 
     /// <summary>Explicit source-shaped declaration input. Publishing a later snapshot requires an idle host transaction.</summary>

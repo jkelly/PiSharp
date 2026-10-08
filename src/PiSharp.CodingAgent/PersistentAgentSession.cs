@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (durationMs, agent_settled.aborted).
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -282,7 +283,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(runtimeForWorkingDirectory);
         ArgumentNullException.ThrowIfNull(clock); ArgumentNullException.ThrowIfNull(nextEntryId);
-        var configured = options ?? new();
+        var configured = Timed(options);
         if (string.IsNullOrWhiteSpace(path) || !System.IO.Path.IsPathFullyQualified(path) ||
             configured.UseLatestLeaf && configured.SelectedLeafId is not null ||
             configured.AgentOptions?.CancellationBehavior == AgentCancellationBehavior.Propagate)
@@ -833,6 +834,15 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         value is { Length: > 0 } && value.Length <= SessionExtensionEntryLimits.MaximumIdentifierCharacters &&
         value.All(character => character is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' or '.' or '_' or '-');
 
+    /// <summary>The session host times assistant responses and tool executions like the source AgentSession
+    /// (durationMs), with the system clock unless the caller supplied one.</summary>
+    private static PersistentAgentSessionOptions Timed(PersistentAgentSessionOptions? options)
+    {
+        var configured = options ?? new();
+        return configured.AgentOptions?.TimeProvider is not null ? configured :
+            configured with { AgentOptions = (configured.AgentOptions ?? new()) with { TimeProvider = TimeProvider.System } };
+    }
+
     private static (PersistentAgentSessionOptions, SessionContextProjector, SessionEntryCodec, NativeAgent, Bridge)
         Admit(string path, AgentConfiguration configuration, Func<long> clock, Func<string> nextEntryId,
             PersistentAgentSessionOptions? options)
@@ -840,7 +850,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(clock); ArgumentNullException.ThrowIfNull(nextEntryId);
         if (string.IsNullOrWhiteSpace(path) || !System.IO.Path.IsPathFullyQualified(path))
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
-        var configured = options ?? new();
+        var configured = Timed(options);
         if (configured.UseLatestLeaf && configured.SelectedLeafId is not null ||
             configured.AgentOptions?.CancellationBehavior == AgentCancellationBehavior.Propagate)
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -1106,7 +1116,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 Task settingsIdle; lock (_gate) settingsIdle = RetrySettingsIdleLocked();
                 try { await settingsIdle.ConfigureAwait(false); }
                 catch (Exception error) { AddDistinctFailure(failures, error); status = "failed"; }
-                try { await EmitOperationAsync(new SessionOperationSettled(operation, status, settledResult)).ConfigureAwait(false); }
+                // The source flag is set by abort() during an active run; the caller's token is this host's abort path.
+                var aborted = runAbort.Abort.IsCancellationRequested || token.IsCancellationRequested;
+                try { await EmitOperationAsync(new SessionOperationSettled(operation, status, settledResult) { Aborted = aborted }).ConfigureAwait(false); }
                 catch (Exception error)
                 { AddDistinctFailure(failures, error); lock (_gate) _fault ??= new(PersistentAgentSessionFailure.RunFailed); }
             }

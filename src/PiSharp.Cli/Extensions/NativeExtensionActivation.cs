@@ -124,7 +124,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
                 registrationBridge is null ? null : scope => RetireConfiguredOwnerAsync(registrationBridge, mcpBridge, scope));
             await loadOriginal.ConfigureAwait(false);
             var snapshot = registry.CaptureSnapshot();
-            if (snapshot.Registrations.Any(entry => entry.Kind is not ("Tool" or "Command" or "InputHandler" or "ToolCallHandler" or "ToolResultHandler" or "Observation" or "SessionSwitchHandler" or "SessionCreationHandler" or "ContextHandler" or "ContextWithSystemHandler" or "BeforeAgentStartHandler" or "SessionBeforeTreeHandler")) ||
+            if (snapshot.Registrations.Any(entry => entry.Kind is not ("Tool" or "Command" or "InputHandler" or "ToolCallHandler" or "ToolResultHandler" or "Observation" or "SessionSwitchHandler" or "SessionCreationHandler" or "ContextHandler" or "ContextWithSystemHandler" or "BeforeAgentStartHandler" or "SessionBeforeTreeHandler" or "ToolRenderer")) ||
                 preflight.Configuration.EnabledTools.Any(name => snapshot.Tools.Count(tool => tool.Name == name) != 1) ||
                 preflight.Configuration.EnabledCommands.Any(name => snapshot.Commands.Count(command => command.Name == name) != 1))
                 throw new NativeExtensionException(NativeExtensionFailure.InvalidConfiguration);

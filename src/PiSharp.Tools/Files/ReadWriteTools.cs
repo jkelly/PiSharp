@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/read.ts (outputSchema, structuredContent).
 using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -45,6 +46,35 @@ public sealed class ReadWriteTools
             JsonData.Parse("""{"name":"write","description":"Write UTF-8 text content to a file, creating parent directories and overwriting existing contents. Bounded text profile; this is not atomic replacement.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to write (relative or absolute)"},"content":{"type":"string","description":"Content to write to the file"}},"required":["path","content"],"additionalProperties":false}}""")
         ];
         ToolsAdded = JsonData.Parse("[" + string.Join(',', Declarations.Select(value => value.ToString())) + "]");
+    }
+
+    /// <summary>
+    /// Source readOutputSchema: the result for programmatic callers (codemode), the text for text files or an image block
+    /// with its note. It is tool metadata, not part of the model-facing declaration. Authored rendering of the TypeBox
+    /// schema; property descriptions are left out as in the source.
+    /// </summary>
+    public static JsonData ReadOutputSchema { get; } = JsonData.Parse("""
+        {"anyOf":[{"type":"string"},{"type":"object","properties":{"type":{"const":"image","type":"string"},"data":{"type":"string"},"mimeType":{"type":"string"},"note":{"type":"string"}},"required":["type","data","mimeType","note"]}]}
+        """);
+
+    private static readonly JsonSerializerOptions OutputJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
+    /// <summary>Source toReadOutput: the first image block with the first text as its note, otherwise the first text.</summary>
+    public static JsonData ToReadOutput(JsonData content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        if (content.Value.ValueKind != JsonValueKind.Array) throw new ArgumentException("Read content must be an array.", nameof(content));
+        var blocks = content.Value.EnumerateArray().Where(block => block.ValueKind == JsonValueKind.Object).ToArray();
+        var text = blocks.Where(block => Type(block) == "text").Select(block =>
+            block.TryGetProperty("text", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null).FirstOrDefault() ?? "";
+        if (blocks.FirstOrDefault(block => Type(block) == "image") is not { ValueKind: JsonValueKind.Object } image)
+            return JsonData.Parse(JsonSerializer.Serialize(text, OutputJson));
+        return JsonData.Parse(JsonSerializer.Serialize(new
+        {
+            type = "image", data = image.GetProperty("data").GetString(), mimeType = image.GetProperty("mimeType").GetString(), note = text
+        }, OutputJson));
+        static string? Type(JsonElement block) =>
+            block.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String ? type.GetString() : null;
     }
 
     public ToolInvoker CreateInvoker(IToolActionPolicy policy, IEnumerable<ToolActionTransform>? transforms = null,
@@ -185,7 +215,8 @@ public sealed class ReadWriteTools
             else if (input.Limit is not null && start + count < lines.Length)
                 output = truncation.Content + $"\n\n[{lines.Length - start - count} more lines in file. Use offset={start + count + 1} to continue.]";
             else output = truncation.Content;
-            return new([new TextContent(output)], details);
+            ToolResult result = new([new TextContent(output)], details);
+            return result with { StructuredContent = ToReadOutput(result.ContentValue) };
         }
         catch (FileToolException error) { return FileError(ToolFailureKind.ExecutionError, error.Message, error.Failure.ToString()); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)

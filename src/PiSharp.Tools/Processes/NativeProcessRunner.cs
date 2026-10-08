@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/utils/output-files.ts (LocalProcessOutputStorage).
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using PiSharp.Agent.Tools;
@@ -49,11 +50,25 @@ public interface IProcessOutputStorage
     ValueTask<Stream> CreateNewAsync(string absolutePath);
 }
 
+/// <summary>
+/// Source output files (utils/output-files.ts): output can carry private data, so a spill file is created exclusively
+/// (never following or reusing an existing path or link) and, on Unix, readable and writable by its owner only (0600).
+/// Windows has no POSIX mode: the file inherits the spill directory's ACL, as Node ignores the mode there too.
+/// </summary>
 public sealed class LocalProcessOutputStorage : IProcessOutputStorage
 {
-    public ValueTask<Stream> CreateNewAsync(string absolutePath) => ValueTask.FromResult<Stream>(
-        new FileStream(absolutePath, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 8192,
-            FileOptions.Asynchronous | FileOptions.SequentialScan));
+    public ValueTask<Stream> CreateNewAsync(string absolutePath) => ValueTask.FromResult<Stream>(new FileStream(absolutePath, Options()));
+
+    internal static FileStreamOptions Options()
+    {
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read, BufferSize = 8192,
+            Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+        };
+        if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        return options;
+    }
 }
 
 /// <summary>

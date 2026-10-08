@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/agent/src/agent-loop.ts.
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
@@ -17,7 +18,7 @@ public static class ToolResultMessageMaterializer
         var message = new ToolResultMessage(outcome.Invocation.Call.Id, outcome.Invocation.Call.Name,
             result.OwnedContent is ImmutableArray<TextContent> text ? text : [],
             result.Details, outcome.IsError) { Usage = NestedToolUsage.Combine(result.Usage, outcome.NestedUsage), ValueOptions = limits,
-                NestedCalls = outcome.NestedCalls };
+                NestedCalls = outcome.NestedCalls, DurationMs = outcome.DurationMs };
         if (result.OwnedContent is not ImmutableArray<TextContent>)
             message = message.WithOwnedContent(result.ContentValue);
         return result.HasProperty("details") ? message : message.WithoutDetails();
@@ -44,7 +45,9 @@ public static class ToolResultMessageMaterializer
             if (message.HasDetails) { writer.WritePropertyName("details"); writer.WriteRawValue(message.Details.ToString()); }
             if (message.Usage is { } usage) { writer.WritePropertyName("usage"); writer.WriteRawValue(usage.ToString()); }
             if (message.NestedCalls is { } calls) { writer.WritePropertyName("nestedCalls"); writer.WriteRawValue(calls.ToString()); }
-            writer.WriteBoolean("isError", message.IsError); writer.WriteNumber("timestamp", timestamp); writer.WriteEndObject();
+            writer.WriteBoolean("isError", message.IsError);
+            if (message.DurationMs is { } duration) writer.WriteNumber("durationMs", duration);
+            writer.WriteNumber("timestamp", timestamp); writer.WriteEndObject();
         }
         return new("toolResult", JsonData.Parse(Encoding.UTF8.GetString(buffer.GetBuffer(), 0, checked((int)buffer.Length))));
     }
