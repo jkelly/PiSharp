@@ -8,7 +8,12 @@ namespace PiSharp.Cli.Commands;
 public static class InteractiveSessionCommand
 {
     public const string Usage = "session chat --session <existing absolute JSONL> --workspace <existing absolute directory> --offline-script <absolute JSON> [existing session rpc options]; cooked commands /edit /save /cancel /compact [focus] /compact-all /branch-summary <entryId|root> /auto-compact on|off /abort /state /steer <text> /follow-up <text> /clear-queue /quit";
-    public static async Task<int> RunAsync(string[] args, TextReader input, TextWriter output, TextWriter error, CancellationToken token = default)
+    public static Task<int> RunAsync(string[] args, TextReader input, TextWriter output, TextWriter error, CancellationToken token = default) =>
+        RunHostedAsync(args, input, output, error, null, token);
+
+    /// <summary>The production entry: <paramref name="mcpHost"/> supplies the session's MCP servers (the global mcp.json).</summary>
+    internal static async Task<int> RunHostedAsync(string[] args, TextReader input, TextWriter output, TextWriter error,
+        PiSharp.Cli.Mcp.McpSessionHost? mcpHost, CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(input); ArgumentNullException.ThrowIfNull(output); ArgumentNullException.ThrowIfNull(error);
         if (args is not ["session", "chat", ..])
@@ -19,7 +24,7 @@ public static class InteractiveSessionCommand
         frontend.BindLogin(PiSharp.Cli.Authentication.ProviderLoginHost.CreateDefault());
         await using var connection = new BoundedRpcConnection(frontend.ObserveAsync); frontend.Bind(connection.SendAsync);
         var rpcArgs = args.ToArray(); rpcArgs[1] = "rpc";
-        var host = RpcSessionCommand.RunWithPresentationAsync(rpcArgs, connection.Input, connection.Output, error, frontend, hostCancellation.Token);
+        var host = RpcSessionCommand.RunWithPresentationAsync(rpcArgs, connection.Input, connection.Output, error, frontend, hostCancellation.Token, mcpHost: mcpHost);
         Task? reading = null; Exception? failure = null; var result = 1;
         try
         {

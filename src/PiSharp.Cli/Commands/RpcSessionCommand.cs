@@ -40,6 +40,11 @@ public static class RpcSessionCommand
         Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null, PiSharp.Cli.Reloading.NativeHostReloadAdmission? reloadAdmission = null) =>
         RunCoreAsync(args, stdin, stdout, stderr, null, cancellationToken, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission);
 
+    /// <summary>The production entry: the session's MCP servers come from <paramref name="mcpHost"/> (the global mcp.json).</summary>
+    internal static Task<int> RunHostedAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
+        PiSharp.Cli.Mcp.McpSessionHost mcpHost, CancellationToken cancellationToken = default) =>
+        RunCoreAsync(args, stdin, stdout, stderr, null, cancellationToken, mcpHost: mcpHost ?? throw new ArgumentNullException(nameof(mcpHost)));
+
     /// <summary>Same host lifecycle with injected reads for explicitly selected settings files.</summary>
     public static Task<int> RunWithSettingsAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
         IStartupSettingsFileSystem settingsFileSystem, CancellationToken cancellationToken = default,
@@ -56,8 +61,8 @@ public static class RpcSessionCommand
         LiveSessionRuntime? liveRuntime = null, PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
         Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null, PiSharp.Cli.Reloading.NativeHostReloadAdmission? reloadAdmission = null,
         TerminalExtensionInputAdmission? terminalInputAdmission = null,
-        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null) =>
-        RunCoreAsync(args, stdin, stdout, stderr, presentation, cancellationToken, userShutdown, stopTerminalAndJoin, liveRuntime, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission, terminalInputAdmission: terminalInputAdmission, decorateTerminalUi: decorateTerminalUi);
+        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null) =>
+        RunCoreAsync(args, stdin, stdout, stderr, presentation, cancellationToken, userShutdown, stopTerminalAndJoin, liveRuntime, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission, terminalInputAdmission: terminalInputAdmission, decorateTerminalUi: decorateTerminalUi, mcpHost: mcpHost);
 
     private static async Task<int> RunCoreAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
         IRpcExtensionUiPresentationObserver? presentation, CancellationToken cancellationToken, Func<bool>? userShutdown = null,
@@ -66,7 +71,7 @@ public static class RpcSessionCommand
         PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
         Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null, PiSharp.Cli.Reloading.NativeHostReloadAdmission? reloadAdmission = null,
         TerminalExtensionInputAdmission? terminalInputAdmission = null,
-        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null)
+        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null)
     {
         ArgumentNullException.ThrowIfNull(stdin); ArgumentNullException.ThrowIfNull(stdout); ArgumentNullException.ThrowIfNull(stderr);
         OfflineSessionProfile? profile = null; PersistentAgentSession? session = null;
@@ -84,6 +89,8 @@ public static class RpcSessionCommand
             if (!Directory.Exists(parsed.Workspace)) throw new SessionCommandException(SessionCommandFailure.WorkspaceMissing);
             var settings = await SettingsStartupConfiguration.LoadAsync(parsed.Settings, stderr, settingsFileSystem, cancellationToken).ConfigureAwait(false);
             var liveSelection = parsed.Live?.Resolve(settings);
+            // Production sessions read the global mcp.json once at start; --no-mcp connects nothing.
+            if (mcpAdmission is null && !parsed.Tools.NoMcp && mcpHost is not null) mcpAdmission = mcpHost.CreateAdmission(parsed.Workspace, stderr);
             backend = parsed.SessionMode == "open" ? null : new SessionStorageBackend(Path.GetDirectoryName(parsed.Session)!,
                 parsed.SessionMode == "new-memory" ? SessionStorageMode.InMemory : SessionStorageMode.LazyLocal,
                 new(MaximumFileBytes: 8_388_608));

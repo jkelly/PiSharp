@@ -94,7 +94,7 @@ internal static class Program
         {
             if (args is ["session", "terminal", ..])
             {
-                return await RunTerminalHostAsync(args, cancellation.Token).ConfigureAwait(false);
+                return await RunTerminalHostAsync(args, cancellation.Token, mcpHost: Mcp.McpSessionHost.CreateDefault()).ConfigureAwait(false);
             }
             Stream standardOutput;
             try { standardOutput = StandardOutputStream.Open(); }
@@ -108,7 +108,7 @@ internal static class Program
                 try
                 {
                     await using (input.ConfigureAwait(false))
-                        return await Commands.RpcSessionCommand.RunAsync(args, input, standardOutput, Console.Error, cancellation.Token).ConfigureAwait(false);
+                        return await Commands.RpcSessionCommand.RunHostedAsync(args, input, standardOutput, Console.Error, Mcp.McpSessionHost.CreateDefault(), cancellation.Token).ConfigureAwait(false);
                 }
                 catch (Exception) { return Fail("RpcHostFailed", "RPC host failed after owned input cleanup; inspect durable state.", 1); }
             }
@@ -123,7 +123,7 @@ internal static class Program
                     await using (input.ConfigureAwait(false))
                     {
                         using var reader = new StreamReader(input, new System.Text.UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: false, bufferSize: 4096, leaveOpen: true);
-                        return await Commands.InteractiveSessionCommand.RunAsync(args, reader, output, Console.Error, cancellation.Token).ConfigureAwait(false);
+                        return await Commands.InteractiveSessionCommand.RunHostedAsync(args, reader, output, Console.Error, Mcp.McpSessionHost.CreateDefault(), cancellation.Token).ConfigureAwait(false);
                     }
                 }
                 catch (Exception) { return Fail("InteractiveHostFailed", "Interactive host failed after owned input cleanup; inspect durable state.", 1); }
@@ -145,7 +145,7 @@ internal static class Program
         Func<CancellationToken, ValueTask<PiSharp.Tui.WindowsConsoleTerminal>>? openConsole = null, TextWriter? errorOutput = null,
         Func<CancellationToken, ValueTask<PiSharp.Tui.IConsoleTerminal>>? openOwnedTestTerminal = null,
         PiSharp.Cli.Interactive.TerminalKeybindingConfiguration? ownedTestConfiguration = null,
-        Commands.LiveSessionRuntime? liveRuntime = null)
+        Commands.LiveSessionRuntime? liveRuntime = null, Mcp.McpSessionHost? mcpHost = null)
     {
         var diagnostics = errorOutput ?? Console.Error;
         var startup = await Commands.TerminalSessionCommand.ValidateStartupAsync(args, diagnostics).ConfigureAwait(false);
@@ -167,7 +167,7 @@ internal static class Program
                 throw new InvalidOperationException("Owned terminal must provide its actual viewport.");
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, close?.CancellationToken ?? default);
             exitCode = await Commands.TerminalSessionCommand.RunWithTerminalRestoreAsync(args, terminal, viewport,
-                diagnostics, RestoreTerminalAndJoin, linked.Token, ownedTestConfiguration, liveRuntime).ConfigureAwait(false);
+                diagnostics, RestoreTerminalAndJoin, linked.Token, ownedTestConfiguration, liveRuntime, mcpHost).ConfigureAwait(false);
         }
         catch (Exception error) { failure = error; }
         // The process-local close handler remains registered while application work,

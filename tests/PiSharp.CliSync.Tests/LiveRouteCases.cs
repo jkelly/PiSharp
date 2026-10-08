@@ -57,13 +57,13 @@ internal static partial class Program
         public StringWriter Error { get; } = new();
         public Task<int> Completion { get; }
         public List<JsonData> Events { get; } = [];
-        public LiveRpc(string[] args, LiveSessionRuntime runtime)
+        public LiveRpc(string[] args, LiveSessionRuntime runtime, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null)
         {
             connection = new((record, _) => { records.Writer.TryWrite(record); return ValueTask.CompletedTask; });
             Completion = Run();
             async Task<int> Run()
             {
-                try { return await RpcSessionCommand.RunWithPresentationAsync(args, connection.Input, connection.Output, Error, null!, deadline.Token, liveRuntime: runtime); }
+                try { return await RpcSessionCommand.RunWithPresentationAsync(args, connection.Input, connection.Output, Error, null!, deadline.Token, liveRuntime: runtime, mcpHost: mcpHost); }
                 finally { records.Writer.TryComplete(); }
             }
         }

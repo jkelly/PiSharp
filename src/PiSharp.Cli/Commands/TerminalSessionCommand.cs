@@ -54,9 +54,10 @@ public static class TerminalSessionCommand
         RunOwnedAsync(args, terminal, viewport, error, null, null, token, null, kittyProtocolActive: false, liveRuntime: runtime);
     internal static Task<int> RunWithTerminalRestoreAsync(string[] args, IConsoleTerminal terminal,
         ITerminalViewportSource viewport, TextWriter error, Func<ValueTask> restoreTerminalAndJoin,
-        CancellationToken token = default, TerminalKeybindingConfiguration? keybindingConfiguration = null, LiveSessionRuntime? liveRuntime = null) =>
+        CancellationToken token = default, TerminalKeybindingConfiguration? keybindingConfiguration = null, LiveSessionRuntime? liveRuntime = null,
+        PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null) =>
         RunOwnedAsync(args, terminal, viewport, error, null, null, token, keybindingConfiguration, kittyProtocolActive: false,
-            restoreTerminalAndJoin: restoreTerminalAndJoin, liveRuntime: liveRuntime);
+            restoreTerminalAndJoin: restoreTerminalAndJoin, liveRuntime: liveRuntime, mcpHost: mcpHost);
 
     public static Task<int> RunConfiguredAsync(string[] args, IConsoleTerminal terminal, ITerminalViewportSource viewport,
         TextWriter error, TerminalKeybindingConfiguration keybindingConfiguration, CancellationToken token = default)
@@ -98,7 +99,7 @@ public static class TerminalSessionCommand
         TerminalKeybindingConfiguration? keybindingConfiguration, bool kittyProtocolActive, TimeProvider? shutdownTimeProvider = null,
         Func<ValueTask>? restoreTerminalAndJoin = null, Action<RpcSessionShutdownSettlement>? shutdownObserver = null,
         Action<TerminalInputEvent>? observeInputCompletion = null, Action<TerminalSessionFailureObservation>? observeFailure = null,
-        LiveSessionRuntime? liveRuntime = null, TerminalExtensionInputAdmission? terminalInputAdmission = null)
+        LiveSessionRuntime? liveRuntime = null, TerminalExtensionInputAdmission? terminalInputAdmission = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null)
     {
         ArgumentNullException.ThrowIfNull(args); ArgumentNullException.ThrowIfNull(terminal);
         ArgumentNullException.ThrowIfNull(viewport); ArgumentNullException.ThrowIfNull(error);
@@ -231,7 +232,7 @@ public static class TerminalSessionCommand
                     try { shutdownObserver?.Invoke(settlement); } catch (Exception errorValue) { RecordFailure(errorValue); }
                     var cleanupFailures = await StopTerminalAndJoin().ConfigureAwait(false);
                     return settlement.AcknowledgeTerminalStopped(cleanupFailures);
-                }, liveRuntime: liveRuntime, terminalInputAdmission: terminalInputAdmission,
+                }, liveRuntime: liveRuntime, terminalInputAdmission: terminalInputAdmission, mcpHost: mcpHost,
                 decorateTerminalUi: inner => new TerminalCustomComponentUiProvider(inner, view, terminalInputAdmission!,
                     frontend.CaptureSessionGeneration)).ConfigureAwait(false); }
             finally { receipts.Complete(); } // Actual host and its awaited output callbacks have settled.
