@@ -1,7 +1,21 @@
 namespace PiSharp.Tools.Files;
 
-public sealed record ReadWriteToolOptions(int MaximumReadBytes = 8 * 1024 * 1024,
-    int MaximumWriteBytes = 64 * 1024, int MaximumArgumentCharacters = 512 * 1024, int MaximumPathCharacters = 4096);
+/// <summary>
+/// Read/write bounds and the source ReadToolOptions. Pi itself has no size limits; these memory bounds default to the
+/// largest admitted values, and text output is still truncated to 2000 lines or 50KB as in the source.
+/// </summary>
+public sealed record ReadWriteToolOptions(int MaximumReadBytes = 64 * 1024 * 1024,
+    int MaximumWriteBytes = 64 * 1024 * 1024, int MaximumArgumentCharacters = 8 * 1024 * 1024, int MaximumPathCharacters = 4096)
+{
+    /// <summary>Source autoResizeImages (settings images.autoResize). Default true.</summary>
+    public bool AutoResizeImages { get; init; } = true;
+    /// <summary>Source resizeOptions: the model's image resize profile, or the built-in 2000x2000 / 4.5MB defaults.</summary>
+    public PiSharp.Tools.Images.ImageResizeOptions? ImageResizeOptions { get; init; }
+    /// <summary>The decode/encode backend (Photon upstream). Default: the dependency-free built-in codec.</summary>
+    public PiSharp.Tools.Images.IImageCodec? ImageCodec { get; init; }
+    /// <summary>Source ctx.model.input: false adds the non-vision note to image reads; null means no current model.</summary>
+    public Func<bool?>? CurrentModelSupportsImages { get; init; }
+}
 
 public enum FileToolFailure { ResourceLimit, UnsupportedContent }
 
@@ -10,7 +24,7 @@ public sealed class FileToolException : Exception
     public FileToolFailure Failure { get; }
     public FileToolException(FileToolFailure failure) : base(failure == FileToolFailure.ResourceLimit
         ? "File content exceeds the supported input limit."
-        : "Only UTF-8 text is supported; image, binary and other encoding support remains unfinished.") => Failure = failure;
+        : "File content is not valid UTF-8 text; editing it would replace its undecodable bytes.") => Failure = failure;
 }
 
 /// <summary>Trusted host seam. Async methods settle all their owned I/O and cleanup before returning or throwing.</summary>

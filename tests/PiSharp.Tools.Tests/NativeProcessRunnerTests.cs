@@ -44,6 +44,9 @@ internal static class NativeProcessRunnerTests
                     arguments = args[1..]
                 })));
                 return 0;
+            case "echo-stdin":
+                await Console.OpenStandardInput().CopyToAsync(Console.OpenStandardOutput());
+                return 0;
             case "emit-file":
                 await using (var input = new FileStream(args[1], FileMode.Open, FileAccess.Read, FileShare.Read))
                     await input.CopyToAsync(Console.OpenStandardOutput());
@@ -357,7 +360,7 @@ internal static class NativeProcessRunnerTests
         var (executable, arguments) = ChildCommand(childArgs);
         return new(executable, arguments, temp.Root, ParentEnvironment(), temp.File(Guid.NewGuid().ToString("N") + ".log"));
     }
-    private static (string Executable, ImmutableArray<string> Arguments) ChildCommand(string[] args)
+    internal static (string Executable, ImmutableArray<string> Arguments) ChildCommand(string[] args)
     {
         var executable = Environment.ProcessPath ?? throw new InvalidOperationException("No test executable path.");
         var arguments = ImmutableArray.CreateBuilder<string>();
@@ -375,7 +378,7 @@ internal static class NativeProcessRunnerTests
         var process = Process.Start(start) ?? throw new InvalidOperationException("Fixture descendant did not start.");
         process.StandardInput.Close(); return process;
     }
-    private static ImmutableDictionary<string, string> ParentEnvironment()
+    internal static ImmutableDictionary<string, string> ParentEnvironment()
     {
         var result = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (System.Collections.DictionaryEntry item in Environment.GetEnvironmentVariables())

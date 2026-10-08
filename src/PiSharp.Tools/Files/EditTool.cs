@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/edit.ts.
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
@@ -7,9 +8,16 @@ using PiSharp.Contracts;
 
 namespace PiSharp.Tools.Files;
 
-public sealed record EditToolOptions(int MaximumInputBytes = 1_048_576, int MaximumOutputBytes = 1_048_576,
-    int MaximumArgumentCharacters = 524_288, int MaximumPathCharacters = 4096, int MaximumEdits = 64,
-    DiffFormatterOptions? DiffOptions = null);
+/// <summary>Memory bounds for the edit tool. Pi has no size limits; the defaults are the largest admitted values. The display
+/// diff is bounded separately: an edit whose diff exceeds <see cref="DiffOptions"/> still succeeds, with the diff omitted.</summary>
+public sealed record EditToolOptions(int MaximumInputBytes = 64 * 1024 * 1024, int MaximumOutputBytes = 64 * 1024 * 1024,
+    int MaximumArgumentCharacters = 8 * 1024 * 1024, int MaximumPathCharacters = 4096, int MaximumEdits = 1024,
+    DiffFormatterOptions? DiffOptions = null)
+{
+    /// <summary>The diff bounds used when <see cref="DiffOptions"/> is absent.</summary>
+    public static DiffFormatterOptions DefaultDiffOptions { get; } = new(MaximumLines: 1_000_000, MaximumWork: 50_000_000,
+        MaximumTraceCells: 4_000_000, MaximumOutputCharacters: 262_144);
+}
 
 /// <summary>Prepared edit adapter. Hosts share its required mutation queue with all coordinated writers and route it through policy.</summary>
 public sealed class EditTool : IPreparedToolAdapter
@@ -29,7 +37,7 @@ public sealed class EditTool : IPreparedToolAdapter
         IFileOperations? operations = null, EditToolOptions? options = null, IFileAccessProbe? accessProbe = null)
     {
         ArgumentNullException.ThrowIfNull(mutationQueue);
-        _options = options ?? new(); _diffOptions = _options.DiffOptions ?? new();
+        _options = options ?? new(); _diffOptions = _options.DiffOptions ?? EditToolOptions.DefaultDiffOptions;
         if (_options.MaximumInputBytes is < 1 or > 64 * 1024 * 1024 || _options.MaximumOutputBytes is < 1 or > 64 * 1024 * 1024 ||
             _options.MaximumArgumentCharacters is < 1 or > 8 * 1024 * 1024 || _options.MaximumPathCharacters is < 1 or > 65_536 || _options.MaximumEdits is < 1 or > 1024 ||
             _diffOptions.MaximumOutputCharacters is < 1 or > 1_048_576)
@@ -38,8 +46,11 @@ public sealed class EditTool : IPreparedToolAdapter
         _operations = operations ?? new LocalFileOperations(); _mutations = mutationQueue;
         _accessProbe = accessProbe ?? new LocalFileAccessProbe();
         _paths = new(workingDirectory, homeDirectory, _operations, _options.MaximumPathCharacters);
-        Declaration = JsonData.Parse("""{"name":"edit","description":"Edit one UTF-8 text file using unique non-overlapping replacements matched against original content. Includes bounded native diff/patch and an exact-byte outside-change check.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to edit (relative or absolute)"},"edits":{"type":"array","items":{"type":"object","properties":{"oldText":{"type":"string","description":"Unique original text, without overlap with other edits"},"newText":{"type":"string","description":"Replacement text"}},"required":["oldText","newText"],"additionalProperties":false},"description":"One or more replacements matched against the original file"}},"required":["path","edits"],"additionalProperties":false},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""");
+        Declaration = SourceDeclaration;
     }
+
+    /// <summary>Source createEditToolDefinition name, description, TypeBox parameters and constrainedSampling.</summary>
+    public static JsonData SourceDeclaration { get; } = JsonData.Parse("""{"name":"edit","description":"Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to edit (relative or absolute)"},"edits":{"type":"array","items":{"type":"object","properties":{"oldText":{"type":"string","description":"Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."},"newText":{"type":"string","description":"Replacement text for this targeted edit."}},"required":["oldText","newText"]},"description":"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."}},"required":["path","edits"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""");
 
     public ToolInvoker CreateInvoker(IToolActionPolicy policy, IEnumerable<ToolActionTransform>? transforms = null,
         IEnumerable<ToolResultTransform>? resultTransforms = null) => new([this], policy, transforms, resultTransforms,
@@ -103,9 +114,18 @@ public sealed class EditTool : IPreparedToolAdapter
                 operationToken.ThrowIfCancellationRequested();
                 var replacement = Utf8.GetBytes(plan.Content);
                 if (replacement.Length > _options.MaximumOutputBytes) throw EditPlan.Limit();
-                var formatted = DiffFormatter.Format(input.DisplayPath, plan.BaseContent, plan.NewContent, _diffOptions, operationToken);
-                // Construct/own result metadata before the only write; bounds/finalization failures cannot follow a successful effect here.
-                var details = JsonData.Parse(JsonSerializer.Serialize(new { diff = formatted.Diff, patch = formatted.Patch, firstChangedLine = formatted.FirstChangedLine }));
+                JsonData details;
+                try
+                {
+                    var formatted = DiffFormatter.Format(input.DisplayPath, plan.BaseContent, plan.NewContent, _diffOptions, operationToken);
+                    // Construct/own result metadata before the only write; bounds/finalization failures cannot follow a successful effect here.
+                    details = JsonData.Parse(JsonSerializer.Serialize(new { diff = formatted.Diff, patch = formatted.Patch, firstChangedLine = formatted.FirstChangedLine }));
+                }
+                catch (EditPlanException error) when (error.Failure == EditPlanFailure.ResourceLimit)
+                {
+                    // Pi always edits; only the display diff is bounded natively. Keep the edit and omit the oversized diff.
+                    details = JsonData.Parse(JsonSerializer.Serialize(new { diff = "", patch = "", firstChangedLine = FirstChangedLine(plan.BaseContent, plan.NewContent) }));
+                }
                 var current = await ReadOwnedAsync(action.Target, operationToken).ConfigureAwait(false);
                 operationToken.ThrowIfCancellationRequested();
                 if (!current.AsSpan().SequenceEqual(original)) return Failure(ToolFailureKind.ExecutionError, "File changed outside the edit operation; no edit write was attempted.", "OutsideChange", false, false);
@@ -165,13 +185,23 @@ public sealed class EditTool : IPreparedToolAdapter
             edits.Add(new(oldText, newText));
         }
     }
+    private static int? FirstChangedLine(string before, string after)
+    {
+        var line = 1;
+        for (var index = 0; index < Math.Min(before.Length, after.Length); index++)
+        {
+            if (before[index] != after[index]) return line;
+            if (before[index] == '\n') line++;
+        }
+        return before.Length == after.Length ? null : line;
+    }
     private static bool IsEdit(JsonElement value) => value.ValueKind == JsonValueKind.Object &&
         value.TryGetProperty("oldText", out var old) && old.ValueKind == JsonValueKind.String && value.TryGetProperty("newText", out var next) && next.ValueKind == JsonValueKind.String;
     private static string Text(JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.String) throw new ArgumentException("Required edit string is absent.");
-        var text = value.GetString()!; if (text.Contains('\0')) throw new ArgumentException("Unsupported edit text.");
-        _ = Utf8.GetByteCount(text); return text;
+        // Source edits accept any string, including NUL; the strict encoder still rejects unpaired surrogates.
+        var text = value.GetString()!; _ = Utf8.GetByteCount(text); return text;
     }
     private async ValueTask<byte[]> ReadOwnedAsync(string path, CancellationToken token)
     {
@@ -179,16 +209,11 @@ public sealed class EditTool : IPreparedToolAdapter
         token.ThrowIfCancellationRequested(); if (memory.Length > _options.MaximumInputBytes) throw new FileToolException(FileToolFailure.ResourceLimit);
         return memory.ToArray();
     }
+    /// <summary>Source buffer.toString("utf-8"). Control characters and NUL are ordinary text; a file that is not valid UTF-8
+    /// is refused, because writing the lossy decode back would replace its undecodable bytes (native data-loss guard).</summary>
     private static string DecodeText(byte[] bytes)
     {
-        try
-        {
-            var text = Utf8.GetString(bytes);
-            if (text.Any(character => char.IsControl(character) && character is not ('\t' or '\n' or '\r'))) throw new FileToolException(FileToolFailure.UnsupportedContent);
-            if (text.StartsWith("GIF87a", StringComparison.Ordinal) || text.StartsWith("GIF89a", StringComparison.Ordinal) ||
-                (text.Length >= 12 && text.StartsWith("RIFF", StringComparison.Ordinal) && text[8..12] == "WEBP")) throw new FileToolException(FileToolFailure.UnsupportedContent);
-            return text;
-        }
+        try { return Utf8.GetString(bytes); }
         catch (DecoderFallbackException) { throw new FileToolException(FileToolFailure.UnsupportedContent); }
     }
     private static ToolResult Failure(ToolFailureKind kind, string message, string code, bool writeAttempted, bool writeCompleted) =>

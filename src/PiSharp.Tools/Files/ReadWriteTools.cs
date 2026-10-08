@@ -1,5 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/read.ts (outputSchema, structuredContent).
-using System.Buffers.Binary;
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/read.ts and core/tools/write.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -7,13 +6,17 @@ using System.Text.Json;
 using PiSharp.Agent;
 using PiSharp.Agent.Tools;
 using PiSharp.Contracts;
+using PiSharp.Tools.Images;
 
 namespace PiSharp.Tools.Files;
 
-/// <summary>Bounded UTF-8 read/write adapters, owned declarations and mandatory-policy invoker composition.</summary>
+/// <summary>Source read/write tools: bounded adapters, owned declarations and mandatory-policy invoker composition.</summary>
 public sealed class ReadWriteTools
 {
     private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
+    // Source buffer.toString("utf-8"): malformed sequences become U+FFFD and a BOM is kept.
+    private static readonly Encoding LenientUtf8 = new UTF8Encoding(false, false);
+    public const string NonVisionImageNote = "[Current model does not support images. The image will be omitted from this request.]";
     private readonly IFileOperations _operations;
     private readonly PathResolver _paths;
     private readonly FileMutationQueue _mutations;
@@ -40,13 +43,14 @@ public sealed class ReadWriteTools
             return OperatingSystem.IsWindows() ? key.ToUpperInvariant() : key;
         }, new(MaximumKeyCharacters: _options.MaximumPathCharacters));
         Adapters = [new Adapter(this, "read"), new Adapter(this, "write")];
-        Declarations =
-        [
-            JsonData.Parse("""{"name":"read","description":"Read UTF-8 text file contents, capped at 2000 lines or 50 KiB. Use offset/limit to continue. Images, binary and other encodings are unsupported in this profile.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to read (relative or absolute)"},"offset":{"type":"integer","minimum":1,"description":"Line number to start reading from (1-indexed)"},"limit":{"type":"integer","minimum":0,"description":"Maximum number of lines to read"}},"required":["path"],"additionalProperties":false}}"""),
-            JsonData.Parse("""{"name":"write","description":"Write UTF-8 text content to a file, creating parent directories and overwriting existing contents. Bounded text profile; this is not atomic replacement.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to write (relative or absolute)"},"content":{"type":"string","description":"Content to write to the file"}},"required":["path","content"],"additionalProperties":false}}""")
-        ];
+        Declarations = [ReadDeclaration, WriteDeclaration];
         ToolsAdded = JsonData.Parse("[" + string.Join(',', Declarations.Select(value => value.ToString())) + "]");
     }
+
+    /// <summary>Source createReadToolDefinition name, description, TypeBox parameters and constrainedSampling.</summary>
+    public static JsonData ReadDeclaration { get; } = JsonData.Parse("""{"name":"read","description":"Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to read (relative or absolute)"},"offset":{"type":"number","description":"Line number to start reading from (1-indexed)"},"limit":{"type":"number","description":"Maximum number of lines to read"}},"required":["path"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""");
+    /// <summary>Source createWriteToolDefinition name, description, TypeBox parameters and constrainedSampling.</summary>
+    public static JsonData WriteDeclaration { get; } = JsonData.Parse("""{"name":"write","description":"Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to write (relative or absolute)"},"content":{"type":"string","description":"Content to write to the file"}},"required":["path","content"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""");
 
     /// <summary>
     /// Source readOutputSchema: the result for programmatic callers (codemode), the text for text files or an image block
@@ -81,7 +85,16 @@ public sealed class ReadWriteTools
         IEnumerable<ToolResultTransform>? resultTransforms = null) => new(Adapters, policy, transforms, resultTransforms,
             new(MaximumArgumentCharacters: _options.MaximumArgumentCharacters,
                 MaximumActionCharacters: checked(_options.MaximumArgumentCharacters + 2 * _options.MaximumPathCharacters + 128),
-                MaximumResultCharacters: 512 * 1024));
+                MaximumResultCharacters: ResultCharacters(_options)) { MaximumStructuredContentCharacters = ResultCharacters(_options) + 65_536 });
+
+    /// <summary>Text results are truncated to 50KB; an image result carries base64 data of at most the resize limit, or of the
+    /// whole admitted file when automatic resizing is off.</summary>
+    public static int ResultCharacters(ReadWriteToolOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var image = options.AutoResizeImages ? (long)(options.ImageResizeOptions ?? new()).MaxBytes : (options.MaximumReadBytes + 2L) / 3 * 4;
+        return (int)Math.Min(12 * 1024 * 1024, Math.Max(512 * 1024, image + 65_536));
+    }
 
     public ImmutableArray<ToolDefinition> CreateDefinitions(ToolInvoker invoker)
     {
@@ -149,14 +162,16 @@ public sealed class ReadWriteTools
         if (path.Length > _options.MaximumPathCharacters) throw new ArgumentException("Oversized file path.");
         var display = normalized ? String(value, "displayPath", empty: false) : path;
         if (display.Length > _options.MaximumPathCharacters) throw new ArgumentException("Oversized display path.");
-        var offset = 1; int? limit = null; string? content = null;
+        var offset = 0; int? limit = null; string? content = null;
         if (name == "read")
         {
-            if (value.TryGetProperty("offset", out var number) && (!number.TryGetInt32(out offset) || offset < 1))
-                throw new ArgumentException("Offset must be a positive 32-bit integer.");
-            if (value.TryGetProperty("limit", out number))
+            // Source offset/limit are TypeBox numbers: a falsy or negative offset starts at line 1. Native admission keeps them integral.
+            // Pi validation.ts normalizeOptionalNulls: an optional property sent as null (strict tool schemas make optional properties nullable) is absent.
+            if (value.TryGetProperty("offset", out var number) && number.ValueKind != JsonValueKind.Null && !Integral(number, out offset))
+                throw new ArgumentException("Offset must be an integral number.");
+            if (value.TryGetProperty("limit", out number) && number.ValueKind != JsonValueKind.Null)
             {
-                if (!number.TryGetInt32(out var count) || count < 0) throw new ArgumentException("Limit must be a nonnegative 32-bit integer.");
+                if (!Integral(number, out var count) || count < 0) throw new ArgumentException("Limit must be a nonnegative integral number.");
                 limit = count;
             }
         }
@@ -166,6 +181,14 @@ public sealed class ReadWriteTools
             if (Utf8.GetByteCount(content) > _options.MaximumWriteBytes) throw new FileToolException(FileToolFailure.ResourceLimit);
         }
         return new(path, display, offset, limit, content);
+    }
+
+    private static bool Integral(JsonElement value, out int result)
+    {
+        result = 0;
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var number) || !double.IsFinite(number) ||
+            number != Math.Truncate(number) || number is < int.MinValue or > int.MaxValue) return false;
+        result = (int)number; return true;
     }
 
     private static string String(JsonElement value, string name, bool empty, bool allowNulData = false)
@@ -180,47 +203,84 @@ public sealed class ReadWriteTools
 
     private async ValueTask<ToolResult> ReadAsync(string target, Input input, CancellationToken token)
     {
+        byte[] owned;
         try
         {
             var supplied = await _operations.ReadAsync(target, _options.MaximumReadBytes, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             if (supplied.Length > _options.MaximumReadBytes) throw new FileToolException(FileToolFailure.ResourceLimit);
-            var owned = supplied.ToArray();
-            if (UnsupportedBytes(owned)) throw new FileToolException(FileToolFailure.UnsupportedContent);
-            string text;
-            try { text = Utf8.GetString(owned); }
-            catch (DecoderFallbackException) { throw new FileToolException(FileToolFailure.UnsupportedContent); }
-            if (text.Any(character => (char.IsControl(character) && character is not ('\t' or '\n' or '\r'))))
-                throw new FileToolException(FileToolFailure.UnsupportedContent);
-            var lines = text.Split('\n');
-            var start = input.Offset - 1;
-            if (start >= lines.Length)
-                return ToolResult.Error(ToolFailureKind.InvalidArguments, $"Offset {input.Offset} is beyond end of file ({lines.Length} lines total)");
-            var count = input.Limit is { } requested ? Math.Min(requested, lines.Length - start) : lines.Length - start;
-            var selected = string.Join("\n", lines, start, count);
-            var truncation = ToolOutputTruncator.Head(selected);
-            string output; var details = JsonData.Null;
-            if (truncation.FirstLineExceedsLimit)
-            {
-                output = $"[Line {input.Offset} is {FormatSize(Utf8.GetByteCount(lines[start]))}, exceeds 50.0KB limit. Use bash: sed -n '{input.Offset}p' {input.DisplayPath} | head -c 51200]";
-                details = TruncationDetails(truncation);
-            }
-            else if (truncation.Truncated)
-            {
-                var end = input.Offset + truncation.OutputLines - 1;
-                var suffix = truncation.TruncatedBy == ToolOutputTruncationLimit.Bytes ? " (50.0KB limit)" : "";
-                output = truncation.Content + $"\n\n[Showing lines {input.Offset}-{end} of {lines.Length}{suffix}. Use offset={end + 1} to continue.]";
-                details = TruncationDetails(truncation);
-            }
-            else if (input.Limit is not null && start + count < lines.Length)
-                output = truncation.Content + $"\n\n[{lines.Length - start - count} more lines in file. Use offset={start + count + 1} to continue.]";
-            else output = truncation.Content;
-            ToolResult result = new([new TextContent(output)], details);
-            return result with { StructuredContent = ToReadOutput(result.ContentValue) };
+            owned = supplied.ToArray();
         }
         catch (FileToolException error) { return FileError(ToolFailureKind.ExecutionError, error.Message, error.Failure.ToString()); }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-        { return FileError(ToolFailureKind.ExecutionError, "Cannot read file contents.", "ReadIoFailure"); }
+        catch (Exception error) when (error is FileNotFoundException or DirectoryNotFoundException)
+        { return ToolResult.Error(ToolFailureKind.ExecutionError, $"ENOENT: no such file or directory, access '{target}'"); }
+        catch (UnauthorizedAccessException)
+        {
+            // Windows reports opening a directory as denied access; Node's readFile reports EISDIR.
+            var directory = false;
+            if (_operations is IDirectoryFileOperations directories)
+                try { directory = await directories.IsDirectoryAsync(target, token).ConfigureAwait(false); }
+                catch (Exception probe) when (probe is IOException or UnauthorizedAccessException) { }
+            return ToolResult.Error(ToolFailureKind.ExecutionError, directory
+                ? "EISDIR: illegal operation on a directory, read" : $"EACCES: permission denied, access '{target}'");
+        }
+        catch (IOException) { return ToolResult.Error(ToolFailureKind.ExecutionError, $"EIO: i/o error, read '{target}'"); }
+        // Source detectSupportedImageMimeTypeFromFile sniffs the leading bytes; everything else is text.
+        var mimeType = ImageMime.DetectSupportedImageMimeType(owned.AsSpan(0, Math.Min(owned.Length, ImageMime.SniffBytes)));
+        if (mimeType is not null) return await ReadImageAsync(owned, mimeType, token).ConfigureAwait(false);
+        var lines = LenientUtf8.GetString(owned).Split('\n');
+        // Source: a falsy offset starts at line 1; otherwise Math.max(0, offset - 1).
+        var start = input.Offset == 0 ? 0 : Math.Max(0, input.Offset - 1);
+        var startDisplay = start + 1;
+        if (start >= lines.Length)
+            return ToolResult.Error(ToolFailureKind.InvalidArguments, $"Offset {input.Offset} is beyond end of file ({lines.Length} lines total)");
+        var count = input.Limit is { } requested ? Math.Min(requested, lines.Length - start) : lines.Length - start;
+        var selected = string.Join("\n", lines, start, count);
+        var truncation = ToolOutputTruncator.Head(selected);
+        string output; var details = JsonData.Null;
+        if (truncation.FirstLineExceedsLimit)
+        {
+            output = $"[Line {startDisplay} is {FormatSize(Utf8.GetByteCount(lines[start]))}, exceeds 50.0KB limit. Use bash: sed -n '{startDisplay}p' {input.DisplayPath} | head -c 51200]";
+            details = TruncationDetails(truncation);
+        }
+        else if (truncation.Truncated)
+        {
+            var end = startDisplay + truncation.OutputLines - 1;
+            var suffix = truncation.TruncatedBy == ToolOutputTruncationLimit.Bytes ? " (50.0KB limit)" : "";
+            output = truncation.Content + $"\n\n[Showing lines {startDisplay}-{end} of {lines.Length}{suffix}. Use offset={end + 1} to continue.]";
+            details = TruncationDetails(truncation);
+        }
+        else if (input.Limit is not null && start + count < lines.Length)
+            output = truncation.Content + $"\n\n[{lines.Length - start - count} more lines in file. Use offset={start + count + 1} to continue.]";
+        else output = truncation.Content;
+        ToolResult result = new([new TextContent(output)], details);
+        return result with { StructuredContent = ToReadOutput(result.ContentValue) };
+    }
+
+    /// <summary>Source read image branch: processImage, the "Read image file" note with hints, and the non-vision note.</summary>
+    private async ValueTask<ToolResult> ReadImageAsync(byte[] bytes, string mimeType, CancellationToken token)
+    {
+        var processed = await Task.Run(() => ImageProcessor.Process(bytes, mimeType, _options.AutoResizeImages,
+            _options.ImageResizeOptions, _options.ImageCodec), token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        var nonVision = _options.CurrentModelSupportsImages?.Invoke() == false ? NonVisionImageNote : null;
+        string content;
+        if (!processed.Ok)
+        {
+            var note = $"Read image file [{mimeType}]\n{processed.Message}" + (nonVision is null ? "" : "\n" + nonVision);
+            content = JsonSerializer.Serialize(new object[] { new { type = "text", text = note } }, OutputJson);
+        }
+        else
+        {
+            var note = $"Read image file [{processed.MimeType}]" + (processed.Hints.IsEmpty ? "" : "\n" + string.Join("\n", processed.Hints)) +
+                (nonVision is null ? "" : "\n" + nonVision);
+            content = JsonSerializer.Serialize(new object[]
+            {
+                new { type = "text", text = note }, new { type = "image", data = processed.Data, mimeType = processed.MimeType }
+            }, OutputJson);
+        }
+        var value = JsonData.Parse(content);
+        return new ToolResult([], JsonData.Null) { ContentValue = value, StructuredContent = ToReadOutput(value) };
     }
 
     private async ValueTask<ToolResult> WriteAsync(string target, Input input, CancellationToken token)
@@ -239,18 +299,31 @@ public sealed class ReadWriteTools
                 writeAttempted = true;
                 await _operations.WriteAsync(target, bytes, operationToken).ConfigureAwait(false);
                 writeCompleted = true;
+                // Source throwIfAborted after the write settles: "Operation aborted". The details record the effect.
                 if (operationToken.IsCancellationRequested)
-                    return FileError(ToolFailureKind.Canceled, "Write completed after cancellation was requested.", "WriteCompletedAfterCancellation",
+                    return FileError(ToolFailureKind.Canceled, "Operation aborted", "WriteCompletedAfterCancellation",
                         directoryAttempted, directoryCompleted, writeAttempted, writeCompleted);
                 return new([new TextContent($"Successfully wrote to {input.DisplayPath}")], JsonData.Null);
             }
             catch (OperationCanceledException) when (operationToken.IsCancellationRequested)
-            { return FileError(ToolFailureKind.Canceled, "Write canceled; an attempted file operation may have changed the filesystem.", "WriteCanceled",
+            { return FileError(ToolFailureKind.Canceled, "Operation aborted", "WriteCanceled",
                 directoryAttempted, directoryCompleted, writeAttempted, writeCompleted); }
-            catch (Exception)
-            { return FileError(ToolFailureKind.ExecutionError, "Cannot write file contents; an attempted file operation may have changed the filesystem.", "WriteIoFailure",
+            catch (Exception error)
+            { return FileError(ToolFailureKind.ExecutionError, NodeWriteError(error, target, directoryCompleted), "WriteIoFailure",
                 directoryAttempted, directoryCompleted, writeAttempted, writeCompleted); }
         }, token).ConfigureAwait(false);
+    }
+
+    /// <summary>The Node fs error text the source propagates from mkdir (recursive) or writeFile.</summary>
+    private static string NodeWriteError(Exception error, string target, bool directoryCompleted)
+    {
+        var directory = Path.GetDirectoryName(target) ?? target;
+        if (!directoryCompleted)
+            return error is UnauthorizedAccessException ? $"EACCES: permission denied, mkdir '{directory}'" : $"ENOTDIR: not a directory, mkdir '{directory}'";
+        if (Directory.Exists(target)) return $"EISDIR: illegal operation on a directory, open '{target}'";
+        if (error is UnauthorizedAccessException) return $"EACCES: permission denied, open '{target}'";
+        // Host exception text is not propagated; a Node-style code names the failed operation.
+        return $"EIO: i/o error, write '{target}'";
     }
 
     private static ToolResult FileError(ToolFailureKind kind, string message, string code, bool directoryAttempted = false,
@@ -270,23 +343,4 @@ public sealed class ReadWriteTools
     private static string FormatSize(int bytes) => bytes < 1024 ? bytes.ToString(CultureInfo.InvariantCulture) + "B"
         : bytes < 1024 * 1024 ? (bytes / 1024d).ToString("F1", CultureInfo.InvariantCulture) + "KB"
         : (bytes / (1024d * 1024)).ToString("F1", CultureInfo.InvariantCulture) + "MB";
-
-    private static bool UnsupportedBytes(ReadOnlySpan<byte> bytes) => bytes.Contains((byte)0) ||
-        bytes.StartsWith(new byte[] { 0xff, 0xfe }) || bytes.StartsWith(new byte[] { 0xfe, 0xff }) ||
-        bytes.StartsWith(new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a }) ||
-        bytes.StartsWith(new byte[] { 0xff, 0xd8, 0xff }) || bytes.StartsWith("GIF87a"u8) || bytes.StartsWith("GIF89a"u8) ||
-        (bytes.Length >= 12 && bytes.StartsWith("RIFF"u8) && bytes[8..].StartsWith("WEBP"u8)) ||
-        IsBmp(bytes);
-
-    private static bool IsBmp(ReadOnlySpan<byte> bytes)
-    {
-        if (bytes.Length < 26 || !bytes.StartsWith("BM"u8)) return false;
-        var size = BinaryPrimitives.ReadUInt32LittleEndian(bytes[2..]);
-        var pixels = BinaryPrimitives.ReadUInt32LittleEndian(bytes[10..]);
-        var header = BinaryPrimitives.ReadUInt32LittleEndian(bytes[14..]);
-        if ((size != 0 && size < 26) || pixels < 14L + header || (size != 0 && pixels >= size)) return false;
-        var offset = header == 12 ? 22 : header is >= 40 and <= 124 && bytes.Length >= 30 ? 26 : -1;
-        return offset >= 0 && BinaryPrimitives.ReadUInt16LittleEndian(bytes[offset..]) == 1 &&
-            BinaryPrimitives.ReadUInt16LittleEndian(bytes[(offset + 2)..]) is 1 or 4 or 8 or 16 or 24 or 32;
-    }
 }

@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/ls.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
@@ -15,7 +16,7 @@ public sealed class LsTool
     private readonly IDirectoryFileOperations _operations;
     private readonly PathResolver _paths;
     public IPreparedToolAdapter Adapter { get; }
-    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"ls","description":"List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first). Bounded native listing profile.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Directory to list (default: current directory)"},"limit":{"type":"number","description":"Maximum number of entries to return (default: 500)"}},"additionalProperties":false}}""");
+    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"ls","description":"List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Directory to list (default: current directory)"},"limit":{"type":"number","description":"Maximum number of entries to return (default: 500)"}}}}""");
 
     public LsTool(string workingDirectory, string homeDirectory, IDirectoryFileOperations? operations = null)
     {
@@ -38,6 +39,8 @@ public sealed class LsTool
         foreach (var property in arguments.Value.EnumerateObject())
         {
             if (!seen.Add(property.Name)) throw new ArgumentException("Duplicate ls argument.");
+            // Pi validation.ts normalizeOptionalNulls: an optional property sent as null (strict tool schemas make optional properties nullable) is absent.
+            if (property.Name is "path" or "limit" && property.Value.ValueKind == JsonValueKind.Null) continue;
             if (property.Name == "path" && property.Value.ValueKind == JsonValueKind.String)
                 path = property.Value.GetString()!;
             else if (property.Name == "limit" && property.Value.ValueKind == JsonValueKind.Number && property.Value.TryGetDouble(out var number)
