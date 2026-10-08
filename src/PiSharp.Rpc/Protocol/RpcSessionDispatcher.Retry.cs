@@ -31,19 +31,8 @@ public sealed partial class RpcSessionDispatcher
             var started = observation as SessionAutoRetryStarted;
             var ended = observation as SessionAutoRetryEnded;
             if (started is null && ended is null) throw new InvalidOperationException("Unsupported retry event.");
-            await WriteAsync(RpcCommandCodec.Event(started is null ? "auto_retry_end" : "auto_retry_start", writer =>
-            {
-                if (started is not null)
-                {
-                    writer.WriteNumber("attempt", started.Attempt); writer.WriteNumber("maxAttempts", started.MaxAttempts);
-                    writer.WriteNumber("delayMs", started.DelayMs); writer.WriteString("errorMessage", started.ErrorMessage);
-                }
-                else
-                {
-                    writer.WriteBoolean("success", ended!.Success); writer.WriteNumber("attempt", ended.Attempt);
-                    if (ended.FinalError is not null) writer.WriteString("finalError", ended.FinalError);
-                }
-            }, _options)).ConfigureAwait(false);
+            // Shared with JSON mode: source JSON.stringify escaping of the provider error text.
+            await WriteAsync(RpcSessionEventProjector.Project(observation, _options)!).ConfigureAwait(false);
         }
         catch (Exception error) { SignalFatal(error is RpcDispatchException dispatch ? dispatch.Failure : RpcDispatchFailure.SessionRunFailed, error); throw; }
         finally { _inCallback.Value = previous; }

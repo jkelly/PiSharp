@@ -18,13 +18,15 @@ stack is guarded, and a worker that dies is reported as `Worker exited with code
 Jint runs on the .NET stack, and .NET cannot recover from a stack overflow. Some built-ins recurse natively on the depth of
 a value (for example a property lookup along a prototype chain a million objects long), and no in-process guard covers all of
 them. PiSharp therefore runs each script's engine in a **child process** of its own executable (`pisharp --codemode-worker`),
-speaking upstream's protocol (start, call, output, done, crash, result) as JSON lines over standard input and output:
+speaking upstream's protocol (start, call, output, done, crash, result, plus `ready` when the script starts) as JSON lines over standard input and output:
 
 - A crash ends only the worker. The script fails as a `sandbox` error, `Worker exited with code -1073741571 before the
   script settled`, exactly as upstream reports a dying worker, and the host keeps running.
 - Deadlines, aborts and finished scripts kill the worker process (upstream: `worker.terminate()`); no worker outlives its
-  script. One spare worker is started ahead and warmed (engine compiled) so the next script starts quickly. A worker exits
-  when the host closes its standard input, so spares never outlive the host.
+  script. Terminating kills the worker (SIGKILL on Linux and macOS), closes its standard input and waits for its exit, so
+  the child is reaped before the result is delivered. One spare worker is started ahead and warmed (engine compiled) so the
+  next script starts quickly; spares are retired the same way. A worker exits when its standard input reaches end of file,
+  so a worker whose host dies, even by SIGKILL, ends too; a normal host exit kills its spares at once.
 - Cost: each script still pays a process start (about 100 to 300 ms with the spare, against a few ms for a Node worker).
 - Hosts set `CodemodeWorker.Default` (the CLI does at startup). An SDK host that sets nothing runs engines on a thread of
   its own process, which the deep-nesting cases below can crash.
@@ -57,7 +59,7 @@ speaking upstream's protocol (start, call, output, done, crash, result) as JSON 
 | Native nesting depth | Stack guard: a catchable `RangeError` | A shim evaluated before the prelude makes Array `join`/`toString`/`toLocaleString`, `flat` and `JSON.stringify` throw a catchable `RangeError: Maximum call stack size exceeded` past 1000 levels; `JSON.parse` stops at 1000 levels with a catchable `SyntaxError`. The bound is low because unwinding an exception through Jint costs memory that grows with the square of its depth (a throw about 3000 calls deep exceeds the 256 MiB budget). Other native recursion (prototype or proxy chains) can exhaust the worker's 256 MiB stack: the worker exits and the script fails as a sandbox error. |
 | Memory | 256 MiB heap (`memoryLimit`); overruns throw a catchable `InternalError: out of memory` | Jint's `LimitMemory(256 MiB)` counts bytes **allocated** by the engine thread between two host entries (the start of the script and every settled tool call), plus a 1 GiB budget for the whole execution. Overruns fail the script with `InternalError: out of memory`; Jint does not let the script catch it. |
 | Recursion of script functions | Stack guard; overflow is a catchable `RangeError` | `LimitRecursion(10000)`. Overflow fails the script with `RangeError: Maximum call stack size exceeded`; Jint does not let the script catch it. |
-| Deadline | `timeout_ms` (none by default for the tool); the worker is terminated | `timeout_ms` kills the worker process. |
+| Deadline | `timeout_ms` (none by default for the tool); the worker is terminated | `timeout_ms` kills the worker process. It counts from the moment the engine starts the script (the worker's `ready` message), so starting a worker process is not charged to the script; a worker that does not start within 60 s fails the script as a sandbox error. |
 | Caller cancellation | `AbortSignal`; the worker is terminated | The caller's `CancellationToken` kills the worker process. |
 | Regular expressions | Interruptible | Jint's regex timeout of 5 s inside the worker; deadlines and aborts kill the worker regardless. |
 | Arrays | Heap limit | `MaxArraySize` of 32 Mi elements in addition to the memory budget. |
