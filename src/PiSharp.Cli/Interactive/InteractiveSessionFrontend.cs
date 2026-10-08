@@ -235,6 +235,12 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
                             (nextSessionCursor is null ? "" : "\n/sessions-next for the next page.") +
                             "\nskipped=" + value.GetProperty("skippedFiles").GetRawText() + " unavailable stores=" + value.GetProperty("unavailableStores").GetRawText();
                     }
+                    else if (body.GetProperty("command").GetString() == "bash")
+                    {
+                        if (id is not null && id == pendingBash) pendingBash = null;
+                        display = success ? BashStatus(body.GetProperty("data")) : "[error] Bash command failed: " +
+                            (body.TryGetProperty("error", out var bashError) ? bashError.GetString() : "Unknown error");
+                    }
                     else if (!success) display = "[response] rejected " + body.GetProperty("command").GetString();
                     else if (body.GetProperty("command").GetString() == "get_state")
                     {
@@ -308,6 +314,11 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
                 case "tool_execution_end":
                     display = "[tool end] " + body.GetProperty("toolName").GetString() + " error=" + body.GetProperty("isError").GetRawText() + " " + ResultText(body.GetProperty("result")); break;
                 case "agent_settled": terminalStreaming = false; if (!nativePresentation) ClearDialogs(); display = "[settled]"; break;
+                case "bash_execution_update":
+                    // Deltas are already sanitized by the host executor; the cooked view shows them as streamed.
+                    if (body.TryGetProperty("id", out var bashUpdate) && bashUpdate.GetString() == pendingBash)
+                        display = body.GetProperty("delta").GetString()!.TrimEnd('\n');
+                    break;
                 case "queue_update":
                     // The dispatcher serializes attachment changes with queue publication:
                     // a new-session snapshot cannot precede its session_switched record.
@@ -441,6 +452,26 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
         uiCharacters -= dialog!.Record.ToString().Length; dialog = dialogs.TryDequeue(out var next) ? next : null; dialogEditor.Clear(); dialogResponsePending = false;
         return dialog is null ? null : DescribeDialog();
     }
+    private string? pendingBash;
+    private sealed record UserBashInput(string Command, bool Excluded);
+    /// <summary>Source handling: <c>!command</c> runs and records; <c>!!command</c> runs excluded from context. An empty command is ordinary text.</summary>
+    private static UserBashInput? UserBashLine(string line)
+    {
+        if (!line.StartsWith('!')) return null;
+        var excluded = line.StartsWith("!!", StringComparison.Ordinal);
+        var command = (excluded ? line[2..] : line[1..]).Trim();
+        return command.Length == 0 ? null : new(command, excluded);
+    }
+    /// <summary>Source BashExecutionComponent completion lines (an exit code of 0 adds none).</summary>
+    private static string? BashStatus(JsonElement result)
+    {
+        var parts = new List<string>();
+        if (result.GetProperty("cancelled").GetBoolean()) parts.Add("(cancelled)");
+        else if (result.TryGetProperty("exitCode", out var exit) && exit.GetInt32() != 0) parts.Add("(exit " + exit.GetRawText() + ")");
+        if (result.GetProperty("truncated").GetBoolean() && result.TryGetProperty("fullOutputPath", out var full))
+            parts.Add("Output truncated. Full output: " + full.GetString());
+        return parts.Count == 0 ? null : string.Join('\n', parts);
+    }
     private void ClearDialogs() { dialog = null; dialogs.Clear(); dialogEditor.Clear(); dialogResponsePending = false; uiCharacters = 0; }
 
     internal Task<bool> LineAsync(string line, CancellationToken token) => LineCoreAsync(line, null, token);
@@ -452,12 +483,24 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
     }
     private async Task<bool> LineCoreAsync(string line, TerminalSubmittedLine? submission, CancellationToken token)
     {
-        ChatEditor.Validate(line); object? command = null; string? display = null, completionIdentity = null, catalogIdentity = null;
+        ChatEditor.Validate(line); object? command = null; string? display = null, completionIdentity = null, catalogIdentity = null, bashIdentity = null;
         bool quit = false, localAcknowledged = false;
         lock (state)
         {
             var id = "chat-" + (++sequence).ToString(CultureInfo.InvariantCulture);
             if (line == "/quit") quit = true;
+            else if ((loginPrompt is not null || dialog is null && !draft.IsEditing) && TryLoginLineLocked(line, out display)) localAcknowledged = true;
+            // Source Esc precedence: a streaming run is aborted first, otherwise a running user bash command.
+            else if (line == "/abort" && !terminalStreaming && pendingBash is not null) command = new { id, type = "abort_bash" };
+            else if (dialog is null && !draft.IsEditing && UserBashLine(line) is { } bash)
+            {
+                if (pendingBash is not null) display = "[warning] A bash command is already running. Use /abort to cancel it first.";
+                else
+                {
+                    pendingBash = bashIdentity = id; display = "$ " + bash.Command;
+                    command = new { id, type = "bash", command = bash.Command, excludeFromContext = bash.Excluded };
+                }
+            }
             else if (line is "/abort" or "/state" or "/clear-queue") command = new { id, type = line switch { "/abort" => "abort", "/state" => "get_state", _ => "clear_queue" } };
             else if (line.StartsWith("/steer ", StringComparison.Ordinal)) command = new { id, type = "steer", message = line[7..] };
             else if (line.StartsWith("/follow-up ", StringComparison.Ordinal)) command = new { id, type = "follow_up", message = line[11..] };
@@ -612,6 +655,7 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
                 // An unaccepted send cannot retain a completion slot.
                 if (completionIdentity is not null) lock (state) completionRequests.Remove(completionIdentity);
                 if (catalogIdentity is not null) lock (state) catalogRequests.Remove(catalogIdentity);
+                if (bashIdentity is not null) lock (state) if (pendingBash == bashIdentity) pendingBash = null;
                 throw;
             }
         }
@@ -691,6 +735,7 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
     public void Dispose()
     {
         // The command joins its input loop and the host's actual output callbacks before closing this view.
+        CancelLogin();
         lock (state) { queueRestoration?.Completion.TrySetCanceled(); queueRestoration = null; ClearDialogs(); draft.Clear(); statuses.Clear(); widgets.Clear(); completionRequests.Clear(); ResetAssistantPresentation(); send = null; }
         ready.TrySetCanceled(); rendering.Dispose();
     }

@@ -126,6 +126,7 @@ public static class TerminalSessionCommand
         var programStatus = view.ProgramStatus is null ? null : new ProgramStatusReporter();
         var receipts = new TerminalSubmissionReceipts();
         using var frontend = new InteractiveSessionFrontend(view, nativePresentation: true, submissionReceipts: receipts);
+        frontend.BindLogin(PiSharp.Cli.Authentication.ProviderLoginHost.CreateDefault());
         var selectList = new TerminalSelectListDialogController(frontend, view, keybindings);
         var selectRouter = new TerminalSelectListInputRouter(frontend, selectList, focusOwner); frontend.BindSelectList(selectRouter);
         var beginInput = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

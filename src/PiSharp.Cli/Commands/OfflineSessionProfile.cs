@@ -52,6 +52,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     private readonly ToolInvokerOptions _profileInvokerOptions;
     private readonly NativeExtensionActivation? _extension;
     private readonly OwnedProcessCleanup? _processCleanup;
+    /// <summary>User Bash capability, present only with an explicit shell and spill root.</summary>
+    internal PiSharp.CodingAgent.Execution.IUserBashExecutor? UserBash { get; private set; }
     internal ImmutableArray<OwnedProcessCleanupReceipt> ProcessCleanupReceipts => _processCleanup?.Capture() ?? [];
     internal ImmutableArray<Exception> ProcessCleanupFailures => _processCleanup?.CaptureFailures() ?? [];
     private readonly object _disposalGate = new();
@@ -400,6 +402,10 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         }
         if (registeredMcpAdmission is not null && mcpAdmission is not null)
             throw new ArgumentException("Choose one explicit MCP profile admission.");
+        if (resolvedAnthropicAuthentication is null && resolvedAnthropicHandler is null && liveSelection is { Model.Provider: "anthropic" } &&
+            (liveRuntime ?? LiveSessionRuntime.Default) is { ResolveStoredAnthropic: { } resolveStored } storedRuntime &&
+            await resolveStored(token).ConfigureAwait(false) is { } storedAnthropic)
+        { resolvedAnthropicAuthentication = storedAnthropic; resolvedAnthropicHandler = storedRuntime.CreateHttpHandler(); }
         // Explicit admitted resolution uses no environment lookup; reject invalid composition before profile effects.
         if (resolvedAnthropicAuthentication is not null &&
             (liveSelection is null || liveSelection.Model.Provider != "anthropic" || liveSelection.Model.Api != "anthropic-messages" ||
@@ -460,7 +466,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             reserved.Add(extension.ManifestPath); reserved.Add(extension.ApprovalPath);
         }
         var reads = await Targets(readTargets); var writes = await Targets(writeTargets);
-        BashTool? bashTool = null; BashGrant? grant = null;
+        BashTool? bashTool = null; BashGrant? grant = null; UserBashHost? userBash = null;
         OwnedProcessCleanup? processCleanup = null;
         if (bash is not null)
         {
@@ -486,6 +492,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             grant = new(executable, canonicalWorkspace, canonicalSpill, environment, bash.Commands, bash.Timeout, files);
             processCleanup = new(new NativeProcessRunner());
             bashTool = new(processCleanup, new(executable, canonicalWorkspace, environment, canonicalSpill));
+            userBash = new(new(new NativeShellOperations(executable, environment, canonicalSpill), canonicalSpill));
         }
         var policy = new FilePolicy(canonicalWorkspace, reads, writes, reserved, grant, grepHost);
         var grepReader = grepHost is null ? null : new AdmittedGrepContextReader(canonicalWorkspace,
@@ -512,6 +519,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup, connection, toolSelection,
                 deferCatalogValidation: mcpAdmission is not null || registeredMcpAdmission is not null || readApplicationHost is not null,
                 originalSystemPrompt: originalSystemPrompt);
+            profile.UserBash = userBash;
             if (readApplicationHost is not null) profile.ConfigureMcpRegistrationRuntime(readApplicationHost().CreateRegisteredAdmission());
             else if (registeredMcpAdmission is not null) profile.ConfigureMcpRegistrationRuntime(registeredMcpAdmission);
             else if (mcpAdmission is not null) profile.ConfigureMcpRuntime(mcpAdmission);

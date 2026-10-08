@@ -37,6 +37,7 @@ internal static partial class Program
             ("reload.default-tools-additions-only", Sync(ReloadAdditions)),
             ("reload.modifiers-allowlists-and-patterns", Sync(ReloadPolicies)),
             ("reload.planner-host-selector", ReloadPlannerSelector),
+            ("reload.pending-tools-activate-on-late-registration", PendingReloadTools),
             ("prompt.hidden-tools-byte-exact-sections", Sync(HiddenPrompt)),
             ("prompt.skills-hint-reader-fallback-and-indirect", Sync(SkillsHint)),
             ("prompt.unhidden-docs-line-and-options", Sync(DocsAndOptions)),
@@ -47,7 +48,12 @@ internal static partial class Program
             ("osc7501.query-and-reply-detection", Sync(Replies)),
             ("osc7501.channel-override-negotiation-and-restart", Sync(Channel)),
             ("osc7501.reporter-run-dialog-and-compaction-lifecycle", Sync(Reporter)),
-            ("osc7501.terminal-view-start-report-and-stop", TerminalView)
+            ("osc7501.terminal-view-start-report-and-stop", TerminalView),
+            ("auth.anthropic.login-copy-code-stores-auth-json-and-refreshes", LoginStoresAndRefreshes),
+            ("auth.anthropic.login-browser-pasted-redirect-and-state-mismatch", BrowserLoginPastedRedirect),
+            ("wire.agent-settled.json-mode-record-with-aborted", JsonModeAgentSettled),
+            ("wire.agent-settled.native-extension-observation-and-reported-failure", ExtensionAgentSettled),
+            ("wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas", InteractiveUserBash)
         };
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)

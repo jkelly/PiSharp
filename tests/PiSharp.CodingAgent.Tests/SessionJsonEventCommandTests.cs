@@ -122,7 +122,7 @@ internal static class SessionJsonEventCommandTests
         Check(branched.OriginalBytes.AsSpan().StartsWith(resumed.OriginalBytes.AsSpan()), "JSON selected branch rewrote sibling history.");
         Equal(ancestor, branched.ValidatedPrefix[resumed.ValidatedPrefix.Length].Entry.ParentId);
         Correlate(branch, branched, 2);
-        Check(!branch[^1].GetProperty("messages").GetRawText().Contains("resume user", StringComparison.Ordinal), "agent_end included old sibling history.");
+        Check(!branch[^2].GetProperty("messages").GetRawText().Contains("resume user", StringComparison.Ordinal), "agent_end included old sibling history.");
         var context = Context(branched);
         Check(!context.LlmMessages.Any(message => message.WireBody.ToString().Contains("resume user", StringComparison.Ordinal)), "Selected context flattened a sibling.");
         var targetAfter = await File.ReadAllBytesAsync(target);
@@ -148,7 +148,7 @@ internal static class SessionJsonEventCommandTests
         var denied = await Child(files, Prompt(files, api, "deny action"));
         Equal(1, denied.Code); Equal("CompletedWithErrors", Diagnostic(denied.Error).GetProperty("code").GetString());
         var deniedEvents = Records(Utf8.GetString(denied.Output));
-        Equal("agent_end", Type(deniedEvents[^1])); Check(!File.Exists(deniedTarget), "JSON denied tool performed a file effect.");
+        Equal("agent_end", Type(deniedEvents[^2])); Equal("agent_settled", Type(deniedEvents[^1])); Check(!File.Exists(deniedTarget), "JSON denied tool performed a file effect.");
         Check(deniedEvents.Single(record => Type(record) == "tool_execution_end").GetProperty("isError").GetBoolean(), "Tool failure flag disappeared from JSON events.");
         await Script(files, Failure(api));
         var failed = await Child(files, Prompt(files, api, "provider failure"));
@@ -165,7 +165,9 @@ internal static class SessionJsonEventCommandTests
     private static void Correlate(JsonElement[] records, SessionLogReadResult read, int expectedNewMessages)
     {
         Equal("session", Type(records[0])); Equal(read.Header!.WireBody.ToString(), records[0].GetRawText());
-        Equal("agent_start", Type(records[1])); Equal("turn_start", Type(records[2])); Equal("agent_end", Type(records[^1]));
+        Equal("agent_start", Type(records[1])); Equal("turn_start", Type(records[2])); Equal("agent_end", Type(records[^2]));
+        // Source docs/json.md: agent_settled closes the session-level run after agent_end.
+        Equal("""{"type":"agent_settled","aborted":false}""", records[^1].GetRawText());
         Equal(1, records.Count(record => Type(record) == "agent_start")); Equal(1, records.Count(record => Type(record) == "agent_end"));
         Check(records.All(record => Type(record) is not ("session_command_result" or "response")), "Settlement or RPC command output mixed into JSON events.");
         var ended = records.Where(record => Type(record) == "message_end").Select(record => record.GetProperty("message")).ToArray();
@@ -173,10 +175,10 @@ internal static class SessionJsonEventCommandTests
         var durable = read.ValidatedPrefix.Where(record => record.Entry.Type == "message")
             .Select(record => record.Entry.WireBody.Value.GetProperty("message")).ToArray();
         Check(ended.All(message => durable.Any(saved => saved.GetRawText() == message.GetRawText())), "An authoritative message_end lacks an identical actual durable body.");
-        var agentMessages = records[^1].GetProperty("messages").EnumerateArray().ToArray();
+        var agentMessages = records[^2].GetProperty("messages").EnumerateArray().ToArray();
         Equal(ended.Length, agentMessages.Length);
         for (var index = 0; index < ended.Length; index++) Equal(ended[index].GetRawText(), agentMessages[index].GetRawText());
-        Check(!records[^1].GetProperty("willRetry").GetBoolean(), "Native fixed-session agent_end invented retry authority.");
+        Check(!records[^2].GetProperty("willRetry").GetBoolean(), "Native fixed-session agent_end invented retry authority.");
         foreach (var update in records.Where(record => Type(record) == "message_update"))
         {
             Check(!update.TryGetProperty("message", out _) && update.TryGetProperty("usage", out _), "JSON update contains a cumulative message or drops usage.");
@@ -208,7 +210,8 @@ internal static class SessionJsonEventCommandTests
             Equal(AgentLoopStopReason.Completed, result.Reason);
             Equal(StopReason.Stop, PiWireJson.ReadMessage(result.Transcript[^1].WireBody.Value).StopReason);
             var records = Records(output.ToString());
-            Equal(expected.Count + 1, records.Length);
+            Equal(expected.Count + 2, records.Length);
+            Equal("""{"type":"agent_settled","aborted":false}""", records[^1].GetRawText());
             for (var index = 0; index < expected.Count; index++) Equal(expected[index].ToString(), records[index + 1].GetRawText());
             Equal((long)Utf8.GetByteCount(output.ToString()), json.AcknowledgedBytes); Equal(records.Length, json.AcknowledgedRecords);
             var thinking = records.Single(record => Type(record) == "message_end" &&

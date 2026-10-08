@@ -478,6 +478,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             lock (_gate)
             {
                 _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(prospective));
+                if (update.ActiveToolNames is not null)
+                    SelectPendingToolsLocked(_configuration.Tools.Select(tool => tool.Name).ToImmutableArray(),
+                        selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray());
                 _configuration = selection.Configuration;
                 _acknowledgedLog = acknowledged.Snapshot;
                 _context = prospective;
@@ -1049,6 +1052,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             token.ThrowIfCancellationRequested();
             if (injectNextTurnCustom) inputs = InjectNextTurnCustomLocked(inputs);
             _operationGeneration = checked(_operationGeneration + 1);
+            // Source _runAgentPrompt: the run records the loadout; restored tools that did not register by now are dropped.
+            _pendingToolNames = [];
             _runCancellation = new(); _operationPhase = SessionOperationPhase.Provider;
             idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle;
         }

@@ -152,7 +152,7 @@ public static class RpcSessionCommand
                 inputAdmissionSelector: profile.PromptInputSelector, exportHtmlWriter: profile.ExportHtmlWriter,
                 selectedTreePublisher: profile.PublishSelectedTreeAsync,
                 postInputSettlement: profile.DrainLifecycleHandoffsAsync,
-                postRunSettlement: profile.DrainLifecycleHandoffsAsync);
+                postRunSettlement: profile.DrainLifecycleHandoffsAsync, userBash: profile.UserBash);
             profile.ConfigureLifecycleModeStop(lifecycleStop.CancelAsync);
             await dispatcher.RunAsync(reader, lifecycleRun.Token).ConfigureAwait(false);
         }
