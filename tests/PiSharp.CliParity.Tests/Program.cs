@@ -72,12 +72,18 @@ internal static partial class Program
         public Dictionary<string, string?> Vars { get; } = new(StringComparer.Ordinal);
         public List<Seen> Requests { get; } = [];
         public Func<Seen, int, HttpResponseMessage> Respond { get; set; } = (_, _) => AnthropicText("ok");
-        public Sandbox(string name)
+        public Sandbox(string name, bool trusted = true)
         {
             Root = Path.Combine(Path.GetFullPath(Path.GetTempPath()), "pisharp-cli-parity", name + "-" + Guid.NewGuid().ToString("N")[..8]);
             Home = Path.Combine(Root, "home"); AgentDir = Path.Combine(Home, ".pi", "agent"); Cwd = Path.Combine(Root, "project");
             Directory.CreateDirectory(AgentDir); Directory.CreateDirectory(Cwd);
             Vars["ANTHROPIC_API_KEY"] = "sk-test-key";
+            // The sandbox is a git repository, so the ancestor walk for .agents/skills stops at its root (collectAncestorAgentsSkillDirs).
+            Directory.CreateDirectory(Path.Combine(Root, ".git"));
+            File.WriteAllText(Path.Combine(Root, ".git", "HEAD"), "ref: refs/heads/main\n");
+            // An ancestor of the temporary directory may hold .agents/skills (a trust-requiring resource), so the project is trusted
+            // explicitly, as a user's earlier choice would; trust cases construct untrusted sandboxes.
+            if (trusted) new ProjectTrustStore(AgentDir, Home).Set(Root, true);
         }
         public string Write(string relative, string text)
         {
@@ -142,9 +148,9 @@ internal static partial class Program
         + Frame("message_stop", new { type = "message_stop" }));
 
     /// <summary>An Anthropic Messages stream calling one tool.</summary>
-    internal static HttpResponseMessage AnthropicToolCall(string name, object input) => Sse(
+    internal static HttpResponseMessage AnthropicToolCall(string name, object input, string id = "toolu_01") => Sse(
         Frame("message_start", new { type = "message_start", message = new { id = "msg_t", role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 3, output_tokens = 0 } } })
-        + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = new { type = "tool_use", id = "toolu_01", name, input = new { } } })
+        + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = new { type = "tool_use", id, name, input = new { } } })
         + Frame("content_block_delta", new { type = "content_block_delta", index = 0, delta = new { type = "input_json_delta", partial_json = JsonSerializer.Serialize(input) } })
         + Frame("content_block_stop", new { type = "content_block_stop", index = 0 })
         + Frame("message_delta", new { type = "message_delta", delta = new { stop_reason = "tool_use" }, usage = new { output_tokens = 2 } })
