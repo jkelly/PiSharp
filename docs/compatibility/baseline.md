@@ -21,6 +21,51 @@ To verify the target lock against a clean upstream checkout without the fixture 
 node tools/CompatibilityReport/verify-baseline.mjs --upstream <checkout of v1.1.0>
 ```
 
+### Surface inventories: v0.99.1 preserved, v1.1.0 current
+
+Two whole-file surface inventories are pinned by other evidence. They therefore follow the lock precedent: the v0.99.1 files stay byte-for-byte as evidence, and the v1.1.0 refresh lives in new files beside them.
+
+| Inventory | Preserved v0.99.1 evidence | Current v1.1.0 inventory |
+| --- | --- | --- |
+| Extension event catalog (41 events) | [event-catalog.json](../../compatibility/extensions/event-catalog.json) | [event-catalog.v1.1.0.json](../../compatibility/extensions/event-catalog.v1.1.0.json) |
+| Command, RPC and SDK declarations | [coding-agent-command-rpc-inventory.json](../../compatibility/coding-agent-command-rpc-inventory.json) (712 rows) | [coding-agent-command-rpc-inventory.v1.1.0.json](../../compatibility/coding-agent-command-rpc-inventory.v1.1.0.json) (716 rows) |
+
+The v0.99.1 files remain the ones pinned or validated elsewhere:
+- [public-entrypoints.plan.json](../../compatibility/public-entrypoints.plan.json), [command-rpc-inventory.md](command-rpc-inventory.md) and [public-surface-inventory.md](public-surface-inventory.md) pin the command/RPC inventory.
+- `EventReducerTests` checks the event catalog against the P6-01 native-surface inventory.
+
+New work reads the v1.1.0 files.
+
+Two generators produce both versions:
+- [build-event-catalog.mjs](../../tools/SurfaceInventory/build-event-catalog.mjs)
+- [build-command-rpc-inventory.mjs](../../tools/SurfaceInventory/build-command-rpc-inventory.mjs)
+
+Each generator works as follows:
+- **Ref and bytes.** It takes the ref from a lock file and reads canonical Git blob bytes with `git show`.
+- **Carried forward.** It keeps the authored row text of the v0.99.1 file.
+- **Re-derived.** It recomputes every source pin, span, embedded declaration and count.
+- **Native status.** It applies an authored overlay. The overlays are [event-catalog.v1.1.0.overlay.json](../../compatibility/extensions/event-catalog.v1.1.0.overlay.json) and [coding-agent-command-rpc-inventory.v1.1.0.overlay.json](../../compatibility/coding-agent-command-rpc-inventory.v1.1.0.overlay.json).
+
+With the v0.99.1 lock and no overlay, both generators reproduce the preserved files byte-for-byte.
+
+Upstream changes between the two versions:
+- **Event catalog.** There are no added or removed events. Every span was recomputed. Two event declarations changed: `AgentSettledEvent` gained `aborted` and `ToolExecutionEndEvent` gained `durationMs`.
+- **Command/RPC inventory.**
+  - It adds `--no-mcp` and the root exports `ToolRendererResolver`, `ToolRenderers` and `QuietStartup`.
+  - It records the changed `--models` and `--tools` parser branches and the `agent_settled` and `tool_execution_end` declarations.
+  - RPC types, the RPC handler and the slash registry are byte-identical.
+
+Native status:
+- **What counts as Implemented.** A surface is recorded as implemented only where an authored test case exercises it. Each such test is named by suite, file and case.
+- **Acceptance.** `implementationAcceptance` stays Deferred.
+- **Native-only surfaces.** The `mcp_diagnostic` stderr record and the `LiveAuthenticationFailed` and `LiveAzureEndpoint` failure codes have no upstream counterpart. They are listed under `nativeOnlySurfaces`.
+
+[inventory-refresh.test.mjs](../../tools/SurfaceInventory/inventory-refresh.test.mjs) checks both versions offline. With `PI_UPSTREAM` set to a Pi checkout that has both tags, it also re-runs both generators:
+
+```powershell
+$env:PI_UPSTREAM = '<Pi checkout with v0.99.1 and v1.1.0>'; node --test tools/SurfaceInventory/inventory-refresh.test.mjs
+```
+
 ## Previous target: Pi v0.99.1
 
 The source target was public Pi v0.99.1 at `d86654abb8862e201933517d6f1fce9f88dd117f`. The local checkout HEAD, tag resolution and tree are recorded in [baseline.lock.json](../../compatibility/baseline.lock.json). The coding-agent and AI package versions are 0.99.1; the repository root package version is 0.0.3.
