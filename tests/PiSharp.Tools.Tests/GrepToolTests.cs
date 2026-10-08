@@ -71,10 +71,14 @@ internal static class GrepToolTests
     private static async Task Unsupported()
     {
         using var f = new Fixture();
-        foreach (var args in new object[] { new { pattern = "x", context = 1 }, new { pattern = "x", context = -1 }, new { pattern = "x", limit = 1.5 }, new { pattern = "x", limit = 0 }, new { pattern = "x", limit = 10001 }, new { pattern = "x\0" }, new { pattern = "x", literal = "true" } })
+        foreach (var args in new object[] { new { pattern = "x", context = 1 }, new { pattern = "x", limit = 1.5 }, new { pattern = "x", limit = 10001 }, new { pattern = "x\0" }, new { pattern = "x", literal = "true" } })
             Check((await Invoke(f.Tool(), args)).Failure?.Kind == ToolFailureKind.InvalidArguments, "Unsupported input was silently approximated.");
         Check((await Invoke(f.Tool(), new { pattern = "x", path = Path.GetDirectoryName(f.Root)! })).Failure?.Kind == ToolFailureKind.InvalidArguments, "Outside workspace target admitted.");
         Check(f.Runner.Calls == 0 && f.Spills.Calls == 0, "Invalid input reached executor.");
+        // Pi grep.ts: Math.max(1, limit) and context > 0 ? context : 0, so these are admitted as one match without context.
+        f.Runner.Result = Receipt(Event(f.File, 1, "x one\n") + Event(f.File, 2, "x two\n"), "", 0);
+        var coerced = await Invoke(f.Tool(), new { pattern = "x", limit = 0, context = -3 });
+        Check(!coerced.IsError && Text(coerced) == "a.cs:1: x one\n\n[1 matches limit reached. Use limit=2 for more, or refine pattern]", "Pi limit/context coercion differs.");
         foreach (var stdout in new[] { "not JSON\n", "{\"type\":\"context\"}\n", "{\"type\":\"match\",\"data\":{\"path\":{\"bytes\":\"YQ==\"}}}\n", Event(f.File, 0, "bad\n"), Event(f.File, 1, "multiline\ntext\n") })
         {
             f.Runner.Result = Receipt(stdout, "", 0); var result = await Invoke(f.Tool(), new { pattern = "x" });
@@ -278,7 +282,8 @@ internal static class GrepToolTests
     private static async Task ContextBounds()
     {
         using var f = new Fixture(); var reader = new ContextReader(); var tool = f.Tool(reader);
-        foreach (var context in new[] { -1.0, 0.5, 101.0 })
+        // Pi: context > 0 ? context : 0, so a negative context is no context; fractional and oversized values stay refused natively.
+        foreach (var context in new[] { 0.5, 101.0 })
             Check((await Invoke(tool, new { pattern = "x", context })).Failure?.Kind == ToolFailureKind.InvalidArguments, "Unbounded/fractional context admitted.");
         Check(f.Runner.Calls == 0 && reader.Calls == 0, "Invalid context caused effects.");
         f.Runner.Result = Receipt(Event(f.File, 1, "x\n"), "", 0);

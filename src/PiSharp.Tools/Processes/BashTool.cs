@@ -1,4 +1,4 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/bash.ts (bashOutputSchema).
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/bash.ts.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
@@ -15,9 +15,15 @@ public sealed class BashTool : IPreparedToolAdapter
     private readonly BashToolOptions _options;
     private readonly Func<string> _nextSpillFileName;
     public string Name => "bash";
-    public JsonData Declaration { get; } = JsonData.Parse("""
-        {"name":"bash","description":"Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"timeout":{"type":"number","description":"Timeout in seconds (optional, no default timeout)"}},"required":["command"],"additionalProperties":false},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}
+    /// <summary>Source createShellToolDefinition for bash: description, TypeBox parameters and constrainedSampling.</summary>
+    public JsonData Declaration { get; } = SourceDeclaration;
+    public static JsonData SourceDeclaration { get; } = JsonData.Parse("""
+        {"name":"bash","description":"Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"timeout":{"type":"number","description":"Timeout in seconds (optional, no default timeout)"}},"required":["command"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}
         """);
+    /// <summary>Source MAX_TIMEOUT_MS.</summary>
+    public const double MaximumTimeoutMilliseconds = 2_147_483_647;
+    /// <summary>Source promptGuidelines: the PI_* guideline only when session variables are exposed.</summary>
+    public ImmutableArray<string> PromptGuidelines => BuiltinToolPrompts.BashGuidelines(_options.ExposeSessionEnvironment);
 
     /// <summary>
     /// Source bashOutputSchema (1.0.3 shortened descriptions): the structuredContent shape for programmatic callers.
@@ -31,6 +37,8 @@ public sealed class BashTool : IPreparedToolAdapter
     {
         ArgumentNullException.ThrowIfNull(runner); ArgumentNullException.ThrowIfNull(options);
         if (options.MaximumCommandCharacters is < 1 or > 12_000 || options.MaximumArgumentCharacters is < 1 or > 96_000 ||
+            options.ShellArguments.IsDefault || options.ShellArguments.Length > 16 || options.ShellArguments.Any(argument => !Text(argument)) ||
+            !Enum.IsDefined(options.CommandTransport) || options.CommandPrefix is { } prefix && (!Text(prefix) || prefix.Length > 12_000) ||
             !Absolute(options.Executable) || !File.Exists(options.Executable) ||
             !Absolute(options.WorkingDirectory) || !Directory.Exists(options.WorkingDirectory) ||
             !Absolute(options.SpillDirectory) || !Directory.Exists(options.SpillDirectory) ||
@@ -67,13 +75,25 @@ public sealed class BashTool : IPreparedToolAdapter
         if (!FileName(file)) throw Invalid();
         var outputPath = Path.Combine(_options.SpillDirectory, file);
         if (!SpillPath(outputPath)) throw Invalid();
+        // Source resolveSpawnContext: the prefixed command, the environment with the current PI_* values, then spawnHook.
+        var environment = BashSessionEnvironment.Apply(_options.Environment,
+            _options.ExposeSessionEnvironment ? _options.SessionEnvironment?.Invoke() : null);
+        var context = new BashSpawnContext(Resolve(input.Command), _options.WorkingDirectory, environment);
+        if (_options.SpawnHook is { } hook) context = hook(context) ?? throw Invalid();
+        if (!Text(context.Command) || context.Command.Length > _options.MaximumCommandCharacters + (_options.CommandPrefix?.Length + 1 ?? 0) &&
+            _options.SpawnHook is null || !Absolute(context.WorkingDirectory) || !EnvironmentValid(context.Environment)) throw Invalid();
         var arguments = new Dictionary<string, object?> { ["command"] = input.Command, ["outputPath"] = outputPath };
         if (input.TimeoutToken is { } timeout) arguments["timeout"] = timeout;
+        if (_options.CommandTransport == ShellCommandTransport.Stdin) arguments["standardInput"] = context.Command;
         var action = new PreparedToolAction(Name, Name, PreparedToolActionKind.Command, _options.Executable,
-            JsonData.Parse(JsonSerializer.Serialize(arguments)), ["-c", input.Command],
-            _options.WorkingDirectory, _options.Environment);
+            JsonData.Parse(JsonSerializer.Serialize(arguments)), Shell.CommandArguments(context.Command),
+            context.WorkingDirectory, context.Environment.ToImmutableDictionary(StringComparer.Ordinal));
         return ValueTask.FromResult(action);
     }
+
+    private ShellConfiguration Shell => new(_options.Executable, _options.ShellArguments, _options.CommandTransport);
+    /// <summary>Source <c>commandPrefix ? `${commandPrefix}\n${command}` : command</c>.</summary>
+    private string Resolve(string command) => string.IsNullOrEmpty(_options.CommandPrefix) ? command : _options.CommandPrefix + "\n" + command;
 
     public ValueTask<bool> ValidateAsync(PreparedToolAction action, CancellationToken cancellationToken)
     {
@@ -82,12 +102,15 @@ public sealed class BashTool : IPreparedToolAdapter
         {
             if (action is null) return ValueTask.FromResult(false);
             var input = Parse(action.Arguments, normalized: true);
+            // Without a spawn hook the shell command is exactly the prefixed model command; a hook may rewrite it.
+            var shellCommand = _options.CommandTransport == ShellCommandTransport.Stdin ? input.StandardInput
+                : action.CommandArguments.IsDefault || action.CommandArguments.Length == 0 ? null : action.CommandArguments[^1];
             var valid = action.ToolName == Name && action.Operation == Name && action.Kind == PreparedToolActionKind.Command &&
-                action.Target == _options.Executable && File.Exists(action.Target) &&
-                !action.CommandArguments.IsDefault && action.CommandArguments.Length == 2 &&
-                action.CommandArguments[0] == "-c" && action.CommandArguments[1] == input.Command &&
-                Absolute(action.WorkingDirectory) && Directory.Exists(action.WorkingDirectory) &&
-                EnvironmentValid(action.Environment) && SpillPath(input.OutputPath);
+                action.Target == _options.Executable && File.Exists(action.Target) && shellCommand is not null && Text(shellCommand) &&
+                (_options.SpawnHook is not null || shellCommand == Resolve(input.Command)) &&
+                !action.CommandArguments.IsDefault && action.CommandArguments.SequenceEqual(Shell.CommandArguments(shellCommand)) &&
+                (input.StandardInput is null) == (_options.CommandTransport == ShellCommandTransport.Argv) &&
+                Absolute(action.WorkingDirectory) && EnvironmentValid(action.Environment) && SpillPath(input.OutputPath);
             cancellationToken.ThrowIfCancellationRequested();
             return ValueTask.FromResult(valid);
         }
@@ -106,6 +129,19 @@ public sealed class BashTool : IPreparedToolAdapter
         if (!await ValidateAsync(action, cancellationToken).ConfigureAwait(false))
             return ToolResult.Error(ToolFailureKind.InvalidArguments, "Invalid or unsupported final Bash action.");
         var input = Parse(action.Arguments, normalized: true);
+        // Source resolveTimeoutMs and the working-directory check run inside exec, after the initial empty update.
+        string? setupError = null;
+        if (input.Timeout is { } requested && requested <= 0) setupError = "Invalid timeout: must be a finite number of seconds";
+        else if (input.Timeout is { } large && large * 1000 > MaximumTimeoutMilliseconds)
+            setupError = "Invalid timeout: maximum is " + (MaximumTimeoutMilliseconds / 1000).ToString("R", CultureInfo.InvariantCulture) + " seconds";
+        else if (!Directory.Exists(action.WorkingDirectory))
+            setupError = $"Working directory does not exist: {action.WorkingDirectory}\nCannot execute bash commands.";
+        if (setupError is not null)
+        {
+            try { await ToolProgressDelivery.ReportAndWaitAsync(onProgress, new([], JsonData.Null), cancellationToken).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { return ToolResult.Error(ToolFailureKind.Canceled, "Command aborted"); }
+            return ToolResult.Error(ToolFailureKind.ExecutionError, setupError);
+        }
         ProcessOutputSnapshot? lastOutput = null;
         try
         {
@@ -113,7 +149,8 @@ public sealed class BashTool : IPreparedToolAdapter
             await ToolProgressDelivery.ReportAndWaitAsync(onProgress, new([], JsonData.Null), cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             var request = new ProcessRequest(action.Target, action.CommandArguments, action.WorkingDirectory!,
-                action.Environment, input.OutputPath!, input.Timeout);
+                action.Environment, input.OutputPath!, input.Timeout)
+            { StandardInput = input.StandardInput is null ? null : System.Text.Encoding.UTF8.GetBytes(input.StandardInput) };
             var result = await _runner.RunAsync(request, async snapshot =>
             {
                 CheckOutput(snapshot, input.OutputPath!); lastOutput = snapshot;
@@ -131,7 +168,7 @@ public sealed class BashTool : IPreparedToolAdapter
         { return Failure(lastOutput, ToolFailureKind.ExecutionError, "Command execution failed."); }
     }
 
-    private sealed record Input(string Command, double? Timeout, JsonElement? TimeoutToken, string? OutputPath);
+    private sealed record Input(string Command, double? Timeout, JsonElement? TimeoutToken, string? OutputPath, string? StandardInput = null);
     private Input Parse(JsonData? arguments, bool normalized)
     {
         if (arguments is null) throw Invalid();
@@ -144,25 +181,31 @@ public sealed class BashTool : IPreparedToolAdapter
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in value.EnumerateObject())
             if (!names.Add(property.Name) || property.Name is not ("command" or "timeout") &&
-                !(normalized && property.Name == "outputPath")) throw Invalid();
+                !(normalized && property.Name is "outputPath" or "standardInput")) throw Invalid();
         if (!value.TryGetProperty("command", out var command) || command.ValueKind != JsonValueKind.String) throw Invalid();
         var text = command.GetString()!;
         if (!Text(text) || text.Length > _options.MaximumCommandCharacters) throw Invalid();
         double? seconds = null; JsonElement? token = null;
-        if (value.TryGetProperty("timeout", out var timeout))
+        // Pi validation.ts normalizeOptionalNulls: an optional property sent as null (strict tool schemas make optional properties nullable) is absent.
+        if (value.TryGetProperty("timeout", out var timeout) && timeout.ValueKind != JsonValueKind.Null)
         {
-            if (timeout.ValueKind != JsonValueKind.Number || !timeout.TryGetDouble(out var number) ||
-                !double.IsFinite(number) || number <= 0 || number * 1000 > int.MaxValue) throw Invalid();
+            // Out-of-range values reach execution, which reports the source resolveTimeoutMs error.
+            if (timeout.ValueKind != JsonValueKind.Number || !timeout.TryGetDouble(out var number) || !double.IsFinite(number)) throw Invalid();
             seconds = number; token = timeout.Clone();
         }
-        string? output = null;
+        string? output = null, standardInput = null;
         if (normalized)
         {
             if (!value.TryGetProperty("outputPath", out var path) || path.ValueKind != JsonValueKind.String) throw Invalid();
             output = path.GetString();
             if (!SpillPath(output)) throw Invalid();
+            if (value.TryGetProperty("standardInput", out var stdin))
+            {
+                if (stdin.ValueKind != JsonValueKind.String || !Text(stdin.GetString())) throw Invalid();
+                standardInput = stdin.GetString();
+            }
         }
-        return new(text, seconds, token, output);
+        return new(text, seconds, token, output, standardInput);
     }
 
     private bool SpillPath(string? path) => Absolute(path) && Directory.Exists(_options.SpillDirectory) &&
@@ -205,7 +248,7 @@ public sealed class BashTool : IPreparedToolAdapter
     private static void CheckOutput(ProcessOutputSnapshot output, string authorizedPath)
     {
         if (output is null || !Text(output.Content, allowNul: true) || output.Content.Length > 200_000 ||
-            output.Truncation is null || output.Truncation.Content != output.Content || output.RawBytes is < 0 or > 64 * 1024 * 1024 ||
+            output.Truncation is null || output.Truncation.Content != output.Content || output.RawBytes < 0 ||
             output.LastLineBytes < 0 || output.FullOutputPath is not null && output.FullOutputPath != authorizedPath)
             throw new InvalidOperationException("Invalid process output.");
     }

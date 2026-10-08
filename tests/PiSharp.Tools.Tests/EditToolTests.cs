@@ -272,13 +272,21 @@ internal static class EditToolTests
         Failure(await Invoke(small, Input("file", new TextEdit("a", "123456789"))), ToolFailureKind.InvalidArguments); Equal(0, operations.ReadCalls);
         await File.WriteAllTextAsync(temp.File("file"), "abcdefghi"); var oversized = await Invoke(small, Input("file", new TextEdit("a", "A"))); Failure(oversized, ToolFailureKind.ExecutionError); Code(oversized, "ResourceLimit");
         await File.WriteAllTextAsync(temp.File("file"), "a\nb\n");
-        var noDiff = Tool(temp, operations, options: new(DiffOptions: new(MaximumOutputCharacters: 16)));
-        Code(await Invoke(noDiff, Input("file", new TextEdit("a", "A"))), "ResourceLimit"); Equal(0, operations.WriteCalls);
-        var noTrace = Tool(temp, operations, options: new(DiffOptions: new(MaximumTraceCells: 1)));
-        Code(await Invoke(noTrace, Input("file", new TextEdit("a", "A"))), "ResourceLimit"); Equal(0, operations.WriteCalls);
         var oneEdit = Tool(temp, operations, options: new(MaximumEdits: 1)); Failure(await Invoke(oneEdit, Input("file", new TextEdit("a", "A"), new TextEdit("b", "B"))), ToolFailureKind.InvalidArguments);
-        foreach (var bytes in new byte[][] { [0xff, 0xfe, 0x41, 0x00], [0xc3, 0x28], [0x61, 0x00, 0x62], Encoding.ASCII.GetBytes("GIF89a") })
+        foreach (var bytes in new byte[][] { [0xff, 0xfe, 0x41, 0x00], [0xc3, 0x28] })
         { await File.WriteAllBytesAsync(temp.File("file"), bytes); var failure = await Invoke(Tool(temp, operations), Input("file", new TextEdit("a", "A"))); Code(failure, "UnsupportedContent"); Equal(0, operations.WriteCalls); }
+        // Pi edits any file: only the display diff is bounded natively, so an oversized diff is omitted and the edit is written.
+        foreach (var diff in new DiffFormatterOptions[] { new(MaximumOutputCharacters: 16), new(MaximumTraceCells: 1) })
+        {
+            await File.WriteAllTextAsync(temp.File("file"), "a\nb\n");
+            var omitted = await Invoke(Tool(temp, operations, options: new(DiffOptions: diff)), Input("file", new TextEdit("b", "B"))); Success(omitted);
+            Equal("""{"diff":"","patch":"","firstChangedLine":2}""", omitted.Details.ToString()); Equal("a\nB\n", await File.ReadAllTextAsync(temp.File("file")));
+        }
+        // Control characters and NUL are text (source buffer.toString("utf-8")), as is a GIF signature without image handling.
+        foreach (var (bytes, expected) in new (byte[], string)[] { ([0x61, 0x00, 0x62], "A\0b"), (Encoding.ASCII.GetBytes("GIF89a"), "GIF89A"), ([0x61, 0x1b, 0x0c], "A\u001b\f") })
+        { await File.WriteAllBytesAsync(temp.File("file"), bytes); Success(await Invoke(Tool(temp, operations), Input("file", new TextEdit("a", "A")))); Equal(expected, await File.ReadAllTextAsync(temp.File("file"))); }
+        await File.WriteAllTextAsync(temp.File("file"), "nul");
+        Success(await Invoke(Tool(temp, operations), Input("file", new TextEdit("nul", "a\0b")))); Equal("a\0b", await File.ReadAllTextAsync(temp.File("file")));
         await File.WriteAllTextAsync(temp.File("file"), "original"); var calls = 0;
         operations.Write = async (path, bytes, token) =>
         { if (Interlocked.Increment(ref calls) == 1) { await operations.Local.WriteAsync(path, bytes[..2], default); throw new IOException("private fault"); } await operations.Local.WriteAsync(path, bytes, token); };
