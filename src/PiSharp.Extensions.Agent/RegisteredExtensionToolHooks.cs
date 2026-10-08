@@ -38,7 +38,8 @@ internal sealed class RegisteredExtensionToolHooks : IPreparedToolHooks
         cancellationToken.ThrowIfCancellationRequested(); session.ThrowIfCancellationRequested();
         var terminate = reduced.Decision is not null && reduced.Decision.Value.TryGetProperty("terminate", out var flag) &&
             flag.ValueKind == JsonValueKind.True;
-        return new(reduced.ArgumentsReplaced ? reduced.Event.Arguments : null, reduced.Blocked, reduced.Blocked && terminate);
+        var reason = reduced.Blocked && reduced.Decision!.Value.TryGetProperty("reason", out var text) && text.ValueKind == JsonValueKind.String ? text.GetString() : null;
+        return new(reduced.ArgumentsReplaced ? reduced.Event.Arguments : null, reduced.Blocked, reduced.Blocked && terminate) { Reason = reason };
     }
 
     public async ValueTask<JsonData?> AfterAsync(ToolInvocation invocation, PreparedToolAction finalAction,

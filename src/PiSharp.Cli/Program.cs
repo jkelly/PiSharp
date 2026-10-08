@@ -9,6 +9,10 @@ internal static class Program
 
     private static async Task<int> Main(string[] args)
     {
+        // Codemode scripts run in a child process of this executable (see PiSharp.Codemode.CodemodeWorker).
+        if (args is [PiSharp.Codemode.CodemodeWorker.Argument])
+            return await PiSharp.Codemode.CodemodeWorker.RunAsync(Console.OpenStandardInput(), Console.OpenStandardOutput()).ConfigureAwait(false);
+        PiSharp.Codemode.CodemodeWorker.Default ??= PiSharp.Codemode.CodemodeWorkerLauncher.ForCurrentProcess();
         if (args.Length > 0 && args[0] == "session") return await RunSessionAsync(args).ConfigureAwait(false);
         if (args.Length > 0 && args[0] == "mcp") return await RunMcpAsync(args[1..]).ConfigureAwait(false);
         Stream standardOutput;

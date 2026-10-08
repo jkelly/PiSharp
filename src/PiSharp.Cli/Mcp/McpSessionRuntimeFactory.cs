@@ -123,6 +123,15 @@ public sealed class McpSessionRuntimeFactory
                     activation.BindOwner(owner, attachment);
                     admission.BindProfileView?.Invoke(owner, attachment);
                     connections?.Start(owner, attachment);
+                    // extensions/mcp/index.ts scriptNeedsServer: codemode scripts wait for the servers they reach. PiSharp publishes a
+                    // server's tools between runs, so the wait happens before a prompt is admitted while codemode is active.
+                    if (connections is not null)
+                        attachment.Session.BeforeInputAdmission = async token =>
+                        {
+                            if (!attachment.Session.GetActiveTools().Contains(PiSharp.Extensions.Mcp.Discovery.McpDiscoveryToolIdentity.CodemodeName, StringComparer.Ordinal)) return;
+                            await connections.WhenSettled(entry => McpConfigurationReader.ConfiguredExposures(entry.Config).Contains(McpExposure.Codemode))
+                                .WaitAsync(token).ConfigureAwait(false);
+                        };
                 });
         }
         catch (Exception original)

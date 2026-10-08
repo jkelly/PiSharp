@@ -35,10 +35,18 @@ public sealed class McpBackgroundConnections
     private Task? running;
     /// <summary>Connections wait for this before connecting; see <see cref="McpSessionRuntimeAdmission.ConnectAfter"/>.</summary>
     internal Task? ConnectAfter { get; init; }
+    private readonly Dictionary<string, TaskCompletionSource> settled = new(StringComparer.Ordinal);
 
     internal McpBackgroundConnections(ImmutableArray<(McpServerEntry Entry, McpBackgroundServerFactory Bind)> servers, long generation,
         McpServersPromptSource? section, Action<McpBackgroundConnectionReport>? report)
-    { this.servers = servers; this.generation = generation; this.section = section; this.report = report; }
+    {
+        this.servers = servers; this.generation = generation; this.section = section; this.report = report;
+        foreach (var (entry, _) in servers) settled[entry.Name] = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    /// <summary>Settles once each named server connected (its tools published) or failed, or the attachment retired.</summary>
+    internal Task WhenSettled(Func<McpServerEntry, bool> include) =>
+        Task.WhenAll(servers.Where(server => include(server.Entry)).Select(server => settled[server.Entry.Name].Task));
 
     /// <summary>Splits the enabled servers: those with `direct` tools stay pre-open (<see cref="McpServersSection.FirstPromptWaitsFor"/>);
     /// the others connect in the background when the host admitted them for it. Validates every background
@@ -90,6 +98,12 @@ public sealed class McpBackgroundConnections
         Task.WhenAll(servers.Select(server => ConnectAsync(server.Entry, server.Bind, owner, attachment)));
 
     private async Task ConnectAsync(McpServerEntry entry, McpBackgroundServerFactory bind, ReplaceableAgentSession owner, AgentSessionAttachment attachment)
+    {
+        try { await ConnectCoreAsync(entry, bind, owner, attachment).ConfigureAwait(false); }
+        finally { settled[entry.Name].TrySetResult(); }
+    }
+
+    private async Task ConnectCoreAsync(McpServerEntry entry, McpBackgroundServerFactory bind, ReplaceableAgentSession owner, AgentSessionAttachment attachment)
     {
         await Task.Yield();
         McpRuntimeSnapshot snapshot;

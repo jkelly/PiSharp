@@ -73,31 +73,44 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
             .Select(entry => KeyValuePair.Create((string)entry.Key, (string?)entry.Value ?? "")));
     }
 
-    /// <summary>Reads the global mcp.json and returns the profile admission, or null when no server is enabled. Configuration
-    /// errors, the ignored project file and skipped servers are written to <paramref name="diagnostics"/>.</summary>
-    internal McpProfileRuntimeAdmission? CreateAdmission(string cwd, TextWriter diagnostics, JsonData? settings = null)
+    /// <summary>Reads the global mcp.json (unless <paramref name="noMcp"/>) and returns the profile admission. Every session gets
+    /// the built-in codemode tool, inactive unless MCP servers need it or the tool selection names it, as the original registers
+    /// it with every session. Configuration errors, the ignored project file and skipped servers are written to
+    /// <paramref name="diagnostics"/>.</summary>
+    internal McpProfileRuntimeAdmission? CreateAdmission(string cwd, TextWriter diagnostics, JsonData? settings = null, bool noMcp = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(cwd); ArgumentNullException.ThrowIfNull(diagnostics);
         var reporter = new Reporter(diagnostics);
         var globalConfig = Path.Combine(AgentDirectory, "mcp.json");
         var projectConfig = Path.Combine(cwd, ".pi", "mcp.json");
-        if (File.Exists(projectConfig)) reporter.Notice($"{projectConfig} is ignored because PiSharp does not read project trust.");
-        if (!File.Exists(globalConfig)) return null;
-        McpLoadedConfiguration loaded;
-        try { loaded = McpConfigurationReader.Load(new(globalConfig, File.ReadAllText(globalConfig)), null, false); }
-        catch (IOException error) { reporter.Notice($"MCP failed to load: Could not read {globalConfig}: {error.Message}"); return null; }
-        var problems = loaded.Errors.Select(error => "config: " + error).ToList();
-        var environment = InheritedEnvironment();
+        var problems = new List<string>();
         var admitted = ImmutableArray.CreateBuilder<McpServerEntry>();
-        foreach (var entry in loaded.Servers.Where(entry => entry.Config.Enabled))
+        bool? configuredAutoEnable = null;
+        if (!noMcp)
         {
-            if (entry.Config.AuthProvider is not null)
-            { problems.Add($"{entry.Name}: not connected: auth.provider is not supported by PiSharp"); continue; }
-            admitted.Add(entry);
+            if (File.Exists(projectConfig)) reporter.Notice($"{projectConfig} is ignored because PiSharp does not read project trust.");
+            if (File.Exists(globalConfig))
+            {
+                McpLoadedConfiguration? loaded = null;
+                try { loaded = McpConfigurationReader.Load(new(globalConfig, File.ReadAllText(globalConfig)), null, false); }
+                catch (IOException error) { reporter.Notice($"MCP failed to load: Could not read {globalConfig}: {error.Message}"); }
+                if (loaded is not null)
+                {
+                    problems.AddRange(loaded.Errors.Select(error => "config: " + error));
+                    configuredAutoEnable = loaded.AutoEnableCodemode;
+                    foreach (var entry in loaded.Servers.Where(entry => entry.Config.Enabled))
+                    {
+                        if (entry.Config.AuthProvider is not null)
+                        { problems.Add($"{entry.Name}: not connected: auth.provider is not supported by PiSharp"); continue; }
+                        admitted.Add(entry);
+                    }
+                }
+            }
+            if (admitted.Count == 0) { reporter.Problems(problems); problems.Clear(); }
         }
-        if (admitted.Count == 0) { reporter.Problems(problems); return null; }
+        var environment = InheritedEnvironment();
         var catalog = new McpServerCatalog(admitted.ToImmutable(), []);
-        var autoEnableCodemode = loaded.EffectiveAutoEnableCodemode;
+        var autoEnableCodemode = configuredAutoEnable ?? true;
         var (codemodeMode, inlineBudget) = PiSharp.Codemode.CodemodeToolDefinition.ReadSettings(settings?.Value);
         var codemodeModels = CodemodeModels ?? (() => McpCodemode.ModelRuntime.CreateDefault());
         var hostStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -141,24 +154,26 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                 var definitions = Discovery?.Invoke(generation) is { IsDefault: false } supplied ? supplied : [];
                 var exposures = catalog.Servers.SelectMany(entry => McpConfigurationReader.ConfiguredExposures(entry.Config)).ToHashSet();
                 var selection = nativeRegistry.LifetimeToolSelection;
-                // The original registers codemode (inactive) with every session and the MCP extension activates it for `codemode`
-                // servers unless autoEnableCodemode is false; here it is registered (active) for them when the tool selection allows
-                // it and either autoEnableCodemode holds or the selection names codemode.
-                var codemodeOff = false;
-                if (exposures.Contains(McpExposure.Codemode) && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode))
+                // The original registers codemode (inactive) with every session; the MCP extension activates it for `codemode`
+                // servers unless autoEnableCodemode is false. --tools, --exclude-tools and defaultTools select it like any tool.
+                var codemodeNamed = selection?.IsNamed(McpCodemode.Name) == true || selection?.InitialNames.Contains(McpCodemode.Name) == true;
+                var codemodeActivated = exposures.Contains(McpExposure.Codemode) && autoEnableCodemode;
+                bool codemodeActive;
+                if (!definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode) && selection?.IsAllowed(McpCodemode.Name) != false)
                 {
-                    if (selection?.IsAllowed(McpCodemode.Name) != false && (autoEnableCodemode || selection?.IsNamed(McpCodemode.Name) == true ||
-                        selection?.InitialNames.Contains(McpCodemode.Name) == true))
-                        definitions = definitions.Add(McpCodemode.Create(codemodeMode, inlineBudget, codemodeModels));
-                    else codemodeOff = !autoEnableCodemode && selection?.IsAllowed(McpCodemode.Name) != false;
+                    definitions = definitions.Add(McpCodemode.Create(codemodeMode, inlineBudget, codemodeModels, codemodeActivated));
+                    codemodeActive = codemodeActivated || codemodeNamed;
                 }
+                else codemodeActive = definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode);
+                var codemodeOff = exposures.Contains(McpExposure.Codemode) && !autoEnableCodemode && selection?.IsAllowed(McpCodemode.Name) != false;
                 // The original registers tool_search with every session and the MCP extension activates it for `deferred` servers;
                 // here it is registered (active) for them. A tool selection that leaves tool_search out leaves their tools unreachable.
                 if (exposures.Contains(McpExposure.Deferred) && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch) &&
                     selection?.IsAllowed(McpToolSearch.Name) != false)
                     definitions = definitions.Add(McpToolSearch.Create());
                 // ensureDiscoveryActive: tools that are not declared need codemode or tool_search; warn once when neither is there.
-                if (generation == 1 && (exposures.Contains(McpExposure.Codemode) || exposures.Contains(McpExposure.Deferred)) && definitions.IsEmpty)
+                if (generation == 1 && (exposures.Contains(McpExposure.Codemode) || exposures.Contains(McpExposure.Deferred)) && !codemodeActive &&
+                    !definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch))
                     reporter.Notice($"MCP tools are only reachable from the codemode or tool_search tool, but neither is active{(codemodeOff ? " (autoEnableCodemode is false)" : "")}; they cannot be called.");
                 if (!definitions.IsEmpty)
                 {

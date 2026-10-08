@@ -13,19 +13,27 @@ internal static partial class Program
 
     private static async Task<int> Main(string[] args)
     {
+        // This test executable is also the codemode worker process, as the CLI is in production.
+        if (args is [CodemodeWorker.Argument]) return await CodemodeWorker.RunAsync(Console.OpenStandardInput(), Console.OpenStandardOutput());
+        if (args is [RawWorkerArgument]) return await RawWorkerAsync();
+        CodemodeWorker.Default = CodemodeWorkerLauncher.ForCurrentProcess();
         if (args.Length != 0 && (args.Length != 2 || args[0] != "--report") && (args.Length != 2 || args[0] != "--only"))
             throw new ArgumentException("Use [--report <fresh path>] or [--only <case prefix>].");
         var cases = new List<(string Id, Func<Task> Run)>();
         cases.AddRange(PureCases());
         cases.AddRange(SandboxCases());
         cases.AddRange(LimitCases());
+        cases.AddRange(IsolationCases());
         cases.AddRange(ExecutorCases());
+        cases.AddRange(HookCases());
         cases.AddRange(SessionCases());
+        cases.AddRange(SessionParityCases());
         if (args.Length == 2 && args[0] == "--only") cases = [.. cases.Where(test => test.Id.StartsWith(args[1], StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {
             var started = System.Diagnostics.Stopwatch.StartNew();
+            Console.Error.WriteLine("start " + test.Id);
             try { await test.Run().WaitAsync(TimeSpan.FromSeconds(180)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY", ms = started.ElapsedMilliseconds }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }

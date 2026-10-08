@@ -49,21 +49,22 @@ internal static partial class Program
         Stream(new { type = "tool_use", id, name, input = new { } }, JsonSerializer.Serialize(input), "tool_use");
 
     /// <summary>A fake `docs` MCP server; tools/call answers with the query it received and records the invocation identity.</summary>
-    private sealed class DocsServer : IMcpAdmittedRequestChannel
+    private sealed class DocsServer(TimeSpan initializeDelay = default) : IMcpAdmittedRequestChannel
     {
         public readonly ConcurrentQueue<(string Call, McpInvocationIdentity? Identity)> Calls = new();
         public int Closes;
         public ValueTask StartAsync(CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask ConfigureRootsAsync(JsonData roots, CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask NotifyAsync(string method, JsonData? parameters, CancellationToken token) => ValueTask.CompletedTask;
-        public ValueTask<JsonData> RequestAsync(string method, JsonData? parameters, McpRequestOptions options, CancellationToken token)
+        public async ValueTask<JsonData> RequestAsync(string method, JsonData? parameters, McpRequestOptions options, CancellationToken token)
         {
             switch (method)
             {
                 case "initialize":
-                    return ValueTask.FromResult(JsonData.Parse("""{"protocolVersion":"2025-11-25","serverInfo":{"name":"docs","version":"1"},"capabilities":{"tools":{}},"instructions":"Search and fetch the docs."}"""));
+                    if (initializeDelay > TimeSpan.Zero) await Task.Delay(initializeDelay, token);
+                    return (JsonData.Parse("""{"protocolVersion":"2025-11-25","serverInfo":{"name":"docs","version":"1"},"capabilities":{"tools":{}},"instructions":"Search and fetch the docs."}"""));
                 case "tools/list":
-                    return ValueTask.FromResult(JsonData.Parse("""
+                    return (JsonData.Parse("""
                         {"tools":[
                           {"name":"search","description":"Search the documentation.","inputSchema":{"type":"object","properties":{"query":{"type":"string"}}}},
                           {"name":"fetch","description":"Fetch a page by URL.","inputSchema":{"type":"object","properties":{"url":{"type":"string"}}}}]}
@@ -71,7 +72,7 @@ internal static partial class Program
                 case "tools/call":
                     var call = parameters!.Value;
                     Calls.Enqueue((call.GetProperty("name").GetString() + ":" + call.GetProperty("arguments").GetRawText(), options.InvocationIdentity));
-                    return ValueTask.FromResult(JsonData.Parse("""{"content":[{"type":"text","text":"Found: install guide."}],"structuredContent":{"hits":1}}"""));
+                    return JsonData.Parse("""{"content":[{"type":"text","text":"Found: install guide."}],"structuredContent":{"hits":1}}""");
                 default: throw new IOException("Unexpected MCP method " + method);
             }
         }
@@ -136,9 +137,10 @@ internal static partial class Program
         public readonly string Agent = Path.Combine(root, "agent");
         public readonly ConcurrentBag<DocsServer> Servers = [];
         public TaskCompletionSource Connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TimeSpan InitializeDelay;
         public McpSessionHost Host() => new(Agent, Path.Combine(root, "home"), () => [KeyValuePair.Create("PATH", root)])
         {
-            CreateChannel = entry => (actual, token) => { var server = new DocsServer(); Servers.Add(server); return ValueTask.FromResult<IMcpAdmittedRequestChannel>(server); },
+            CreateChannel = entry => (actual, token) => { var server = new DocsServer(InitializeDelay); Servers.Add(server); return ValueTask.FromResult<IMcpAdmittedRequestChannel>(server); },
             ObserveBackgroundConnection = report => { if (report.Failure is null) Connected.TrySetResult(); else Connected.TrySetException(report.Failure); },
             CodemodeModels = () => null
         };
@@ -152,11 +154,11 @@ internal static partial class Program
         await fixture.Connected.Task;
     }
 
-    private static async Task WithSessionRoot(string name, string mcpJson, Func<string, Fixture, Task> run)
+    private static async Task WithSessionRoot(string name, string? mcpJson, Func<string, Fixture, Task> run)
     {
         var root = Temp(name); Directory.CreateDirectory(root);
         var fixture = new Fixture(root); Directory.CreateDirectory(fixture.Agent);
-        await File.WriteAllTextAsync(Path.Combine(fixture.Agent, "mcp.json"), mcpJson);
+        if (mcpJson is not null) await File.WriteAllTextAsync(Path.Combine(fixture.Agent, "mcp.json"), mcpJson);
         try { await run(root, fixture); }
         finally { try { Directory.Delete(root, true); } catch (IOException) { } }
     }

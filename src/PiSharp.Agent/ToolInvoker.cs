@@ -307,7 +307,7 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                 cancellationToken.ThrowIfCancellationRequested();
                 if (before is null) return CompleteResult(Error(ToolFailureKind.HookError));
                 if (before.Block)
-                    return CompleteResult(ToolResult.Error(ToolFailureKind.Blocked, "Tool execution was blocked by a prepared hook.", before.Terminate));
+                    return CompleteResult(ToolResult.Error(ToolFailureKind.Blocked, before.Reason is { Length: > 0 } reason ? reason : "Tool execution was blocked by a prepared hook.", before.Terminate));
                 if (before.Arguments is not null)
                 {
                     stage = ToolFailureKind.InvalidArguments;

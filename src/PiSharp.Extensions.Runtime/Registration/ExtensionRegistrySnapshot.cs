@@ -276,6 +276,7 @@ internal sealed class ExtensionToolInvocationContext(RegistrationScope scope, Ca
         NestedDelivery delivery;
         lock (gate)
         {
+            // In flight, not in total: completed calls leave the list, so a tool such as codemode can make any number of calls.
             if (closed || broker is null || nested.Count >= 4096 ||
                 options?.OnUpdate is { } onUpdate && onUpdate.GetInvocationList().Length != 1)
                 return ValueTask.FromResult(ExtensionToolCallOutcome.Unavailable(name));
@@ -283,6 +284,7 @@ internal sealed class ExtensionToolInvocationContext(RegistrationScope scope, Ca
         }
         delivery.Work = DispatchNestedAsync(name, arguments, options ?? new());
         delivery.Published.TrySetResult();
+        _ = delivery.Work.ContinueWith(_ => { lock (gate) nested.Remove(delivery); }, TaskScheduler.Default);
         return new(delivery.Work!);
     }
     private async Task<ExtensionToolCallOutcome> DispatchNestedAsync(string name, JsonData arguments,

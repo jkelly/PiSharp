@@ -1,24 +1,18 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/codemode/src/runtime/host.ts, packages/codemode/src/runtime/worker.ts
-// and packages/codemode/src/runtime/protocol.ts. The QuickJS worker is replaced by a Jint engine on a dedicated thread
+// and packages/codemode/src/runtime/protocol.ts. The QuickJS worker is replaced by a Jint engine in a child process (or a thread)
 // (decision 0003); docs/compatibility/codemode-engine.md lists the differences.
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Text.Json;
-using Jint;
-using Jint.Native;
-using Jint.Native.Object;
-using Jint.Runtime;
-using Jint.Runtime.Interop;
 using PiSharp.Contracts;
 
 namespace PiSharp.Codemode;
 
 /// <summary>
-/// Runs JavaScript in a fresh Jint engine on its own thread. The script sees <c>tools.&lt;name&gt;(args)</c> for every
+/// Runs JavaScript in a fresh Jint engine, in a worker process of its own (or on a thread without a launcher). The script sees <c>tools.&lt;name&gt;(args)</c> for every
 /// registered tool, <c>ALL_TOOLS</c>, the output helpers <c>text</c>, <c>image</c>, <c>exit</c> and <c>console.*</c>,
 /// <c>store</c>/<c>load</c> and the configured globals; nothing else (no timers, network, file system, modules or CLR
-/// access). Each execution gets its own engine and thread; the sandbox only holds the tool table and defaults.
+/// access). Each execution gets its own engine and worker; the sandbox only holds the tool table and defaults.
 /// <see cref="CloseAsync"/> aborts in-flight executions.
 /// </summary>
 public sealed class CodemodeSandbox : IAsyncDisposable
@@ -97,41 +91,11 @@ public sealed class CodemodeSandbox : IAsyncDisposable
 
     public ValueTask DisposeAsync() => new(CloseAsync());
 
+
     /// <summary>Message of an aborted execution, as an AbortSignal without a reason reports it.</summary>
     internal const string AbortedMessage = "This operation was aborted";
 
-    /// <summary>Jint compatibility shim, evaluated before the prelude so its lockdown freezes the result:
-    /// error stacks use "\n" like QuickJS (Jint joins frames with the platform newline), and Atomics.wait/waitAsync, which
-    /// would block the engine thread past cancellation, are removed (QuickJS's worker never blocks there).</summary>
-    internal const string EngineShim = """
-        (function () {
-          "use strict";
-          const descriptor = Object.getOwnPropertyDescriptor(Error.prototype, "stack");
-          if (descriptor && typeof descriptor.get === "function") {
-            const get = descriptor.get;
-            Object.defineProperty(Error.prototype, "stack", {
-              get() { const stack = get.call(this); return typeof stack === "string" ? stack.replace(/\r\n?/g, "\n") : stack; },
-              set: descriptor.set, enumerable: descriptor.enumerable, configurable: descriptor.configurable,
-            });
-          }
-          if (typeof Atomics === "object" && Atomics !== null) { delete Atomics.wait; delete Atomics.waitAsync; }
-        })();
-        """;
-
     private sealed class BridgeException(string message) : Exception(message);
-    private sealed class AllocationLimitException(string message) : Exception(message);
-
-    /// <summary>Allocation budget of the whole execution, never reset between host entries (Jint's memory limit is per entry).</summary>
-    private sealed class TotalAllocationConstraint(long limit) : Constraint
-    {
-        private readonly long start = GC.GetAllocatedBytesForCurrentThread();
-        public override void Check()
-        {
-            if (GC.GetAllocatedBytesForCurrentThread() - start > limit)
-                throw new AllocationLimitException($"Script has allocated more than {limit} bytes in total");
-        }
-        public override void Reset() { }
-    }
 
     private sealed class PendingCall(CallRecord? record)
     {
@@ -147,8 +111,8 @@ public sealed class CodemodeSandbox : IAsyncDisposable
         public double DurationMs { get; set; }
     }
 
-    /// <summary>One script run in its own engine and thread. The first of done, timeout, abort and failure finishes it; the
-    /// engine is then cancelled and the result resolves once its thread has exited.</summary>
+    /// <summary>host.ts Execution: one script in its own engine (a child process, or a thread without a launcher). The first of
+    /// done, timeout, abort and failure finishes it; the engine is then terminated and the result resolves once it is gone.</summary>
     private sealed class Execution
     {
         private readonly string code;
@@ -164,10 +128,8 @@ public sealed class CodemodeSandbox : IAsyncDisposable
         private readonly List<CodemodeOutputItem> output = [];
         private readonly List<CallRecord> calls = [];
         private readonly Dictionary<long, PendingCall> pending = [];
-        private readonly BlockingCollection<EngineAction> inbox = [];
-        private readonly CancellationTokenSource engineStop = new();
         private readonly TaskCompletionSource<CodemodeResult> result = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource exited = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly ICodemodeWorker worker;
         private CancellationTokenRegistration abortRegistration;
         private Timer? timer;
         private bool finished;
@@ -180,6 +142,7 @@ public sealed class CodemodeSandbox : IAsyncDisposable
             this.store = store; this.cancellationToken = cancellationToken;
             toolsByName = tools.GroupBy(tool => tool.Name, StringComparer.Ordinal).ToImmutableDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
             globalsByName = globals.ToImmutableDictionary(global => global.Name, StringComparer.Ordinal);
+            worker = options.Worker is { } launcher ? new CodemodeProcessWorker(launcher) : new CodemodeThreadWorker();
         }
 
         public Task<CodemodeResult> Result => result.Task;
@@ -191,144 +154,55 @@ public sealed class CodemodeSandbox : IAsyncDisposable
                 var due = TimeSpan.FromMilliseconds(Math.Clamp(timeout, 0, int.MaxValue));
                 timer = new Timer(_ => Finish(new(CodemodeErrorKind.Timeout, $"Execution timed out after {Js.Number(timeout)} ms")), null, due, Timeout.InfiniteTimeSpan);
             }
-            if (cancellationToken.IsCancellationRequested) { Finish(new(CodemodeErrorKind.Aborted, AbortMessage)); exited.TrySetResult(); return; }
+            if (cancellationToken.IsCancellationRequested) { Finish(new(CodemodeErrorKind.Aborted, AbortMessage)); return; }
             abortRegistration = cancellationToken.Register(() => Finish(new(CodemodeErrorKind.Aborted, AbortMessage)));
-            Thread thread;
             try
             {
-                thread = new Thread(Run, Environment.Is64BitProcess ? 1024 * 1024 * 1024 : 64 * 1024 * 1024)
-                { IsBackground = true, Name = "codemode" };
-                thread.Start();
+                worker.Start(new(code, ToolsJson(), GlobalsJson(), StoreJson(), options.MemoryLimitBytes, options.TotalAllocationLimitBytes, options.RecursionLimit),
+                    Received, code => Finish(new(CodemodeErrorKind.Sandbox, $"Worker exited with code {code?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"} before the script settled")),
+                    error => Finish(error is FormatException format ? Bridge(format.Message) : new(CodemodeErrorKind.Sandbox, $"Sandbox host failed: {error.Message}")));
             }
-            catch (Exception error)
-            {
-                Finish(new(CodemodeErrorKind.Sandbox, "Failed to start worker: " + error.Message)); exited.TrySetResult();
-            }
+            catch (Exception error) { Finish(new(CodemodeErrorKind.Sandbox, "Failed to start worker: " + error.Message)); }
         }
 
         public Task<CodemodeResult> AbortAsync(string message) { Finish(new(CodemodeErrorKind.Aborted, message)); return result.Task; }
 
-        private void Run()
+        private static CodemodeError Bridge(string reason) => new(CodemodeErrorKind.Sandbox,
+            $"Sandbox bridge broken: {reason}. The script may have modified built-ins such as a prototype's toJSON.");
+
+        private void Received(CodemodeWorkerMessage message)
         {
+            // An exception here would leave the execution unsettled.
             try
             {
-                if (engineStop.IsCancellationRequested) return;
-                var engine = new Engine(engineOptions =>
+                switch (message)
                 {
-                    engineOptions.LimitMemory(options.MemoryLimitBytes);
-                    engineOptions.LimitRecursion(options.RecursionLimit);
-                    engineOptions.CancellationToken(engineStop.Token);
-                    engineOptions.Constraints.Constraints.Add(new TotalAllocationConstraint(options.TotalAllocationLimitBytes));
-                    engineOptions.Constraints.MaxArraySize = 32u * 1024 * 1024;
-                    engineOptions.Constraints.RegexTimeout = TimeSpan.FromSeconds(5);
-                });
-                engine.Execute(EngineShim, "codemode-shim.js");
-                var bridge = new ClrFunction(engine, "bridge", (_, arguments) => { Bridge(arguments); return JsValue.Undefined; });
-                var prelude = engine.Evaluate(CodemodePrelude.Source, "codemode-prelude.js");
-                var api = engine.Call(prelude, JsValue.Undefined, [bridge, new JsString(ToolsJson()), new JsString(GlobalsJson()), new JsString(StoreJson())]);
-                var apiObject = api.AsObject();
-                var settle = apiObject.Get("settle"); var run = apiObject.Get("run"); var stalled = apiObject.Get("stalled");
-                void Drain() { engine.Advanced.ProcessTasks(); engine.Call(stalled, api, []); }
-                JsValue function;
-                // The prefix shares the first line with the script so reported line numbers match the script as written.
-                try { function = engine.Evaluate("(async (tools, console) => {" + code + "\n})", "codemode.js"); }
-                catch (JavaScriptException error) { HandleDone(false, DescribeException(error), null, null); return; }
-                engine.Call(run, api, [function]);
-                Drain();
-                foreach (var action in inbox.GetConsumingEnumerable(engineStop.Token))
-                {
-                    action(engine, settle, api);
-                    Drain();
+                    case CodemodeOutputMessage item: lock (gate) if (!finished) output.Add(item.Item); break;
+                    case CodemodeCallMessage call: HandleCall(call.Id, call.Tool, call.Name, call.Arguments); break;
+                    case CodemodeDoneMessage done: HandleDone(done); break;
+                    case CodemodeCrashMessage crash: Finish(new(CodemodeErrorKind.Sandbox, crash.Message)); break;
                 }
             }
-            catch (Exception error) when (engineStop.IsCancellationRequested &&
-                error is ExecutionCanceledException or OperationCanceledException or InvalidOperationException) { }
-            catch (Exception error) { Finish(Failure(error)); }
-            finally { exited.TrySetResult(); }
+            catch (BridgeException error) { Finish(Bridge(error.Message)); }
+            catch (Exception error) { Finish(new(CodemodeErrorKind.Sandbox, $"Sandbox host failed: {error.Message}")); }
         }
 
-        /// <summary>Engine limits Jint enforces outside the script's reach fail the script like an uncaught error.</summary>
-        private CodemodeError Failure(Exception error) => error switch
-        {
-            MemoryLimitExceededException or AllocationLimitException or OutOfMemoryException =>
-                Script("InternalError", "out of memory"),
-            RecursionDepthOverflowException => Script("RangeError", "Maximum call stack size exceeded"),
-            System.Text.RegularExpressions.RegexMatchTimeoutException => Script("InternalError", "regular expression timed out"),
-            ExecutionCanceledException or OperationCanceledException => new(CodemodeErrorKind.Aborted, AbortedMessage),
-            BridgeException bridge => new(CodemodeErrorKind.Sandbox,
-                $"Sandbox bridge broken: {bridge.Message}. The script may have modified built-ins such as a prototype's toJSON."),
-            JavaScriptException script => ParseScriptError(DescribeException(script)),
-            _ => new(CodemodeErrorKind.Sandbox, $"{error.GetType().Name}: {error.Message}")
-        };
-
-        private static CodemodeError Script(string name, string message) => new(CodemodeErrorKind.Script, message, name, $"{name}: {message}");
-
-        private static string DescribeException(JavaScriptException error)
-        {
-            string name = "Error", message = error.Message; string? stack = null;
-            if (error.Error is ObjectInstance instance)
-            {
-                try
-                {
-                    var nameValue = instance.Get("name"); if (nameValue.IsString()) name = nameValue.AsString();
-                    var messageValue = instance.Get("message"); if (messageValue.IsString()) message = messageValue.AsString();
-                    var stackValue = instance.Get("stack"); if (stackValue.IsString()) stack = stackValue.AsString().Replace("\r\n", "\n", StringComparison.Ordinal);
-                }
-                catch (Exception) { }
-            }
-            else if (error.Error.IsString()) message = error.Error.AsString();
-            var head = message.Length > 0 ? $"{name}: {message}" : name;
-            // worker.ts describeException: QuickJS stacks list frames only, as the shim makes Jint's do.
-            if (stack is not null) { var trimmed = Js.Trim("x" + stack); stack = trimmed[1..]; }
-            return JsonSerializer.Serialize(new { name, message, stack = string.IsNullOrEmpty(stack) ? head : $"{head}\n{stack}" });
-        }
-
-        // Called from the prelude with primitives only: (kind, a, b, c).
-        private void Bridge(JsValue[] arguments)
-        {
-            JsValue At(int index) => index < arguments.Length ? arguments[index] : JsValue.Undefined;
-            static string? Text(JsValue value) => value.IsUndefined() ? null : value.ToString();
-            var kind = At(0).ToString();
-            switch (kind)
-            {
-                case "call":
-                case "global":
-                    HandleCall((long)TypeConverter.ToNumber(At(1)), kind == "call", At(2).ToString(), Text(At(3)));
-                    break;
-                case "output":
-                    var type = At(1).ToString();
-                    AddOutput(type == "image" ? new CodemodeImageOutput(At(2).ToString(), At(3).ToString())
-                        : new CodemodeTextOutput(At(2).ToString(), type == "console"));
-                    break;
-                case "done":
-                    if (TypeConverter.ToBoolean(At(1))) HandleDone(true, null, Text(At(2)), At(3).ToString());
-                    else HandleDone(false, At(2).ToString(), null, null);
-                    break;
-            }
-        }
-
-        private void AddOutput(CodemodeOutputItem item) { lock (gate) if (!finished) output.Add(item); }
-
-        private void HandleDone(bool ok, string? errorJson, string? valueJson, string? writesJson)
+        private void HandleDone(CodemodeDoneMessage done)
         {
             lock (gate) if (finished) return;
             // Decode everything before Finish, which must not fail once it starts.
-            try
-            {
-                if (!ok) { Finish(ParseScriptError(errorJson!)); return; }
-                var value = valueJson is null ? null : ParseBridgeJson(valueJson, "return value");
-                Finish(null, value, ParseStoreWrites(writesJson!));
-            }
-            catch (BridgeException error) { Finish(Failure(error)); }
+            if (!done.Ok) { Finish(ParseScriptError(done.Error ?? throw new BridgeException("script error is missing"))); return; }
+            var value = done.Value is null ? null : ParseBridgeJson(done.Value, "return value");
+            Finish(null, value, ParseStoreWrites(done.Writes ?? throw new BridgeException("store writes are missing")));
         }
 
-        private static JsonData ParseBridgeJson(string json, string what)
+        internal static JsonData ParseBridgeJson(string json, string what)
         {
             try { return JsonData.Parse(json); }
             catch (Exception) { throw new BridgeException($"{what} is not valid JSON"); }
         }
 
-        private static CodemodeStoreWrites ParseStoreWrites(string json)
+        internal static CodemodeStoreWrites ParseStoreWrites(string json)
         {
             var entries = ParseBridgeJson(json, "store writes").Value;
             if (entries.ValueKind != JsonValueKind.Array) throw new BridgeException("store writes are not an array");
@@ -345,7 +219,7 @@ public sealed class CodemodeSandbox : IAsyncDisposable
             return new([.. set], [.. deleted]);
         }
 
-        private static CodemodeError ParseScriptError(string json)
+        internal static CodemodeError ParseScriptError(string json)
         {
             var parsed = ParseBridgeJson(json, "script error").Value;
             if (parsed.ValueKind != JsonValueKind.Object) throw new BridgeException("script error is not an object");
@@ -363,7 +237,7 @@ public sealed class CodemodeSandbox : IAsyncDisposable
             lock (gate)
             {
                 if (finished) return;
-                if (pending.ContainsKey(id)) { Finish(Failure(new BridgeException($"duplicate call id {id}"))); return; }
+                if (pending.ContainsKey(id)) throw new BridgeException($"duplicate call id {id}");
                 CallRecord? record = isTool ? new(name) : null;
                 if (record is not null) calls.Add(record);
                 pending[id] = call = new(record);
@@ -387,10 +261,8 @@ public sealed class CodemodeSandbox : IAsyncDisposable
                     // Already cancelled by Finish: the record keeps "cancelled" and the engine is gone or going.
                     if (finished || !pending.Remove(id)) return;
                     if (call.Record is { } record) { record.Status = ok ? CodemodeCallStatus.Ok : CodemodeCallStatus.Error; record.DurationMs = call.Started.Elapsed.TotalMilliseconds; }
-                    var settledOk = ok; var settledPayload = payload;
-                    inbox.TryAdd((engine, settle, api) => engine.Call(settle, api,
-                        [new JsNumber(id), settledOk ? JsBoolean.True : JsBoolean.False, settledPayload is null ? JsValue.Undefined : new JsString(settledPayload)]));
                 }
+                worker.Send(new(id, ok, payload));
             }
         }
 
@@ -414,9 +286,11 @@ public sealed class CodemodeSandbox : IAsyncDisposable
             }
             timer?.Dispose();
             abortRegistration.Dispose();
-            try { engineStop.Cancel(); } catch (AggregateException) { }
-            inbox.CompleteAdding();
-            _ = exited.Task.ContinueWith(_ => result.TrySetResult(outcome), TaskScheduler.Default);
+            _ = Task.Run(async () =>
+            {
+                try { await worker.TerminateAsync().ConfigureAwait(false); } catch (Exception) { }
+                result.TrySetResult(outcome);
+            });
         }
 
         private string ToolsJson() => Js.Serialize(tools.Select(tool => new
@@ -428,8 +302,5 @@ public sealed class CodemodeSandbox : IAsyncDisposable
             foreach (var (key, value) in store ?? []) entries[key] = Js.Stringify(value.Value);
             return Js.Serialize(entries);
         }
-
     }
-
-    private delegate void EngineAction(Engine engine, JsValue settle, JsValue api);
 }
