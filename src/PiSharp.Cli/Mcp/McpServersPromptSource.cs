@@ -48,6 +48,20 @@ public sealed class McpServersPromptSource
         }
     }
 
+    /// <summary>The configured servers of <paramref name="generation"/> changed (`/mcp` enabled, disabled or changed the exposure of
+    /// one), as the original renders the section from its current servers. Instructions of servers still listed are kept.</summary>
+    public bool ReplaceServers(long generation, ImmutableArray<McpServerEntry> servers)
+    {
+        if (servers.IsDefault) throw new ArgumentException("Initialized servers required.", nameof(servers));
+        lock (gate)
+        {
+            if (!generations.TryGetValue(generation, out var state)) return false;
+            var names = servers.Select(server => server.Name).ToHashSet(StringComparer.Ordinal);
+            generations[generation] = new(servers, state.Instructions.RemoveRange(state.Instructions.Keys.Where(name => !names.Contains(name))));
+            return true;
+        }
+    }
+
     /// <summary>The untagged section content for <paramref name="generation"/> (the latest when null), or null when no
     /// enabled server has codemode or deferred tools, or nothing was published for it.</summary>
     public string? Render(long? generation = null)

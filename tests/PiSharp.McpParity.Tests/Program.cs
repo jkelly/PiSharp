@@ -36,7 +36,11 @@ internal static partial class Program
             ("manager.status-command-and-menus", ManagerStatusAndMenus),
             ("manager.disable-enable-reconnect-and-exposure", ManagerActions),
             ("manager.project-override-enable-and-disable", ManagerProjectOverride),
-            ("manager.login-logout-through-the-command", ManagerLoginLogout)
+            ("manager.login-logout-through-the-command", ManagerLoginLogout),
+            ("notifications.server-log-and-tool-list-changes", NotificationsLogAndToolListChanges),
+            ("notifications.server-log-format-and-rotation", ServerLogFormatAndRotation),
+            ("cli.mcp-list-resource-and-template-counts", ListResourceCounts),
+            ("prompt.servers-section-follows-manager-changes", ServersSectionFollowsManagerChanges)
         };
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)

@@ -111,6 +111,8 @@ internal static partial class Program
         await using (var rpc = new Rpc(Args(fixture.Root, "new-memory"), provider, fixture.Host()))
         {
             await rpc.Prompt("p1", "read the guide");
+            // describeState counts the resources the server listed when it connected.
+            Equal("connected · 1 tool · 1 resource · direct · global", (await fixture.Manager.Task).ServersMenu().Items.Single().Description, "state with resources");
             Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
         }
         var requests = provider.Snapshot();

@@ -50,6 +50,9 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     public IMcpOAuthCredentialBackend? Credentials { get; init; }
     /// <summary>A replacement channel for a server (tests); null keeps the stdio or HTTP channel of its config.</summary>
     public Func<McpServerEntry, McpAdmittedChannelFactory?>? CreateChannel { get; init; }
+    /// <summary>A replacement channel that also receives the server's notification handler (tests: log messages and tool list
+    /// changes); null falls back to <see cref="CreateChannel"/>.</summary>
+    public Func<McpServerEntry, McpNotificationHandler?, McpAdmittedChannelFactory?>? CreateNotifyingChannel { get; init; }
     /// <summary>Executable codemode/tool_search definitions for one generation (tests). The built-in codemode and tool_search are
     /// added unless supplied here or left out by the tool selection.</summary>
     public Func<long, ImmutableArray<McpDiscoveryExecutableDefinition>>? Discovery { get; init; }
@@ -130,6 +133,9 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         var (codemodeMode, inlineBudget) = PiSharp.Codemode.CodemodeToolDefinition.ReadSettings(settings?.Value);
         var codemodeModels = CodemodeModels ?? (() => McpCodemode.ModelRuntime.CreateDefault());
         var credentials = new McpOAuthCredentialStore(Credentials ?? McpOAuthFileCredentialBackend.InAgentDirectory(AgentDirectory));
+        var serverLog = new McpServerLog(Path.Combine(AgentDirectory, "mcp.log"));
+        // One source for every generation: the profile admits a single servers prompt source for its lifetime.
+        var promptSource = new McpServersPromptSource();
         var hostStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         McpProfileRuntimeAdmission admission = async (currentCwd, generation, nativeRegistry, exactPolicy, token) =>
         {
@@ -141,7 +147,8 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
             try
             {
                 var options = new McpRuntimeOptions(generation, ClientVersion, Roots(currentCwd));
-                McpAdmittedChannelFactory Channels(McpServerEntry entry) => Channel(entry, currentCwd, options, () => owned.Client, environment);
+                McpAdmittedChannelFactory Channels(McpServerEntry entry, McpNotificationHandler? notification) =>
+                    Channel(entry, currentCwd, options, () => owned.Client, environment, notification);
                 var resourceRegistry = owned.Track(new ExtensionRegistry());
                 var resourceScope = await resourceRegistry.ActivateAsync("mcp-resources", new EmptyExtension(), token).ConfigureAwait(false);
                 var resources = new McpResourceToolsPublisher(resourceRegistry, resourceScope, exactPolicy, ValidateArguments, ComposeHooks, grants);
@@ -151,9 +158,13 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     var registry = owned.Track(new ExtensionRegistry());
                     var scope = await registry.ActivateAsync("mcp-" + actual.Name, new EmptyExtension(), cancellation).ConfigureAwait(false);
                     grants.AdmitServer(scope);
+                    McpPreparedServer? prepared = null;
+                    var notifications = Notifications(actual.Name, serverLog, () => Volatile.Read(ref prepared), (name, error) => manager?.RefreshFailed(name, error));
                     // The original records nothing at session_shutdown, so a resumed session declares the tools again once the server connects.
-                    return new McpPreparedServer(actual, registry, scope, owner, exactPolicy, ValidateArguments, Channels(actual),
+                    var server = new McpPreparedServer(actual, registry, scope, owner, exactPolicy, ValidateArguments, Channels(actual, notifications),
                         new McpRuntimeOptions(attachment.Generation, ClientVersion, Roots(currentCwd)), ComposeHooks) { DurableWithdrawalOnShutdown = false };
+                    Volatile.Write(ref prepared, server);
+                    return server;
                 }
                 var background = admitted.Select(entry => new McpBackgroundServerAdmission(entry.Name, actual => Same(actual, entry), async (actual, owner, attachment, cancellation) =>
                 {
@@ -205,7 +216,11 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                         grants.AdmitExact(McpCodemode.Name, $"{scope.OwnerId}/{scope.OwnerGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture)}/{McpCodemode.RegistrationId}");
                 }
                 manager = new McpServerManager(configured, configErrors, trustedProject, new(Bind, resources, credentials, CreateClient,
-                    Resolve, OpenUrl ?? PiSharp.Cli.Commands.McpCommand.OpenBrowser, AgentDirectory) { AutoEnableCodemode = autoEnableCodemode });
+                    Resolve, OpenUrl ?? PiSharp.Cli.Commands.McpCommand.OpenBrowser, AgentDirectory)
+                {
+                    AutoEnableCodemode = autoEnableCodemode,
+                    ServersChanged = servers => promptSource.ReplaceServers(generation, [.. servers.Where(server => server.Config.Enabled)])
+                });
                 return new McpSessionRuntimeAdmission(nativeRegistry, owned, discovery, exactPolicy, new McpServerCatalog(admitted, []), [],
                     autoEnableCodemode, prepare)
                 {
@@ -213,7 +228,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     // The first generation's background servers wait until the host started dispatching; later generations (reload)
                     // open on a running host.
                     ConnectAfter = generation == 1 ? hostStarted.Task : null,
-                    ServersPromptSource = new McpServersPromptSource(),
+                    ServersPromptSource = promptSource,
                     StartupWait = StartupWait, Notify = reporter.Notice,
                     ReportBackgroundConnection = report =>
                     {
@@ -227,6 +242,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     {
                         try { await resources.UpdateAsync(entry.Name, server, entry.Config.Exposure, snapshot.Catalog.HasResources, cancellation).ConfigureAwait(false); }
                         catch (Exception) when (!cancellation.IsCancellationRequested) { /* The resource tools follow on the next change. */ }
+                        await manager.CountResourcesAsync(entry.Name, server, cancellation).ConfigureAwait(false);
                     },
                     BindManager = (owner, attachment, connections) =>
                     {
@@ -292,15 +308,26 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
 
     /// <summary>createDefaultTransport: the server's stdio or streamable HTTP channel (or the <see cref="CreateChannel"/> replacement).</summary>
     internal McpAdmittedChannelFactory Channel(McpServerEntry entry, string cwd, McpRuntimeOptions options, Func<HttpClient> client,
-        Dictionary<string, string>? inherited = null) =>
-        CreateChannel?.Invoke(entry) ?? (entry.Config.Transport == McpTransportKind.Http
-            ? HttpChannel(entry, options, client()) : StdioChannel(entry, cwd, inherited ?? InheritedEnvironment()));
+        Dictionary<string, string>? inherited = null, McpNotificationHandler? notification = null) =>
+        CreateNotifyingChannel?.Invoke(entry, notification) ?? CreateChannel?.Invoke(entry) ?? (entry.Config.Transport == McpTransportKind.Http
+            ? HttpChannel(entry, options, client(), notification) : StdioChannel(entry, cwd, inherited ?? InheritedEnvironment(), notification));
+
+    /// <summary>runtime.ts connectOnce notification handlers: <c>notifications/message</c> goes to the server log and
+    /// <c>notifications/tools/list_changed</c> refreshes the server's tools (new tools are added, withdrawn ones become unreachable).</summary>
+    private static McpNotificationHandler Notifications(string server, McpServerLog log, Func<McpPreparedServer?> target, Action<string, Exception>? refreshFailed) =>
+        async (method, parameters, token) =>
+        {
+            if (method == "notifications/message") { log.Write(server, parameters); return; }
+            if (method != "notifications/tools/list_changed" || target() is not { } prepared) return;
+            try { await prepared.RefreshToolsAsync(token).ConfigureAwait(false); }
+            catch (Exception error) when (!token.IsCancellationRequested) { refreshFailed?.Invoke(server, error); }
+        };
 
     /// <summary>A client for HTTP servers and their OAuth requests; an injected handler stays the caller's.</summary>
     internal HttpClient CreateClient() => new(CreateHttpHandler?.Invoke() ?? new SocketsHttpHandler { AllowAutoRedirect = false }, disposeHandler: CreateHttpHandler is null)
     { Timeout = Timeout.InfiniteTimeSpan };
 
-    private McpAdmittedChannelFactory HttpChannel(McpServerEntry entry, McpRuntimeOptions options, HttpClient client)
+    private McpAdmittedChannelFactory HttpChannel(McpServerEntry entry, McpRuntimeOptions options, HttpClient client, McpNotificationHandler? notification)
     {
         var raw = entry.Config.Raw.Value;
         var url = new Uri(raw.GetProperty("url").GetString()!);
@@ -322,7 +349,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         // runtime.ts auth.provider: the provider's current token, read on every request so its refreshes apply.
         else if (entry.Config.AuthProvider is not null && entry.Scope != McpConfigurationScope.Project)
             authentication = McpProviderTokenAuthentication.Create(entry, ProviderTokenAsync);
-        return AdmittedMcpHttpChannelFactory.Create(entry, binding, client, options, authentication: authentication);
+        return AdmittedMcpHttpChannelFactory.Create(entry, binding, client, options, notification: notification, authentication: authentication);
     }
 
     /// <summary>OAuth metadata and refresh requests, each bounded by the original's 15 s timeout.</summary>
@@ -344,7 +371,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         { throw new TimeoutException("OAuth request timed out after 15 s.", canceled); }
     }
 
-    private McpAdmittedChannelFactory StdioChannel(McpServerEntry entry, string cwd, Dictionary<string, string> inherited)
+    private McpAdmittedChannelFactory StdioChannel(McpServerEntry entry, string cwd, Dictionary<string, string> inherited, McpNotificationHandler? notification)
     {
         var raw = entry.Config.Raw.Value;
         var environment = new Dictionary<string, string>(inherited, inherited.Comparer);
@@ -360,7 +387,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         {
             token.ThrowIfCancellationRequested();
             Same(actual, entry);
-            return ValueTask.FromResult<IMcpAdmittedRequestChannel>(new McpJsonRpcRequestChannel(new McpStdioTransport(new McpNativeDuplexLease(admission))));
+            return ValueTask.FromResult<IMcpAdmittedRequestChannel>(new McpJsonRpcRequestChannel(new McpStdioTransport(new McpNativeDuplexLease(admission)), notification: notification));
         };
     }
 

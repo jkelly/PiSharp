@@ -89,6 +89,8 @@ public sealed class McpServerManager
         public string? TokensAtSignIn;
         /// <summary>Settles when the connection started for the server connected or failed.</summary>
         public Task Ready = Task.CompletedTask;
+        /// <summary>Resources the server listed when it connected, without MCP App resources.</summary>
+        public int Resources;
     }
 
     internal sealed record Dependencies(
@@ -100,6 +102,8 @@ public sealed class McpServerManager
         public Action<McpServerEntry, bool?, McpExposure?, bool>? UpdateConfig { get; init; }
         /// <summary>autoEnableCodemode of the configuration: whether `codemode` servers activate the codemode tool.</summary>
         public bool AutoEnableCodemode { get; init; } = true;
+        /// <summary>The servers changed (enabled, disabled, exposure), for the `mcp_servers` prompt section.</summary>
+        public Action<ImmutableArray<McpServerEntry>>? ServersChanged { get; init; }
     }
 
     private readonly object gate = new();
@@ -161,6 +165,13 @@ public sealed class McpServerManager
             if (Find(entry.Name) is not { } slot) return;
             slot.Server = server; slot.State = ConnectionState.Connecting; slot.Error = null;
         }
+        Changed();
+    }
+
+    /// <summary>runtime.ts refreshTools: a changed tool list could not be read; the state shows why.</summary>
+    internal void RefreshFailed(string name, Exception error)
+    {
+        lock (gate) { if (Find(name) is { } slot) slot.Error = "Failed to refresh tools: " + FailureText(error); }
         Changed();
     }
 
@@ -246,7 +257,8 @@ public sealed class McpServerManager
             case "failed": return withError ? "failed: " + FirstLine(slot.Error ?? "unknown error") : "failed";
             case "connected":
                 var tools = ToolCount(slot);
-                return $"connected · {tools} tool{(tools == 1 ? "" : "s")}";
+                var resources = slot.Resources > 0 ? $" · {slot.Resources} resource{(slot.Resources == 1 ? "" : "s")}" : "";
+                return $"connected · {tools} tool{(tools == 1 ? "" : "s")}{resources}";
             case "connecting": return "connecting…";
             case var other: return other;
         }
@@ -371,11 +383,29 @@ public sealed class McpServerManager
         Changed();
     }
 
-    private Task UpdateResourcesAsync(Slot slot, CancellationToken token)
+    private async Task UpdateResourcesAsync(Slot slot, CancellationToken token)
     {
         McpPreparedServer? server; lock (gate) server = slot.Server;
-        return dependencies.Resources?.UpdateAsync(slot.Entry.Name, server, slot.Entry.Config.Exposure,
-            server?.Snapshot.Catalog is { Connected: true, HasResources: true }, token) ?? Task.CompletedTask;
+        if (dependencies.Resources is { } resources)
+            await resources.UpdateAsync(slot.Entry.Name, server, slot.Entry.Config.Exposure, server?.Snapshot.Catalog is { Connected: true, HasResources: true }, token)
+                .ConfigureAwait(false);
+        if (server is not null) await CountResourcesAsync(slot, server, token).ConfigureAwait(false);
+    }
+
+    /// <summary>The resources a connected server lists (fetchResources at connect), for describeState.</summary>
+    internal async Task CountResourcesAsync(string name, McpPreparedServer server, CancellationToken token)
+    {
+        Slot? slot; lock (gate) slot = Find(name);
+        if (slot is not null) await CountResourcesAsync(slot, server, token).ConfigureAwait(false);
+    }
+
+    private async Task CountResourcesAsync(Slot slot, McpPreparedServer server, CancellationToken token)
+    {
+        var count = 0;
+        if (server.Snapshot.Catalog is { Connected: true, HasResources: true })
+            try { count = (await server.CountResourcesAsync(token).ConfigureAwait(false)).Resources; }
+            catch (Exception) when (!token.IsCancellationRequested) { /* A server whose lists fail still connects. */ }
+        lock (gate) slot.Resources = count;
     }
 
     /// <summary>saveConfig: save a change to the server's mcp.json (or a project override); returns an error message.</summary>
@@ -399,7 +429,9 @@ public sealed class McpServerManager
         if (exposure is { } chosen) raw["exposure"] = ExposureName(chosen);
         var validated = McpConfigurationReader.Validate(entry.Name, JsonSerializer.SerializeToElement(raw));
         if (validated.Config is not { } config) return validated.Error;
-        lock (gate) slot.Entry = entry with { Config = config };
+        ImmutableArray<McpServerEntry> current;
+        lock (gate) { slot.Entry = entry with { Config = config }; current = [.. servers.Select(item => item.Entry)]; }
+        try { dependencies.ServersChanged?.Invoke(current); } catch (Exception) { /* The section follows on the next change. */ }
         return null;
     }
 

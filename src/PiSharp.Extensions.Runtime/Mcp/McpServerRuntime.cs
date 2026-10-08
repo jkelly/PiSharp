@@ -200,6 +200,45 @@ public sealed class McpServerRuntime : IAsyncDisposable
         await GetConnectionAsync(token).ConfigureAwait(false); return Snapshot;
     }, cancellationToken);
 
+    /// <summary>runtime.ts fetchResources: how many resources and resource templates the server lists, for the counts of `mcp list`
+    /// and `/mcp`. MCP App resources (`ui://` URIs, `profile=mcp-app` HTML) are left out; a list that fails counts none, and a
+    /// server without the resources capability has none.</summary>
+    public Task<(int Resources, int Templates)> CountResourcesAsync(CancellationToken cancellationToken = default) => RunAsync(async token =>
+    {
+        var current = await GetConnectionAsync(token).ConfigureAwait(false);
+        if (!current.HasResources) return (0, 0);
+        async Task<int> CountAsync(string method, string key)
+        {
+            var count = 0; var cursors = new HashSet<string>(StringComparer.Ordinal); string? cursor = null;
+            try
+            {
+                for (var page = 0; page < options.Limits.MaximumPages; page++)
+                {
+                    var response = await current.Channel.RequestAsync(method, cursor is null ? null : Json(new { cursor }), RequestOptions(), token).ConfigureAwait(false);
+                    CheckResponse(response);
+                    if (response.Value.ValueKind != JsonValueKind.Object || !response.Value.TryGetProperty(key, out var items) || items.ValueKind != JsonValueKind.Array) return count;
+                    count += items.EnumerateArray().Count(item => !IsMcpAppResource(item));
+                    if (!response.Value.TryGetProperty("nextCursor", out var next) || next.ValueKind != JsonValueKind.String || !cursors.Add(next.GetString()!)) return count;
+                    cursor = next.GetString();
+                }
+                return count;
+            }
+            catch (Exception) when (!token.IsCancellationRequested) { return 0; }
+        }
+        var counts = await Task.WhenAll(CountAsync("resources/list", "resources"), CountAsync("resources/templates/list", "resourceTemplates")).ConfigureAwait(false);
+        return (counts[0], counts[1]);
+    }, cancellationToken);
+
+    /// <summary>resources.ts isMcpAppResource: user interfaces for hosts that render them.</summary>
+    private static bool IsMcpAppResource(JsonElement item)
+    {
+        if (item.ValueKind != JsonValueKind.Object) return false;
+        var uri = String(item, "uri", out var direct) ? direct : String(item, "uriTemplate", out var template) ? template : "";
+        if (uri!.StartsWith("ui://", StringComparison.Ordinal)) return true;
+        return String(item, "mimeType", out var mime) && System.Text.RegularExpressions.Regex.IsMatch(mime!, ";\\s*profile\\s*=\\s*\"?mcp-app\"?",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    }
+
     /// <summary>runtime.ts signOut: drop the current connection without reconnecting; the next call connects again.</summary>
     public Task DisconnectAsync(CancellationToken cancellationToken = default) => RunAsync(async _ =>
     { await DisconnectCoreAsync().ConfigureAwait(false); return true; }, cancellationToken);

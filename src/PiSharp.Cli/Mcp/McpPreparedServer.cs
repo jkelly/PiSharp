@@ -70,6 +70,13 @@ public sealed class McpPreparedServer : IAsyncDisposable
     /// <summary>Drops the connection without reconnecting (sign-out); the tools stay registered and the next call reconnects.</summary>
     public Task DisconnectAsync(CancellationToken token = default)
         => RunAsync(async () => { await runtime.DisconnectAsync(token).ConfigureAwait(false); return runtime.Snapshot; }, token);
+    /// <summary>How many resources and templates the server lists (fetchResources), for `/mcp`.</summary>
+    public async Task<(int Resources, int Templates)> CountResourcesAsync(CancellationToken token = default)
+    {
+        var counts = (0, 0);
+        await RunAsync(async () => { counts = await runtime.CountResourcesAsync(token).ConfigureAwait(false); return runtime.Snapshot; }, token).ConfigureAwait(false);
+        return counts;
+    }
     /// <summary>The runtime's current catalog state (connected, tools, instructions, resources).</summary>
     public McpRuntimeSnapshot Snapshot => runtime.Snapshot;
     /// <summary>Called by the actual prepared resource dispatch after its resource-scope admission.
