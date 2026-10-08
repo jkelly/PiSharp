@@ -605,11 +605,11 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         private static StringComparison Comparison => OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         public readonly List<object> Actions = [];
         public ImmutableDictionary<string, string> ExtensionTargets { get; set; } = ImmutableDictionary<string, string>.Empty;
-        /// <summary>The host's own MCP discovery tools (the built-in tool_search) by exact tool name and target; they only change
-        /// the session's tool selection. Each acquired generation adds its own; a retired generation's adapter cannot run.</summary>
-        private ImmutableHashSet<(string Tool, string Target)> hostDiscoveryTargets = [];
-        public void AdmitHostDiscoveryTargets(ImmutableArray<(string Tool, string Target)> targets) =>
-            ImmutableInterlocked.Update(ref hostDiscoveryTargets, current => current.Union(targets));
+        /// <summary>MCP call grants by session generation (Pi trusts the servers of mcp.json): an invoke action is admitted only
+        /// for a tool of a server admitted in the invocation's own generation, or for that generation's host tool_search.</summary>
+        private ImmutableDictionary<long, PiSharp.Cli.Mcp.McpCallGrants> mcpGrants = ImmutableDictionary<long, PiSharp.Cli.Mcp.McpCallGrants>.Empty;
+        public void AdmitMcpCalls(long generation, PiSharp.Cli.Mcp.McpCallGrants grants) =>
+            ImmutableInterlocked.Update(ref mcpGrants, current => current.SetItem(generation, grants));
         public Func<string?>? ActiveSessionPath { get; set; }
         public static bool Within(string root, string target) =>
             target.StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, Comparison);
@@ -635,7 +635,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             if (action.Kind == PreparedToolActionKind.Extension)
             {
                 var granted = (ExtensionTargets.TryGetValue(action.ToolName, out var exactTarget) && action.Target == exactTarget ||
-                        hostDiscoveryTargets.Contains((action.ToolName, action.Target))) &&
+                        invocation.Context?.SessionGeneration is { } generation && mcpGrants.TryGetValue(generation, out var grants) &&
+                        grants.Allows(action.ToolName, action.Target)) &&
                     action.Operation == "invoke" && action.WorkingDirectory is null && !action.CommandArguments.IsDefault &&
                     action.CommandArguments.IsEmpty && action.Environment.IsEmpty && action.Arguments.Value.ValueKind == JsonValueKind.Object;
                 Actions.Add(new { action.ToolName, action.Operation, action.Target, allowed = granted });

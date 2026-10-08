@@ -51,22 +51,24 @@ internal static partial class Program
         Stream(new { type = "tool_use", id, name, input = new { } }, JsonSerializer.Serialize(input), "tool_use");
 
     /// <summary>A fake `docs` MCP server with two tools; tools/call answers with the query it received.</summary>
-    private sealed class DocsServer(TaskCompletionSource? listed = null) : IMcpAdmittedRequestChannel
+    private sealed class DocsServer(string name, Task? initialized = null) : IMcpAdmittedRequestChannel
     {
+        public string Name => name;
         public readonly ConcurrentQueue<string> Calls = new();
         public int Lists, Closes;
         public ValueTask StartAsync(CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask ConfigureRootsAsync(JsonData roots, CancellationToken token) => ValueTask.CompletedTask;
         public ValueTask NotifyAsync(string method, JsonData? parameters, CancellationToken token) => ValueTask.CompletedTask;
-        public ValueTask<JsonData> RequestAsync(string method, JsonData? parameters, McpRequestOptions options, CancellationToken token)
+        public async ValueTask<JsonData> RequestAsync(string method, JsonData? parameters, McpRequestOptions options, CancellationToken token)
         {
             switch (method)
             {
                 case "initialize":
-                    return ValueTask.FromResult(JsonData.Parse("""{"protocolVersion":"2025-11-25","serverInfo":{"name":"docs","version":"1"},"capabilities":{"tools":{}},"instructions":"Search and fetch the docs."}"""));
+                    if (initialized is not null) await initialized.WaitAsync(token);
+                    return (JsonData.Parse("""{"protocolVersion":"2025-11-25","serverInfo":{"name":"docs","version":"1"},"capabilities":{"tools":{}},"instructions":"Search and fetch the docs."}"""));
                 case "tools/list":
-                    Interlocked.Increment(ref Lists); listed?.TrySetResult();
-                    return ValueTask.FromResult(JsonData.Parse("""
+                    Interlocked.Increment(ref Lists);
+                    return (JsonData.Parse("""
                         {"tools":[
                           {"name":"search","description":"Search the documentation.\nReturns links.","inputSchema":{"type":"object","properties":{"query":{"type":"string","description":"Words to look for."}}}},
                           {"name":"fetch","description":"Fetch a page by URL.","inputSchema":{"type":"object","properties":{"url":{"type":"string"}}}}]}
@@ -74,8 +76,8 @@ internal static partial class Program
                 case "tools/call":
                     var call = parameters!.Value;
                     Calls.Enqueue(call.GetProperty("name").GetString() + ":" + call.GetProperty("arguments").GetRawText());
-                    return ValueTask.FromResult(JsonData.Parse("""{"content":[{"type":"text","text":"Found: install guide."}]}"""));
-                default: return ValueTask.FromException<JsonData>(new IOException("Unexpected MCP method " + method));
+                    return JsonData.Parse("""{"content":[{"type":"text","text":"Found: install guide."}]}""");
+                default: throw new IOException("Unexpected MCP method " + method);
             }
         }
         public Task CloseAsync() { Interlocked.Increment(ref Closes); return Task.CompletedTask; }
@@ -140,13 +142,15 @@ internal static partial class Program
         public readonly string Agent = Path.Combine(root, "agent");
         public readonly ConcurrentBag<DocsServer> Servers = [];
         public TaskCompletionSource Connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        /// <summary>When set, every server answers initialize only once it completes, so background servers connect late.</summary>
+        public Task? Initialized;
         public McpSessionHost Host(Func<long, System.Collections.Immutable.ImmutableArray<McpDiscoveryExecutableDefinition>>? discovery = null) =>
             new(Agent, Path.Combine(root, "home"), () => [KeyValuePair.Create("PATH", root)])
             {
                 CreateChannel = entry => (actual, token) =>
                 {
-                    if (actual.Name != "docs") throw new InvalidOperationException("Unexpected MCP server " + actual.Name);
-                    var server = new DocsServer(); Servers.Add(server);
+                    if (actual.Name is not ("docs" or "web")) throw new InvalidOperationException("Unexpected MCP server " + actual.Name);
+                    var server = new DocsServer(actual.Name, Initialized); Servers.Add(server);
                     return ValueTask.FromResult<IMcpAdmittedRequestChannel>(server);
                 },
                 ObserveBackgroundConnection = report => { if (report.Failure is null) Connected.TrySetResult(); else Connected.TrySetException(report.Failure); },
@@ -203,9 +207,8 @@ internal static partial class Program
 
     // The release blocker of 1.1.0: a `deferred` server now connects in a production session. Its tools are registered but not
     // declared; tool_search (active for it, and admitted by the profile's final-action policy) loads the best match, which the
-    // next model call declares and which stays declared for later prompts. The change is recorded in the session file. The
-    // production profile's policy grants no MCP tool (direct or deferred), so the loaded tool's call is denied before it reaches
-    // the server, as for direct MCP tools in 1.1.0.
+    // next model call declares and calls on the server (Pi trusts the servers of mcp.json), and which stays declared for later
+    // prompts. The change is recorded in the session file.
     private static Task DeferredServerProductionSession() => WithRoot("deferred", DeferredDocs, async (root, fixture) =>
     {
         var provider = new Endpoint(() => Text("ready"),
@@ -228,8 +231,8 @@ internal static partial class Program
         }
         Names([LoadedSearch], ToolResults(requests[2]), "tool_search result");
         Check(ToolNames(requests[2]).Contains("mcp__docs__search") && !ToolNames(requests[2]).Contains("mcp__docs__fetch"), "the next call declares the loaded tool only");
-        Names(["Final tool action was denied."], ToolResults(requests[3]), "the loaded tool reaches the final-action policy");
-        Check(fixture.Servers.Single().Calls.IsEmpty, "no MCP grant: nothing reaches the server");
+        Names(["Found: install guide."], ToolResults(requests[3]), "the loaded tool's result");
+        Names(["search:{\"query\":\"install\"}"], fixture.Servers.Single().Calls, "the loaded tool is called on its server");
         Check(ToolNames(requests[4]).Contains("mcp__docs__search") && ToolNames(requests[4]).Contains("tool_search"), "still declared at the next prompt");
         var recorded = File.ReadAllLines(Path.Combine(root, "session.jsonl")).Select(line => JsonDocument.Parse(line).RootElement)
             .Where(entry => entry.TryGetProperty("message", out var message) && message.TryGetProperty("toolsAdded", out _))
