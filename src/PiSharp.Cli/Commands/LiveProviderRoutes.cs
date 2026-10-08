@@ -21,12 +21,13 @@ namespace PiSharp.Cli.Commands;
 internal sealed class LiveProviderRoute
 {
     internal static bool Handles(string provider) =>
-        provider is "amazon-bedrock" or "openai-codex" or "github-copilot" or "cloudflare-workers-ai" or "cloudflare-ai-gateway";
+        provider is "amazon-bedrock" or "openai-codex" or "github-copilot" or "cloudflare-workers-ai" or "cloudflare-ai-gateway" or "google-vertex";
 
     /// <summary>The APIs each routed provider serves (providers/*.ts api maps).</summary>
     internal static bool SupportsApi(string provider, string api) => provider switch
     {
         "amazon-bedrock" => api == "bedrock-converse-stream",
+        "google-vertex" => api == "google-vertex",
         "openai-codex" => api == "openai-codex-responses",
         "github-copilot" or "cloudflare-ai-gateway" => api is "anthropic-messages" or "openai-completions" or "openai-responses",
         "cloudflare-workers-ai" => api == "openai-completions",
@@ -116,6 +117,24 @@ internal sealed class LiveProviderRoute
                     ModelHeaders = Headers(definition)
                 }, async token => (await CurrentAsync(token).ConfigureAwait(false)).ApiKey ?? throw new InvalidOperationException("No API key for provider: openai-codex"),
                     handler, summary && Levels(definition).Contains("off") ? "off" : null);
+            case "google-vertex":
+            {
+                var adc = new PiSharp.AI.Protocols.GoogleVertex.GoogleApplicationDefaultCredentials(credentialHttp.Value, environment.Get,
+                    runtime.HomeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), runtime.Time);
+                return NativeProviderFactory.CreateGoogleVertexRoute(model, definition.Raw, async token =>
+                {
+                    var auth = await CurrentAsync(token).ConfigureAwait(false);
+                    string? Value(string name) => auth.Environment is { } scoped && scoped.TryGetValue(name, out var value) && value.Length != 0 ? value : environment.Get(name);
+                    var project = Value("GOOGLE_CLOUD_PROJECT") ?? environment.Get("GCLOUD_PROJECT");
+                    var location = Value("GOOGLE_CLOUD_LOCATION");
+                    if (auth.ApiKey is { Length: > 0 } key)
+                        return new(PiSharp.AI.Protocols.GoogleVertex.GoogleVertexEndpoints.ApiKey(model.Id, definition.BaseUrl), key, true, project ?? "-", location ?? "-");
+                    if (project is null) throw new InvalidOperationException("Vertex AI requires a project ID. Set GOOGLE_CLOUD_PROJECT/GCLOUD_PROJECT or pass project in options.");
+                    if (location is null) throw new InvalidOperationException("Vertex AI requires a location. Set GOOGLE_CLOUD_LOCATION or pass location in options.");
+                    var access = await adc.AccessTokenAsync(auth.Environment?.GetValueOrDefault("GOOGLE_APPLICATION_CREDENTIALS"), token).ConfigureAwait(false);
+                    return new(PiSharp.AI.Protocols.GoogleVertex.GoogleVertexEndpoints.Adc(model.Id, project, location, definition.BaseUrl), access, false, project, location);
+                }, maximum, summary, handler);
+            }
             default:
                 return NativeProviderFactory.CreateProviderRoute(model, definition.Raw, new ProviderRouteOptions(async token =>
                 {
@@ -123,7 +142,7 @@ internal sealed class LiveProviderRoute
                     var baseUrl = ProviderHeaderPolicies.ResolveCloudflareBaseUrl(auth.BaseUrl ?? definition.BaseUrl, auth.Environment);
                     return new ProviderRequestAuth(auth.ApiKey, baseUrl, auth.Headers);
                 })
-                { MaxTokens = maximum, Summary = summary, MaximumMessages = 1024, MaximumEntryCharacters = 1_048_576, MaximumPayloadBytes = 1_048_576 }, handler);
+                { MaxTokens = maximum, Summary = summary, MaximumMessages = 1024 }, handler);
         }
     }
 

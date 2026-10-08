@@ -44,6 +44,7 @@ internal static partial class Program
             ("copilot.dynamic-headers-and-bearer-auth-on-every-api", CopilotRequests),
             ("cloudflare.workers-ai-and-gateway-urls-and-auth", CloudflareRequests),
             ("opencode.session-header-policy", Sync(OpenCodeHeaders)),
+            ("budget.4-5-mb-images-reach-copilot-bedrock-and-codex", LargeImageRequests),
             ("authjson.json-provider-fields-and-api-key-entries", AuthJsonFields),
             ("live.provider-route-selection-and-per-request-auth", LiveRoutes),
             ("login.every-provider-cli-flow-api-key-and-oauth", CliLogin),
@@ -79,6 +80,13 @@ internal static partial class Program
         bodyComparisons++;
         var left = JsonNode.Parse(expected)!.ToJsonString(); var right = JsonNode.Parse(actual)!.ToJsonString();
         if (left != right) throw new CheckException($"{what}:\nexpected {left}\nactual   {right}");
+    }
+    /// <summary>Compares two JSON documents structurally, ignoring object property order.</summary>
+    private static void JsonSame(string expected, string actual, string what)
+    {
+        bodyComparisons++;
+        if (!System.Text.Json.Nodes.JsonNode.DeepEquals(JsonNode.Parse(expected), JsonNode.Parse(actual)))
+            throw new CheckException($"{what}:\nexpected {JsonNode.Parse(expected)!.ToJsonString()}\nactual   {JsonNode.Parse(actual)!.ToJsonString()}");
     }
     private static async Task<T> Throws<T>(Func<Task> run) where T : Exception
     {

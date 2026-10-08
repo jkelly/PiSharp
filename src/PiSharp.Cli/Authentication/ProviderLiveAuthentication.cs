@@ -110,6 +110,22 @@ internal sealed class ProviderLiveAuthentication
                 if (environment.Get("AWS_WEB_IDENTITY_TOKEN_FILE") is not null) return new(null, null, null, null, "web identity token");
                 return null;
             }
+            case ApiKeyLoginKind.GoogleVertex:
+            {
+                // vertexAuth.resolve: an API key, else ADC credentials with a project and a location.
+                var key = storedKey is { Length: > 0 } ? storedKey : environment.Get("GOOGLE_CLOUD_API_KEY");
+                if (key is not null) return new(key, null, null, null, storedKey is { Length: > 0 } ? "stored credential" : "GOOGLE_CLOUD_API_KEY");
+                var adcPath = Scoped("GOOGLE_APPLICATION_CREDENTIALS") ?? environment.Get("GOOGLE_APPLICATION_CREDENTIALS");
+                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                string Expand(string path) => path.StartsWith('~') ? home + path[1..] : path;
+                var hasCredentials = adcPath is not null ? File.Exists(Expand(adcPath))
+                    : File.Exists(Path.Combine(home, ".config", "gcloud", "application_default_credentials.json")) ||
+                      environment.Get("APPDATA") is { } appData && File.Exists(Path.Combine(appData, "gcloud", "application_default_credentials.json"));
+                var project = Scoped("GOOGLE_CLOUD_PROJECT") ?? environment.Get("GOOGLE_CLOUD_PROJECT") ?? environment.Get("GCLOUD_PROJECT");
+                var location = Scoped("GOOGLE_CLOUD_LOCATION") ?? environment.Get("GOOGLE_CLOUD_LOCATION");
+                return hasCredentials && project is not null && location is not null
+                    ? new(null, null, null, scoped, hasStored ? "stored credential" : "gcloud application default credentials") : null;
+            }
             default:
             {
                 // envApiKeyAuth: a stored key wins (with its env), else the first set variable.

@@ -41,7 +41,7 @@ internal static partial class Program
     [
         Entry("""{"role":"system","content":"You are helpful.","sections":{"b":"Section B","1":"Section one"},"toolsAdded":[{"name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"},"limit":{"type":"number"}},"required":["path"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}],"timestamp":1}"""),
         Entry("""{"role":"user","content":[{"type":"text","text":"Hi"},{"type":"image","data":"AAEC","mimeType":"image/png"}],"timestamp":2}"""),
-        Entry($$"""{"role":"assistant","content":[{"type":"thinking","thinking":"Let me think","thinkingSignature":"sig-1"},{"type":"text","text":"Calling a tool"},{"type":"toolCall","id":"toolu_1","name":"read","arguments":{"path":"a.txt"}}],"api":"bedrock-converse-stream","provider":"amazon-bedrock","model":"{{ClaudeTranscriptModel}}","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"toolUse","timestamp":3}"""),
+        Entry($$$"""{"role":"assistant","content":[{"type":"thinking","thinking":"Let me think","thinkingSignature":"sig-1"},{"type":"text","text":"Calling a tool"},{"type":"toolCall","id":"toolu_1","name":"read","arguments":{"path":"a.txt"}}],"api":"bedrock-converse-stream","provider":"amazon-bedrock","model":"{{{ClaudeTranscriptModel}}}","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"toolUse","timestamp":3}"""),
         Entry("""{"role":"toolResult","toolCallId":"toolu_1","toolName":"read","content":[{"type":"text","text":"file body"},{"type":"image","data":"AAEC","mimeType":"image/jpeg"}],"isError":false,"timestamp":4}"""),
         Entry("""{"role":"user","content":"Next","timestamp":5}""")
     ];
@@ -164,7 +164,7 @@ internal static partial class Program
             string.Join(",", events.Select(frame => frame.GetType().Name)), "event sequence");
         var done = (StreamDone)events[^1];
         Equal(StopReason.ToolUse, done.Reason, "stop reason");
-        JsonEqual("""
+        JsonSame("""
             {"role":"assistant","content":[{"type":"thinking","thinking":"think","thinkingSignature":"sig"},{"type":"text","text":"Hello"},{"type":"toolCall","id":"t1","name":"read","arguments":{"path":"a.txt"}}],
              "api":"bedrock-converse-stream","provider":"amazon-bedrock","model":"anthropic.claude-sonnet-4-5-20250929-v1:0",
              "usage":{"input":100,"output":50,"cacheRead":10,"cacheWrite":20,"cacheWrite1h":20,"totalTokens":180,"cost":{"input":0.0003,"output":0.00075,"cacheRead":0.000003,"cacheWrite":0.00012,"total":0.001173}},
@@ -189,8 +189,8 @@ internal static partial class Program
         fixture.Http.OnUrl("https://", _ => EventStream(messages:
         [
             EventMessage("messageStart", """{"role":"assistant"}"""),
-            EventMessage("contentBlockDelta", $$"""{"contentBlockIndex":0,"delta":{"reasoningContent":{"redactedContent":"{{first}}"}}}"""),
-            EventMessage("contentBlockDelta", $$"""{"contentBlockIndex":0,"delta":{"reasoningContent":{"redactedContent":"{{second}}","signature":"ignored"}}}"""),
+            EventMessage("contentBlockDelta", "{\"contentBlockIndex\":0,\"delta\":{\"reasoningContent\":{\"redactedContent\":\"" + first + "\"}}}"),
+            EventMessage("contentBlockDelta", "{\"contentBlockIndex\":0,\"delta\":{\"reasoningContent\":{\"redactedContent\":\"" + second + "\",\"signature\":\"ignored\"}}}"),
             EventMessage("contentBlockDelta", """{"contentBlockIndex":1,"delta":{"text":"answer"}}"""),
             // Neither block is stopped before messageStop.
             EventMessage("messageStop", """{"stopReason":"end_turn"}""")
@@ -198,7 +198,7 @@ internal static partial class Program
         var events = await Collect(fixture.Transport, new(fixture.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 5));
         Equal("StreamStarted,ThinkingStarted,ThinkingDelta,TextStarted,TextDelta,ThinkingEnded,TextEnded,StreamDone", string.Join(",", events.Select(frame => frame.GetType().Name)), "events");
         var done = (StreamDone)events[^1];
-        JsonEqual($$"""[{"type":"thinking","thinking":"[Reasoning redacted]","thinkingSignature":"{{Convert.ToBase64String([1, 2, 3, 4, 5])}}","redacted":true},{"type":"text","text":"answer"}]""",
+        JsonSame($$"""[{"type":"thinking","thinking":"[Reasoning redacted]","thinkingSignature":"{{Convert.ToBase64String([1, 2, 3, 4, 5])}}","redacted":true},{"type":"text","text":"answer"}]""",
             JsonDocument.Parse(Wire(done.Message)).RootElement.GetProperty("content").GetRawText(), "redacted content");
         // Replay: the same model sends the payload back as redactedContent; another model drops it.
         var replay = ImmutableArray.Create(Entry("""{"role":"user","content":"Hi","timestamp":1}"""), new TranscriptEntry("assistant", PiWireJson.WriteMessage(done.Message)),

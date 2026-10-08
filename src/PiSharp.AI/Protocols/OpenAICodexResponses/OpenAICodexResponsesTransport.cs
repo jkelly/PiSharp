@@ -45,7 +45,8 @@ public sealed record OpenAICodexResponsesOptions
     public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask>? OnResponse { get; init; }
     public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask>? OnProviderStreamEvent { get; init; }
     public int MaximumMessages { get; init; } = 1024;
-    public int MaximumEntryCharacters { get; init; } = 1_048_576;
+    /// <summary>Pi has no request-size cap; the default admits image payloads of several megabytes.</summary>
+    public int MaximumEntryCharacters { get; init; } = 64 * 1_048_576;
 }
 
 public sealed class CodexApiException(string message, string? code = null) : Exception(message) { public string? Code { get; } = code; }
@@ -123,6 +124,9 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         return Encoding.Latin1.GetString(Convert.FromBase64String(text));
     }
 
+    /// <summary>The transcript and projection budget (several images of ~4.5 MB each).</summary>
+    private int Budget => (int)Math.Min(int.MaxValue / 2, Math.Max(_options.MaximumEntryCharacters, 1_048_576) * 2L);
+
     private static readonly JsonSerializerOptions BodyJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     /// <summary>buildRequestBody for the request's thinking level (streamSimple clamps it; "off" omits reasoningEffort).</summary>
@@ -140,10 +144,10 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             Reasoning: _metadata.TryGetProperty("reasoning", out var reasoning) && reasoning.ValueKind == JsonValueKind.True,
             SupportsDeveloperRole: _developerRole, SupportsMidConversationSystemMessages: _midConversation, IncludeInitialSystemPrompt: false,
             MaximumMessages: _options.MaximumMessages, MaximumEntryCharacters: _options.MaximumEntryCharacters,
-            MaximumInputCharacters: Math.Max(_options.MaximumEntryCharacters, 1_048_576) * 4, MaximumOutputCharacters: 16 * 1_048_576,
+            MaximumInputCharacters: Budget, MaximumOutputCharacters: Budget,
             ToolDeclarations: new(SupportsStrictMode: _strictMode, Strict: null, MaximumMessages: _options.MaximumMessages,
-                MaximumEntryCharacters: _options.MaximumEntryCharacters, MaximumInputCharacters: Math.Max(_options.MaximumEntryCharacters, 1_048_576) * 4,
-                MaximumOutputCharacters: 16 * 1_048_576, MaximumOutputBytes: 16 * 1_048_576) { SupportsOpenAIGrammarTools = _grammar });
+                MaximumEntryCharacters: _options.MaximumEntryCharacters, MaximumInputCharacters: Budget,
+                MaximumOutputCharacters: Budget, MaximumOutputBytes: Budget) { SupportsOpenAIGrammarTools = _grammar });
         var projector = new ResponsesTranscriptProjector(projection);
         var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString());
         var tools = JsonNode.Parse(projector.ProjectTools(request, CancellationToken.None).ToString()) as JsonArray;

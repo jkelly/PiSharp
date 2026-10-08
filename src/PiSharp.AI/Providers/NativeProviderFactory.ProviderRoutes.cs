@@ -36,8 +36,8 @@ public sealed record ProviderRouteOptions(Func<CancellationToken, ValueTask<Prov
     /// <summary>Provider env values for base URL placeholders such as {CLOUDFLARE_ACCOUNT_ID}.</summary>
     public ImmutableDictionary<string, string>? Environment { get; init; }
     public int MaximumMessages { get; init; } = 1024;
-    public int MaximumEntryCharacters { get; init; } = 1_048_576;
-    public int MaximumPayloadBytes { get; init; } = 1_048_576;
+    public int MaximumEntryCharacters { get; init; } = 64 * 1_048_576;
+    public int MaximumPayloadBytes { get; init; } = 64 * 1_048_576;
 }
 
 /// <summary>Provider-specific request header policies.</summary>
@@ -117,11 +117,15 @@ public static partial class NativeProviderFactory
         using var prototype = BindRouteRequest(model, modelMetadata, options, new("prototype-key", "https://prototype.invalid/"),
             ImmutableDictionary<string, string?>.Empty, null);
         var levels = prototype.GetSupportedThinkingLevels(model);
-        return Bind(model, handler, client => new RouteTransport(model, levels, async (request, token) =>
+        // Each request binds through the route's own handler (an HttpClient refuses to resend a request another client sent).
+        var root = handler ?? new HttpClientHandler { AllowAutoRedirect = false };
+        var invoker = new HttpMessageInvoker(root, disposeHandler: false);
+        var client = new HttpClient(root, disposeHandler: handler is null) { Timeout = Timeout.InfiniteTimeSpan };
+        return new(model, client, new RouteTransport(model, levels, async (request, token) =>
         {
             var auth = await options.Auth(token).ConfigureAwait(false);
             var dynamic = model.Provider == "github-copilot" ? ProviderHeaderPolicies.CopilotDynamicHeaders(request.Messages) : ImmutableDictionary<string, string?>.Empty;
-            return BindRouteRequest(model, modelMetadata, options, auth, dynamic, client);
+            return BindRouteRequest(model, modelMetadata, options, auth, dynamic, invoker);
         }));
     }
 
@@ -132,6 +136,13 @@ public static partial class NativeProviderFactory
         string Text(string name) => raw.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString()! : "";
         var baseUrl = ProviderHeaderPolicies.ResolveCloudflareBaseUrl(auth.BaseUrl ?? Text("baseUrl"), options.Environment);
         if (baseUrl.Contains('{')) throw new ArgumentException("Unresolved provider base URL placeholder.");
+        // The bound model is the resolved model (resolveCloudflareModel, Copilot's per-credential baseUrl): its metadata names that URL.
+        if (Text("baseUrl") != baseUrl && JsonNode.Parse(metadata.ToString()) is JsonObject resolvedRow)
+        {
+            resolvedRow["baseUrl"] = baseUrl;
+            metadata = JsonData.Parse(resolvedRow.ToJsonString());
+            raw = metadata.Value;
+        }
         var reasoning = raw.TryGetProperty("reasoning", out var flag) && flag.ValueKind == JsonValueKind.True;
         var images = raw.TryGetProperty("input", out var input) && input.ValueKind == JsonValueKind.Array &&
             input.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.String && value.GetString() == "image");
@@ -154,14 +165,17 @@ public static partial class NativeProviderFactory
         var handler = client is null ? null : new RouteHandler(client, rewrites);
         var maximum = options.MaxTokens; var summary = options.Summary;
         var sessionId = options.Summary ? null : options.SessionId;
+        // Pi has no request-size cap: projection budgets follow the configured payload limit (images of ~4.5 MB reach the provider).
+        var budget = options.MaximumPayloadBytes;
         switch (model.Api)
         {
             case "openai-completions":
             {
                 var endpoint = new Uri(baseUrl.TrimEnd('/') + "/chat/completions");
                 var projection = new CompletionsTranscriptProjectionOptions(Reasoning: reasoning, MaximumMessages: options.MaximumMessages,
-                    MaximumEntryCharacters: options.MaximumEntryCharacters,
-                    ToolDeclarations: new(MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters)) { ModelSupportsImages = images };
+                    MaximumEntryCharacters: options.MaximumEntryCharacters, MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget,
+                    ToolDeclarations: new(MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
+                        MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget)) { ModelSupportsImages = images };
                 var request = new CompletionsKeyAuthRequestOptions(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
                     MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId) { ModelMetadata = metadata };
                 return BindCompletions(model, endpoint, key, projection, request with { ModelHeaders = modelHeaders }, handler, summary ? null : metadata);
@@ -169,13 +183,17 @@ public static partial class NativeProviderFactory
             case "openai-responses":
             {
                 var endpoint = new Uri(baseUrl.TrimEnd('/') + "/responses");
-                return BindRouteResponses(model, endpoint, key, new(Reasoning: reasoning, MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters),
+                return BindRouteResponses(model, endpoint, key, new(Reasoning: reasoning, MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
+                    MaximumInputCharacters: budget, MaximumOutputCharacters: budget,
+                    ToolDeclarations: new(MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
+                        MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget)),
                     new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId) { ModelHeaders = modelHeaders },
                     handler, summary ? null : metadata);
             }
             default:
                 return BindRouteAnthropic(model, new Uri(baseUrl), key, RouteAnthropicProjection(raw, new(MaximumTokens: maximum, ModelReasoning: reasoning,
                     ModelSupportsImages: images, ThinkingEnabled: false, MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
+                    MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget,
                     CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), summary),
                     new(MaxTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, ModelHeaders: modelHeaders, SessionId: sessionId)
                     { BearerAuthorization = model.Provider == "github-copilot" },

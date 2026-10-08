@@ -50,7 +50,8 @@ public sealed class GoogleVertexRequestFactory
         }
         if (projection.ModelMetadata.Value.TryGetProperty("headers", out var modelHeaders)) Merge(modelHeaders);
         if (projection.Headers is { } extra) Merge(extra.Value);
-        headers["Authorization"] = "Bearer " + options.AccessToken;
+        if (options.ApiKeyMode) headers["x-goog-api-key"] = options.AccessToken;
+        else headers["Authorization"] = "Bearer " + options.AccessToken;
         if (headers.Count + 1 > projection.MaximumHeaders || headers.Any(header => header.Key.Length + header.Value.Length > projection.MaximumHeaderCharacters))
             throw GoogleData.Fail(GoogleFailure.ResourceLimit);
         var owned = new HttpRequestMessage(HttpMethod.Post, options.Endpoint);
