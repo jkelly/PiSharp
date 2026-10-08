@@ -22,9 +22,9 @@ public static class AnthropicResolvedProviderFactory
         if (modelMetadata is not null && (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue))
             throw new ArgumentException("Unsupported native thinking token cap.");
         var profile = modelMetadata is null ? null : new NativeThinkingProfile(model, modelMetadata, projectionOptions.ModelReasoning, (int)maximum);
-        var responseOptions = new AnthropicMessagesOptions(OAuthToolNames: authentication.UseOAuthProjection,
+        var responseOptions = NativeProviderFactory.AnthropicMessagesOptionsForModel(modelMetadata, new AnthropicMessagesOptions(OAuthToolNames: authentication.UseOAuthProjection,
             MaximumToolDeclarations: projectionOptions.MaximumDeclarations, MaximumActiveTools: projectionOptions.MaximumActiveTools,
-            MaximumInputCharacters: projectionOptions.MaximumInputCharacters);
+            MaximumInputCharacters: projectionOptions.MaximumInputCharacters));
         return Bind(model, handler, factory.Federation is { } federation ? (endpoint, federation) : null, client =>
         {
             IChatTransport Create(AnthropicMessagesAuthenticatedRequestFactory bound) => new AnthropicMessagesHttpSseTransport(client,

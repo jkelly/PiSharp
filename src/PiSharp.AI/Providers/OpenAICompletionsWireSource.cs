@@ -1,16 +1,19 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Contracts;
 using PiSharp.Contracts.Compatibility;
+using PiSharp.AI.Protocols;
 using PiSharp.AI.Protocols.OpenAICompletions;
 
 namespace PiSharp.AI.Providers;
 
 /// <summary>Explicit synthetic rates per million tokens, independent of provider/catalog selection.</summary>
 public sealed record OpenAICompletionsTokenRates(decimal Input = 0, decimal Output = 0,
-    decimal CacheRead = 0, decimal CacheWrite = 0);
+    decimal CacheRead = 0, decimal CacheWrite = 0)
+{ public ImmutableArray<TokenRateTier> Tiers { get; init; } = []; }
 
 public sealed record OpenAICompletionsWireOptions(int MaximumChunks = 4096, int MaximumChunkCharacters = 65_536,
     int MaximumInputCharacters = 1_048_576, int MaximumContentSlots = 64, int MaximumContentCharacters = 1_048_576,
@@ -45,7 +48,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             _options.MaximumJsonDepth is < 1 or > 64)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid Completions stream limits.");
         var rates = _options.Rates ?? new();
-        if (rates.Input < 0 || rates.Output < 0 || rates.CacheRead < 0 || rates.CacheWrite < 0)
+        if (rates.Input < 0 || rates.Output < 0 || rates.CacheRead < 0 || rates.CacheWrite < 0 || !PromptLengthPricing.Valid(rates.Tiers))
             throw new ArgumentOutOfRangeException(nameof(options), "Completions token rates must be nonnegative.");
     }
 
@@ -677,10 +680,13 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             Charge(extraCharacters - _usageCharacters); _usageCharacters = extraCharacters;
             // Pinned models.ts: three divide-then-multiply terms, cache write
             // multiplies before dividing, and the total is left associative.
-            var costInput = (double)_rates.Input / 1_000_000d * input;
-            var costOutput = (double)_rates.Output / 1_000_000d * output;
-            var costRead = (double)_rates.CacheRead / 1_000_000d * cacheRead;
-            var costWrite = (double)_rates.CacheWrite * write / 1_000_000d;
+            // Pi abe508 models.ts calculateCost: the prompt-length tier is chosen from Number token sums.
+            var rates = PromptLengthPricing.TrySelect(_rates.Tiers, candidate => (double)candidate.InputTokensAbove, (double)input, cacheRead, write, out var tier)
+                ? (Input: tier.Input, Output: tier.Output, CacheRead: tier.CacheRead, CacheWrite: tier.CacheWrite) : (_rates.Input, _rates.Output, _rates.CacheRead, _rates.CacheWrite);
+            var costInput = (double)rates.Input / 1_000_000d * input;
+            var costOutput = (double)rates.Output / 1_000_000d * output;
+            var costRead = (double)rates.CacheRead / 1_000_000d * cacheRead;
+            var costWrite = (double)rates.CacheWrite * write / 1_000_000d;
             var total = ((costInput + costOutput) + costRead) + costWrite;
             if (!double.IsFinite(total)) throw Protocol();
             var sourceCost = JsonData.Parse(EcmaScriptJsonProjection.Project(JsonSerializer.Serialize(new

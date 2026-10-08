@@ -21,8 +21,8 @@ using PiSharp.Contracts;
 // Authored expectations derived by reading Pi v1.1.0 (abe508e1b89912adde45528136c3221eb69acdd7) source text:
 // api/anthropic-messages.ts, api/constrained-sampling.ts, api/simple-options.ts, api/openai-completions.ts,
 // api/openai-responses.ts, api/azure-openai-responses.ts, providers/azure.ts, env-api-keys.ts, utils/retry.ts,
-// utils/provider-retry.ts, utils/overflow.ts, api/mistral-conversations.ts, utils/estimate.ts, utils/pi-user-agent.ts
-// and the @earendil-works/pi-ai@1.1.0 catalog shards. Nothing here executes upstream code or is an upstream capture;
+// utils/provider-retry.ts, utils/overflow.ts, api/mistral-conversations.ts, utils/estimate.ts, utils/pi-user-agent.ts,
+// api/openai-responses-shared.ts, utils/transcript.ts, models.ts and the @earendil-works/pi-ai@1.1.0 catalog shards. Nothing here executes upstream code or is an upstream capture;
 // no network, provider or credential is used.
 internal static class Program
 {
@@ -50,7 +50,12 @@ internal static class Program
             ("retry.google-unusable-delays-backoff-and-no-retry-statuses", GoogleBackoff),
             ("estimate.request-estimators-use-three-and-a-half-chars-per-token", TokenEstimates),
             ("google.user-agent-retained-with-header-precedence", GoogleUserAgent),
-            ("catalog.pi-ai-1.1.0-shards-hashes-and-additions", Catalog)
+            ("catalog.pi-ai-1.1.0-shards-hashes-and-additions", Catalog),
+            ("responses.ctc-replay-same-provider-and-streamed-grammar-call", ResponsesCtcSameProvider),
+            ("responses.ctc-replay-cross-provider", ResponsesCtcCrossProvider),
+            ("responses.ctc-replay-grammar-then-function-call-and-support-switch", ResponsesCtcMixed),
+            ("pricing.prompt-length-tier-anthropic-haiku-5-5-catalog-boundaries", AnthropicPromptLengthPricing),
+            ("pricing.prompt-length-tier-completions-responses-google-mistral-boundaries", SharedPromptLengthPricing)
         };
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
@@ -555,6 +560,253 @@ internal static class Program
         Check(mistral.TryGetModel(CatalogModelType.Chat, "open-mistral-7b", out _) && mistral.TryGetModel(CatalogModelType.Chat, "codestral-latest", out _),
             "Mistral models used by existing CLI selections disappeared.");
         return Task.CompletedTask;
+    }
+
+    // ---------------------------------------------------------------- 8. Grammar tool replay ids (ctc_), Pi 1.0.0
+
+    // openai-responses-shared.ts convertResponsesMessages: an item id survives only for the same model and only when it matches
+    // the replayed item type (function_call fc_*, custom_tool_call ctc_*); foreign ids are first normalized to fc_<shortHash>.
+    // The expected input and tools arrays equal Pi v1.1.0 convertResponsesMessages/convertResponsesTools output for the same
+    // transcripts as JSON values; PiSharp keeps its existing key order for function_call items (id last).
+    private static readonly ModelDescriptor GrammarModel = new("gpt-5-fixture", "openai-responses", "openai");
+    private const string Codemode = """{"name":"codemode","description":"Run code","parameters":{"type":"object","properties":{"code":{"type":"string"}},"required":["code"]},"constrainedSampling":{"type":"grammar","variants":{"openai_lark":"start: /.+/"}}}""";
+    private const string ReadTool = """{"name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}""";
+    private static TranscriptEntry GrammarSystem => Entry("""{"role":"system","content":"Base","toolsAdded":[""" + Codemode + "," + ReadTool + """],"timestamp":0}""");
+    private const string CustomTool = """{"type":"custom","name":"codemode","description":"Run code","format":{"type":"grammar","syntax":"lark","definition":"start: /.+/"}}""";
+    private const string ReadFunction = """{"type":"function","name":"read","description":"Read a file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}""";
+    private const string CodemodeFunction = """{"type":"function","name":"codemode","description":"Run code","parameters":{"type":"object","properties":{"code":{"type":"string"}},"required":["code"]}}""";
+    private static TranscriptEntry User(string text, int timestamp) => Entry("{\"role\":\"user\",\"content\":\"" + text + "\",\"timestamp\":" + timestamp + "}");
+    private static TranscriptEntry Calls(string provider, string api, string model, int timestamp, params (string Id, string Name, string Arguments)[] calls) =>
+        new("assistant", PiWireJson.WriteMessage(new(api, provider, model, timestamp,
+            [.. calls.Select(call => (AssistantContent)new ToolCallContent(call.Id, call.Name, JsonData.Parse(call.Arguments)))], TokenUsage.Zero, StopReason.ToolUse)));
+    private static TranscriptEntry Result(string id, string name, string text, int timestamp) => Entry("{\"role\":\"toolResult\",\"toolCallId\":\"" + id +
+        "\",\"toolName\":\"" + name + "\",\"content\":[{\"type\":\"text\",\"text\":\"" + text + "\"}],\"isError\":false,\"timestamp\":" + timestamp + "}");
+    private static string GrammarBody(string input, string tools) =>
+        """{"model":"gpt-5-fixture","input":[{"role":"system","content":"Base"},{"role":"user","content":[{"type":"input_text","text":"go"}]},""" + input + """],"stream":true,"store":false,"tools":[""" + tools + "]}";
+    private const string Completed = """{"type":"response.completed","response":{"id":"r","status":"completed","output":[],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}}""";
+
+    private static JsonData GrammarMetadata(bool grammar) => JsonData.Parse("""{"id":"gpt-5-fixture","name":"Grammar","api":"openai-responses","provider":"openai","baseUrl":"https://api.openai.com/v1","reasoning":false,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"contextWindow":1000,"maxTokens":100,"compat":{"supportsOpenAIGrammarTools":""" +
+        (grammar ? "true" : "false") + "}}");
+
+    // Native composition binds compat.supportsOpenAIGrammarTools; each request body is captured from the fake handler.
+    private static async Task<(List<string> Bodies, List<ChatResult> Results)> GrammarExchange(bool grammar, params (TranscriptEntry[] Messages, string Response)[] turns)
+    {
+        var bodies = new List<string>(); var results = new List<ChatResult>(); var turn = 0;
+        using var handler = new Handler(async request => { bodies.Add(await request.Content!.ReadAsStringAsync()); return Sse(null, turns[turn - 1].Response); });
+        using var provider = NativeProviderFactory.CreateResponses(GrammarModel, new("https://api.openai.com/v1/responses"), Key, new(false), null, handler, GrammarMetadata(grammar));
+        foreach (var (messages, _) in turns)
+        {
+            turn++;
+            results.Add(await new ChatClient(provider).CompleteAsync(new ChatRequest(GrammarModel, [.. messages], 1)).WaitAsync(Deadline));
+        }
+        return (bodies, results);
+    }
+    private static string Frames(params string[] events) => string.Concat(events.Select(value => "data: " + value + "\n\n")) + "data: [DONE]\n\n";
+
+    private static async Task ResponsesCtcSameProvider()
+    {
+        // A custom_tool_call streamed by this model: its input becomes {"code":...} through grammar-input JSON deltas.
+        const string item = """{"type":"custom_tool_call","id":"ctc_s","call_id":"call_s","name":"codemode","input":"print(\"hi\")\n"}""";
+        var stream = Frames("""{"type":"response.created","response":{"id":"r1"}}""",
+            """{"type":"response.output_item.added","output_index":0,"item":{"type":"custom_tool_call","id":"ctc_s","call_id":"call_s","name":"codemode","input":""}}""",
+            """{"type":"response.custom_tool_call_input.delta","output_index":0,"item_id":"ctc_s","delta":"print(\"hi\")"}""",
+            """{"type":"response.custom_tool_call_input.delta","output_index":0,"item_id":"ctc_s","delta":"\n"}""",
+            """{"type":"response.custom_tool_call_input.done","output_index":0,"item_id":"ctc_s","input":"print(\"hi\")\n"}""",
+            """{"type":"response.output_item.done","output_index":0,"item":""" + item + "}",
+            """{"type":"response.completed","response":{"id":"r1","status":"completed","output":[""" + item + """],"usage":{"input_tokens":5,"output_tokens":3,"total_tokens":8}}}""");
+        var deltas = new List<string>(); AssistantMessage? streamed = null;
+        using (var handler = new Handler(_ => Task.FromResult(Sse(null, stream))))
+        using (var provider = NativeProviderFactory.CreateResponses(GrammarModel, new("https://api.openai.com/v1/responses"), Key, new(false), null, handler, GrammarMetadata(true)))
+            await foreach (var progress in provider.Transport.StreamAsync(new(GrammarModel, [GrammarSystem, User("go", 1)], 1)).WithCancellation(CancellationToken.None))
+                if (progress is ToolCallDelta delta) deltas.Add(delta.Delta);
+                else if (progress is StreamDone done) streamed = done.Message;
+        // appendGrammarToolInputJsonDelta: the opening key, each escaped input delta, and the closing quote on done; output_item.done adds nothing.
+        Equal("""{"code":"print(\"hi\")|\n|"}""", string.Join("|", deltas));
+        Check(streamed is { StopReason: StopReason.ToolUse } && streamed.Content.Single() is ToolCallContent { Id: "call_s|ctc_s", Name: "codemode" } call &&
+            call.Arguments.ToString() == """{"code":"print(\"hi\")\n"}""", "Streamed grammar call was not mapped.");
+
+        // Same model: the streamed ctc_ id is replayed with the custom_tool_call and its custom output.
+        var (bodies, _) = await GrammarExchange(true,
+            ([GrammarSystem, User("go", 1), new("assistant", PiWireJson.WriteMessage(streamed!)), Result("call_s|ctc_s", "codemode", "hi", 3)], Frames(Completed)),
+            ([GrammarSystem, User("go", 1), Calls("openai", "openai-responses", "gpt-5-other", 2, ("call_g1|ctc_g1", "codemode", """{"code":"print(1)"}""")),
+                Result("call_g1|ctc_g1", "codemode", "1", 3), User("next", 4)], Frames(Completed)));
+        BodyEqual(GrammarBody("""{"type":"custom_tool_call","id":"ctc_s","call_id":"call_s","name":"codemode","input":"print(\"hi\")\n"},{"type":"custom_tool_call_output","call_id":"call_s","output":"hi"}""",
+            CustomTool + "," + ReadFunction), bodies[0]);
+        // Same provider and api, different model: the id is dropped to avoid reasoning-item pairing validation.
+        BodyEqual(GrammarBody("""{"type":"custom_tool_call","call_id":"call_g1","name":"codemode","input":"print(1)"},{"type":"custom_tool_call_output","call_id":"call_g1","output":"1"},{"role":"user","content":[{"type":"input_text","text":"next"}]}""",
+            CustomTool + "," + ReadFunction), bodies[1]);
+    }
+
+    private static async Task ResponsesCtcCrossProvider()
+    {
+        // A gateway Responses provider: ctc_g2 is normalized to fc_<shortHash("ctc_g2")>, which a custom_tool_call cannot carry (the
+        // 1.0.0 "Expected an ID that begins with 'ctc'" fix), while its function call keeps fc_<shortHash("fc_r2")>. An Anthropic id has no item id.
+        var (bodies, _) = await GrammarExchange(true, ([GrammarSystem, User("go", 1),
+            Calls("radius", "openai-responses", "gpt-5-fixture", 2, ("call_g2|ctc_g2", "codemode", """{"code":"print(2)"}"""), ("call_r2|fc_r2", "read", """{"path":"a.txt"}""")),
+            Result("call_g2|ctc_g2", "codemode", "2", 3), Result("call_r2|fc_r2", "read", "A", 4), User("again", 5),
+            Calls("anthropic", "anthropic-messages", "claude-haiku-5-5", 6, ("toolu_01", "codemode", """{"code":"print(3)"}""")), Result("toolu_01", "codemode", "3", 7), User("done", 8)], Frames(Completed)));
+        BodyEqual(GrammarBody("""{"type":"custom_tool_call","call_id":"call_g2","name":"codemode","input":"print(2)"},{"type":"function_call","call_id":"call_r2","name":"read","arguments":"{\"path\":\"a.txt\"}","id":"fc_axkwo3n4q33o"},""" +
+            """{"type":"custom_tool_call_output","call_id":"call_g2","output":"2"},{"type":"function_call_output","call_id":"call_r2","output":"A"},{"role":"user","content":[{"type":"input_text","text":"again"}]},""" +
+            """{"type":"custom_tool_call","call_id":"toolu_01","name":"codemode","input":"print(3)"},{"type":"custom_tool_call_output","call_id":"toolu_01","output":"3"},{"role":"user","content":[{"type":"input_text","text":"done"}]}""",
+            CustomTool + "," + ReadFunction), bodies[0]);
+    }
+
+    private static async Task ResponsesCtcMixed()
+    {
+        TranscriptEntry[] messages = [GrammarSystem, User("go", 1),
+            Calls("openai", "openai-responses", "gpt-5-fixture", 2, ("call_g3|ctc_g3", "codemode", """{"code":"print(4)"}"""), ("call_r3|fc_r3", "read", """{"path":"b.txt"}""")),
+            Result("call_g3|ctc_g3", "codemode", "4", 3), Result("call_r3|fc_r3", "read", "B", 4), User("more", 5),
+            Calls("openai", "openai-responses", "gpt-5-fixture", 6, ("call_g4|fc_g4", "codemode", """{"code":"print(5)"}""")), Result("call_g4|fc_g4", "codemode", "5", 7), User("end", 8)];
+        // Grammar call then function call in one turn keep ctc_ and fc_; an fc_ id recorded while grammar was unsupported is dropped.
+        var (grammar, _) = await GrammarExchange(true, (messages, Frames(Completed)));
+        BodyEqual(GrammarBody("""{"type":"custom_tool_call","id":"ctc_g3","call_id":"call_g3","name":"codemode","input":"print(4)"},{"type":"function_call","call_id":"call_r3","name":"read","arguments":"{\"path\":\"b.txt\"}","id":"fc_r3"},""" +
+            """{"type":"custom_tool_call_output","call_id":"call_g3","output":"4"},{"type":"function_call_output","call_id":"call_r3","output":"B"},{"role":"user","content":[{"type":"input_text","text":"more"}]},""" +
+            """{"type":"custom_tool_call","call_id":"call_g4","name":"codemode","input":"print(5)"},{"type":"custom_tool_call_output","call_id":"call_g4","output":"5"},{"role":"user","content":[{"type":"input_text","text":"end"}]}""",
+            CustomTool + "," + ReadFunction), grammar[0]);
+        // Without grammar support the same history replays as function calls: ctc_g3 is dropped and fc_g4 is kept.
+        var (plain, _) = await GrammarExchange(false, (messages, Frames(Completed)));
+        BodyEqual(GrammarBody("""{"type":"function_call","call_id":"call_g3","name":"codemode","arguments":"{\"code\":\"print(4)\"}"},{"type":"function_call","call_id":"call_r3","name":"read","arguments":"{\"path\":\"b.txt\"}","id":"fc_r3"},""" +
+            """{"type":"function_call_output","call_id":"call_g3","output":"4"},{"type":"function_call_output","call_id":"call_r3","output":"B"},{"role":"user","content":[{"type":"input_text","text":"more"}]},""" +
+            """{"type":"function_call","call_id":"call_g4","name":"codemode","arguments":"{\"code\":\"print(5)\"}","id":"fc_g4"},{"type":"function_call_output","call_id":"call_g4","output":"5"},{"role":"user","content":[{"type":"input_text","text":"end"}]}""",
+            CodemodeFunction + "," + ReadFunction), plain[0]);
+    }
+
+    // ---------------------------------------------------------------- 9. Prompt-length pricing tiers, Pi 1.1.0
+
+    // models.ts calculateCost: inputTokens = input + cacheRead + cacheWrite; a tier applies only strictly above inputTokensAbove,
+    // the greatest matching threshold prices the whole request (first of equal thresholds), and 1h cache writes cost 2x the
+    // selected input rate. Decimal paths are exact; binary64 paths equal Pi v1.1.0 calculateCost's Number results.
+    private static string RepositoryFile(params string[] parts)
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "PiSharp.slnx"))) root = root.Parent;
+        return Path.Combine([root?.FullName ?? throw new InvalidOperationException("Repository root (PiSharp.slnx) not found."), .. parts]);
+    }
+    private static JsonData CatalogRow(string provider, string id) =>
+        FrozenModelCatalog.ReadProviderJson(provider, File.ReadAllBytes(RepositoryFile("src", "PiSharp.Cli", "Models", provider + ".json")))
+            .TryGetModel(CatalogModelType.Chat, id, out var row) ? row!.Raw : throw new InvalidOperationException(id + " missing.");
+    private static void Cost(TokenUsage usage, decimal input, decimal output, decimal cacheRead, decimal cacheWrite, decimal total) =>
+        Equal((input, output, cacheRead, cacheWrite, total), (usage.Cost.Input, usage.Cost.Output, usage.Cost.CacheRead, usage.Cost.CacheWrite, usage.Cost.Total));
+
+    private static async Task AnthropicPromptLengthPricing()
+    {
+        var haiku = CatalogRow("anthropic", "claude-haiku-5-5");
+        Equal("""{"input":0.1,"output":0.5,"cacheRead":0.01,"cacheWrite":0.125,"tiers":[{"inputTokensAbove":100000,"input":0.5,"output":2.5,"cacheRead":0.05,"cacheWrite":0.625}]}""",
+            haiku.Value.GetProperty("cost").GetRawText());
+        async Task<AssistantMessage> Usage(JsonData metadata, string responseModel, object startUsage, int output, bool factory = false)
+        {
+            static string Frame(string type, object value) => "event: " + type + "\ndata: " + JsonSerializer.Serialize(value) + "\n\n";
+            var stream = Frame("message_start", new { type = "message_start", message = new { id = "authored", role = "assistant", model = responseModel, content = Array.Empty<object>(), usage = startUsage } })
+                + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = new { type = "text", text = "" } })
+                + Frame("content_block_delta", new { type = "content_block_delta", index = 0, delta = new { type = "text_delta", text = "ok" } })
+                + Frame("content_block_stop", new { type = "content_block_stop", index = 0 })
+                + Frame("message_delta", new { type = "message_delta", delta = new { stop_reason = "end_turn" }, usage = new { output_tokens = output } })
+                + Frame("message_stop", new { type = "message_stop" });
+            var model = new ModelDescriptor(metadata.Value.GetProperty("id").GetString()!, "anthropic-messages", "anthropic");
+            using var handler = new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(stream, Encoding.UTF8, "text/event-stream") }));
+            ChatResult result;
+            if (factory)
+            {
+                // Native composition: the catalog row binds rates and fallback costs.
+                using var provider = NativeProviderFactory.CreateAnthropic(model, new("https://api.anthropic.com/"), Key,
+                    new(MaximumTokens: 4096, ModelReasoning: true, ThinkingEnabled: false), null, handler, metadata);
+                result = await new ChatClient(provider).CompleteAsync(new(model, [Ask], 1)).WaitAsync(Deadline);
+            }
+            else
+            {
+                // NativeThinkingProfile refuses Haiku 5.5's metadata (per-message effort without thinking off), so the catalog
+                // cost binding is composed over the Messages HTTP transport directly.
+                var requests = new AnthropicMessagesKeyAuthRequestFactory(new("https://api.anthropic.com/"), model, new(4096));
+                using var client = new HttpClient(handler);
+                var transport = new AnthropicMessagesHttpSseTransport(client, (request, token) => requests.Create(request, Key, token),
+                    messagesOptions: NativeProviderFactory.AnthropicMessagesOptionsForModel(metadata));
+                result = await new ChatClient(transport).CompleteAsync(new(model, [Ask], 1)).WaitAsync(Deadline);
+            }
+            Equal(StopReason.Stop, result.Message.StopReason);
+            return result.Message;
+        }
+        // Exactly 100000 input tokens, cache reads included: base rates.
+        Cost((await Usage(haiku, "claude-haiku-5-5", new { input_tokens = 99000, cache_read_input_tokens = 1000, output_tokens = 0 }, 1000)).Usage,
+            0.0099m, 0.0005m, 0.00001m, 0m, 0.01041m);
+        // One cache read more: the tier prices the whole request.
+        Cost((await Usage(haiku, "claude-haiku-5-5", new { input_tokens = 99000, cache_read_input_tokens = 1001, output_tokens = 0 }, 1000)).Usage,
+            0.0495m, 0.0025m, 0.00005005m, 0m, 0.05205005m);
+        // Cache writes count too; 1h writes cost twice the selected input rate (6000 x 0.125 + 4000 x 0.2 at base).
+        Cost((await Usage(haiku, "claude-haiku-5-5", new { input_tokens = 90000, cache_creation_input_tokens = 10000, cache_creation = new { ephemeral_1h_input_tokens = 4000 }, output_tokens = 0 }, 500)).Usage,
+            0.009m, 0.00025m, 0m, 0.00155m, 0.0108m);
+        // One write more: 6001 x 0.625 + 4000 x 1.0 per million.
+        Cost((await Usage(haiku, "claude-haiku-5-5", new { input_tokens = 90000, cache_creation_input_tokens = 10001, cache_creation = new { ephemeral_1h_input_tokens = 4000 }, output_tokens = 0 }, 500)).Usage,
+            0.045m, 0.00125m, 0m, 0.007750625m, 0.054000625m);
+        // compat.allowedFallbackModels: an answer from the listed fallback model is priced with that entry's cost.
+        var fable = CatalogRow("anthropic", "claude-fable-5");
+        var fallback = await Usage(fable, "claude-opus-4-8", new { input_tokens = 1000, output_tokens = 0 }, 100, factory: true);
+        Equal("claude-opus-4-8", fallback.ExtraProperties!.TryGet("responseModel", out var answered) ? answered!.Value.GetString() : null);
+        Cost(fallback.Usage, 0.005m, 0.0025m, 0m, 0m, 0.0075m);
+        Cost((await Usage(fable, "claude-fable-5", new { input_tokens = 1000, output_tokens = 0 }, 100, factory: true)).Usage, 0.01m, 0.005m, 0m, 0m, 0.015m);
+    }
+
+    private static async Task SharedPromptLengthPricing()
+    {
+        // Completions (binary64): the OpenRouter catalog row carries the Haiku tier.
+        var latest = CatalogRow("openrouter", "~anthropic/claude-haiku-latest");
+        var router = new ModelDescriptor("~anthropic/claude-haiku-latest", "openai-completions", "openrouter");
+        async Task<TokenUsage> Completions(int prompt, int cached, int written)
+        {
+            var usage = "{\"choices\":[],\"usage\":{\"prompt_tokens\":" + prompt + ",\"completion_tokens\":1000,\"prompt_tokens_details\":{\"cached_tokens\":" + cached + ",\"cache_write_tokens\":" + written + "}}}";
+            using var handler = new Handler(_ => Task.FromResult(Sse(null, "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\ndata: " + usage + "\n\ndata: [DONE]\n\n")));
+            using var provider = NativeProviderFactory.CreateCompletions(router, new("https://openrouter.ai/api/v1/chat/completions"), Key, new(Reasoning: true, SupportsDeveloperRole: false),
+                new(MaxTokensField: "max_tokens", SupportsStore: false, SupportsLongCacheRetention: false) { ModelMetadata = latest }, handler, latest);
+            return (await new ChatClient(provider).CompleteAsync(new(router, [Ask], 1)).WaitAsync(Deadline)).Message.Usage;
+        }
+        Cost(await Completions(100000, 1000, 0), 0.0099m, 0.0005m, 0.00001m, 0m, 0.01041m);
+        Cost(await Completions(100001, 1001, 0), 0.049499999999999995m, 0.0025m, 0.000050050000000000004m, 0m, 0.05205005m);
+        Cost(await Completions(100001, 0, 10001), 0.045m, 0.0025m, 0m, 0.006250625m, 0.053750625m);
+
+        // Responses (decimal): GPT-5.4 at its 272000 threshold, cached tokens included in input_tokens.
+        var gpt = CatalogRow("openai", "gpt-5.4");
+        var gptModel = new ModelDescriptor("gpt-5.4", "openai-responses", "openai");
+        async Task<TokenUsage> Responses(int input, int cached)
+        {
+            var completed = "{\"type\":\"response.completed\",\"response\":{\"id\":\"r\",\"status\":\"completed\",\"output\":[],\"usage\":{\"input_tokens\":" + input +
+                ",\"input_tokens_details\":{\"cached_tokens\":" + cached + "},\"output_tokens\":1000,\"total_tokens\":" + (input + 1000) + "}}}";
+            using var handler = new Handler(_ => Task.FromResult(Sse(completed)));
+            using var provider = NativeProviderFactory.CreateResponses(gptModel, new("https://api.openai.com/v1/responses"), Key, new(true), null, handler, gpt);
+            return (await new ChatClient(provider).CompleteAsync(new(gptModel, [Ask], 1)).WaitAsync(Deadline)).Message.Usage;
+        }
+        Cost(await Responses(272000, 2000), 0.675m, 0.015m, 0.0005m, 0m, 0.6905m);
+        Cost(await Responses(272001, 2001), 1.35m, 0.0225m, 0.0010005m, 0m, 1.3735005m);
+
+        // Authored tiers in source order [1000, 500, 1000]: exactly 1000 selects 500, 1001 selects the first 1000 tier, 501 selects 500.
+        const string tiers = """[{"inputTokensAbove":1000,"input":4,"output":6,"cacheRead":1,"cacheWrite":0},{"inputTokensAbove":500,"input":9,"output":9,"cacheRead":9,"cacheWrite":0},{"inputTokensAbove":1000,"input":7,"output":7,"cacheRead":7,"cacheWrite":0}]""";
+        // Google (binary64): input = promptTokenCount - cachedContentTokenCount; no cache writes.
+        var google = JsonData.Parse(GoogleMetadata().ToString().Replace("\"cacheWrite\":0}", "\"cacheWrite\":0,\"tiers\":" + tiers + "}", StringComparison.Ordinal));
+        async Task<TokenUsage> Google(int prompt, int cached)
+        {
+            var chunk = "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ok\"}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":" + prompt +
+                ",\"cachedContentTokenCount\":" + cached + ",\"candidatesTokenCount\":10,\"totalTokenCount\":" + (prompt + 10) + "}}";
+            using var handler = new Handler(_ => Task.FromResult(Sse(null, "data: " + chunk + "\n\n")));
+            using var client = new HttpClient(handler);
+            var transport = new GoogleGenerativeAIHttpTransport(client, Gemini, new GoogleGenerativeAIOptions(google, Key));
+            return (await new ChatClient(transport).CompleteAsync(new(Gemini, [Ask], 1)).WaitAsync(Deadline)).Message.Usage;
+        }
+        Cost(await Google(1000, 200), 0.0072m, 0.00009m, 0.0018m, 0m, 0.009089999999999999m);
+        Cost(await Google(1001, 201), 0.0031999999999999997m, 0.00006m, 0.00020099999999999998m, 0m, 0.0034609999999999997m);
+        Cost(await Google(501, 1), 0.0045000000000000005m, 0.00009m, 0.000009m, 0m, 0.004599000000000001m);
+
+        // Mistral (binary64): input = prompt_tokens - cached tokens.
+        var mistralModel = new ModelDescriptor("mistral-fixture", "mistral-conversations", "mistral");
+        var endpoint = new Uri("https://api.mistral.ai/");
+        async Task<TokenUsage> Mistral(int prompt, int cached)
+        {
+            var usage = "{\"choices\":[],\"usage\":{\"prompt_tokens\":" + prompt + ",\"completion_tokens\":10,\"prompt_tokens_details\":{\"cached_tokens\":" + cached + "},\"total_tokens\":" + (prompt + 10) + "}}";
+            using var handler = new Handler(_ => Task.FromResult(Sse(null, "data: {\"id\":\"m\",\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\ndata: " + usage + "\n\ndata: [DONE]\n\n")));
+            var costs = new MistralTokenCosts(2, 3, 0.5, 0) { Tiers = [new(1000, 4, 6, 1, 0), new(500, 9, 9, 9, 0), new(1000, 7, 7, 7, 0)] };
+            using var provider = NativeProviderFactory.CreateMistral(mistralModel, endpoint, Key, new MistralTextOptions(endpoint, true, costs, "offline-fixture"), handler);
+            return (await new ChatClient(provider).CompleteAsync(new(mistralModel, [Ask], 1)).WaitAsync(Deadline)).Message.Usage;
+        }
+        Cost(await Mistral(1000, 200), 0.0072m, 0.00009m, 0.0018m, 0m, 0.009089999999999999m);
+        Cost(await Mistral(1001, 201), 0.0031999999999999997m, 0.00006m, 0.00020099999999999998m, 0m, 0.0034609999999999997m);
+        Cost(await Mistral(501, 1), 0.0045000000000000005m, 0.00009m, 0.000009m, 0m, 0.004599000000000001m);
     }
 
     // ---------------------------------------------------------------- helpers

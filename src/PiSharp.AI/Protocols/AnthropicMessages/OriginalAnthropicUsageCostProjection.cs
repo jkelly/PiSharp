@@ -18,6 +18,10 @@ internal static class OriginalAnthropicUsageCostProjection
         // In particular, do not cast the already-rounded native decimal costs.
         double inputRate = Number(rates.Input), outputRate = Number(rates.Output);
         double readRate = Number(rates.CacheRead), writeRate = Number(rates.CacheWrite);
+        // models.ts calculateCost compares Number token sums with each tier's Number threshold.
+        if (PromptLengthPricing.TrySelect(rates.Tiers.IsDefault ? [] : rates.Tiers, candidate => Number(candidate.InputTokensAbove),
+            (double)usage.Input, (double)usage.CacheRead, (double)usage.CacheWrite, out var tier))
+        { inputRate = Number(tier.Input); outputRate = Number(tier.Output); readRate = Number(tier.CacheRead); writeRate = Number(tier.CacheWrite); }
         double longWrite = cacheWrite1h;
         double shortWrite = (double)usage.CacheWrite - longWrite;
         double input = (inputRate / 1_000_000d) * (double)usage.Input;

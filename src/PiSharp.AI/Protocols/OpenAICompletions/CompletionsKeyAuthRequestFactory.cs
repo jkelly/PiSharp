@@ -418,12 +418,25 @@ public sealed class CompletionsKeyAuthRequestFactory
                     { SupportsStrictMode = Flag("supportsStrictMode", false), SupportsOpenAIGrammarTools = grammarTools }
             };
             if (!model.TryGetProperty("cost", out var cost) || cost.ValueKind != JsonValueKind.Object) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
-            decimal Rate(string name)
+            decimal Rate(string name, JsonElement? table = null)
             {
-                if (!cost.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var number) || !double.IsFinite(number) || number < 0)
+                if (!(table ?? cost).TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var number) || !double.IsFinite(number) || number < 0)
                     throw Fail(CompletionsRequestFailure.InvalidConfiguration);
                 if (!value.TryGetDecimal(out var rate) || (double)rate != number) throw Fail(CompletionsRequestFailure.UnsupportedContent);
                 return rate;
+            }
+            // Pi abe508 models.ts calculateCost: source-ordered prompt-length tiers.
+            var tiers = ImmutableArray.CreateBuilder<TokenRateTier>();
+            if (cost.TryGetProperty("tiers", out var declaredTiers) && declaredTiers.ValueKind != JsonValueKind.Null)
+            {
+                if (declaredTiers.ValueKind != JsonValueKind.Array) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
+                foreach (var tier in declaredTiers.EnumerateArray())
+                {
+                    if (tier.ValueKind != JsonValueKind.Object || !tier.TryGetProperty("inputTokensAbove", out var threshold) || threshold.ValueKind != JsonValueKind.Number ||
+                        !threshold.TryGetDouble(out var above) || !double.IsFinite(above)) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
+                    if (!threshold.TryGetDecimal(out var exact) || (double)exact != above) throw Fail(CompletionsRequestFailure.UnsupportedContent);
+                    tiers.Add(new(exact, Rate("input", tier), Rate("output", tier), Rate("cacheRead", tier), Rate("cacheWrite", tier)));
+                }
             }
             JsonData? priority = null;
             if (compat.TryGetProperty("vllmPriority", out var priorityValue))
@@ -432,7 +445,7 @@ public sealed class CompletionsKeyAuthRequestFactory
                 priority = JsonData.FromElement(priorityValue);
             }
             return new(options, projection, cacheFormat, Object(compat, "openRouterRouting"), Object(model, "samplingParams"), priority,
-                new(SupportsFinishReason: Flag("supportsFinishReason", true), Rates: new(Rate("input"), Rate("output"), Rate("cacheRead"), Rate("cacheWrite")))
+                new(SupportsFinishReason: Flag("supportsFinishReason", true), Rates: new(Rate("input"), Rate("output"), Rate("cacheRead"), Rate("cacheWrite")) { Tiers = tiers.ToImmutable() })
                     { SupportsOpenAIGrammarTools = grammarTools }, thinkingFormat, budgetField, modelMaxTokens,
                 Object(compat, "chatTemplateKwargs"), Object(compat, "chatTemplateArgs"), Flag("zaiToolStream", false),
                 Object(model, "samplingParamsByThinkingLevel"));
