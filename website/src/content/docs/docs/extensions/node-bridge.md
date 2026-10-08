@@ -1,9 +1,15 @@
 ---
 title: Node bridge
-description: Run Pi's existing TypeScript extensions alongside native ones.
+description: The in-development bridge for Pi's TypeScript extensions.
 ---
 
-The Node bridge is an optional way to run Pi's existing TypeScript extensions. They run in a separate Node worker that PiSharp starts and supervises. PiSharp installs and runs fully without Node; you only need Node if you turn the bridge on.
+The Node bridge is an optional way to run Pi's TypeScript extensions in a separate Node worker that PiSharp starts and supervises. PiSharp installs and runs fully without Node.
+
+:::caution[In development]
+The bridge is a library today, not a CLI feature. It admits only seven of Pi's example extensions (from Pi v0.99.1), matched by content hash, and there's no CLI switch to turn it on yet. Loading your own extensions and installing packages from npm aren't built. See the **TypeScript extension compatibility** tab on the [Parity](/parity/) page.
+:::
+
+The rest of this page describes how the bridge is designed to work.
 
 ## How it works
 

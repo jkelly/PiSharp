@@ -3,17 +3,17 @@ title: Overview
 description: What PiSharp is, what it targets, and where to start.
 ---
 
-PiSharp is an independent native .NET implementation of the [Pi coding agent](https://pi.dev). It targets .NET 10, has no external package dependencies, and runs without Node.
+PiSharp is an independent native .NET implementation of the [Pi coding agent](https://pi.dev). It targets .NET 10 and runs without Node. The core libraries use no third-party packages; the CLI adds YamlDotNet for prompt-template frontmatter.
 
 PiSharp's version is the Pi version it matches. The current baseline is **Pi v1.1.0**, pinned to commit `abe508e`. See [How versions work](/docs/versioning/).
 
 ## What's included
 
 - **Agent and tools:** the agent loop, built-in file and process tools, steering and follow-up queues.
-- **Providers:** streaming adapters for Anthropic Messages, OpenAI Completions and Responses, Azure Responses, Google Generative AI and Mistral Conversations.
+- **Providers:** streaming adapters for Anthropic Messages, OpenAI Completions and Responses, Azure (Responses and Foundry Chat Completions), Google Generative AI, Google Vertex, Mistral Conversations and Pi Messages. The CLI starts live sessions with Anthropic, OpenAI, OpenRouter, Mistral and Azure.
 - **Sessions:** tree-structured, branchable sessions with compaction.
 - **Frontends:** interactive terminal UI, print/JSON output, and a JSON RPC protocol over stdin/stdout.
-- **Extensions:** a native C# extension SDK, plus an optional Node bridge for Pi's TypeScript extensions.
+- **Extensions:** a native C# extension SDK. A Node bridge for Pi's TypeScript extensions is in development.
 
 Every layer is a separate library. See the [SDK](/sdk/) for the full list.
 

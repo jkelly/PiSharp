@@ -63,13 +63,13 @@ const libraries = packages.filter((p) => p.nuget);
 			</div>
 			<div class="ps-card">
 				<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ps-blue)"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"></path><path d="M9 12l2 2 4-4"></path></svg>
-				<h3 class="card-title">Zero external dependencies</h3>
-				<p class="ps-muted card-text">No third-party packages, a locked restore and a pinned SDK. A short supply chain you can audit.</p>
+				<h3 class="card-title">Minimal dependencies</h3>
+				<p class="ps-muted card-text">The core libraries use no third-party packages; the CLI adds YamlDotNet for prompt templates. A locked restore and a pinned SDK keep the supply chain short.</p>
 			</div>
 			<div class="ps-card">
 				<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ps-blue)"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6"></path></svg>
 				<h3 class="card-title">Extend in C#</h3>
-				<p class="ps-muted card-text">Tools, commands, hooks and UI as native extensions, plus an optional bridge for existing Pi extensions.</p>
+				<p class="ps-muted card-text">Tools, commands, hooks and UI as native extensions, plus an early Node bridge for Pi's TypeScript extensions.</p>
 			</div>
 			<div class="ps-card">
 				<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ps-blue)"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
@@ -93,7 +93,7 @@ const libraries = packages.filter((p) => p.nuget);
 			</div>
 			<div>
 				<h3 class="ps-h3"><em>Bring</em> your providers</h3>
-				<p class="ps-muted">Streaming adapters for Anthropic Messages, OpenAI Completions and Responses, Azure Responses, Google Generative AI and Mistral Conversations, with more landing as parity grows.</p>
+				<p class="ps-muted">Streaming adapters for Anthropic Messages, OpenAI Completions and Responses, Azure, Google Generative AI and Vertex, Mistral Conversations and Pi Messages, with more landing as parity grows.</p>
 				<p class="ps-muted">Switch with <span class="ps-kbd">/model</span>.</p>
 			</div>
 		</div>
@@ -134,7 +134,7 @@ const libraries = packages.filter((p) => p.nuget);
 			<div>
 				<h3 class="ps-h3">Primitives, <em>not features</em></h3>
 				<p class="ps-muted">Register tools, commands, shortcuts, renderers and typed hooks from a plain C# class. Ship it as a NuGet package.</p>
-				<p class="ps-muted">Already have Pi extensions? The optional Node bridge runs them alongside native ones.</p>
+				<p class="ps-muted">Already have Pi extensions? An optional Node bridge is in development. Today it runs a pinned set of Pi's example extensions and isn't switched on from the CLI yet.</p>
 				<a href="/extensions/" class="ps-link-mono">Explore extensions →</a>
 			</div>
 		</div>
@@ -190,8 +190,8 @@ const libraries = packages.filter((p) => p.nuget);
 		<div class="ps-card cta">
 			<div style="flex: 1 1 30rem; min-width: 0">
 				<div class="ps-eyebrow">Already using Pi?</div>
-				<h2 class="ps-h3" style="margin-top: 0.6rem">Bring your sessions, skills and prompts</h2>
-				<p class="ps-muted" style="margin: 0">PiSharp is built to read Pi's AGENTS.md, skills, prompt templates and themes, and to import sessions on request. Your Pi install stays exactly as it is.</p>
+				<h2 class="ps-h3" style="margin-top: 0.6rem">Bring your sessions, credentials and skills</h2>
+				<p class="ps-muted" style="margin: 0">PiSharp reads Pi's session files, shares its <code>auth.json</code>, <code>mcp.json</code> and keybindings, and loads skills and prompt templates you point it at. AGENTS.md, SYSTEM.md and themes aren't read yet.</p>
 			</div>
 			<a href="/docs/coming-from-pi/" class="ps-button">Coming from Pi →</a>
 		</div>
