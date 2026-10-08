@@ -96,6 +96,7 @@ public sealed class ResponsesTranscriptProjector
         private int _outputCharacters = 2;
         private readonly Dictionary<string, string> _idMap = new(StringComparer.Ordinal);
         private readonly HashSet<string> _callIds = new(StringComparer.Ordinal);
+        private Dictionary<string, string> _grammarInputs = new(StringComparer.Ordinal);
 
         public JsonData Run()
         {
@@ -129,6 +130,8 @@ public sealed class ResponsesTranscriptProjector
                 }
                 else { _ = ContentText(body, entry.Role == "toolResult"); entries.Add(new(entry.Role, entry.WireBody)); }
             }
+            // Pi abe508 openai-responses.ts: grammar input properties come from every tool the transcript declared.
+            _grammarInputs = ResponsesGrammar.InputProperties(request, options.ToolDeclarations?.SupportsOpenAIGrammarTools == true, token);
             if (!options.SupportsMidConversationSystemMessages) entries = FoldSystems(entries);
             entries = Transform(entries);
             entries = PairAndOrder(entries);
@@ -161,8 +164,8 @@ public sealed class ResponsesTranscriptProjector
                 else
                 {
                     var output = ContentText(entry.Body.Value, true);
-                    Add(new JsonObject { ["type"] = "function_call_output", ["call_id"] = CallParts(String(entry.Body.Value, "toolCallId")).Call,
-                        ["output"] = output.Length == 0 ? "(no tool output)" : output });
+                    Add(new JsonObject { ["type"] = _grammarInputs.ContainsKey(String(entry.Body.Value, "toolName")) ? "custom_tool_call_output" : "function_call_output",
+                        ["call_id"] = CallParts(String(entry.Body.Value, "toolCallId")).Call, ["output"] = output.Length == 0 ? "(no tool output)" : output });
                 }
                 if (!leadingSystem) messageIndex++;
             }
@@ -333,9 +336,23 @@ public sealed class ResponsesTranscriptProjector
                 else if (part is ToolCallContent tool)
                 {
                     var (call, itemId) = CallParts(tool.Id);
-                    if (different || itemId?.StartsWith("fc_", StringComparison.Ordinal) != true) itemId = null;
-                    var item = new JsonObject { ["type"] = "function_call", ["call_id"] = call, ["name"] = tool.Name, ["arguments"] = ArgumentString(tool.Arguments.Value) };
-                    if (itemId is not null) item["id"] = itemId;
+                    // Pi abe508 (1.0.0) openai-responses-shared.ts: drop the item id of a different model, and any id that does not
+                    // match the replayed item type: function_call ids must be fc_*, custom_tool_call ids ctc_*. Foreign ids were
+                    // normalized to fc_*, and a call switches type when grammar tool support differs.
+                    var grammar = _grammarInputs.TryGetValue(tool.Name, out var inputProperty);
+                    if (different || itemId?.StartsWith(grammar ? "ctc_" : "fc_", StringComparison.Ordinal) != true) itemId = null;
+                    JsonObject item;
+                    if (grammar)
+                    {
+                        item = new JsonObject { ["type"] = "custom_tool_call" };
+                        if (itemId is not null) item["id"] = itemId;
+                        item["call_id"] = call; item["name"] = tool.Name; item["input"] = ResponsesGrammar.Input(tool.Arguments.Value, inputProperty!);
+                    }
+                    else
+                    {
+                        item = new JsonObject { ["type"] = "function_call", ["call_id"] = call, ["name"] = tool.Name, ["arguments"] = ArgumentString(tool.Arguments.Value) };
+                        if (itemId is not null) item["id"] = itemId;
+                    }
                     if (same && tool.ExtraProperties?.TryGet("namespace", out var ns) == true) item["namespace"] = JsonNode.Parse(ns!.ToString());
                     Add(item);
                 }

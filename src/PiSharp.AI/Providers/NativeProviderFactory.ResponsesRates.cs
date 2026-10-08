@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
+using PiSharp.AI.Protocols;
+using PiSharp.AI.Protocols.AnthropicMessages;
 using PiSharp.AI.Protocols.OpenAIResponses;
 using PiSharp.Contracts;
 
@@ -14,28 +16,41 @@ public static partial class NativeProviderFactory
         if (metadata is null || !metadata.Value.TryGetProperty("cost", out var cost) || cost.ValueKind == JsonValueKind.Null) return null;
         try
         {
-            if (cost.ValueKind != JsonValueKind.Object) throw new ArgumentException();
-
-            decimal Rate(JsonElement table, string name)
-            {
-                if (!table.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number ||
-                    !value.TryGetDecimal(out var result) || result < 0) throw new ArgumentException();
-                return result;
-            }
-            var admittedTiers = ImmutableArray.CreateBuilder<ResponsesTokenRateTier>();
-            if (cost.TryGetProperty("tiers", out var tiers) && tiers.ValueKind != JsonValueKind.Null)
-            {
-                if (tiers.ValueKind != JsonValueKind.Array) throw new ArgumentException();
-                foreach (var tier in tiers.EnumerateArray())
-                {
-                    if (tier.ValueKind != JsonValueKind.Object || !tier.TryGetProperty("inputTokensAbove", out var threshold) ||
-                        threshold.ValueKind != JsonValueKind.Number || !threshold.TryGetDecimal(out var above)) throw new ArgumentException();
-                    admittedTiers.Add(new(above, Rate(tier, "input"), Rate(tier, "output"), Rate(tier, "cacheRead"), Rate(tier, "cacheWrite")));
-                }
-            }
-            return new(Rate(cost, "input"), Rate(cost, "output"), Rate(cost, "cacheRead"), Rate(cost, "cacheWrite")) { Tiers = admittedTiers.ToImmutable() };
+            var (input, output, cacheRead, cacheWrite, tiers) = PromptLengthPricing.ReadCost(cost);
+            return new(input, output, cacheRead, cacheWrite)
+            { Tiers = [.. tiers.Select(tier => new ResponsesTokenRateTier(tier.InputTokensAbove, tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite))] };
         }
         catch (Exception error) when (error is ArgumentException or InvalidOperationException or FormatException or OverflowException)
         { throw new ArgumentException("Unsupported native Responses model cost metadata."); }
+    }
+
+    // Pi abe508 anthropic-messages.ts prices usage with calculateCost(model) from model.cost, tiers included, or from the
+    // cost of the compat.allowedFallbackModels entry (first match) naming the model that answered.
+    /// <summary>Binds catalog <c>cost</c> (with prompt-length tiers) and <c>compat.allowedFallbackModels</c> costs to Messages options.</summary>
+    public static AnthropicMessagesOptions? AnthropicMessagesOptionsForModel(JsonData? metadata, AnthropicMessagesOptions? options = null)
+    {
+        if (metadata is null || !metadata.Value.TryGetProperty("cost", out var cost) || cost.ValueKind == JsonValueKind.Null) return options;
+        try
+        {
+            static AnthropicTokenRates Rates(JsonElement table)
+            {
+                var (input, output, cacheRead, cacheWrite, tiers) = PromptLengthPricing.ReadCost(table);
+                return new(input, output, cacheRead, cacheWrite) { Tiers = tiers };
+            }
+            var rates = Rates(cost); var fallbacks = ImmutableArray.CreateBuilder<AnthropicFallbackModel>();
+            if (metadata.Value.TryGetProperty("compat", out var compat) && compat.ValueKind == JsonValueKind.Object &&
+                compat.TryGetProperty("allowedFallbackModels", out var allowed) && allowed.ValueKind != JsonValueKind.Null)
+                foreach (var fallback in allowed.EnumerateArray())
+                {
+                    var provider = fallback.GetProperty("provider").GetString()!; var model = fallback.GetProperty("model").GetString()!;
+                    // A first match without a cost keeps the model's own rates.
+                    if (!fallbacks.Any(known => known.Provider == provider && known.Model == model))
+                        fallbacks.Add(new(provider, model, fallback.TryGetProperty("cost", out var fallbackCost) && fallbackCost.ValueKind != JsonValueKind.Null
+                            ? Rates(fallbackCost) : rates));
+                }
+            return (options ?? new()) with { Rates = rates, AllowedFallbackModels = fallbacks.ToImmutable() };
+        }
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException)
+        { throw new ArgumentException("Unsupported native Anthropic model cost metadata."); }
     }
 }

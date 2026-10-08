@@ -6,7 +6,8 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.AnthropicMessages;
 
-public sealed record AnthropicTokenRates(decimal Input = 0, decimal Output = 0, decimal CacheRead = 0, decimal CacheWrite = 0);
+public sealed record AnthropicTokenRates(decimal Input = 0, decimal Output = 0, decimal CacheRead = 0, decimal CacheWrite = 0)
+{ public ImmutableArray<TokenRateTier> Tiers { get; init; } = []; }
 public sealed record AnthropicFallbackModel(string Provider, string Model, AnthropicTokenRates Rates);
 public sealed record AnthropicMessagesOptions(int MaximumEvents = 4096, int MaximumEventCharacters = 65_536,
     int MaximumInputCharacters = 1_048_576, int MaximumContentSlots = 64, int MaximumContentCharacters = 1_048_576,
@@ -47,7 +48,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
     }
     private static void ValidateRates(AnthropicTokenRates rates)
     {
-        if (rates.Input < 0 || rates.Output < 0 || rates.CacheRead < 0 || rates.CacheWrite < 0)
+        if (rates.Input < 0 || rates.Output < 0 || rates.CacheRead < 0 || rates.CacheWrite < 0 || !PromptLengthPricing.Valid(rates.Tiers))
             throw new ArgumentOutOfRangeException(nameof(rates), "Anthropic token rates must be nonnegative.");
     }
     private static void ValidateIdentity(string value)
@@ -361,9 +362,11 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 _reasoning = Number(thinking);
             if (_cacheWrite1h > write || _reasoning > output) throw Protocol();
             var total = checked(input + output + read + write);
-            var costInput = checked(_rates.Input / 1_000_000m * input); var costOutput = checked(_rates.Output / 1_000_000m * output);
-            var costRead = checked(_rates.CacheRead / 1_000_000m * read);
-            var costWrite = checked((_rates.CacheWrite * (write - _cacheWrite1h) + _rates.Input * 2 * _cacheWrite1h) / 1_000_000m);
+            // Pi abe508 models.ts calculateCost: prompt-length tiers price the whole request, 1h writes at 2x the tier input.
+            var rates = PromptLengthPricing.Select(_rates.Input, _rates.Output, _rates.CacheRead, _rates.CacheWrite, _rates.Tiers, input, read, write);
+            var costInput = checked(rates.Input / 1_000_000m * input); var costOutput = checked(rates.Output / 1_000_000m * output);
+            var costRead = checked(rates.CacheRead / 1_000_000m * read);
+            var costWrite = checked((rates.CacheWrite * (write - _cacheWrite1h) + rates.Input * 2 * _cacheWrite1h) / 1_000_000m);
             var extras = JsonFields.Empty.Set("cacheWrite1h", JsonData.Parse(_cacheWrite1h.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             if (_reasoning is { } tokens) extras = extras.Set("reasoning", JsonData.Parse(tokens.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             _usage = new(input, output, read, write, total, new(costInput, costOutput, costRead, costWrite,

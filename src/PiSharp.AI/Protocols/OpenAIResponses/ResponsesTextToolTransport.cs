@@ -49,7 +49,11 @@ public sealed record ResponsesTextToolOptions(
     int MaximumEvents = 4096, int MaximumEventCharacters = 65_536,
     int MaximumInputCharacters = 1_048_576, int MaximumContentSlots = 64,
     int MaximumContentCharacters = 1_048_576, int MaximumJsonDepth = 32,
-    ResponsesTokenRates? Rates = null, string? ServiceTier = null);
+    ResponsesTokenRates? Rates = null, string? ServiceTier = null)
+{
+    /// <summary>Model compat <c>supportsOpenAIGrammarTools</c>: selects each custom tool call's grammar input property.</summary>
+    public bool SupportsOpenAIGrammarTools { get; init; }
+}
 
 /// <summary>A bounded parsed-DTO adapter. Owns the returned source enumerator, never performs HTTP or executes tools.</summary>
 public sealed class ResponsesTextToolTransport : IChatTransport
@@ -176,34 +180,39 @@ public sealed class ResponsesTextToolTransport : IChatTransport
     private static string Signature(string id, string? phase)
     {
         var builder = new StringBuilder("{\"v\":1,\"id\":");
-        Quote(id);
-        if (!string.IsNullOrEmpty(phase)) { builder.Append(",\"phase\":"); Quote(phase); }
+        Quote(builder, id);
+        if (!string.IsNullOrEmpty(phase)) { builder.Append(",\"phase\":"); Quote(builder, phase); }
         return builder.Append('}').ToString();
-
-        void Quote(string value)
-        {
-            builder.Append('"');
-            foreach (var character in value)
-                switch (character)
-                {
-                    case '"': builder.Append("\\\""); break;
-                    case '\\': builder.Append("\\\\"); break;
-                    case '\b': builder.Append("\\b"); break;
-                    case '\f': builder.Append("\\f"); break;
-                    case '\n': builder.Append("\\n"); break;
-                    case '\r': builder.Append("\\r"); break;
-                    case '\t': builder.Append("\\t"); break;
-                    default:
-                        if (character < 0x20) builder.Append("\\u").Append(((int)character).ToString("x4", System.Globalization.CultureInfo.InvariantCulture));
-                        else builder.Append(character);
-                        break;
-                }
-            builder.Append('"');
-        }
+    }
+    private static string Quoted(string value) { var builder = new StringBuilder(); Quote(builder, value); return builder.ToString(); }
+    private static void Quote(StringBuilder builder, string value)
+    {
+        builder.Append('"');
+        foreach (var character in value)
+            switch (character)
+            {
+                case '"': builder.Append("\\\""); break;
+                case '\\': builder.Append("\\\\"); break;
+                case '\b': builder.Append("\\b"); break;
+                case '\f': builder.Append("\\f"); break;
+                case '\n': builder.Append("\\n"); break;
+                case '\r': builder.Append("\\r"); break;
+                case '\t': builder.Append("\\t"); break;
+                default:
+                    if (character < 0x20) builder.Append("\\u").Append(((int)character).ToString("x4", System.Globalization.CultureInfo.InvariantCulture));
+                    else builder.Append(character);
+                    break;
+            }
+        builder.Append('"');
     }
 
     private sealed class Slot(int index, string kind, string itemId, string? callId = null, string? name = null)
     {
+        // constrained-sampling.ts GrammarToolInputJsonBuffer for custom_tool_call input.
+        public string? CustomProperty;
+        public string CustomInput = "";
+        public string BufferInput = "";
+        public bool BufferStarted, BufferClosed;
         public readonly int Index = index;
         public readonly string Kind = kind;
         public readonly string ItemId = itemId;
@@ -220,6 +229,8 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         private readonly ResponsesTextToolOptions _options;
         private readonly ResponsesTokenRates _rates;
         private readonly string _modelId;
+        private readonly ChatRequest _request;
+        private Dictionary<string, string>? _grammarInputs;
         private readonly AssistantStreamReducer _reducer;
         private readonly Dictionary<int, Slot> _slots = [];
         private readonly Dictionary<string, Slot> _reasoningById = new(StringComparer.Ordinal);
@@ -237,6 +248,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         {
             _options = options;
             _modelId = request.Model.Id;
+            _request = request;
             _rates = rates;
             var message = new AssistantMessage(request.Model.Api, request.Model.Provider, request.Model.Id,
                 request.Timestamp, [], TokenUsage.Zero, StopReason.Pending);
@@ -323,6 +335,14 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     }
                     else Emit(new ToolCallCheckpoint(argsSlot.Index, arguments));
                     break;
+                case "response.custom_tool_call_input.delta":
+                    var custom = Active(value, "custom_tool_call");
+                    CustomInput(custom, custom.CustomInput + String(value, "delta", allowEmpty: true), false, Emit);
+                    break;
+                case "response.custom_tool_call_input.done":
+                    var customDone = Active(value, "custom_tool_call");
+                    CustomInput(customDone, String(value, "input", allowEmpty: true), true, Emit);
+                    break;
                 case "response.output_item.done":
                     var item = Object(value.GetProperty("item"));
                     var outputIndex = Index(value);
@@ -358,6 +378,16 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                         }
                         var signature = Signature(slot.ItemId, OptionalString(item, "phase"));
                         Emit(new TextEnded(slot.Index, string.Concat(pieces), JsonFields.Empty.Set("textSignature", StringData(signature))));
+                    }
+                    else if (slot.Kind == "custom_tool_call")
+                    {
+                        if (String(item, "call_id") != slot.CallId || String(item, "name") != slot.Name) throw Protocol();
+                        CustomInput(slot, OptionalStringOrNull(item, "input") ?? slot.CustomInput, true, Emit);
+                        var started = (ToolCallContent)_reducer.Snapshot().Content[slot.Index];
+                        var customFields = started.ExtraProperties ?? JsonFields.Empty;
+                        if (OptionalString(item, "namespace") is { } customNamespace) customFields = customFields.Set("namespace", StringData(customNamespace));
+                        var input = new JsonObject { [slot.CustomProperty!] = slot.CustomInput };
+                        Emit(new ToolCallEnded(slot.Index, new(started.Id, started.Name, JsonData.Parse(input.ToJsonString(SignatureJson)), customFields)));
                     }
                     else
                     {
@@ -412,7 +442,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                         {
                             var kind = String(Object(finalItem), "type");
                             if (kind == "reasoning") BackfillReasoning(finalItem);
-                            else if (kind is not ("message" or "function_call")) throw Protocol();
+                            else if (kind is not ("message" or "function_call" or "custom_tool_call")) throw Protocol();
                         }
                     }
                     if (OptionalString(response, "id") is { Length: > 0 } id) _properties = _properties.Set("responseId", StringData(id));
@@ -489,9 +519,8 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             if (_slots.Count >= _options.MaximumContentSlots) throw Limit();
             var kind = String(item, "type");
             var itemId = String(item, "id");
-            var slot = new Slot(_slots.Count, kind, itemId,
-                kind == "function_call" ? String(item, "call_id") : null,
-                kind == "function_call" ? String(item, "name") : null);
+            var call = kind is "function_call" or "custom_tool_call";
+            var slot = new Slot(_slots.Count, kind, itemId, call ? String(item, "call_id") : null, call ? String(item, "name") : null);
             if (kind == "reasoning") emit(new ThinkingStarted(slot.Index, new ThinkingContent("")));
             else if (kind == "message") emit(new TextStarted(slot.Index, new TextContent("")));
             else if (kind == "function_call")
@@ -501,9 +530,39 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                 emit(new ToolCallStarted(slot.Index, new(slot.CallId + "|" + itemId, slot.Name!, JsonData.EmptyObject, fields)));
                 if (OptionalString(item, "arguments") is { Length: > 0 } seed) emit(new ToolCallCheckpoint(slot.Index, seed));
             }
+            else if (kind == "custom_tool_call")
+            {
+                // Pi abe508 openai-responses-shared.ts: the input property of the declared grammar tool, else "input".
+                _grammarInputs ??= ResponsesGrammar.InputProperties(_request, _options.SupportsOpenAIGrammarTools, CancellationToken.None);
+                slot.CustomProperty = _grammarInputs.TryGetValue(slot.Name!, out var property) ? property : "input";
+                slot.CustomInput = OptionalStringOrNull(item, "input") ?? "";
+                var fields = JsonFields.Empty;
+                if (OptionalString(item, "namespace") is { } ns) fields = fields.Set("namespace", StringData(ns));
+                emit(new ToolCallStarted(slot.Index, new(slot.CallId + "|" + itemId, slot.Name!, JsonData.EmptyObject, fields)));
+            }
             else throw Protocol();
             _slots.Add(outputIndex, slot);
             return slot;
+        }
+
+        // constrained-sampling.ts appendGrammarToolInputJsonDelta: stream the raw input as the JSON text {"<property>":"<input>"}.
+        private static void CustomInput(Slot slot, string next, bool close, Action<StreamEvent> emit)
+        {
+            if (slot.BufferClosed)
+            {
+                if (close && next == slot.BufferInput) return;
+                throw Protocol();
+            }
+            if (!next.StartsWith(slot.BufferInput, StringComparison.Ordinal)) throw Protocol();
+            var inputDelta = next[slot.BufferInput.Length..];
+            slot.CustomInput = next;
+            if (!close && inputDelta.Length == 0) return;
+            var delta = new StringBuilder();
+            if (!slot.BufferStarted) { delta.Append('{').Append(Quoted(slot.CustomProperty!)).Append(":\""); slot.BufferStarted = true; }
+            delta.Append(Quoted(inputDelta)[1..^1]);
+            slot.BufferInput = next;
+            if (close) { delta.Append("\"}"); slot.BufferClosed = true; }
+            emit(new ToolCallDelta(slot.Index, delta.ToString()));
         }
 
         private Slot Active(JsonElement value, string kind)
@@ -536,7 +595,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var message = _reducer.Snapshot() with
             {
                 Usage = _usage, ExtraProperties = _properties,
-                StopReason = _stopReason == StopReason.Stop && _slots.Values.Any(slot => slot.Kind == "function_call") ? StopReason.ToolUse : _stopReason
+                StopReason = _stopReason == StopReason.Stop && _slots.Values.Any(slot => slot.Kind is "function_call" or "custom_tool_call") ? StopReason.ToolUse : _stopReason
             };
             StreamTerminalEvent terminal = message.StopReason == StopReason.Error ?
                 new StreamError(StopReason.Error, message) : new StreamDone(message.StopReason, message);
@@ -575,12 +634,9 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             if (usage.TryGetProperty("output_tokens_details", out var outputDetails))
                 reasoning = Number(Object(outputDetails), "reasoning_tokens");
             var uncached = Math.Max(0, checked(input - cached - written));
-            // Pi models.ts calculateCost: greatest strictly exceeded threshold, first equal threshold wins.
-            var inputTokens = checked(uncached + cached + written);
-            var rates = _rates; var matchedThreshold = -1m;
-            foreach (var tier in _rates.Tiers)
-                if (inputTokens > tier.InputTokensAbove && tier.InputTokensAbove > matchedThreshold)
-                { rates = new(tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite); matchedThreshold = tier.InputTokensAbove; }
+            // Pi abe508 models.ts calculateCost through the shared tier selection.
+            var rates = PromptLengthPricing.TrySelect(_rates.Tiers, candidate => candidate.InputTokensAbove, (decimal)uncached, cached, written, out var tier)
+                ? new ResponsesTokenRates(tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite) : _rates;
             var inputCost = ComputedCost(checked(rates.Input / 1_000_000m * uncached));
             var outputCost = ComputedCost(checked(rates.Output / 1_000_000m * output));
             var cachedCost = ComputedCost(checked(rates.CacheRead / 1_000_000m * cached));

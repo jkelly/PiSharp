@@ -18,7 +18,8 @@ public static partial class NativeProviderFactory
         var profile = modelMetadata is null ? null : new NativeThinkingProfile(model, modelMetadata, projectionOptions.Reasoning);
         effectiveRequestOptions = effectiveRequestOptions with { ThinkingLevelMap = modelMetadata is null ? effectiveRequestOptions.ThinkingLevelMap : profile?.Map };
         var factory = new ResponsesKeyAuthRequestFactory(endpoint, model, projectionOptions, effectiveRequestOptions);
-        var responsesOptions = new ResponsesTextToolOptions(Rates: ResponsesRatesForModel(modelMetadata));
+        var responsesOptions = new ResponsesTextToolOptions(Rates: ResponsesRatesForModel(modelMetadata))
+        { SupportsOpenAIGrammarTools = projectionOptions.ToolDeclarations?.SupportsOpenAIGrammarTools == true };
         return Bind(model, handler, client => new NativeThinkingTransport(model, profile?.Levels ?? ["off"], level => level is null
                 ? new ResponsesHttpSseTransport(client, factory, explicitApiKey, responsesOptions: responsesOptions)
                 : new ResponsesHttpSseTransport(client, new ResponsesKeyAuthRequestFactory(endpoint, model, projectionOptions,
@@ -80,10 +81,11 @@ public static partial class NativeProviderFactory
         if (modelMetadata is not null && (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue))
             throw new ArgumentException("Unsupported native thinking token cap.");
         var profile = modelMetadata is null ? null : new NativeThinkingProfile(model, modelMetadata, projectionOptions.ModelReasoning, (int)maximum);
+        var messagesOptions = AnthropicMessagesOptionsForModel(modelMetadata);
         return Bind(model, handler, client =>
         {
             IChatTransport Create(AnthropicMessagesKeyAuthRequestFactory bound) => new AnthropicMessagesHttpSseTransport(client,
-                (request, token) => bound.Create(request, explicitApiKey, token), hooks: hooks);
+                (request, token) => bound.Create(request, explicitApiKey, token), messagesOptions: messagesOptions, hooks: hooks);
             if (profile is null && projectionOptions.ModelReasoning && !projectionOptions.SupportsThinkingOff)
                 throw new ArgumentException("Native thinking off is unsupported by the configured profile.");
             return new NativeThinkingTransport(model, profile?.Levels ?? ["off"], level => level is null
