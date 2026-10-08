@@ -186,13 +186,14 @@ internal static class OAuthLifecycleTests
             using var queued = new CancellationTokenSource();
             var second = owner.ResolveAsync("provider", cancellationToken: queued.Token); queued.Cancel();
             Require(!first.IsCompleted && !second.IsCompleted);
-            finish.SetResult(Credential("late"));
+            var late = Credential("late"); finish.SetResult(late);
             foreach (var operation in new[] { first, second })
             {
                 try { await operation; Require(false); }
                 catch (OperationCanceledException) { }
             }
-            Require(source.Writes == 0 && refresh.Calls == 1);
+            // Pi 1.0.3: a started refresh is persisted despite caller cancellation (rotated refresh tokens).
+            Require(source.Writes == 1 && refresh.Calls == 1 && ReferenceEquals(await source.ReadAsync("provider", default), late));
         });
         await check("oauth-original-refresh-rejection-precedes-late-cancellation", async () =>
         {

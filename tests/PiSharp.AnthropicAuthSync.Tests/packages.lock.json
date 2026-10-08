@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "pisharp.ai": {
+        "type": "Project",
+        "dependencies": { "PiSharp.Contracts": "[1.0.0, )" }
+      },
+      "pisharp.contracts": { "type": "Project" }
+    }
+  }
+}
