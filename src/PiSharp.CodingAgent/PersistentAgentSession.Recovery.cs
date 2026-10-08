@@ -14,7 +14,11 @@ public enum SessionOperationPhase { Idle, Provider, RecoveryOmission, Compaction
 public abstract record SessionOperationEvent(long OperationGeneration);
 public sealed record SessionRecoveryStarted(long OperationGeneration, string Reason, bool WillRetry) : SessionOperationEvent(OperationGeneration);
 public sealed record SessionRecoveryEnded(long OperationGeneration, string Status, bool WillRetry, string? CheckpointId = null) : SessionOperationEvent(OperationGeneration);
-public sealed record SessionOperationSettled(long OperationGeneration, string Status, AgentLoopResult? Result) : SessionOperationEvent(OperationGeneration);
+public sealed record SessionOperationSettled(long OperationGeneration, string Status, AgentLoopResult? Result) : SessionOperationEvent(OperationGeneration)
+{
+    /// <summary>Source agent_settled.aborted: the operation ended because an abort was requested while it ran.</summary>
+    public bool Aborted { get; init; }
+}
 public interface ISessionOperationEventSink
 { ValueTask EmitAsync(SessionOperationEvent observation, CancellationToken cancellationToken); }
 

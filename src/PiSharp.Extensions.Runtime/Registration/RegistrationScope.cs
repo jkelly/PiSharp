@@ -3,7 +3,8 @@ namespace PiSharp.Extensions.Runtime;
 internal enum RegistrationScopeState { Initializing, Active, Quiescing, Quiescent, Closing, Disposed }
 
 /// <summary>A single extension generation. Concurrent disposal shares the actual cleanup settlement.</summary>
-public sealed partial class RegistrationScope : IExtensionSessionCreationRegistry, IExtensionEventBusRegistry, IExtensionSessionTreeLifecycleRegistry, IAsyncDisposable
+public sealed partial class RegistrationScope : IExtensionSessionCreationRegistry, IExtensionEventBusRegistry, IExtensionSessionTreeLifecycleRegistry,
+    IExtensionToolRendererRegistry, IAsyncDisposable
 {
     public string OwnerId { get; }
     public long OwnerGeneration { get; }
@@ -42,6 +43,7 @@ public sealed partial class RegistrationScope : IExtensionSessionCreationRegistr
     public IExtensionRegistration RegisterToolResultHandler(ExtensionToolResultHandlerDescriptor descriptor) => Registry.Register(this, descriptor);
     public IExtensionRegistration RegisterSessionSwitchHandler(ExtensionSessionSwitchHandlerDescriptor descriptor) => Registry.Register(this, descriptor);
     public IExtensionRegistration RegisterSessionCreationHandler(ExtensionSessionCreationHandlerDescriptor descriptor) => Registry.Register(this, descriptor);
+    public IExtensionRegistration RegisterToolRenderer(ExtensionToolRendererDescriptor descriptor) => Registry.Register(this, descriptor);
 
     /// <summary>Stops new callback admission and waits for all callbacks already leased to this owner.
     /// Cancellation rolls the pause back without cancelling those callbacks. Dispose the returned lease

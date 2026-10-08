@@ -91,7 +91,9 @@ public static class McpCatalogPlanner
             if (!snapshot.Connected || !entry.Config.Enabled) continue;
             if (snapshot.Tools.IsDefault) throw new ArgumentException("An initialized borrowed tool snapshot is required.", nameof(snapshots));
             var configured = entry.Config.Description is { } text ? McpJson.JsTrim(text) : null;
-            var group = new ToolNamespace(Namespace(entry.Name), string.IsNullOrEmpty(configured) ? null : configured);
+            // Like upstream registerTools: the configured description and the server's connection instructions.
+            var group = new ToolNamespace(Namespace(entry.Name), string.IsNullOrEmpty(configured) ? null : configured)
+                { Instructions = string.IsNullOrEmpty(snapshot.Instructions) ? null : snapshot.Instructions };
             var current = new HashSet<string>(StringComparer.Ordinal);
             // Like Codex, every tool whose name sanitizes to a shared name gets the hash suffix, so which one
             // would keep the plain name does not depend on the order of the list.

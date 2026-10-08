@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/docs/json.md.
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Agent;
@@ -85,6 +86,7 @@ public sealed class RpcAgentEventProjector
             {
                 writer.WriteString("toolCallId", tool.Outcome.Invocation.Call.Id); writer.WriteString("toolName", tool.Outcome.Invocation.Call.Name);
                 RpcCommandCodec.Raw(writer, "result", Result(tool.Outcome.Result)); writer.WriteBoolean("isError", tool.Outcome.IsError);
+                if (tool.Outcome.DurationMs is { } duration) writer.WriteNumber("durationMs", duration);
             })];
             case AgentLoopTurnEnded turn:
             {

@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/agent/src/agent-loop.ts.
 using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
@@ -18,6 +19,9 @@ public sealed class ToolBatchScheduler
     private readonly ToolProgressDeliveryOptions progressOptions;
     private readonly ToolResultValueOptions resultOptions;
     private static readonly AsyncLocal<object?> ProgressDelivery = new();
+    /// <summary>Opt-in monotonic clock for tool execution durations (durationMs); null records none. Prepared
+    /// invocations carry it to finalized executors, which time the tool's own execution.</summary>
+    public TimeProvider? TimeProvider { get; init; }
 
     public ToolBatchScheduler(IEnumerable<ToolDefinition> tools, IToolHooks? hooks = null,
         ToolExecutionMode executionMode = ToolExecutionMode.Parallel, ToolProgressDeliveryOptions? progressOptions = null,
@@ -82,7 +86,7 @@ public sealed class ToolBatchScheduler
         var budget = progressOptions.Mode == ToolProgressDeliveryMode.SourceCompatible ? new ToolProgressBudget(progressOptions, resultOptions) : null;
         using var batchLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var delivery = new BatchEventSink(sink, deliveryOwner, batchLifetime);
-        invocations = invocations.Select(value => value with { EventSink = delivery }).ToImmutableArray();
+        invocations = invocations.Select(value => value with { EventSink = delivery, Clock = TimeProvider }).ToImmutableArray();
         try
         {
             var result = sequential
@@ -340,14 +344,21 @@ public sealed class ToolBatchScheduler
         ToolResult result;
         bool? finalizedIsError = null;
         JsonData? nestedCalls = null, nestedUsage = null;
+        long? durationMs = null;
         var progress = new ToolProgressScope((partial, token) => onProgress(Normalize(partial), token), cancellationToken, budget);
+        // A plain executor is the tool's execute(): its time is measured before admitted progress is joined.
+        // A finalized executor owns its pipeline and reports the time of the tool's own execution, if it ran.
+        var finalizedExecutor = tool.Executor as IFinalizedToolExecutor;
+        var clock = invocation.Clock;
+        var started = clock?.GetTimestamp() ?? 0;
         try
         {
             try
             {
-                if (tool.Executor is IFinalizedToolExecutor finalized)
+                if (finalizedExecutor is not null)
                 {
-                    var execution = await finalized.ExecuteFinalizedAsync(invocation, progress.ReportAsync, cancellationToken).ConfigureAwait(false);
+                    var execution = await finalizedExecutor.ExecuteFinalizedAsync(invocation, progress.ReportAsync, cancellationToken).ConfigureAwait(false);
+                    durationMs = execution.DurationMs;
                     result = Normalize(execution.Result);
                     finalizedIsError = execution.IsError;
                     nestedCalls = execution.NestedCalls;
@@ -355,7 +366,11 @@ public sealed class ToolBatchScheduler
                 }
                 else result = Normalize(await tool.Executor.ExecuteAsync(invocation, progress.ReportAsync, cancellationToken).ConfigureAwait(false));
             }
-            finally { await progress.CloseAsync().ConfigureAwait(false); }
+            finally
+            {
+                if (finalizedExecutor is null && clock is not null) durationMs = ElapsedMilliseconds(clock, started);
+                await progress.CloseAsync().ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         { result = ToolResult.Error(ToolFailureKind.Canceled, "Operation aborted"); finalizedIsError = null; }
@@ -364,9 +379,11 @@ public sealed class ToolBatchScheduler
         if (budget is not null && progress.DeliveryFailure is { } failure)
             ExceptionDispatchInfo.Capture(failure).Throw();
 
-        var outcome = new ToolOutcome(invocation, result) { IsError = finalizedIsError ?? result.IsError, NestedCalls = nestedCalls, NestedUsage = nestedUsage };
+        var outcome = new ToolOutcome(invocation, result) { IsError = finalizedIsError ?? result.IsError, NestedCalls = nestedCalls,
+            NestedUsage = nestedUsage, DurationMs = durationMs };
         if (hooks is not null)
         {
+            // After-hook replacements and failures keep the execution's measured duration.
             try
             {
                 if (hooks is ISourceToolHooks sourceHooks)
@@ -375,15 +392,19 @@ public sealed class ToolBatchScheduler
                 else
                 {
                     result = Normalize(await hooks.AfterExecutionAsync(invocation, result, cancellationToken).ConfigureAwait(false));
-                    outcome = new(invocation, result) { NestedCalls = nestedCalls, NestedUsage = nestedUsage };
+                    outcome = new(invocation, result) { NestedCalls = nestedCalls, NestedUsage = nestedUsage, DurationMs = durationMs };
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            { outcome = new(invocation, ToolResult.Error(ToolFailureKind.Canceled, "Operation aborted")) { NestedCalls = nestedCalls, NestedUsage = nestedUsage }; }
-            catch (Exception error) { outcome = new(invocation, ToolResult.Error(ToolFailureKind.HookError, error.Message)) { NestedCalls = nestedCalls, NestedUsage = nestedUsage }; }
+            { outcome = new(invocation, ToolResult.Error(ToolFailureKind.Canceled, "Operation aborted")) { NestedCalls = nestedCalls, NestedUsage = nestedUsage, DurationMs = durationMs }; }
+            catch (Exception error) { outcome = new(invocation, ToolResult.Error(ToolFailureKind.HookError, error.Message)) { NestedCalls = nestedCalls, NestedUsage = nestedUsage, DurationMs = durationMs }; }
         }
         return outcome;
     }
+
+    /// <summary>Whole milliseconds of monotonic time since a timestamp of the same provider.</summary>
+    internal static long ElapsedMilliseconds(TimeProvider time, long started) =>
+        Math.Max(0, (long)Math.Round(time.GetElapsedTime(started).TotalMilliseconds, MidpointRounding.AwayFromZero));
 
     private ToolResult Normalize(ToolResult result)
     {

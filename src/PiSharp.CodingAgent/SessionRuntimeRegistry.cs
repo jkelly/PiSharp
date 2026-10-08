@@ -19,6 +19,8 @@ public sealed record SessionRegisteredTool(JsonData Declaration, IPreparedToolAd
     /// <summary>Catalog origin for default-extension initial selection; never inferred from the tool name.</summary>
     public bool IsExtension { get; init; }
     public Func<ToolLoadout, ToolLoadoutChanges?>? PrepareLoadout { get; init; }
+    /// <summary>Source promptGuidelines, reported to loadout preparation by ToolLoadout.GetPromptGuidelines.</summary>
+    public ImmutableArray<string> PromptGuidelines { get; init; } = [];
 }
 public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int MaximumTools = 128,
     int MaximumMessages = 1024, int MaximumDeclarations = 4096, int MaximumCharacters = 1_048_576,
@@ -235,7 +237,8 @@ public sealed partial class SessionRuntimeRegistry
                 .Select(Metadata).ToImmutableArray(), _registeredTools.Select(Metadata).ToImmutableArray());
         return ToolLoadoutPresentation.Prepare(loadout, (name, original) => _tools[name].PrepareLoadout?.Invoke(original),
             report ? _options.ReportLoadoutDiagnostic : null, _options.MaximumCharacters, token);
-        static ToolLoadoutTool Metadata(SessionRegisteredTool tool) => new(tool.Declaration, tool.Exposure) { Namespace = tool.Namespace };
+        static ToolLoadoutTool Metadata(SessionRegisteredTool tool) => new(tool.Declaration, tool.Exposure)
+            { Namespace = tool.Namespace, PromptGuidelines = tool.PromptGuidelines.IsDefault ? [] : tool.PromptGuidelines };
     }
 
     public SessionRuntimeSelection Resolve(SessionContextProjection context, ModelDescriptor? fallbackModel = null,

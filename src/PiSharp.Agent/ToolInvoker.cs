@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/agent/src/agent-loop.ts.
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Contracts;
@@ -192,7 +193,7 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
     {
         var source = parent.Invocation;
         var invocation = new ToolInvocation(source.AssistantMessage with { Content = [call], StopReason = StopReason.ToolUse }, call, 0)
-            { EventSink = source.EventSink };
+            { EventSink = source.EventSink, Clock = source.Clock };
         var record = parent.Record.Start(call);
         ToolOutcome outcome;
         ToolResult? completedResult = null;
@@ -227,7 +228,7 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                         await events.EmitAsync(new ToolExecutionUpdated(invocation, partial), progressToken).ConfigureAwait(false);
                 }
                 var finalized = await ExecuteCoreAsync(invocation, Progress, linked.Token).ConfigureAwait(false);
-                outcome = new(invocation, finalized.Result) { IsError = finalized.IsError };
+                outcome = new(invocation, finalized.Result) { IsError = finalized.IsError, DurationMs = finalized.DurationMs };
                 completedResult = finalized.Result;
             }
             finally { context.StopAdmission(); await context.CloseAsync().ConfigureAwait(false); }
@@ -254,6 +255,7 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
         if (cancellationToken.IsCancellationRequested) return CompleteResult(Error(ToolFailureKind.Canceled));
         var stage = ToolFailureKind.InvalidArguments;
         ToolResult? completed = null;
+        long? duration = null;
         try
         {
             if (invocation is null || invocation.AssistantMessage is null || invocation.Call is null)
@@ -344,6 +346,8 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
             var progress = invocation.ParentToolCallId is not null && invocation.Context?.ProgressBudget is { } inheritedBudget
                 ? new ToolProgressScope((partial, token) => onProgress(Normalize(partial), token), cancellationToken, inheritedBudget)
                 : ToolProgressScope.Forward(onProgress, Normalize, cancellationToken);
+            var clock = invocation.Clock;
+            var started = clock?.GetTimestamp() ?? 0;
             try
             {
                 try
@@ -354,14 +358,16 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                 }
                 finally
                 {
+                    // execute() settled (or threw); admitted progress and nested calls are joined after timing.
+                    if (clock is not null) duration = ToolBatchScheduler.ElapsedMilliseconds(clock, started);
                     invocation.Context?.StopAdmission();
                     try { await progress.CloseAsync().ConfigureAwait(false); }
                     finally { if (invocation.Context is { } context) await context.CloseAsync().ConfigureAwait(false); }
                 }
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { return CompleteResult(Error(ToolFailureKind.Canceled)); }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { return Timed(Error(ToolFailureKind.Canceled)); }
             catch (Exception) { result = Error(ToolFailureKind.ExecutionError); }
-            if (progress.IsSourceCompatible && progress.DeliveryFailure is not null) return CompleteResult(Error(ToolFailureKind.ExecutionError));
+            if (progress.IsSourceCompatible && progress.DeliveryFailure is not null) return Timed(Error(ToolFailureKind.ExecutionError));
             completed = result;
             cancellationToken.ThrowIfCancellationRequested();
             stage = ToolFailureKind.HookError;
@@ -381,11 +387,13 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                 completed = result;
                 cancellationToken.ThrowIfCancellationRequested();
             }
-            return new(result, outcome.IsError);
+            return new(result, outcome.IsError) { DurationMs = duration };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        { return CompleteResult(Error(ToolFailureKind.Canceled, completed)); }
-        catch (Exception) { return CompleteResult(Error(stage, completed)); }
+        { return Timed(Error(ToolFailureKind.Canceled, completed)); }
+        catch (Exception) { return Timed(Error(stage, completed)); }
+        // Failures after execution keep its measured time; earlier failures have none.
+        FinalizedToolExecution Timed(ToolResult value) => CompleteResult(value) with { DurationMs = duration };
     }
 
     private ToolResultValueOptions ResultLimits() => new(_options.MaximumResultCharacters, _options.MaximumStructuredContentCharacters,

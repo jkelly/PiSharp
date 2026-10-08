@@ -162,7 +162,8 @@ internal static class Program
         Equal("described", loaded.Servers.Single().Name); Equal("  Docs search \n", loaded.Servers.Single().Config.Description);
         Equal("global.json: server \"bad\": description must be a string", loaded.Errors.Single());
         var plan = McpCatalogPlanner.Plan([new(loaded.Servers.Single(), [Tool("search")], "Server instructions.")]);
-        Equal(new ToolNamespace("mcp__described", "Docs search"), plan.Tools.Single().Namespace);
+        // Upstream registerTools puts the connection instructions on the namespace itself.
+        Equal(new ToolNamespace("mcp__described", "Docs search") { Instructions = "Server instructions." }, plan.Tools.Single().Namespace);
         Equal("Server instructions.", plan.Tools.Single().NamespaceInstructions);
         return Task.CompletedTask;
     }
