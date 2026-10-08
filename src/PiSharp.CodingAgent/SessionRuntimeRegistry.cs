@@ -38,6 +38,9 @@ public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int 
     public Func<CancellationToken, ValueTask>? DrainLoadoutDiagnostics { get; init; }
     /// <summary>Explicit pure base-section construction, validated before the owning transcript append.</summary>
     public Func<SessionPromptSectionRequest, SessionPromptSectionPreparation?>? PreparePromptSections { get; init; }
+    /// <summary>Source <c>images.blockImages</c>, read per request so a changed setting applies mid-session: true replaces image
+    /// blocks of user and tool result messages in the request (<see cref="BlockedImages"/>).</summary>
+    public Func<bool>? BlockImages { get; init; }
 }
 public sealed record SessionRuntimeSelection(AgentConfiguration Configuration, ImmutableArray<JsonData> ActiveToolDeclarations)
 {
@@ -415,6 +418,16 @@ public sealed partial class SessionRuntimeRegistry
             {
                 var transformed = priorFinal is null ? requestMessages : await priorFinal(requestMessages, token).ConfigureAwait(false);
                 token.ThrowIfCancellationRequested(); return presentation.Project(transformed);
+            } };
+        }
+        if (_options.BlockImages is { } blockImages)
+        {
+            // Source convertToLlmWithBlockImages runs after the context transforms, on the final request messages.
+            var priorRequest = hooks?.FinalTransformRequestMessages;
+            hooks = (hooks ?? new()) with { FinalTransformRequestMessages = async (requestMessages, token) =>
+            {
+                var transformed = priorRequest is null ? requestMessages : await priorRequest(requestMessages, token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested(); return blockImages() ? BlockedImages.Filter(transformed) : transformed;
             } };
         }
         cancellationToken.ThrowIfCancellationRequested();

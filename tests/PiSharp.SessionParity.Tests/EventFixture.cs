@@ -29,6 +29,7 @@ internal sealed class EventFixture : IAsyncDisposable
     internal string Root { get; } = Program.Temp("events");
     internal string Source => Path.Combine(Root, "source.jsonl");
     internal ScriptTransport Transport { get; } = new();
+    internal ProbeAdapter Probe { get; } = new();
     internal ReplaceableAgentSession Owner { get; private set; } = null!;
     internal PersistentAgentSession Session => Owner.Current.Session;
     internal ExtensionRegistry Registry { get; private set; } = null!;
@@ -39,12 +40,13 @@ internal sealed class EventFixture : IAsyncDisposable
     internal long Clock() => Interlocked.Increment(ref ticks);
 
     internal static Task<EventFixture> CreateAsync(params AssistantMessage[] responses) => CreateAsync(false, responses);
-    internal static async Task<EventFixture> CreateAsync(bool withTool, params AssistantMessage[] responses)
+    internal static Task<EventFixture> CreateAsync(bool withTool, params AssistantMessage[] responses) => CreateWithOptionsAsync(withTool, null, responses);
+    internal static async Task<EventFixture> CreateWithOptionsAsync(bool withTool, SessionRuntimeRegistryOptions? options, params AssistantMessage[] responses)
     {
         var f = new EventFixture(); foreach (var response in responses) f.Transport.Responses.Enqueue(response);
         f.Transport.Clock = f.Clock;
         var runtime = new SessionRuntimeRegistry([new(Model, f.Transport), new(Model2, f.Transport)],
-            withTool ? [new(ProbeDeclaration, new ProbeAdapter())] : [], new NoPolicy());
+            withTool ? [new(ProbeDeclaration, f.Probe)] : [], new NoPolicy(), options);
         var header = Codec.Parse(JsonSerializer.Serialize(new { type = "session", version = 3, id = "parity-source", timestamp = "2026-10-08T00:00:00.000Z", cwd = f.Root }));
         await using (var store = await SessionLogStore.CreateNewAsync(f.Source, header))
             await store.AppendAsync([Entry("u0", null, User(new string('x', 8000))), Entry("a0", "u0", Assistant("first")),
@@ -97,11 +99,11 @@ internal sealed class EventFixture : IAsyncDisposable
     { public ValueTask<ToolActionAuthorization> AuthorizeAsync(ToolInvocation invocation, PreparedToolAction action, CancellationToken token) => ValueTask.FromResult(new ToolActionAuthorization(true)); }
     internal sealed class ProbeAdapter : IPreparedToolAdapter
     {
-        internal int Executions; public string Name => "probe";
+        internal int Executions; internal ToolResult Result = ToolResult.Success("probe output"); public string Name => "probe";
         public ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token) => ValueTask.FromResult(new PreparedToolAction(Name, "probe",
             PreparedToolActionKind.Path, "/authored", invocation.Call.Arguments, [], null, ImmutableDictionary<string, string>.Empty));
         public ValueTask<bool> ValidateAsync(PreparedToolAction action, CancellationToken token) => ValueTask.FromResult(true);
-        public ValueTask<ToolResult> ExecuteAsync(PreparedToolAction action, CancellationToken token) { Executions++; return ValueTask.FromResult(ToolResult.Success("probe output")); }
+        public ValueTask<ToolResult> ExecuteAsync(PreparedToolAction action, CancellationToken token) { Executions++; return ValueTask.FromResult(Result); }
     }
     internal static AssistantMessage ToolCall(string id = "call-1") =>
         new(Model.Api, Model.Provider, Model.Id, 0, [new ToolCallContent(id, "probe", JsonData.EmptyObject)], TokenUsage.Zero, StopReason.ToolUse);
@@ -110,11 +112,11 @@ internal sealed class EventFixture : IAsyncDisposable
     internal sealed class ScriptTransport : IChatTransport, IThinkingLevelTransport
     {
         internal readonly Queue<AssistantMessage> Responses = new(); internal Func<long> Clock = () => 0; internal int Calls;
-        internal NativeChatDiagnostic? ErrorDiagnostic;
+        internal NativeChatDiagnostic? ErrorDiagnostic; internal readonly List<ChatRequest> Requests = [];
         public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor model) => ["off", "minimal", "low", "medium", "high"];
         public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken token = default)
         {
-            token.ThrowIfCancellationRequested(); Calls++;
+            token.ThrowIfCancellationRequested(); Calls++; lock (Requests) Requests.Add(request);
             var final = (Responses.Count == 0 ? Response() : Responses.Dequeue()) with { Timestamp = Clock() };
             await Task.CompletedTask;
             yield return new StreamStarted(final with { Content = [], StopReason = StopReason.Pending });

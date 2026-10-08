@@ -280,7 +280,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         startupOriginalPrompt = OriginalSystemPromptBuilder.Capture(originalSystemPrompt ?? new() { CustomPrompt = literalSystem },
             workspace, initialTools, literal: originalSystemPrompt is null);
         _startupRegistry = new([DecorateOriginalPromptBinding(new(model, transport, ExecutionMode: ToolExecutionMode.Sequential, Hooks: extension?.Binding.ContextHooks))], registrations, policy,
-            new SessionRuntimeRegistryOptions(MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = extension?.Binding.PreparedHooks,
+            new SessionRuntimeRegistryOptions(MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
                 LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
                 BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
                 DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync,
@@ -537,7 +537,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup, connection, toolSelection,
                 deferCatalogValidation: mcpAdmission is not null || registeredMcpAdmission is not null || readApplicationHost is not null,
                 originalSystemPrompt: originalSystemPrompt);
-            profile.UserBash = userBash; bashOwner = profile;
+            profile.UserBash = userBash; bashOwner = profile; profile.ImageSettings = toolSettings;
             if (readApplicationHost is not null) profile.ConfigureMcpRegistrationRuntime(readApplicationHost().CreateRegisteredAdmission());
             else if (registeredMcpAdmission is not null) profile.ConfigureMcpRegistrationRuntime(registeredMcpAdmission);
             else if (mcpAdmission is not null) profile.ConfigureMcpRuntime(mcpAdmission);
