@@ -1,9 +1,11 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/auth/resolve.ts.
 namespace PiSharp.AI.Authentication.OAuth;
 
 /// <summary>
 /// Stored OAuth owner over admitted synthetic dependencies. Keeps original tasks joined before
-/// releasing a provider lane, even if a dependency ignores cancellation. Does not select env/API
-/// keys, acquire tokens, run login flows, or supply storage/provider effects.
+/// releasing a provider lane, even if a dependency ignores cancellation. A refresh that has
+/// started completes and is persisted even if the caller cancels (Pi 1.0.3). Does not select
+/// env/API keys, acquire tokens, run login flows, or supply storage/provider effects.
 /// </summary>
 public sealed class StoredOAuthLifecycle
 {
@@ -89,38 +91,46 @@ public sealed class StoredOAuthLifecycle
 
         OAuthCredentialSnapshot? post;
         Task<OAuthCredentialSnapshot?>? originalModify = null;
+        // Pi 1.0.3 refreshStoredOAuthCredential: the caller token cancels only the wait for the
+        // source's serialization. Once the mutation starts, the provider may already have rotated
+        // the refresh token, so the refresh and its persistence ignore the caller and are bounded
+        // only by RefreshTimeout. Otherwise a cancelled caller would discard the only valid token.
+        using var lockWait = new CancellationTokenSource();
+        var forward = token.UnsafeRegister(static state => ((CancellationTokenSource)state!).Cancel(), lockWait);
         try
         {
             originalModify = credentials.ModifyAsync(provider, async (authoritative, mutationToken) =>
             {
+                // Dispose waits for an in-flight forward, so lockWait cannot change after this point.
+                forward.Dispose();
+                token.ThrowIfCancellationRequested();
                 mutationToken.ThrowIfCancellationRequested();
                 if (authoritative is null || !ExpiresSoon(authoritative, minimum)) return null;
                 using var deadline = new CancellationTokenSource(RefreshTimeout, time);
-                using var linked = CancellationTokenSource.CreateLinkedTokenSource(mutationToken, deadline.Token);
                 OAuthCredentialSnapshot replacement;
                 Task<OAuthCredentialSnapshot>? originalRefresh = null;
                 try
                 {
-                    originalRefresh = refresh.RefreshAsync(provider, authoritative, linked.Token);
+                    originalRefresh = refresh.RefreshAsync(provider, authoritative, deadline.Token);
                     replacement = await originalRefresh.ConfigureAwait(false);
                 }
-                catch (OperationCanceledException error) when (IsOwnedCancellation(error, linked.Token, originalRefresh)
-                    && mutationToken.IsCancellationRequested)
-                { throw new OperationCanceledException("Stored OAuth refresh cancelled.", mutationToken); }
                 catch (Exception error) { throw new OAuthLifecycleException(OAuthLifecycleFailure.Refresh, error, originalRefresh?.Exception); }
-                // A rejection above owns its original fault, even if cancellation arrived meanwhile.
-                // A successful non-cooperative completion cannot publish after cancellation/deadline.
-                mutationToken.ThrowIfCancellationRequested();
+                // A rejection above owns its original fault, even if the caller cancelled meanwhile.
+                // A successful non-cooperative completion after the deadline is still refused.
                 if (deadline.IsCancellationRequested)
                     throw new OAuthLifecycleException(OAuthLifecycleFailure.Refresh,
                         new TimeoutException("Stored OAuth refresh deadline elapsed."));
                 return replacement ?? throw new OAuthLifecycleException(OAuthLifecycleFailure.Refresh);
-            }, token);
+            }, lockWait.Token);
             post = await originalModify.ConfigureAwait(false);
         }
         catch (OAuthLifecycleException error) { throw error.RetainOriginalTask(originalModify?.Exception); }
         catch (OperationCanceledException error) when (IsOwnedCancellation(error, token, originalModify)) { throw; }
+        catch (OperationCanceledException error) when (token.IsCancellationRequested && IsOwnedCancellation(error, lockWait.Token, originalModify))
+        { throw new OperationCanceledException("Stored OAuth credential wait cancelled.", error, token); }
         catch (Exception error) { throw new OAuthLifecycleException(OAuthLifecycleFailure.Modify, error, originalModify?.Exception); }
+        finally { forward.Dispose(); }
+        // The rotated credential is persisted; a cancelled caller still observes its own cancellation.
         token.ThrowIfCancellationRequested();
         if (post is not null && requestedMinimum.HasValue && ExpiresSoon(post, minimum))
             throw new OAuthLifecycleException(OAuthLifecycleFailure.MinimumValidity);

@@ -1,13 +1,19 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/env-api-keys.ts and packages/ai/src/providers/anthropic.ts.
 using System.Collections.Immutable;
 
 namespace PiSharp.AI.Authentication;
 
-/// <summary>Pi v0.99.1 source-specific resolution. No stores, environment reads, providers or OAuth acquisition.</summary>
+/// <summary>Pi v1.1.0 source-specific resolution. No stores, environment reads, providers or OAuth acquisition.</summary>
 public static class InjectedAuthenticationResolver
 {
     public const string AnthropicAuthToken = "ANTHROPIC_AUTH_TOKEN";
     public const string AnthropicOAuthToken = "ANTHROPIC_OAUTH_TOKEN";
     public const string AnthropicApiKey = "ANTHROPIC_API_KEY";
+    public const string AnthropicFederationRuleId = "ANTHROPIC_FEDERATION_RULE_ID";
+    public const string AnthropicOrganizationId = "ANTHROPIC_ORGANIZATION_ID";
+    public const string AnthropicServiceAccountId = "ANTHROPIC_SERVICE_ACCOUNT_ID";
+    public const string AnthropicIdentityTokenFile = "ANTHROPIC_IDENTITY_TOKEN_FILE";
+    public const string AnthropicWorkspaceId = "ANTHROPIC_WORKSPACE_ID";
     private static readonly ImmutableDictionary<string, string> ApiKeyNames = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["github-copilot"] = "COPILOT_GITHUB_TOKEN",
@@ -78,7 +84,24 @@ public static class InjectedAuthenticationResolver
                         : name == AnthropicOAuthToken ? AuthenticationOrigin.AnthropicOAuthEnvironmentToken : AuthenticationOrigin.EnvironmentApiKey,
                     value, name);
             }
-            return new(AuthenticationDiagnostic.Missing);
+            // Workload identity federation (Pi 0.99.2): last, so keys and AUTH_TOKEN keep winning as in the
+            // Anthropic SDK. The ids are provider configuration, not a secret, so they travel as the environment.
+            var federation = new Dictionary<string, string?>(StringComparer.Ordinal);
+            foreach (var name in new[] { AnthropicFederationRuleId, AnthropicOrganizationId, AnthropicIdentityTokenFile })
+            {
+                var value = await environment.ReadAsync(name, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (string.IsNullOrEmpty(value)) return new(AuthenticationDiagnostic.Missing);
+                federation[name] = value;
+            }
+            foreach (var name in new[] { AnthropicServiceAccountId, AnthropicWorkspaceId })
+            {
+                var value = await environment.ReadAsync(name, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!string.IsNullOrEmpty(value)) federation[name] = value;
+            }
+            return Found(AuthenticationKind.WorkloadIdentityFederation, AuthenticationOrigin.AnthropicWorkloadIdentityFederation,
+                string.Empty, credentialEnvironment: new(federation));
         }
         catch (OperationCanceledException error) when (cancellationToken.IsCancellationRequested && error.CancellationToken == cancellationToken)
         {
