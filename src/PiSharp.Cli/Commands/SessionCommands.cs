@@ -49,11 +49,11 @@ public sealed class SessionCommandException : Exception
 public static class SessionCommands
 {
     public const string Usage = "session create --session <new absolute JSONL> --workspace <existing absolute directory> [--offline-api openai-responses|anthropic-messages|openai-completions] " +
-        "[--bash-executable <absolute file> --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]]; " +
+        "[[--bash-executable <absolute file>] --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]]; " +
         "session prompt|resume --session <JSONL> --workspace <directory> --offline-script <JSON> --message <text> " +
         "[--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
         "[--output report|print|json] " +
-        "[--bash-executable <absolute file> --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]]; " +
+        "[[--bash-executable <absolute file>] --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]]; " +
         NativeExtensionConfiguration.Flags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags +
         " (startup settings/tools apply to create, prompt and resume); session inspect|tree|history --session <JSONL> [--leaf <id>|--root]";
     private static readonly UTF8Encoding Utf8 = new(false, true);
@@ -233,7 +233,8 @@ public static class SessionCommands
         await using var profile = await OfflineSessionProfile.CreateAsync(args.Workspace!, args.Session, args.Script, turns, args.Reads, args.Writes, token,
             offlineApi: args.OfflineApi, bash: args.Bash, extension: args.Extension,
             extensionUi: new UnavailableExtensionUiProvider(args.Json ? ExtensionUiMode.Json : ExtensionUiMode.Print),
-            modelSupportsImages: args.SupportsImages, toolSelection: ToolSelectionCliConfiguration.ResolveOptions(args.Tools, settings), mcpAdmission: args.Tools.NoMcp ? null : mcpAdmission).ConfigureAwait(false);
+            modelSupportsImages: args.SupportsImages, toolSelection: ToolSelectionCliConfiguration.ResolveOptions(args.Tools, settings), mcpAdmission: args.Tools.NoMcp ? null : mcpAdmission,
+            toolSettings: PiSharp.Tools.BuiltinToolSettings.FromSettings(settings?.Values)).ConfigureAwait(false);
         profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
         profile.ConfigureEffectiveSettings(settings);
         profile.BindSettingsThinkingReads();

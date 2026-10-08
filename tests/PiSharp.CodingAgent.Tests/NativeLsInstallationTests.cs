@@ -56,7 +56,8 @@ internal static class NativeLsInstallationTests
         var original = new ReadWriteTools(profile.Workspace, profile.Workspace);
         var defaults = new SessionSystemReplay().Replay(session.Snapshot.Context.LlmMessages).Tools;
         Names(["read", "write"], defaults.Select(tool => tool.Value.GetProperty("name").GetString()!));
-        Check(defaults.Zip(original.Declarations).All(pair => pair.First.ToString() == pair.Second.ToString()), "Existing read/write declarations changed.");
+        // Semantic comparison: replayed declarations are re-serialized (for example "doesn't" becomes "doesn\u0027t").
+        Check(defaults.Zip(original.Declarations).All(pair => JsonElement.DeepEquals(pair.First.Value, pair.Second.Value)), "Existing read/write declarations changed.");
         await session.SetActiveToolsAsync(["read", "ls", "write"]);
         Names(["read", "ls", "write"], session.GetActiveTools());
         var declaration = new SessionSystemReplay().Replay(session.Snapshot.Context.LlmMessages).Tools.Single(tool => tool.Value.GetProperty("name").GetString() == "ls");

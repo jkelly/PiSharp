@@ -44,6 +44,9 @@ public sealed class ShellCommandExecutor
         _nextSpillFileName = nextSpillFileName ?? (() => "pi-bash-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)) + ".log");
     }
 
+    /// <summary>The same spill storage and file naming over other operations (a user_bash handler's custom operations).</summary>
+    public ShellCommandExecutor WithOperations(IShellOperations operations) => new(operations, _spillDirectory, _storage, _nextSpillFileName);
+
     public async Task<ShellCommandResult> ExecuteAsync(string command, string workingDirectory, ShellTextCallback? onChunk,
         CancellationToken cancellationToken)
     {
@@ -99,14 +102,20 @@ public sealed class ShellCommandExecutor
 }
 
 /// <summary>Local source createLocalBashOperations over the bounded Windows process primitive: <c>shell -c command</c>
-/// with the host's complete environment. The runner's own spill copy is discarded; the executor owns user-bash spill.</summary>
+/// (or the command over standard input for legacy WSL bash) with the host's complete environment. The runner's own
+/// spill copy is discarded; the executor owns user-bash spill.</summary>
 public sealed class NativeShellOperations : IShellOperations
 {
     private readonly NativeProcessRunner _runner;
-    private readonly string _shell, _scratchDirectory;
+    private readonly ShellConfiguration _shell;
+    private readonly string _scratchDirectory;
     private readonly ImmutableDictionary<string, string> _environment;
 
     public NativeShellOperations(string shell, ImmutableDictionary<string, string> environment, string scratchDirectory,
+        ProcessRunnerOptions? options = null) : this(new ShellConfiguration(shell ?? throw new ArgumentNullException(nameof(shell)), ["-c"]),
+            environment, scratchDirectory, options) { }
+
+    public NativeShellOperations(ShellConfiguration shell, ImmutableDictionary<string, string> environment, string scratchDirectory,
         ProcessRunnerOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(shell); ArgumentNullException.ThrowIfNull(environment); ArgumentNullException.ThrowIfNull(scratchDirectory);
@@ -117,8 +126,9 @@ public sealed class NativeShellOperations : IShellOperations
     public async ValueTask<int?> ExecuteAsync(string command, string workingDirectory, ProcessRawOutputCallback onData,
         CancellationToken cancellationToken)
     {
-        var request = new ProcessRequest(_shell, ["-c", command], workingDirectory, _environment,
-            Path.Combine(_scratchDirectory, "pi-bash-discarded-" + Guid.NewGuid().ToString("N") + ".log"));
+        var request = new ProcessRequest(_shell.Shell, _shell.CommandArguments(command), workingDirectory, _environment,
+            Path.Combine(_scratchDirectory, "pi-bash-discarded-" + Guid.NewGuid().ToString("N") + ".log"))
+        { StandardInput = _shell.CommandTransport == ShellCommandTransport.Stdin ? Encoding.UTF8.GetBytes(command) : null };
         var result = await _runner.RunStreamingAsync(request, onData, cancellationToken).ConfigureAwait(false);
         return result.Status switch
         {

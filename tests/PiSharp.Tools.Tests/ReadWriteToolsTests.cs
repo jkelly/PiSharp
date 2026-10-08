@@ -34,12 +34,11 @@ internal static class ReadWriteToolsTests
         var tools = new ReadWriteTools(temp.Root, temp.Root);
         Sequence(["read", "write"], tools.Adapters.Select(value => value.Name));
         Equal(2, tools.ToolsAdded.Value.GetArrayLength());
-        foreach (var declaration in tools.Declarations)
-        {
-            Equal("object", declaration.Value.GetProperty("parameters").GetProperty("type").GetString());
-            Check(!declaration.Value.GetProperty("parameters").GetProperty("additionalProperties").GetBoolean(), "Schema allows unsupported fields.");
-        }
-        Equal("integer", tools.Declarations[0].Value.GetProperty("parameters").GetProperty("properties").GetProperty("offset").GetProperty("type").GetString());
+        // Pi read.ts/write.ts: description, TypeBox parameters (no additionalProperties; offset/limit are numbers) and strict-prefer sampling.
+        Equal("""{"name":"read","description":"Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to read (relative or absolute)"},"offset":{"type":"number","description":"Line number to start reading from (1-indexed)"},"limit":{"type":"number","description":"Maximum number of lines to read"}},"required":["path"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""",
+            tools.Declarations[0].ToString());
+        Equal("""{"name":"write","description":"Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to write (relative or absolute)"},"content":{"type":"string","description":"Content to write to the file"}},"required":["path","content"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""",
+            tools.Declarations[1].ToString());
         var invoker = tools.CreateInvoker(new Policy());
         Check(tools.CreateDefinitions(invoker).All(value => ReferenceEquals(value.Executor, invoker)), "Definitions bypass the invoker.");
         Throws<ArgumentNullException>(() => tools.CreateInvoker(null!));
@@ -119,18 +118,27 @@ internal static class ReadWriteToolsTests
         Equal(0, policy.Actions.Count); Check(!File.Exists(temp.File("absent")), "Oversized write created a file.");
         Success(await Invoke(tools, "write", new { path = "exact", content = "\U0001f642" })); Equal(4L, new FileInfo(temp.File("exact")).Length);
         var contentTools = new ReadWriteTools(temp.Root, temp.Root);
-        var unsupported = new byte[][]
+        // Pi read.ts: anything that is not a supported image is buffer.toString("utf-8") (U+FFFD for malformed bytes, BOM and
+        // control characters kept); a truncated PNG signature is not an image.
+        var text = new (byte[] Bytes, string Text)[]
         {
-            [0xc3, 0x28], [0xff, 0xfe, 0x41, 0x00], [0x61, 0x00, 0x62], [0x61, 0x01, 0x62],
-            Encoding.UTF8.GetBytes("a\u0085b"),
-            [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], Encoding.ASCII.GetBytes("GIF89a"),
-            Encoding.ASCII.GetBytes("RIFFxxxxWEBP")
+            ([0xc3, 0x28], "�("), ([0xff, 0xfe, 0x41, 0x00], "��A\0"), ([0x61, 0x00, 0x62], "a\0b"), ([0x61, 0x01, 0x62], "a\u0001b"),
+            (Encoding.UTF8.GetBytes("a\u0085b"), "a\u0085b"), ([0xef, 0xbb, 0xbf, 0x41], "﻿A"),
+            ([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], "�PNG\r\n\u001a\n")
         };
-        for (var index = 0; index < unsupported.Length; index++)
+        foreach (var (bytes, expected) in text)
         {
-            await File.WriteAllBytesAsync(temp.File("unsupported"), unsupported[index]);
-            var result = await Invoke(contentTools, "read", new { path = "unsupported" }); Failure(result, ToolFailureKind.ExecutionError);
-            Equal("UnsupportedContent", result.Details.Value.GetProperty("fileOperation").GetProperty("code").GetString());
+            await File.WriteAllBytesAsync(temp.File("binary"), bytes);
+            var result = await Invoke(contentTools, "read", new { path = "binary" }); Success(result);
+            Equal(expected, result.Content.Single().Text);
+            Equal(expected, result.StructuredContent!.Value.GetString());
+        }
+        // A detected image the backend cannot read is omitted with the source resize message (Photon failing to decode).
+        foreach (var (bytes, mime) in new[] { (Encoding.ASCII.GetBytes("GIF89a"), "image/gif"), (Encoding.ASCII.GetBytes("RIFFxxxxWEBP"), "image/webp") })
+        {
+            await File.WriteAllBytesAsync(temp.File("image"), bytes);
+            var result = await Invoke(contentTools, "read", new { path = "image" }); Success(result);
+            Equal($"Read image file [{mime}]\n[Image omitted: could not be resized below the inline image size limit.]", result.Content.Single().Text);
         }
         const string ordinaryBmpPrefix = "BM is a text prefix with at least twenty six characters.";
         await File.WriteAllBytesAsync(temp.File("text"), Encoding.UTF8.GetBytes(ordinaryBmpPrefix));
@@ -143,7 +151,8 @@ internal static class ReadWriteToolsTests
     private static async Task AdmissionAndDenial()
     {
         using var temp = new TemporaryFiles(); var operations = new Operations(); var tools = new ReadWriteTools(temp.Root, temp.Root, operations);
-        foreach (var raw in new[] { "{}", "{\"path\":\"x\",\"offset\":0}", "{\"path\":\"x\",\"offset\":1.5}",
+        // Pi offset is a number; 0 and negative offsets start at line 1, so only non-integral values are refused natively.
+        foreach (var raw in new[] { "{}", "{\"path\":\"x\",\"offset\":1.5}",
             "{\"path\":\"x\",\"limit\":-1}", "{\"path\":\"x\",\"unknown\":1}" })
             Failure(await tools.CreateInvoker(new Policy()).ExecuteAsync(Invocation("read", JsonData.Parse(raw)), default), ToolFailureKind.InvalidArguments);
         foreach (var raw in new[] { "{\"path\":\"x\"}", "{\"path\":\"x\",\"content\":1}", "{\"path\":\"x\\u0000\",\"content\":\"valid\"}" })

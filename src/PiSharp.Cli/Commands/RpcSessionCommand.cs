@@ -27,7 +27,7 @@ public static class RpcSessionCommand
 {
     public const string Usage = "session rpc --session <existing absolute JSONL> --workspace <existing absolute directory> " +
         "(--offline-script <absolute JSON> | --live [--provider <provider>] [--model <pattern>[:<thinking>]] [--models <patterns>] [--max-output-tokens 1..8192]) [--thinking off|minimal|low|medium|high|xhigh|max] [--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
-        "[--bash-executable <absolute file> --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]] " + NativeExtensionConfiguration.Flags + " " + SessionCatalogCommand.Flags + " " + CreationFlags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags;
+        "[[--bash-executable <absolute file>] --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]] " + NativeExtensionConfiguration.Flags + " " + SessionCatalogCommand.Flags + " " + CreationFlags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags;
     public const string CreationFlags = "[--session-mode open|new-memory|new-lazy]";
     private static readonly JsonlTransportOptions Framing = new(MaximumFrameBytes: 1_048_576, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
     private sealed record Arguments(string Session, string Workspace, string? Script, bool Latest, string? Leaf,
@@ -111,7 +111,8 @@ public static class RpcSessionCommand
                         registrationId = diagnostic.RegistrationId, failure = diagnostic.Failure.ToString() }) + "\n").AsMemory(), token).ConfigureAwait(false);
                     await stderr.FlushAsync(token).ConfigureAwait(false);
                 }, modelSupportsImages: parsed.SupportsImages, liveSelection: liveSelection, liveRuntime: liveRuntime,
-                toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings), mcpAdmission: parsed.Tools.NoMcp ? null : mcpAdmission).ConfigureAwait(false);
+                toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings), mcpAdmission: parsed.Tools.NoMcp ? null : mcpAdmission,
+                toolSettings: PiSharp.Tools.BuiltinToolSettings.FromSettings(settings?.Values)).ConfigureAwait(false);
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();

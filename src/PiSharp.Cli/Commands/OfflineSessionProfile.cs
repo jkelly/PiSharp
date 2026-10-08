@@ -31,7 +31,8 @@ using PiSharp.CodingAgent.Resources.Skills;
 
 namespace PiSharp.Cli.Commands;
 
-internal sealed record OfflineBashAuthorization(string Executable, string SpillRoot,
+/// <summary>The model bash grant. A null executable resolves the shell as Pi does (settings shellPath, then discovery).</summary>
+internal sealed record OfflineBashAuthorization(string? Executable, string SpillRoot,
     ImmutableHashSet<string> Commands, double? Timeout);
 
 /// <summary>Literal authored wire turns through injected HTTP; only explicit final file targets are authorized.</summary>
@@ -342,7 +343,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     {
         if (executable is null && spillRoot is null && commands.IsEmpty && timeout is null) return null;
         if (!OperatingSystem.IsWindows()) throw new SessionCommandException(SessionCommandFailure.UnsupportedBashPlatform);
-        if (executable is null || spillRoot is null || commands.Length is < 1 or > 16)
+        if (spillRoot is null || commands.Length is < 1 or > 16)
             throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
         var exact = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal); long characters = 0;
         foreach (var command in commands)
@@ -359,7 +360,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
             seconds = value;
         }
-        return new(SessionCommands.Absolute(executable), SessionCommands.Absolute(spillRoot), exact.ToImmutable(), seconds);
+        return new(executable is null ? null : SessionCommands.Absolute(executable), SessionCommands.Absolute(spillRoot), exact.ToImmutable(), seconds);
     }
 
     public static async Task<OfflineSessionProfile> CreateAsync(string workspace, string sessionPath, string? scriptPath,
@@ -374,8 +375,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         NativeExtensionInitializerInstallation? configuredInitializerInstallation = null,
         PiSharp.Cli.Mcp.McpApplicationInitializerAdmission? applicationMcpHost = null,
         Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null,
-        OriginalSystemPromptAdmission? originalSystemPrompt = null)
+        OriginalSystemPromptAdmission? originalSystemPrompt = null, BuiltinToolSettings? toolSettings = null)
     {
+        toolSettings ??= BuiltinToolSettings.Default;
         if (configuredExecInstallation is not null && (extension is null || configuredExecInstallation.GetInvocationList().Length != 1))
             throw new ArgumentException("One native extension and one explicit execution installation factory required.");
         Func<PiSharp.Cli.Mcp.McpApplicationHostInstallation>? readApplicationHost = null;
@@ -456,12 +458,17 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         }
         var reads = await Targets(readTargets); var writes = await Targets(writeTargets);
         BashTool? bashTool = null; BashGrant? grant = null; UserBashHost? userBash = null;
-        OwnedProcessCleanup? processCleanup = null;
+        OwnedProcessCleanup? processCleanup = null; OfflineSessionProfile? bashOwner = null;
         if (bash is not null)
         {
             token.ThrowIfCancellationRequested();
             if (!OperatingSystem.IsWindows()) throw new SessionCommandException(SessionCommandFailure.UnsupportedBashPlatform);
-            var executable = SessionCommands.Absolute(await files.CanonicalizeAsync(bash.Executable, token));
+            // Pi getShellConfig: the explicit shell (--bash-executable, like settings shellPath), else platform discovery.
+            ShellConfiguration shell;
+            try { shell = bash.Executable is { } configured ? ShellDiscovery.ForBash(configured) : ShellDiscovery.Resolve(toolSettings.ShellPath); }
+            catch (ShellDiscoveryException) { throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration); }
+            var executable = SessionCommands.Absolute(await files.CanonicalizeAsync(SessionCommands.Absolute(shell.Shell), token));
+            shell = shell with { Shell = executable };
             var spillRoot = SessionCommands.Absolute(await files.CanonicalizeAsync(bash.SpillRoot, token));
             if (!File.Exists(executable) || reserved.Contains(executable) || !Directory.Exists(spillRoot) ||
                 !(FilePolicy.Comparer.Equals(spillRoot, canonicalWorkspace) || FilePolicy.Within(canonicalWorkspace, spillRoot)) ||
@@ -478,10 +485,14 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
             var environment = ImmutableDictionary<string, string>.Empty.Add("SystemRoot", windows)
                 .Add("TEMP", canonicalSpill).Add("TMP", canonicalSpill).Add("LANG", "C.UTF-8").Add("LC_ALL", "C.UTF-8");
-            grant = new(executable, canonicalWorkspace, canonicalSpill, environment, bash.Commands, bash.Timeout, files);
-            processCleanup = new(new NativeProcessRunner());
-            bashTool = new(processCleanup, new(executable, canonicalWorkspace, environment, canonicalSpill));
-            userBash = new(new(new NativeShellOperations(executable, environment, canonicalSpill), canonicalSpill));
+            grant = new(shell, toolSettings.ShellCommandPrefix, canonicalWorkspace, canonicalSpill, environment, bash.Commands, bash.Timeout, files);
+            // Pi spills any amount of command output to its file; only the in-memory tail is bounded.
+            var unboundedOutput = new ProcessRunnerOptions(MaximumRawBytes: int.MaxValue);
+            processCleanup = new(new NativeProcessRunner(unboundedOutput));
+            // Pi exposes PI_SESSION_ID, PI_SESSION_FILE, PI_PROVIDER, PI_MODEL and PI_REASONING_LEVEL to model bash commands.
+            bashTool = new(processCleanup, BashToolOptions.FromShell(shell, canonicalWorkspace, environment, canonicalSpill) with
+            { CommandPrefix = toolSettings.ShellCommandPrefix, SessionEnvironment = () => CurrentBashSession(bashOwner) });
+            userBash = new(new(new NativeShellOperations(shell, environment, canonicalSpill, unboundedOutput), canonicalSpill), toolSettings.ShellCommandPrefix);
         }
         var policy = new FilePolicy(canonicalWorkspace, reads, writes, reserved, grant, grepHost);
         var grepReader = grepHost is null ? null : new AdmittedGrepContextReader(canonicalWorkspace,
@@ -507,14 +518,15 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 connection = await connectionOriginal.ConfigureAwait(false);
             }
             var profile = new OfflineSessionProfile(canonicalWorkspace, new BuiltinToolCatalog(canonicalWorkspace, canonicalWorkspace, files,
-                readWriteOptions: new(MaximumReadBytes: 65_536, MaximumWriteBytes: 65_536, MaximumArgumentCharacters: 65_536),
-                editOptions: new(MaximumInputBytes: 65_536, MaximumOutputBytes: 65_536, MaximumArgumentCharacters: 65_536,
+                readWriteOptions: ReadOptions(bash is not null, toolSettings, modelDefinition.DeclaresImageInput),
+                // Pi edits files of any size; only the edit arguments and the display diff keep the profile bounds.
+                editOptions: new(MaximumInputBytes: 64 * 1024 * 1024, MaximumOutputBytes: 64 * 1024 * 1024, MaximumArgumentCharacters: 65_536,
                     DiffOptions: new(MaximumOutputCharacters: 4096)), bash: bashTool,
                 grep: grepHost?.Executor, grepContextReader: grepReader), policy,
                 new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup, connection, toolSelection,
                 deferCatalogValidation: mcpAdmission is not null || registeredMcpAdmission is not null || readApplicationHost is not null,
                 originalSystemPrompt: originalSystemPrompt);
-            profile.UserBash = userBash;
+            profile.UserBash = userBash; bashOwner = profile;
             if (readApplicationHost is not null) profile.ConfigureMcpRegistrationRuntime(readApplicationHost().CreateRegisteredAdmission());
             else if (registeredMcpAdmission is not null) profile.ConfigureMcpRegistrationRuntime(registeredMcpAdmission);
             else if (mcpAdmission is not null) profile.ConfigureMcpRuntime(mcpAdmission);
@@ -674,26 +686,57 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         }
     }
 
-    private sealed record BashGrant(string Executable, string Workspace, string SpillDirectory,
+    /// <summary>Pi's read limits behind the profile bounds: any file size, images resized to fit the profile's request entries.</summary>
+    private static ReadWriteToolOptions ReadOptions(bool megabyteEntries, BuiltinToolSettings settings, bool modelSupportsImages) =>
+        new(MaximumReadBytes: 64 * 1024 * 1024, MaximumWriteBytes: 65_536, MaximumArgumentCharacters: 65_536)
+        {
+            AutoResizeImages = settings.AutoResizeImages,
+            // Pi resizes to 4.5MB of base64; this profile's transports admit 1 MiB (or 64 KiB) request entries, so images
+            // are resized to fit them. Without automatic resizing an oversized image is still bounded by those entries.
+            ImageResizeOptions = new(MaxBytes: megabyteEntries ? 448 * 1024 : 40 * 1024),
+            CurrentModelSupportsImages = () => modelSupportsImages
+        };
+
+    /// <summary>The PI_* values of the profile's current session (source resolveSpawnContext), or none before attachment.</summary>
+    private static BashSessionEnvironment? CurrentBashSession(OfflineSessionProfile? owner)
+    {
+        if (owner?.Sessions is not { } sessions) return null;
+        try
+        {
+            var session = sessions.Current.Session; var snapshot = session.Snapshot; var model = snapshot.Agent.Model;
+            return new(snapshot.Log.Header.Id, session.SessionFile, model.Provider, model.Id, snapshot.Context.ThinkingLevel);
+        }
+        catch (Exception error) when (error is InvalidOperationException or ObjectDisposedException) { return null; }
+    }
+
+    private sealed record BashGrant(ShellConfiguration Shell, string? Prefix, string Workspace, string SpillDirectory,
         ImmutableDictionary<string, string> Environment, ImmutableHashSet<string> Commands, double? Timeout, IFileOperations Files)
     {
+        private string Executable => Shell.Shell;
         public async ValueTask<bool> AuthorizeAsync(PreparedToolAction action, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
             try
             {
+                // The configured environment exactly, plus only the PI_* session variables the tool adds.
                 if (action.ToolName != "bash" || action.Operation != "bash" || action.Kind != PreparedToolActionKind.Command ||
                     action.Target != Executable || action.WorkingDirectory != Workspace || action.CommandArguments.IsDefault ||
-                    action.CommandArguments.Length != 2 || action.CommandArguments[0] != "-c" || action.Environment.Count != Environment.Count ||
                     !Environment.All(pair => action.Environment.TryGetValue(pair.Key, out var value) && value == pair.Value) ||
+                    action.Environment.Keys.Any(key => !Environment.ContainsKey(key) && !BashSessionEnvironment.VariableNames.Contains(key)) ||
                     action.Arguments.ToString().Length > 96_000) return false;
                 var raw = JsonData.Parse(action.Arguments.ToString()).Value;
-                if (raw.ValueKind != JsonValueKind.Object || raw.EnumerateObject().Any(pair => pair.Name is not ("command" or "timeout" or "outputPath")) ||
+                if (raw.ValueKind != JsonValueKind.Object || raw.EnumerateObject().Any(pair => pair.Name is not ("command" or "timeout" or "outputPath" or "standardInput")) ||
                     !raw.TryGetProperty("command", out var command) || command.ValueKind != JsonValueKind.String ||
-                    command.GetString() is not { } text || !Commands.Contains(text) || action.CommandArguments[1] != text ||
+                    command.GetString() is not { } text || !Commands.Contains(text) ||
                     !raw.TryGetProperty("outputPath", out var path) || path.ValueKind != JsonValueKind.String || path.GetString() is not { } output ||
                     SessionCommands.Absolute(output) != output || Path.GetDirectoryName(output) != SpillDirectory ||
                     !ArtifactName(Path.GetFileName(output)) || File.Exists(output) || Directory.Exists(output)) return false;
+                // Pi runs `${shellCommandPrefix}\n${command}`; the shell receives it as its last argument or over stdin.
+                var resolved = string.IsNullOrEmpty(Prefix) ? text : Prefix + "\n" + text;
+                if (!action.CommandArguments.SequenceEqual(Shell.CommandArguments(resolved))) return false;
+                var hasInput = raw.TryGetProperty("standardInput", out var input);
+                if (Shell.CommandTransport == ShellCommandTransport.Stdin
+                    ? !hasInput || input.ValueKind != JsonValueKind.String || input.GetString() != resolved : hasInput) return false;
                 if (Timeout is { } seconds)
                 {
                     if (!raw.TryGetProperty("timeout", out var limit) || limit.ValueKind != JsonValueKind.Number ||

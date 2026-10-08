@@ -126,7 +126,7 @@ internal static partial class NativeExtensionSessionCommandTests
         {
             var declaration = source ?? throw new InvalidOperationException("Authored declaration is absent.");
             var parameters = declaration["input_schema"]!.DeepClone();
-            if (declaration["name"]!.GetValue<string>() != "hello") parameters["additionalProperties"] = false;
+            // Pi's read/write TypeBox schemas have no additionalProperties; non-strict projections send them as declared.
             var function = new JsonObject { ["name"] = declaration["name"]!.DeepClone(), ["description"] = declaration["description"]!.DeepClone(), ["parameters"] = parameters };
             if (api == "openai-completions") tools.Add(new JsonObject { ["type"] = "function", ["function"] = function });
             else { function["type"] = "function"; function["strict"] = false; tools.Add(function); }
