@@ -1,7 +1,7 @@
 <Project>
   <!-- Opt-in through CustomAfterMicrosoftCommonTargets; shared projects unchanged. -->
   <PropertyGroup>
-    <PiSharpNativeSdkPackage Condition="'$(MSBuildProjectName)' == 'PiSharp.Contracts' Or '$(MSBuildProjectName)' == 'PiSharp.AI' Or '$(MSBuildProjectName)' == 'PiSharp.Agent' Or '$(MSBuildProjectName)' == 'PiSharp.Sessions' Or '$(MSBuildProjectName)' == 'PiSharp.Tools' Or '$(MSBuildProjectName)' == 'PiSharp.CodingAgent' Or '$(MSBuildProjectName)' == 'PiSharp.PromptTemplates.Yaml' Or '$(MSBuildProjectName)' == 'PiSharp.Rpc' Or '$(MSBuildProjectName)' == 'PiSharp.Tui' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Abstractions' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Runtime' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Agent' Or '$(MSBuildProjectName)' == 'PiSharp.ExtensionHost' Or '$(MSBuildProjectName)' == 'PiSharp.Compatibility.Node'">true</PiSharpNativeSdkPackage>
+    <PiSharpNativeSdkPackage Condition="'$(MSBuildProjectName)' == 'PiSharp.Contracts' Or '$(MSBuildProjectName)' == 'PiSharp.AI' Or '$(MSBuildProjectName)' == 'PiSharp.Agent' Or '$(MSBuildProjectName)' == 'PiSharp.Sessions' Or '$(MSBuildProjectName)' == 'PiSharp.Tools' Or '$(MSBuildProjectName)' == 'PiSharp.CodingAgent' Or '$(MSBuildProjectName)' == 'PiSharp.PromptTemplates.Yaml' Or '$(MSBuildProjectName)' == 'PiSharp.Rpc' Or '$(MSBuildProjectName)' == 'PiSharp.Tui' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Abstractions' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Runtime' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Agent' Or '$(MSBuildProjectName)' == 'PiSharp.ExtensionHost' Or '$(MSBuildProjectName)' == 'PiSharp.Compatibility.Node' Or '$(MSBuildProjectName)' == 'PiSharp.Codemode'">true</PiSharpNativeSdkPackage>
   </PropertyGroup>
   <PropertyGroup Condition="'$(PiSharpNativeSdkPackage)' == 'true'">
     <IsPackable>true</IsPackable>
@@ -24,6 +24,7 @@
     <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Extensions.Agent'">Connects PiSharp extension hooks to the agent loop. Compatibility is limited to recorded acceptance evidence.</Description>
     <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.ExtensionHost'">Supervised out-of-process extension workers for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
     <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Compatibility.Node'">Optional Node.js bridge for Pi TypeScript extensions in PiSharp. Requires Node.js. Compatibility is limited to recorded acceptance evidence.</Description>
+    <Description Condition="'$(MSBuildProjectName)' == 'PiSharp.Codemode'">Codemode for PiSharp: model-written JavaScript in a Jint sandbox that calls the session's tools. Compatibility is limited to recorded acceptance evidence.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryType>git</RepositoryType>

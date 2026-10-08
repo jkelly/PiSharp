@@ -87,6 +87,9 @@ public sealed record ExtensionToolDescriptor(
     public Func<ToolLoadout, ToolLoadoutChanges?>? PrepareLoadout { get; init; }
     /// <summary>Source promptGuidelines, reported to loadout preparation by ToolLoadout.GetPromptGuidelines.</summary>
     public ImmutableArray<string> PromptGuidelines { get; init; } = [];
+    /// <summary>Source constrainedSampling: provider sampling constraints carried on the model-facing declaration, for example
+    /// <c>{ "type": "grammar", "variants": { "openai_lark": "..." } }</c>. Null declares none.</summary>
+    public JsonData? ConstrainedSampling { get; init; }
     /// <summary>The tool's own renderers, consulted after every registered tool renderer resolver.</summary>
     public ExtensionToolRenderers? Renderers { get; init; }
 }

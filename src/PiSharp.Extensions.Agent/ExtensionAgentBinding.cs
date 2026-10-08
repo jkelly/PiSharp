@@ -156,7 +156,8 @@ public sealed class ExtensionAgentBinding
             {
                 var prefix = "{\"name\":" + JsonSerializer.Serialize(tool.Name) + ",\"description\":" +
                     JsonSerializer.Serialize(tool.Description) + ",\"parameters\":";
-                var parameters = tool.Parameters.ToString();
+                // Source constrainedSampling travels on the declaration after parameters; providers that support it project it.
+                var parameters = tool.Parameters.ToString() + (tool.ConstrainedSampling is { } sampling ? ",\"constrainedSampling\":" + sampling : "");
                 var separator = first ? 0 : 1; first = false;
                 characters += prefix.Length + (long)parameters.Length + 1 + separator;
                 bytes += Encoding.UTF8.GetByteCount(prefix) + (long)Encoding.UTF8.GetByteCount(parameters) + 1 + separator;

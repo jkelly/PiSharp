@@ -149,7 +149,7 @@ internal static partial class Program
             {
                 CreateChannel = entry => (actual, token) =>
                 {
-                    if (actual.Name is not ("docs" or "web")) throw new InvalidOperationException("Unexpected MCP server " + actual.Name);
+                    if (actual.Name is not ("docs" or "web" or "scripts" or "mixed")) throw new InvalidOperationException("Unexpected MCP server " + actual.Name);
                     var server = new DocsServer(actual.Name, Initialized); Servers.Add(server);
                     return ValueTask.FromResult<IMcpAdmittedRequestChannel>(server);
                 },
@@ -309,9 +309,9 @@ internal static partial class Program
         Names(["read", "tool_search", "mcp__docs__search"], ToolNames(requests[1]), "loaded unnamed MCP tool declared");
     });
 
-    // Codemode is a later release: a server whose tools need codemode is still reported and not connected without a codemode
-    // implementation, while its deferred neighbour connects.
-    private static Task CodemodeServersStillSkipped() => WithRoot("codemode",
+    // PiSharp 1.1.0.3: servers whose tools need codemode connect too. The built-in codemode is active for them (the "mixed"
+    // server has both kinds), next to tool_search for the deferred ones, and nothing is reported.
+    private static Task CodemodeServersConnect() => WithRoot("codemode",
         """{"mcpServers":{"docs":{"command":"docs-server","exposure":"deferred"},"scripts":{"command":"scripts-server"},"mixed":{"command":"mixed-server","exposure":"deferred","toolExposure":{"run":"codemode"}}}}""",
         async (root, fixture) =>
     {
@@ -320,11 +320,9 @@ internal static partial class Program
         await Connected(fixture, rpc);
         await rpc.Prompt("p1", "hello");
         Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
-        Names(["MCP servers need attention:\n" +
-            "  scripts: not connected: its codemode tools need the codemode tool, which PiSharp does not implement yet; set \"exposure\": \"deferred\" or \"direct\" to use it\n" +
-            "  mixed: not connected: its codemode tools need the codemode tool, which PiSharp does not implement yet; set \"exposure\": \"deferred\" or \"direct\" to use it"],
-            McpDiagnostics(rpc.Error.ToString()), "codemode servers reported");
-        Equal(1, fixture.Servers.Count, "only the deferred server connected");
-        Check(ToolNames(provider.Snapshot().Single()).Contains("tool_search"), "tool_search active for the deferred server");
+        Names([], McpDiagnostics(rpc.Error.ToString()), "nothing reported");
+        Equal(3, fixture.Servers.Count, "every server connected");
+        var declared = ToolNames(provider.Snapshot().Single());
+        Check(declared.Contains("tool_search") && declared.Contains("codemode"), "tool_search and codemode active: " + string.Join(",", declared));
     });
 }

@@ -55,3 +55,4 @@ compatibility/semantic-full-structural-openai.plan.json -text
 # Export integrity sidecars are also physical-byte authorities.
 /PUBLIC-DERIVATIVE-INTEGRITY.json -text
 /PUBLIC-SNAPSHOT-MANIFEST.json -text
+src/PiSharp.Codemode/Runtime/*.js text eol=lf
