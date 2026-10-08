@@ -18,7 +18,8 @@ function Assert-PiSharpNativeSdkPackage {
     $required=@($assembly,($PackageId+'.nuspec'),'LICENSE','README.md','THIRD-PARTY-NOTICES.md','provenance.json','[Content_Types].xml','_rels/.rels')
     if($PackageId-ceq'PiSharp.PromptTemplates.Yaml'){$required+='licenses/YamlDotNet.LICENSE.txt'}
     foreach($name in $required){if(-not$files.ContainsKey($name)){throw 'Required native SDK package member absent.'}}
-    foreach($name in $files.Keys){if($name-cnotin$required-and$name-cnotmatch'^package/services/metadata/core-properties/[0-9a-f]+\.psmdcp$'){throw 'Unexpected SDK package member.'}}
+    # SDK 10 deterministic pack names the core-properties part nuget.psmdcp; older packs use a random hex name.
+    foreach($name in $files.Keys){if($name-cnotin$required-and$name-cnotmatch'^package/services/metadata/core-properties/(?:[0-9a-f]+|nuget)\.psmdcp$'){throw 'Unexpected SDK package member.'}}
     if(@($files.Keys|Where-Object{$_-cmatch'^package/services/metadata/core-properties/'}).Count-ne1){throw 'Exactly one NuGet core-properties entry required.'}
     foreach($name in @('LICENSE','README.md','THIRD-PARTY-NOTICES.md')){
         if($files[$name].sha256-cne(Get-FileHash -LiteralPath (Join-Path $Repo $name) -Algorithm SHA256).Hash.ToLowerInvariant()){throw 'SDK source/license document differs.'}
