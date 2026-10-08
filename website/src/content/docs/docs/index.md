@@ -19,7 +19,7 @@ Every layer is a separate library. See the [SDK](/sdk/) for the full list.
 
 ## Where to go next
 
-- [Quickstart](/docs/quickstart/): build PiSharp and run it.
+- [Quickstart](/docs/quickstart/): install PiSharp with `dotnet tool install -g PiSharp.Cli` and run it.
 - [Coming from Pi](/docs/coming-from-pi/): what carries over and what's different.
 - [Build an extension](/docs/extensions/build-an-extension/): write your first native extension.
 - [Parity](/parity/): how close PiSharp is to Pi today.

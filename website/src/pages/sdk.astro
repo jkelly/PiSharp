@@ -45,13 +45,9 @@ const groups = ['Core', 'Frontends', 'Extensions'] as const;
 						.filter((p) => p.group === group)
 						.map((p) => (
 							<div class="ps-card pkg" style={p.optional ? 'border-style: dashed' : undefined}>
-								<h3 class="ps-mono">{p.id}</h3>
+								<h3 class="ps-mono"><a href={`https://www.nuget.org/packages/${p.id}`}>{p.id}</a></h3>
 								<p class="ps-muted">{p.description}</p>
-								{p.nuget ? (
-									<code class="ps-mono add">dotnet add package {p.id}</code>
-								) : (
-									<code class="ps-mono add" style="color: var(--sl-color-gray-3)">Distribution to be announced</code>
-								)}
+								<code class="ps-mono add">{p.tool ? `dotnet tool install -g ${p.id}` : `dotnet add package ${p.id}`}</code>
 							</div>
 						))}
 				</div>
@@ -139,6 +135,9 @@ const groups = ['Core', 'Frontends', 'Extensions'] as const;
 	.pkg h3 {
 		margin: 0;
 		font-size: 1rem;
+		color: var(--sl-color-white);
+	}
+	.pkg h3 a {
 		color: var(--sl-color-white);
 	}
 	.pkg p {

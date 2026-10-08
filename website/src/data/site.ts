@@ -11,6 +11,8 @@ export const nav = [
 
 export const links = {
 	github: 'https://github.com/jkelly/PiSharp',
+	releases: 'https://github.com/jkelly/PiSharp/releases',
+	nuget: 'https://www.nuget.org/profiles/PiSharpJK',
 	issues: 'https://github.com/jkelly/PiSharp/issues',
 	contributing: 'https://github.com/jkelly/PiSharp/blob/main/CONTRIBUTING.md',
 	plans: 'https://github.com/jkelly/PiSharp/tree/main/docs/plans',

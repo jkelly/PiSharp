@@ -8,7 +8,7 @@ const libraries = packages.filter((p) => p.nuget);
 
 <SitePage title="The minimal agent harness, native to .NET" description="The minimal agent harness, native to .NET. An independent C# port of the Pi coding agent.">
 	<div class="announce">
-		<span class="ps-serif ps-em" style="font-size: 1.15rem">PiSharp {versions.pisharp} tracks Pi v{versions.baseline}.</span>
+		<span class="ps-serif ps-em" style="font-size: 1.15rem">PiSharp {versions.pisharp} is out, tracking Pi v{versions.baseline}.</span>
 		{!inSync && <span class="ps-muted"> Syncing to Pi {versions.latestPi} is underway. </span>}
 		<a href="/parity/">See parity →</a>
 	</div>
@@ -23,13 +23,14 @@ const libraries = packages.filter((p) => p.nuget);
 			extensions, embeddable libraries, and no Node runtime required.
 		</p>
 
-		<!-- Install box: intentionally blank until distribution is decided. Add tabs here. -->
 		<div class="ps-term install" aria-label="Install">
+			<div class="ps-termbar"><span>Install as a .NET tool</span><span>Requires .NET 10</span></div>
 			<div class="install-body">
-				<code class="ps-mono"><span style="color: #38bdf8">$</span> <span style="color: #8a85b3">Packaged install coming soon</span></code>
+				<code class="ps-mono" id="install-command"><span style="color: #38bdf8">$</span> dotnet tool install -g PiSharp.Cli</code>
+				<button type="button" class="ps-mono copy" data-copy="dotnet tool install -g PiSharp.Cli" aria-label="Copy install command">[ COPY ]</button>
 			</div>
 		</div>
-		<a href="/docs/quickstart/">Build from source →</a>
+		<p class="ps-muted install-note">Then run <span class="ps-kbd">pisharp</span>. Or <a href="/docs/quickstart/#build-from-source">build from source</a>.</p>
 	</header>
 
 	<!-- Terminal demo -->
@@ -207,6 +208,20 @@ const libraries = packages.filter((p) => p.nuget);
 	</section>
 </SitePage>
 
+<script>
+	for (const button of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
+		button.addEventListener('click', async () => {
+			try {
+				await navigator.clipboard.writeText(button.dataset.copy ?? '');
+				button.textContent = '[ COPIED ]';
+			} catch {
+				button.textContent = '[ COPY FAILED ]';
+			}
+			setTimeout(() => (button.textContent = '[ COPY ]'), 1500);
+		});
+	}
+</script>
+
 <style>
 	.announce {
 		text-align: center;
@@ -253,8 +268,39 @@ const libraries = packages.filter((p) => p.nuget);
 		text-align: start;
 	}
 	.install-body {
-		padding: 1.3rem 1.25rem;
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		padding: 1.1rem 1.25rem;
 		font-size: 0.95rem;
+	}
+	.install-body code {
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow-x: auto;
+		white-space: nowrap;
+		color: #ffffff;
+		background: transparent;
+		padding: 0;
+	}
+	.copy {
+		flex: 0 0 auto;
+		background: transparent;
+		color: #c9c4e8;
+		border: 1px solid #2e2866;
+		border-radius: 6px;
+		padding: 0.5rem 0.8rem;
+		min-height: 44px;
+		font-size: 0.75rem;
+		letter-spacing: 0.1em;
+		cursor: pointer;
+	}
+	.copy:hover {
+		color: #ffffff;
+		border-color: #7c4dff;
+	}
+	.install-note {
+		margin: 0;
 	}
 	.card-title {
 		font-size: 1.2rem;

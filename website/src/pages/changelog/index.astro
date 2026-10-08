@@ -43,7 +43,8 @@ const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone
 						</div>
 						<p class="ps-muted baseline">
 							{entry.data.kind === 'patch' ? `Baseline unchanged: Pi ${entry.data.baseline}.` : `Matches Pi ${entry.data.baseline}.`}
-							{entry.data.kind === 'sync' && <> <a href={links.piChangelog}>Pi's release notes ↗</a></>}
+							{entry.data.status === 'released' && <> <a href={`${links.releases}/tag/v${entry.data.version}`}>GitHub release ↗</a></>}
+							{entry.data.kind === 'sync' && <>{entry.data.status === 'released' ? ' · ' : ' '}<a href={links.piChangelog}>Pi's release notes ↗</a></>}
 						</p>
 						<div class="body sl-markdown-content">
 							<Content />
