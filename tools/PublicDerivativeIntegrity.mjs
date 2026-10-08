@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const tablePath = 'PUBLIC-DERIVATIVE-INTEGRITY.json';
-const tableSha256 = 'bfd919d9dca71f79bcf7866c37a64dfa5c82d273910993152e41a0204a2a0145';
+const tableSha256 = '540ac073debf25bc87e10caf4aa942cd38feeb0e12c85dc8a4afb11522f05d38';
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const digest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const size = value => Number.isSafeInteger(value) && value >= 0;

@@ -517,7 +517,7 @@
         "tests/PiSharp.ToolSearch.Tests"
       ],
       "outcome": "partial",
-      "notes": "Implemented: codemode-deferred alias, description, .pi/mcp.json override rules, mcp_servers section through the existing append-on-change sections, background connection for non-direct servers, production sessions load <agent dir>/mcp.json and honour --no-mcp. 1.1.0.1: servers with deferred tools connect in production; the built-in tool_search (active for them; --tools/--exclude-tools without it leaves them unreachable with upstream's warning) loads their tools; MCP tool calls are admitted for servers of the session's generation, as Pi trusts mcp.json (no approval step, as upstream; 1.1.0 denied every MCP call). Remaining: servers needing codemode cannot connect until codemode ships (1.1.0.3); tool_search does not wait for background servers and late tools publish at the next idle point; the live/terminal routes send a literal system prompt, so mcp_servers renders only with the original-system-prompt profile; session close durably withdraws background servers' tools; no 10 s cap on direct servers; background servers have no resource tools; project .pi/mcp.json is unread; close during background publication can still fault."
+      "notes": "Implemented: codemode-deferred alias, description, .pi/mcp.json override rules, mcp_servers section through the existing append-on-change sections, background connection for non-direct servers, production sessions load <agent dir>/mcp.json and honour --no-mcp. 1.1.0.1: servers with deferred tools connect in production; the built-in tool_search (active for them; --tools/--exclude-tools without it leaves them unreachable with upstream's warning) loads their tools; MCP tool calls are admitted for servers of the session's generation, as Pi trusts mcp.json (no approval step, as upstream; 1.1.0 denied every MCP call). Codemode servers connect (full-parity IMPL-C). Remaining: tool_search does not wait for background servers and late tools publish at the next idle point; the live/terminal routes send a literal system prompt, so mcp_servers renders only with the original-system-prompt profile; session close durably withdraws background servers' tools; no 10 s cap on direct servers; background servers have no resource tools; project .pi/mcp.json is unread; close during background publication can still fault."
     },
     {
       "id": "mcp.oauth",
@@ -649,12 +649,16 @@
       ],
       "change": "Pre-existing port gap; openai-decisions and image input new in 1.1.0.",
       "pisharp": [
-        "src/PiSharp.AI"
+        "src/PiSharp.AI/ModelOperations",
+        "src/PiSharp.Contracts/ModelOperations",
+        "src/PiSharp.Cli/Extensions/NativeExtensionModelOperations.cs"
       ],
       "status": "port",
       "workPackage": "4b",
       "release": "1.1.0.2",
-      "test": "planned.gap.classifiers-images"
+      "test": "tests/PiSharp.Classifiers.Tests",
+      "outcome": "implemented",
+      "notes": "All classifier and image APIs (openai-decisions incl. image input, TypeSafe/Cloudflare system-one, llama.cpp log-probability classification, OpenRouter images), the ModelOperationsRegistry facade and the extension contract (ctx.modelRegistry classify/generateImages). Extensions pass their own model objects with the provider's credentials and stored OAuth is refreshed, as upstream (decision 0004). Remaining: extension registration of classifier/image providers and llama.cpp server discovery (IMPL-E), RPC/Node bridge exposure (IMPL-E)."
     },
     {
       "id": "gap.codemode",
@@ -665,12 +669,16 @@
       ],
       "change": "Pre-existing port gap (parity row codemode.runtime); Jint engine per decision 0003.",
       "pisharp": [
-        "src/PiSharp.Codemode"
+        "src/PiSharp.Codemode",
+        "src/PiSharp.Cli/Mcp/McpCodemode.cs",
+        "src/PiSharp.Cli/docs/codemode.md"
       ],
       "status": "port",
       "workPackage": "4c",
       "release": "1.1.0.3",
-      "test": "planned.gap.codemode"
+      "test": "tests/PiSharp.Codemode.Tests",
+      "outcome": "implemented",
+      "notes": "Jint 4.16.3 sandbox (decision 0003) with upstream's prelude byte-for-byte; declarations, // @options:, output framing and budget, image(), store as a session custom entry, models.* bridge, nested calls through the shared invoker (uncapped for codemode, as upstream), grammar sampling, renderer; codemode registered in every session; codemode MCP servers connect. Each script runs in a worker process so no script can take down the host. Deviations (docs/compatibility/codemode-engine.md): ~100-300 ms worker start per script; memory and recursion overruns are not catchable; throwing ~3000 calls deep exhausts memory; prompts wait for all codemode servers instead of per named server; the renderer is not shown until the terminal consults native renderers (IMPL-I)."
     },
     {
       "id": "exclude.durable",
@@ -807,6 +815,77 @@
         "tests/PiSharp.CliSync.Tests"
       ],
       "notes": "Gap that predates the sync (upstream commit 4e69b0c28, in v0.85.0+): PiSharp rejected every managed-effort model with \"Unsupported native thinking metadata\", which blocked the Claude 5.5 catalog rows. input_transformations now yields the anthropic_input_transformations diagnostic. Deviations: the diagnostic uses the request timestamp; malformed transformation entries fail as malformed; the summary route keeps thinking off (managed models send managed high, as upstream with no reasoning). Disabled thinking is sent only when thinkingLevelMap.off is not null, so claude-fable-5 (unmanaged, off null) summaries and no-level main requests carry no thinking field, as upstream."
+    },
+    {
+      "id": "parity.provider-apis",
+      "since": "0.99.0",
+      "upstream": [
+        "packages/ai/src/api/bedrock-converse-stream.ts",
+        "packages/ai/src/api/openai-codex-responses.ts",
+        "packages/ai/src/api/github-copilot-headers.ts",
+        "packages/ai/src/api/cloudflare.ts",
+        "packages/ai/src/auth"
+      ],
+      "change": "Pre-existing port gap: Bedrock, Codex, Copilot, Cloudflare and Vertex ADC routes and logins for every provider.",
+      "pisharp": [
+        "src/PiSharp.AI/Protocols/Bedrock",
+        "src/PiSharp.AI/Protocols/OpenAICodexResponses",
+        "src/PiSharp.AI/Protocols/ProviderShared",
+        "src/PiSharp.Cli/Authentication/ProviderAuthCatalog.cs",
+        "src/PiSharp.Cli/Commands/LiveProviderRoutes.cs"
+      ],
+      "status": "port",
+      "workPackage": "IMPL-A1",
+      "release": "1.1.0.x",
+      "outcome": "implemented",
+      "test": "tests/PiSharp.ProviderApis.Tests",
+      "notes": "Native SigV4 and the AWS credential chain (incl. credential_process, decision 0004), event-stream framing; Codex SSE with ChatGPT OAuth; Copilot headers and device login; Cloudflare Workers AI and AI Gateway; Vertex API key and ADC; /login for all 42 providers; stored !command keys resolve for every provider. Deviations: no Codex WebSocket transport, no zstd request compression, login secrets are not masked, no ADC external_account."
+    },
+    {
+      "id": "parity.catalogs-and-model-selection",
+      "since": "0.99.0",
+      "upstream": [
+        "packages/ai/src/providers",
+        "packages/coding-agent/src/core/model-registry.ts",
+        "packages/coding-agent/src/core/model-resolver.ts",
+        "packages/coding-agent/src/cli/list-models.ts",
+        "packages/coding-agent/src/core/resolve-config-value.ts"
+      ],
+      "change": "Pre-existing port gap: every provider catalog, models.json, model resolution, --list-models, config values.",
+      "pisharp": [
+        "src/PiSharp.Cli/Models",
+        "src/PiSharp.AI/Catalogs"
+      ],
+      "status": "port",
+      "workPackage": "IMPL-A2",
+      "release": "1.1.0.x",
+      "outcome": "implemented",
+      "test": "tests/PiSharp.Models.Tests",
+      "notes": "42 catalog shards byte-for-byte from pi-ai 1.1.0; env key map; models.json; --model patterns, --models, enabledModels, virtual models; --list-models; !command config values run as upstream (decision 0004). Deviations: an unknown configured default model is refused instead of replaced; models.json schema messages are approximations; startup catalog refresh is wired by IMPL-I."
+    },
+    {
+      "id": "parity.builtin-tools",
+      "since": "0.99.0",
+      "upstream": [
+        "packages/coding-agent/src/core/tools",
+        "packages/coding-agent/src/utils/image-process.ts",
+        "packages/coding-agent/src/core/bash-executor.ts"
+      ],
+      "change": "Pre-existing port gap: read images, binary text, bash shell discovery, shellCommandPrefix, user_bash, tool settings, upstream declarations.",
+      "pisharp": [
+        "src/PiSharp.Tools",
+        "src/PiSharp.Tools.Skia",
+        "src/PiSharp.AI/PiRequestBudget.cs"
+      ],
+      "status": "port",
+      "workPackage": "IMPL-D",
+      "release": "1.1.0.x",
+      "outcome": "implemented",
+      "test": [
+        "tests/PiSharp.Tools.Tests",
+        "tests/PiSharp.CliSync.Tests"
+      ],
+      "notes": "Upstream declarations and errors for all seven tools; read images via SkiaSharp (decision 0004) with upstream resize rules; bash shell discovery, shellCommandPrefix, PI_* session environment, user_bash interception; request and image budgets follow upstream (about 4.5 MB images reach every live API family). Deviations: edit still refuses non-UTF-8 files; CLI bash is Windows-only until IMPL-F; the --tool-policy gate (decision 0004) lands with IMPL-F."
     }
   ],
   "catalogRefresh": {

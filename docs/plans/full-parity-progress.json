@@ -4,20 +4,86 @@
   "branch": "parity/full",
   "started": "2026-10-08",
   "packages": [
-    { "id": "IMPL-A1", "title": "Provider APIs and authentication", "wave": 1, "status": "in-progress" },
-    { "id": "IMPL-A2", "title": "Model catalogs and model selection", "wave": 1, "status": "in-progress" },
-    { "id": "IMPL-B", "title": "Classifiers and image generation", "wave": 1, "status": "in-progress" },
-    { "id": "IMPL-C", "title": "Codemode on Jint", "wave": 1, "status": "in-progress" },
-    { "id": "IMPL-D", "title": "Built-in tools", "wave": 1, "status": "in-progress" },
-    { "id": "IMPL-F", "title": "CLI, configuration and resources", "wave": 2, "status": "planned" },
-    { "id": "IMPL-G", "title": "Events, session features and extension events", "wave": 2, "status": "planned" },
-    { "id": "IMPL-H", "title": "MCP completion", "wave": 2, "status": "planned" },
-    { "id": "IMPL-I", "title": "Interactive mode and slash commands", "wave": 3, "status": "planned" },
-    { "id": "IMPL-E", "title": "Extensions, Node bridge and packages", "wave": 3, "status": "planned" }
+    {
+      "id": "IMPL-A1",
+      "title": "Provider APIs and authentication",
+      "wave": 1,
+      "status": "merged"
+    },
+    {
+      "id": "IMPL-A2",
+      "title": "Model catalogs and model selection",
+      "wave": 1,
+      "status": "merged"
+    },
+    {
+      "id": "IMPL-B",
+      "title": "Classifiers and image generation",
+      "wave": 1,
+      "status": "merged"
+    },
+    {
+      "id": "IMPL-C",
+      "title": "Codemode on Jint",
+      "wave": 1,
+      "status": "merged"
+    },
+    {
+      "id": "IMPL-D",
+      "title": "Built-in tools",
+      "wave": 1,
+      "status": "merged"
+    },
+    {
+      "id": "IMPL-F",
+      "title": "CLI, configuration and resources",
+      "wave": 2,
+      "status": "planned"
+    },
+    {
+      "id": "IMPL-G",
+      "title": "Events, session features and extension events",
+      "wave": 2,
+      "status": "planned"
+    },
+    {
+      "id": "IMPL-H",
+      "title": "MCP completion",
+      "wave": 2,
+      "status": "planned"
+    },
+    {
+      "id": "IMPL-I",
+      "title": "Interactive mode and slash commands",
+      "wave": 3,
+      "status": "planned"
+    },
+    {
+      "id": "IMPL-E",
+      "title": "Extensions, Node bridge and packages",
+      "wave": 3,
+      "status": "planned"
+    }
   ],
   "qualityGates": {
-    "releaseSuites": ["AzureResponses", "MistralConversations", "AnthropicAuthSync", "McpSync", "ProviderSync", "WireSync", "CliSync", "ToolSearch"],
-    "alsoRequired": ["Rpc", "Sessions"],
+    "releaseSuites": [
+      "AzureResponses",
+      "MistralConversations",
+      "AnthropicAuthSync",
+      "McpSync",
+      "ProviderSync",
+      "WireSync",
+      "CliSync",
+      "ToolSearch"
+    ],
+    "alsoRequired": [
+      "Rpc",
+      "Sessions"
+    ],
     "perWave": "merge, refresh pins, all suites green, Linux dry run"
+  },
+  "wave1": {
+    "merged": "2026-10-08",
+    "gate": "all release suites, Rpc, Sessions, Tools and the four new parity suites green"
   }
 }

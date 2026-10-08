@@ -208,8 +208,8 @@
       "lockFile": {
         "path": "tests/PiSharp.Tui.LockModifiers.Tests/packages.lock.json",
         "status": "PINNED_EXISTING",
-        "bytes": 2597,
-        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+        "bytes": 4875,
+        "sha256": "19d8e80e666029e1eb0f45eb9ff440cb699f72181bb1a6aa8e4b1d9eafb99e23"
       },
       "currentExecution": "UNEXECUTED",
       "originalExpectationChanges": 0
@@ -411,8 +411,8 @@
       "lockFile": {
         "path": "tests/PiSharp.Tui.Keypad.Tests/packages.lock.json",
         "status": "PINNED_EXISTING",
-        "bytes": 2597,
-        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+        "bytes": 4875,
+        "sha256": "19d8e80e666029e1eb0f45eb9ff440cb699f72181bb1a6aa8e4b1d9eafb99e23"
       },
       "currentExecution": "UNEXECUTED",
       "originalExpectationChanges": 0
@@ -474,8 +474,8 @@
       "lockFile": {
         "path": "tests/PiSharp.Tui.ModifyOtherKeys.Tests/packages.lock.json",
         "status": "PINNED_EXISTING",
-        "bytes": 2597,
-        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+        "bytes": 4875,
+        "sha256": "19d8e80e666029e1eb0f45eb9ff440cb699f72181bb1a6aa8e4b1d9eafb99e23"
       },
       "currentExecution": "UNEXECUTED",
       "originalExpectationChanges": 0
@@ -649,8 +649,8 @@
       "lockFile": {
         "path": "tests/PiSharp.Tui.Focus.Tests/packages.lock.json",
         "status": "PINNED_EXISTING",
-        "bytes": 2597,
-        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+        "bytes": 4875,
+        "sha256": "19d8e80e666029e1eb0f45eb9ff440cb699f72181bb1a6aa8e4b1d9eafb99e23"
       },
       "currentExecution": "UNEXECUTED",
       "originalExpectationChanges": 0
@@ -800,8 +800,8 @@
       "lockFile": {
         "path": "tests/PiSharp.Tui.IndicConjunct.Tests/packages.lock.json",
         "status": "PINNED_EXISTING",
-        "bytes": 2597,
-        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+        "bytes": 4875,
+        "sha256": "19d8e80e666029e1eb0f45eb9ff440cb699f72181bb1a6aa8e4b1d9eafb99e23"
       },
       "currentExecution": "UNEXECUTED",
       "originalExpectationChanges": 0
@@ -1018,8 +1018,8 @@
       "lockFile": {
         "path": "tests/PiSharp.Tui.KittyAlternate.Tests/packages.lock.json",
         "status": "PINNED_EXISTING",
-        "bytes": 2597,
-        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+        "bytes": 4875,
+        "sha256": "19d8e80e666029e1eb0f45eb9ff440cb699f72181bb1a6aa8e4b1d9eafb99e23"
       },
       "currentExecution": "UNEXECUTED",
       "originalExpectationChanges": 0
@@ -1088,8 +1088,8 @@
       "lockFile": {
         "path": "tests/PiSharp.Tui.Keybindings.Tests/packages.lock.json",
         "status": "PINNED_EXISTING",
-        "bytes": 2597,
-        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299",
+        "bytes": 4875,
+        "sha256": "19d8e80e666029e1eb0f45eb9ff440cb699f72181bb1a6aa8e4b1d9eafb99e23",
         "provenance": {
           "copiedExistingLockPath": "tests/PiSharp.Tui.KittyAlternate.Tests/packages.lock.json",
           "copiedExistingLockSha256": "8e097c409127c9f7cfade1f4d44ae6327aec72363c62f6b5dcea8762efa834ae",
@@ -1444,8 +1444,8 @@
       "lockFile": {
         "path": "tests/PiSharp.Terminal.SelectList.Integration.Tests/packages.lock.json",
         "status": "PINNED_EXISTING",
-        "bytes": 2597,
-        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299",
+        "bytes": 4875,
+        "sha256": "19d8e80e666029e1eb0f45eb9ff440cb699f72181bb1a6aa8e4b1d9eafb99e23",
         "provenance": {
           "reviewedConsumerLockRawPreserved": true,
           "compatibleProjectGraphVerifiedStatically": true,
@@ -1604,9 +1604,9 @@
           "copiedExistingLockPath": "tests/PiSharp.Terminal.SelectList.Integration.Tests/packages.lock.json"
         },
         "status": "PINNED_EXISTING",
-        "bytes": 2597,
+        "bytes": 4875,
         "path": "tests/PiSharp.Terminal.Ownership.Tests/packages.lock.json",
-        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+        "sha256": "19d8e80e666029e1eb0f45eb9ff440cb699f72181bb1a6aa8e4b1d9eafb99e23"
       },
       "partialScope": "PARTIAL_SELECTOR_OWNERSHIP_31",
       "selectedOriginalOwnershipCases": 31,

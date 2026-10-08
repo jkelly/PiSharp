@@ -205,7 +205,7 @@ function Get-NativeAzureResponsesSourcePins {
     return @(
         @{ relative = 'compatibility/azure-responses-explicit-adapter.json'; bytes = 827; sha256 = '7b7928753e6281069bb493c286237ff59a46a039560c6e415324bfd6ba50e950' },
         @{ relative = 'docs/contracts/azure-responses-explicit-adapter.md'; bytes = 10693; sha256 = '730ed61331a599a554fef00e0bafefb21bf88022fc6a4c09557c11c79d74bf17' },
-        @{ relative = 'src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesOptions.cs'; bytes = 3211; sha256 = '0e5f45c1ebc18d2a498fe034f7b1a4de36a933e9c191a274cd216e0251085f47' },
+        @{ relative = 'src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesOptions.cs'; bytes = 3237; sha256 = '5743cb3b31a9d33c84f8cab77f70721811dd4aa56ab7450bed8418760a4cb23a' },
         @{ relative = 'src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesRequestFactory.cs'; bytes = 17420; sha256 = '0c93b621385caf6ece3877236f343f14fd876cbd44fe7129c811d7726963a062' },
         @{ relative = 'src/PiSharp.AI/Protocols/AzureResponses/AzureResponsesTransport.cs'; bytes = 14136; sha256 = '78986051ee53abcfb5758ecb22e157750464f3f532a74b00b8d5bcce83ca0b1d' },
         @{ relative = 'tests/PiSharp.AzureResponses.Tests/PiSharp.AzureResponses.Tests.csproj'; bytes = 208; sha256 = 'dd80069b3545d6291634e031ed2740773ad0af1535420f5ac44ef6451c0218c2' },
