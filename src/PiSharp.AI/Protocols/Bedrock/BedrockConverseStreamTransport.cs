@@ -40,7 +40,7 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
     private readonly BedrockConverseOptions _options;
     private readonly AwsEnvironment _environment;
     private readonly ImmutableArray<string> _levels;
-    private readonly Lazy<AwsCredentialChain> _chain;
+    private readonly Dictionary<string, AwsCredentialChain> _chains = new(StringComparer.Ordinal);
     /// <summary>The level used when a request carries none (the session's selected level at binding).</summary>
     private readonly string? _defaultLevel;
 
@@ -69,25 +69,41 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
         _levels = ProviderTranscript.SupportedThinkingLevels(modelMetadata.Value);
         if (defaultThinkingLevel is not null && !_levels.Contains(defaultThinkingLevel)) throw new ArgumentException("Unsupported Bedrock thinking level.");
         _defaultLevel = defaultThinkingLevel;
-        _chain = new(() => new AwsCredentialChain(_environment, Profile()));
+    }
+
+    /// <summary>One cached default chain per configured profile (the chain caches expiring credentials).</summary>
+    private AwsCredentialChain Chain(string? profile)
+    {
+        lock (_chains)
+        {
+            if (!_chains.TryGetValue(profile ?? "", out var chain)) _chains[profile ?? ""] = chain = new(_environment, profile);
+            return chain;
+        }
     }
 
     public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor model) =>
         model == _model.Descriptor ? _levels : throw new ArgumentException("Unknown Bedrock model.");
 
     /// <summary>getProviderEnvValue: the provider-scoped env, then the process environment.</summary>
-    private string? Env(string name) => _options.Environment is { } scoped && scoped.TryGetValue(name, out var value) && value.Length > 0 ? value : _environment.Env(name);
-    private string? OptionsProfile() => _options.Profile is { Length: > 0 } profile ? profile :
-        _options.Environment is { } scoped && scoped.TryGetValue("AWS_PROFILE", out var value) && value.Length > 0 ? value : null;
-    private string? Profile() => OptionsProfile() ?? Env("AWS_PROFILE");
-    private string? ConfiguredRegion() => _options.Region is { Length: > 0 } region ? region : Env("AWS_REGION") ?? Env("AWS_DEFAULT_REGION");
+    private string? Env(BedrockConverseOptions o, string name) => o.Environment is { } scoped && scoped.TryGetValue(name, out var value) && value.Length > 0 ? value : _environment.Env(name);
+    private static string? OptionsProfile(BedrockConverseOptions o) => o.Profile is { Length: > 0 } profile ? profile :
+        o.Environment is { } scoped && scoped.TryGetValue("AWS_PROFILE", out var value) && value.Length > 0 ? value : null;
+    private string? Profile(BedrockConverseOptions o) => OptionsProfile(o) ?? Env(o, "AWS_PROFILE");
+    private string? ConfiguredRegion(BedrockConverseOptions o) => o.Region is { Length: > 0 } region ? region : Env(o, "AWS_REGION") ?? Env(o, "AWS_DEFAULT_REGION");
 
-    /// <summary>The resolved client configuration: region, endpoint and authentication.</summary>
-    internal sealed record Resolved(string Region, Uri Endpoint, string? BearerToken, AwsCredentials? Credentials);
+    /// <summary>The resolved client configuration: region, endpoint and authentication, with the request's effective options.</summary>
+    internal sealed record Resolved(string Region, Uri Endpoint, string? BearerToken, AwsCredentials? Credentials, BedrockConverseOptions Options);
 
     internal async Task<Resolved> ResolveAsync(CancellationToken token)
     {
-        var configuredRegion = ConfiguredRegion();
+        var o = _options;
+        if (_options.Auth is { } auth)
+        {
+            var (apiKey, environment) = await auth(token).ConfigureAwait(false);
+            o = _options with { ApiKey = apiKey, Environment = environment };
+        }
+        string? Env(string name) => this.Env(o, name);
+        var configuredRegion = ConfiguredRegion(o);
         var ambientProfile = _environment.Env("AWS_PROFILE") is not null;
         var endpointRegion = StandardEndpointRegion(_model.BaseUrl);
         var explicitEndpoint = endpointRegion is null || configuredRegion is null && !ambientProfile;
@@ -100,7 +116,7 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
         {
             // The SDK's region chain: the configured profile's region in the shared config file.
             var files = AwsSharedFiles.Load(_environment);
-            region = files.Profiles.TryGetValue(Profile() ?? "default", out var data) ? data.GetValueOrDefault("region") : null;
+            region = files.Profiles.TryGetValue(Profile(o) ?? "default", out var data) ? data.GetValueOrDefault("region") : null;
             if (region is null) throw new BedrockServiceException("Error", "Region is missing") { Modeled = false };
         }
         Uri endpoint;
@@ -113,13 +129,13 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
             endpoint = new($"https://bedrock-runtime{(fips ? "-fips" : "")}.{region}.{suffix}");
         }
         var skipAuth = Env("AWS_BEDROCK_SKIP_AUTH") == "1";
-        var bearer = _options.BearerToken is { Length: > 0 } explicitBearer ? explicitBearer : _options.ApiKey is { Length: > 0 } apiKey ? apiKey : Env("AWS_BEARER_TOKEN_BEDROCK");
-        if (bearer is not null && !skipAuth) return new(region, endpoint, bearer, null);
-        if (skipAuth) return new(region, endpoint, null, new("dummy-access-key", "dummy-secret-key") { Source = "AWS_BEDROCK_SKIP_AUTH" });
+        var bearer = o.BearerToken is { Length: > 0 } explicitBearer ? explicitBearer : o.ApiKey is { Length: > 0 } key ? key : Env("AWS_BEARER_TOKEN_BEDROCK");
+        if (bearer is not null && !skipAuth) return new(region, endpoint, bearer, null, o);
+        if (skipAuth) return new(region, endpoint, null, new("dummy-access-key", "dummy-secret-key") { Source = "AWS_BEDROCK_SKIP_AUTH" }, o);
         // A profile configured through pi (option or scoped AWS_PROFILE) wins over ambient keys (#6957).
-        if (OptionsProfile() is null && Env("AWS_ACCESS_KEY_ID") is { } id && Env("AWS_SECRET_ACCESS_KEY") is { } secret)
-            return new(region, endpoint, null, new(id, secret, Env("AWS_SESSION_TOKEN")) { Source = "AWS access keys" });
-        return new(region, endpoint, null, await _chain.Value.ResolveAsync(token).ConfigureAwait(false));
+        if (OptionsProfile(o) is null && Env("AWS_ACCESS_KEY_ID") is { } id && Env("AWS_SECRET_ACCESS_KEY") is { } secret)
+            return new(region, endpoint, null, new(id, secret, Env("AWS_SESSION_TOKEN")) { Source = "AWS access keys" }, o);
+        return new(region, endpoint, null, await Chain(Profile(o)).ResolveAsync(token).ConfigureAwait(false), o);
     }
 
     [GeneratedRegex("^arn:aws(?:-[a-z0-9-]+)?:bedrock:([a-z0-9-]+):")] private static partial Regex ArnRegion();
@@ -147,8 +163,9 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
         var level = request.ThinkingLevel ?? _defaultLevel;
         if (level is not null && !_levels.Contains(level)) throw new ArgumentException("Unsupported Bedrock thinking level.");
         var transcript = ProviderTranscript.Parse(request.Messages);
-        var stream = BedrockConverseRequest.Simple(_model, transcript, _options, level);
-        return BedrockConverseRequest.Build(_model, request, _options, stream, Env, ConfiguredRegion() ?? resolved.Region);
+        var o = resolved.Options;
+        var stream = BedrockConverseRequest.Simple(_model, transcript, o, level);
+        return BedrockConverseRequest.Build(_model, request, o, stream, name => Env(o, name), ConfiguredRegion(o) ?? resolved.Region);
     }
 
     private HttpRequestMessage CreateHttpRequest(Resolved resolved, byte[] body)
@@ -156,11 +173,11 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
         var basePath = resolved.Endpoint.AbsolutePath.TrimEnd('/');
         // __extendedEncodeURIComponent(modelId): every reserved character, including ":" and "/", is escaped.
         var path = basePath + "/model/" + AwsSigV4.EscapeUri(_model.Id) + "/converse-stream";
-        var uri = new UriBuilder(resolved.Endpoint) { Path = path, Query = "" }.Uri;
+        var uri = new Uri(resolved.Endpoint.GetLeftPart(UriPartial.Authority) + path);
         var host = resolved.Endpoint.IsDefaultPort ? resolved.Endpoint.Host : resolved.Endpoint.Host + ":" + resolved.Endpoint.Port.ToString(CultureInfo.InvariantCulture);
         var headers = new List<KeyValuePair<string, string>> { new("content-type", "application/json") };
         // Caller headers are applied before signing; SigV4 and auth headers are reserved.
-        foreach (var (name, value) in _options.Headers ?? ImmutableDictionary<string, string?>.Empty)
+        foreach (var (name, value) in resolved.Options.Headers ?? ImmutableDictionary<string, string?>.Empty)
         {
             if (value is null) continue;
             var lower = name.ToLowerInvariant();
@@ -246,7 +263,7 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
 
     private async Task<HttpResponseMessage> SendWithRetriesAsync(Resolved resolved, byte[] body, CancellationToken token)
     {
-        var maxAttempts = _options.MaxAttempts ?? (int.TryParse(Env("AWS_MAX_ATTEMPTS"), NumberStyles.None, CultureInfo.InvariantCulture, out var configured) && configured > 0 ? configured : 3);
+        var maxAttempts = _options.MaxAttempts ?? (int.TryParse(Env(resolved.Options, "AWS_MAX_ATTEMPTS"), NumberStyles.None, CultureInfo.InvariantCulture, out var configured) && configured > 0 ? configured : 3);
         var random = _options.Random ?? System.Random.Shared.NextDouble;
         var delay = _options.Delay ?? ((wait, cancellation) => Task.Delay(wait, _environment.Time, cancellation));
         for (var attempt = 1; ; attempt++)
@@ -274,7 +291,7 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
             await delay(TimeSpan.FromMilliseconds(wait), token).ConfigureAwait(false);
             // Credentials may have rotated meanwhile; the chain's cache keeps this cheap.
             resolved = resolved.BearerToken is null && resolved.Credentials?.Source is not ("AWS_BEDROCK_SKIP_AUTH" or "AWS access keys")
-                ? resolved with { Credentials = await _chain.Value.ResolveAsync(token).ConfigureAwait(false) } : resolved;
+                ? resolved with { Credentials = await Chain(Profile(resolved.Options)).ResolveAsync(token).ConfigureAwait(false) } : resolved;
         }
     }
 
@@ -304,9 +321,11 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
         }
         catch (JsonException) { }
         var trimmed = text.Trim();
+        // A body the SDK cannot model (a gateway's HTML page) surfaces as "status: body" instead of "Unknown: UnknownError".
         if (message is null)
             return new(code ?? "Unknown", "UnknownError", status, requestId,
-                trimmed.Length == 0 ? null : trimmed.Length <= 4000 ? trimmed : trimmed[..4000] + $"... [truncated {trimmed.Length - 4000} chars]");
+                trimmed.Length == 0 ? null : trimmed.Length <= 4000 ? trimmed : trimmed[..4000] + $"... [truncated {trimmed.Length - 4000} chars]")
+            { Modeled = code is not null };
         return new(code ?? "Unknown", message, status, requestId);
     }
 

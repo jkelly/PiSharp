@@ -35,6 +35,9 @@ public sealed record BedrockConverseOptions
     public ImmutableDictionary<string, string?>? Headers { get; init; }
     /// <summary>Provider-scoped env (a stored credential's env) consulted before the process environment.</summary>
     public ImmutableDictionary<string, string>? Environment { get; init; }
+    /// <summary>Per-request auth resolution (model-runtime prepareRequest): its apiKey and env replace <see cref="ApiKey"/> and
+    /// <see cref="Environment"/> for that request.</summary>
+    public Func<CancellationToken, ValueTask<(string? ApiKey, ImmutableDictionary<string, string>? Environment)>>? Auth { get; init; }
     /// <summary>The SDK's standard retry mode attempts (AWS_MAX_ATTEMPTS, default 3).</summary>
     public int? MaxAttempts { get; init; }
     public Func<TimeSpan, CancellationToken, Task>? Delay { get; init; }

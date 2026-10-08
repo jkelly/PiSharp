@@ -51,6 +51,7 @@ internal sealed partial class InteractiveSessionFrontend
         var provider = line.Length > 7 ? line[7..].Trim() : "";
         if (loginHost is null) display = "No login providers available.";
         else if (!loginRun.IsCompleted) display = "[warning] A login is already in progress.";
+        else if (loginHost.AllProviders) StartProviderLoginLocked(loginHost, provider);
         else if (provider.Length != 0 && !string.Equals(provider, ProviderLoginHost.AnthropicProvider, StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(provider, ProviderLoginHost.AnthropicName, StringComparison.OrdinalIgnoreCase))
             display = "[error] No login provider matches \"" + provider + "\". Available: anthropic.";
@@ -140,11 +141,7 @@ internal sealed partial class InteractiveSessionFrontend
     private sealed class LogoutReadException(string message) : Exception(message);
 
     /// <summary>The provider's display name (Provider.name) for the providers PiSharp knows; otherwise its id.</summary>
-    private static string ProviderName(string provider) => provider switch
-    {
-        ProviderLoginHost.AnthropicProvider => ProviderLoginHost.AnthropicName, "openai" => "OpenAI", "openrouter" => "OpenRouter",
-        "mistral" => "Mistral", "azure" => "Azure", _ => provider
-    };
+    private static string ProviderName(string provider) => ProviderAuthCatalog.DisplayName(provider);
 
     /// <summary>Caller holds <c>state</c>. Login lines render in order, after any line already queued.</summary>
     private Task QueueLoginRenderLocked(string text)

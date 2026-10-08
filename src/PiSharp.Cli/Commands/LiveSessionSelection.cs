@@ -40,6 +40,11 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
     internal PiSharp.Cli.Authentication.AnthropicLiveAuthentication CreateAnthropicAuthentication(PiSharp.Cli.Authentication.LiveProcessEnvironment environment) =>
         new(AuthPath is null ? null : new PiSharp.Cli.Authentication.AuthJsonCredentialStore(AuthPath, Time), environment,
             CreateAuthHttp ?? (() => new HttpClient()), Time);
+
+    /// <summary>The home directory the AWS shared config and SSO cache are read from (null: the user profile).</summary>
+    internal string? HomeDirectory { get; init; }
+    /// <summary>Replaces a provider's OAuth flow (tests); null uses the catalog flow.</summary>
+    internal Func<string, PiSharp.Cli.Authentication.OAuthFlowContext, PiSharp.AI.Authentication.OAuth.IProviderOAuth>? OAuthFlows { get; init; }
 }
 internal sealed class LiveSessionException(string code, string message) : Exception(message)
 { internal string Code { get; } = code; }
@@ -59,7 +64,9 @@ internal sealed class LiveSessionSelection
     private static bool SupportedApi(string provider, string api) => provider switch
     {
         "anthropic" => api == "anthropic-messages", "openai" => api == "openai-responses", "mistral" => api == "mistral-conversations",
-        "azure" => api is "azure-openai-responses" or "openai-completions", _ => api == "openai-completions"
+        "azure" => api is "azure-openai-responses" or "openai-completions",
+        _ when LiveProviderRoute.Handles(provider) => LiveProviderRoute.SupportsApi(provider, api),
+        _ => api == "openai-completions"
     };
     internal FrozenCatalogModel Definition { get; }
     internal ModelDescriptor Model { get; }
@@ -118,9 +125,19 @@ internal sealed class LiveSessionSelection
         return (resolved, runtime.CreateHttpHandler(), authentication.ResolveAsync);
     }
 
+    /// <summary>A selection over explicit catalog metadata (fixture rows for providers whose pinned catalog is not shipped).</summary>
+    internal static LiveSessionSelection FromDefinition(FrozenCatalogModel definition, int maximumOutputTokens)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        if (!SupportedApi(definition.Provider, definition.DeclaredApi) || maximumOutputTokens is < 1 or > 8192)
+            throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
+        return new(definition, maximumOutputTokens);
+    }
+
     internal LiveSessionConnection Connect(LiveSessionRuntime? runtime)
     {
         runtime ??= LiveSessionRuntime.Default;
+        if (LiveProviderRoute.TryConnect(this, runtime) is { } routed) return routed;
         var environment = runtime.CreateEnvironment();
         var variable = Model.Provider switch { "openai" => "OPENAI_API_KEY", "openrouter" => "OPENROUTER_API_KEY", "mistral" => "MISTRAL_API_KEY",
             "azure" => "AZURE_OPENAI_API_KEY", _ => "ANTHROPIC_API_KEY" };
@@ -193,6 +210,8 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     private readonly List<AnthropicInjectedTransportLease> _replacedMains = [];
     /// <summary>Azure endpoint/deployment configuration (the session's AZURE_OPENAI_* values) for provider azure.</summary>
     internal AzureEndpointOptions? Azure { get; init; }
+    /// <summary>The per-request auth route of amazon-bedrock, openai-codex, github-copilot and the Cloudflare providers.</summary>
+    internal LiveProviderRoute? ProviderRoute { get; init; }
     internal static async ValueTask<LiveSessionConnection> ConnectResolvedAsync(LiveSessionSelection selected,
         AuthenticationResolution authentication, HttpMessageHandler? handler, CancellationToken token,
         Func<CancellationToken, ValueTask<AuthenticationResolution>>? reresolve = null)
@@ -292,6 +311,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         var model = selection.Model; var definition = selection.Definition;
         var maximum = outputTokens ?? MaximumOutputTokens;
         var reasoning = definition.Raw.Value.GetProperty("reasoning").GetBoolean();
+        if (ProviderRoute is { } route) return Own(route.Create(handler, maximum, summary));
         if (model.Api == "mistral-conversations")
         {
             var endpoint = new Uri(definition.BaseUrl);

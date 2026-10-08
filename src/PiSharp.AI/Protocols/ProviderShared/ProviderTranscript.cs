@@ -13,6 +13,13 @@ namespace PiSharp.AI.Protocols.ProviderShared;
 
 public sealed class ProviderTranscriptException(string message) : Exception(message);
 
+/// <summary>Public access to the catalog thinking-level helpers (models.ts getSupportedThinkingLevels, clampThinkingLevel).</summary>
+public static class ProviderTranscriptAccess
+{
+    public static ImmutableArray<string> SupportedThinkingLevels(JsonData metadata) => ProviderTranscript.SupportedThinkingLevels(metadata.Value);
+    public static string ClampThinkingLevel(JsonData metadata, string level) => ProviderTranscript.ClampThinkingLevel(metadata.Value, level);
+}
+
 /// <summary>Owned transcript helpers shared by the Bedrock and Codex ports. Every method works on copies.</summary>
 internal static class ProviderTranscript
 {
