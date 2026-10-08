@@ -6,7 +6,7 @@ function Assert-PiSharpNativeSdkPackage {
     param([Parameter(Mandatory)][string]$Package,
         [Parameter(Mandatory)][ValidateSet('PiSharp.Contracts','PiSharp.AI','PiSharp.Agent','PiSharp.Sessions','PiSharp.Tools','PiSharp.CodingAgent',
             'PiSharp.PromptTemplates.Yaml','PiSharp.Rpc','PiSharp.Tui','PiSharp.Extensions.Abstractions','PiSharp.Extensions.Runtime',
-            'PiSharp.Extensions.Agent','PiSharp.ExtensionHost','PiSharp.Compatibility.Node')][string]$PackageId,
+            'PiSharp.Extensions.Agent','PiSharp.ExtensionHost','PiSharp.Compatibility.Node','PiSharp.Codemode')][string]$PackageId,
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$SourceCommit,
         [Parameter(Mandatory)][string]$Repo,
@@ -18,6 +18,7 @@ function Assert-PiSharpNativeSdkPackage {
     $assembly='lib/net10.0/'+$PackageId+'.dll'
     $required=@($assembly,($PackageId+'.nuspec'),'LICENSE','README.md','THIRD-PARTY-NOTICES.md','provenance.json','[Content_Types].xml','_rels/.rels')
     if($PackageId-ceq'PiSharp.PromptTemplates.Yaml'){$required+='licenses/YamlDotNet.LICENSE.txt'}
+    if($PackageId-ceq'PiSharp.Codemode'){$required+=@('licenses/Jint.LICENSE.txt','licenses/Jint.CREDITS.txt','licenses/Acornima.LICENSE.txt','licenses/Acornima.NOTICE.txt')}
     foreach($name in $required){if(-not$files.ContainsKey($name)){throw 'Required native SDK package member absent.'}}
     # SDK 10 deterministic pack names the core-properties part nuget.psmdcp; older packs use a random hex name.
     foreach($name in $files.Keys){if($name-cnotin$required-and$name-cnotmatch'^package/services/metadata/core-properties/(?:[0-9a-f]+|nuget)\.psmdcp$'){throw 'Unexpected SDK package member.'}}
@@ -57,9 +58,12 @@ function Assert-PiSharpNativeSdkPackage {
         'PiSharp.Rpc'=@('PiSharp.Contracts','PiSharp.CodingAgent','PiSharp.Extensions.Abstractions')
         'PiSharp.Extensions.Agent'=@('PiSharp.Agent','PiSharp.Extensions.Runtime')
         'PiSharp.Compatibility.Node'=@('PiSharp.Contracts','PiSharp.ExtensionHost','PiSharp.Extensions.Abstractions','PiSharp.Extensions.Runtime')
+        'PiSharp.Codemode'=@('PiSharp.Contracts','PiSharp.Extensions.Abstractions')
     }
     $external=@{}
     if($PackageId-ceq'PiSharp.PromptTemplates.Yaml'){$external['YamlDotNet']='16.3.0'}
+    # Decision 0003: Jint is pinned exactly; its parser Acornima is transitive and not a package dependency of its own.
+    if($PackageId-ceq'PiSharp.Codemode'){$external['Jint']='4.16.3'}
     $expected=[Collections.Generic.HashSet[string]]::new([string[]]@($siblings[$PackageId]+@($external.Keys)),[StringComparer]::Ordinal)
     if($dependencies.Count-ne$expected.Count){throw 'SDK dependency identity/version differs.'}
     foreach($dependency in $dependencies){

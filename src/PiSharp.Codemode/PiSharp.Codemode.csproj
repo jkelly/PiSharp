@@ -14,6 +14,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="../../third-party/Jint.LICENSE.txt" Pack="true" PackagePath="licenses/" />
+    <None Include="../../third-party/Jint.CREDITS.txt" Pack="true" PackagePath="licenses/" />
     <None Include="../../third-party/Acornima.LICENSE.txt" Pack="true" PackagePath="licenses/" />
+    <None Include="../../third-party/Acornima.NOTICE.txt" Pack="true" PackagePath="licenses/" />
   </ItemGroup>
 </Project>

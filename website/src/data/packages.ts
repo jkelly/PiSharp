@@ -10,6 +10,7 @@ export const packages: Package[] = [
 	{ id: 'PiSharp.Rpc', group: 'Frontends', nuget: true, description: "Pi's JSON RPC protocol over stdin/stdout, including extension UI requests." },
 	{ id: 'PiSharp.Tui', group: 'Frontends', nuget: true, description: 'Terminal UI building blocks: input, text and list components, rendering.' },
 	{ id: 'PiSharp.Cli', group: 'Frontends', tool: true, description: 'The command-line app itself, installed as a .NET tool and run as pisharp.' },
+	{ id: 'PiSharp.Codemode', group: 'Core', nuget: true, description: 'Codemode: model-written JavaScript in a Jint sandbox that calls the session tools.' },
 	{ id: 'PiSharp.Extensions.Abstractions', group: 'Extensions', nuget: true, description: 'The interfaces you implement to write an extension.' },
 	{ id: 'PiSharp.Extensions.Runtime', group: 'Extensions', nuget: true, description: 'Discovery, loading, registration and dispatch for hosts.' },
 	{ id: 'PiSharp.Extensions.Agent', group: 'Extensions', nuget: true, description: 'Connects extension hooks to the agent loop.' },

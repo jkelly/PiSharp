@@ -49,8 +49,9 @@ internal static partial class Program
         Names(["search:{\"query\":\"install\"}"], fixture.Servers.Single().Calls, "the call reached the late server");
     });
 
-    // Nothing is granted to a server that was skipped (codemode, no implementation): its tool is not registered, so the call fails
-    // before the policy and nothing is connected. A deferred tool that tool_search did not load is not callable either.
+    // A codemode server's tools are registered but not declared (PiSharp 1.1.0.3 connects it with the built-in codemode), so a direct
+    // call fails before the policy; a deferred tool that tool_search did not load is not callable either. Input that arrives while
+    // the second server publishes its tools waits for the publication instead of being refused.
     private static Task SkippedServerCallsFail() => WithRoot("skipped",
         """{"mcpServers":{"docs":{"command":"docs-server","exposure":"deferred"},"scripts":{"command":"scripts-server"}}}""", async (root, fixture) =>
     {
@@ -63,9 +64,9 @@ internal static partial class Program
             Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
         }
         var requests = provider.Snapshot();
-        Names(["Tool mcp__scripts__run not found"], ToolResults(requests[1]), "skipped server's tool");
+        Names(["Tool mcp__scripts__run not found"], ToolResults(requests[1]), "codemode server's tool called directly");
         Names(["Tool mcp__docs__search not found"], ToolResults(requests[2]), "deferred tool that was not loaded");
-        Check(fixture.Servers.Single().Name == "docs" && fixture.Servers.Single().Calls.IsEmpty, "no call reached any server");
+        Check(fixture.Servers.All(server => server.Calls.IsEmpty), "no call reached any server");
     });
 
     private sealed class NoExtension : IPiSharpExtension

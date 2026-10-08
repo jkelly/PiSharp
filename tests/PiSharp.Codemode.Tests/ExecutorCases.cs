@@ -247,6 +247,20 @@ internal static partial class Program
                 Equal("""{"type":"grammar","variants":{"openai_lark":"\nstart: options_source | plain_source\noptions_source: OPTIONS_LINE NEWLINE SOURCE\nplain_source: SOURCE\n\nOPTIONS_LINE: /[ \\t]*\\/\\/ @options:[^\\r\\n]*/\nNEWLINE: /\\r?\\n/\nSOURCE: /[\\s\\S]+/\n"}}""",
                     CodemodeToolDefinition.ConstrainedSampling.ToString(), "constrained sampling");
             }),
+            // tool.ts constrainedSampling: on routes that support OpenAI grammar tools the codemode declaration becomes a custom tool
+            // whose input is the raw script (SupportsOpenAIGrammarTools); elsewhere it stays an ordinary function declaration.
+            Case("tool.grammar-sampling-through-openai-grammar-tools", () =>
+            {
+                var declaration = "{\"name\":\"codemode\",\"description\":\"Run JavaScript.\",\"parameters\":" + CodemodeToolDefinition.Parameters +
+                    ",\"constrainedSampling\":" + CodemodeToolDefinition.ConstrainedSampling + "}";
+                var request = new PiSharp.AI.ChatRequest(new("gpt-x", "openai-completions", "openai"),
+                    [new("system", Parse("{\"role\":\"system\",\"content\":\"\",\"toolsAdded\":[" + declaration + "],\"timestamp\":0}"))]);
+                var grammar = new PiSharp.AI.Protocols.OpenAICompletions.CompletionsToolDeclarationProjector(new() { SupportsOpenAIGrammarTools = true }).Project(request).Value[0];
+                Equal("custom", grammar.GetProperty("type").GetString(), "grammar tool: " + grammar);
+                Check(grammar.ToString().Contains("options_source: OPTIONS_LINE NEWLINE SOURCE", StringComparison.Ordinal) && grammar.ToString().Contains("lark", StringComparison.Ordinal), "lark grammar: " + grammar);
+                var plain = new PiSharp.AI.Protocols.OpenAICompletions.CompletionsToolDeclarationProjector().Project(request).Value[0];
+                Equal("function", plain.GetProperty("type").GetString(), "without grammar support");
+            }),
             Case("renderer.header-calls-costs-and-previews", () =>
             {
                 var result = Parse("""{"content":[{"type":"text","text":"Script completed\nWall time 0.1 seconds\nOutput:\n"},{"type":"text","text":"l1\nl2\nl3\nl4\nl5\nl6\nl7"}],"details":{"calls":[{"id":"a","name":"models.classify","args":"typesafe/jev","status":"ok","durationMs":1500,"cost":0.0042},{"id":"b","name":"models.classify","args":"typesafe/jev","status":"error","durationMs":12,"error":"bad","cost":0.02}],"fullOutputPath":"/tmp/out.txt"}}""");
