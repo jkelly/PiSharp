@@ -547,7 +547,7 @@ internal static class SessionCommandTests
     private static object CompletionsInitialRequest(string user)
     {
         // Anthropic's authored input schemas omit additionalProperties, as its converter does.
-        // Completions preserves the closed registered schemas; expected fields stay authored here.
+        // Completions sends the registered schemas as declared. Pi's read/write TypeBox schemas have no additionalProperties; non-strict projections send them as declared.
         var declarations = JsonSerializer.SerializeToElement(AnthropicInitialRequest(user)).GetProperty("tools");
         return new { model = "pisharp-offline-completions-session", stream = true, store = false,
             max_completion_tokens = 8192, stream_options = new { include_usage = true },
@@ -557,8 +557,7 @@ internal static class SessionCommandTests
                 {
                     type = tool.GetProperty("input_schema").GetProperty("type").GetString(),
                     properties = tool.GetProperty("input_schema").GetProperty("properties").Clone(),
-                    required = tool.GetProperty("input_schema").GetProperty("required").Clone(),
-                    additionalProperties = false
+                    required = tool.GetProperty("input_schema").GetProperty("required").Clone()
                 } } }).ToArray() };
     }
     internal static object AnthropicText(string text, bool gate = false, string[]? required = null, object? expectedRequest = null)
@@ -600,11 +599,11 @@ internal static class SessionCommandTests
         system = new[] { new { type = "text", text = "Explicit offline session file tools.", cache_control = new { type = "ephemeral" } } },
         tools = new object[]
         {
-            new { name = "read", description = "Read UTF-8 text file contents, capped at 2000 lines or 50 KiB. Use offset/limit to continue. Images, binary and other encodings are unsupported in this profile.",
+            new { name = "read", description = "Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.",
                 input_schema = new { type = "object", properties = new { path = new { type = "string", description = "Path to the file to read (relative or absolute)" },
-                    offset = new { type = "integer", minimum = 1, description = "Line number to start reading from (1-indexed)" },
-                    limit = new { type = "integer", minimum = 0, description = "Maximum number of lines to read" } }, required = new[] { "path" } }, eager_input_streaming = true },
-            new { name = "write", description = "Write UTF-8 text content to a file, creating parent directories and overwriting existing contents. Bounded text profile; this is not atomic replacement.",
+                    offset = new { type = "number", description = "Line number to start reading from (1-indexed)" },
+                    limit = new { type = "number", description = "Maximum number of lines to read" } }, required = new[] { "path" } }, eager_input_streaming = true },
+            new { name = "write", description = "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
                 input_schema = new { type = "object", properties = new { path = new { type = "string", description = "Path to the file to write (relative or absolute)" },
                     content = new { type = "string", description = "Content to write to the file" } }, required = new[] { "path", "content" } },
                 eager_input_streaming = true, cache_control = new { type = "ephemeral" } }

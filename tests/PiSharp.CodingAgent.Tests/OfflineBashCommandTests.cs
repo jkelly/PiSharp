@@ -454,8 +454,11 @@ internal static class OfflineBashCommandTests
     private static void CheckEnvironment(JsonElement env, string artifact, Files files)
     {
         var expected = new[] { "LANG", "LC_ALL", "SystemRoot", "TEMP", "TMP" };
-        Check(env.EnumerateObject().Select(value => value.Name).Order(StringComparer.Ordinal).SequenceEqual(expected.Order(StringComparer.Ordinal)),
-            "Child environment inherited undeclared credentials/PATH/home.");
+        // Pi bash.ts resolveSpawnContext adds the session's PI_* variables; nothing else beyond the declared environment.
+        var session = new[] { "PI_SESSION_ID", "PI_SESSION_FILE", "PI_PROVIDER", "PI_MODEL", "PI_REASONING_LEVEL" };
+        var names = env.EnumerateObject().Select(value => value.Name).ToArray();
+        Check(expected.All(names.Contains) && names.All(name => expected.Contains(name) || session.Contains(name)) && names.Contains("PI_SESSION_ID") &&
+            names.Contains("PI_PROVIDER") && names.Contains("PI_MODEL"), "Child environment inherited undeclared credentials/PATH/home.");
         Equal("C.UTF-8", env.GetProperty("LANG").GetString()); Equal("C.UTF-8", env.GetProperty("LC_ALL").GetString());
         Equal(env.GetProperty("TEMP").GetString(), env.GetProperty("TMP").GetString());
         Equal(Path.GetDirectoryName(artifact), env.GetProperty("TEMP").GetString());

@@ -248,8 +248,8 @@ internal static class NodeHelloPackageTests
     {
         // Complete independently authored HTTP predicate. Registered input admission commits a content array.
         var declarations = JsonNode.Parse("""
-            [{"name":"read","description":"Read UTF-8 text file contents, capped at 2000 lines or 50 KiB. Use offset/limit to continue. Images, binary and other encodings are unsupported in this profile.","input_schema":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to read (relative or absolute)"},"offset":{"type":"integer","minimum":1,"description":"Line number to start reading from (1-indexed)"},"limit":{"type":"integer","minimum":0,"description":"Maximum number of lines to read"}},"required":["path"]},"eager_input_streaming":true},
-             {"name":"write","description":"Write UTF-8 text content to a file, creating parent directories and overwriting existing contents. Bounded text profile; this is not atomic replacement.","input_schema":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to write (relative or absolute)"},"content":{"type":"string","description":"Content to write to the file"}},"required":["path","content"]},"eager_input_streaming":true}]
+            [{"name":"read","description":"Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.","input_schema":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to read (relative or absolute)"},"offset":{"type":"number","description":"Line number to start reading from (1-indexed)"},"limit":{"type":"number","description":"Maximum number of lines to read"}},"required":["path"]},"eager_input_streaming":true},
+             {"name":"write","description":"Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.","input_schema":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to write (relative or absolute)"},"content":{"type":"string","description":"Content to write to the file"}},"required":["path","content"]},"eager_input_streaming":true}]
             """)!.AsArray();
         declarations.Add(new JsonObject { ["name"] = "hello", ["description"] = "A simple greeting tool", ["input_schema"] = JsonNode.Parse(Parameters) });
         if (api == "anthropic-messages")
@@ -261,7 +261,7 @@ internal static class NodeHelloPackageTests
         }
         var tools = new JsonArray(); foreach (var row in declarations)
         {
-            var parameters = row!["input_schema"]!.DeepClone(); if (row["name"]!.GetValue<string>() != "hello") parameters["additionalProperties"] = false;
+            var parameters = row!["input_schema"]!.DeepClone(); // Pi's read/write TypeBox schemas have no additionalProperties; non-strict projections send them as declared.
             var function = new JsonObject { ["name"] = row["name"]!.DeepClone(), ["description"] = row["description"]!.DeepClone(), ["parameters"] = parameters };
             if (api == "openai-completions") tools.Add(new JsonObject { ["type"] = "function", ["function"] = function }); else { function["type"] = "function"; function["strict"] = false; tools.Add(function); }
         }

@@ -234,8 +234,8 @@ internal static partial class ImageCapabilityFrontendTests
                 var schema = tool.GetProperty("input_schema");
                 tools.Add(new JsonObject { ["type"] = "function", ["function"] = new JsonObject { ["name"] = tool.GetProperty("name").GetString(),
                     ["description"] = tool.GetProperty("description").GetString(), ["parameters"] = new JsonObject { ["type"] = "object",
-                        ["properties"] = JsonNode.Parse(schema.GetProperty("properties").GetRawText()), ["required"] = JsonNode.Parse(schema.GetProperty("required").GetRawText()),
-                        ["additionalProperties"] = false } } });
+                        // Pi's read/write TypeBox schemas have no additionalProperties; non-strict projections send them as declared.
+                        ["properties"] = JsonNode.Parse(schema.GetProperty("properties").GetRawText()), ["required"] = JsonNode.Parse(schema.GetProperty("required").GetRawText()) } } });
             }
             result["tools"] = tools;
         }
