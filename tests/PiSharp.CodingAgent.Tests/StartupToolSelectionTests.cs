@@ -22,7 +22,7 @@ internal static class StartupToolSelectionTests
         (Prefix + "unknown unavailable names and missing CLI values reject", Invalid),
         (Prefix + "resumed RPC settings override recorded tools and absent leaves them", Resume),
         (Prefix + "one shot create and resume apply settings and CLI empty", OneShot),
-        (Prefix + "unavailable recorded Bash rejects absent override and explicit selection resumes safely", ResumeAdmissionBoundary),
+        (Prefix + "unavailable recorded Bash is pending without override and explicit selection resumes safely", ResumeAdmissionBoundary),
         (Prefix + "admitted extension settings append CLI empty and named selection", AdmittedExtension),
         .. AllowedToolSelectionTests.Cases(),
         .. ToolSelectionCliFlagTests.Cases(),
@@ -125,16 +125,14 @@ internal static class StartupToolSelectionTests
         {
             using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             await using var profile = await OfflineSessionProfile.CreateAsync(fixture.Root, path, null, [], [], [], stop.Token);
-            try
-            {
-                await using var unexpected = await PersistentAgentSession.OpenWithRegistryAsync(path, profile.Registry, () => 1,
-                    () => Guid.NewGuid().ToString("N"), fallbackModel: profile.SelectedModel, cancellationToken: stop.Token);
-                throw new InvalidOperationException("Unavailable recorded Bash binding was admitted.");
-            }
-            catch (SessionRuntimeRegistryException error) { Equal(SessionRuntimeRegistryFailure.UnknownTool, error.Failure); }
+            // Pi 0.99.2 _restoreToolsFromTranscript: the unavailable recorded Bash binding is left out and pending, not rejected.
+            await using var restored = await PersistentAgentSession.OpenWithRegistryAsync(path, profile.Registry, () => 1,
+                () => Guid.NewGuid().ToString("N"), fallbackModel: profile.SelectedModel, cancellationToken: stop.Token);
+            Names([], restored.GetActiveTools()); Names(["bash"], restored.PendingToolNames);
         }
         var afterRegistry = await File.ReadAllBytesAsync(path);
-        Equal(true, original.SequenceEqual(afterRegistry));
+        Equal(true, afterRegistry.Length > original.Length && afterRegistry.Take(original.Length).SequenceEqual(original));
+        await File.WriteAllBytesAsync(path, original);
         await File.WriteAllTextAsync(fixture.User, "{\"defaultTools\":[\"read\"]}");
         foreach (var flags in new[] { new[] { "--tools", "read" }, new[] { "--tools", "" }, new[] { "--user-settings", fixture.User } })
         {

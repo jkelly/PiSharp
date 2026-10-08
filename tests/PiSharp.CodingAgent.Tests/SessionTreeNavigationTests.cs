@@ -27,7 +27,7 @@ internal static class SessionTreeNavigationTests
         (Prefix + "pending queues and active input reject selection publication", Admission),
         (Prefix + "steering and followup admission preserve queues durable state and revision", QueueAdmissionPreservation),
         (Prefix + "late steering and followup prevent navigation publication without mutation", LateQueuePublicationPreservation),
-        (Prefix + "unknown branch loadout rejects before preflight and canonical editor ignores context edits", ProjectionAdmission)
+        (Prefix + "unregistered branch tool restores as pending and canonical editor ignores context edits", ProjectionAdmission)
     ];
 
     private static async Task SameFile()
@@ -328,13 +328,16 @@ internal static class SessionTreeNavigationTests
 
     private static async Task ProjectionAdmission()
     {
+        // Pi 0.99.2 navigateTree -> _restoreToolsFromTranscript: the target's unbound tool is left out and pending, not
+        // rejected. The restored loadout is recorded on the target branch, so the leaf is that record.
         await using var unavailable = await Fixture.Open(registerRead: false);
-        var before = unavailable.Session.Snapshot; var view = unavailable.Owner.CaptureTree(unavailable.Owner.Current); var callbacks = 0;
-        var error = await Throws<SessionRuntimeRegistryException>(() => unavailable.Owner.NavigateTreeAsync(view.Attachment,
-            new("left-system", view.Revision), beforeTree: (_, _) => { callbacks++; return ValueTask.FromResult(true); }));
-        Equal(SessionRuntimeRegistryFailure.UnknownTool, error.Failure); Equal(0, callbacks);
-        Check(ReferenceEquals(before.Context, unavailable.Session.Snapshot.Context) && ReferenceEquals(before.Log, unavailable.Session.Snapshot.Log),
-            "Unsupported selected loadout changed state.");
+        var view = unavailable.Owner.CaptureTree(unavailable.Owner.Current); var callbacks = 0;
+        var restored = await unavailable.Owner.NavigateTreeAsync(view.Attachment,
+            new("left-system", view.Revision), beforeTree: (preview, _) => { callbacks++; Check(preview.Configuration.Tools.IsEmpty, "Unbound tool previewed."); return ValueTask.FromResult(true); });
+        Equal(SessionTreeNavigationDisposition.Selected, restored.Disposition); Equal(1, callbacks);
+        Equal("left-system", restored.Context.Ancestry[^1].ParentId); Check(restored.Checkpoint is not null, "Restored loadout was not recorded.");
+        Check(unavailable.Session.GetActiveTools().IsEmpty && unavailable.Session.PendingToolNames.SequenceEqual(["read"]),
+            "Unbound navigation tool was not kept pending.");
         await using var f = await Fixture.Open();
         await Select(f, "left-custom");
         var edit = await f.Owner.AppendContextEditAsync(f.Owner.Current,

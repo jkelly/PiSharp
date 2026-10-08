@@ -262,9 +262,37 @@ public sealed partial class SessionRuntimeRegistry
         ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null)
         => ResolveCatalog(_modelCatalog.Read(), model, messages, thinkingLevel, cancellationToken, prepareLoadout, preparedLoadout, initialActiveToolNames);
 
+    /// <summary>
+    /// Source _restoreToolsFromTranscript (session open without initial names, tree navigation): the recorded loadout is
+    /// restored by name, and recorded tools with no binding are left out instead of rejected. They are returned in recorded
+    /// order; the caller records the restored loadout and keeps the allowed ones pending until they register.
+    /// </summary>
+    internal (SessionRuntimeSelection Selection, ImmutableArray<string> Unbound) ResolveRestored(SessionContextProjection context,
+        ModelDescriptor? fallbackModel, CancellationToken cancellationToken, ImmutableArray<string>? initialActiveToolNames = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+        var catalog = _modelCatalog.Read();
+        SessionModelBinding model;
+        if (context.Model is { } selected)
+        {
+            if (!catalog.Models.TryGetValue((selected.Provider, selected.ModelId), out model!))
+                throw Error(SessionRuntimeRegistryFailure.UnknownModel);
+        }
+        else model = Model(fallbackModel, catalog);
+        var unbound = new List<string>();
+        var selection = ResolveCatalog(catalog, model.Model, context.LlmMessages, context.ThinkingLevel, cancellationToken,
+            initialActiveToolNames: initialActiveToolNames, unbound: unbound);
+        return (selection, [.. unbound]);
+    }
+
+    /// <summary>Source _isAllowedTool: names that --tools/--exclude-tools keep out of the catalog never become pending.</summary>
+    internal ImmutableArray<string> PendingRestoredTools(ImmutableArray<string> unbound) =>
+        [.. unbound.Where(name => _options.LifetimeToolSelection?.IsAllowed(name) != false)];
+
     private SessionRuntimeSelection ResolveCatalog(ModelCatalog catalog, ModelDescriptor model, ImmutableArray<TranscriptEntry> messages,
         string thinkingLevel = "off", CancellationToken cancellationToken = default, bool prepareLoadout = true,
-        ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null)
+        ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null, List<string>? unbound = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var binding = Model(model, catalog);
@@ -326,10 +354,15 @@ public sealed partial class SessionRuntimeRegistry
         }
         var resolved = ImmutableArray.CreateBuilder<SessionRegisteredTool>();
         var rawDeclarations = ImmutableArray.CreateBuilder<JsonData>();
-        foreach (var name in order)
+        foreach (var name in order.ToArray())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!_tools.TryGetValue(name, out var tool)) throw Error(SessionRuntimeRegistryFailure.UnknownTool);
+            if (!_tools.TryGetValue(name, out var tool))
+            {
+                // Only a restored loadout leaves an unbound tool out; every other resolution still rejects it.
+                if (unbound is null) throw Error(SessionRuntimeRegistryFailure.UnknownTool);
+                unbound.Add(name); order.Remove(name); continue;
+            }
             if (tool.Exposure == ToolExposure.Hidden) throw Error(SessionRuntimeRegistryFailure.UnsupportedDeclaration);
             if (!Same(active[name].Value, tool.Declaration.Value, cancellationToken))
                 throw Error(SessionRuntimeRegistryFailure.DeclarationMismatch);
