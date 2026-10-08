@@ -24,7 +24,7 @@ using PiSharp.Contracts;
 // utils/provider-retry.ts, utils/overflow.ts, api/mistral-conversations.ts, utils/estimate.ts, utils/pi-user-agent.ts,
 // api/openai-responses-shared.ts, utils/transcript.ts, models.ts and the @earendil-works/pi-ai@1.1.0 catalog shards. Nothing here executes upstream code or is an upstream capture;
 // no network, provider or credential is used.
-internal static class Program
+internal static partial class Program
 {
     private const string SourceSha = "abe508e1b89912adde45528136c3221eb69acdd7";
     private const string Key = "inert-provider-sync-key";
@@ -38,6 +38,11 @@ internal static class Program
         {
             ("anthropic.inline-tools-full-requests-across-add-redefine-remove", AnthropicInlineTools),
             ("anthropic.strict-rejected-keywords-send-non-strict", AnthropicStrictKeywords),
+            ("anthropic.mid-effort-catalog-models-construct-on-key-and-resolved-routes", MidEffortModelsConstruct),
+            ("anthropic.mid-effort-sonnet-5-5-every-level-full-requests-oauth-and-simple", MidEffortSonnetEveryLevel),
+            ("anthropic.mid-effort-multi-turn-replay-preserves-per-turn-effort", MidEffortReplay),
+            ("anthropic.mid-effort-input-transformations-diagnostic", MidEffortInputTransformations),
+            ("anthropic.unmanaged-fable-5-and-budget-sonnet-4-5-unchanged", UnmanagedAnthropicModelsUnchanged),
             ("sampling.completions-model-level-request-precedence", CompletionsSampling),
             ("sampling.responses-model-level-request-precedence-and-metadata-binding", ResponsesSampling),
             ("sampling.azure-responses-level-precedence", AzureSampling),
@@ -693,7 +698,7 @@ internal static class Program
         var haiku = CatalogRow("anthropic", "claude-haiku-5-5");
         Equal("""{"input":0.1,"output":0.5,"cacheRead":0.01,"cacheWrite":0.125,"tiers":[{"inputTokensAbove":100000,"input":0.5,"output":2.5,"cacheRead":0.05,"cacheWrite":0.625}]}""",
             haiku.Value.GetProperty("cost").GetRawText());
-        async Task<AssistantMessage> Usage(JsonData metadata, string responseModel, object startUsage, int output, bool factory = false)
+        async Task<AssistantMessage> Usage(JsonData metadata, string responseModel, object startUsage, int output)
         {
             static string Frame(string type, object value) => "event: " + type + "\ndata: " + JsonSerializer.Serialize(value) + "\n\n";
             var stream = Frame("message_start", new { type = "message_start", message = new { id = "authored", role = "assistant", model = responseModel, content = Array.Empty<object>(), usage = startUsage } })
@@ -704,24 +709,10 @@ internal static class Program
                 + Frame("message_stop", new { type = "message_stop" });
             var model = new ModelDescriptor(metadata.Value.GetProperty("id").GetString()!, "anthropic-messages", "anthropic");
             using var handler = new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(stream, Encoding.UTF8, "text/event-stream") }));
-            ChatResult result;
-            if (factory)
-            {
-                // Native composition: the catalog row binds rates and fallback costs.
-                using var provider = NativeProviderFactory.CreateAnthropic(model, new("https://api.anthropic.com/"), Key,
-                    new(MaximumTokens: 4096, ModelReasoning: true, ThinkingEnabled: false), null, handler, metadata);
-                result = await new ChatClient(provider).CompleteAsync(new(model, [Ask], 1)).WaitAsync(Deadline);
-            }
-            else
-            {
-                // NativeThinkingProfile refuses Haiku 5.5's metadata (per-message effort without thinking off), so the catalog
-                // cost binding is composed over the Messages HTTP transport directly.
-                var requests = new AnthropicMessagesKeyAuthRequestFactory(new("https://api.anthropic.com/"), model, new(4096));
-                using var client = new HttpClient(handler);
-                var transport = new AnthropicMessagesHttpSseTransport(client, (request, token) => requests.Create(request, Key, token),
-                    messagesOptions: NativeProviderFactory.AnthropicMessagesOptionsForModel(metadata));
-                result = await new ChatClient(transport).CompleteAsync(new(model, [Ask], 1)).WaitAsync(Deadline);
-            }
+            // Native composition: the catalog row binds rates and fallback costs (Haiku 5.5's managed effort included).
+            using var provider = NativeProviderFactory.CreateAnthropic(model, new("https://api.anthropic.com/"), Key,
+                new(MaximumTokens: 4096, ModelReasoning: true, ThinkingEnabled: false), null, handler, metadata);
+            var result = await new ChatClient(provider).CompleteAsync(new(model, [Ask], 1)).WaitAsync(Deadline);
             Equal(StopReason.Stop, result.Message.StopReason);
             return result.Message;
         }
@@ -739,10 +730,10 @@ internal static class Program
             0.045m, 0.00125m, 0m, 0.007750625m, 0.054000625m);
         // compat.allowedFallbackModels: an answer from the listed fallback model is priced with that entry's cost.
         var fable = CatalogRow("anthropic", "claude-fable-5");
-        var fallback = await Usage(fable, "claude-opus-4-8", new { input_tokens = 1000, output_tokens = 0 }, 100, factory: true);
+        var fallback = await Usage(fable, "claude-opus-4-8", new { input_tokens = 1000, output_tokens = 0 }, 100);
         Equal("claude-opus-4-8", fallback.ExtraProperties!.TryGet("responseModel", out var answered) ? answered!.Value.GetString() : null);
         Cost(fallback.Usage, 0.005m, 0.0025m, 0m, 0m, 0.0075m);
-        Cost((await Usage(fable, "claude-fable-5", new { input_tokens = 1000, output_tokens = 0 }, 100, factory: true)).Usage, 0.01m, 0.005m, 0m, 0m, 0.015m);
+        Cost((await Usage(fable, "claude-fable-5", new { input_tokens = 1000, output_tokens = 0 }, 100)).Usage, 0.01m, 0.005m, 0m, 0m, 0.015m);
     }
 
     private static async Task SharedPromptLengthPricing()

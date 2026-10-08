@@ -1,4 +1,5 @@
-// Pi v0.99.1 d86654abb8862e201933517d6f1fce9f88dd117f: models.ts and anthropic-messages.ts.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/models.ts (getSupportedThinkingLevels) and
+// packages/ai/src/api/anthropic-messages.ts (mapThinkingLevelToEffort, compat.supportsMidConvoEffort).
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Contracts;
@@ -39,6 +40,8 @@ internal sealed class NativeThinkingProfile
     public JsonData? Map { get; }
     public bool Adaptive { get; }
     public bool SupportsOff { get; }
+    /// <summary>compat.supportsMidConvoEffort: per-turn effort markers with always-adaptive thinking (Pi has no cap restriction).</summary>
+    public bool MidConversationEffort { get; }
     public int ModelMaxTokens { get; }
 
     public NativeThinkingProfile(ModelDescriptor model, JsonData metadata, bool reasoning, int? anthropicCap = null)
@@ -63,22 +66,22 @@ internal sealed class NativeThinkingProfile
                 Map = JsonData.Parse(map.GetRawText());
             }
             SupportsOff = !(map.ValueKind == JsonValueKind.Object && map.TryGetProperty("off", out var off) && off.ValueKind == JsonValueKind.Null);
-            var midEffort = false;
             if (raw.TryGetProperty("compat", out var compat) && compat.ValueKind != JsonValueKind.Null)
             {
                 if (compat.ValueKind != JsonValueKind.Object) throw new ArgumentException();
                 Adaptive = compat.TryGetProperty("forceAdaptiveThinking", out var adaptive) && adaptive.GetBoolean();
-                midEffort = compat.TryGetProperty("supportsMidConvoEffort", out var mid) && mid.GetBoolean();
+                MidConversationEffort = compat.TryGetProperty("supportsMidConvoEffort", out var mid) && mid.GetBoolean();
             }
             Levels = !reasoning ? ["off"] : ThinkingLevels.Ordered.Where(level =>
                 !(map.ValueKind == JsonValueKind.Object && map.TryGetProperty(level, out var entry) && entry.ValueKind == JsonValueKind.Null) &&
                 (level is not ("xhigh" or "max") || map.ValueKind == JsonValueKind.Object && map.TryGetProperty(level, out _)))
                 .ToImmutableArray();
-            // The explicit native cap is never enlarged. Nonadaptive enabled thinking needs 1024 thinking + 1024 answer tokens.
+            // The explicit native cap is never enlarged. Nonadaptive enabled thinking needs 1024 thinking + 1024 answer tokens;
+            // adaptive (including per-turn effort) levels carry no budget, so upstream's level list stands.
             if (anthropicCap is { } cap)
             {
                 if (cap <= 0 || cap > ModelMaxTokens) throw new ArgumentException();
-                if (midEffort || !Adaptive && cap < 2048) Levels = Levels.Where(level => level == "off").ToImmutableArray();
+                if (!Adaptive && cap < 2048) Levels = Levels.Where(level => level == "off").ToImmutableArray();
                 if (map.ValueKind == JsonValueKind.Object)
                     foreach (var entry in map.EnumerateObject())
                         if (entry.Value.ValueKind == JsonValueKind.String && entry.Value.GetString() is not ("low" or "medium" or "high" or "xhigh" or "max"))

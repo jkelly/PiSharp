@@ -223,7 +223,9 @@ static class AnthropicMessagesTests
             new[] { Start, Delta(42, "text_delta", "unknown") }, new[] { Start, TextStart, End, Stop },
             new[] { Start, End, Stop, End },
             new[] { Start, TextStart, """{"type":"content_block_start","index":0,"content_block":{"type":"fallback","model":"other"}}""" },
-            new[] { Start, """{"type":"message_delta","delta":{},"input_transformations":[{"type":"unsupported"}]}""" }
+            // Reported transformations are diagnostics (Pi abe508); only malformed entries are rejected.
+            new[] { Start, """{"type":"message_delta","delta":{},"input_transformations":[{"type":1}]}""" },
+            new[] { Start, """{"type":"message_delta","delta":{},"input_transformations":{"type":"unsupported"}}""" }
         }) Failure(Terminal(await Collect(trace)), AnthropicMessagesFailure.MalformedStream);
         Failure(Terminal(await Collect([Start, """{"type":"error","error":{"type":"overloaded_error","message":"private-provider-payload"}}"""])), AnthropicMessagesFailure.ProviderError);
     }

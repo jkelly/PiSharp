@@ -1,4 +1,5 @@
-// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/anthropic-messages.ts (buildParams/convertMessages/convertTools)
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/anthropic-messages.ts (buildParams/convertMessages/convertTools,
+// getBetaFeatures and insertThinkingLevelMessages for compat.supportsMidConvoEffort)
 // and packages/ai/src/api/constrained-sampling.ts (strict conversion with Anthropic's unsupported keywords).
 using System.Collections.Immutable;
 using System.Globalization;
@@ -41,7 +42,11 @@ public sealed record AnthropicMessagesRequestOptions(
     int MaximumContentBlocks = 1024, int MaximumDeclarations = 1024, int MaximumActiveTools = 128,
     int MaximumProjectedMessages = 1024, int MaximumJsonDepth = 32,
     int MaximumOutputCharacters = 1_048_576, int MaximumOutputBytes = 1_048_576,
-    bool SupportsMidConversationToolChanges = false);
+    bool SupportsMidConversationToolChanges = false, bool SupportsMidConversationEffort = false)
+{
+    /// <summary>Upstream stream(): the effort a managed (compat.supportsMidConvoEffort) response records as providerThinkingLevel.</summary>
+    public string? ProviderThinkingLevel => SupportsMidConversationEffort ? Effort ?? "high" : null;
+}
 
 /// <summary>Pure owned transcript-to-request projection. No network, credential, clock or execution authority.</summary>
 public sealed class AnthropicMessagesRequestProjector
@@ -81,6 +86,7 @@ public sealed class AnthropicMessagesRequestProjector
         private readonly List<Entry> _entries = [];
         private readonly JsonArray _messages = [];
         private readonly List<JsonObject> _pendingSystems = [];
+        private readonly Dictionary<int, string> _assistantLevels = [];
         private readonly Dictionary<string, JsonElement> _tools = new(StringComparer.Ordinal);
         private readonly List<string> _toolOrder = [];
         private readonly Dictionary<string, string> _idMap = new(StringComparer.Ordinal);
@@ -180,7 +186,12 @@ public sealed class AnthropicMessagesRequestProjector
                         }
                         else throw Fail(AnthropicRequestFailure.UnsupportedContent);
                     }
-                    if (blocks.Count > 0) AddMessage("assistant", blocks);
+                    if (blocks.Count == 0) continue;
+                    var at = _messages.Count; AddMessage("assistant", blocks);
+                    // convertMessages: only exact Anthropic Messages responses of this provider replay their recorded effort.
+                    if (options.SupportsMidConversationEffort && assistant.Api == "anthropic-messages" && assistant.Provider == request.Model.Provider &&
+                        assistant.ExtraProperties?.TryGet("providerThinkingLevel", out var recorded) == true && recorded!.Value.ValueKind == JsonValueKind.String &&
+                        recorded.Value.GetString() is "low" or "medium" or "high" or "xhigh" or "max") _assistantLevels[at] = recorded.Value.GetString()!;
                 }
                 else if (entry.Role == "toolResult")
                 {
@@ -194,16 +205,24 @@ public sealed class AnthropicMessagesRequestProjector
                 }
             }
             CloseCalls(); FlushSystems(); AttachLastCache();
+            if (options.SupportsMidConversationEffort) InsertEffortMessages();
             var root = new JsonObject { ["model"] = request.Model.Id, ["messages"] = _messages, ["max_tokens"] = options.MaximumTokens, ["stream"] = true };
             var system = options.SupportsMidConversationSystemMessages ? InitialSystem() : FoldedSystem();
             var systemBlocks = new JsonArray();
             if (options.OAuthProjection) systemBlocks.Add(CacheText("You are Claude Code, Anthropic's official CLI for Claude."));
             if (system.Length > 0) systemBlocks.Add(CacheText(system));
             if (systemBlocks.Count > 0) root["system"] = systemBlocks;
-            if (options.Temperature is { } temperature && options.ThinkingEnabled != true && options.SupportsTemperature) root["temperature"] = JsonNode.Parse(Number((double)temperature));
+            if (options.Temperature is { } temperature && options.ThinkingEnabled != true && !options.SupportsMidConversationEffort && options.SupportsTemperature) root["temperature"] = JsonNode.Parse(Number((double)temperature));
             var tools = ConvertTools(); if (tools.Count > 0) root["tools"] = tools;
             var betas = Betas(); if (betas.Count > 0) root["betas"] = betas;
-            if (options.ModelReasoning && options.ThinkingEnabled == true)
+            // Managed effort models always use adaptive thinking so prefix mismatches are dropped; per-turn effort rides the markers.
+            if (options.SupportsMidConversationEffort)
+            {
+                root["thinking"] = new JsonObject { ["type"] = "adaptive", ["display"] = options.ThinkingDisplay,
+                    ["block_binding"] = new JsonObject { ["prefix_mismatch_behavior"] = "drop_block" } };
+                root["output_config"] = new JsonObject { ["effort"] = "high" };
+            }
+            else if (options.ModelReasoning && options.ThinkingEnabled == true)
             {
                 root["thinking"] = options.ForceAdaptiveThinking
                     ? new JsonObject { ["type"] = "adaptive", ["display"] = options.ThinkingDisplay }
@@ -418,6 +437,15 @@ public sealed class AnthropicMessagesRequestProjector
             }
             else { AddMessage("user", new JsonArray(block), charge: false); _lastWasToolResults = true; }
         }
+        // insertThinkingLevelMessages: a marker before each recorded assistant turn, then the active effort last (after the cache breakpoint).
+        private void InsertEffortMessages()
+        {
+            static JsonObject Marker(string effort) => new() { ["role"] = "system", ["content"] = new JsonArray(), ["output_config"] = new JsonObject { ["effort"] = effort } };
+            if (_messages.Count + _assistantLevels.Count + 1 > options.MaximumProjectedMessages) throw Fail(AnthropicRequestFailure.ResourceLimit);
+            foreach (var (index, effort) in _assistantLevels.OrderByDescending(pair => pair.Key))
+            { token.ThrowIfCancellationRequested(); var marker = Marker(effort); Charge(marker); _messages.Insert(index, marker); }
+            var active = Marker(options.Effort ?? "high"); Charge(active); _messages.Add(active);
+        }
         private void FlushSystems() { foreach (var system in _pendingSystems) AddMessage("system", system["content"]!.DeepClone()); _pendingSystems.Clear(); }
         private void AddMessage(string role, JsonNode content, bool charge = true)
         {
@@ -499,6 +527,7 @@ public sealed class AnthropicMessagesRequestProjector
                 if (_tools.Count > 0 && !options.SupportsEagerToolInputStreaming) values.Add("fine-grained-tool-streaming-2025-05-14");
                 if (options.ModelReasoning && options.ThinkingEnabled == true && options.InterleavedThinking && !options.ForceAdaptiveThinking) values.Add("interleaved-thinking-2025-05-14");
                 if (!options.AllowedFallbackModels.IsDefaultOrEmpty) values.Add("server-side-fallback-2026-07-01");
+                if (options.SupportsMidConversationEffort) values.AddRange(["mid-conversation-output-config-2026-07-01", "thinking-binding-controls-2026-08-01"]);
                 if (_nativeToolChanges) values.Add("inline-tools-2026-09-15");
             }
             return new JsonArray(values.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray());

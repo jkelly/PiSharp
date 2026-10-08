@@ -258,7 +258,9 @@ public sealed class AnthropicMessagesHttpSseTransport : IChatTransport
         internal StreamTerminalEvent Failure(AssistantMessage? partial,AnthropicMessagesFailure failure)
         {
             var reason = failure == AnthropicMessagesFailure.Cancelled ? StopReason.Aborted : StopReason.Error;
-            var properties = (partial?.ExtraProperties ?? JsonFields.Empty)
+            // Upstream records providerThinkingLevel on the output before any request work, so pre-stream failures keep it.
+            var properties = (partial?.ExtraProperties ?? (transport._messagesOptions?.ProviderThinkingLevel is { } level
+                    ? JsonFields.Empty.Set("providerThinkingLevel", JsonData.Parse(JsonSerializer.Serialize(level))) : JsonFields.Empty))
                 .Set("errorMessage",JsonData.Parse(JsonSerializer.Serialize(reason == StopReason.Aborted ? "Anthropic stream was cancelled." : "Anthropic stream did not complete.")))
                 .Set("anthropicFailure",JsonData.Parse(JsonSerializer.Serialize(failure.ToString())));
             var message = partial ?? new(request.Model.Api,request.Model.Provider,request.Model.Id,request.Timestamp,[],TokenUsage.Zero,reason);

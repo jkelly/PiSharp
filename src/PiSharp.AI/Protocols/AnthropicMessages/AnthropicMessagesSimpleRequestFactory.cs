@@ -1,5 +1,5 @@
-// Pi v0.99.1 d86654abb8862e201933517d6f1fce9f88dd117f (MIT):
-// api/anthropic-messages.ts:streamSimple/mapThinkingLevelToEffort and api/simple-options.ts.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/anthropic-messages.ts (streamSimple,
+// mapThinkingLevelToEffort, compat.supportsMidConvoEffort) and packages/ai/src/api/simple-options.ts.
 using System.Text.Json;
 using PiSharp.Contracts;
 
@@ -15,7 +15,7 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
     private readonly ModelDescriptor _model;
     private readonly AnthropicMessagesSimpleOptions _options;
     private readonly int _contextWindow, _modelMaxTokens;
-    private readonly bool _reasoning, _adaptive, _supportsOff;
+    private readonly bool _reasoning, _adaptive, _supportsOff, _midEffort;
     private readonly JsonElement _levelMap;
 
     public AnthropicMessagesSimpleRequestFactory(HttpClient client, Uri baseUri, ModelDescriptor model,
@@ -40,8 +40,8 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
             if (_modelMaxTokens <= 0) throw Fail(AnthropicMessagesSimpleFailure.InvalidConfiguration);
             _adaptive = metadata.TryGetProperty("compat", out var compat) && compat.ValueKind != JsonValueKind.Null &&
                 compat.TryGetProperty("forceAdaptiveThinking", out var adaptive) && adaptive.GetBoolean();
-            if (compat.ValueKind == JsonValueKind.Object && compat.TryGetProperty("supportsMidConvoEffort", out var midEffort) && midEffort.GetBoolean())
-                throw Fail(AnthropicMessagesSimpleFailure.InvalidConfiguration);
+            // Managed per-turn effort: buildParams then always sends adaptive thinking with effort markers.
+            _midEffort = compat.ValueKind == JsonValueKind.Object && compat.TryGetProperty("supportsMidConvoEffort", out var midEffort) && midEffort.GetBoolean();
             if (metadata.TryGetProperty("thinkingLevelMap", out var map) && map.ValueKind != JsonValueKind.Null)
             {
                 if (map.ValueKind != JsonValueKind.Object) throw Fail(AnthropicMessagesSimpleFailure.InvalidConfiguration);
@@ -101,12 +101,14 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
     public IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested(); AdmitKey(_options.ApiKey);
-        var factory = Bind(Resolve(request, cancellationToken));
+        var resolved = Resolve(request, cancellationToken); var factory = Bind(resolved);
+        // stream(): a managed response records the effort it was sent with (omitted effort is "high").
+        var messages = _midEffort ? (_options.MessagesOptions ?? new()) with { ProviderThinkingLevel = resolved.Effort ?? "high" } : _options.MessagesOptions;
         if (_options.Hooks is not null)
             return AnthropicMessagesHttpSseTransport.FromPrepared(_client, (current, token) => factory.Prepare(current, _options.ApiKey!, token),
-                _options.HttpOptions, _options.MessagesOptions, _options.Hooks).StreamAsync(request, cancellationToken);
+                _options.HttpOptions, messages, _options.Hooks).StreamAsync(request, cancellationToken);
         return new AnthropicMessagesHttpSseTransport(_client, (current, token) => factory.Create(current, _options.ApiKey!, token),
-            _options.HttpOptions, _options.MessagesOptions).StreamAsync(request, cancellationToken);
+            _options.HttpOptions, messages).StreamAsync(request, cancellationToken);
     }
     public AnthropicMessagesPreparedRequest Prepare(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
     {
@@ -118,6 +120,7 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
         {
             MaximumTokens = resolved.MaxTokens, ModelReasoning = _reasoning, ThinkingEnabled = resolved.ThinkingEnabled,
             ForceAdaptiveThinking = _adaptive, SupportsThinkingOff = _supportsOff, ThinkingBudgetTokens = resolved.ThinkingBudgetTokens,
+            SupportsMidConversationEffort = _midEffort,
             Effort = resolved.Effort, ToolChoice = _options.ToolChoice ?? _options.ProjectionOptions.ToolChoice
         }, _options.KeyAuthOptions with { MaxTokens = resolved.MaxTokens });
     private void AdmitKey(string? key)
