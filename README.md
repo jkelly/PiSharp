@@ -2,6 +2,8 @@
 
 PiSharp is a native .NET 10 / C# port of the [Pi coding agent](https://github.com/earendil-works/pi), in early implementation.
 
+The public version baseline is **0.99.1**, matching the pinned Pi **v0.99.1** release. This identifies the porting baseline, not complete behavioral parity or an already published binary. Fresh version-specific artifact qualification is required; earlier private packages retain their original versions. See the [0.99.1 release notes](docs/release-notes/0.99.1.md).
+
 The development build includes a native offline CLI, durable sessions and branch/history views, session replacement, native C# extension loading, and bounded optional Node bridge workflows. Accepted session lifecycle and history milestones include fresh context replacement, old-context write rejection and joined cleanup. Provider and interoperability capabilities retain their individually tested scopes. All eight original phase gates remain open. See [implementation status](IMPLEMENTATION_STATUS.md) for current evidence and gaps.
 
 ## Native validation tooling

@@ -1014,8 +1014,8 @@
       "originalSha256": "2551376cd09efe8406c1558c4e98f334f34756d1fa900e8e30a5a5dcf400421c"
     },
     {
-      "currentSha256": "ac5ce47d0629f5b040a1615dbc4cc69ce4babde81f727f8392252c3b06a40ad9",
-      "currentBytes": 380,
+      "currentSha256": "e3ae83ea61c8d97857452cfd64bf423d45194924670b2d9afad6d849e02daf53",
+      "currentBytes": 763,
       "originalBytes": 380,
       "path": "Directory.Build.props",
       "originalSha256": "ac5ce47d0629f5b040a1615dbc4cc69ce4babde81f727f8392252c3b06a40ad9"
@@ -5872,8 +5872,8 @@
       "originalSha256": "0f5f73cc466a7aa3c8939d483b171da02d34d7fff0518ab80964f1311c92e6a9"
     },
     {
-      "currentSha256": "b80786cc8adfda416d97e4e034e81b4d74433f7f3cc9fbbddd4d535d59401db0",
-      "currentBytes": 4229,
+      "currentSha256": "47a52b3f2ac28d788bdbf5d1d6ba9a10d603acf5325d7540177991a5e118c761",
+      "currentBytes": 4596,
       "originalBytes": 3622,
       "path": "README.md",
       "originalSha256": "1b053b228b07ff43b8ba7d37d19e4ea3a1d6214731dfa4a1f2ef6f3240f292df"
@@ -19074,7 +19074,7 @@
       "originalSha256": "6a4a313fcaac4373ba1266ab6c30c2433ef3ddd7c2f7cb80abb67a3b4218d560"
     }
   ],
-  "mappingNotice": "Path-normalized fixture derivatives preserve nonpath behavioral observations. Current source follows a separately reviewed successor with bounded private qualification; this is not semantic equivalence to historical code or execution of the public tree. Private provenance dispositions remain explicit. Historical capture identities are unchanged.",
+  "mappingNotice": "Current source includes reviewed version metadata only after the separately qualified993 implementation. Version-specific products and public-tree execution remain unqualified. Path-normalized fixture derivatives and historical capture identities are unchanged; historical qualification is not transferred.",
   "privacyMetadataDisposition": {
     "privateApprovalThreadIdentifierRedacted": true,
     "newExecutionAuthorityCreated": false,
@@ -19083,15 +19083,18 @@
   },
   "sourceBasis": {
     "completeNativeGateReady": false,
-    "privateScopedRuntimeAccepted": true,
+    "privateScopedRuntimeAccepted": false,
     "publicationAuthorized": false,
     "fullProviderParity": false,
-    "tree": "16edbf8038943a783ed71f8c9a60f4b88447d3d4",
+    "tree": "5d51ec3d34a06b8e54e0efeb66e75ab2514c075c",
     "publicTreeRuntimeExecuted": false,
-    "candidate": "cb338cb120c90ea5e7908bf40305d95411e3fbf0",
+    "candidate": "f27deb1847a7dc4a71b8731845c03162adc6af88",
     "semanticEquivalenceToHistoricalCodeClaimed": false,
     "sourceOverlayAccepted": true,
     "historicalCaptureSourceBasis": "557115ed5fb4c43b6965da3b939dfa572a869f1a",
-    "implementationAndTests": "993d1c372d3c09903c33212443750838f466b694"
+    "implementationAndTests": "993d1c372d3c09903c33212443750838f466b694",
+    "versionSpecificArtifactsQualified": false,
+    "precedingQualifiedSource": "cb338cb120c90ea5e7908bf40305d95411e3fbf0",
+    "productVersion": "0.99.1"
   }
 }
