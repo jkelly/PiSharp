@@ -777,6 +777,30 @@
         "tests/PiSharp.AnthropicAuthSync.Tests"
       ],
       "notes": "Owner decision (2026-10-08): persist a refresh that succeeds after its deadline, as upstream refreshStoredOAuthCredential does (RefreshTimeout only signals the refresh). Rotated refresh tokens are never discarded; serialization, the logout re-check and caller cancellation are unchanged."
+    },
+    {
+      "id": "provider.anthropic-mid-conversation-effort",
+      "since": "0.85.0",
+      "upstream": [
+        "packages/ai/src/api/anthropic-messages.ts",
+        "packages/ai/src/models.ts"
+      ],
+      "change": "compat.supportsMidConvoEffort models (Claude Opus 5, Opus/Sonnet/Haiku 5.5, Fable 5.1) send managed adaptive thinking, output_config effort markers per assistant turn and the mid-conversation-output-config and thinking-binding-controls betas; thinkingLevelMap null entries remove levels.",
+      "pisharp": [
+        "src/PiSharp.AI/Providers/NativeThinkingTransport.cs",
+        "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs",
+        "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesTransport.cs",
+        "src/PiSharp.Cli/Commands/LiveSessionSelection.cs"
+      ],
+      "status": "port",
+      "workPackage": "2f",
+      "release": "1.1.0",
+      "outcome": "implemented",
+      "test": [
+        "tests/PiSharp.ProviderSync.Tests",
+        "tests/PiSharp.CliSync.Tests"
+      ],
+      "notes": "Gap that predates the sync (upstream commit 4e69b0c28, in v0.85.0+): PiSharp rejected every managed-effort model with \"Unsupported native thinking metadata\", which blocked the Claude 5.5 catalog rows. input_transformations now yields the anthropic_input_transformations diagnostic. Deviations: the diagnostic uses the request timestamp; malformed transformation entries fail as malformed; the summary route keeps thinking off (managed models send managed high, as upstream with no reasoning); claude-fable-5 (unmanaged, off null) summaries still send thinking disabled, which upstream never sends."
     }
   ],
   "catalogRefresh": {
