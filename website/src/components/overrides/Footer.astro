@@ -1,0 +1,56 @@
+---
+import Default from '@astrojs/starlight/components/Footer.astro';
+import { links } from '../../data/site';
+---
+
+<Default />
+<div class="ps-footer">
+	<p>
+		<strong>PiSharp · MIT License.</strong> PiSharp is an independent port and not an official Pi release. Pi is
+		created by Mario Zechner and maintained by Earendil; derived code keeps its MIT attribution.
+		<a href={links.pi}>pi.dev</a>
+	</p>
+	<nav aria-label="Footer">
+		<a href={links.github}>GitHub</a>
+		<a href="/parity/">Roadmap</a>
+		<a href="/changelog/">Changelog</a>
+		<a href="/changelog/rss.xml">RSS</a>
+	</nav>
+</div>
+
+<style>
+	.ps-footer {
+		margin-top: 3rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid var(--sl-color-gray-5);
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1rem 2rem;
+		justify-content: space-between;
+		font-size: var(--sl-text-sm);
+		color: var(--sl-color-gray-3);
+	}
+	.ps-footer p {
+		max-width: 36rem;
+		margin: 0;
+	}
+	.ps-footer strong {
+		color: var(--sl-color-gray-1);
+	}
+	.ps-footer nav {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.2rem;
+		font-family: var(--sl-font-mono);
+		font-size: 0.75rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+	}
+	.ps-footer a {
+		color: var(--sl-color-gray-2);
+		text-decoration: none;
+	}
+	.ps-footer a:hover {
+		color: var(--sl-color-white);
+	}
+</style>

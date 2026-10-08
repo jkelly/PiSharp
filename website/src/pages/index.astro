@@ -1,0 +1,341 @@
+---
+import SitePage from '../components/SitePage.astro';
+import { links, versions, inSync } from '../data/site';
+import { packages } from '../data/packages';
+
+const libraries = packages.filter((p) => p.nuget);
+---
+
+<SitePage title="The minimal agent harness, native to .NET" description="The minimal agent harness, native to .NET. An independent C# port of the Pi coding agent.">
+	<div class="announce">
+		<span class="ps-serif ps-em" style="font-size: 1.15rem">PiSharp {versions.pisharp} tracks Pi v{versions.baseline}.</span>
+		{!inSync && <span class="ps-muted"> Syncing to Pi {versions.latestPi} is underway. </span>}
+		<a href="/parity/">See parity →</a>
+	</div>
+
+	<!-- Hero -->
+	<header class="hero">
+		<img src="/favicon.svg" alt="" width="112" height="112" class="hero-mark" />
+		<div class="ps-mono version-pill">v{versions.pisharp} · TRACKS PI v{versions.baseline} · .NET 10</div>
+		<h1 class="ps-serif hero-title">The minimal agent harness,<br /><em style="color: var(--ps-blue)">native to .NET</em></h1>
+		<p class="ps-lede" style="text-align: center; margin-inline: auto">
+			PiSharp is an independent C# port of the Pi coding agent. Pi's sessions, RPC and workflow, with native C#
+			extensions, embeddable libraries, and no Node runtime required.
+		</p>
+
+		<!-- Install box: intentionally blank until distribution is decided. Add tabs here. -->
+		<div class="ps-term install" aria-label="Install">
+			<div class="install-body">
+				<code class="ps-mono"><span style="color: #38bdf8">$</span> <span style="color: #8a85b3">Packaged install coming soon</span></code>
+			</div>
+		</div>
+		<a href="/docs/quickstart/">Build from source →</a>
+	</header>
+
+	<!-- Terminal demo -->
+	<section class="ps-section" style="max-width: 62rem; margin-inline: auto">
+		<div class="ps-term" style="box-shadow: var(--ps-shadow)">
+			<div class="ps-termbar"><span><span class="ps-dot"></span>PiSharp — make it yours</span></div>
+			<pre class="ps-termbody"><span class="c">~/src/orders-api · anthropic · claude-sonnet</span>
+
+<span class="t">›</span> <span class="w">add exponential backoff to the payment client retries</span>
+
+<span class="k">read</span>   src/Payments/PaymentClient.cs
+<span class="k">read</span>   src/Payments/RetryPolicy.cs
+<span class="k">edit</span>   src/Payments/RetryPolicy.cs  <span class="g">+18</span> <span class="r">-6</span>
+<span class="k">bash</span>   dotnet test tests/Payments.Tests
+
+<span class="w">Retries now back off exponentially with jitter, capped at 5 attempts.</span>
+<span class="w">Tests pass. Want me to make the cap configurable?</span></pre>
+		</div>
+	</section>
+
+	<!-- Why -->
+	<section class="ps-section">
+		<div class="ps-eyebrow">Why PiSharp?</div>
+		<h2 class="ps-h2">Pi's philosophy, <em>without leaving .NET</em></h2>
+		<div class="ps-grid">
+			<div class="ps-card">
+				<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ps-blue)"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M7 9l3 3-3 3M12 15h5"></path></svg>
+				<h3 class="card-title">Native .NET 10</h3>
+				<p class="ps-muted card-text">One runtime, no Node. The CLI, terminal UI, RPC and agent loop are all C#.</p>
+			</div>
+			<div class="ps-card">
+				<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ps-blue)"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"></path><path d="M9 12l2 2 4-4"></path></svg>
+				<h3 class="card-title">Zero external dependencies</h3>
+				<p class="ps-muted card-text">No third-party packages, a locked restore and a pinned SDK. A short supply chain you can audit.</p>
+			</div>
+			<div class="ps-card">
+				<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ps-blue)"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6"></path></svg>
+				<h3 class="card-title">Extend in C#</h3>
+				<p class="ps-muted card-text">Tools, commands, hooks and UI as native extensions, plus an optional bridge for existing Pi extensions.</p>
+			</div>
+			<div class="ps-card">
+				<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--ps-blue)"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+				<h3 class="card-title">Embed it anywhere</h3>
+				<p class="ps-muted card-text">Every layer ships on NuGet. Use just the LLM client, or the whole agent, in your own app.</p>
+			</div>
+		</div>
+	</section>
+
+	<!-- Feature rows -->
+	<section class="ps-section features">
+		<div class="ps-row">
+			<div class="ps-term">
+				<div class="ps-termbar"><span><span class="ps-dot"></span>Switch models mid-session</span></div>
+				<pre class="ps-termbody"><span class="c">/model</span>
+<span class="t">›</span> anthropic · messages
+  openai · completions / responses
+  azure · responses
+  google · generative-ai
+  mistral · conversations</pre>
+			</div>
+			<div>
+				<h3 class="ps-h3"><em>Bring</em> your providers</h3>
+				<p class="ps-muted">Streaming adapters for Anthropic Messages, OpenAI Completions and Responses, Azure Responses, Google Generative AI and Mistral Conversations, with more landing as parity grows.</p>
+				<p class="ps-muted">Switch with <span class="ps-kbd">/model</span>.</p>
+			</div>
+		</div>
+
+		<div class="ps-row ps-reverse">
+			<div>
+				<h3 class="ps-h3">Sessions are <em>trees</em></h3>
+				<p class="ps-muted">Branch from any point, keep every branch in one file, and compact long histories automatically.</p>
+				<p class="ps-muted">PiSharp keeps its own home directory and imports Pi sessions only when you ask. It never touches Pi's files.</p>
+			</div>
+			<div class="ps-term">
+				<div class="ps-termbar"><span><span class="ps-dot"></span>Navigate the session tree</span></div>
+				<pre class="ps-termbody">● user   plan the retry change
+├─● asst   read 2 files
+│ ├─● user   use a retry library
+│ │ └─○ asst   …abandoned
+│ └─● user   <span class="t">keep it dependency-free</span>
+│   └─● asst   <span class="t">edit RetryPolicy.cs  ← you are here</span>
+└─● compaction   summary of earlier entries</pre>
+			</div>
+		</div>
+
+		<div class="ps-row">
+			<div class="ps-term">
+				<div class="ps-termbar"><span><span class="ps-dot"></span>A native extension</span><span>C#</span></div>
+				<pre class="ps-termbody"><span class="k">public sealed class</span> <span class="t">StatefulTodoExtension</span> : IPiSharpExtension
+{'{'}
+    <span class="k">public</span> ValueTask InitializeAsync(
+        IExtensionRegistry registry, CancellationToken ct)
+    {'{'}
+        registry.RegisterTool(<span class="k">new</span>(<span class="s">"todo"</span>, <span class="s">"todo"</span>,
+            Description, JsonData.Parse(ParametersJson),
+            ExecuteAsync));
+        <span class="k">return</span> ValueTask.CompletedTask;
+    {'}'}
+{'}'}</pre>
+			</div>
+			<div>
+				<h3 class="ps-h3">Primitives, <em>not features</em></h3>
+				<p class="ps-muted">Register tools, commands, shortcuts, renderers and typed hooks from a plain C# class. Ship it as a NuGet package.</p>
+				<p class="ps-muted">Already have Pi extensions? The optional Node bridge runs them alongside native ones.</p>
+				<a href="/extensions/" class="ps-link-mono">Explore extensions →</a>
+			</div>
+		</div>
+
+		<div class="ps-row ps-reverse">
+			<div>
+				<h3 class="ps-h3"><em>Four</em> ways to run it</h3>
+				<p class="ps-muted">The full terminal UI, print and JSON event streams for scripts, a JSON RPC protocol over stdin/stdout for any language, or the SDK inside your own .NET app.</p>
+			</div>
+			<div class="modes">
+				<div class="ps-card"><div class="ps-eyebrow">Interactive</div><p class="ps-muted card-text">Full terminal UI with steering and follow-ups</p></div>
+				<div class="ps-card"><div class="ps-eyebrow">Print / JSON</div><p class="ps-muted card-text">One-shot answers and event streams</p></div>
+				<div class="ps-card"><div class="ps-eyebrow">RPC</div><p class="ps-muted card-text">Pi's protocol over stdin/stdout</p></div>
+				<div class="ps-card"><div class="ps-eyebrow">SDK</div><p class="ps-muted card-text">Embed the agent in any .NET app</p></div>
+			</div>
+		</div>
+	</section>
+
+	<!-- Libraries -->
+	<section class="ps-section band">
+		<div class="band-head">
+			<div>
+				<div class="ps-eyebrow">On NuGet</div>
+				<h2 class="ps-h2" style="margin-bottom: 0">Take the whole agent, <em>or just a layer</em></h2>
+			</div>
+			<a href="/sdk/" class="ps-link-mono">Browse the SDK →</a>
+		</div>
+		<div class="libs">
+			{libraries.map((p) => <a href="/sdk/" class="ps-mono lib">{p.id}</a>)}
+		</div>
+	</section>
+
+	<!-- What we didn't build -->
+	<section class="ps-section ps-row" style="align-items: flex-start">
+		<div style="flex: 1 1 20rem">
+			<div class="ps-eyebrow">Inherited from Pi</div>
+			<h2 class="ps-h2">What we <em>didn't</em> build</h2>
+			<p class="ps-muted">PiSharp keeps Pi's minimal core. Features other agents bake in are left to extensions, so the harness fits your workflow, not the other way around.</p>
+			<a href={links.piBlogPost} class="ps-link-mono">Read why, from Pi's author ↗</a>
+		</div>
+		<div class="didnt" style="flex: 2 1 34rem">
+			<div><h3>No sub-agents</h3><p>Spawn instances via tmux, or build your own as an extension.</p></div>
+			<div><h3>No permission popups</h3><p>Run in a container, or write a confirmation hook that matches your policy.</p></div>
+			<div><h3>No plan mode</h3><p>Write plans to files, or install an extension that does it your way.</p></div>
+			<div><h3>No built-in to-dos</h3><p>Use a TODO.md, or the sample todo extension, in C#.</p></div>
+			<div><h3>No background bash</h3><p>Use tmux. Full observability, direct interaction.</p></div>
+			<div><h3>No Node requirement</h3><p>The one thing PiSharp adds to the list: the bridge is opt-in.</p></div>
+		</div>
+	</section>
+
+	<!-- Coming from Pi -->
+	<section class="ps-section">
+		<div class="ps-card cta">
+			<div style="flex: 1 1 30rem; min-width: 0">
+				<div class="ps-eyebrow">Already using Pi?</div>
+				<h2 class="ps-h3" style="margin-top: 0.6rem">Bring your sessions, skills and prompts</h2>
+				<p class="ps-muted" style="margin: 0">PiSharp is built to read Pi's AGENTS.md, skills, prompt templates and themes, and to import sessions on request. Your Pi install stays exactly as it is.</p>
+			</div>
+			<a href="/docs/coming-from-pi/" class="ps-button">Coming from Pi →</a>
+		</div>
+	</section>
+
+	<!-- Get involved -->
+	<section class="ps-section">
+		<h2 class="ps-h2">Get involved</h2>
+		<div class="ps-grid">
+			<a href={links.issues} class="ps-card"><div class="ps-eyebrow">Issues</div><p class="ps-muted card-text">Bugs, parity gaps and feature requests on GitHub.</p></a>
+			<a href={links.contributing} class="ps-card"><div class="ps-eyebrow">Contribute</div><p class="ps-muted card-text">Pick up an open parity item or port an extension.</p></a>
+			<a href="/docs/" class="ps-card"><div class="ps-eyebrow">Documentation</div><p class="ps-muted card-text">Guides, reference and the architecture.</p></a>
+		</div>
+	</section>
+</SitePage>
+
+<style>
+	.announce {
+		text-align: center;
+		padding: 0.6rem 1rem;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 999px;
+		background: var(--ps-surface);
+		font-size: 0.95rem;
+		max-width: 46rem;
+		margin: 0 auto;
+	}
+	.hero {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		gap: 1.5rem;
+		padding: 4.5rem 0 4.5rem;
+	}
+	.hero-mark {
+		border-radius: 26px;
+		border: 1px solid var(--sl-color-gray-5);
+	}
+	.version-pill {
+		font-size: 0.8rem;
+		letter-spacing: 0.1em;
+		color: var(--sl-color-gray-3);
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 999px;
+		padding: 0.35rem 0.9rem;
+	}
+	.hero-title {
+		margin: 0;
+		font-size: clamp(2.8rem, 7vw, 4.8rem);
+		line-height: 1.02;
+		color: var(--sl-color-white);
+	}
+	.hero .ps-lede {
+		margin-bottom: 0;
+	}
+	.install {
+		width: 100%;
+		max-width: 45rem;
+		text-align: start;
+	}
+	.install-body {
+		padding: 1.3rem 1.25rem;
+		font-size: 0.95rem;
+	}
+	.card-title {
+		font-size: 1.2rem;
+		margin: 1rem 0 0.4rem;
+		color: var(--sl-color-white);
+	}
+	.card-text {
+		margin: 0.4rem 0 0;
+		font-size: 0.98rem;
+	}
+	.features {
+		display: flex;
+		flex-direction: column;
+		gap: 6rem;
+	}
+	.modes {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.9rem;
+	}
+	.modes .ps-card {
+		padding: 1.2rem;
+	}
+	.band {
+		border-top: 1px solid var(--sl-color-gray-5);
+		border-bottom: 1px solid var(--sl-color-gray-5);
+		padding-block: 4rem;
+	}
+	.band-head {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		align-items: end;
+		gap: 1.2rem;
+		margin-bottom: 2rem;
+	}
+	.libs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+	}
+	.lib {
+		border: 1px solid var(--sl-color-gray-4);
+		border-radius: 6px;
+		padding: 0.6rem 0.9rem;
+		font-size: 0.88rem;
+		color: var(--sl-color-gray-1) !important;
+	}
+	.lib:hover {
+		border-color: var(--sl-color-accent);
+		text-decoration: none !important;
+	}
+	.didnt {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+		gap: 1px;
+		background: var(--sl-color-gray-5);
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 12px;
+		overflow: hidden;
+	}
+	.didnt > div {
+		background: var(--sl-color-black);
+		padding: 1.4rem;
+	}
+	.didnt h3 {
+		margin: 0 0 0.3rem;
+		font-size: 1.1rem;
+		color: var(--sl-color-white);
+	}
+	.didnt p {
+		margin: 0;
+		font-size: 0.95rem;
+		color: var(--sl-color-gray-2);
+	}
+	.cta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 2rem;
+		align-items: center;
+		justify-content: space-between;
+		padding: 2.4rem;
+	}
+</style>

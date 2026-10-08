@@ -1,0 +1,109 @@
+---
+import SitePage from '../components/SitePage.astro';
+import { links } from '../data/site';
+---
+
+<SitePage title="Extensions" description="Shape the PiSharp harness in C#: tools, commands, shortcuts, renderers and hooks.">
+	<div style="padding-top: 3rem">
+		<div class="ps-eyebrow">Extensions</div>
+		<h1 class="ps-h1">Shape the harness <em>in C#</em></h1>
+		<p class="ps-lede">Add tools, slash commands, shortcuts, renderers and lifecycle hooks with a plain C# class. Package it for NuGet and share it.</p>
+	</div>
+
+	<div class="lanes">
+		<div class="ps-card" style="border-color: var(--sl-color-accent)">
+			<div class="ps-mono tag" style="color: var(--ps-link)">RECOMMENDED</div>
+			<h2 class="ps-h3" style="margin: 0.5rem 0 0.6rem">Native C# extensions</h2>
+			<p class="ps-muted">Implement <code>IPiSharpExtension</code>, register what you need, and ship a NuGet package. In-process, typed, no Node.</p>
+			<a href="/docs/extensions/build-an-extension/" class="ps-link-mono">Build an extension →</a>
+		</div>
+		<div class="ps-card" style="border-style: dashed">
+			<div class="ps-mono tag" style="color: var(--sl-color-gray-3)">OPTIONAL</div>
+			<h2 class="ps-h3" style="margin: 0.5rem 0 0.6rem">Pi extensions via the Node bridge</h2>
+			<p class="ps-muted">Run existing TypeScript extensions in a supervised Node worker. Support is tiered, and anything unsupported is reported at startup instead of being silently ignored.</p>
+			<a href="/docs/extensions/node-bridge/" class="ps-link-mono">Bridge compatibility →</a>
+		</div>
+	</div>
+
+	<section class="ps-section">
+		<h2 class="ps-h2">Same extension, <em>two languages</em></h2>
+		<p class="ps-muted" style="max-width: 45rem; margin-bottom: 1.8rem">The sample todo extension is ported from Pi's own example. If you've written one for Pi, you already know the shape.</p>
+		<div class="ps-row" style="gap: 1.25rem; align-items: stretch">
+			<div class="ps-term">
+				<div class="ps-termbar"><span>Pi · todo.ts</span><span>TypeScript</span></div>
+				<pre class="ps-termbody"><span class="k">export default function</span> (pi: <span class="t">ExtensionAPI</span>) {'{'}
+  pi.<span class="t">registerTool</span>({'{'}
+    name: <span class="s">"todo"</span>,
+    label: <span class="s">"Todo"</span>,
+    description: <span class="s">"Manage a todo list. …"</span>,
+    parameters: TodoParams,
+
+    <span class="k">async</span> execute(_id, params, …) {'{'}
+      <span class="k">switch</span> (params.action) {'{'} <span class="c">/* … */</span> {'}'}
+    {'}'},
+  {'}'});
+{'}'}</pre>
+			</div>
+			<div class="ps-term" style="border-color: #4b3a9e">
+				<div class="ps-termbar"><span>PiSharp · StatefulTodoExtension.cs</span><span style="color: #38bdf8">C#</span></div>
+				<pre class="ps-termbody"><span class="k">public sealed class</span> <span class="t">StatefulTodoExtension</span>
+    : <span class="t">IPiSharpExtension</span>
+{'{'}
+  <span class="k">public</span> ValueTask InitializeAsync(
+      IExtensionRegistry registry, CancellationToken ct)
+  {'{'}
+    registry.<span class="t">RegisterTool</span>(<span class="k">new</span>(<span class="s">"todo"</span>, <span class="s">"todo"</span>,
+        Description, JsonData.Parse(ParametersJson),
+        ExecuteAsync));
+    <span class="k">return</span> ValueTask.CompletedTask;
+  {'}'}
+{'}'}</pre>
+			</div>
+		</div>
+	</section>
+
+	<section class="ps-section">
+		<h2 class="ps-h2">Samples</h2>
+		<div class="ps-grid">
+			<a href={`${links.samples}/StatefulTodo`} class="ps-card">
+				<div class="ps-mono sample">StatefulTodo</div>
+				<p class="ps-muted">A todo tool whose state is rebuilt from the current session branch, so it stays correct when you branch.</p>
+				<span class="ps-mono tag" style="color: var(--sl-color-gray-3)">PORTED FROM PI · TOOL</span>
+			</a>
+			<a href={`${links.samples}/SessionCheckpoint`} class="ps-card">
+				<div class="ps-mono sample">SessionCheckpoint</div>
+				<p class="ps-muted">Registers a <code>/checkpoint</code> command, a session-start observer and a pre-switch handler that saves and restores session checkpoints.</p>
+				<span class="ps-mono tag" style="color: var(--sl-color-gray-3)">COMMANDS · SESSION HOOKS</span>
+			</a>
+		</div>
+	</section>
+
+	<section class="ps-section">
+		<h2 class="ps-h2">Community extensions</h2>
+		<div class="ps-card" style="border-style: dashed">
+			<p class="ps-muted" style="margin: 0">A catalog of community extensions published to NuGet will appear here. Building one? Open an issue on <a href={links.issues}>GitHub</a> so it can be listed.</p>
+		</div>
+	</section>
+</SitePage>
+
+<style>
+	.lanes {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+		gap: 1.25rem;
+		margin-bottom: 6rem;
+	}
+	.tag {
+		font-size: 0.72rem;
+		letter-spacing: 0.14em;
+	}
+	.sample {
+		font-size: 1rem;
+		font-weight: 700;
+		color: var(--sl-color-white);
+	}
+	.ps-term {
+		display: flex;
+		flex-direction: column;
+	}
+</style>
