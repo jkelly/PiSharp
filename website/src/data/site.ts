@@ -23,30 +23,45 @@ export const links = {
 	piBlogPost: 'https://mariozechner.at/posts/2025-11-30-pi-coding-agent/',
 };
 
-/** The Pi baseline, read at build time from the port's pinned compatibility lock file. */
-function readBaseline() {
+const readJson = (path: string) => JSON.parse(readFileSync(resolve(process.cwd(), path), 'utf8'));
+
+/** The Pi baseline the port currently targets, read at build time from the compatibility lock. */
+function readTarget() {
 	try {
-		const lock = JSON.parse(
-			readFileSync(resolve(process.cwd(), '../compatibility/baseline.lock.json'), 'utf8'),
-		);
+		const lock = readJson('../compatibility/target.lock.json');
 		return {
-			tag: String(lock.source?.tag ?? 'v0.99.1'),
-			commit: String(lock.source?.commit ?? ''),
-			repository: String(lock.source?.repository ?? 'https://github.com/earendil-works/pi'),
+			tag: String(lock.source.tag),
+			commit: String(lock.source.commit),
+			repository: String(lock.source.repository ?? 'https://github.com/earendil-works/pi'),
 		};
 	} catch {
-		return { tag: 'v0.99.1', commit: '', repository: 'https://github.com/earendil-works/pi' };
+		return { tag: 'v1.1.0', commit: '', repository: 'https://github.com/earendil-works/pi' };
 	}
 }
 
-const baseline = readBaseline();
+/** The newest published PiSharp release and the Pi baseline it tracks, from the release record. */
+function readPublished() {
+	try {
+		const release = readJson('../compatibility/public-release.json');
+		if (release.publication?.nugetPackagesPublished) return { version: String(release.version), tag: String(release.upstream.tag) };
+		const previous = (release.previousReleases ?? []).filter((entry: { nugetPackagesPublished?: boolean }) => entry.nugetPackagesPublished).at(-1);
+		if (previous) return { version: String(previous.version), tag: String(previous.upstreamTag) };
+	} catch {}
+	return { version: '0.99.1', tag: 'v0.99.1' };
+}
+
+const target = readTarget();
+const published = readPublished();
 
 export const versions = {
 	/** PiSharp's version is the Pi version it matches; a fourth segment marks C#-only patches. */
-	pisharp: baseline.tag.replace(/^v/, ''),
-	baseline: baseline.tag.replace(/^v/, ''),
-	baselineCommit: baseline.commit,
-	baselineUrl: `${baseline.repository}/releases/tag/${baseline.tag}`,
+	pisharp: published.version,
+	/** The Pi release the published PiSharp version matches. */
+	baseline: published.tag.replace(/^v/, ''),
+	baselineCommit: target.tag === published.tag ? target.commit : '',
+	baselineUrl: `${target.repository}/releases/tag/${published.tag}`,
+	/** The Pi release the port is currently being synced to. */
+	target: target.tag.replace(/^v/, ''),
 	/** Update by hand when Pi ships a new release. */
 	latestPi: '1.1.0',
 };

@@ -9,6 +9,7 @@ $scratch = Join-Path ([IO.Path]::GetTempPath()) ('pisharp-distribution-' + [Guid
 New-Item -ItemType Directory -Path $scratch | Out-Null
 $commit = '7452a7b2a355e1f603a31eb693def91a9f565df1'
 $version = '0.1.0-preview.1'
+$baselineLock = Get-Content -LiteralPath (Join-Path $Repo 'compatibility/target.lock.json') -Raw | ConvertFrom-Json
 $results = [Collections.Generic.List[object]]::new()
 
 function New-FixtureFiles {
@@ -16,8 +17,8 @@ function New-FixtureFiles {
         [bool]$EnablePromptTemplateYaml = $true)
     $files = [Collections.Generic.Dictionary[string,byte[]]]::new([StringComparer]::Ordinal)
     foreach ($name in @('LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md')) { $files.Add($name, [IO.File]::ReadAllBytes((Join-Path $Repo $name))) }
-    $provenance = @{ schemaVersion = 1; sourceCommit = $commit; version = $version; baselineTag = 'v0.99.1';
-        baselineCommit = 'd86654abb8862e201933517d6f1fce9f88dd117f'; sdk = '10.0.401';
+    $provenance = @{ schemaVersion = 1; sourceCommit = $commit; version = $version; baselineTag = $baselineLock.source.tag;
+        baselineCommit = $baselineLock.source.commit; sdk = '10.0.401';
         kind = $(if ($Standalone) { 'standalone' } else { 'tool' }); rid = $(if ($Standalone) { $Rid } else { $null });
         enablePromptTemplateYaml = $EnablePromptTemplateYaml }
     $files.Add('provenance.json', [Text.Encoding]::UTF8.GetBytes(($provenance | ConvertTo-Json)))

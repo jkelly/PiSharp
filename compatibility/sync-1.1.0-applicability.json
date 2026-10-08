@@ -1,8 +1,15 @@
 {
   "schemaVersion": 1,
   "decision": "docs/decisions/0002-pi-1.1.0-sync.md",
-  "from": { "tag": "v0.99.1", "commit": "d86654abb8862e201933517d6f1fce9f88dd117f" },
-  "to": { "tag": "v1.1.0", "commit": "abe508e1b89912adde45528136c3221eb69acdd7", "tree": "77d78fae728879c16550b1f874785aed7851233c" },
+  "from": {
+    "tag": "v0.99.1",
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f"
+  },
+  "to": {
+    "tag": "v1.1.0",
+    "commit": "abe508e1b89912adde45528136c3221eb69acdd7",
+    "tree": "77d78fae728879c16550b1f874785aed7851233c"
+  },
   "statusMeaning": {
     "port": "Required change; implemented with authored tests before the target release.",
     "verify": "Audit PiSharp's current behavior against the upstream source; port only the observed delta.",
@@ -10,52 +17,592 @@
     "exclude": "Outside native scope per the linked decision; no port."
   },
   "rows": [
-    { "id": "unchanged.rpc", "upstream": ["packages/coding-agent/src/modes/rpc/*", "packages/coding-agent/docs/rpc*.md"], "change": "None.", "pisharp": ["src/PiSharp.Rpc"], "status": "unchanged", "release": "1.1.0" },
-    { "id": "unchanged.sessions", "upstream": ["packages/coding-agent/src/core/session-manager.ts", "packages/coding-agent/src/core/messages.ts", "packages/coding-agent/src/core/compaction/*", "packages/coding-agent/docs/session-format.md"], "change": "None; stored messages may now carry optional durationMs (see wire.duration).", "pisharp": ["src/PiSharp.Sessions"], "status": "unchanged", "release": "1.1.0" },
-    { "id": "unchanged.file-tools", "upstream": ["packages/coding-agent/src/core/tools/{edit,write,edit-diff,grep,find,ls,truncate}.ts"], "change": "None.", "pisharp": ["src/PiSharp.Tools/Files"], "status": "unchanged", "release": "1.1.0" },
-
-    { "id": "wire.duration", "since": "1.1.0", "upstream": ["packages/ai/src/types.ts", "packages/ai/src/utils/event-stream.ts", "packages/agent/src/types.ts", "packages/agent/src/agent-loop.ts"], "change": "Optional durationMs on AssistantMessage, ToolResultMessage and tool_execution_end.", "pisharp": ["src/PiSharp.Contracts/Messages", "src/PiSharp.Contracts/Serialization/PiWireJson.cs", "src/PiSharp.Agent/ToolInvoker.cs", "src/PiSharp.Agent/ToolContracts.cs", "src/PiSharp.Agent/AgentEvents.cs", "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs", "src/PiSharp.Cli/Output/SessionJsonEventOutput.cs"], "status": "port", "workPackage": "2a", "release": "1.1.0", "test": "planned.sync.wire-duration" },
-    { "id": "wire.agent-settled-aborted", "since": "1.1.0", "upstream": ["packages/coding-agent/src/core/agent-session.ts", "packages/coding-agent/docs/json.md"], "change": "agent_settled carries aborted: boolean in session, extension and JSON events.", "pisharp": ["src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs", "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs", "src/PiSharp.CodingAgent/PersistentAgentSession.cs", "compatibility/extensions/event-catalog.json"], "status": "port", "workPackage": "2a", "release": "1.1.0", "test": "planned.sync.agent-settled-aborted" },
-    { "id": "wire.rpc-bash-ansi", "since": "1.1.0", "upstream": ["packages/coding-agent/src/core/bash-executor.ts", "packages/coding-agent/src/core/tools/output-accumulator.ts"], "change": "ANSI escape sequences split across chunks are held back.", "pisharp": ["src/PiSharp.Tools/Processes/ShellOutputAccumulator.cs"], "status": "port", "workPackage": "2a", "release": "1.1.0", "test": "planned.sync.bash-ansi-holdback" },
-
-    { "id": "ext.tool-renderer", "since": "1.0.1", "upstream": ["packages/coding-agent/src/core/extensions/types.ts", "packages/coding-agent/src/core/extensions/runner.ts"], "change": "registerToolRenderer with ToolRenderers/ToolRendererResolver; render context durationMs and outputPad.", "pisharp": ["src/PiSharp.Extensions.Abstractions/RegistrationContracts.cs", "src/PiSharp.Extensions.Runtime/Registration", "src/PiSharp.Compatibility.Node/NodeCommandInputExtension.ToolRendering.cs"], "status": "port", "workPackage": "2b", "release": "1.1.0", "test": "planned.sync.tool-renderer" },
-    { "id": "ext.loadout-namespace", "since": "1.0.4", "upstream": ["packages/coding-agent/src/core/extensions/types.ts"], "change": "Namespace instructions; ToolLoadout.getPromptGuidelines().", "pisharp": ["src/PiSharp.Extensions.Abstractions/ToolActivationContracts.cs", "src/PiSharp.Contracts"], "status": "port", "workPackage": "2b", "release": "1.1.0", "test": "planned.sync.loadout-guidelines" },
-    { "id": "ext.command-validation", "since": "0.99.2", "upstream": ["packages/coding-agent/src/core/extensions/loader.ts"], "change": "Commands without a string name or handler fail at load.", "pisharp": ["src/PiSharp.Extensions.Runtime/Registration"], "status": "verify", "workPackage": "2b", "release": "1.1.0", "test": "planned.sync.command-validation" },
-
-    { "id": "cli.tool-selection", "since": "1.0.4", "upstream": ["packages/coding-agent/src/cli/args.ts", "packages/coding-agent/src/core/settings-manager.ts", "packages/coding-agent/src/core/sdk.ts"], "change": "--tools/--exclude-tools patterns; MCP tools kept unless an entry starts with mcp__; +name/-name modifiers (1.1.0); --no-mcp.", "pisharp": ["src/PiSharp.Cli/Settings/ToolSelectionCliConfiguration.cs", "src/PiSharp.CodingAgent/Configuration/StartupToolSelection.cs"], "status": "port", "workPackage": "2c", "release": "1.1.0", "test": "planned.sync.tool-selection" },
-    { "id": "cli.provider-model", "since": "1.0.0", "upstream": ["packages/coding-agent/src/main.ts", "packages/coding-agent/src/cli/args.ts"], "change": "--provider without --model is an error; trailing comma in --models ignored (1.0.1).", "pisharp": ["src/PiSharp.Cli"], "status": "port", "workPackage": "2c", "release": "1.1.0", "test": "planned.sync.provider-model-args" },
-    { "id": "cli.reload-tools", "since": "0.99.2", "upstream": ["packages/coding-agent/src/core/agent-session.ts"], "change": "/reload enables tools newly added to defaultTools; restored but unregistered tools stay pending.", "pisharp": ["src/PiSharp.CodingAgent/PersistentAgentSession.Activation.cs", "src/PiSharp.CodingAgent/SessionRuntimeRegistry.cs"], "status": "verify", "workPackage": "2c", "release": "1.1.0", "test": "planned.sync.reload-tools" },
-
-    { "id": "prompt.hidden-tools", "since": "1.0.4", "upstream": ["packages/coding-agent/src/core/system-prompt.ts"], "change": "Hidden tools excluded from rules and skills hint; indirect skills hint when read is hidden; docs line mentions codemode.", "pisharp": ["src/PiSharp.Cli/Prompts/OriginalSystemPromptBuilder.cs", "src/PiSharp.Cli/Prompts/OriginalSystemPromptInputs.cs"], "status": "port", "workPackage": "2d", "release": "1.1.0", "test": "planned.sync.system-prompt" },
-
-    { "id": "tools.read-structured", "since": "1.0.4", "upstream": ["packages/coding-agent/src/core/tools/read.ts"], "change": "outputSchema and structuredContent, including image blocks.", "pisharp": ["src/PiSharp.Tools/Files/ReadWriteTools.cs"], "status": "port", "workPackage": "2e", "release": "1.1.0", "test": "planned.sync.read-structured" },
-    { "id": "tools.bash-schema-and-spill", "since": "1.0.3", "upstream": ["packages/coding-agent/src/core/tools/bash.ts", "packages/coding-agent/src/utils/output-files.ts"], "change": "Shorter outputSchema descriptions; spill files created 0600 with exclusive create.", "pisharp": ["src/PiSharp.Tools/Processes/BashTool.cs", "src/PiSharp.Cli/Commands/OfflineSessionProfile.cs"], "status": "port", "workPackage": "2e", "release": "1.1.0", "test": "planned.sync.bash-spill" },
-
-    { "id": "provider.anthropic-inline-tools", "since": "1.0.1", "upstream": ["packages/ai/src/api/anthropic-messages.ts"], "change": "Beta inline-tools-2026-09-15 replaces mid-conversation-tool-changes-2026-07-01; non-strict fallback for strict-rejected schema keywords (0.99.2).", "pisharp": ["src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs"], "status": "port", "workPackage": "2f", "release": "1.1.0", "test": "planned.sync.anthropic-inline-tools" },
-    { "id": "provider.sampling-by-thinking", "since": "1.0.2", "upstream": ["packages/ai/src/api/simple-options.ts", "packages/ai/src/api/openai-completions.ts", "packages/ai/src/api/openai-responses.ts", "packages/ai/src/types.ts"], "change": "samplingParamsByThinkingLevel merged model -> level -> request.", "pisharp": ["src/PiSharp.AI/Protocols/OpenAIResponses", "src/PiSharp.AI/Protocols/OpenAICompletions", "src/PiSharp.AI/Protocols/AzureResponses"], "status": "port", "workPackage": "2f", "release": "1.1.0", "test": "planned.sync.sampling-by-thinking" },
-    { "id": "provider.azure-rename", "since": "1.0.3", "upstream": ["packages/ai/src/providers/azure.ts", "packages/ai/src/api/azure-openai-config.ts", "packages/ai/src/api/azure-openai-responses.ts"], "change": "Breaking: provider id azure-openai-responses -> azure; api id and AZURE_OPENAI_* unchanged; Foundry Chat Completions via openai-completions.", "pisharp": ["src/PiSharp.AI/Authentication/InjectedAuthenticationResolver.cs", "src/PiSharp.AI/Protocols/AzureResponses"], "status": "port", "workPackage": "2f", "release": "1.1.0", "test": "planned.sync.azure-rename" },
-    { "id": "provider.retry-classification", "since": "1.1.0", "upstream": ["packages/ai/src/utils/retry.ts", "packages/ai/src/utils/provider-retry.ts", "packages/ai/src/utils/overflow.ts", "packages/ai/src/api/mistral-conversations.ts"], "change": "server_busy/capacity retries; exponential fallback for unparseable Retry-After; Mistral finish_reason error retried; Z.AI CN overflow message.", "pisharp": ["src/PiSharp.CodingAgent/Configuration/AgentRetryPolicy.cs", "src/PiSharp.CodingAgent/SessionRecoveryClassifier.cs", "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleRetryPolicy.cs", "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsRetryOptions.cs"], "status": "port", "workPackage": "2f", "release": "1.1.0", "test": "planned.sync.retry-classification" },
-    { "id": "provider.token-estimate", "since": "1.1.0", "upstream": ["packages/ai/src/utils/estimate.ts"], "change": "CHARS_PER_TOKEN 4 -> 3.5; compaction estimator unchanged.", "pisharp": ["src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesSimpleContextEstimator.cs", "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleSimpleContextEstimator.cs", "src/PiSharp.AI/Protocols/MistralConversations/MistralSimpleHttpSseTransport.cs"], "status": "port", "workPackage": "2f", "release": "1.1.0", "test": "planned.sync.token-estimate" },
-    { "id": "provider.catalog", "since": "1.1.0", "upstream": ["packages/ai/src/providers/*.models.ts"], "change": "Haiku 5.5, GPT-6 Luna, Clef classifiers, Azure id rename, prompt-length pricing tiers.", "pisharp": ["src/PiSharp.Cli/Models", "src/PiSharp.AI/Catalogs"], "status": "port", "workPackage": "2f", "release": "1.1.0", "test": "planned.sync.catalog" },
-
-    { "id": "mcp.names", "since": "0.99.2", "upstream": ["packages/coding-agent/src/core/mcp-servers.ts", "packages/coding-agent/src/extensions/mcp/tools.ts"], "change": "- -> _ in tool/namespace names; hash suffix on collisions; reject server names differing only by -/_.", "pisharp": ["src/PiSharp.Extensions.Abstractions/Mcp/Configuration/McpCatalogPlanner.cs"], "status": "port", "workPackage": "2g", "release": "1.1.0", "test": "planned.sync.mcp-names" },
-    { "id": "mcp.exposure-and-prompt", "since": "0.99.2", "upstream": ["packages/coding-agent/src/core/mcp-servers.ts", "packages/coding-agent/src/extensions/mcp/index.ts"], "change": "codemode-deferred aliases codemode; server description; mcp_servers prompt section appended on change; background connection; .pi/mcp.json project overrides (1.0.1).", "pisharp": ["src/PiSharp.Extensions.Abstractions/Mcp", "src/PiSharp.Cli/Mcp"], "status": "port", "workPackage": "2g", "release": "1.1.0", "test": "planned.sync.mcp-exposure" },
-    { "id": "mcp.oauth", "since": "1.0.0", "upstream": ["packages/coding-agent/src/extensions/mcp/oauth.ts", "packages/mcp/src"], "change": "authServerMetadataUrl, RFC 9207 iss, step-up scope union, credentials per server name + URL with migration, cimd registration, clientName, auth.provider bearer, cancellable sign-in, 15 s request timeouts.", "pisharp": ["src/PiSharp.Extensions.Runtime/Mcp/OAuth", "src/PiSharp.Extensions.Runtime/Mcp/Authentication"], "status": "port", "workPackage": "2g", "release": "1.1.0", "test": "planned.sync.mcp-oauth" },
-
-    { "id": "tui.keybindings", "since": "1.0.3", "upstream": ["packages/tui/src/keybindings.ts"], "change": "Home/End editor-only; fullscreen top/bottom on Ctrl+Home/Ctrl+End.", "pisharp": ["src/PiSharp.Tui/Input/TerminalKeybindingDefinitions.cs"], "status": "port", "workPackage": "2h", "release": "1.1.0", "test": "planned.sync.keybindings" },
-    { "id": "tui.settings", "since": "1.0.0", "upstream": ["packages/coding-agent/src/core/settings-manager.ts"], "change": "tuiMode fullscreen default; quietStartup header; outputPad on !, tool and summary blocks.", "pisharp": ["src/PiSharp.Cli/Interactive", "src/PiSharp.CodingAgent/Configuration"], "status": "verify", "workPackage": "2h", "release": "1.1.0", "test": "planned.sync.tui-settings" },
-    { "id": "tui.program-status", "since": "1.1.0", "upstream": ["packages/tui/src/program-status.ts", "packages/tui/src/terminal.ts", "packages/coding-agent/src/modes/interactive/program-status-reporter.ts"], "change": "OSC 7501 program status (PI_PROGRAM_STATUS).", "pisharp": ["src/PiSharp.Tui/Rendering", "src/PiSharp.Cli/Interactive"], "status": "port", "workPackage": "2h", "release": "1.1.0", "test": "planned.sync.program-status" },
-
-    { "id": "auth.anthropic", "since": "0.99.2", "upstream": ["packages/ai/src/auth", "packages/coding-agent/src/core/auth"], "change": "Workload identity federation env vars and precedence; copy-code login (1.0.0); login port fallback (1.1.0); refresh completes despite cancellation (1.0.3).", "pisharp": ["src/PiSharp.AI/Authentication"], "status": "port", "workPackage": "2i", "release": "1.1.0", "test": "planned.sync.anthropic-auth" },
-
-    { "id": "gap.tool-search", "since": "0.99.0", "upstream": ["packages/coding-agent/src/extensions/tool-search/tool.ts"], "change": "Pre-existing port gap: BM25 tool_search and deferred exposure.", "pisharp": ["src/PiSharp.Extensions.Abstractions/Mcp/Discovery"], "status": "port", "workPackage": "4a", "release": "1.1.0.1", "test": "planned.gap.tool-search" },
-    { "id": "gap.classifiers-images", "since": "0.99.0", "upstream": ["packages/ai/src/api/openai-decisions.ts", "packages/ai/src/api/classifier-shared.ts", "packages/ai/src/api/system-one-shared.ts", "packages/ai/src/api/llama-cpp-classify.ts", "packages/ai/src/api/openrouter-images.ts"], "change": "Pre-existing port gap; openai-decisions and image input new in 1.1.0.", "pisharp": ["src/PiSharp.AI"], "status": "port", "workPackage": "4b", "release": "1.1.0.2", "test": "planned.gap.classifiers-images" },
-    { "id": "gap.codemode", "since": "0.99.0", "upstream": ["packages/codemode/src", "packages/coding-agent/src/extensions/codemode"], "change": "Pre-existing port gap (parity row codemode.runtime); Jint engine per decision 0003.", "pisharp": ["src/PiSharp.Codemode"], "status": "port", "workPackage": "4c", "release": "1.1.0.3", "test": "planned.gap.codemode" },
-
-    { "id": "exclude.durable", "upstream": ["packages/durable", "packages/coding-agent/src/experimental/durable", "packages/coding-agent/src/experimental/vacation"], "change": "pi-durable runtime and experimental durable modes.", "status": "exclude", "decision": "docs/decisions/0002-pi-1.1.0-sync.md" },
-    { "id": "exclude.env", "upstream": ["packages/env"], "change": "Remote execution daemon for pi-durable.", "status": "exclude", "decision": "docs/decisions/0002-pi-1.1.0-sync.md" },
-    { "id": "exclude.experimental-server", "upstream": ["packages/server", "packages/client", "packages/protocol", "packages/coding-agent/src/experimental"], "change": "Experimental client/server products and session catalog.", "status": "exclude", "decision": "docs/decisions/0002-pi-1.1.0-sync.md" },
-    { "id": "exclude.removed-harness", "upstream": ["packages/agent/src/harness", "packages/session-backends"], "change": "Removed upstream in 1.0.0; never in native scope.", "status": "exclude", "decision": "docs/decisions/0002-pi-1.1.0-sync.md" },
-    { "id": "exclude.distribution", "upstream": ["flake.nix", "nix", "packages/coding-agent/npm-shrinkwrap.json"], "change": "Nix packaging and npm/managed-installer policy.", "status": "exclude", "decision": "docs/decisions/0002-pi-1.1.0-sync.md" }
+    {
+      "id": "unchanged.rpc",
+      "upstream": [
+        "packages/coding-agent/src/modes/rpc/*",
+        "packages/coding-agent/docs/rpc*.md"
+      ],
+      "change": "None.",
+      "pisharp": [
+        "src/PiSharp.Rpc"
+      ],
+      "status": "unchanged",
+      "release": "1.1.0"
+    },
+    {
+      "id": "unchanged.sessions",
+      "upstream": [
+        "packages/coding-agent/src/core/session-manager.ts",
+        "packages/coding-agent/src/core/messages.ts",
+        "packages/coding-agent/src/core/compaction/*",
+        "packages/coding-agent/docs/session-format.md"
+      ],
+      "change": "None; stored messages may now carry optional durationMs (see wire.duration).",
+      "pisharp": [
+        "src/PiSharp.Sessions"
+      ],
+      "status": "unchanged",
+      "release": "1.1.0"
+    },
+    {
+      "id": "unchanged.file-tools",
+      "upstream": [
+        "packages/coding-agent/src/core/tools/{edit,write,edit-diff,grep,find,ls,truncate}.ts"
+      ],
+      "change": "None.",
+      "pisharp": [
+        "src/PiSharp.Tools/Files"
+      ],
+      "status": "unchanged",
+      "release": "1.1.0"
+    },
+    {
+      "id": "wire.duration",
+      "since": "1.1.0",
+      "upstream": [
+        "packages/ai/src/types.ts",
+        "packages/ai/src/utils/event-stream.ts",
+        "packages/agent/src/types.ts",
+        "packages/agent/src/agent-loop.ts"
+      ],
+      "change": "Optional durationMs on AssistantMessage, ToolResultMessage and tool_execution_end.",
+      "pisharp": [
+        "src/PiSharp.Contracts/Messages",
+        "src/PiSharp.Contracts/Serialization/PiWireJson.cs",
+        "src/PiSharp.Agent/ToolInvoker.cs",
+        "src/PiSharp.Agent/ToolContracts.cs",
+        "src/PiSharp.Agent/AgentEvents.cs",
+        "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs",
+        "src/PiSharp.Cli/Output/SessionJsonEventOutput.cs"
+      ],
+      "status": "port",
+      "workPackage": "2a",
+      "release": "1.1.0",
+      "test": "planned.sync.wire-duration"
+    },
+    {
+      "id": "wire.agent-settled-aborted",
+      "since": "1.1.0",
+      "upstream": [
+        "packages/coding-agent/src/core/agent-session.ts",
+        "packages/coding-agent/docs/json.md"
+      ],
+      "change": "agent_settled carries aborted: boolean in session, extension and JSON events.",
+      "pisharp": [
+        "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs",
+        "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs",
+        "src/PiSharp.CodingAgent/PersistentAgentSession.cs",
+        "compatibility/extensions/event-catalog.json"
+      ],
+      "status": "port",
+      "workPackage": "2a",
+      "release": "1.1.0",
+      "test": "planned.sync.agent-settled-aborted"
+    },
+    {
+      "id": "wire.rpc-bash-ansi",
+      "since": "1.1.0",
+      "upstream": [
+        "packages/coding-agent/src/core/bash-executor.ts",
+        "packages/coding-agent/src/core/tools/output-accumulator.ts"
+      ],
+      "change": "ANSI escape sequences split across chunks are held back.",
+      "pisharp": [
+        "src/PiSharp.Tools/Processes/ShellOutputAccumulator.cs"
+      ],
+      "status": "port",
+      "workPackage": "2a",
+      "release": "1.1.0",
+      "test": "planned.sync.bash-ansi-holdback"
+    },
+    {
+      "id": "ext.tool-renderer",
+      "since": "1.0.1",
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/types.ts",
+        "packages/coding-agent/src/core/extensions/runner.ts"
+      ],
+      "change": "registerToolRenderer with ToolRenderers/ToolRendererResolver; render context durationMs and outputPad.",
+      "pisharp": [
+        "src/PiSharp.Extensions.Abstractions/RegistrationContracts.cs",
+        "src/PiSharp.Extensions.Runtime/Registration",
+        "src/PiSharp.Compatibility.Node/NodeCommandInputExtension.ToolRendering.cs"
+      ],
+      "status": "port",
+      "workPackage": "2b",
+      "release": "1.1.0",
+      "test": "planned.sync.tool-renderer"
+    },
+    {
+      "id": "ext.loadout-namespace",
+      "since": "1.0.4",
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/types.ts"
+      ],
+      "change": "Namespace instructions; ToolLoadout.getPromptGuidelines().",
+      "pisharp": [
+        "src/PiSharp.Extensions.Abstractions/ToolActivationContracts.cs",
+        "src/PiSharp.Contracts"
+      ],
+      "status": "port",
+      "workPackage": "2b",
+      "release": "1.1.0",
+      "test": "planned.sync.loadout-guidelines"
+    },
+    {
+      "id": "ext.command-validation",
+      "since": "0.99.2",
+      "upstream": [
+        "packages/coding-agent/src/core/extensions/loader.ts"
+      ],
+      "change": "Commands without a string name or handler fail at load.",
+      "pisharp": [
+        "src/PiSharp.Extensions.Runtime/Registration"
+      ],
+      "status": "verify",
+      "workPackage": "2b",
+      "release": "1.1.0",
+      "test": "planned.sync.command-validation"
+    },
+    {
+      "id": "cli.tool-selection",
+      "since": "1.0.4",
+      "upstream": [
+        "packages/coding-agent/src/cli/args.ts",
+        "packages/coding-agent/src/core/settings-manager.ts",
+        "packages/coding-agent/src/core/sdk.ts"
+      ],
+      "change": "--tools/--exclude-tools patterns; MCP tools kept unless an entry starts with mcp__; +name/-name modifiers (1.1.0); --no-mcp.",
+      "pisharp": [
+        "src/PiSharp.Cli/Settings/ToolSelectionCliConfiguration.cs",
+        "src/PiSharp.CodingAgent/Configuration/StartupToolSelection.cs"
+      ],
+      "status": "port",
+      "workPackage": "2c",
+      "release": "1.1.0",
+      "test": "planned.sync.tool-selection"
+    },
+    {
+      "id": "cli.provider-model",
+      "since": "1.0.0",
+      "upstream": [
+        "packages/coding-agent/src/main.ts",
+        "packages/coding-agent/src/cli/args.ts"
+      ],
+      "change": "--provider without --model is an error; trailing comma in --models ignored (1.0.1).",
+      "pisharp": [
+        "src/PiSharp.Cli"
+      ],
+      "status": "port",
+      "workPackage": "2c",
+      "release": "1.1.0",
+      "test": "planned.sync.provider-model-args"
+    },
+    {
+      "id": "cli.reload-tools",
+      "since": "0.99.2",
+      "upstream": [
+        "packages/coding-agent/src/core/agent-session.ts"
+      ],
+      "change": "/reload enables tools newly added to defaultTools; restored but unregistered tools stay pending.",
+      "pisharp": [
+        "src/PiSharp.CodingAgent/PersistentAgentSession.Activation.cs",
+        "src/PiSharp.CodingAgent/SessionRuntimeRegistry.cs"
+      ],
+      "status": "verify",
+      "workPackage": "2c",
+      "release": "1.1.0",
+      "test": "planned.sync.reload-tools"
+    },
+    {
+      "id": "prompt.hidden-tools",
+      "since": "1.0.4",
+      "upstream": [
+        "packages/coding-agent/src/core/system-prompt.ts"
+      ],
+      "change": "Hidden tools excluded from rules and skills hint; indirect skills hint when read is hidden; docs line mentions codemode.",
+      "pisharp": [
+        "src/PiSharp.Cli/Prompts/OriginalSystemPromptBuilder.cs",
+        "src/PiSharp.Cli/Prompts/OriginalSystemPromptInputs.cs"
+      ],
+      "status": "port",
+      "workPackage": "2d",
+      "release": "1.1.0",
+      "test": "planned.sync.system-prompt"
+    },
+    {
+      "id": "tools.read-structured",
+      "since": "1.0.4",
+      "upstream": [
+        "packages/coding-agent/src/core/tools/read.ts"
+      ],
+      "change": "outputSchema and structuredContent, including image blocks.",
+      "pisharp": [
+        "src/PiSharp.Tools/Files/ReadWriteTools.cs"
+      ],
+      "status": "port",
+      "workPackage": "2e",
+      "release": "1.1.0",
+      "test": "planned.sync.read-structured"
+    },
+    {
+      "id": "tools.bash-schema-and-spill",
+      "since": "1.0.3",
+      "upstream": [
+        "packages/coding-agent/src/core/tools/bash.ts",
+        "packages/coding-agent/src/utils/output-files.ts"
+      ],
+      "change": "Shorter outputSchema descriptions; spill files created 0600 with exclusive create.",
+      "pisharp": [
+        "src/PiSharp.Tools/Processes/BashTool.cs",
+        "src/PiSharp.Cli/Commands/OfflineSessionProfile.cs"
+      ],
+      "status": "port",
+      "workPackage": "2e",
+      "release": "1.1.0",
+      "test": "planned.sync.bash-spill"
+    },
+    {
+      "id": "provider.anthropic-inline-tools",
+      "since": "1.0.1",
+      "upstream": [
+        "packages/ai/src/api/anthropic-messages.ts"
+      ],
+      "change": "Beta inline-tools-2026-09-15 replaces mid-conversation-tool-changes-2026-07-01; non-strict fallback for strict-rejected schema keywords (0.99.2).",
+      "pisharp": [
+        "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs"
+      ],
+      "status": "port",
+      "workPackage": "2f",
+      "release": "1.1.0",
+      "test": "planned.sync.anthropic-inline-tools"
+    },
+    {
+      "id": "provider.sampling-by-thinking",
+      "since": "1.0.2",
+      "upstream": [
+        "packages/ai/src/api/simple-options.ts",
+        "packages/ai/src/api/openai-completions.ts",
+        "packages/ai/src/api/openai-responses.ts",
+        "packages/ai/src/types.ts"
+      ],
+      "change": "samplingParamsByThinkingLevel merged model -> level -> request.",
+      "pisharp": [
+        "src/PiSharp.AI/Protocols/OpenAIResponses",
+        "src/PiSharp.AI/Protocols/OpenAICompletions",
+        "src/PiSharp.AI/Protocols/AzureResponses"
+      ],
+      "status": "port",
+      "workPackage": "2f",
+      "release": "1.1.0",
+      "test": "planned.sync.sampling-by-thinking"
+    },
+    {
+      "id": "provider.azure-rename",
+      "since": "1.0.3",
+      "upstream": [
+        "packages/ai/src/providers/azure.ts",
+        "packages/ai/src/api/azure-openai-config.ts",
+        "packages/ai/src/api/azure-openai-responses.ts"
+      ],
+      "change": "Breaking: provider id azure-openai-responses -> azure; api id and AZURE_OPENAI_* unchanged; Foundry Chat Completions via openai-completions.",
+      "pisharp": [
+        "src/PiSharp.AI/Authentication/InjectedAuthenticationResolver.cs",
+        "src/PiSharp.AI/Protocols/AzureResponses"
+      ],
+      "status": "port",
+      "workPackage": "2f",
+      "release": "1.1.0",
+      "test": "planned.sync.azure-rename"
+    },
+    {
+      "id": "provider.retry-classification",
+      "since": "1.1.0",
+      "upstream": [
+        "packages/ai/src/utils/retry.ts",
+        "packages/ai/src/utils/provider-retry.ts",
+        "packages/ai/src/utils/overflow.ts",
+        "packages/ai/src/api/mistral-conversations.ts"
+      ],
+      "change": "server_busy/capacity retries; exponential fallback for unparseable Retry-After; Mistral finish_reason error retried; Z.AI CN overflow message.",
+      "pisharp": [
+        "src/PiSharp.CodingAgent/Configuration/AgentRetryPolicy.cs",
+        "src/PiSharp.CodingAgent/SessionRecoveryClassifier.cs",
+        "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleRetryPolicy.cs",
+        "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsRetryOptions.cs"
+      ],
+      "status": "port",
+      "workPackage": "2f",
+      "release": "1.1.0",
+      "test": "planned.sync.retry-classification"
+    },
+    {
+      "id": "provider.token-estimate",
+      "since": "1.1.0",
+      "upstream": [
+        "packages/ai/src/utils/estimate.ts"
+      ],
+      "change": "CHARS_PER_TOKEN 4 -> 3.5; compaction estimator unchanged.",
+      "pisharp": [
+        "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesSimpleContextEstimator.cs",
+        "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleSimpleContextEstimator.cs",
+        "src/PiSharp.AI/Protocols/MistralConversations/MistralSimpleHttpSseTransport.cs"
+      ],
+      "status": "port",
+      "workPackage": "2f",
+      "release": "1.1.0",
+      "test": "planned.sync.token-estimate"
+    },
+    {
+      "id": "provider.catalog",
+      "since": "1.1.0",
+      "upstream": [
+        "packages/ai/src/providers/*.models.ts"
+      ],
+      "change": "Haiku 5.5, GPT-6 Luna, Clef classifiers, Azure id rename, prompt-length pricing tiers.",
+      "pisharp": [
+        "src/PiSharp.Cli/Models",
+        "src/PiSharp.AI/Catalogs"
+      ],
+      "status": "port",
+      "workPackage": "2f",
+      "release": "1.1.0",
+      "test": "planned.sync.catalog"
+    },
+    {
+      "id": "provider.google-user-agent",
+      "since": "0.99.1",
+      "upstream": [
+        "packages/ai/src/utils/pi-user-agent.ts"
+      ],
+      "change": "Upstream sends User-Agent 'pi (<platform> <release>; <arch>)' at both refs; PiSharp sends 'pi/<version>' (bumped to pi/1.1.0 in the re-freeze). Pre-existing difference.",
+      "pisharp": [
+        "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleKeyAuthRequestFactory.cs",
+        "src/PiSharp.AI/Protocols/GoogleVertex/GoogleVertexRequestFactory.cs"
+      ],
+      "status": "verify",
+      "workPackage": "2f",
+      "release": "1.1.0",
+      "test": "planned.sync.google-user-agent"
+    },
+    {
+      "id": "mcp.names",
+      "since": "0.99.2",
+      "upstream": [
+        "packages/coding-agent/src/core/mcp-servers.ts",
+        "packages/coding-agent/src/extensions/mcp/tools.ts"
+      ],
+      "change": "- -> _ in tool/namespace names; hash suffix on collisions; reject server names differing only by -/_.",
+      "pisharp": [
+        "src/PiSharp.Extensions.Abstractions/Mcp/Configuration/McpCatalogPlanner.cs"
+      ],
+      "status": "port",
+      "workPackage": "2g",
+      "release": "1.1.0",
+      "test": "planned.sync.mcp-names"
+    },
+    {
+      "id": "mcp.exposure-and-prompt",
+      "since": "0.99.2",
+      "upstream": [
+        "packages/coding-agent/src/core/mcp-servers.ts",
+        "packages/coding-agent/src/extensions/mcp/index.ts"
+      ],
+      "change": "codemode-deferred aliases codemode; server description; mcp_servers prompt section appended on change; background connection; .pi/mcp.json project overrides (1.0.1).",
+      "pisharp": [
+        "src/PiSharp.Extensions.Abstractions/Mcp",
+        "src/PiSharp.Cli/Mcp"
+      ],
+      "status": "port",
+      "workPackage": "2g",
+      "release": "1.1.0",
+      "test": "planned.sync.mcp-exposure"
+    },
+    {
+      "id": "mcp.oauth",
+      "since": "1.0.0",
+      "upstream": [
+        "packages/coding-agent/src/extensions/mcp/oauth.ts",
+        "packages/mcp/src"
+      ],
+      "change": "authServerMetadataUrl, RFC 9207 iss, step-up scope union, credentials per server name + URL with migration, cimd registration, clientName, auth.provider bearer, cancellable sign-in, 15 s request timeouts.",
+      "pisharp": [
+        "src/PiSharp.Extensions.Runtime/Mcp/OAuth",
+        "src/PiSharp.Extensions.Runtime/Mcp/Authentication"
+      ],
+      "status": "port",
+      "workPackage": "2g",
+      "release": "1.1.0",
+      "test": "planned.sync.mcp-oauth"
+    },
+    {
+      "id": "tui.keybindings",
+      "since": "1.0.3",
+      "upstream": [
+        "packages/tui/src/keybindings.ts"
+      ],
+      "change": "Home/End editor-only; fullscreen top/bottom on Ctrl+Home/Ctrl+End.",
+      "pisharp": [
+        "src/PiSharp.Tui/Input/TerminalKeybindingDefinitions.cs"
+      ],
+      "status": "port",
+      "workPackage": "2h",
+      "release": "1.1.0",
+      "test": "planned.sync.keybindings"
+    },
+    {
+      "id": "tui.settings",
+      "since": "1.0.0",
+      "upstream": [
+        "packages/coding-agent/src/core/settings-manager.ts"
+      ],
+      "change": "tuiMode fullscreen default; quietStartup header; outputPad on !, tool and summary blocks.",
+      "pisharp": [
+        "src/PiSharp.Cli/Interactive",
+        "src/PiSharp.CodingAgent/Configuration"
+      ],
+      "status": "verify",
+      "workPackage": "2h",
+      "release": "1.1.0",
+      "test": "planned.sync.tui-settings"
+    },
+    {
+      "id": "tui.program-status",
+      "since": "1.1.0",
+      "upstream": [
+        "packages/tui/src/program-status.ts",
+        "packages/tui/src/terminal.ts",
+        "packages/coding-agent/src/modes/interactive/program-status-reporter.ts"
+      ],
+      "change": "OSC 7501 program status (PI_PROGRAM_STATUS).",
+      "pisharp": [
+        "src/PiSharp.Tui/Rendering",
+        "src/PiSharp.Cli/Interactive"
+      ],
+      "status": "port",
+      "workPackage": "2h",
+      "release": "1.1.0",
+      "test": "planned.sync.program-status"
+    },
+    {
+      "id": "auth.anthropic",
+      "since": "0.99.2",
+      "upstream": [
+        "packages/ai/src/auth",
+        "packages/coding-agent/src/core/auth"
+      ],
+      "change": "Workload identity federation env vars and precedence; copy-code login (1.0.0); login port fallback (1.1.0); refresh completes despite cancellation (1.0.3).",
+      "pisharp": [
+        "src/PiSharp.AI/Authentication"
+      ],
+      "status": "port",
+      "workPackage": "2i",
+      "release": "1.1.0",
+      "test": "planned.sync.anthropic-auth"
+    },
+    {
+      "id": "gap.tool-search",
+      "since": "0.99.0",
+      "upstream": [
+        "packages/coding-agent/src/extensions/tool-search/tool.ts"
+      ],
+      "change": "Pre-existing port gap: BM25 tool_search and deferred exposure.",
+      "pisharp": [
+        "src/PiSharp.Extensions.Abstractions/Mcp/Discovery"
+      ],
+      "status": "port",
+      "workPackage": "4a",
+      "release": "1.1.0.1",
+      "test": "planned.gap.tool-search"
+    },
+    {
+      "id": "gap.classifiers-images",
+      "since": "0.99.0",
+      "upstream": [
+        "packages/ai/src/api/openai-decisions.ts",
+        "packages/ai/src/api/classifier-shared.ts",
+        "packages/ai/src/api/system-one-shared.ts",
+        "packages/ai/src/api/llama-cpp-classify.ts",
+        "packages/ai/src/api/openrouter-images.ts"
+      ],
+      "change": "Pre-existing port gap; openai-decisions and image input new in 1.1.0.",
+      "pisharp": [
+        "src/PiSharp.AI"
+      ],
+      "status": "port",
+      "workPackage": "4b",
+      "release": "1.1.0.2",
+      "test": "planned.gap.classifiers-images"
+    },
+    {
+      "id": "gap.codemode",
+      "since": "0.99.0",
+      "upstream": [
+        "packages/codemode/src",
+        "packages/coding-agent/src/extensions/codemode"
+      ],
+      "change": "Pre-existing port gap (parity row codemode.runtime); Jint engine per decision 0003.",
+      "pisharp": [
+        "src/PiSharp.Codemode"
+      ],
+      "status": "port",
+      "workPackage": "4c",
+      "release": "1.1.0.3",
+      "test": "planned.gap.codemode"
+    },
+    {
+      "id": "exclude.durable",
+      "upstream": [
+        "packages/durable",
+        "packages/coding-agent/src/experimental/durable",
+        "packages/coding-agent/src/experimental/vacation"
+      ],
+      "change": "pi-durable runtime and experimental durable modes.",
+      "status": "exclude",
+      "decision": "docs/decisions/0002-pi-1.1.0-sync.md"
+    },
+    {
+      "id": "exclude.env",
+      "upstream": [
+        "packages/env"
+      ],
+      "change": "Remote execution daemon for pi-durable.",
+      "status": "exclude",
+      "decision": "docs/decisions/0002-pi-1.1.0-sync.md"
+    },
+    {
+      "id": "exclude.experimental-server",
+      "upstream": [
+        "packages/server",
+        "packages/client",
+        "packages/protocol",
+        "packages/coding-agent/src/experimental"
+      ],
+      "change": "Experimental client/server products and session catalog.",
+      "status": "exclude",
+      "decision": "docs/decisions/0002-pi-1.1.0-sync.md"
+    },
+    {
+      "id": "exclude.removed-harness",
+      "upstream": [
+        "packages/agent/src/harness",
+        "packages/session-backends"
+      ],
+      "change": "Removed upstream in 1.0.0; never in native scope.",
+      "status": "exclude",
+      "decision": "docs/decisions/0002-pi-1.1.0-sync.md"
+    },
+    {
+      "id": "exclude.distribution",
+      "upstream": [
+        "flake.nix",
+        "nix",
+        "packages/coding-agent/npm-shrinkwrap.json"
+      ],
+      "change": "Nix packaging and npm/managed-installer policy.",
+      "status": "exclude",
+      "decision": "docs/decisions/0002-pi-1.1.0-sync.md"
+    }
   ]
 }
