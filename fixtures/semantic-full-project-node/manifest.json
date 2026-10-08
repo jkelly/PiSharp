@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "kind": "genuine-unchanged-upstream-config-node-declaration-semantic-diagnostics-reference",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "receiptSha256": "9ea0d71520ad542fdbabafc3711238ca02ad43e0c85649367c6f740979fb2617",
+  "baselineSnapshotSha256": "ad2f8b8926dbb9a3485023a460fd139f982c488d6f413e5f0bc32851b6ea3008",
+  "harness": [
+    {
+      "path": "compatibility/semantic-full-project-node.plan.json",
+      "bytes": 7129,
+      "sha256": "299155962bebb8d415233401fb43ace87feef9c787999717e85afcb360debe02"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-node.md",
+      "bytes": 11239,
+      "sha256": "fe7022880d3f5d0ce6ce094ab2a8bca419fe753b07a742182bc59a6274f4c67a"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-node-common.mjs",
+      "bytes": 21386,
+      "sha256": "2b7b2c7948c02366028f820b4de0c67ac2e109ac54a45946945538b3459ff3ce"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-node-driver.mjs",
+      "bytes": 9990,
+      "sha256": "e8997e2c11f3bbaa24a021a5df5c465d2710ad95a2927269e69c28191ce63e03"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-node-preload.mjs",
+      "bytes": 8547,
+      "sha256": "b11aa534a4ee7d81d80ba05e4292dba5cbf37e46a706450f98aed36e23bd2bba"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-node.test.mjs",
+      "bytes": 20416,
+      "sha256": "e5a37c543e0ecfd882161fb5e3db608841eaa349ebf36b4aeb502db25fb01694"
+    },
+    {
+      "path": "tools/SemanticInventory/run-full-project-node.mjs",
+      "bytes": 6691,
+      "sha256": "fc01b4e16a95bfb75c696d8407c94184338dfa5b0919dbaae32a32516404453a"
+    }
+  ],
+  "expected": {
+    "path": "fixtures/semantic-full-project-node/expected.json",
+    "bytes": 11259657,
+    "sha256": "2868cfa785b7e55a1a2ea00ec98e0de4bb91cfdd0eec86a5cd0b662d905b00d9"
+  },
+  "rawProvenance": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-semantic-full-project-node-first\\first.json.provenance.json",
+      "sha256": "c73a778800143e43a4ed0d1755d7e20a9f8aeb401e69ade17cbff4f7c32ebc84"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-semantic-full-project-node-first\\second.json.provenance.json",
+      "sha256": "431abd98f69551f1d6427b0173249ddbd41a023febcdfe0f47d1cccdd9b28a21"
+    }
+  ],
+  "originalConfigOpenedUnchanged": true,
+  "admittedPackageFiles": 114,
+  "admittedDeclarationFiles": 108,
+  "diagnosticFiltering": false,
+  "pathNormalization": false,
+  "semanticPublicClosure": false,
+  "phaseGatesPassed": []
+}

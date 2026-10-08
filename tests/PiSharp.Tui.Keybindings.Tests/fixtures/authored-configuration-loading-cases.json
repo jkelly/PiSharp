@@ -1,0 +1,303 @@
+{
+  "schemaVersion": 1,
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "Authored expectations from pinned Source text; no Source capture or native execution",
+  "cases": [
+    {
+      "id": "missing-file",
+      "raw": null,
+      "readError": false,
+      "expected": {
+        "status": "missing",
+        "migrated": false,
+        "users": []
+      }
+    },
+    {
+      "id": "unreadable-file",
+      "raw": null,
+      "readError": true,
+      "expected": {
+        "status": "unreadable-invalid-or-bounded",
+        "migrated": false,
+        "users": []
+      }
+    },
+    {
+      "id": "invalid-json",
+      "raw": "{",
+      "readError": false,
+      "expected": {
+        "status": "unreadable-invalid-or-bounded",
+        "migrated": false,
+        "users": []
+      }
+    },
+    {
+      "id": "null-root",
+      "raw": "null",
+      "readError": false,
+      "expected": {
+        "status": "invalid-root",
+        "migrated": false,
+        "users": []
+      }
+    },
+    {
+      "id": "boolean-root",
+      "raw": "true",
+      "readError": false,
+      "expected": {
+        "status": "invalid-root",
+        "migrated": false,
+        "users": []
+      }
+    },
+    {
+      "id": "empty-array-root",
+      "raw": "[]",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": false,
+        "users": []
+      }
+    },
+    {
+      "id": "one-bom",
+      "raw": "﻿{\"tui.editor.cursorLeft\":\"alt+j\"}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": false,
+        "users": [
+          {
+            "id": "tui.editor.cursorLeft",
+            "value": "alt+j"
+          }
+        ]
+      }
+    },
+    {
+      "id": "two-boms",
+      "raw": "﻿﻿{}",
+      "readError": false,
+      "expected": {
+        "status": "unreadable-invalid-or-bounded",
+        "migrated": false,
+        "users": []
+      }
+    },
+    {
+      "id": "definition-order",
+      "raw": "{\"app.exit\":\"ctrl+e\",\"tui.editor.cursorLeft\":\"alt+j\",\"tui.editor.cursorUp\":\"alt+k\"}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": false,
+        "users": [
+          {
+            "id": "tui.editor.cursorUp",
+            "value": "alt+k"
+          },
+          {
+            "id": "tui.editor.cursorLeft",
+            "value": "alt+j"
+          },
+          {
+            "id": "app.exit",
+            "value": "ctrl+e"
+          }
+        ]
+      }
+    },
+    {
+      "id": "array-shape-and-dedup",
+      "raw": "{\"tui.editor.cursorLeft\":[\"alt+j\",\"alt+j\",\"left\"]}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": false,
+        "users": [
+          {
+            "id": "tui.editor.cursorLeft",
+            "value": [
+              "alt+j",
+              "alt+j",
+              "left"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "empty-array-disables",
+      "raw": "{\"tui.input.submit\":[]}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": false,
+        "users": [
+          {
+            "id": "tui.input.submit",
+            "value": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "null-filtered",
+      "raw": "{\"tui.editor.cursorLeft\":null}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": false,
+        "users": []
+      }
+    },
+    {
+      "id": "invalid-values-filtered",
+      "raw": "{\"tui.editor.cursorLeft\":[\"left\",null],\"app.exit\":2,\"app.clear\":false}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": false,
+        "users": []
+      }
+    },
+    {
+      "id": "legacy-migration",
+      "raw": "{\"cursorLeft\":\"alt+j\",\"clear\":\"ctrl+x\",\"exit\":\"ctrl+e\"}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": true,
+        "users": [
+          {
+            "id": "tui.editor.cursorLeft",
+            "value": "alt+j"
+          },
+          {
+            "id": "app.clear",
+            "value": "ctrl+x"
+          },
+          {
+            "id": "app.exit",
+            "value": "ctrl+e"
+          }
+        ]
+      }
+    },
+    {
+      "id": "modern-wins-collision",
+      "raw": "{\"cursorLeft\":\"alt+j\",\"tui.editor.cursorLeft\":\"alt+k\"}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": true,
+        "users": [
+          {
+            "id": "tui.editor.cursorLeft",
+            "value": "alt+k"
+          }
+        ]
+      }
+    },
+    {
+      "id": "modern-null-blocks-legacy",
+      "raw": "{\"cursorLeft\":\"alt+j\",\"tui.editor.cursorLeft\":null}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": true,
+        "users": []
+      }
+    },
+    {
+      "id": "extras-and-numeric-order",
+      "raw": "{\"z\":\"z\",\"10\":\"ten\",\"2\":\"two\",\"01\":\"one\",\"a\":\"a\",\"tui.editor.cursorLeft\":\"left\"}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": false,
+        "users": [
+          {
+            "id": "2",
+            "value": "two"
+          },
+          {
+            "id": "10",
+            "value": "ten"
+          },
+          {
+            "id": "tui.editor.cursorLeft",
+            "value": "left"
+          },
+          {
+            "id": "01",
+            "value": "one"
+          },
+          {
+            "id": "a",
+            "value": "a"
+          },
+          {
+            "id": "z",
+            "value": "z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "array-root-unknowns",
+      "raw": "[\"left\",null,[\"right\"],false]",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": false,
+        "users": [
+          {
+            "id": "0",
+            "value": "left"
+          },
+          {
+            "id": "2",
+            "value": [
+              "right"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "duplicate-property-last",
+      "raw": "{\"tui.editor.cursorLeft\":\"alt+j\",\"tui.editor.cursorLeft\":\"alt+k\"}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": false,
+        "users": [
+          {
+            "id": "tui.editor.cursorLeft",
+            "value": "alt+k"
+          }
+        ]
+      }
+    },
+    {
+      "id": "untrimmed-key-preserved",
+      "raw": "{\"tui.editor.cursorLeft\":\" alt+j \"}",
+      "readError": false,
+      "expected": {
+        "status": "loaded",
+        "migrated": false,
+        "users": [
+          {
+            "id": "tui.editor.cursorLeft",
+            "value": " alt+j "
+          }
+        ]
+      }
+    }
+  ]
+}

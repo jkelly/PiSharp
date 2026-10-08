@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "edit-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "authored-edit-input-and-owned-filesystem-layout",
+  "requirementIds": [
+    "P1-05",
+    "P1-06",
+    "P3-05",
+    "P3-06"
+  ],
+  "clock": "No clock or RNG override; no sleeps; source tool has no authored timestamps",
+  "seed": "Explicit literal corpus and case IDs",
+  "normalizerVersion": "raw-json-object-key-order-v1-lossless-numeric-lexemes",
+  "cases": [
+    {
+      "caseId": "reverse-disjoint",
+      "path": "files/reverse.txt",
+      "utf8": "alpha\nmiddle\nomega\n",
+      "arguments": {
+        "edits": [
+          {
+            "oldText": "omega",
+            "newText": "OMEGA"
+          },
+          {
+            "oldText": "alpha",
+            "newText": "ALPHA"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "introduced-later-match",
+      "path": "files/introduced.txt",
+      "utf8": "alpha\nomega\n",
+      "arguments": {
+        "edits": [
+          {
+            "oldText": "alpha",
+            "newText": "introduced"
+          },
+          {
+            "oldText": "introduced",
+            "newText": "final"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "normalized-ambiguity",
+      "path": "files/ambiguity.txt",
+      "utf8": "value=\"same\"\nvalue=“same”\n",
+      "arguments": {
+        "edits": [
+          {
+            "oldText": "value=\"same\"",
+            "newText": "different"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "nested-overlap",
+      "path": "files/overlap.txt",
+      "utf8": "prefix abcdef suffix\n",
+      "arguments": {
+        "edits": [
+          {
+            "oldText": "abcdef",
+            "newText": "wide"
+          },
+          {
+            "oldText": "bcd",
+            "newText": "inner"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "no-op",
+      "path": "files/no-op.txt",
+      "utf8": "same\n",
+      "arguments": {
+        "edits": [
+          {
+            "oldText": "same",
+            "newText": "same"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "empty-edits",
+      "path": "files/empty-edits.txt",
+      "utf8": "unchanged\n",
+      "arguments": {
+        "edits": []
+      }
+    },
+    {
+      "caseId": "empty-old-text",
+      "path": "files/empty-old.txt",
+      "utf8": "unchanged\n",
+      "arguments": {
+        "edits": [
+          {
+            "oldText": "",
+            "newText": "insert"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "unicode-fuzzy-overlay",
+      "path": "files/unicode.txt",
+      "utf8": "untouched: “keep”   \nuntouched: \"keep\"\nvalue=Ｆｏｏ—café 😀   \ntail  \n",
+      "arguments": {
+        "edits": "[{\"oldText\":\"value=Foo-café 😀\",\"newText\":\"value=Bar 😀\"},{\"oldText\":\"tail  \",\"newText\":\"done\"}]"
+      }
+    },
+    {
+      "caseId": "bom-mixed-endings",
+      "path": "files/BOM π.txt",
+      "utf8": "﻿first\r\nsecond\nthird\rEND",
+      "arguments": {
+        "oldText": "second\nthird",
+        "newText": "SECOND\nTHIRD"
+      }
+    },
+    {
+      "caseId": "single-object-preparation",
+      "path": "files/single.txt",
+      "utf8": "one\ntwo\n",
+      "arguments": {
+        "edits": {
+          "oldText": "one",
+          "newText": "ONE"
+        }
+      }
+    },
+    {
+      "caseId": "legacy-appended",
+      "path": "files/legacy.txt",
+      "utf8": "alpha\nbeta\n",
+      "arguments": {
+        "edits": [
+          {
+            "oldText": "beta",
+            "newText": "BETA"
+          }
+        ],
+        "oldText": "alpha",
+        "newText": "ALPHA"
+      }
+    },
+    {
+      "caseId": "missing-file-access",
+      "path": "files/missing.txt",
+      "missing": true,
+      "arguments": {
+        "edits": [
+          {
+            "oldText": "old",
+            "newText": "new"
+          }
+        ]
+      }
+    }
+  ]
+}

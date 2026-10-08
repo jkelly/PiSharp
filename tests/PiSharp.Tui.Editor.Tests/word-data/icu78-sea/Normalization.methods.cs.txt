@@ -1,0 +1,62 @@
+            private void DecomposeInto(int scalar, List<int> output)
+            {
+                if (scalar is >= 0xac00 and <= 0xd7a3)
+                {
+                    var index = scalar - 0xac00; Add(0x1100 + index / 588); Add(0x1161 + index % 588 / 28);
+                    if (index % 28 != 0) Add(0x11a7 + index % 28);
+                }
+                else if (mappings.TryGetValue(scalar, out var value)) { foreach (var rune in value.EnumerateRunes()) Add(rune.Value); }
+                else Add(scalar);
+                void Add(int value)
+                {
+                    if (output.Count == 65_536 * 18) throw new TerminalTextEditorException(TerminalTextEditorFailure.ResourceLimit);
+                    output.Add(value);
+                }
+            }
+            internal bool BoundaryBefore(int scalar)
+            {
+                var first = scalar is >= 0xac00 and <= 0xd7a3 ? 0x1100 + (scalar - 0xac00) / 588 :
+                    mappings.TryGetValue(scalar, out var value) ? Rune.GetRuneAt(value, 0).Value : scalar;
+                return Class(first) == 0 && !backwardStarters.Contains(first) && first is not (>= 0x1161 and <= 0x1175 or >= 0x11a8 and <= 0x11c2);
+            }
+            private int Compose(int first, int second)
+            {
+                if (first is >= 0x1100 and <= 0x1112 && second is >= 0x1161 and <= 0x1175) return 0xac00 + ((first - 0x1100) * 21 + second - 0x1161) * 28;
+                if (first is >= 0xac00 and <= 0xd7a3 && (first - 0xac00) % 28 == 0 && second is >= 0x11a8 and <= 0x11c2) return first + second - 0x11a7;
+                return compositions.GetValueOrDefault(((long)first << 21) | (uint)second, -1);
+            }
+            internal string Normalize(string text)
+            {
+                var result = new StringBuilder(text.Length);
+                AppendNormalized(text.AsSpan(), result, new NormalizationWork());
+                return result.ToString();
+            }
+            internal void AppendNormalized(ReadOnlySpan<char> text, StringBuilder result, NormalizationWork work)
+            {
+                var decomposed = work.Decomposed; var output = work.Output; decomposed.Clear(); output.Clear();
+                foreach (var rune in text.EnumerateRunes()) DecomposeInto(rune.Value, decomposed);
+                for (var begin = 0; begin < decomposed.Count;)
+                {
+                    if (Class(decomposed[begin]) == 0) { begin++; continue; }
+                    var end = begin + 1; while (end < decomposed.Count && Class(decomposed[end]) != 0) end++;
+                    if (end - begin > 1)
+                    {
+                        if (work.Scratch.Length < decomposed.Count) work.Scratch = new int[decomposed.Count];
+                        var counts = work.Counts ??= new int[256]; Array.Clear(counts);
+                        for (var i = begin; i < end; i++) counts[Class(decomposed[i])]++;
+                        var total = begin; for (var c = 1; c < counts.Length; c++) { var size = counts[c]; counts[c] = total; total += size; }
+                        for (var i = begin; i < end; i++) work.Scratch[counts[Class(decomposed[i])]++] = decomposed[i];
+                        for (var i = begin; i < end; i++) decomposed[i] = work.Scratch[i];
+                    }
+                    begin = end;
+                }
+                var starter = -1; var previousClass = 0;
+                foreach (var scalar in decomposed)
+                {
+                    var currentClass = Class(scalar); var composed = starter >= 0 && (previousClass == 0 || previousClass < currentClass) ? Compose(output[starter], scalar) : -1;
+                    if (composed >= 0) output[starter] = composed;
+                    else { if (currentClass == 0) starter = output.Count; output.Add(scalar); previousClass = currentClass; }
+                }
+                Span<char> unit = stackalloc char[2];
+                foreach (var scalar in output) { var length = new Rune(scalar).EncodeToUtf16(unit); result.Append(unit[..length]); }
+            }

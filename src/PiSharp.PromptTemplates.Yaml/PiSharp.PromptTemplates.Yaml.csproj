@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.Cli" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <PackageReference Include="YamlDotNet" Version="[16.3.0]" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../third-party/YamlDotNet.LICENSE.txt" Pack="true" PackagePath="licenses/" />
+  </ItemGroup>
+</Project>

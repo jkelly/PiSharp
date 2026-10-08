@@ -12,10 +12,14 @@ namespace PiSharp.AI.Protocols.GoogleGenerativeAI;
 public static class GoogleRequestProjector
 {
     public static JsonData Project(ChatRequest request, GoogleGenerativeAIOptions options)
+        => ProjectCore(request, options, "google-generative-ai");
+    internal static JsonData ProjectVertex(ChatRequest request, GoogleGenerativeAIOptions options)
+        => ProjectCore(request, options, "google-vertex");
+    private static JsonData ProjectCore(ChatRequest request, GoogleGenerativeAIOptions options, string api)
     {
         ArgumentNullException.ThrowIfNull(request); ArgumentNullException.ThrowIfNull(options); options.Validate();
         var model = options.ModelMetadata.Value;
-        if (request.Model.Api != "google-generative-ai" || GoogleData.String(model, "api") != request.Model.Api ||
+        if (request.Model.Api != api || GoogleData.String(model, "api") != request.Model.Api ||
             GoogleData.String(model, "provider") != request.Model.Provider || GoogleData.String(model, "id") != request.Model.Id)
             throw GoogleData.Fail(GoogleFailure.Configuration);
         if (request.Messages.Sum(m => (long)Encoding.UTF8.GetByteCount(m.WireBody.ToString())) > options.MaximumPayloadBytes)

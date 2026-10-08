@@ -1,0 +1,703 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "New undo-only public Editor schedules; original text/paste corpora reused unchanged; host submission/reset and history navigation not captured",
+  "cases": [
+    {
+      "id": "undo-empty-stack-and-distinct-underscore-key",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[95;5u"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-word-and-space-coalescing",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "h"
+        },
+        {
+          "kind": "input",
+          "data": "e"
+        },
+        {
+          "kind": "input",
+          "data": "l"
+        },
+        {
+          "kind": "input",
+          "data": "l"
+        },
+        {
+          "kind": "input",
+          "data": "o"
+        },
+        {
+          "kind": "input",
+          "data": " "
+        },
+        {
+          "kind": "input",
+          "data": "w"
+        },
+        {
+          "kind": "input",
+          "data": "o"
+        },
+        {
+          "kind": "input",
+          "data": "r"
+        },
+        {
+          "kind": "input",
+          "data": "l"
+        },
+        {
+          "kind": "input",
+          "data": "d"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "Z"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-consecutive-spaces-one-unit-each",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "h"
+        },
+        {
+          "kind": "input",
+          "data": "i"
+        },
+        {
+          "kind": "input",
+          "data": " "
+        },
+        {
+          "kind": "input",
+          "data": " "
+        },
+        {
+          "kind": "input",
+          "data": "t"
+        },
+        {
+          "kind": "input",
+          "data": "h"
+        },
+        {
+          "kind": "input",
+          "data": "e"
+        },
+        {
+          "kind": "input",
+          "data": "r"
+        },
+        {
+          "kind": "input",
+          "data": "e"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-ecmascript-whitespace-bom-nbsp-and-nel-distinction",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "A"
+        },
+        {
+          "kind": "input",
+          "data": " "
+        },
+        {
+          "kind": "input",
+          "data": "B"
+        },
+        {
+          "kind": "input",
+          "data": "﻿"
+        },
+        {
+          "kind": "input",
+          "data": "C"
+        },
+        {
+          "kind": "input",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "D"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-movement-and-no-op-navigation-start-new-units",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "a"
+        },
+        {
+          "kind": "input",
+          "data": "b"
+        },
+        {
+          "kind": "input",
+          "data": "c"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[F"
+        },
+        {
+          "kind": "input",
+          "data": "X"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "data": "Y"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-no-op-deletion-callbacks-without-new-snapshots",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "a"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[3~"
+        },
+        {
+          "kind": "input",
+          "data": "b"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "set",
+          "data": "a"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "b"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-programmatic-normalization-clear-and-empty-insert",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "a\r\nb\tc"
+        },
+        {
+          "kind": "insert",
+          "data": "X\r\nY\td"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "insert",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-legacy-minus-csi-minus-and-ignored-control-z",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abc"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[95;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "def"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[122;5u"
+        },
+        {
+          "kind": "input",
+          "data": "X"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[95;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-small-multiline-and-filtered-empty-paste",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "a"
+        },
+        {
+          "kind": "input",
+          "data": "b"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~c\r\n\td\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~\u0003\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "Z"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-newline-and-following-word-are-separate-units",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "a"
+        },
+        {
+          "kind": "input",
+          "data": "b"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[13;2u"
+        },
+        {
+          "kind": "input",
+          "data": "C"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-large-paste-backspace-restores-registry-and-seam",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-renumber-and-forward-delete-restore-counter-and-ordered-registry",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "\u001b[200~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[3~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-set-text-restores-pastes-and-same-text-set-does-not-push",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "\u001b[200~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001b[201~"
+        },
+        {
+          "kind": "set",
+          "data": "replacement"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "set",
+          "data": "[paste #1 1001 chars]"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\u001b[201~"
+        }
+      ]
+    },
+    {
+      "id": "undo-restores-unknown-alias-suffix-before-renumber",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "\u001b[200~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\u001b[201~"
+        },
+        {
+          "kind": "insert",
+          "data": "[paste #99][paste #2]"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-restores-source-cursor-inside-joined-zwj-grapheme",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "👩👩"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "data": "‍"
+        },
+        {
+          "kind": "input",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[3~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "undo-bulk-printable-input-with-whitespace-is-one-source-operation",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "X"
+        },
+        {
+          "kind": "input",
+          "data": "a b"
+        },
+        {
+          "kind": "input",
+          "data": "c"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[45;5u"
+        }
+      ]
+    }
+  ]
+}

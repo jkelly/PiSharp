@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 1,
+  "kind": "unchanged-whole-upstream-config-released-source-catalog-semantic-profile",
+  "status": "bound to actual root Stage D admission; root whole-config captures and independent qualification pending",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "oracle": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1",
+  "receipt": {
+    "path": ".pisharp-released-catalog-admitted.json",
+    "sha256": "2e5fea6e5ed55fdff54dfc507499eb98e0bfba6851a9004d6c5e9b1af09981f4",
+    "payloadFiles": 4581,
+    "sourceFiles": 2093,
+    "compilerFiles": 529,
+    "previousNodePackageFiles": 114,
+    "previousNodeDeclarations": 108,
+    "typeboxPackageFiles": 1385,
+    "typeboxDeclarations": 691,
+    "leafPackageFiles": 416,
+    "leafDeclarations": 129,
+    "allAddedPackageFiles": 1915,
+    "allAdmittedDeclarations": 928,
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+    "actualAdmissionPinPending": false,
+    "bytes": 1887205,
+    "catalogFiles": 43,
+    "catalogBytes": 902551
+  },
+  "metadataPins": [
+    {
+      "path": ".pisharp-released-catalog-owner.json",
+      "bytes": 1158,
+      "sha256": "ad5b94ff5e58844681731c1e5b646a5d93ed75e47f4e6fb470f0b5c454ef5929"
+    },
+    {
+      "path": ".pisharp-released-catalog-prepared.json",
+      "bytes": 881483,
+      "sha256": "3e7be90b2ec154bcc12149d2b247e4eb26241e9daf1f2acd4978fd4b702a6111"
+    },
+    {
+      "path": ".pisharp-released-catalog-admission-started.json",
+      "bytes": 8126,
+      "sha256": "552efc063d32a4fc3c9e10bf126d8919e6f8f5e65a393779bf3dbf7d8f3f35c3"
+    }
+  ],
+  "origin": {
+    "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-leaves-v0.99.1",
+    "receipt": ".pisharp-leaf-declarations-admitted.json",
+    "receiptSha256": "0c3bb31d39dd7ed9c63dcefb11b7c3677b05352505a6fa63d418c567f691f1ae",
+    "receiptBytes": 1038729,
+    "payloadFiles": 4538,
+    "sourceFiles": 2093,
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+    "verifier": "tools/SemanticInventory/full-project-leaves-common.mjs",
+    "metadataPins": [
+      {
+        "path": ".pisharp-leaf-declarations-owner.json",
+        "bytes": 1166,
+        "sha256": "48e770efb28e5de87495192486df88120830a35b9428183bc7bbd84749dc25a6"
+      },
+      {
+        "path": ".pisharp-leaf-declarations-prepared.json",
+        "bytes": 804766,
+        "sha256": "62d43b0c534d26bd3597e23651b42973eb306c3b0497e0f579924b6589a050c9"
+      },
+      {
+        "path": ".pisharp-leaf-declarations-admission-started.json",
+        "bytes": 1154,
+        "sha256": "3d50dcc33db9a5067a7d6064362fc186c55cb829b9bed0452a6ea0fd621d13fa"
+      }
+    ]
+  },
+  "protectedOracleRoots": [
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-leaves-v0.99.1",
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-typebox-v0.99.1",
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-node-v0.99.1",
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-oracle-v0.99.1",
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-extension-reducers-oracle-v0.99.1-license-corrected"
+  ],
+  "runtime": {
+    "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "native": {
+    "path": "node_modules/@typescript/typescript-win32-x64/lib/tsc.exe",
+    "sha256": "f9ecfbdc93753d2c972d66a8d0d75f5bd737fd4a5f88b422d9091ea282bcb2c7",
+    "arguments": [
+      "--api",
+      "--async",
+      "--cwd",
+      "{oracle}/upstream",
+      "--callbacks=readFile,fileExists,directoryExists,getAccessibleEntries,realpath"
+    ],
+    "stdio": [
+      "pipe",
+      "pipe",
+      "inherit"
+    ],
+    "exitTimeoutMs": 30000
+  },
+  "sourcePins": [
+    {
+      "path": "upstream/tsconfig.json",
+      "sha256": "1ef1041faebef510f59480731ece80657f7e67b1091a0b0dcf05ca51e8a267a6"
+    },
+    {
+      "path": "upstream/tsconfig.base.json",
+      "sha256": "eea9b73c99e36e35d2afca6fb313899ebb214840beedad7a67ec07d880857f1b"
+    },
+    {
+      "path": "upstream/package-lock.json",
+      "sha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d"
+    }
+  ],
+  "publicEntrypointPlan": {
+    "path": "compatibility/public-entrypoints.plan.json",
+    "sha256": "9524ccdeaaaaec2409f17c823a8baf0f9da0acd27c5492fdaf986e63fd815857"
+  },
+  "baseline": {
+    "pins": [
+      {
+        "path": "fixtures/semantic-full-project-leaves/expected.json",
+        "bytes": 11900399,
+        "sha256": "9688c7ab648cab659fc12b93cf39d817f9fd398145ed23185c1439790d7a5d28"
+      },
+      {
+        "path": "fixtures/semantic-full-project-leaves/manifest.json",
+        "bytes": 2680,
+        "sha256": "b5c26efdc8c6e15210879712aaf438c488db870cffcba79f3844bf1a57bef606"
+      }
+    ],
+    "snapshotSha256": "9688c7ab648cab659fc12b93cf39d817f9fd398145ed23185c1439790d7a5d28",
+    "sourceFiles": 2400,
+    "rootFiles": 1661,
+    "unresolvedRecords": 711,
+    "diagnosticCounts": {
+      "getConfigFileParsingDiagnostics": 0,
+      "getGlobalDiagnostics": 0,
+      "getProgramDiagnostics": 0,
+      "getSyntacticDiagnostics": 0,
+      "getBindDiagnostics": 0,
+      "getSemanticDiagnostics": 2259,
+      "getSuggestionDiagnostics": 832,
+      "getDeclarationDiagnostics": 0
+    },
+    "nearestLockInstances": 26,
+    "mandatoryNearestLockInstances": 34,
+    "originalMandatorySpecifierGroups": 43,
+    "entrypointConditionRecords": 150,
+    "comparison": "complete unfiltered families/unresolved/declarations and raw snapshots; no diagnostic forecast or path normalizer"
+  },
+  "configurationFacts": {
+    "originalNoEmit": true,
+    "originalSkipLibCheck": true,
+    "originalAmbientTypes": [
+      "node"
+    ],
+    "originalExclusions": [
+      "**/dist/**",
+      "packages/coding-agent/examples/extensions/gondolin/**"
+    ],
+    "compatibilityScopeExclusionsApproved": false
+  },
+  "diagnosticMethods": [
+    "getConfigFileParsingDiagnostics",
+    "getGlobalDiagnostics",
+    "getProgramDiagnostics",
+    "getSyntacticDiagnostics",
+    "getBindDiagnostics",
+    "getSemanticDiagnostics",
+    "getSuggestionDiagnostics",
+    "getDeclarationDiagnostics"
+  ],
+  "limits": {
+    "fileBytes": 33554432,
+    "snapshotBytes": 134217728,
+    "protocolBytes": 536870912,
+    "driverTimeoutMs": 300000,
+    "jsonDepth": 64,
+    "jsonNodes": 4000000
+  },
+  "executionBoundary": {
+    "parentNativeExecution": "root reviewed invocation only",
+    "runtimeModulePrefix": "node_modules/typescript/",
+    "vfsPayloadFiles": 4581,
+    "sourceCorpus": "all2093 original canonical rows plus43 unchanged publisher-source JSON data; all1915 admitted package members and529 compiler/native members retained",
+    "upstreamModulesExecuted": false,
+    "addedPackageRuntimeExecuted": false,
+    "scratch": "explicit fresh absolute caller-owned --run-root (--scratch legacy alias), disjoint from repository/protected oracles; all home/temp/config/protocol/output there",
+    "nodeGuardIsNativeOsSandbox": false,
+    "apiCloseIsHelperExitJoin": false
+  },
+  "fullStructuralTypeInventoryPending": true,
+  "semanticPublicClosure": false,
+  "remainingDeclarationClosure": "all34 original mandatory instances and all43 groups remain; genuine previous2259 semantic/711 unresolved retained; source catalog inputs do not qualify SDK/Vitest/declaration closure or published ownership",
+  "phaseGatesPassed": [],
+  "sharedProfilePins": [
+    {
+      "path": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "bytes": 18430,
+      "sha256": "df5b99d591731d56607d4d8eb505bfbdb25581d50a2652c2dbd90cc05dc00eba"
+    }
+  ],
+  "catalogSetup": {
+    "plan": "compatibility/semantic-released-catalog.plan.json",
+    "helper": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+    "pins": [
+      {
+        "path": "compatibility/semantic-released-catalog.plan.json",
+        "bytes": 17168,
+        "sha256": "9a14334508d418ed0bdc46f38fa31f368390a017f31c4ea49250965d58b6d3a0"
+      },
+      {
+        "path": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+        "bytes": 28626,
+        "sha256": "5c38f84d281796838e392e1148850eb8130ffff7e0c47ccef31929f5752ae81c"
+      },
+      {
+        "path": "tools/SemanticInventory/semantic-released-catalog.test.mjs",
+        "bytes": 7861,
+        "sha256": "fcc5b2a1124c4cee33ea4d457cd9e298348e1c441825800c1471c63302a1e59b"
+      },
+      {
+        "path": "docs/compatibility/semantic-released-catalog-setup.md",
+        "bytes": 9346,
+        "sha256": "0f7dcd321da4506c974a9e5d993da00456ec9c538f662b9c4c3fc5c898c0f7a6"
+      }
+    ]
+  },
+  "publicArtifactEvidence": {
+    "pins": [
+      {
+        "path": "tools/SemanticInventory/node-declaration-archive.mjs",
+        "bytes": 6790,
+        "sha256": "baee47b869aab6d2409c0a3906b1e0ea5bf5fe236ca24837fae71aa81d633ffd"
+      },
+      {
+        "path": "artifacts/released-baseline/inspection.json",
+        "bytes": 41808,
+        "sha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b"
+      },
+      {
+        "path": "artifacts/released-baseline/metadata.json",
+        "bytes": 72880,
+        "sha256": "1aafbfc3e2a0610b4066dd4cd94e239a64bc3b08506cd0d67f41cd18a34af789"
+      },
+      {
+        "path": "artifacts/released-npm-ai/evidence.lock.json",
+        "bytes": 1532,
+        "sha256": "35fe3e5e8713163c4277fa72747de1ad38a2f842ea7543d00f567f3865ee0d94"
+      },
+      {
+        "path": "artifacts/released-npm-ai/inspection.json",
+        "bytes": 157841,
+        "sha256": "0c385e57ebdc3a01e0a7a50748af231a6fbefdea91b643356d6d0e239ebf6168"
+      },
+      {
+        "path": "artifacts/released-npm-ai/pi-ai-0.99.1.tgz",
+        "bytes": 760966,
+        "sha256": "f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3"
+      }
+    ],
+    "packageArchivesAdmittedToVfs": false,
+    "registrySignaturesVerified": false,
+    "sourceArchiveDataReceiptSeparate": true,
+    "missingPublishedArchives": [
+      "@earendil-works/pi-coding-agent",
+      "@earendil-works/pi-tui"
+    ]
+  },
+  "requiredPublishedOwnershipBlockers": [
+    {
+      "manifestPath": "packages/ai/package.json",
+      "field": "bin",
+      "subpath": "pi-ai",
+      "target": "dist/cli.js"
+    },
+    {
+      "manifestPath": "packages/coding-agent/package.json",
+      "field": "bin",
+      "subpath": "pi",
+      "target": "dist/bundle/cli.js"
+    },
+    {
+      "manifestPath": "packages/tui/package.json",
+      "field": "main",
+      "subpath": ".",
+      "target": "dist/index.js"
+    }
+  ],
+  "publicTargetClassifier": {
+    "literalPackageRelativeFields": [
+      "main",
+      "bin",
+      "source",
+      "types",
+      "typings"
+    ],
+    "exportsRequiresDotSlash": true,
+    "distToSourceInference": false,
+    "unknownBecomesResolved": false,
+    "rawConditionsAndTargetsRetained": true,
+    "previousProfileClassificationsRetained": true,
+    "semanticOwnershipQualification": false
+  },
+  "buildConfigurationPaths": [
+    "packages/ai/tsconfig.build.json",
+    "packages/coding-agent/tsconfig.build.json",
+    "packages/tui/tsconfig.build.json"
+  ]
+}

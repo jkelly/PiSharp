@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "interleaved-signed",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "authored-frame-event-input",
+  "requirementIds": ["stream.indexed-events"],
+  "scenario": "Interleaved indexed thinking/text/tool events, split JSON escapes, authoritative ends and final opaque signatures",
+  "clock": {"unixMilliseconds": 1700000000000, "mechanism": "Explicit input timestamps; reducer invokes no clock"},
+  "seed": "none; explicit response/tool IDs",
+  "normalizerVersion": "object-key-order-v1",
+  "initialMessage": {
+    "role": "assistant", "content": [], "api": "openai-responses", "provider": "synthetic-oracle", "model": "oracle-model", "responseId": "response-frame-1",
+    "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 0, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}},
+    "stopReason": "pending", "timestamp": 1700000000000
+  },
+  "operations": [
+    {"type": "thinking_start", "contentIndex": 0, "content": {"type": "thinking", "thinking": "", "thinkingSignature": "stale-thinking=="}},
+    {"type": "text_start", "contentIndex": 1, "content": {"type": "text", "text": "", "textSignature": "stale-text=="}},
+    {"type": "thinking_delta", "contentIndex": 0, "delta": "Draft reasoning π"},
+    {"type": "toolcall_start", "contentIndex": 2, "toolCall": {"type": "toolCall", "id": "call-frame-1", "name": "read", "arguments": {}, "thoughtSignature": "stale-tool==", "namespace": "stale"}},
+    {"type": "text_delta", "contentIndex": 1, "delta": "Draft text π"},
+    {"type": "toolcall_delta", "contentIndex": 2, "delta": "{\"path\":\"C:\\"},
+    {"type": "thinking_delta", "contentIndex": 0, "delta": "\r\nnext"},
+    {"type": "toolcall_delta", "contentIndex": 2, "delta": "\\temp\\\\π\",\"options\":{\"preserve\":null,\"order\":[\"b\",\"a\"]}}"},
+    {"type": "text_end", "contentIndex": 1, "content": "Authoritative π\r\nC:\\temp\\π", "textSignature": "opaque-text=="},
+    {"type": "thinking_end", "contentIndex": 0, "content": "Authoritative reasoning π", "thinkingSignature": "opaque-thinking==", "redacted": false},
+    {"type": "toolcall_end", "contentIndex": 2, "toolCall": {"type": "toolCall", "id": "call-frame-1", "name": "read", "arguments": {"path": "C:\\temp\\π", "options": {"preserve": null, "order": ["b", "a"]}}, "thoughtSignature": "opaque-tool==", "namespace": "fs"}}
+  ],
+  "finalArguments": {"path": "C:\\temp\\π", "options": {"preserve": null, "order": ["b", "a"]}},
+  "finalSignatures": {"thinking": "opaque-thinking==", "text": "opaque-text==", "tool": "opaque-tool==", "namespace": "fs"},
+  "provenance": {"kind": "authored-synthetic-input", "origin": "New event operations executed through the unchanged pinned encoder and reducer; no provider wire or native output used"}
+}

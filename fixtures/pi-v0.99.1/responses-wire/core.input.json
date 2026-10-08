@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "responses-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": ["api.openai-responses", "stream.indexed-events", "stream.terminal-settlement"],
+  "kind": "authored-parsed-responses-wire-input",
+  "normalizerVersion": "object-key-order-v1",
+  "scenario": "Interleaved text/tool completion, EOF-before-terminal and completed unfinished tool",
+  "clock": {"unixMilliseconds":1700000000000,"mechanism":"Explicit initial output timestamps; helper invokes no clock"},
+  "seed": "none; explicit case/response/item/call IDs",
+  "model": {"id":"synthetic-responses-model","name":"Synthetic Responses model","api":"openai-responses","provider":"fixture-provider","baseUrl":"https://fixture.invalid/v1","reasoning":true,"input":["text"],"contextWindow":4096,"maxTokens":1024,"cost":{"input":1000000,"output":2000000,"cacheRead":500000,"cacheWrite":1500000}},
+  "initialOutput": {"role":"assistant","content":[],"api":"openai-responses","provider":"fixture-provider","model":"synthetic-responses-model","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"pending","timestamp":1700000000000},
+  "cases": [
+    {
+      "caseId":"interleaved-completed",
+      "events":[
+        {"type":"response.created","sequence_number":0,"response":{"id":"resp_complete"}},
+        {"type":"response.output_item.added","sequence_number":1,"output_index":4,"item":{"type":"message","id":"msg_complete","role":"assistant","status":"in_progress","content":[],"phase":"commentary"}},
+        {"type":"response.output_item.added","sequence_number":2,"output_index":9,"item":{"type":"function_call","id":"fc_complete","call_id":"call_complete","name":"read","namespace":"fs.initial","arguments":""}},
+        {"type":"response.output_text.delta","sequence_number":3,"output_index":4,"item_id":"msg_complete","content_index":0,"delta":"Draft π"},
+        {"type":"response.function_call_arguments.delta","sequence_number":4,"output_index":9,"item_id":"fc_complete","delta":"{\"path\":\"C:\\"},
+        {"type":"response.output_text.delta","sequence_number":5,"output_index":4,"item_id":"msg_complete","content_index":0,"delta":"\r\ncontinued"},
+        {"type":"response.function_call_arguments.done","sequence_number":6,"output_index":9,"item_id":"fc_complete","arguments":"{\"path\":\"C:\\\\temp\\\\π\",\"options\":{\"preserve\":null,\"order\":[\"b\",\"a\"]}}"},
+        {"type":"response.output_item.done","sequence_number":7,"output_index":4,"item":{"type":"message","id":"msg_complete","role":"assistant","status":"completed","phase":"final_answer","content":[{"type":"output_text","text":"Authoritative π\r\nfinal","annotations":[]}]}},
+        {"type":"response.output_item.done","sequence_number":8,"output_index":9,"item":{"type":"function_call","id":"fc_complete","call_id":"call_complete","name":"read","namespace":"fs.final","arguments":"{\"path\":\"C:\\\\temp\\\\π\",\"options\":{\"preserve\":null,\"order\":[\"b\",\"a\"]}}"}},
+        {"type":"response.completed","sequence_number":9,"response":{"id":"resp_complete","status":"completed","output":[],"usage":{"input_tokens":20,"output_tokens":7,"total_tokens":27,"input_tokens_details":{"cached_tokens":2,"cache_write_tokens":3},"output_tokens_details":{"reasoning_tokens":1}}}}
+      ]
+    },
+    {
+      "caseId":"eof-before-terminal",
+      "events":[
+        {"type":"response.created","sequence_number":0,"response":{"id":"resp_eof"}},
+        {"type":"response.output_item.added","sequence_number":1,"output_index":2,"item":{"type":"message","id":"msg_eof","role":"assistant","status":"in_progress","content":[]}},
+        {"type":"response.output_text.delta","sequence_number":2,"output_index":2,"item_id":"msg_eof","content_index":0,"delta":"Partial before EOF"}
+      ]
+    },
+    {
+      "caseId":"completed-unfinished-tool",
+      "events":[
+        {"type":"response.output_item.added","sequence_number":0,"output_index":5,"item":{"type":"function_call","id":"fc_unfinished","call_id":"call_unfinished","name":"read","arguments":""}},
+        {"type":"response.function_call_arguments.delta","sequence_number":1,"output_index":5,"item_id":"fc_unfinished","delta":"{\"path\":\"unfinished"},
+        {"type":"response.completed","sequence_number":2,"response":{"id":"resp_unfinished","status":"completed","output":[]}}
+      ]
+    }
+  ],
+  "provenance":{"kind":"authored-synthetic-input","wireSeam":"Parsed ResponseStreamEvent DTOs; no HTTP/SSE/SDK decoding","rates":"Authored synthetic unit rates, not provider catalog prices","expectedValues":"Captured only from unchanged processResponsesStream","scopeExclusions":["HTTP/SSE bytes","SDK/provider wrapper","authentication","catalog costs","native provider parity"]}
+}

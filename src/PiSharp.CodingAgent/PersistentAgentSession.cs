@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using PiSharp.AI;
 using PiSharp.Agent;
 using PiSharp.Contracts;
 using PiSharp.Sessions.Context;
@@ -13,7 +14,10 @@ namespace PiSharp.CodingAgent;
 
 public sealed record PersistentAgentSessionOptions(bool UseLatestLeaf = true, string? SelectedLeafId = null,
     AgentOptions? AgentOptions = null, SessionLogStoreOptions? SessionLogStoreOptions = null,
-    SessionContextProjectionOptions? ContextOptions = null);
+    SessionContextProjectionOptions? ContextOptions = null)
+{
+    public PiSharp.CodingAgent.ToolSelection.AllowedToolSelection? LifetimeToolSelection { get; init; }
+}
 public enum PersistentAgentSessionFailure
 {
     InvalidConfiguration, UnsupportedThinkingLevel, ModelMismatch, InvalidCommit,
@@ -134,6 +138,17 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     /// In-memory namespace identities are not filesystem session paths.</summary>
     public string? SessionFile => Snapshot.Log.StorageDurability == SessionLogStorageDurability.VolatileMemory ? null : Path;
     public string WorkingDirectory { get; }
+
+    /// <summary>Queries admitted native capabilities. A registry is required to query a different model.</summary>
+    public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor? model = null)
+    {
+        SessionRuntimeRegistry? registry; AgentConfiguration configuration;
+        lock (_gate) { ThrowAvailable(); registry = _registry; configuration = _configuration; }
+        var selected = model ?? configuration.Model;
+        if (registry is not null) return registry.GetSupportedThinkingLevels(selected);
+        if (selected != configuration.Model) throw new ArgumentException("Unknown session model.", nameof(model));
+        return ThinkingLevels.GetSupported(configuration.Transport, selected);
+    }
     /// <summary>Read-only self-wait detection for the current host call; this does not transfer input authority.</summary>
     internal bool IsExecutingInputCallback
     {
@@ -179,7 +194,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 writer.WriteString("modelId", configuration.Model.Id);
             });
             var thinking = Record(codec, "thinking_level_change", Identity(nextEntryId, header.Id, [model]), model.Id,
-                clock, writer => writer.WriteString("thinkingLevel", "off"));
+                clock, writer => writer.WriteString("thinkingLevel", configuration.ThinkingLevel));
             ImmutableArray<SessionEntry> initial = [model, thinking];
             var context = projector.Project(initial, thinking.Id, cancellationToken);
             store = await SessionLogStore.CreateNewAsync(path, header, configured.SessionLogStoreOptions, cancellationToken).ConfigureAwait(false);
@@ -226,7 +241,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         PersistentAgentSessionOptions? options = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(registry);
-        var selection = registry.Resolve(initialModel, [], cancellationToken: cancellationToken);
+        registry = registry.RetainToolSelection(options?.LifetimeToolSelection);
+        var selection = await registry.PrepareAndDrainAsync(() => registry.Resolve(initialModel, [], registry.GetDefaultThinkingLevel(initialModel), cancellationToken), cancellationToken).ConfigureAwait(false);
         var session = await CreateAsync(path, header, selection.Configuration, clock, nextEntryId, options, cancellationToken).ConfigureAwait(false);
         session._registry = registry;
         return session;
@@ -276,6 +292,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         var store = await SessionLogStore.OpenAsync(path, configured.SessionLogStoreOptions, cancellationToken).ConfigureAwait(false);
         NativeAgent? agent = null;
         SessionRuntimeLease? runtime = null;
+        PersistentAgentSession? opened = null;
         try
         {
             if (string.IsNullOrWhiteSpace(store.Snapshot.Header.WireBody.Value.GetProperty("cwd").GetString()))
@@ -286,29 +303,50 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             var acquired = await runtimeForWorkingDirectory(store.Snapshot.Header.WireBody.Value.GetProperty("cwd").GetString()!, cancellationToken).ConfigureAwait(false)
                 ?? throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
             acquired.Claim(); runtime = acquired;
-            var registry = runtime.Registry;
+            var registry = runtime.Registry.RetainToolSelection(configured.LifetimeToolSelection);
             cancellationToken.ThrowIfCancellationRequested();
-            var selection = registry.Resolve(context, fallbackModel, cancellationToken);
+            var selection = await registry.PrepareAndDrainAsync(() => registry.Resolve(context, fallbackModel, cancellationToken, registry.InitialActiveToolNames), cancellationToken).ConfigureAwait(false);
             var bridge = new Bridge();
             agent = new(selection.Configuration, clock, bridge, configured.AgentOptions);
             agent.ReplaceMessages(SessionContextProjector.AgentMessages(context));
             cancellationToken.ThrowIfCancellationRequested();
-            return new(path, store, agent, bridge, projector, codec, context, selection.Configuration, clock, nextEntryId,
+            opened = new(path, store, agent, bridge, projector, codec, context, selection.Configuration, clock, nextEntryId,
                 configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions)
             { _registry = registry, _runtimeLease = runtime };
+            if (registry.InitialActiveToolNames is not null)
+                await opened.SetActiveToolsAsync(selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), cancellationToken).ConfigureAwait(false);
+            return opened;
         }
         catch (Exception admission)
         {
             var failures = new List<Exception>();
-            if (agent is not null) try { await agent.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
-            try { await store.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
-            if (runtime is not null) try { await runtime.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+            if (opened is not null)
+            { try { await opened.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); } }
+            else
+            {
+                if (agent is not null) try { await agent.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+                try { await store.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+                if (runtime is not null) try { await runtime.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+            }
             if (failures.Count != 0) throw new AggregateException("Session admission and owned cleanup failed.", new[] { admission }.Concat(failures));
             throw;
         }
     }
 
     internal void OwnRuntime(SessionRuntimeLease runtime) => _runtimeLease = runtime;
+    internal bool RequiresRuntimeOwnerBinding => _runtimeLease?.RequiresOwnerBinding == true;
+    internal void BindRuntimeOwner(ReplaceableAgentSession owner, AgentSessionAttachment attachment)
+    { if (_runtimeLease?.RequiresOwnerBinding == true) _runtimeLease.BindOwner(owner, attachment); }
+    internal async Task ReleaseRuntimeAfterBindingFailureAsync()
+    {
+        SessionRuntimeLease? runtime;
+        lock (_gate)
+        {
+            if (!_replacing || _active is not null) throw new InvalidOperationException("Failed runtime release requires reserved idle ownership.");
+            runtime = _runtimeLease; _runtimeLease = null;
+        }
+        if (runtime is not null) await runtime.DisposeAsync().ConfigureAwait(false);
+    }
 
     internal void RetireInvocationOwner() => _invocationLifetime?.Cancel();
 
@@ -352,7 +390,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         lock (_gate)
         {
             ThrowAvailable();
+            ThrowUserBashMutationLocked();
             if (_registry is null) throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
+            ThrowUserBashMutationLocked();
             if (_active is not null || _inputSubmission is not null) throw new InvalidOperationException("Session is already processing.");
             var snapshot = _agent.Snapshot;
             if (!snapshot.PendingInputs.IsEmpty || snapshot.SteeringCount != 0 || snapshot.FollowUpCount != 0)
@@ -374,8 +414,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token, _closing.Token);
             var work = cancellation.Token;
             await _commits.WaitAsync(work).ConfigureAwait(false); commitHeld = true;
-            SessionContextProjection context; SessionLogStoreSnapshot log;
-            lock (_gate) { context = _context; log = _acknowledgedLog; }
+            await DrainLoadoutDiagnosticsAsync(work).ConfigureAwait(false);
+            SessionContextProjection context; SessionLogStoreSnapshot log; object? priorPromptRevision;
+            lock (_gate) { context = _context; log = _acknowledgedLog; priorPromptRevision = _acknowledgedPromptRevision; }
             var entries = ImmutableArray.CreateBuilder<SessionEntry>();
             var parent = context.LeafId;
             if (update.Model is { } model)
@@ -387,8 +428,16 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             if (update.ThinkingLevel is { } level && level != context.ThinkingLevel)
                 Add("thinking_level_change", writer => writer.WriteString("thinkingLevel", level));
             var systemUpdate = update.ActiveToolNames is { } activeNames
-                ? _registry!.CreateActivationMessage(activeNames, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), _clock(), work)
+                ? _registry!.CreateActivationMessage(activeNames, RecordedActiveToolNames(context, work), _clock(), work)
                 : update.SystemMessage;
+            SessionPromptSectionPreparation? promptPreparation = null;
+            if (update.SystemMessage is null)
+            {
+                var names = update.ActiveToolNames ?? _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+                _activationPreparation.Value = true;
+                try { (systemUpdate, promptPreparation) = _registry!.PreparePromptSectionMessage(names, context.Messages, systemUpdate, _clock(), work); }
+                finally { _activationPreparation.Value = false; }
+            }
             if (systemUpdate is { } system)
             {
                 if (system.Role != "system" || system.WireBody is null)
@@ -401,12 +450,13 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             var prospective = _projector.Project(log.Entries.AddRange(entries), parent, work);
             if (entries.Count == 0)
             {
+                promptPreparation?.ValidateSource();
                 work.ThrowIfCancellationRequested();
                 if (update.ActiveToolNames is not null) lock (_gate)
                 { work.ThrowIfCancellationRequested(); if (_pendingActivation is not null) PrepareActivationRestoration(_configuration)(); }
                 return Snapshot with { IsConfiguring = false };
             }
-            var selection = _registry!.Resolve(prospective, update.Model ?? _configuration.Model, work);
+            var selection = await PrepareAndDrainLoadoutAsync(() => _registry!.Resolve(prospective, update.Model ?? _configuration.Model, work), work).ConfigureAwait(false);
             // A stored selection only carries provider/modelId; preserve exact API matching for an explicitly requested model.
             if (update.Model is { } requested && selection.Configuration.Model != requested)
                 throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -415,6 +465,12 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             work.ThrowIfCancellationRequested();
             Action restoreActivation;
             lock (_gate) restoreActivation = PrepareActivationRestoration(selection.Configuration);
+            promptPreparation?.ValidateSource();
+            work.ThrowIfCancellationRequested();
+            lock (_gate)
+                if (!ReferenceEquals(_context, context) || !ReferenceEquals(_acknowledgedLog, log) || !ReferenceEquals(_active, idle) ||
+                    !ReferenceEquals(_acknowledgedPromptRevision, priorPromptRevision))
+                    throw new InvalidOperationException("Prompt configuration reservation changed.");
             writeAdmitted = true;
             var acknowledged = await _store.AppendAsync(entries.ToImmutable(), work).ConfigureAwait(false);
             if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
@@ -424,6 +480,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 _configuration = selection.Configuration;
                 _acknowledgedLog = acknowledged.Snapshot;
                 _context = prospective;
+                _acknowledgedPromptRevision = promptPreparation?.Revision ?? _acknowledgedPromptRevision;
                 restoreActivation();
             }
             return Snapshot with { IsConfiguring = false };
@@ -467,8 +524,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         lock (_gate)
         {
             ThrowAvailable();
+            ThrowUserBashMutationLocked();
             var agent = _agent.Snapshot;
-            if (_active is not null || agent.IsRunning || agent.SteeringCount != 0 || agent.FollowUpCount != 0 ||
+            if (_active is not null || _retrySettingsWrite is not null || _loadoutDrains.Count != 0 || _synchronousLoadoutWork != 0 || agent.IsRunning || agent.SteeringCount != 0 || agent.FollowUpCount != 0 ||
                 _inputSubmission is not null && !IsExecutingInputCallback || !agent.PendingInputs.IsEmpty)
                 throw new InvalidOperationException("Session replacement requires idle execution and empty pending input queues.");
             _replacing = true;
@@ -479,6 +537,45 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     internal sealed class ReplacementReservation(PersistentAgentSession owner) : IDisposable
     {
         private bool committed, released;
+        internal SessionCreationSetupWriter CreateSetupWriter(CancellationToken token)
+        {
+            lock (owner._gate) { ValidateCatalogAuthority(owner); return owner.CreateSetupWriter(this, token); }
+        }
+        internal void ValidateCatalogAuthority(PersistentAgentSession expected)
+        {
+            if (!ReferenceEquals(owner, expected) || released || committed || !owner._replacing ||
+                owner._disposed || owner._admissionStopped || owner._retired || owner._fault is not null)
+                throw new InvalidOperationException("Catalog publication requires the exact live retirement reservation.");
+        }
+        internal SessionRuntimeRegistry CaptureToolCatalogRegistry()
+        {
+            lock (owner._gate) { ValidateCatalogAuthority(owner); return owner._registry ?? throw Error(PersistentAgentSessionFailure.InvalidConfiguration); }
+        }
+        internal System.Collections.Immutable.ImmutableArray<string> CaptureActiveToolNames()
+        {
+            lock (owner._gate) { ValidateCatalogAuthority(owner); return owner._pendingActivation?.Names ??
+                owner._configuration.Tools.Select(tool => tool.Name).ToImmutableArray(); }
+        }
+        internal Task<SessionToolCatalogReceipt> PublishToolCatalogAsync(SessionRuntimeRegistry expected,
+            SessionRuntimeRegistry replacement, System.Collections.Immutable.ImmutableArray<string> activeNames, Action commit)
+        {
+            lock (owner._gate) ValidateCatalogAuthority(owner);
+            return owner.AdmitToolCatalogPublication(expected, replacement, activeNames, commit, CancellationToken.None, this);
+        }
+        internal async Task DrainLoadoutDiagnosticsAsync(CancellationToken token)
+        {
+            SessionRuntimeRegistry? registry;
+            lock (owner._gate)
+            {
+                if (released || committed || !owner._replacing || owner._disposed || owner._admissionStopped || owner._retired)
+                    throw new InvalidOperationException("Staged diagnostic drain requires the original replacement reservation.");
+                registry = owner._registry;
+            }
+            if (registry is null || !registry.HasLoadoutDiagnosticDrain) return;
+            var prior = owner._inLoadoutDiagnosticDrain.Value; owner._inLoadoutDiagnosticDrain.Value = true;
+            try { await registry.DrainLoadoutDiagnosticsAsync(token).ConfigureAwait(false); }
+            finally { owner._inLoadoutDiagnosticDrain.Value = prior; }
+        }
         internal async Task RetireWriterAsync()
         {
             lock (owner._gate)
@@ -756,7 +853,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
 
     private static void ValidateRuntimeContext(SessionContextProjection context, AgentConfiguration configuration)
     {
-        if (context.ThinkingLevel != "off") throw Error(PersistentAgentSessionFailure.UnsupportedThinkingLevel);
+        if (context.ThinkingLevel != configuration.ThinkingLevel) throw Error(PersistentAgentSessionFailure.UnsupportedThinkingLevel);
         if (context.Model is { } model &&
             (model.Provider != configuration.Model.Provider || model.ModelId != configuration.Model.Id))
             throw Error(PersistentAgentSessionFailure.ModelMismatch);
@@ -765,7 +862,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     public Task<AgentLoopResult> PromptAsync(TranscriptEntry message, CancellationToken cancellationToken = default) =>
         PromptAsync([message], cancellationToken);
     public Task<AgentLoopResult> PromptAsync(ImmutableArray<TranscriptEntry> messages, CancellationToken cancellationToken = default) =>
-        Start(token => _agent.PromptAsync(messages, token), cancellationToken, messages);
+        Start(token => _agent.PromptAsync(messages, token), cancellationToken, messages, injectNextTurnCustom: true);
     public Task<AgentLoopResult> ContinueAsync(CancellationToken cancellationToken = default) =>
         Start(_agent.ContinueAsync, cancellationToken);
 
@@ -782,6 +879,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             lock (_gate)
             {
                 ThrowAvailable();
+                if (_active is null) ThrowUserBashMutationLocked();
                 if (_configuring || _inputSubmission is not null) throw new InvalidOperationException("Session input admission is already processing.");
                 cancellationToken.ThrowIfCancellationRequested();
                 _inputSubmission = reservation;
@@ -890,7 +988,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             }
             // ExecuteAsync keeps the accepted loadout validation, durable event path and run fault policy.
             // Keep the input abort reservation until Agent admission has begun, closing the pre-start race.
-            var run = ExecuteAsync(current => _agent.PromptAsync(message, current), work, generation, [message]);
+            ImmutableArray<TranscriptEntry> promptMessages;
+            lock (_gate) promptMessages = InjectNextTurnCustomLocked([message]);
+            var run = ExecuteAsync(current => _agent.PromptAsync(promptMessages, current), work, generation, promptMessages);
             await ReleaseInputAsync(reservation).ConfigureAwait(false);
             return new(SubmittedInputDisposition.Started, await run.ConfigureAwait(false));
         }
@@ -928,19 +1028,21 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     }
 
     private Task<AgentLoopResult> Start(Func<CancellationToken, Task<AgentLoopResult>> start, CancellationToken token,
-        ImmutableArray<TranscriptEntry> inputs = default)
+        ImmutableArray<TranscriptEntry> inputs = default, bool injectNextTurnCustom = false)
     {
         TaskCompletionSource idle;
         lock (_gate)
         {
             ThrowAvailable();
+            ThrowUserBashMutationLocked();
             if (_active is not null || _inputSubmission is not null) throw new InvalidOperationException("Session is already processing.");
             token.ThrowIfCancellationRequested();
+            if (injectNextTurnCustom) inputs = InjectNextTurnCustomLocked(inputs);
             _operationGeneration = checked(_operationGeneration + 1);
             _runCancellation = new(); _operationPhase = SessionOperationPhase.Provider;
             idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle;
         }
-        return ExecuteAsync(start, token, idle, inputs);
+        return ExecuteAsync(injectNextTurnCustom ? current => _agent.PromptAsync(inputs, current) : start, token, idle, inputs);
     }
     private async Task<AgentLoopResult> ExecuteAsync(Func<CancellationToken, Task<AgentLoopResult>> start,
         CancellationToken token, TaskCompletionSource idle, ImmutableArray<TranscriptEntry> inputs)
@@ -948,54 +1050,82 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         var generation = _agent.Snapshot.Generation;
         ContextEditCancellation runAbort; long operation;
         lock (_gate) { runAbort = _runCancellation!; operation = _operationGeneration; }
+        var retry = BeginRetryOperation(operation);
         AgentLoopResult? settledResult = null; var status = "failed";
+        var failures = new List<Exception>();
         var priorCallback = _configurationCallback.Value; _configurationCallback.Value = idle;
         try
         {
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token, _closing.Token, runAbort.Abort.Token);
+            await DrainLoadoutDiagnosticsAsync(cancellation.Token).ConfigureAwait(false);
             if (_registry is not null && !inputs.IsDefault)
                 ValidateLoadout(_context.LlmMessages.AddRange(inputs), cancellation.Token);
             settledResult = await RunUntilSettlementAsync(start, idle, cancellation.Token, operation).ConfigureAwait(false);
             status = cancellation.IsCancellationRequested ? "cancelled" :
                 settledResult.Reason == AgentLoopStopReason.Completed ? "completed" :
                 settledResult.Reason == AgentLoopStopReason.TurnLimit ? "turn-limit" : "failed";
-            return settledResult;
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested || _closing.IsCancellationRequested || runAbort.Abort.IsCancellationRequested)
+        catch (OperationCanceledException error) when (token.IsCancellationRequested || _closing.IsCancellationRequested || runAbort.Abort.IsCancellationRequested)
+        { status = "cancelled"; AddDistinctFailure(failures, error); }
+        catch (Exception error)
         {
-            // Safe pre-write cancellation retains any earlier acknowledged commits and existing storage fault.
-            status = "cancelled";
-            throw;
-        }
-        catch
-        {
+            AddDistinctFailure(failures, error);
             if (_agent.Snapshot.Generation > generation)
                 lock (_gate) _fault ??= new(PersistentAgentSessionFailure.RunFailed);
-            throw;
         }
         finally
         {
+            IDisposable? bashBoundary = null;
             try
             {
                 SetOperationPhase(SessionOperationPhase.Settlement);
-                await EmitOperationAsync(new SessionOperationSettled(operation, status, settledResult)).ConfigureAwait(false);
-            }
-            catch
-            {
-                lock (_gate) _fault ??= new(PersistentAgentSessionFailure.RunFailed);
-                throw;
+                // Even without automatic compaction, final settlement joins Bash originals and the
+                // acknowledged transcript flush before notifying observers or releasing provider ownership.
+                try
+                {
+                    bashBoundary = await BeginUserBashBoundaryAsync(idle).ConfigureAwait(false);
+                    if (settledResult is not null) settledResult = settledResult with { Transcript = Snapshot.Context.LlmMessages };
+                }
+                catch (Exception error) { AddDistinctFailure(failures, error); status = "failed"; }
+                if (retry is not null)
+                {
+                    try
+                    {
+                        if (status == "cancelled" || token.IsCancellationRequested || _closing.IsCancellationRequested || runAbort.Abort.IsCancellationRequested)
+                            await retry.FinishCancelledAsync().ConfigureAwait(false);
+                        else
+                        {
+                            var last = settledResult?.Turns.LastOrDefault()?.Result.Chat.Message;
+                            await retry.FinishAsync(last?.StopReason ?? StopReason.Error, last is null ? null : RetryErrorMessage(last)).ConfigureAwait(false);
+                        }
+                    }
+                    catch (Exception error) { AddDistinctFailure(failures, error); status = "failed"; }
+                    try { await retry.JoinAsync().ConfigureAwait(false); }
+                    catch (Exception error) { AddDistinctFailure(failures, error); status = "failed"; }
+                }
+                Task settingsIdle; lock (_gate) settingsIdle = RetrySettingsIdleLocked();
+                try { await settingsIdle.ConfigureAwait(false); }
+                catch (Exception error) { AddDistinctFailure(failures, error); status = "failed"; }
+                try { await EmitOperationAsync(new SessionOperationSettled(operation, status, settledResult)).ConfigureAwait(false); }
+                catch (Exception error)
+                { AddDistinctFailure(failures, error); lock (_gate) _fault ??= new(PersistentAgentSessionFailure.RunFailed); }
             }
             finally
             {
+                try { bashBoundary?.Dispose(); } catch (Exception error) { AddDistinctFailure(failures, error); }
                 Task cancelIdle;
-                lock (_gate) { if (ReferenceEquals(_runCancellation,runAbort)) _runCancellation = null; cancelIdle = runAbort.CancelUsers == 0 ? Task.CompletedTask : runAbort.CancelIdle!.Task; }
-                await cancelIdle.ConfigureAwait(false); runAbort.Abort.Dispose();
+                lock (_gate) { if (ReferenceEquals(_runCancellation, runAbort)) _runCancellation = null; cancelIdle = runAbort.CancelUsers == 0 ? Task.CompletedTask : runAbort.CancelIdle!.Task; }
+                try { await cancelIdle.ConfigureAwait(false); } catch (Exception error) { AddDistinctFailure(failures, error); }
+                try { runAbort.Abort.Dispose(); } catch (Exception error) { AddDistinctFailure(failures, error); }
                 lock (_gate) if (ReferenceEquals(_active, idle)) { _active = null; _operationPhase = SessionOperationPhase.Idle; }
+                lock (_gate) if (ReferenceEquals(_retryCoordinator, retry)) _retryCoordinator = null;
                 idle.TrySetResult(); _configurationCallback.Value = priorCallback;
             }
         }
+        if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException("Session body and owned settlement failed.", failures);
+        return settledResult!;
     }
-
     public void Steer(TranscriptEntry message, CancellationToken cancellationToken = default)
     { lock (_gate) { ThrowAvailable(); ThrowInputMutation(); RejectSettlementQueue(); RejectConfigurationQueue(); RejectQueuedLoadoutChange(message); _agent.Steer(message, cancellationToken); } }
     public void FollowUp(TranscriptEntry message, CancellationToken cancellationToken = default)
@@ -1023,7 +1153,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     }
     private void ValidateLoadout(ImmutableArray<TranscriptEntry> messages, CancellationToken token = default)
     {
-        var selected = _registry!.Resolve(_configuration.Model, messages, cancellationToken: token, prepareLoadout: false);
+        var selected = _registry!.Resolve(_configuration.Model, messages, _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false);
         if (!selected.Configuration.Tools.Select(tool => (tool.Name, tool.ExecutionMode))
             .SequenceEqual(_configuration.Tools.Select(tool => (tool.Name, tool.ExecutionMode))))
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -1081,10 +1211,17 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         ThrowConfigurationSelfWait();
         // Agent detects callback self-waits before this coordinator's additional admission lease is awaited.
         var agentIdle = _agent.WaitForIdleAsync();
-        Task idle; Task input;
-        lock (_gate) { idle = _active?.Task ?? Task.CompletedTask; input = _inputSubmission?.Idle.Task ?? Task.CompletedTask; }
-        var settled = Task.WhenAll(agentIdle, idle, input);
+        Task idle; Task input; Task diagnostics; Task settings; Task[] bash;
+        lock (_gate) { idle = _active?.Task ?? Task.CompletedTask; input = _inputSubmission?.Idle.Task ?? Task.CompletedTask; diagnostics = LoadoutDiagnosticIdleLocked(); settings = RetrySettingsIdleLocked(); bash = CaptureUserBashCompletionsLocked(); }
+        var settled = Task.WhenAll(new[] { agentIdle, idle, input, diagnostics, settings }.Concat(bash));
         return cancellationToken.CanBeCanceled ? settled.WaitAsync(cancellationToken) : settled;
+    }
+
+    // Same pre-mutation callback checks as WaitForIdle, without creating an aggregate idle join.
+    internal void RejectOwnedResourceSelfWait()
+    {
+        ThrowConfigurationSelfWait();
+        _ = _agent.WaitForIdleAsync(); // Agent returns its existing task after its own synchronous guard.
     }
 
     private async ValueTask CommitAsync(AgentEvent observation)
@@ -1148,6 +1285,11 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             throw new PersistentAgentSessionException(fault);
         }
         finally { _commits.Release(); }
+        if (observation is AssistantMessageEnded assistant && assistant.Message.StopReason != StopReason.Error)
+        {
+            SessionRetryCoordinator? retry; lock (_gate) retry = _retryCoordinator;
+            if (retry is not null) await retry.CompleteAssistantAsync(assistant.Message.StopReason, RetryErrorMessage(assistant.Message)).ConfigureAwait(false);
+        }
     }
 
     public ValueTask DisposeAsync()
@@ -1203,6 +1345,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     }
     private void ThrowConfigurationSelfWait()
     {
+        ThrowRetrySelfWait();
+        ThrowUserBashSelfWait();
+        if (_inLoadoutDiagnosticDrain.Value) throw new InvalidOperationException("A diagnostic reporter cannot await its own session settlement.");
         lock (_gate)
         {
             if (_active is not null && ReferenceEquals(_configurationCallback.Value, _active))
@@ -1213,6 +1358,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     }
     private void ThrowInputMutation()
     {
+        if (_active is null) ThrowUserBashMutationLocked();
         if (_queueValidationCallback.Value)
             throw new InvalidOperationException("Queue preflight cannot mutate pending queues.");
     }

@@ -1,0 +1,3152 @@
+{
+  "schemaVersion": 1,
+  "kind": "P7-01-real-unmodified-public-extension-corpus-plan",
+  "status": "Unverified",
+  "implementationOwner": {
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "xhigh"
+  },
+  "source": {
+    "repository": "https://github.com/earendil-works/pi",
+    "tag": "v0.99.1",
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "tree": "200bd10bb146773516f862a02b8aaebeed163e00",
+    "readOnlyCheckoutHint": "../Pi-upstream-v0.99.1",
+    "canonicalTrackedFiles": 2093,
+    "wholeCanonicalFingerprint": {
+      "files": 2093,
+      "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+      "authority": "Existing whole-source receipts; not recomputed by this selected-file metadata check."
+    },
+    "acquiredCheckoutFingerprint": {
+      "files": 2093,
+      "sha256": "676a5df7a526ab0fb6a78f734b57093bb7571913fc17251d02cb0c84527dcf21",
+      "attributeConversions": [
+        "pi-test.bat",
+        "pi-test.ps1"
+      ],
+      "selectedCorpusFilesConverted": false
+    }
+  },
+  "evidence": {
+    "canonicalSourceFingerprintReceipt": {
+      "path": "compatibility/responses-sdk-oracle-setup.json",
+      "bytes": 43422,
+      "sha256": "e3e8f2eb4c0f5df31408f65aa800c385197b9dde63212171581ad30fe3965934"
+    },
+    "metadataRuntime": {
+      "version": "v24.19.0",
+      "platform": "win32",
+      "architecture": "x64",
+      "bytes": 92825416,
+      "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+      "purpose": "Inert metadata hashing/JSON/archive comparison only; no extension/helper execution or product runtime qualification."
+    },
+    "authorityPins": [
+      {
+        "path": "compatibility/baseline.lock.json",
+        "bytes": 59384,
+        "sha256": "3d39afb8a23079ae35a123b66dee1bbd291cdf16c2bf30b16ecb3ca923338a1a"
+      },
+      {
+        "path": "artifacts/released-baseline/inspection.json",
+        "bytes": 41808,
+        "sha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b"
+      },
+      {
+        "path": "artifacts/released-baseline/evidence.lock.json",
+        "bytes": 1263,
+        "sha256": "6fe01c9a77d39505c154b1b20c65d838513a8efba17ea58164aaa38e7b81456c"
+      },
+      {
+        "path": "docs/plans/07-node-bridge.md",
+        "bytes": 8846,
+        "sha256": "d8f2ebff557f8fbec36dcb50c0b3f6f980075c53f7b6533ee9d667bdfdce2091"
+      },
+      {
+        "path": "docs/plans/06-native-extension-sdk.md",
+        "bytes": 22158,
+        "sha256": "421c13b4c84a3e490ee61cc7c80fd4bbb50f8f9c9a6788aa2460ca026bf133f7"
+      },
+      {
+        "path": "docs/architecture.md",
+        "bytes": 48032,
+        "sha256": "d1441f7b2ecc7921e47dad68050d4c495047164aeb1e60d04c38f8e1c0eb6699"
+      }
+    ],
+    "publisherArchive": {
+      "path": "artifacts/released-baseline/pi-0.99.1-source.tar.gz",
+      "bytes": 8646242,
+      "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b",
+      "prefix": "pi-0.99.1/",
+      "existingQualifiedTrackedComparisons": 2093,
+      "existingRawGitBlobMatches": 2091,
+      "existingDeclaredAttributeConversions": 2,
+      "selectedPayloadComparisons": 32
+    },
+    "hashSemantics": "SHA256 of exact bytes. gitBlob is SHA1 of raw Git blob header+bytes computed without Git execution. Selected source/dependency/context payloads byte-compared to the qualified publisher archive and canonical receipt; no imported/executed source."
+  },
+  "license": {
+    "spdx": "MIT",
+    "source": {
+      "path": "LICENSE",
+      "bytes": 1069,
+      "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48",
+      "gitBlob": "b0a8e9b81083294360c69b4ec45d3d39a2b28197",
+      "publisherArchiveMember": "pi-0.99.1/LICENSE",
+      "checkoutEqualsArchivePayload": true
+    },
+    "wholeNotice": "MIT License\n\nCopyright (c) 2025 Mario Zechner\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+    "redistribution": "This inventory adds no source copies. Future copied source must retain this entire notice.",
+    "dependencyNoticeStatus": "Unverified: lock license strings are metadata; actual archive/installed full-notice closure remains required."
+  },
+  "gate": {
+    "P7_01": "HOLD",
+    "P7_02": "HOLD",
+    "P7_G": "HOLD",
+    "requirementStatus": "Deferred",
+    "upstreamExtensionsExecuted": false,
+    "bridgeExecuted": false,
+    "supportMatrixFrozen": false,
+    "proceedNarrowDeferDecision": null,
+    "productParityCredit": false,
+    "allEightPhaseGatesChanged": false
+  },
+  "counts": {
+    "realExtensionEntrypoints": 11,
+    "realExtensionTypeScriptFiles": 12,
+    "relativeHelperFiles": 1,
+    "authoredScenarioGroups": 42,
+    "executedScenarioGroups": 0,
+    "passingScenarioGroups": 0,
+    "lockInstancesRecorded": 18
+  },
+  "method": {
+    "classification": "Complete-file manual review plus inert exact-byte/hash/import/API anchor checks.",
+    "apiAnchorSemantics": "First spelling of a manually reviewed API symbol in the file; this may identify its import. Calls were reviewed in the complete source, not counted by an unqualified AST parser.",
+    "typeScriptAstClosureQualified": false,
+    "dynamicClosureQualified": false,
+    "absenceOfDirectDynamicImportsIsNotTransitiveClosure": true,
+    "contextProvenanceFilesAreNotExtraExtensions": true
+  },
+  "sourceFiles": [
+    {
+      "path": "packages/coding-agent/examples/extensions/hello.ts",
+      "bytes": 640,
+      "sha256": "0aa4e9800c2526914d4c1edb00b2cfa9bd9dd6da5218289994cccd5f5bfa4934",
+      "gitBlob": "52da3910bdc3cb316ced113dc1c95a2dd6b5f7cb",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/hello.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-default-extension-factory",
+      "imports": [
+        {
+          "specifier": "@earendil-works/pi-ai",
+          "rawClause": "{ Type }",
+          "kind": "runtime",
+          "runtimeBindings": [
+            "Type"
+          ],
+          "typeBindings": [],
+          "line": 5
+        },
+        {
+          "specifier": "@earendil-works/pi-coding-agent",
+          "rawClause": "{ defineTool, type ExtensionAPI }",
+          "kind": "mixed",
+          "runtimeBindings": [
+            "defineTool"
+          ],
+          "typeBindings": [
+            "ExtensionAPI"
+          ],
+          "line": 6
+        }
+      ],
+      "directDynamicImportOrRequireExpressions": 0
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/commands.ts",
+      "bytes": 2594,
+      "sha256": "36716b53da169936c7e1360a4fde1e2fc0c3356a6505f177235f09c5538c6e4f",
+      "gitBlob": "346c5f21eafccfadba446968e44ff79a97fab758",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/commands.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-default-extension-factory",
+      "imports": [
+        {
+          "specifier": "@earendil-works/pi-coding-agent",
+          "rawClause": "type { ExtensionAPI, SlashCommandInfo }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "ExtensionAPI",
+            "SlashCommandInfo"
+          ],
+          "line": 13
+        }
+      ],
+      "directDynamicImportOrRequireExpressions": 0
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/input-transform.ts",
+      "bytes": 1444,
+      "sha256": "cf0f65d610631ca75d18aae1c8f1408139702f674cb2835f8c009b943776474b",
+      "gitBlob": "e47c1af5d737d00c11b6e751721e09050a6240c5",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/input-transform.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-default-extension-factory",
+      "imports": [
+        {
+          "specifier": "@earendil-works/pi-coding-agent",
+          "rawClause": "type { ExtensionAPI }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "ExtensionAPI"
+          ],
+          "line": 12
+        }
+      ],
+      "directDynamicImportOrRequireExpressions": 0
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/protected-paths.ts",
+      "bytes": 808,
+      "sha256": "9ca66b1f3b1b9a61cc5ddc660f92cca2ea66c4264a1bdb6b00e0da5844399fe2",
+      "gitBlob": "2cd9cd2bd2b0cac517eca71e17ee7b94d1647c24",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/protected-paths.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-default-extension-factory",
+      "imports": [
+        {
+          "specifier": "@earendil-works/pi-coding-agent",
+          "rawClause": "type { ExtensionAPI }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "ExtensionAPI"
+          ],
+          "line": 8
+        }
+      ],
+      "directDynamicImportOrRequireExpressions": 0
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/plan-mode/index.ts",
+      "bytes": 12135,
+      "sha256": "90fae53e2fada97165f7488520bd54f3cbfe5d2c7e4cfd3bd2aa07ee796e61e8",
+      "gitBlob": "737ce56ac7eb9053458454e7dbf942452aa7dfd9",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/plan-mode/index.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-default-extension-factory",
+      "imports": [
+        {
+          "specifier": "@earendil-works/pi-agent-core",
+          "rawClause": "type { AgentMessage }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "AgentMessage"
+          ],
+          "line": 15
+        },
+        {
+          "specifier": "@earendil-works/pi-ai",
+          "rawClause": "type { AssistantMessage, TextContent }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "AssistantMessage",
+            "TextContent"
+          ],
+          "line": 16
+        },
+        {
+          "specifier": "@earendil-works/pi-coding-agent",
+          "rawClause": "type { ExtensionAPI, ExtensionContext }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "ExtensionAPI",
+            "ExtensionContext"
+          ],
+          "line": 17
+        },
+        {
+          "specifier": "@earendil-works/pi-tui",
+          "rawClause": "{ Key }",
+          "kind": "runtime",
+          "runtimeBindings": [
+            "Key"
+          ],
+          "typeBindings": [],
+          "line": 18
+        },
+        {
+          "specifier": "./utils.ts",
+          "rawClause": "{ extractTodoItems, isSafeCommand, markCompletedSteps, type TodoItem }",
+          "kind": "mixed",
+          "runtimeBindings": [
+            "extractTodoItems",
+            "isSafeCommand",
+            "markCompletedSteps"
+          ],
+          "typeBindings": [
+            "TodoItem"
+          ],
+          "line": 19
+        }
+      ],
+      "directDynamicImportOrRequireExpressions": 0
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/plan-mode/utils.ts",
+      "bytes": 4129,
+      "sha256": "12ea28d57cc55e68e8d52a2f1d16df8b2e7f2749cd694d41453028002a2bdad9",
+      "gitBlob": "62123f9e3996be2dcab549addcb312b6ec59dbff",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/plan-mode/utils.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-relative-helper",
+      "imports": [],
+      "directDynamicImportOrRequireExpressions": 0
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/todo.ts",
+      "bytes": 8848,
+      "sha256": "e46824d00217e25242c186d41837cc84ca81b23f978500323448502a9a424ee2",
+      "gitBlob": "67cba7424dc329dc09c2c582eb5c54044ef3433a",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/todo.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-default-extension-factory",
+      "imports": [
+        {
+          "specifier": "@earendil-works/pi-ai",
+          "rawClause": "{ StringEnum }",
+          "kind": "runtime",
+          "runtimeBindings": [
+            "StringEnum"
+          ],
+          "typeBindings": [],
+          "line": 13
+        },
+        {
+          "specifier": "@earendil-works/pi-coding-agent",
+          "rawClause": "type { ExtensionAPI, ExtensionContext, Theme }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "ExtensionAPI",
+            "ExtensionContext",
+            "Theme"
+          ],
+          "line": 14
+        },
+        {
+          "specifier": "@earendil-works/pi-tui",
+          "rawClause": "{ matchesKey, Text, truncateToWidth }",
+          "kind": "runtime",
+          "runtimeBindings": [
+            "matchesKey",
+            "Text",
+            "truncateToWidth"
+          ],
+          "typeBindings": [],
+          "line": 15
+        },
+        {
+          "specifier": "typebox",
+          "rawClause": "{ Type }",
+          "kind": "runtime",
+          "runtimeBindings": [
+            "Type"
+          ],
+          "typeBindings": [],
+          "line": 16
+        }
+      ],
+      "directDynamicImportOrRequireExpressions": 0
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/provider-payload.ts",
+      "bytes": 764,
+      "sha256": "e0016077798098f528b1129954c30a28809a1513924d9c2e0efda9328d503a49",
+      "gitBlob": "7f02a077618f40f02996f98420d359ffc94ccee4",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/provider-payload.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-default-extension-factory",
+      "imports": [
+        {
+          "specifier": "node:fs",
+          "rawClause": "{ appendFileSync }",
+          "kind": "runtime",
+          "runtimeBindings": [
+            "appendFileSync"
+          ],
+          "typeBindings": [],
+          "line": 1
+        },
+        {
+          "specifier": "node:path",
+          "rawClause": "{ join }",
+          "kind": "runtime",
+          "runtimeBindings": [
+            "join"
+          ],
+          "typeBindings": [],
+          "line": 2
+        },
+        {
+          "specifier": "@earendil-works/pi-coding-agent",
+          "rawClause": "{ CONFIG_DIR_NAME, type ExtensionAPI }",
+          "kind": "mixed",
+          "runtimeBindings": [
+            "CONFIG_DIR_NAME"
+          ],
+          "typeBindings": [
+            "ExtensionAPI"
+          ],
+          "line": 3
+        }
+      ],
+      "directDynamicImportOrRequireExpressions": 0
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/custom-provider-anthropic/index.ts",
+      "bytes": 19811,
+      "sha256": "52bb733e1a25d9e175a644e6a6e17bbf61071beecf0f2903869baa9579a05ab3",
+      "gitBlob": "5f116651fa15864fd30688efc5709c7e8668ec1a",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/custom-provider-anthropic/index.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-default-extension-factory",
+      "imports": [
+        {
+          "specifier": "@anthropic-ai/sdk",
+          "rawClause": "Anthropic",
+          "kind": "runtime",
+          "runtimeBindings": [
+            "Anthropic"
+          ],
+          "typeBindings": [],
+          "line": 24
+        },
+        {
+          "specifier": "@anthropic-ai/sdk/resources/messages.js",
+          "rawClause": "type { ContentBlockParam, MessageCreateParamsStreaming }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "ContentBlockParam",
+            "MessageCreateParamsStreaming"
+          ],
+          "line": 25
+        },
+        {
+          "specifier": "@earendil-works/pi-ai",
+          "rawClause": "{\n\ttype Api,\n\ttype AssistantMessage,\n\ttype AssistantMessageEventStream,\n\tcalculateCost,\n\tcollapseSystemMessages,\n\tcreateAssistantMessageEventStream,\n\tgetCurrentSystemPrompt,\n\tgetCurrentTools,\n\ttype ImageContent,\n\ttype Message,\n\ttype Model,\n\ttype OAuthCredentials,\n\ttype OAuthLoginCallbacks,\n\ttype SimpleStreamOptions,\n\ttype StopReason,\n\ttype TextContent,\n\ttype ThinkingContent,\n\ttype Tool,\n\ttype ToolCall,\n\ttype ToolResultMessage,\n\ttype TranscriptContext,\n}",
+          "kind": "mixed",
+          "runtimeBindings": [
+            "calculateCost",
+            "collapseSystemMessages",
+            "createAssistantMessageEventStream",
+            "getCurrentSystemPrompt",
+            "getCurrentTools"
+          ],
+          "typeBindings": [
+            "Api",
+            "AssistantMessage",
+            "AssistantMessageEventStream",
+            "ImageContent",
+            "Message",
+            "Model",
+            "OAuthCredentials",
+            "OAuthLoginCallbacks",
+            "SimpleStreamOptions",
+            "StopReason",
+            "TextContent",
+            "ThinkingContent",
+            "Tool",
+            "ToolCall",
+            "ToolResultMessage",
+            "TranscriptContext"
+          ],
+          "line": 26
+        },
+        {
+          "specifier": "@earendil-works/pi-coding-agent",
+          "rawClause": "type { ExtensionAPI }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "ExtensionAPI"
+          ],
+          "line": 49
+        }
+      ],
+      "directDynamicImportOrRequireExpressions": 0
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/rpc-demo.ts",
+      "bytes": 3632,
+      "sha256": "3d54a396eee12eb04ea12d0ea03716a6edd3e8743502b6a529e3b8d429ae640d",
+      "gitBlob": "78789a13ee970f0c24643499f2b3575f00a00b1c",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/rpc-demo.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-default-extension-factory",
+      "imports": [
+        {
+          "specifier": "@earendil-works/pi-coding-agent",
+          "rawClause": "type { ExtensionAPI }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "ExtensionAPI"
+          ],
+          "line": 20
+        }
+      ],
+      "directDynamicImportOrRequireExpressions": 0
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/custom-footer.ts",
+      "bytes": 2149,
+      "sha256": "1e5f17bec95a48d407fbcc092faf7e1f6021c30cee4a66ec09bc120412292cb2",
+      "gitBlob": "15e41e06f0b5358c030305b571e92912cfcfc548",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/custom-footer.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-default-extension-factory",
+      "imports": [
+        {
+          "specifier": "@earendil-works/pi-ai",
+          "rawClause": "type { AssistantMessage }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "AssistantMessage"
+          ],
+          "line": 11
+        },
+        {
+          "specifier": "@earendil-works/pi-coding-agent",
+          "rawClause": "type { ExtensionAPI }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "ExtensionAPI"
+          ],
+          "line": 12
+        },
+        {
+          "specifier": "@earendil-works/pi-tui",
+          "rawClause": "{ truncateToWidth, visibleWidth }",
+          "kind": "runtime",
+          "runtimeBindings": [
+            "truncateToWidth",
+            "visibleWidth"
+          ],
+          "typeBindings": [],
+          "line": 13
+        }
+      ],
+      "directDynamicImportOrRequireExpressions": 0
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/with-deps/index.ts",
+      "bytes": 1012,
+      "sha256": "8d4dbc7028c891eac7f0386d25eecea3e9ac0de7fd841b5bb08137e2ec5ab443",
+      "gitBlob": "17be7da0486aa01c37a2750d60edaae7506c8bc1",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/with-deps/index.ts",
+      "checkoutEqualsArchivePayload": true,
+      "role": "unchanged-default-extension-factory",
+      "imports": [
+        {
+          "specifier": "@earendil-works/pi-coding-agent",
+          "rawClause": "type { ExtensionAPI }",
+          "kind": "type-only",
+          "runtimeBindings": [],
+          "typeBindings": [
+            "ExtensionAPI"
+          ],
+          "line": 8
+        },
+        {
+          "specifier": "ms",
+          "rawClause": "ms",
+          "kind": "runtime",
+          "runtimeBindings": [
+            "ms"
+          ],
+          "typeBindings": [],
+          "line": 9
+        },
+        {
+          "specifier": "typebox",
+          "rawClause": "{ Type }",
+          "kind": "runtime",
+          "runtimeBindings": [
+            "Type"
+          ],
+          "typeBindings": [],
+          "line": 10
+        }
+      ],
+      "directDynamicImportOrRequireExpressions": 0
+    }
+  ],
+  "contextSourceFiles": [
+    {
+      "path": "LICENSE",
+      "bytes": 1069,
+      "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48",
+      "gitBlob": "b0a8e9b81083294360c69b4ec45d3d39a2b28197",
+      "publisherArchiveMember": "pi-0.99.1/LICENSE",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 186139,
+      "sha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d",
+      "gitBlob": "40fad3ada2f59d453a41dec64f0d6f39f21fc878",
+      "publisherArchiveMember": "pi-0.99.1/package-lock.json",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "package.json",
+      "bytes": 5023,
+      "sha256": "afa486075d170d51b601e8ea92fb1c8c8720fb5b4efb67947285f157d88f3eed",
+      "gitBlob": "26493c596bc8f78845ea61f78dc203a09dc3119e",
+      "publisherArchiveMember": "pi-0.99.1/package.json",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/coding-agent/package.json",
+      "bytes": 4163,
+      "sha256": "c701ddbf28b5170deb478b8586ee713f9372027c04736946a4ffe82168ece5ba",
+      "gitBlob": "22b6fdcb43e81f4eb7f782c44e4d659293dcb544",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/package.json",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/ai/package.json",
+      "bytes": 2636,
+      "sha256": "86a8ccb86ce00af196fc7d48417f82e99c6da40c68d8d138ace2a4f0fda4090d",
+      "gitBlob": "99e1ca54cafe0ac5eefa2b1168ca061e3de1329c",
+      "publisherArchiveMember": "pi-0.99.1/packages/ai/package.json",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/tui/package.json",
+      "bytes": 1594,
+      "sha256": "bfe1aa9bb42fa627e833cb1de27c417d38615cb261c1f46214c73850d353c817",
+      "gitBlob": "33218dd1d8986372773eb2caa99aeab7b7a525e4",
+      "publisherArchiveMember": "pi-0.99.1/packages/tui/package.json",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/agent/package.json",
+      "bytes": 2840,
+      "sha256": "72250dc992253e2de5a6c93ad2f99941ffcc14ee2562db98bbb24e6a7378544b",
+      "gitBlob": "c983f53f05bfdc3b81a9650b025a8cbf2be08fd6",
+      "publisherArchiveMember": "pi-0.99.1/packages/agent/package.json",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/with-deps/package.json",
+      "bytes": 396,
+      "sha256": "65d1e68ff388dcbdebacff1649fb05f6a8657b154b2c79f104ce26762e5308f9",
+      "gitBlob": "472405a64aef5e435646c8ff2e440ac6421c1768",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/with-deps/package.json",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/with-deps/package-lock.json",
+      "bytes": 894,
+      "sha256": "c0aab020f612789fd4c6457d57db2e8a777d2d5a98e0e3274dec22fcac8860be",
+      "gitBlob": "2b01794b0f89bcebf1d6bf38cbf356d65b8fe6b9",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/with-deps/package-lock.json",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/custom-provider-anthropic/package.json",
+      "bytes": 375,
+      "sha256": "6d2001ef68bf92eef4f5891bf235a854bda9efdaea25e38c81940213848c57e7",
+      "gitBlob": "e047ebd4e1108f4d32da9992389f83e691cf036b",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/custom-provider-anthropic/package.json",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/custom-provider-anthropic/package-lock.json",
+      "bytes": 653,
+      "sha256": "f564a1ef297dc3a79ec72cbcd85362f09674685828287cd09a6ecd8e32c00b13",
+      "gitBlob": "0f04a4b6e990ec2354e48dd096522edbe95fe8bf",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/examples/extensions/custom-provider-anthropic/package-lock.json",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/loader.ts",
+      "bytes": 27197,
+      "sha256": "aa903524bb2db3ee9fb7f21e863e373e7f12a56c74fd05d27c879a4a7020deb0",
+      "gitBlob": "d2367f7803e48ac2d3abc6e1f0db3c96e5987853",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/src/core/extensions/loader.ts",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/runner.ts",
+      "bytes": 51250,
+      "sha256": "1a0d73843fba5773d415f484c46898138723b73d27bf8c3159f491fa0b6232f3",
+      "gitBlob": "59e1eb62ead717ebfa724be17f107804f60d6c6e",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/src/core/extensions/runner.ts",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/types.ts",
+      "bytes": 81892,
+      "sha256": "de0ccce3b8b222d19a2ecef24902fc72aab62b6573129cbf886bc064dd6ab505",
+      "gitBlob": "ddbaa846419f33004a58f1c57bab5070f701892e",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/src/core/extensions/types.ts",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/jiti-loader.ts",
+      "bytes": 177,
+      "sha256": "199594e72a9d8abe002c5e80420b94bb65ad0d7953f301249cf7a08652359042",
+      "gitBlob": "ae0c4597248b504a63cd13016c23e86b92fae5bc",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/src/core/extensions/jiti-loader.ts",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/virtual-modules.ts",
+      "bytes": 2010,
+      "sha256": "9a6cdfd7c21fd38fcf1e885990886e38a45f0f0355b918a4bbd757f460470622",
+      "gitBlob": "66a71f695cb83985698412530281e476c5529fb7",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/src/core/extensions/virtual-modules.ts",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/coding-agent/src/config.ts",
+      "bytes": 21035,
+      "sha256": "058e3ae23dece7482858c28fa731f56cecba6d52c3243aab76a94fb26ad3e993",
+      "gitBlob": "360c609e8dfc58c5eb73a770b76068f9b1c37b5f",
+      "publisherArchiveMember": "pi-0.99.1/packages/coding-agent/src/config.ts",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/ai/src/compat.ts",
+      "bytes": 10806,
+      "sha256": "fe077a90f918a69fa6595cf9a7b4571e28e78b57fd52ccde498c5151838569be",
+      "gitBlob": "e41ff083c187e36c10d3665aa7bbc74386ea3764",
+      "publisherArchiveMember": "pi-0.99.1/packages/ai/src/compat.ts",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/ai/src/index.ts",
+      "bytes": 2395,
+      "sha256": "c909ef4f82daff2f494ce1aa29d8bd68390f6513c5aff047088cadb3fa96ecea",
+      "gitBlob": "65d5eae7deabc5dc7f90183ccc3d620a675c7d66",
+      "publisherArchiveMember": "pi-0.99.1/packages/ai/src/index.ts",
+      "checkoutEqualsArchivePayload": true
+    },
+    {
+      "path": "packages/tui/src/index.ts",
+      "bytes": 4970,
+      "sha256": "279b578543913b3333f00beffaacfa346b67e574ab8f4f8fc7603ecd00c6d66e",
+      "gitBlob": "93fb8b72777a3a4f8423cf4e7d5f74b8dbd982f0",
+      "publisherArchiveMember": "pi-0.99.1/packages/tui/src/index.ts",
+      "checkoutEqualsArchivePayload": true
+    }
+  ],
+  "dependencyLockInstances": [
+    {
+      "lockPath": "package-lock.json",
+      "instance": "node_modules/jiti",
+      "entry": {
+        "version": "2.7.0",
+        "resolved": "https://registry.npmjs.org/jiti/-/jiti-2.7.0.tgz",
+        "integrity": "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==",
+        "license": "MIT",
+        "bin": {
+          "jiti": "lib/jiti-cli.mjs"
+        }
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "node_modules/typebox",
+      "entry": {
+        "version": "1.3.27",
+        "resolved": "https://registry.npmjs.org/typebox/-/typebox-1.3.27.tgz",
+        "integrity": "sha512-zu+jc1pcy4UiNThxikUr36f0Rybk9PEeCg/NE6adeWr/SKsdNO4EzZHYRDlv2YCVAfj3Odq3dESSo/jNyoBXzA==",
+        "license": "MIT"
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "node_modules/ms",
+      "entry": {
+        "version": "2.1.3",
+        "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
+        "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
+        "license": "MIT"
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "node_modules/@types/ms",
+      "entry": {
+        "version": "2.1.0",
+        "resolved": "https://registry.npmjs.org/@types/ms/-/ms-2.1.0.tgz",
+        "integrity": "sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==",
+        "dev": true,
+        "license": "MIT"
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "node_modules/@anthropic-ai/sdk",
+      "entry": {
+        "version": "0.124.0",
+        "resolved": "https://registry.npmjs.org/@anthropic-ai/sdk/-/sdk-0.124.0.tgz",
+        "integrity": "sha512-cN5O8i9UVxHeOQAzj/XjshWXG8KiibJDw9OGpH2Z/eR3n/RBxdoLxDJOcfqAJWvjaMDFfHTBADU04hWRJVkDyA==",
+        "license": "MIT",
+        "dependencies": {
+          "json-schema-to-ts": "^3.1.1",
+          "standardwebhooks": "^1.0.0"
+        },
+        "bin": {
+          "anthropic-ai-sdk": "bin/cli"
+        },
+        "peerDependencies": {
+          "zod": "^3.25.0 || ^4.0.0"
+        },
+        "peerDependenciesMeta": {
+          "zod": {
+            "optional": true
+          }
+        }
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "packages/coding-agent/node_modules/@anthropic-ai/sdk",
+      "entry": {
+        "version": "0.52.0",
+        "resolved": "https://registry.npmjs.org/@anthropic-ai/sdk/-/sdk-0.52.0.tgz",
+        "integrity": "sha512-d4c+fg+xy9e46c8+YnrrgIQR45CZlAi7PwdzIfDXDM6ACxEZli1/fxhURsq30ZpMZy6LvSkr41jGq5aF5TD7rQ==",
+        "license": "MIT",
+        "bin": {
+          "anthropic-ai-sdk": "bin/cli"
+        }
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "packages/coding-agent/node_modules/@earendil-works/pi-ai/node_modules/@anthropic-ai/sdk",
+      "entry": {
+        "version": "0.91.1",
+        "resolved": "https://registry.npmjs.org/@anthropic-ai/sdk/-/sdk-0.91.1.tgz",
+        "integrity": "sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw==",
+        "extraneous": true,
+        "license": "MIT",
+        "dependencies": {
+          "json-schema-to-ts": "^3.1.1"
+        },
+        "bin": {
+          "anthropic-ai-sdk": "bin/cli"
+        },
+        "peerDependencies": {
+          "zod": "^3.25.0 || ^4.0.0"
+        },
+        "peerDependenciesMeta": {
+          "zod": {
+            "optional": true
+          }
+        }
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "node_modules/get-east-asian-width",
+      "entry": {
+        "version": "1.6.0",
+        "resolved": "https://registry.npmjs.org/get-east-asian-width/-/get-east-asian-width-1.6.0.tgz",
+        "integrity": "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA==",
+        "license": "MIT",
+        "engines": {
+          "node": ">=18"
+        },
+        "funding": {
+          "url": "https://github.com/sponsors/sindresorhus"
+        }
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "node_modules/marked",
+      "entry": {
+        "version": "18.0.11",
+        "resolved": "https://registry.npmjs.org/marked/-/marked-18.0.11.tgz",
+        "integrity": "sha512-HnslJfsZkRPBDJRHvVtAaWlZHEpSu7u8LgQuJCELjRKuWR+hpq4A7sLq3p8HaI9ypVoXDXxV34CsQJEe1+J5Aw==",
+        "license": "MIT",
+        "bin": {
+          "marked": "bin/marked.js"
+        },
+        "engines": {
+          "node": ">= 20"
+        }
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "node_modules/@earendil-works/pi-coding-agent",
+      "entry": {
+        "resolved": "packages/coding-agent",
+        "link": true
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "node_modules/@earendil-works/pi-ai",
+      "entry": {
+        "resolved": "packages/ai",
+        "link": true
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "node_modules/@earendil-works/pi-tui",
+      "entry": {
+        "resolved": "packages/tui",
+        "link": true
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "node_modules/@earendil-works/pi-agent-core",
+      "entry": {
+        "resolved": "packages/agent",
+        "link": true
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "packages/coding-agent/examples/extensions/custom-provider-anthropic",
+      "entry": {
+        "name": "pi-extension-custom-provider-anthropic",
+        "version": "0.99.1",
+        "dependencies": {
+          "@anthropic-ai/sdk": "0.52.0"
+        }
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "package-lock.json",
+      "instance": "packages/coding-agent/examples/extensions/with-deps",
+      "entry": {
+        "name": "pi-extension-with-deps",
+        "version": "0.99.1",
+        "dependencies": {
+          "ms": "2.1.3"
+        },
+        "devDependencies": {
+          "@types/ms": "2.1.0"
+        }
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "packages/coding-agent/examples/extensions/with-deps/package-lock.json",
+      "instance": "node_modules/ms",
+      "entry": {
+        "version": "2.1.3",
+        "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
+        "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
+        "license": "MIT"
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "packages/coding-agent/examples/extensions/with-deps/package-lock.json",
+      "instance": "node_modules/@types/ms",
+      "entry": {
+        "version": "2.1.0",
+        "resolved": "https://registry.npmjs.org/@types/ms/-/ms-2.1.0.tgz",
+        "integrity": "sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==",
+        "dev": true,
+        "license": "MIT"
+      },
+      "acquiredClosure": "Unverified"
+    },
+    {
+      "lockPath": "packages/coding-agent/examples/extensions/custom-provider-anthropic/package-lock.json",
+      "instance": "node_modules/@anthropic-ai/sdk",
+      "entry": {
+        "version": "0.52.0",
+        "resolved": "https://registry.npmjs.org/@anthropic-ai/sdk/-/sdk-0.52.0.tgz",
+        "integrity": "sha512-d4c+fg+xy9e46c8+YnrrgIQR45CZlAi7PwdzIfDXDM6ACxEZli1/fxhURsq30ZpMZy6LvSkr41jGq5aF5TD7rQ==",
+        "license": "MIT",
+        "bin": {
+          "anthropic-ai-sdk": "bin/cli"
+        }
+      },
+      "acquiredClosure": "Unverified"
+    }
+  ],
+  "dependencyDiscrepancies": [
+    {
+      "id": "anthropic-example-root",
+      "manifestName": "pi-extension-custom-provider-anthropic",
+      "lockRootName": "pi-extension-custom-provider",
+      "manifestRange": "0.52.0",
+      "lockRootRange": "^0.52.0",
+      "lockedVersion": "0.52.0",
+      "action": "Preserve exact canonical files; reviewed exact acquisition/resolution qualification, not an npm ci assumption or root SDK substitution."
+    },
+    {
+      "id": "ms-example-ranges",
+      "manifestRanges": {
+        "ms": "2.1.3",
+        "@types/ms": "2.1.0"
+      },
+      "lockRootRanges": {
+        "ms": "^2.1.3",
+        "@types/ms": "^2.1.0"
+      },
+      "lockedVersions": {
+        "ms": "2.1.3",
+        "@types/ms": "2.1.0"
+      },
+      "action": "Preserve canonical ranges/lock records; actual installed/archive/license qualification before execution."
+    },
+    {
+      "id": "anthropic-three-instances",
+      "versions": [
+        "0.124.0",
+        "0.52.0",
+        "0.91.1"
+      ],
+      "extraneousVersion": "0.91.1",
+      "action": "Record resolved identity per importer. The extraneous neighbor is inventoried, not admitted as the example SDK."
+    }
+  ],
+  "publicAliasRequirements": [
+    {
+      "specifier": "@earendil-works/pi-ai",
+      "sourceLoaderTarget": "packages/ai/src/compat.ts in source mode; dist/compat.js built alias",
+      "neededExports": [
+        "Type",
+        "StringEnum",
+        "calculateCost",
+        "collapseSystemMessages",
+        "createAssistantMessageEventStream",
+        "getCurrentSystemPrompt",
+        "getCurrentTools"
+      ],
+      "action": "Explicit compatible helpers/facades bound to native-owned state/stream contracts; no disconnected registry/full engine substitute."
+    },
+    {
+      "specifier": "@earendil-works/pi-coding-agent",
+      "neededExports": [
+        "defineTool",
+        "CONFIG_DIR_NAME"
+      ],
+      "typeOnlyExports": [
+        "ExtensionAPI",
+        "ExtensionContext",
+        "Theme",
+        "SlashCommandInfo"
+      ],
+      "action": "Explicit helper/constants adapters and erased type imports."
+    },
+    {
+      "specifier": "@earendil-works/pi-tui",
+      "neededExports": [
+        "Key",
+        "matchesKey",
+        "Text",
+        "truncateToWidth",
+        "visibleWidth"
+      ],
+      "action": "Pin helpers/import closure. Component objects/renderers require explicit diagnostics or separately qualified UI host."
+    },
+    {
+      "specifier": "typebox",
+      "neededExports": [
+        "Type"
+      ],
+      "version": "1.3.27",
+      "action": "Real locked schema builder and module identity with admitted archives/notices; native final schema validator still required."
+    }
+  ],
+  "blockers": [
+    {
+      "id": "loader",
+      "requirements": [
+        "P7-04",
+        "P7-05"
+      ],
+      "status": "Deferred",
+      "needed": "Optional supervised Node worker and qualified jiti2.7.0 TypeScript ESM/CJS loader; exact runtime/loader/archive/installed/license closure and confined source discovery. No auto-install/native-core dependency.",
+      "existing": "Baseline pins preinstalled Node v24.19.0. No ExtensionHost/Compatibility.Node project exists in this snapshot; reference runtime availability does not qualify product packaging."
+    },
+    {
+      "id": "callbacks",
+      "requirements": [
+        "P6-03",
+        "P6-06",
+        "P6-07",
+        "P7-03",
+        "P7-06",
+        "P7-09"
+      ],
+      "status": "Deferred",
+      "needed": "Bounded full-duplex protocol, opaque JS callback handles, transactional registration, source tool signature/progress/command completions, owner/generation cancellation/revocation.",
+      "existing": "Experimental native registration/owned callbacks/prepared Agent binding exist in pinned files, without a qualified JS protocol/proxy."
+    },
+    {
+      "id": "reducers",
+      "requirements": [
+        "P6-02",
+        "P6-06",
+        "P7-06"
+      ],
+      "status": "Deferred",
+      "needed": "Translate source Continue/Transform/Handled, own undefined, block/cancel, context replacement and provider composition preserving order/final native policy.",
+      "existing": "Native typed input/tool-call/tool-result reducers exist; selected context/provider/session hooks are absent from current IExtensionRegistry."
+    },
+    {
+      "id": "tools",
+      "requirements": [
+        "P6-06",
+        "P7-07",
+        "P7-09"
+      ],
+      "status": "Deferred",
+      "needed": "Bind Node tool execution into prepared native ToolInvoker final-schema/action-policy/generation/cap paths, with bounded nested callbacks and no unknown-effect replay.",
+      "existing": "ExtensionAgentBinding requires explicit trusted schema validator/action policy; no qualified worker tool adapter."
+    },
+    {
+      "id": "snapshots",
+      "requirements": [
+        "P6-07",
+        "P7-07"
+      ],
+      "status": "Deferred",
+      "needed": "Synchronous pi.getCommands/getActiveTools and ctx.sessionManager.getBranch/getEntries/cwd/model/mode/hasUI views, with freshness after native mutation.",
+      "existing": "Current IExtensionContext exposes ownership/cancellation only; converting getters to async breaks unchanged source."
+    },
+    {
+      "id": "session",
+      "requirements": [
+        "P6-07",
+        "P7-07"
+      ],
+      "status": "Deferred",
+      "needed": "Awaited native custom entries/messages/follow-ups, tool selection, session-before-switch cancellation and generation transactions while preserving source synchronous state.",
+      "existing": "Native ownership/durable session primitives are prerequisites, not a complete source-shaped facade."
+    },
+    {
+      "id": "dialogs",
+      "requirements": [
+        "P6-08",
+        "P7-07",
+        "P7-08"
+      ],
+      "status": "Deferred",
+      "needed": "Bounded correlated select/confirm/input/editor/status/widget/title/editor-text capabilities, reentrant read loop, cancellation and no-UI denial.",
+      "existing": "Current IExtensionContext has no UI contract; frontend/RPC work alone cannot qualify Node adapters."
+    },
+    {
+      "id": "components",
+      "requirements": [
+        "P6-08",
+        "P7-02",
+        "P7-08"
+      ],
+      "status": "Deferred",
+      "needed": "Explicit initial unsupported diagnostics for customFooter/custom UI/renderCall/renderResult/function/class paths. Decide mixed todo registration behavior without silently deleting fields.",
+      "existing": "Tier C has no initial promise. Genuine upstream rendering/cleanup and bridge negative probes are still required; no permanent phase exclusion."
+    },
+    {
+      "id": "providers",
+      "requirements": [
+        "P6-08",
+        "P7-08"
+      ],
+      "status": "Deferred",
+      "needed": "Generation-owned custom provider/OAuth callbacks with complete request/stream/usage/cost/auth cancellation/error/cleanup observations and native caps.",
+      "existing": "registerProvider/OAuth/JS streaming are absent from current IExtensionRegistry; native transport implementations are dependencies."
+    },
+    {
+      "id": "aliases",
+      "requirements": [
+        "P7-05",
+        "P7-06"
+      ],
+      "status": "Deferred",
+      "needed": "Controlled public package aliases/helpers/module identity with explicit native-owned state bindings; include source-loader dynamic/transitive import/license closure.",
+      "existing": "Pinned loader routes pi-ai root to compat. Loading a disconnected upstream registry or whole engine is insufficient."
+    },
+    {
+      "id": "sdk052",
+      "requirements": [
+        "P7-05",
+        "P7-08"
+      ],
+      "status": "Deferred",
+      "needed": "Admit exact real example SDK0.52.0 archive/SRI/notices/installed closure; preserve manifest-versus-lock discrepancy and qualify chosen import root. Do not substitute SDK0.124.0.",
+      "existing": "Source root ancestor and example-local locks contain .52.0; this inventory asserts no corpus acquisition."
+    },
+    {
+      "id": "ms",
+      "requirements": [
+        "P7-05"
+      ],
+      "status": "Deferred",
+      "needed": "Admit exact ms2.1.3 runtime/type closure and notices; qualify local/hoisted CJS default interop and missing/wrong version faults.",
+      "existing": "Both canonical locks record ms2.1.3; package metadata proves no installed qualification."
+    }
+  ],
+  "nativeDependencyPins": [
+    {
+      "path": "src/PiSharp.Extensions.Abstractions/RegistrationContracts.cs",
+      "bytes": 4045,
+      "sha256": "23035f4d358ce00cb7649abccaa262a4f1f46c3b1e730484eaca8e2682919c5b"
+    },
+    {
+      "path": "src/PiSharp.Extensions.Abstractions/Events/ReducerContracts.cs",
+      "bytes": 3548,
+      "sha256": "817b62a062dd8c10f0d3f4116dc1cc6815906fe6ff440715dcabb04a081a16be"
+    },
+    {
+      "path": "src/PiSharp.Extensions.Agent/ExtensionAgentBinding.cs",
+      "bytes": 7052,
+      "sha256": "ab7d9c689627d273e1d2b04ade1b8c0d9a9a222fbbc21bbb54bb3da072bbee98"
+    },
+    {
+      "path": "src/PiSharp.Extensions.Runtime/Registration/ExtensionRegistrySnapshot.cs",
+      "bytes": 4725,
+      "sha256": "6b58e806909e487d834b61e1e56cae284ae559b73650700043d980ec3f53b118"
+    }
+  ],
+  "extensions": [
+    {
+      "id": "hello",
+      "entrypoint": "packages/coding-agent/examples/extensions/hello.ts",
+      "relativeSourceDependencies": [],
+      "families": [
+        "tool"
+      ],
+      "tierProbes": [
+        "A"
+      ],
+      "bridgeCompatibility": "Unverified",
+      "requiredDependencies": [
+        "callbacks",
+        "tools",
+        "aliases"
+      ],
+      "actualApiUsage": [
+        {
+          "api": "pi.registerTool",
+          "line": 25,
+          "status": "Unverified"
+        },
+        {
+          "api": "defineTool",
+          "line": 6,
+          "status": "Unverified"
+        },
+        {
+          "api": "Type.Object",
+          "line": 12,
+          "status": "Unverified"
+        },
+        {
+          "api": "Type.String",
+          "line": 13,
+          "status": "Unverified"
+        }
+      ],
+      "registeredEvents": [],
+      "scenarios": [
+        {
+          "id": "hello-result",
+          "status": "Unverified",
+          "inputs": {
+            "tool": "hello",
+            "toolCallId": "hello-1",
+            "arguments": {
+              "name": "Ada"
+            }
+          },
+          "observations": [
+            "Complete content/details/schema and exact greeting."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "hello-unicode",
+          "status": "Unverified",
+          "inputs": {
+            "tool": "hello",
+            "toolCallId": "hello-2",
+            "arguments": {
+              "name": "Ada 👋\nnext"
+            }
+          },
+          "observations": [
+            "Preserve all Unicode/newline fields through native tool result normalization."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "hello-denied",
+          "status": "Unverified",
+          "inputs": {
+            "tool": "hello",
+            "arguments": {
+              "name": "Ada"
+            },
+            "nativePolicy": "deny"
+          },
+          "observations": [
+            "Final native schema/policy remains authoritative; zero callback effects after denial."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        }
+      ]
+    },
+    {
+      "id": "commands",
+      "entrypoint": "packages/coding-agent/examples/extensions/commands.ts",
+      "relativeSourceDependencies": [],
+      "families": [
+        "command",
+        "dialog",
+        "synchronous-getter"
+      ],
+      "tierProbes": [
+        "A",
+        "B"
+      ],
+      "bridgeCompatibility": "Unverified",
+      "requiredDependencies": [
+        "callbacks",
+        "snapshots",
+        "dialogs"
+      ],
+      "actualApiUsage": [
+        {
+          "api": "pi.registerCommand",
+          "line": 16,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.getCommands",
+          "line": 4,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.notify",
+          "line": 31,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.select",
+          "line": 57,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.confirm",
+          "line": 64,
+          "status": "Unverified"
+        }
+      ],
+      "registeredEvents": [],
+      "scenarios": [
+        {
+          "id": "commands-completions",
+          "status": "Unverified",
+          "inputs": {
+            "prefixes": [
+              "",
+              "p",
+              "extension",
+              "unknown"
+            ]
+          },
+          "observations": [
+            "Full ordered completion arrays versus null from actual registered callback."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "commands-list",
+          "status": "Unverified",
+          "inputs": {
+            "args": "",
+            "commands": [
+              {
+                "name": "hello",
+                "description": "greet",
+                "source": "extension",
+                "sourceInfo": {
+                  "path": "/virtual/extensions/hello.ts"
+                }
+              },
+              {
+                "name": "review",
+                "source": "prompt",
+                "sourceInfo": {
+                  "path": "/virtual/prompts/review.md"
+                }
+              },
+              {
+                "name": "skill-a",
+                "source": "skill",
+                "sourceInfo": {
+                  "path": "/virtual/skills/a/SKILL.md"
+                }
+              }
+            ],
+            "selected": "/hello - greet",
+            "confirm": true
+          },
+          "observations": [
+            "Synchronous getCommands snapshot; complete grouped selector items and path notification."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "commands-empty-cancel",
+          "status": "Unverified",
+          "inputs": {
+            "args": [
+              "unknown",
+              "skill"
+            ],
+            "commands": [],
+            "separateNonemptyTableReplies": [
+              "own undefined",
+              "--- Extensions ---",
+              false
+            ]
+          },
+          "observations": [
+            "Separate empty/filter and cancelled/header/denied-confirm cases; own-undefined ledger and no fabricated approval."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "commands-reentrant",
+          "status": "Unverified",
+          "inputs": {
+            "args": "extension",
+            "selected": "/hello - greet",
+            "confirm": false
+          },
+          "observations": [
+            "Pending command services native select then confirm without blocked read loop; cancellation/stale reply controls."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        }
+      ]
+    },
+    {
+      "id": "input-transform",
+      "entrypoint": "packages/coding-agent/examples/extensions/input-transform.ts",
+      "relativeSourceDependencies": [],
+      "families": [
+        "input-transform"
+      ],
+      "tierProbes": [
+        "A",
+        "B"
+      ],
+      "bridgeCompatibility": "Unverified",
+      "requiredDependencies": [
+        "reducers",
+        "dialogs"
+      ],
+      "actualApiUsage": [
+        {
+          "api": "pi.on",
+          "line": 15,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.notify",
+          "line": 25,
+          "status": "Unverified"
+        }
+      ],
+      "registeredEvents": [
+        "input"
+      ],
+      "scenarios": [
+        {
+          "id": "input-chain",
+          "status": "Unverified",
+          "inputs": {
+            "events": [
+              {
+                "source": "interactive",
+                "text": "?quick explain UTF8",
+                "images": [
+                  {
+                    "type": "image",
+                    "data": "AA==",
+                    "mimeType": "image/png"
+                  }
+                ]
+              },
+              {
+                "source": "extension",
+                "text": "?quick do not transform"
+              },
+              {
+                "source": "rpc",
+                "text": "ordinary"
+              }
+            ]
+          },
+          "observations": [
+            "Full Continue/Transform decisions and downstream image preservation; two-extension registration order."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "input-handled",
+          "status": "Unverified",
+          "inputs": {
+            "events": [
+              {
+                "source": "interactive",
+                "text": "?quick "
+              },
+              {
+                "source": "rpc",
+                "text": "PiNg"
+              }
+            ]
+          },
+          "observations": [
+            "Exact warning/pong notifications and Handled short circuit; zero provider calls."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "input-clock",
+          "status": "Unverified",
+          "inputs": {
+            "event": {
+              "source": "interactive",
+              "text": "time"
+            },
+            "clock": "2026-10-01T12:00:00.000Z",
+            "locale": "en-US",
+            "timezone": "UTC"
+          },
+          "observations": [
+            "Actual toLocaleString bytes; record runtime/ICU/locale/TZ and fixed clock, not an assumed portable format."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "input-no-ui",
+          "status": "Unverified",
+          "inputs": {
+            "event": {
+              "source": "rpc",
+              "text": "ping"
+            },
+            "capabilities": {
+              "notify": false
+            }
+          },
+          "observations": [
+            "Explicit unsupported/unavailable diagnostic; do not silently ignore a supported-looking API."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        }
+      ]
+    },
+    {
+      "id": "protected-paths",
+      "entrypoint": "packages/coding-agent/examples/extensions/protected-paths.ts",
+      "relativeSourceDependencies": [],
+      "families": [
+        "tool-blocker"
+      ],
+      "tierProbes": [
+        "A",
+        "B"
+      ],
+      "bridgeCompatibility": "Unverified",
+      "requiredDependencies": [
+        "reducers",
+        "tools",
+        "dialogs"
+      ],
+      "actualApiUsage": [
+        {
+          "api": "pi.on",
+          "line": 13,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.notify",
+          "line": 23,
+          "status": "Unverified"
+        }
+      ],
+      "registeredEvents": [
+        "tool_call"
+      ],
+      "scenarios": [
+        {
+          "id": "protected-block",
+          "status": "Unverified",
+          "inputs": {
+            "toolCalls": [
+              {
+                "toolName": "write",
+                "input": {
+                  "path": ".env"
+                }
+              },
+              {
+                "toolName": "edit",
+                "input": {
+                  "path": "src/node_modules/a.ts"
+                }
+              },
+              {
+                "toolName": "edit",
+                "input": {
+                  "path": ".git/config"
+                }
+              }
+            ],
+            "hasUI": [
+              true,
+              false
+            ]
+          },
+          "observations": [
+            "Complete block reasons, conditional warning and zero denied native effects."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "protected-continue",
+          "status": "Unverified",
+          "inputs": {
+            "toolCalls": [
+              {
+                "toolName": "read",
+                "input": {
+                  "path": ".env"
+                }
+              },
+              {
+                "toolName": "write",
+                "input": {
+                  "path": "src/a.ts"
+                }
+              },
+              {
+                "toolName": "write",
+                "input": {
+                  "path": "C:\\work\\.git\\config"
+                }
+              },
+              {
+                "toolName": "write",
+                "input": {
+                  "path": ".environment"
+                }
+              }
+            ]
+          },
+          "observations": [
+            "Capture source substring/separator decisions and own-undefined returns; this hook is not a canonical-path security policy."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "protected-composition",
+          "status": "Unverified",
+          "inputs": {
+            "order": [
+              "input-transform",
+              "protected-paths"
+            ],
+            "nativeFinalPolicy": "deny final transformed path"
+          },
+          "observations": [
+            "Ordered hooks followed by native final-action schema/authorization."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        }
+      ]
+    },
+    {
+      "id": "plan-mode",
+      "entrypoint": "packages/coding-agent/examples/extensions/plan-mode/index.ts",
+      "relativeSourceDependencies": [
+        "packages/coding-agent/examples/extensions/plan-mode/utils.ts"
+      ],
+      "families": [
+        "context-transform",
+        "persistent-state",
+        "tool-blocker",
+        "command",
+        "shortcut",
+        "dialog",
+        "status",
+        "follow-up"
+      ],
+      "tierProbes": [
+        "A",
+        "B"
+      ],
+      "bridgeCompatibility": "Unverified",
+      "requiredDependencies": [
+        "reducers",
+        "snapshots",
+        "session",
+        "dialogs",
+        "tools",
+        "aliases"
+      ],
+      "actualApiUsage": [
+        {
+          "api": "pi.registerFlag",
+          "line": 53,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.getFlag",
+          "line": 341,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.registerCommand",
+          "line": 141,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.registerShortcut",
+          "line": 158,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.getActiveTools",
+          "line": 106,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.setActiveTools",
+          "line": 108,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.appendEntry",
+          "line": 117,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.on",
+          "line": 164,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.sendMessage",
+          "line": 267,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.sendUserMessage",
+          "line": 334,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.sessionManager.getEntries",
+          "line": 345,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.setStatus",
+          "line": 63,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.setWidget",
+          "line": 80,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.notify",
+          "line": 132,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.select",
+          "line": 301,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.editor",
+          "line": 331,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.theme.fg",
+          "line": 63,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.theme.strikethrough",
+          "line": 75,
+          "status": "Unverified"
+        },
+        {
+          "api": "Key.ctrlAlt",
+          "line": 158,
+          "status": "Unverified"
+        },
+        {
+          "api": "extractTodoItems",
+          "line": 19,
+          "status": "Unverified"
+        },
+        {
+          "api": "isSafeCommand",
+          "line": 19,
+          "status": "Unverified"
+        },
+        {
+          "api": "markCompletedSteps",
+          "line": 19,
+          "status": "Unverified"
+        }
+      ],
+      "registeredEvents": [
+        "tool_call",
+        "context",
+        "before_agent_start",
+        "turn_end",
+        "agent_end",
+        "session_start"
+      ],
+      "scenarios": [
+        {
+          "id": "plan-context-filter",
+          "status": "Unverified",
+          "inputs": {
+            "enabled": false,
+            "messages": [
+              {
+                "role": "user",
+                "content": "keep me"
+              },
+              {
+                "role": "user",
+                "content": "[PLAN MODE ACTIVE] stale"
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "[PLAN MODE ACTIVE] stale"
+                  },
+                  {
+                    "type": "image",
+                    "data": "AA==",
+                    "mimeType": "image/png"
+                  }
+                ]
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "[PLAN MODE ACTIVE] keep assistant"
+                  }
+                ]
+              },
+              {
+                "role": "custom",
+                "customType": "plan-mode-context",
+                "content": "stale"
+              }
+            ]
+          },
+          "observations": [
+            "Complete ordered replacement array, role/field preservation and stale-context removal; no final-text-only comparison."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "plan-toggle",
+          "status": "Unverified",
+          "inputs": {
+            "activeTools": [
+              "read",
+              "edit",
+              "write",
+              "custom_tool"
+            ],
+            "command": "plan",
+            "repeat": 2
+          },
+          "observations": [
+            "Synchronous tool snapshot, exact order/deduplication/restoration, custom append and undefined UI clear operations."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "plan-blocker",
+          "status": "Unverified",
+          "inputs": {
+            "enabled": true,
+            "commands": [
+              "cat README.md",
+              "rm -rf scratch",
+              "echo ok > file",
+              "git status"
+            ]
+          },
+          "observations": [
+            "Unchanged imported helper through actual hook; exact block/undefined results with no denied tool effects."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "plan-follow-up",
+          "status": "Unverified",
+          "inputs": {
+            "enabled": true,
+            "agentEndMessages": [
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Plan:\n1. Read the schema contract\n2. Verify Unicode boundaries"
+                  }
+                ]
+              }
+            ],
+            "selectReplies": [
+              "Execute the plan (track progress)",
+              "Stay in plan mode",
+              "Refine the plan"
+            ],
+            "editorReply": "  Preserve exact bytes  "
+          },
+          "observations": [
+            "All choice branches; full widgets/status/state/message payloads and triggerTurn/deliverAs ordering with awaited dialogs."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "plan-resume",
+          "status": "Unverified",
+          "inputs": {
+            "flag": false,
+            "entries": [
+              {
+                "type": "custom",
+                "customType": "plan-mode",
+                "data": {
+                  "enabled": false,
+                  "executing": true,
+                  "todos": [
+                    {
+                      "step": 1,
+                      "text": "Read schema",
+                      "completed": false
+                    }
+                  ],
+                  "toolsBeforePlanMode": [
+                    "read",
+                    "custom_tool"
+                  ]
+                }
+              },
+              {
+                "type": "custom",
+                "customType": "plan-mode-execute",
+                "content": "marker"
+              },
+              {
+                "type": "message",
+                "message": {
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "[DONE:1]"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "observations": [
+            "Restore state; completion scan only after execution marker; synchronous getEntries freshness and complete mutations."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "plan-command-collision",
+          "status": "Unverified",
+          "inputs": {
+            "extensions": [
+              "todo",
+              "plan-mode"
+            ],
+            "orders": [
+              [
+                "todo",
+                "plan-mode"
+              ],
+              [
+                "plan-mode",
+                "todo"
+              ]
+            ]
+          },
+          "observations": [
+            "Both register todos; measure upstream collision behavior and bridge diagnostics/order without source rename or discarded registrations."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        }
+      ]
+    },
+    {
+      "id": "todo",
+      "entrypoint": "packages/coding-agent/examples/extensions/todo.ts",
+      "relativeSourceDependencies": [],
+      "families": [
+        "tool",
+        "persistent-state",
+        "session-branch",
+        "custom-component"
+      ],
+      "tierProbes": [
+        "A",
+        "C"
+      ],
+      "bridgeCompatibility": "Unverified",
+      "requiredDependencies": [
+        "callbacks",
+        "tools",
+        "snapshots",
+        "components",
+        "aliases"
+      ],
+      "actualApiUsage": [
+        {
+          "api": "pi.on",
+          "line": 132,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.registerTool",
+          "line": 136,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.registerCommand",
+          "line": 284,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.sessionManager.getBranch",
+          "line": 118,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.notify",
+          "line": 288,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.custom",
+          "line": 292,
+          "status": "Unverified"
+        },
+        {
+          "api": "StringEnum",
+          "line": 13,
+          "status": "Unverified"
+        },
+        {
+          "api": "Type.Object",
+          "line": 31,
+          "status": "Unverified"
+        },
+        {
+          "api": "Type.Optional",
+          "line": 33,
+          "status": "Unverified"
+        },
+        {
+          "api": "Type.String",
+          "line": 33,
+          "status": "Unverified"
+        },
+        {
+          "api": "Type.Number",
+          "line": 34,
+          "status": "Unverified"
+        },
+        {
+          "api": "matchesKey",
+          "line": 15,
+          "status": "Unverified"
+        },
+        {
+          "api": "truncateToWidth",
+          "line": 15,
+          "status": "Unverified"
+        },
+        {
+          "api": "new Text",
+          "line": 225,
+          "status": "Unverified"
+        }
+      ],
+      "registeredEvents": [
+        "session_start",
+        "session_tree"
+      ],
+      "scenarios": [
+        {
+          "id": "todo-sequence",
+          "status": "Unverified",
+          "inputs": {
+            "tool": "todo",
+            "actions": [
+              {
+                "action": "list"
+              },
+              {
+                "action": "add",
+                "text": "preserve source bytes"
+              },
+              {
+                "action": "toggle",
+                "id": 1
+              },
+              {
+                "action": "toggle",
+                "id": 99
+              },
+              {
+                "action": "add",
+                "text": ""
+              },
+              {
+                "action": "toggle"
+              },
+              {
+                "action": "clear"
+              },
+              {
+                "action": "list"
+              }
+            ]
+          },
+          "observations": [
+            "Full content/details/nextId/errors at each boundary; source errors-as-data separately from native schema rejection."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "todo-shallow-alias",
+          "status": "Unverified",
+          "inputs": {
+            "actions": [
+              {
+                "action": "add",
+                "text": "first"
+              },
+              {
+                "action": "toggle",
+                "id": 1
+              }
+            ],
+            "retainEarlierResultReference": true
+          },
+          "observations": [
+            "Immediate owned snapshots and retained source reference ledger: shallow arrays share mutable todo objects. Native immutable JSON alone cannot prove reference-identity parity."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "todo-branch-restore",
+          "status": "Unverified",
+          "inputs": {
+            "events": [
+              "session_start",
+              "session_tree"
+            ],
+            "branches": [
+              [],
+              [
+                {
+                  "type": "message",
+                  "message": {
+                    "role": "toolResult",
+                    "toolName": "other",
+                    "details": {
+                      "todos": [],
+                      "nextId": 9
+                    }
+                  }
+                },
+                {
+                  "type": "message",
+                  "message": {
+                    "role": "toolResult",
+                    "toolName": "todo",
+                    "details": {
+                      "todos": [
+                        {
+                          "id": 3,
+                          "text": "branch task",
+                          "done": false
+                        }
+                      ],
+                      "nextId": 4
+                    }
+                  }
+                }
+              ]
+            ]
+          },
+          "observations": [
+            "Current branch-only rehydration followed by complete tool result; awaited session barrier and stale snapshot controls."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "todo-custom-ui",
+          "status": "Unverified",
+          "inputs": {
+            "command": "todos",
+            "modes": [
+              "rpc",
+              "tui"
+            ],
+            "widths": [
+              20,
+              80
+            ],
+            "keys": [
+              "escape",
+              "ctrl+c"
+            ]
+          },
+          "observations": [
+            "Source RPC notification and genuine TUI render/invalidate/close observations; initial bridge custom-component diagnostic. Supplied renderCall/renderResult remain inventoried, never silently stripped."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        }
+      ]
+    },
+    {
+      "id": "provider-payload",
+      "entrypoint": "packages/coding-agent/examples/extensions/provider-payload.ts",
+      "relativeSourceDependencies": [],
+      "families": [
+        "provider-hooks",
+        "trusted-node-filesystem"
+      ],
+      "tierProbes": [
+        "B"
+      ],
+      "bridgeCompatibility": "Unverified",
+      "requiredDependencies": [
+        "reducers",
+        "snapshots",
+        "providers",
+        "aliases"
+      ],
+      "actualApiUsage": [
+        {
+          "api": "pi.on",
+          "line": 6,
+          "status": "Unverified"
+        },
+        {
+          "api": "appendFileSync",
+          "line": 1,
+          "status": "Unverified"
+        },
+        {
+          "api": "join",
+          "line": 2,
+          "status": "Unverified"
+        },
+        {
+          "api": "CONFIG_DIR_NAME",
+          "line": 3,
+          "status": "Unverified"
+        },
+        {
+          "api": "JSON.stringify",
+          "line": 8,
+          "status": "Unverified"
+        }
+      ],
+      "registeredEvents": [
+        "before_provider_request",
+        "after_provider_response"
+      ],
+      "scenarios": [
+        {
+          "id": "provider-log",
+          "status": "Unverified",
+          "inputs": {
+            "cwd": "caller-owned run-root/workspace",
+            "configDir": ".pi",
+            "request": {
+              "payload": {
+                "messages": [
+                  {
+                    "role": "user",
+                    "content": "synthetic"
+                  }
+                ],
+                "temperature": 0
+              }
+            },
+            "response": {
+              "status": 200,
+              "headers": {
+                "x-request-id": "synthetic-1"
+              }
+            }
+          },
+          "observations": [
+            "Complete fake provider hook events and exact .pi/provider-payload.log bytes/order inside owned run root."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "provider-log-fault",
+          "status": "Unverified",
+          "inputs": {
+            "cwd": "caller-owned run-root/workspace",
+            "configDirectoryPresent": false
+          },
+          "observations": [
+            "Actual ENOENT hook fault and lifecycle handling; no real provider/network."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "provider-log-isolation",
+          "status": "Unverified",
+          "inputs": {
+            "sessions": 2,
+            "workspaces": [
+              "run-root/session-a",
+              "run-root/session-b"
+            ]
+          },
+          "observations": [
+            "Source cwd/CONFIG_DIR_NAME resolution and separate logs; direct Node fs is trusted OS access, not broker sandboxing."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        }
+      ]
+    },
+    {
+      "id": "custom-provider-anthropic",
+      "entrypoint": "packages/coding-agent/examples/extensions/custom-provider-anthropic/index.ts",
+      "relativeSourceDependencies": [],
+      "families": [
+        "provider-registration",
+        "provider-stream",
+        "oauth"
+      ],
+      "tierProbes": [
+        "B"
+      ],
+      "bridgeCompatibility": "Unverified",
+      "requiredDependencies": [
+        "callbacks",
+        "providers",
+        "aliases",
+        "sdk052",
+        "loader"
+      ],
+      "actualApiUsage": [
+        {
+          "api": "pi.registerProvider",
+          "line": 582,
+          "status": "Unverified"
+        },
+        {
+          "api": "calculateCost",
+          "line": 30,
+          "status": "Unverified"
+        },
+        {
+          "api": "collapseSystemMessages",
+          "line": 31,
+          "status": "Unverified"
+        },
+        {
+          "api": "createAssistantMessageEventStream",
+          "line": 32,
+          "status": "Unverified"
+        },
+        {
+          "api": "getCurrentSystemPrompt",
+          "line": 33,
+          "status": "Unverified"
+        },
+        {
+          "api": "getCurrentTools",
+          "line": 34,
+          "status": "Unverified"
+        },
+        {
+          "api": "new Anthropic",
+          "line": 399,
+          "status": "Unverified"
+        },
+        {
+          "api": "client.messages.stream",
+          "line": 454,
+          "status": "Unverified"
+        },
+        {
+          "api": "stream.push",
+          "line": 455,
+          "status": "Unverified"
+        },
+        {
+          "api": "stream.end",
+          "line": 564,
+          "status": "Unverified"
+        },
+        {
+          "api": "callbacks.onAuth",
+          "line": 95,
+          "status": "Unverified"
+        },
+        {
+          "api": "callbacks.onPrompt",
+          "line": 97,
+          "status": "Unverified"
+        },
+        {
+          "api": "fetch",
+          "line": 100,
+          "status": "Unverified"
+        },
+        {
+          "api": "crypto.getRandomValues",
+          "line": 64,
+          "status": "Unverified"
+        },
+        {
+          "api": "crypto.subtle.digest",
+          "line": 72,
+          "status": "Unverified"
+        },
+        {
+          "api": "atob",
+          "line": 55,
+          "status": "Unverified"
+        },
+        {
+          "api": "btoa",
+          "line": 65,
+          "status": "Unverified"
+        },
+        {
+          "api": "Date.now",
+          "line": 126,
+          "status": "Unverified"
+        },
+        {
+          "api": "JSON.parse",
+          "line": 511,
+          "status": "Unverified"
+        }
+      ],
+      "registeredEvents": [],
+      "scenarios": [
+        {
+          "id": "provider-register",
+          "status": "Unverified",
+          "inputs": {
+            "syntheticCredential": "CUSTOM_ANTHROPIC_API_KEY=synthetic-fixture",
+            "network": false
+          },
+          "observations": [
+            "Full two-model/custom-API descriptor, callback handles and staging; registration is not stream qualification."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "provider-stream",
+          "status": "Unverified",
+          "inputs": {
+            "fakeHttp": {
+              "contentType": "text/event-stream",
+              "eventOutline": [
+                "message_start",
+                "content_block_start:text",
+                "content_block_delta:text_delta",
+                "content_block_stop",
+                "content_block_start:thinking",
+                "content_block_delta:thinking_delta",
+                "content_block_delta:signature_delta",
+                "content_block_stop",
+                "content_block_start:tool_use",
+                "content_block_delta:input_json_delta",
+                "content_block_stop",
+                "message_delta:tool_use",
+                "message_stop"
+              ]
+            },
+            "authProfiles": [
+              "synthetic API key",
+              "synthetic sk-ant-oat token"
+            ],
+            "tools": [
+              {
+                "name": "read",
+                "description": "read synthetic",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ]
+                }
+              }
+            ]
+          },
+          "observations": [
+            "Author full raw SSE bytes before execution; real unchanged SDK0.52.0 only. Full request headers/body, push/drain/final/own-undefined, signatures/tool remapping/usage/cost/native caps. Event outline is not a frozen wire fixture."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "provider-errors",
+          "status": "Unverified",
+          "inputs": {
+            "fakeHttpProfiles": [
+              "throw before response",
+              "partial text then malformed SSE",
+              "EOF without stop reason",
+              "abort after partial tool JSON"
+            ]
+          },
+          "observations": [
+            "Complete error/aborted assistant bodies, index/partialJson cleanup and terminal/settlement order."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "provider-oauth",
+          "status": "Unverified",
+          "inputs": {
+            "clock": "2026-10-01T12:00:00.000Z",
+            "cryptoBytes": "authored fixed 32-byte fixture",
+            "promptReply": "synthetic-code#synthetic-state",
+            "fakeTokenReply": {
+              "access_token": "synthetic-access",
+              "refresh_token": "synthetic-refresh",
+              "expires_in": 3600
+            }
+          },
+          "observations": [
+            "Recorded global crypto/clock seams; auth URL/onAuth/onPrompt order, exchange/refresh body, expiry/cancellation; no real secrets or network."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        }
+      ]
+    },
+    {
+      "id": "rpc-demo",
+      "entrypoint": "packages/coding-agent/examples/extensions/rpc-demo.ts",
+      "relativeSourceDependencies": [],
+      "families": [
+        "dialog",
+        "status",
+        "tool-blocker",
+        "session-cancel",
+        "command"
+      ],
+      "tierProbes": [
+        "A",
+        "B"
+      ],
+      "bridgeCompatibility": "Unverified",
+      "requiredDependencies": [
+        "callbacks",
+        "reducers",
+        "dialogs",
+        "session"
+      ],
+      "actualApiUsage": [
+        {
+          "api": "pi.on",
+          "line": 27,
+          "status": "Unverified"
+        },
+        {
+          "api": "pi.registerCommand",
+          "line": 83,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.setTitle",
+          "line": 28,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.setWidget",
+          "line": 29,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.setStatus",
+          "line": 30,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.select",
+          "line": 57,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.notify",
+          "line": 59,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.confirm",
+          "line": 74,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.input",
+          "line": 84,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.editor",
+          "line": 98,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.setEditorText",
+          "line": 112,
+          "status": "Unverified"
+        }
+      ],
+      "registeredEvents": [
+        "session_start",
+        "turn_start",
+        "turn_end",
+        "tool_call",
+        "session_before_switch"
+      ],
+      "scenarios": [
+        {
+          "id": "rpc-lifecycle",
+          "status": "Unverified",
+          "inputs": {
+            "events": [
+              {
+                "type": "session_start",
+                "reason": "new"
+              },
+              {
+                "type": "turn_start"
+              },
+              {
+                "type": "turn_end"
+              },
+              {
+                "type": "turn_start"
+              },
+              {
+                "type": "turn_end"
+              }
+            ]
+          },
+          "observations": [
+            "Full title/widget/status call sequence and per-module turn count."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "rpc-tool-dialog",
+          "status": "Unverified",
+          "inputs": {
+            "toolCalls": [
+              {
+                "toolName": "bash",
+                "input": {
+                  "command": "rm -rf synthetic"
+                }
+              },
+              {
+                "toolName": "bash",
+                "input": {
+                  "command": "echo ok"
+                }
+              }
+            ],
+            "hasUI": [
+              true,
+              false
+            ],
+            "selectReplies": [
+              "Allow",
+              "Block",
+              "own undefined"
+            ]
+          },
+          "observations": [
+            "Tool hook awaits nested select; exact undefined/block/notification; no-UI never approves and native final policy remains required."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "rpc-session-confirm",
+          "status": "Unverified",
+          "inputs": {
+            "event": {
+              "reason": "new"
+            },
+            "hasUI": [
+              true,
+              false
+            ],
+            "confirmReplies": [
+              true,
+              false
+            ]
+          },
+          "observations": [
+            "Exact session pre-action cancellation/notification and native awaited replacement boundary."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "rpc-command-dialogs",
+          "status": "Unverified",
+          "inputs": {
+            "commands": [
+              "rpc-input",
+              "rpc-editor",
+              "rpc-prefill"
+            ],
+            "inputReplies": [
+              "synthetic",
+              "",
+              "own undefined"
+            ],
+            "editorReplies": [
+              "Line 1\nLine 2",
+              "",
+              "own undefined"
+            ]
+          },
+          "observations": [
+            "Full prompts/submitted/cancel notifications/editor text; preserve empty-versus-missing reply."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "rpc-cancel-stale",
+          "status": "Unverified",
+          "inputs": {
+            "pendingDialog": "select",
+            "events": [
+              "worker cancellation",
+              "session generation replacement",
+              "late reply"
+            ]
+          },
+          "observations": [
+            "Bounded cleanup/cancellation and stale-handle rejection; orphaned Allow never authorizes an action."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        }
+      ]
+    },
+    {
+      "id": "custom-footer",
+      "entrypoint": "packages/coding-agent/examples/extensions/custom-footer.ts",
+      "relativeSourceDependencies": [],
+      "families": [
+        "custom-component",
+        "session-view",
+        "subscription-cleanup"
+      ],
+      "tierProbes": [
+        "C"
+      ],
+      "bridgeCompatibility": "Unverified",
+      "requiredDependencies": [
+        "components",
+        "snapshots",
+        "callbacks",
+        "aliases"
+      ],
+      "actualApiUsage": [
+        {
+          "api": "pi.registerCommand",
+          "line": 18,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.setFooter",
+          "line": 2,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.ui.notify",
+          "line": 57,
+          "status": "Unverified"
+        },
+        {
+          "api": "ctx.sessionManager.getBranch",
+          "line": 35,
+          "status": "Unverified"
+        },
+        {
+          "api": "footerData.onBranchChange",
+          "line": 25,
+          "status": "Unverified"
+        },
+        {
+          "api": "footerData.getGitBranch",
+          "line": 45,
+          "status": "Unverified"
+        },
+        {
+          "api": "tui.requestRender",
+          "line": 25,
+          "status": "Unverified"
+        },
+        {
+          "api": "theme.fg",
+          "line": 48,
+          "status": "Unverified"
+        },
+        {
+          "api": "truncateToWidth",
+          "line": 13,
+          "status": "Unverified"
+        },
+        {
+          "api": "visibleWidth",
+          "line": 13,
+          "status": "Unverified"
+        }
+      ],
+      "registeredEvents": [],
+      "scenarios": [
+        {
+          "id": "footer-render",
+          "status": "Unverified",
+          "inputs": {
+            "command": "footer",
+            "branch": [
+              {
+                "type": "message",
+                "message": {
+                  "role": "assistant",
+                  "usage": {
+                    "input": 1234,
+                    "output": 7,
+                    "cost": {
+                      "total": 0.125
+                    }
+                  }
+                }
+              }
+            ],
+            "model": {
+              "id": "synthetic-model"
+            },
+            "gitBranch": "fixture-main",
+            "widths": [
+              20,
+              80
+            ],
+            "actions": [
+              "enable",
+              "branch change",
+              "render",
+              "invalidate",
+              "disable"
+            ]
+          },
+          "observations": [
+            "Whole factory/component rendering, requestRender/subscription/dispose and undefined clear under upstream."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "footer-unsupported",
+          "status": "Unverified",
+          "inputs": {
+            "command": "footer",
+            "bridgeCapability": "customFooter unavailable"
+          },
+          "observations": [
+            "Expected initial Tier C explicit diagnostic at the reviewed registration/invocation boundary; no accepted-but-ignored callback. Actual status stays Unverified."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "footer-reload",
+          "status": "Unverified",
+          "inputs": {
+            "command": "footer",
+            "actions": [
+              "enable",
+              "session replacement",
+              "late branch callback",
+              "reload"
+            ]
+          },
+          "observations": [
+            "Upstream subscription ownership and bridge generation cleanup; no stale updates/leaked handles."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        }
+      ]
+    },
+    {
+      "id": "with-deps",
+      "entrypoint": "packages/coding-agent/examples/extensions/with-deps/index.ts",
+      "relativeSourceDependencies": [],
+      "families": [
+        "tool",
+        "extension-local-dependency",
+        "commonjs-interop"
+      ],
+      "tierProbes": [
+        "A"
+      ],
+      "bridgeCompatibility": "Unverified",
+      "requiredDependencies": [
+        "callbacks",
+        "tools",
+        "loader",
+        "aliases",
+        "ms"
+      ],
+      "actualApiUsage": [
+        {
+          "api": "pi.registerTool",
+          "line": 14,
+          "status": "Unverified"
+        },
+        {
+          "api": "Type.Object",
+          "line": 18,
+          "status": "Unverified"
+        },
+        {
+          "api": "Type.String",
+          "line": 19,
+          "status": "Unverified"
+        },
+        {
+          "api": "ms",
+          "line": 9,
+          "status": "Unverified"
+        }
+      ],
+      "registeredEvents": [],
+      "scenarios": [
+        {
+          "id": "duration-result",
+          "status": "Unverified",
+          "inputs": {
+            "tool": "parse_duration",
+            "durations": [
+              "2 days",
+              "1h",
+              "5m"
+            ]
+          },
+          "observations": [
+            "Full actual ms2.1.3 results using unchanged TS/CJS default interop; native schema/policy ownership."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "duration-error",
+          "status": "Unverified",
+          "inputs": {
+            "tool": "parse_duration",
+            "duration": "not a duration"
+          },
+          "observations": [
+            "Thrown callback error and normalized failure/cleanup; no substitute parser."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        },
+        {
+          "id": "duration-resolution",
+          "status": "Unverified",
+          "inputs": {
+            "profiles": [
+              "example-local installed ms2.1.3",
+              "root-hoisted locked ms2.1.3",
+              "missing or wrong version",
+              "duplicate module identity"
+            ]
+          },
+          "observations": [
+            "Exact resolver/installed/archive identities and extension-relative roots; ordinary discovery installs nothing."
+          ],
+          "upstreamEvidence": null,
+          "bridgeEvidence": null
+        }
+      ]
+    }
+  ],
+  "dynamicAndSemanticUnknowns": [
+    "No direct import()/require() expression was observed in the 12 reviewed files; imported helpers/SDK/jiti/transpiler/source-loader dynamic closure remains unresolved.",
+    "Pinned loader dynamically selects jiti-loader/jiti-static-loader and virtual modules. Capture exact mode/aliases/resolved files; no AST/loaded closure claim.",
+    "JS functions, tool renderers, class component instances, streams/subscriptions and shallow aliases require explicit handles/diagnostics and separate identity ledgers.",
+    "Provider fetch/WebCrypto/clock and input locale require disclosed deterministic seams. Source is unchanged; genuine SDK0.52.0 request/stream/error execution remains mandatory.",
+    "Mixed custom UI paths in todo and plan-mode remain in scope; no silent renderer deletion, command rename or branch filtering may manufacture full-extension support.",
+    "Other public extensions/deep imports/native addons are unselected in this first bounded spike, not permanently excluded. Actual P7-02 evidence/decisions remain required."
+  ],
+  "observationContract": {
+    "minimum": [
+      "registration descriptors/failures",
+      "callback entry/exit and awaited host-call partial order",
+      "full tool results and typed hook decisions",
+      "branch/custom state",
+      "complete provider requests/push/drain/final/error/cleanup",
+      "UI request/reply/cancellation",
+      "own undefined versus missing/null/clear",
+      "raw numeric or binary64 facts where relevant",
+      "source retained alias identity separately from native immutable JSON",
+      "source/import/runtime/archive/license provenance"
+    ],
+    "normalizationNeedsExplicitReview": [
+      "owned run-root identity mapped to a declared virtual path",
+      "fixed clock/locale/TZ/crypto fixture identities with actual raw outputs"
+    ],
+    "normalizationForbidden": [
+      "semantic strings",
+      "array/event order",
+      "errors/cancellation",
+      "missing/null/undefined",
+      "native differences",
+      "source field/branch removal"
+    ],
+    "futureMutableRoot": "Require explicit --run-root outside read-only repo/source/oracle; all homes/cache/temp/logs/evidence there. Non-overlapping task-2 siblings are legitimate.",
+    "releaseEvidence": "compatibility/node/corpus.json, complete traces and proceed/narrow/defer decision are later executed outputs; corpus.plan.json is only the inventory."
+  },
+  "relatedEvidence": {
+    "wholeExtensionRunner": "Existing qualified whole public ExtensionRunner reducer fixtures inform reducer semantics; authored Runner callbacks are not these unchanged real extension factories and supply no corpus execution/parity credit."
+  },
+  "nextActions": [
+    {
+      "id": "dependency-admission",
+      "status": "Deferred",
+      "action": "Root reviews inventory and admits exact publicly locked runtime/loader/ms/SDK0.52.0 archives, installed closure/notices without changing upstream files."
+    },
+    {
+      "id": "minimal-protocol-spike",
+      "status": "Deferred",
+      "action": "Implement optional full-duplex worker and explicit aliases/native facades. Start hello/input/protected/with-deps with real native schema/policy/reducers and preserve unchanged source signatures."
+    },
+    {
+      "id": "genuine-differentials",
+      "status": "Deferred",
+      "action": "Execute whole unchanged factories/callbacks through actual pinned public upstream loader/Runner and minimal bridge, same authored inputs, two fresh captures including faults/unsupported branches."
+    },
+    {
+      "id": "matrix-after-measurement",
+      "status": "Deferred",
+      "action": "Publish per-export/method matrix and proceed/narrow/defer only after real results; custom-component diagnostics/open neighboring APIs remain explicit, full Phase7 stays required."
+    }
+  ]
+}

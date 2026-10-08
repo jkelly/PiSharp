@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORED_INDEPENDENT_MCP_CONFIG_CATALOG_LEAF_UNCOMPILED_UNEXECUTED",
+  "branch": "feat/mcp-config-catalog",
+  "baseCommit": "754251be28928b24eaae5895b744c423450c91a3",
+  "baseTree": "738429cf70aa4609938e398d3ef00b5836bf157c",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "authorBundle": {
+    "sha256": "7b6b1ed39de10230d8182657db87e03ac4be6d5ecb280276c10a869856228840",
+    "bytes": 37509816,
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\PISHARP_VERIFIED_MAIN_754251BE_AUTHOR_R265.bundle"
+  },
+  "checklist": {
+    "sha256": "f631eece2808ef91b670a00fc9f6a6d1482db663e8277de806f9c7a057547f1b",
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\CURRENT_ORIGINAL_PORT_REMAINING_CHECKLIST_AND_PRIORITIES_R262.json"
+  },
+  "sourcePins": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\extensions\\mcp\\index.ts",
+      "bytes": 40025,
+      "sha256": "d6d178d67d4c62bb74d78a01c42549b3cef0f0f39ddfcff71a028a781387e95a"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\extensions\\mcp\\config.ts",
+      "bytes": 6875,
+      "sha256": "29e44d36495cb212fd793cd13bb9190bd3ac3aca196235a342d2d36259e62b39"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\extensions\\mcp\\runtime.ts",
+      "bytes": 16734,
+      "sha256": "d9d672780f5a142ed6443162c4795368cf815233419d5b192de61191c7550905"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\core\\mcp-servers.ts",
+      "bytes": 10219,
+      "sha256": "9a6b6aff30aca9db53312cd8d99bfb485dd4823bc15988379ec0f8acd0bcb6c4"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\main.ts",
+      "bytes": 35140,
+      "sha256": "fa97bd27f22564c1f9c8b87b13d670ab46a4749d4a6cd57a2bb1bf18428adfba"
+    },
+    {
+      "sha256": "75de530ec3b46ae2340cfcd964322b01b89ecd021330e26faaffb617e1686256",
+      "bytes": 13489,
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\extensions\\mcp\\tools.ts"
+    }
+  ],
+  "postimages": [
+    {
+      "path": "src/PiSharp.Extensions.Abstractions/Mcp/Configuration/McpConfigurationModels.cs",
+      "bytes": 2009,
+      "sha256": "598be8a29429d748a7fb3cf60f567f6c2fba479f04854dbe25a619996e8d2e6f"
+    },
+    {
+      "path": "src/PiSharp.Extensions.Abstractions/Mcp/Configuration/McpConfigurationReader.cs",
+      "bytes": 11880,
+      "sha256": "4da2d15269a26d1a1ab8d1d94bd24a94b03d86767c978f4fcb41d020bfa1bcf3"
+    },
+    {
+      "path": "src/PiSharp.Extensions.Abstractions/Mcp/Configuration/McpCatalogPlanner.cs",
+      "bytes": 7893,
+      "sha256": "dea08b498f4a0cc71511fd75c50a4cf6a7915d69ca361de466826c64d2e9a828"
+    },
+    {
+      "path": "tests/PiSharp.Extensions.ContractTests/McpConfigurationTests.cs",
+      "bytes": 16552,
+      "sha256": "874e53032f2e7a7677bf2187a9680cd2ecd9b5f67068b99ef3748aec7053e015"
+    },
+    {
+      "path": "docs/contracts/mcp-config-catalog-leaf.md",
+      "bytes": 8987,
+      "sha256": "2fc417e3275213e92c9b091961bd13df54a3e9e78624237ec088399173ef2198"
+    }
+  ],
+  "API": [
+    "McpConfigurationReader.Validate(name, JsonElement)",
+    "McpConfigurationReader.Load(globalDocument?, projectDocument?, projectTrusted)",
+    "McpConfigurationReader.GetToolExposure(config, toolName)",
+    "McpCatalogPlanner.ComposeServers(loaded, registered)",
+    "McpCatalogPlanner.CreateToolName(server, tool, isTaken?)",
+    "McpCatalogPlanner.ToToolExposure(exposure)",
+    "McpCatalogPlanner.Plan(borrowedSnapshots, autoEnableCodemode, previousNameOwners?)"
+  ],
+  "tests": {
+    "runnerModified": false,
+    "filter": "--filter mcp-configuration.",
+    "path": "tests/PiSharp.Extensions.ContractTests/McpConfigurationTests.cs",
+    "framework": "existing synthetic contract runner",
+    "executedGroups": 0,
+    "registrationRequired": "Program.cs existing case list: .Concat(McpConfigurationTests.Cases())",
+    "authoredGroups": 15
+  },
+  "remainingIntegration": [
+    "Owned registration/get/change pipeline",
+    "Explicit admitted transport and initialize/list/call/resources",
+    "Pipeline-bound descriptors/hooks/final policy/progress/cancellation",
+    "Genuine discovery identity and dynamic exposure/withdrawal",
+    "Reconnect and generation/close/reload joins",
+    "CLI and config add/update/remove persistence",
+    "Separately authorized config-value and OAuth resolution"
+  ],
+  "limits": [
+    "System.Uri is not complete WHATWG normalization",
+    "System.Text.Json parse diagnostics differ from V8",
+    "Existing JsonData depth bound",
+    "No prototype-inherited values",
+    "Exotic JS regex boundary source differential pending",
+    "No result/output-schema/annotations/custom rendering projection"
+  ],
+  "reservedPaths": [
+    "src/PiSharp.CodingAgent/SessionRuntimeRegistry.cs",
+    "src/PiSharp.Cli/Extensions/NativeExtensionActivation.cs",
+    "src/PiSharp.Cli/Program.cs",
+    "tests/PiSharp.Extensions.ContractTests/Program.cs"
+  ],
+  "runtimeBuilds": 0,
+  "runtimeTests": 0,
+  "nodeExecutions": 0,
+  "packagesAdded": 0,
+  "serversConnected": 0,
+  "credentialsReadOrWritten": false,
+  "mainMerge": false,
+  "publicPush": false,
+  "sourceParityGateAdvanced": false
+}

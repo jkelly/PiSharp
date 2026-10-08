@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "status": "STATIC PIN RECONCILIATION ONLY; UNEXECUTED",
+  "base": "bef04af309e7260dc9997c83e62c7419e8a703ae",
+  "historicalBoundarySha256": "614f40468eb264d6c479ab1ccbe9ddcb4382d2e7a80322843244b723fe724166",
+  "changes": [
+    {
+      "relative": "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+      "previousSha256": "88372a76390b788ddc9da77396513754fdacf1e5113313156a1e36d041d622e5",
+      "sha256": "794dd84188271a514fd46a7e6d04644f661a5ad53604870cbcdb31ad9b99654e",
+      "bytes": 38024
+    }
+  ],
+  "sourceMemberCount": 14,
+  "scenarioCount": 8,
+  "scenariosUnchanged": true,
+  "builds": 0,
+  "testsExecuted": 0
+}

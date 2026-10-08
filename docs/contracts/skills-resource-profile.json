@@ -1,0 +1,66 @@
+{
+  "status": "ORIGINAL_SKILLS_RESOURCE_LEAF_SOURCE_ONLY_SHARED_HOST_INTEGRATION_REQUIRED",
+  "baseline": "Pi v0.99.1 d86654abb8862e201933517d6f1fce9f88dd117f",
+  "nativeParent": "754251be28928b24eaae5895b744c423450c91a3",
+  "source": [
+    "packages/coding-agent/src/core/skills.ts:168-269 discovery rules; 277-345 metadata warnings;355-388 formatting;409 onward collision handling",
+    "packages/coding-agent/src/core/agent-session.ts parseSkillBlock and _expandSkillCommand; raw input -> skills -> prompt templates -> queues/model",
+    "packages/coding-agent/src/modes/rpc/rpc-mode.ts get_commands skill rows"
+  ],
+  "implemented": [
+    "Explicit absolute file/directory selections with caller-authorized Trusted flag; denied selections no filesystem calls",
+    "Directory SKILL.md stops recursion; direct root .md children plus nested SKILL.md; skip dot entries/node_modules/links; first name wins, repeated lexical path ignored",
+    "Required nonempty string description; name defaults to directory; name/description bounds warn rather than discard valid descriptions; strict YAML boolean true hides model descriptor only",
+    "Already admitted YamlDotNet decoder/alias guard; new skill projection preserves literal and explicit string nodes, duplicate keys rejected",
+    "Escaped XML descriptor prompt with pinned wording and relative-resource guidance; disabled skills excluded from descriptors but explicitly callable",
+    "Selected /skill:name rereads only admitted winning file, strips frontmatter, trims ECMAScript whitespace and adds pinned block/args; unknown commands unchanged; fixed failure diagnostic then unchanged input",
+    "Command catalog rows source skill/name skill:name; no completion/execution authority acquired",
+    "Borrowed binding composes raw extension commands -> input handlers -> skills -> template expansion; preserves image transforms, explicit queue command rejection, default extension-message opt-out",
+    "System-message content projection preserves existing noncontent fields and tool declarations, grants no file/process/provider authority",
+    "Direct original cancellation awaits, no background loading/read cleanup ownership"
+  ],
+  "limits": {
+    "files": 128,
+    "paths": 4096,
+    "totalAttemptedReadBytes": 1048576,
+    "depth": 16,
+    "directoryEntries": 4096,
+    "fileBytes": 65536,
+    "inputCharacters": 1048576
+  },
+  "readProfile": [
+    "Regular local files only; bounded streaming read maxBytes+one probe byte; failures consume conservative read budget",
+    "Physical links and linked ancestors refused; OS path validation/open remains subject to external filesystem races, no new sandbox or adversarial race containment guarantee",
+    "Selected skill does not grant read/bash tools access to adjacent resources; referenced paths remain data subject to existing final-action policy",
+    "Selection order retained; child order follows borrowed directory enumeration; native dedup uses lexical full paths and local OS comparison",
+    "Directory entry exceptions diagnose and terminate that selected discovery subtree; other explicit selections continue"
+  ],
+  "incomplete": [
+    "Shared OfflineSessionProfile/CLI option registration and Program.cs reserved by R265/R266; no ordinary session CLI support claim until coordinator integrates typed binding",
+    "Automatic agent-dir/project/default/settings/package skill discovery and precedence/trust connection",
+    "Gitignore/ignore/fdignore matching and symlink-follow/canonical realpath alias behavior differ from pinned source; hidden/node_modules skip supported",
+    "Explicit selection initial catalog only; approved reload/generation retirement and replacement resource updates owned by separate integrator",
+    "Current-session system prompt publication, mode settings/enableSkillCommands and terminal rendering/completion require coordinator seam integration",
+    "Skill expansion stderr diagnostic contract is fixed native data, not upstream raw stack/extension error callback parity",
+    "No authenticated provider execution/platform qualification; pinned source/compiler capture phase remains paused"
+  ],
+  "tests": {
+    "executedByThisLane": 0,
+    "newFrameworks": 0,
+    "newGroups": 9,
+    "actualComposition": "Real PersistentAgentSession + LazyLocal backend + real RpcSessionDispatcher via public APIs, borrowed skill binding and bounded scripted inprocess transport; no network",
+    "normalYamlProfile": "Metadata and physical RPC groups use admitted optional YAML frontend; other groups use explicit JSON-only fixture decoder",
+    "regressions": [
+      "description/block and strict-true YAML semantics",
+      "discovery/collision/duplicate/denied reads",
+      "physical oversized file and entry/depth/attempted byte budget",
+      "fresh selected body, unknown skill, hidden descriptor and parse block",
+      "command/input/skill/template order, images, opt-out and explicit queue rejection",
+      "original ignored-cancellation file read joins loader",
+      "real session input cancellation does not start model or materialize lazy file",
+      "real RPC catalog and idle queue are lazy; actual prompt materializes acknowledged user content and reaches scripted model",
+      "failed expansion isolated fixed diagnostic and no unselected reads"
+    ]
+  },
+  "executionOwner": "Coordinator; register Cases and direct-await prefix to preserve original fixture joins; no tests/build/restore/source oracle/process/API execution here"
+}

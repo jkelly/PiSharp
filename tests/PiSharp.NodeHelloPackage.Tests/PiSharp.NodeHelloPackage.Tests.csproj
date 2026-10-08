@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Contracts/PiSharp.Contracts.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Rpc/PiSharp.Rpc.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Sessions/PiSharp.Sessions.csproj" />
+    <Compile Include="../PiSharp.CodingAgent.Tests/NodeHelloPackageTests.cs" Link="NodeHelloPackageTests.cs" />
+  </ItemGroup>
+</Project>

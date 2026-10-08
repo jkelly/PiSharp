@@ -1,0 +1,83 @@
+{
+  "execution": "UNEXECUTED; future root must admit physical closure and Node runtime before launching",
+  "package": "partial-json",
+  "files": [
+    {
+      "bytes": 13601,
+      "sha256": "8808e3f3d4e19fc0e3c292ce0f4bc45dbdf7d1daa6b023eb4f392c5c6040cfe0",
+      "gitBlob": "2137b551f8f8e8c58d3bf0ebb5cf840e5b04183b",
+      "root": "upstream",
+      "path": "packages/ai/src/api/pi-messages.ts"
+    },
+    {
+      "bytes": 1399,
+      "sha256": "06fcbc2347f65a43938078094a7118036b5f12e73147affb5c73cd72753443f0",
+      "gitBlob": "fdb1b48190357d4e8f50a26979e0bbc751b0e57d",
+      "root": "upstream",
+      "path": "packages/ai/src/utils/diagnostics.ts"
+    },
+    {
+      "bytes": 2878,
+      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "gitBlob": "c4f731d59bf192d6889d9b25ba3f3dd2b1b5a9e6",
+      "root": "upstream",
+      "path": "packages/ai/src/utils/event-stream.ts"
+    },
+    {
+      "bytes": 783,
+      "sha256": "423ded49de35ee755f62229ccd64bed6448739c78c6111226ff8e4a201cf9732",
+      "gitBlob": "b96d1514929a7353846c3942203d9ad210a30dc1",
+      "root": "upstream",
+      "path": "packages/ai/src/utils/headers.ts"
+    },
+    {
+      "bytes": 2774,
+      "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "gitBlob": "f39f9f09d6d6a5f6e42c09dcc474ed180bbc0634",
+      "root": "upstream",
+      "path": "packages/ai/src/utils/json-parse.ts"
+    },
+    {
+      "bytes": 1718,
+      "sha256": "3829251ae0674cef7ca09800cee9f46d4e305770129b72b822ea2f6f85efe675",
+      "gitBlob": "db49606722192f60ba8809333221696da8861632",
+      "root": "upstream",
+      "path": "packages/ai/src/utils/provider-env.ts"
+    },
+    {
+      "bytes": 977,
+      "sha256": "42b3ae6c99ec959249f8eb4d3da7fdb44ec1f96ec627fa7f9ca5487a4e80963f",
+      "root": "partialJson",
+      "path": "package.json"
+    },
+    {
+      "bytes": 8376,
+      "sha256": "23f750aa1170c830b7ef180135852317886cc58ce7d2597e5eeee044539072c7",
+      "root": "partialJson",
+      "path": "dist/index.js"
+    },
+    {
+      "bytes": 2849,
+      "sha256": "779b2aded6d4e2ec6171ea9d5d5d97551e8c3258b6e78a01d2e9fc6235865b36",
+      "root": "partialJson",
+      "path": "dist/options.js"
+    },
+    {
+      "path": "package.json",
+      "bytes": 5023,
+      "gitBlob": "26493c596bc8f78845ea61f78dc203a09dc3119e",
+      "root": "upstream",
+      "sha256": "afa486075d170d51b601e8ea92fb1c8c8720fb5b4efb67947285f157d88f3eed"
+    },
+    {
+      "path": "packages/ai/package.json",
+      "bytes": 2636,
+      "gitBlob": "99e1ca54cafe0ac5eefa2b1168ca061e3de1329c",
+      "root": "upstream",
+      "sha256": "86a8ccb86ce00af196fc7d48417f82e99c6da40c68d8d138ace2a4f0fda4090d"
+    }
+  ],
+  "packageVersion": "0.1.7",
+  "schemaVersion": 1,
+  "originalCommit": "d86654abb8862e201933517d6f1fce9f88dd117f"
+}

@@ -8,8 +8,8 @@ using PiSharp.Sessions.Storage;
 namespace PiSharp.Cli.Extensions;
 
 /// <summary>One explicit host attachment. Exposes acknowledged ancestry, with no session mutation authority.</summary>
-internal sealed class NativeSessionSnapshotProvider : IExtensionSessionCatalogProvider, IExtensionSessionOpaqueViewProvider,
-    IExtensionSessionContextEditProvider, IExtensionSessionCompactionProvider, IExtensionSessionToolActivationProvider
+internal sealed partial class NativeSessionSnapshotProvider : IExtensionSessionCatalogProvider, IExtensionSessionOpaqueViewProvider,
+    IExtensionSessionContextEditProvider, IExtensionSessionCompactionProvider, IExtensionSessionToolActivationProvider, IExtensionSessionTreeProvider
 {
     private ReplaceableAgentSession? owner;
     internal Func<AgentSessionAttachment, PersistentAgentSession, CancellationToken, ValueTask<bool>>? BeforeSwitch { get; set; }
@@ -57,7 +57,7 @@ internal sealed class NativeSessionSnapshotProvider : IExtensionSessionCatalogPr
         return new Scope(this, host, attached, context, snapshot, context.SessionCancellationToken);
     }
 
-    private sealed class Scope : IExtensionSessionCatalogScope, IExtensionSessionContextEditScope, IExtensionSessionCompactionScope, IExtensionSessionToolActivationScope
+    private sealed partial class Scope : IExtensionSessionCatalogScope, IExtensionSessionContextEditScope, IExtensionSessionCompactionScope, IExtensionSessionToolActivationScope, IExtensionSessionTreeScope
     {
         private readonly NativeSessionSnapshotProvider provider;
         private readonly ReplaceableAgentSession host;
@@ -238,15 +238,21 @@ internal sealed class NativeSessionSnapshotProvider : IExtensionSessionCatalogPr
             ArgumentNullException.ThrowIfNull(request);
             if (context is not IExtensionCommandContext) throw new InvalidOperationException("Only command contexts can create sessions.");
             if (!Enum.IsDefined(request.Kind)) throw new ArgumentException("Session creation kind is invalid.", nameof(request));
+            if (request.Setup?.GetInvocationList().Length > 1) throw new ArgumentException("One portable setup callback original required.");
             return new(Admit<ExtensionSessionCreationScopeResult?>(async () =>
             {
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,
                     context.OperationCancellationToken, context.ExtensionLifetimeCancellationToken, SessionCancellationToken);
-                var replaced = await host.CreateAsync(attachment,
-                    new((AgentSessionCreationKind)request.Kind, request.EntryId, request.ParentSession),
-                    validateStagedSnapshot is null ? null : (target, _, preflightToken) =>
-                        validateStagedSnapshot(NativeSessionSnapshotProvider.Snapshot(target, checked(attachment.Generation + 1)), preflightToken),
-                    linked.Token).ConfigureAwait(false);
+                var nativeRequest = new AgentSessionCreationRequest((AgentSessionCreationKind)request.Kind, request.EntryId, request.ParentSession);
+                var replaced = request.Setup is { } setup
+                    ? await host.CreateWithSetupAsync(attachment, nativeRequest,
+                        (manager, setupToken) => setup(new NativeSessionSetupManagerAdapter(manager), setupToken), linked.Token,
+                        validateStagedSnapshot is null ? null : (target, validationToken) =>
+                            validateStagedSnapshot(NativeSessionSnapshotProvider.Snapshot(target, checked(attachment.Generation + 1)), validationToken)).ConfigureAwait(false)
+                    : await host.CreateAsync(attachment, nativeRequest,
+                        validateStagedSnapshot is null ? null : (target, _, preflightToken) =>
+                            validateStagedSnapshot(NativeSessionSnapshotProvider.Snapshot(target, checked(attachment.Generation + 1)), preflightToken),
+                        linked.Token).ConfigureAwait(false);
                 if (replaced is null) return null;
                 return new(new Scope(provider, host, replaced.Current, context,
                     NativeSessionSnapshotProvider.Snapshot(replaced.Current), baseSessionToken), replaced.SelectedText);

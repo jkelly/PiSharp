@@ -30,7 +30,12 @@ public sealed partial class PersistentAgentSession
     }
 
     internal sealed record TreeSelection(SessionTreeNavigationDisposition Disposition,
-        SessionTreeNavigationRevision Revision, AgentSnapshot Agent, string? EditorText);
+        SessionTreeNavigationRevision Revision, AgentSnapshot Agent, string? EditorText)
+    {
+        internal SessionTreeCheckpoint? Checkpoint { get; init; }
+        internal SessionBoundaryOriginals? OriginalOwner { get; init; }
+        internal System.Collections.Immutable.ImmutableArray<SessionBoundaryOriginalEvidence> Originals => OriginalOwner?.Snapshot() ?? [];
+    }
 
     internal Task<TreeSelection> NavigateTreeAsync(SessionTreeNavigationRequest request, CancellationToken token,
         Action<Action> publish, Func<SessionTreeNavigationPreview, CancellationToken, ValueTask<bool>>? beforeTree)
@@ -38,6 +43,9 @@ public sealed partial class PersistentAgentSession
         ArgumentNullException.ThrowIfNull(request);
         if (request.ExpectedRevision is null || request.TargetId is { Length: 0 })
             throw new SessionTreeNavigationException(SessionTreeNavigationFailure.InvalidRequest);
+        if (request.Execution?.BeforeTree?.GetInvocationList().Length > 1 || request.Execution?.AfterTree?.GetInvocationList().Length > 1 ||
+            request.Execution?.ValidateProspective?.GetInvocationList().Length > 1)
+            throw new ArgumentException("Tree callbacks must each return one captured original.");
         // Validate and reserve in the same state boundary. ReserveSummary already owns idle admission,
         // Abort and the original cancellation-user/idle joins; IsCompacting covers navigation as in Pi.
         (TaskCompletionSource Idle, ContextEditCancellation Abort, CancellationToken InputAbort) reservation;
@@ -56,10 +64,14 @@ public sealed partial class PersistentAgentSession
     {
         var previousCallback = _configurationCallback.Value; _configurationCallback.Value = idle;
         var revision = request.ExpectedRevision;
+        var originals = new SessionBoundaryOriginals();
+        var commitHeld = false; var writeAdmitted = false;
+        SessionTreeCheckpoint? checkpoint = null;
+        Exception? bodyFailure = null;
         CancellationToken work = default;
         TreeSelection Unchanged(SessionTreeNavigationDisposition disposition)
         {
-            lock (_gate) return new(disposition, revision, _agent.Snapshot, null);
+            lock (_gate) return new(disposition, revision, _agent.Snapshot, null) { OriginalOwner = originals };
         }
         try
         {
@@ -91,7 +103,7 @@ public sealed partial class PersistentAgentSession
             }
             var prospective = _projector.Project(revision.Log.Entries, newLeaf, work);
             var configuration = _registry is { } registry
-                ? registry.Resolve(prospective, revision.Configuration.Model, work).Configuration : revision.Configuration;
+                ? (await PrepareAndDrainLoadoutAsync(() => registry.Resolve(prospective, revision.Configuration.Model, work), work).ConfigureAwait(false)).Configuration : revision.Configuration;
             ValidateRuntimeContext(prospective, configuration);
             var messages = SessionContextProjector.AgentMessages(prospective);
             await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
@@ -101,10 +113,49 @@ public sealed partial class PersistentAgentSession
                 : new SessionBranchSummaryPlanner().Collect(revision.Log.Entries, revision.Context.LeafId, request.TargetId, work);
             var preview = new SessionTreeNavigationPreview(revision.Log.Header.Id, request.TargetId, revision.Context.LeafId,
                 newLeaf, abandoned.CommonAncestorId, abandoned.Entries, prospective, configuration, editorText);
-            if (beforeTree is not null && !await beforeTree(preview, work).ConfigureAwait(false))
+            if (beforeTree is not null && !await originals.Join(beforeTree(preview, work).AsTask(), "tree-veto").ConfigureAwait(false))
             {
                 work.ThrowIfCancellationRequested();
                 return Unchanged(SessionTreeNavigationDisposition.Vetoed);
+            }
+            var options = request.Options;
+            SessionProvidedSummary? provided = null;
+            if (request.Execution?.BeforeTree is { } prepare)
+            {
+                var result = await originals.Join(prepare(preview, options, work).AsTask(), "tree-preparation").ConfigureAwait(false);
+                if(result is not null)foreach(var original in result.Originals)originals.Retain(original);
+                if (result?.Cancel == true) return Unchanged(SessionTreeNavigationDisposition.Vetoed);
+                if (result is not null)
+                {
+                    provided = result.Summary;
+                    options = options with { CustomInstructions = result.CustomInstructions is { } instructions ? instructions.Value : options.CustomInstructions,
+                        ReplaceInstructions = result.ReplaceInstructions?.Value ?? options.ReplaceInstructions,
+                        Label = result.Label is { } label ? label.Value : options.Label };
+                }
+            }
+            var records = await PrepareTreeRecordsAsync(revision, preview, options, provided, request.Execution, work, originals).ConfigureAwait(false);
+            var publishedLog = revision.Log;
+            if (!records.IsEmpty)
+            {
+                await _commits.WaitAsync(work).ConfigureAwait(false); commitHeld = true;
+                lock (_gate) { ThrowAvailable(); ValidateTreeRevision(revision); ValidateTreeQueuePublication(idle); }
+                var summary = records.FirstOrDefault(entry => entry.Kind == SessionEntryKind.BranchSummary);
+                var projectedLeaf = records[^1].Id;
+                prospective = _projector.Project(revision.Log.Entries.AddRange(records), projectedLeaf, work);
+                configuration = _registry is { } changedRegistry
+                    ? (await PrepareAndDrainLoadoutAsync(() => changedRegistry.Resolve(prospective, revision.Configuration.Model, work), work).ConfigureAwait(false)).Configuration
+                    : revision.Configuration;
+                ValidateRuntimeContext(prospective, configuration);
+                messages = SessionContextProjector.AgentMessages(prospective);
+                await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
+                    probe.ConfigureAndReplaceMessages(configuration, messages);
+                if(request.Execution?.ValidateProspective is { } validate)
+                    await originals.Join(validate(prospective,work).AsTask(),"tree-prospective-validator").ConfigureAwait(false);
+                work.ThrowIfCancellationRequested(); writeAdmitted = true;
+                var append = await originals.Join(_store.AppendAsync(records, work), "tree-storage-checkpoint").ConfigureAwait(false);
+                if (!append.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+                publishedLog = append.Snapshot;
+                checkpoint = new(append, summary?.WireBody, records.FirstOrDefault(entry => entry.Kind == SessionEntryKind.Label)?.WireBody);
             }
             TreeSelection? selected = null;
             // The host validates attachment under its publication gate. No callback/output runs here.
@@ -113,37 +164,57 @@ public sealed partial class PersistentAgentSession
             {
                 lock (_gate)
                 {
-                    ThrowAvailable(); ValidateTreeRevision(revision); work.ThrowIfCancellationRequested();
+                    ThrowAvailable(); ValidateTreeRevision(revision); if (checkpoint is null) work.ThrowIfCancellationRequested();
                     ValidateTreeQueuePublication(idle);
                     var restoreActivation = PrepareActivationRestoration(configuration);
                     _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(configuration), messages);
-                    _configuration = configuration; _context = prospective;
+                    _configuration = configuration; _context = prospective; _acknowledgedLog = publishedLog;
                     restoreActivation();
                     selected = new(SessionTreeNavigationDisposition.Selected,
-                        new(revision.Attachment, this, revision.Log, prospective, configuration, revision.Tree, _activationEpoch), _agent.Snapshot, editorText);
+                        new(revision.Attachment, this, publishedLog, prospective, configuration,
+                            new SessionTreeQueries().Build(publishedLog.Entries), _activationEpoch), _agent.Snapshot, editorText)
+                        { Checkpoint = checkpoint, OriginalOwner = originals };
                 }
             });
             return selected!;
         }
         catch (OperationCanceledException error) when (abort.Abort.IsCancellationRequested &&
             !token.IsCancellationRequested && !_closing.IsCancellationRequested && !inputAbort.IsCancellationRequested &&
-            error.CancellationToken == work)
+            error.CancellationToken == work && checkpoint is null)
         {
             // A foreign OCE must never become a successful abort receipt. Only the linked work token
             // can identify our Abort. Caller/lifetime/closing cancellation remains exceptional.
             return Unchanged(SessionTreeNavigationDisposition.Aborted);
         }
+        catch (Exception error)
+        {
+            bodyFailure = checkpoint is not null ? new SessionTreeCheckpointPublicationException(checkpoint, error) : error;
+            if (writeAdmitted) lock (_gate) _fault ??= new(PersistentAgentSessionFailure.InvalidCommit, MayHaveWritten: true);
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(bodyFailure).Throw(); throw;
+        }
         finally
         {
+            var failures = new List<Exception>();
+            try { await originals.JoinAll(row => row.Original.IsCanceled && row.Observed is OperationCanceledException canceled &&
+                canceled.CancellationToken == work && work.IsCancellationRequested).ConfigureAwait(false); }
+            catch (Exception error) { SessionBoundaryOriginals.Add(failures, error); }
+            if (commitHeld) _commits.Release();
             Task cancelIdle;
             lock (_gate)
             {
                 if (ReferenceEquals(_contextEditCancellation, abort)) _contextEditCancellation = null;
                 cancelIdle = abort.CancelUsers == 0 ? Task.CompletedTask : abort.CancelIdle!.Task;
             }
-            await cancelIdle.ConfigureAwait(false); abort.Abort.Dispose();
-            lock (_gate) if (ReferenceEquals(_active, idle)) { _active = null; _compacting = false; }
-            idle.TrySetResult(); _configurationCallback.Value = previousCallback;
+            try { await originals.Join(cancelIdle, "tree-cancellation-users").ConfigureAwait(false); }
+            catch (Exception error) { SessionBoundaryOriginals.Add(failures, error); }
+            try { abort.Abort.Dispose(); } catch (Exception error) { SessionBoundaryOriginals.Add(failures, error); }
+            finally
+            {
+                lock (_gate) if (ReferenceEquals(_active, idle)) { _active = null; _compacting = false; }
+                idle.TrySetResult(); _configurationCallback.Value = previousCallback;
+            }
+            if (failures.Count != 0)
+            { if (bodyFailure is not null) SessionBoundaryOriginals.Add(failures, bodyFailure); SessionBoundaryOriginals.Throw(failures, originals.Snapshot()); }
         }
     }
 

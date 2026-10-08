@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "kind": "notification-publication-content-pin-refresh-proposal",
+  "status": "authored-unexecuted-not-admitted",
+  "branch": "fix/node-notification-failure",
+  "baseCommit": "5e8ab440826fade20cad90ff7a19eb0337c59d92",
+  "integrationCandidate": "75c18ddda73ce7d82954d701a582511d06a63dd1",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "helperChanges": [
+    {
+      "path": "tools/NodeCommandInputBridge/module-loader.mjs",
+      "before": {
+        "sha256": "5441e13bbff31f2c4614205f3eaa6dd8f3f960e9bf63748290f235eac952938d",
+        "bytes": 30043
+      },
+      "after": {
+        "path": "tools/NodeCommandInputBridge/module-loader.mjs",
+        "bytes": 29973,
+        "sha256": "67ebd445352d9f095542cdabf73e1ed84e3972c6032929f5c950c39b827bf3e0"
+      }
+    },
+    {
+      "path": "tools/NodeCommandInputBridge/tool-progress.mjs",
+      "before": {
+        "sha256": "424eb65472142f7e0c2f9f1e2a2abad7f0f6b494557e8c12611a084f663f520c",
+        "bytes": 3389
+      },
+      "after": {
+        "path": "tools/NodeCommandInputBridge/tool-progress.mjs",
+        "bytes": 4005,
+        "sha256": "237eedf025e3d8cf944c306a05dcb3ba33a79c8bfd5fa68abf1be9ea4f6c4455"
+      }
+    }
+  ],
+  "proposedPlan": {
+    "path": "tools/NodeCommandInputBridge/notification-plan.proposed.json",
+    "bytes": 11796,
+    "sha256": "6c325b8cce0dbc4be4f6377c27197b2242ccf875511931f692a4854ff08f7064"
+  },
+  "activePlan": {
+    "path": "compatibility/node/command-input-bridge.plan.json",
+    "bytes": 11796,
+    "sha256": "fde6bae32f17a92d4abc3130772a31d91abeab8bb3c2440ad2196c5d26924d11"
+  },
+  "activeLauncher": {
+    "path": "src/PiSharp.ExtensionHost/Supervision/NodeCommandInputWorkerLaunch.cs",
+    "bytes": 6939,
+    "sha256": "664bfeb498d5d371e58147ef9574e083518eeaaaace007b7976b80f67a6e683e"
+  },
+  "proposedLauncherChange": {
+    "path": "src/PiSharp.ExtensionHost/Supervision/NodeCommandInputWorkerLaunch.cs",
+    "member": "PlanSha256",
+    "before": "fde6bae32f17a92d4abc3130772a31d91abeab8bb3c2440ad2196c5d26924d11",
+    "after": "6c325b8cce0dbc4be4f6377c27197b2242ccf875511931f692a4854ff08f7064"
+  },
+  "policyChanges": false,
+  "admittedHelperPathsChanged": false,
+  "activeAdmissionFilesChanged": false,
+  "workerEntryChanged": false,
+  "sourceEvidence": [
+    {
+      "path": "packages/coding-agent/src/core/extensions/runner.ts",
+      "bytes": 51250,
+      "sha256": "1a0d73843fba5773d415f484c46898138723b73d27bf8c3159f491fa0b6232f3",
+      "verifiedInert": true
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/types.ts",
+      "bytes": 81892,
+      "sha256": "de0ccce3b8b222d19a2ecef24902fc72aab62b6573129cbf886bc064dd6ab505",
+      "verifiedInert": true
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/commands.ts",
+      "bytes": 2594,
+      "sha256": "36716b53da169936c7e1360a4fde1e2fc0c3356a6505f177235f09c5538c6e4f",
+      "verifiedInert": true
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/input-transform.ts",
+      "bytes": 1444,
+      "sha256": "cf0f65d610631ca75d18aae1c8f1408139702f674cb2835f8c009b943776474b",
+      "verifiedInert": true
+    }
+  ],
+  "tests": {
+    "requires": "coordinator allocation",
+    "executedCases": 0,
+    "pin": {
+      "path": "tools/NodeCommandInputBridge/notification-publication.test.mjs",
+      "bytes": 3326,
+      "sha256": "1df6cf11011870e16e8e4b7536da3540da2367bd290a961021215ccad8a9ac02"
+    },
+    "authoredCases": 5,
+    "command": "node --test tools/NodeCommandInputBridge/notification-publication.test.mjs"
+  },
+  "corpus": {
+    "sourceFiles": 12,
+    "entrypoints": 11,
+    "capturedBridge": 0,
+    "newExecutedCorpusCredit": 0,
+    "capturedUpstream": 0,
+    "authoredScenarios": 42
+  },
+  "limitation": "The current immutable admission rejects changed helper bytes until the coordinator applies the exact content-pin refresh. No Node/native execution or compatibility credit."
+}

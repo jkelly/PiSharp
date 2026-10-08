@@ -102,8 +102,16 @@ public sealed class AnthropicMessagesSimpleRequestFactory : IChatTransport
     {
         cancellationToken.ThrowIfCancellationRequested(); AdmitKey(_options.ApiKey);
         var factory = Bind(Resolve(request, cancellationToken));
+        if (_options.Hooks is not null)
+            return AnthropicMessagesHttpSseTransport.FromPrepared(_client, (current, token) => factory.Prepare(current, _options.ApiKey!, token),
+                _options.HttpOptions, _options.MessagesOptions, _options.Hooks).StreamAsync(request, cancellationToken);
         return new AnthropicMessagesHttpSseTransport(_client, (current, token) => factory.Create(current, _options.ApiKey!, token),
             _options.HttpOptions, _options.MessagesOptions).StreamAsync(request, cancellationToken);
+    }
+    public AnthropicMessagesPreparedRequest Prepare(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested(); AdmitKey(explicitApiKey);
+        return Bind(Resolve(request, cancellationToken)).Prepare(request, explicitApiKey, cancellationToken);
     }
     private AnthropicMessagesKeyAuthRequestFactory Bind(AnthropicMessagesSimpleResolution resolved) => new(_baseUri, _model,
         _options.ProjectionOptions with

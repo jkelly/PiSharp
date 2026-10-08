@@ -1,6 +1,6 @@
 namespace PiSharp.Extensions.Runtime;
 
-internal enum RegistrationKind { Tool, Command, Observation, InputHandler, ToolCallHandler, ToolResultHandler, SessionSwitchHandler, SessionCreationHandler, ContextWithSystemHandler, ContextHandler, BeforeAgentStartHandler }
+internal enum RegistrationKind { Tool, Command, Observation, InputHandler, ToolCallHandler, ToolResultHandler, SessionSwitchHandler, SessionCreationHandler, ContextWithSystemHandler, ContextHandler, BeforeAgentStartHandler, EventBus, SessionBeforeTreeHandler }
 
 internal sealed class RegistrationEntry
 {

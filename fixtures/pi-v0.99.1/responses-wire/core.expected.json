@@ -1,0 +1,860 @@
+{
+  "fixtureId": "responses-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "captured-upstream-responses-oracle",
+  "normalizerVersion": "object-key-order-v1",
+  "observations": {
+    "cases": [
+      {
+        "caseId": "interleaved-completed",
+        "providerEvents": [
+          {
+            "type": "response.created",
+            "sequence_number": 0,
+            "response": {
+              "id": "resp_complete"
+            }
+          },
+          {
+            "type": "response.output_item.added",
+            "sequence_number": 1,
+            "output_index": 4,
+            "item": {
+              "type": "message",
+              "id": "msg_complete",
+              "role": "assistant",
+              "status": "in_progress",
+              "content": [],
+              "phase": "commentary"
+            }
+          },
+          {
+            "type": "response.output_item.added",
+            "sequence_number": 2,
+            "output_index": 9,
+            "item": {
+              "type": "function_call",
+              "id": "fc_complete",
+              "call_id": "call_complete",
+              "name": "read",
+              "namespace": "fs.initial",
+              "arguments": ""
+            }
+          },
+          {
+            "type": "response.output_text.delta",
+            "sequence_number": 3,
+            "output_index": 4,
+            "item_id": "msg_complete",
+            "content_index": 0,
+            "delta": "Draft π"
+          },
+          {
+            "type": "response.function_call_arguments.delta",
+            "sequence_number": 4,
+            "output_index": 9,
+            "item_id": "fc_complete",
+            "delta": "{\"path\":\"C:\\"
+          },
+          {
+            "type": "response.output_text.delta",
+            "sequence_number": 5,
+            "output_index": 4,
+            "item_id": "msg_complete",
+            "content_index": 0,
+            "delta": "\r\ncontinued"
+          },
+          {
+            "type": "response.function_call_arguments.done",
+            "sequence_number": 6,
+            "output_index": 9,
+            "item_id": "fc_complete",
+            "arguments": "{\"path\":\"C:\\\\temp\\\\π\",\"options\":{\"preserve\":null,\"order\":[\"b\",\"a\"]}}"
+          },
+          {
+            "type": "response.output_item.done",
+            "sequence_number": 7,
+            "output_index": 4,
+            "item": {
+              "type": "message",
+              "id": "msg_complete",
+              "role": "assistant",
+              "status": "completed",
+              "phase": "final_answer",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Authoritative π\r\nfinal",
+                  "annotations": []
+                }
+              ]
+            }
+          },
+          {
+            "type": "response.output_item.done",
+            "sequence_number": 8,
+            "output_index": 9,
+            "item": {
+              "type": "function_call",
+              "id": "fc_complete",
+              "call_id": "call_complete",
+              "name": "read",
+              "namespace": "fs.final",
+              "arguments": "{\"path\":\"C:\\\\temp\\\\π\",\"options\":{\"preserve\":null,\"order\":[\"b\",\"a\"]}}"
+            }
+          },
+          {
+            "type": "response.completed",
+            "sequence_number": 9,
+            "response": {
+              "id": "resp_complete",
+              "status": "completed",
+              "output": [],
+              "usage": {
+                "input_tokens": 20,
+                "output_tokens": 7,
+                "total_tokens": 27,
+                "input_tokens_details": {
+                  "cached_tokens": 2,
+                  "cache_write_tokens": 3
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 1
+                }
+              }
+            }
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_complete"
+            }
+          },
+          {
+            "type": "toolcall_start",
+            "contentIndex": 1,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_complete|fc_complete",
+                  "name": "read",
+                  "arguments": {},
+                  "namespace": "fs.initial",
+                  "partialJson": ""
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_complete"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Draft π",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Draft π"
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_complete|fc_complete",
+                  "name": "read",
+                  "arguments": {},
+                  "namespace": "fs.initial",
+                  "partialJson": ""
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_complete"
+            }
+          },
+          {
+            "type": "toolcall_delta",
+            "contentIndex": 1,
+            "delta": "{\"path\":\"C:\\",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Draft π"
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_complete|fc_complete",
+                  "name": "read",
+                  "arguments": {
+                    "path": "C:"
+                  },
+                  "namespace": "fs.initial",
+                  "partialJson": "{\"path\":\"C:\\"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_complete"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "\r\ncontinued",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Draft π\r\ncontinued"
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_complete|fc_complete",
+                  "name": "read",
+                  "arguments": {
+                    "path": "C:"
+                  },
+                  "namespace": "fs.initial",
+                  "partialJson": "{\"path\":\"C:\\"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_complete"
+            }
+          },
+          {
+            "type": "toolcall_delta",
+            "contentIndex": 1,
+            "delta": "\\temp\\\\π\",\"options\":{\"preserve\":null,\"order\":[\"b\",\"a\"]}}",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Draft π\r\ncontinued"
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_complete|fc_complete",
+                  "name": "read",
+                  "arguments": {
+                    "path": "C:\\temp\\π",
+                    "options": {
+                      "preserve": null,
+                      "order": [
+                        "b",
+                        "a"
+                      ]
+                    }
+                  },
+                  "namespace": "fs.initial",
+                  "partialJson": "{\"path\":\"C:\\\\temp\\\\π\",\"options\":{\"preserve\":null,\"order\":[\"b\",\"a\"]}}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_complete"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Authoritative π\r\nfinal",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Authoritative π\r\nfinal",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_complete\",\"phase\":\"final_answer\"}"
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_complete|fc_complete",
+                  "name": "read",
+                  "arguments": {
+                    "path": "C:\\temp\\π",
+                    "options": {
+                      "preserve": null,
+                      "order": [
+                        "b",
+                        "a"
+                      ]
+                    }
+                  },
+                  "namespace": "fs.initial",
+                  "partialJson": "{\"path\":\"C:\\\\temp\\\\π\",\"options\":{\"preserve\":null,\"order\":[\"b\",\"a\"]}}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "resp_complete"
+            }
+          },
+          {
+            "type": "toolcall_end",
+            "contentIndex": 1,
+            "toolCall": {
+              "type": "toolCall",
+              "id": "call_complete|fc_complete",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "namespace": "fs.final"
+            },
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Authoritative π\r\nfinal",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_complete\",\"phase\":\"final_answer\"}"
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_complete|fc_complete",
+                  "name": "read",
+                  "arguments": {
+                    "path": "C:\\temp\\π",
+                    "options": {
+                      "preserve": null,
+                      "order": [
+                        "b",
+                        "a"
+                      ]
+                    }
+                  },
+                  "namespace": "fs.final"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "resp_complete"
+            }
+          }
+        ],
+        "finalOutput": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Authoritative π\r\nfinal",
+              "textSignature": "{\"v\":1,\"id\":\"msg_complete\",\"phase\":\"final_answer\"}"
+            },
+            {
+              "type": "toolCall",
+              "id": "call_complete|fc_complete",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "namespace": "fs.final"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "fixture-provider",
+          "model": "synthetic-responses-model",
+          "usage": {
+            "input": 15,
+            "output": 7,
+            "cacheRead": 2,
+            "cacheWrite": 3,
+            "reasoning": 1,
+            "totalTokens": 27,
+            "cost": {
+              "input": 15,
+              "output": 14,
+              "cacheRead": 1,
+              "cacheWrite": 4.5,
+              "total": 34.5
+            }
+          },
+          "stopReason": "toolUse",
+          "timestamp": 1700000000000,
+          "responseId": "resp_complete",
+          "rawStopReason": "completed"
+        },
+        "completion": {
+          "status": "returned"
+        }
+      },
+      {
+        "caseId": "eof-before-terminal",
+        "providerEvents": [
+          {
+            "type": "response.created",
+            "sequence_number": 0,
+            "response": {
+              "id": "resp_eof"
+            }
+          },
+          {
+            "type": "response.output_item.added",
+            "sequence_number": 1,
+            "output_index": 2,
+            "item": {
+              "type": "message",
+              "id": "msg_eof",
+              "role": "assistant",
+              "status": "in_progress",
+              "content": []
+            }
+          },
+          {
+            "type": "response.output_text.delta",
+            "sequence_number": 2,
+            "output_index": 2,
+            "item_id": "msg_eof",
+            "content_index": 0,
+            "delta": "Partial before EOF"
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_eof"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Partial before EOF",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Partial before EOF"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_eof"
+            }
+          }
+        ],
+        "finalOutput": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Partial before EOF"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "fixture-provider",
+          "model": "synthetic-responses-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000,
+          "responseId": "resp_eof"
+        },
+        "completion": {
+          "status": "threw",
+          "error": {
+            "name": "Error",
+            "message": "OpenAI Responses stream ended before a terminal response event"
+          }
+        }
+      },
+      {
+        "caseId": "completed-unfinished-tool",
+        "providerEvents": [
+          {
+            "type": "response.output_item.added",
+            "sequence_number": 0,
+            "output_index": 5,
+            "item": {
+              "type": "function_call",
+              "id": "fc_unfinished",
+              "call_id": "call_unfinished",
+              "name": "read",
+              "arguments": ""
+            }
+          },
+          {
+            "type": "response.function_call_arguments.delta",
+            "sequence_number": 1,
+            "output_index": 5,
+            "item_id": "fc_unfinished",
+            "delta": "{\"path\":\"unfinished"
+          },
+          {
+            "type": "response.completed",
+            "sequence_number": 2,
+            "response": {
+              "id": "resp_unfinished",
+              "status": "completed",
+              "output": []
+            }
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "type": "toolcall_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "call_unfinished|fc_unfinished",
+                  "name": "read",
+                  "arguments": {},
+                  "partialJson": ""
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "toolcall_delta",
+            "contentIndex": 0,
+            "delta": "{\"path\":\"unfinished",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "call_unfinished|fc_unfinished",
+                  "name": "read",
+                  "arguments": {
+                    "path": "unfinished"
+                  },
+                  "partialJson": "{\"path\":\"unfinished"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "fixture-provider",
+              "model": "synthetic-responses-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          }
+        ],
+        "finalOutput": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call_unfinished|fc_unfinished",
+              "name": "read",
+              "arguments": {
+                "path": "unfinished"
+              },
+              "partialJson": "{\"path\":\"unfinished"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "fixture-provider",
+          "model": "synthetic-responses-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "toolUse",
+          "timestamp": 1700000000000,
+          "responseId": "resp_unfinished",
+          "rawStopReason": "completed"
+        },
+        "completion": {
+          "status": "threw",
+          "error": {
+            "name": "Error",
+            "message": "OpenAI Responses stream completed with an unfinished tool call: read (call_unfinished|fc_unfinished)"
+          }
+        }
+      }
+    ],
+    "effects": [],
+    "checks": {
+      "capturedCaseCount": 3,
+      "parsedWireEventCount": 16,
+      "normalizedEmissionCount": 12,
+      "returnedCases": [
+        "interleaved-completed"
+      ],
+      "thrownCases": [
+        "eof-before-terminal",
+        "completed-unfinished-tool"
+      ],
+      "emittedStartCount": 0,
+      "emittedTerminalCount": 0,
+      "sourceSeam": "Unchanged processResponsesStream with explicit parsed events/output/stream/model/options"
+    }
+  }
+}

@@ -1,0 +1,517 @@
+{
+  "schemaVersion": 1,
+  "status": "revised reviewable Anthropic setup plan/helper; original prepared restore attempt blocked and preserved; fresh reviewed root preparation, acquisition, restore and genuine whole-wrapper capture not executed",
+  "source": {
+    "repository": "https://github.com/earendil-works/pi",
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "lockPath": "package-lock.json",
+    "lockSha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d",
+    "canonicalFingerprint": {
+      "files": 2093,
+      "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+    },
+    "acquiredFingerprint": {
+      "files": 2093,
+      "sha256": "676a5df7a526ab0fb6a78f734b57093bb7571913fc17251d02cb0c84527dcf21"
+    },
+    "declaredCheckoutConversions": [
+      {
+        "path": "pi-test.bat",
+        "eol": "crlf",
+        "canonicalSha256": "d454a5a0e203d9009283b887720472b022b0853380758b11419c8547a32dbb88",
+        "checkoutSha256": "c9d3430a614cabfaae5a9e97259643ab9041629bc8253f58f22579a5b6d9c448"
+      },
+      {
+        "path": "pi-test.ps1",
+        "eol": "crlf",
+        "canonicalSha256": "9f76d37f75b1d6f03be14d8bce3ca05331c4b09b8003a53329d8e4fe942792ef",
+        "checkoutSha256": "9b97fa3be6582e935f43865599d21bbb216e5ffe2cb1eb198c77e7298490b895"
+      }
+    ],
+    "pins": [
+      {
+        "path": "package-lock.json",
+        "bytes": 186139,
+        "sha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d"
+      },
+      {
+        "path": "packages/ai/package.json",
+        "bytes": 2636,
+        "sha256": "86a8ccb86ce00af196fc7d48417f82e99c6da40c68d8d138ace2a4f0fda4090d"
+      },
+      {
+        "path": "packages/ai/src/api/anthropic-messages.ts",
+        "bytes": 51170,
+        "sha256": "b3f7b44f85b46fa4bee89a5f6e82240a6f40c014c4c64d3c64132090fc66572a"
+      },
+      {
+        "path": "packages/ai/src/api/simple-options.ts",
+        "bytes": 3256,
+        "sha256": "8bb50ff92c1759434ead59d1b4111826b6be47d13f744b8cc3b775c684536d46"
+      },
+      {
+        "path": "packages/ai/src/utils/provider-retry.ts",
+        "bytes": 4034,
+        "sha256": "d0f68cfe9fe6a5d4be778eaefedc0b453021f89026810691dcd1479371dca699"
+      },
+      {
+        "path": "packages/ai/src/types.ts",
+        "bytes": 48466,
+        "sha256": "7ac401b31a7679a77469037091093c4c25d3719d7c9e9078378fece509fa8e8d"
+      },
+      {
+        "path": "packages/coding-agent/src/experimental/source-resolver.ts",
+        "bytes": 3592,
+        "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6"
+      },
+      {
+        "path": "tsconfig.json",
+        "bytes": 3988,
+        "sha256": "1ef1041faebef510f59480731ece80657f7e67b1091a0b0dcf05ca51e8a267a6"
+      }
+    ],
+    "directDeclarations": [
+      {
+        "packageLockPath": "packages/ai",
+        "name": "@anthropic-ai/sdk",
+        "version": "0.124.0"
+      },
+      {
+        "packageLockPath": "packages/ai",
+        "name": "partial-json",
+        "version": "0.1.7"
+      }
+    ],
+    "requiredEagerImport": "Whole anthropic-messages.ts runtime imports @anthropic-ai/sdk and partial-json through unchanged internal sources; static graph is not proof of actual loaded package/file closure.",
+    "excludedLockEntries": [
+      "packages/coding-agent/node_modules/@anthropic-ai/sdk (0.52.0)",
+      "packages/coding-agent/node_modules/@earendil-works/pi-ai/node_modules/@anthropic-ai/sdk (0.91.1 extraneous)",
+      "Other provider SDKs, typebox, cross-spawn, optional zod peer"
+    ]
+  },
+  "runtime": {
+    "version": "v24.19.0",
+    "absoluteExecutable": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+    "reuseExisting": true,
+    "sourceExecution": "Node native TypeScript stripping; unchanged whole packages/ai/src/api/anthropic-messages.ts and canonical experimental source resolver"
+  },
+  "packageManager": {
+    "version": "11.6.2",
+    "existingVerifiedArchive": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1\\archives\\npm-11.6.2.tgz",
+    "archiveBytes": 2663834,
+    "sha256": "585f95094ee5cb2788ee11d90f2a518a7c9ef6e083fa141d0b63ca3383675a20",
+    "integrity": "sha512-7iKzNfy8lWYs3zq4oFPa8EXZz5xt9gQNKJZau3B1ErLBb6bF7sBJ00x09485DOvRT2l5Gerbl3VlZNT57MxJVA==",
+    "tarballIfMissing": "https://registry.npmjs.org/npm/-/npm-11.6.2.tgz",
+    "bootstrapReuse": "Verify and copy the existing archive into the new owned workspace, inspect confined member/link paths before unpacking only the npm CLI into its tools directory; no global installation",
+    "cacheReuse": "Copy verified existing cache contents into the new workspace's owned cache; never point a writable npm cache at the accepted oracle's cache",
+    "engine": "^20.17.0 || >=22.9.0"
+  },
+  "workspace": {
+    "proposedRoot": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-anthropic-sdk-oracle-v0.99.1-reviewed",
+    "existedAtResearch": false,
+    "upstreamSubdirectory": "upstream",
+    "sourceAcquisition": "Fresh task-local Git clone without hardlinks from the already acquired public pinned checkout; no Git network required",
+    "existingQualifiedOracle": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1",
+    "existingQualifiedOracleMutation": false,
+    "requiredOwnedDirectories": [
+      "upstream",
+      "archives",
+      "tools/npm-11.6.2",
+      "cache",
+      "config",
+      "home",
+      "tmp",
+      "captures"
+    ],
+    "existingTargetPolicy": "Use only the fresh reviewed root; preserve the original incomplete root and its owner/prepared/restore-started metadata, source, cache and archive receipts. Refuse a preexisting nonempty or incomplete target; exact owned prepared/restored layouts may be validated idempotently; no deletion or overwrite of uncertain state",
+    "existedAtPlanCreation": false,
+    "olderQualifiedOraclesRemainImmutable": [
+      "Pi-reference-oracle-v0.99.1",
+      "Pi-responses-sdk-oracle-v0.99.1",
+      "Pi-session-context-oracle-v0.99.1",
+      "Pi-edit-oracle-v0.99.1"
+    ]
+  },
+  "projection": {
+    "packageJson": {
+      "name": "pisharp-anthropic-sdk-reference-oracle",
+      "version": "0.0.0",
+      "private": true,
+      "type": "module",
+      "dependencies": {
+        "@anthropic-ai/sdk": "0.124.0",
+        "@babel/runtime": "7.29.2",
+        "@stablelib/base64": "1.0.1",
+        "fast-sha256": "1.3.0",
+        "json-schema-to-ts": "3.1.1",
+        "partial-json": "0.1.7",
+        "standardwebhooks": "1.1.1",
+        "ts-algebra": "2.0.0"
+      }
+    },
+    "lockfileVersion": 3,
+    "requires": true,
+    "rule": "Fresh isolated root explicitly pins all eight selected original lock entries unchanged; no dependency resolution broadening. Optional SDK peer zod is omitted.",
+    "externalPackageProfileCount": 8,
+    "additionalPackageCount": 7,
+    "dependencyGraph": {
+      "@anthropic-ai/sdk": [
+        "json-schema-to-ts",
+        "standardwebhooks"
+      ],
+      "json-schema-to-ts": [
+        "@babel/runtime",
+        "ts-algebra"
+      ],
+      "standardwebhooks": [
+        "@stablelib/base64",
+        "fast-sha256"
+      ]
+    },
+    "optionalPeersInstalled": [],
+    "runtimeClosureProved": false
+  },
+  "knownOptionalPeerAdmission": {
+    "package": "@anthropic-ai/sdk",
+    "version": "0.124.0",
+    "peerDependencies": {
+      "zod": "^3.25.0 || ^4.0.0"
+    },
+    "peerDependenciesMeta": {
+      "zod": {
+        "optional": true
+      }
+    },
+    "installed": false,
+    "rule": "Allow exactly these canonical SDK declarations; reject other peer or optional dependency declarations in any selected package. zod is not included in projection or installed."
+  },
+  "disabledLifecycleAdmission": {
+    "name": "standardwebhooks",
+    "version": "1.1.1",
+    "archiveFile": "standardwebhooks-1.1.1.tgz",
+    "archiveBytes": 4109,
+    "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+    "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+    "scriptDeclarations": {
+      "build": "tsc",
+      "prepare": "npm run build",
+      "test": "tsc && node --test dist/*.test.js",
+      "prepublishOnly": "biome check",
+      "check": "biome check",
+      "check:fix": "biome check --write",
+      "fmt": "biome format --write"
+    },
+    "disabledScripts": { "prepare": "npm run build", "build": "tsc" },
+    "disabledBy": "--ignore-scripts",
+    "scriptsExecuted": false,
+    "packagedFiles": [
+      "README.md",
+      "dist/index.d.ts",
+      "dist/index.js",
+      "dist/index.js.map",
+      "dist/timing_safe_equal.d.ts",
+      "dist/timing_safe_equal.js",
+      "dist/timing_safe_equal.js.map",
+      "package.json"
+    ]
+  },
+  "developmentOnlyLicenseAdmission": {
+    "name": "standardwebhooks",
+    "version": "1.1.1",
+    "archiveFile": "standardwebhooks-1.1.1.tgz",
+    "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+    "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+    "scope": "task-local-development-only",
+    "declaredLicense": "MIT",
+    "licenseEvidence": "declared-MIT-only",
+    "licenses": [],
+    "packagedRootLicenseVerified": false,
+    "redistributionLicenseClosure": false,
+    "licenseReviewStatus": "P1-02 HOLD"
+  },
+  "preservedBlockedAttempt": {
+    "root": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-anthropic-sdk-oracle-v0.99.1",
+    "planSha256": "b5bbbb7fad8390ccea0f8993ffd598abe06f033404e70a9cce0cfd9a187efa8c",
+    "helperSha256": "5aeb74fa225664612cda5a58b72cf5cb8b1e218dc6a56304d100a506e6db1d75",
+    "prepared": true,
+    "restoreStarted": true,
+    "dependenciesInstalled": false,
+    "scriptsExecuted": false,
+    "blocker": "Exact standardwebhooks 1.1.1 archive declares prepare: npm run build and build: tsc; original lifecycle admission rejected it before npm ci.",
+    "inspectionArtifact": "artifacts/anthropic-sdk-admission/standardwebhooks-inspection.json",
+    "inspectionSha256": "02e808dc4cf73ef8856dbdffd86979af86d29d288c687ba8829be6c4c9a9871c",
+    "archiveArtifact": "artifacts/anthropic-sdk-admission/standardwebhooks-1.1.1.tgz",
+    "policy": "Preserve all existing files and metadata; never resume, alter, delete or use this partial root as the new writable oracle.",
+    "pendingLicenseEvidence": "The exact eight-file standardwebhooks archive has no root LICENSE/LICENCE/NOTICE/COPYING file. Only this pinned archive with licenses exactly empty is admitted for task-local development as declared-MIT-only; packagedRootLicenseVerified and redistributionLicenseClosure remain false. Official library package.json declares MIT; repository root LICENSE is Apache-2.0, separate unresolved evidence and not a substitute MIT grant. Full P1-02 remains HOLD."
+  },
+  "packages": [
+    {
+      "name": "@anthropic-ai/sdk",
+      "sourceLockPath": "node_modules/@anthropic-ai/sdk",
+      "projectedLockPath": "node_modules/@anthropic-ai/sdk",
+      "archiveFile": "anthropic-ai-sdk-0.124.0.tgz",
+      "lockEntry": {
+        "version": "0.124.0",
+        "resolved": "https://registry.npmjs.org/@anthropic-ai/sdk/-/sdk-0.124.0.tgz",
+        "integrity": "sha512-cN5O8i9UVxHeOQAzj/XjshWXG8KiibJDw9OGpH2Z/eR3n/RBxdoLxDJOcfqAJWvjaMDFfHTBADU04hWRJVkDyA==",
+        "license": "MIT",
+        "dependencies": {
+          "json-schema-to-ts": "^3.1.1",
+          "standardwebhooks": "^1.0.0"
+        },
+        "bin": {
+          "anthropic-ai-sdk": "bin/cli"
+        },
+        "peerDependencies": {
+          "zod": "^3.25.0 || ^4.0.0"
+        },
+        "peerDependenciesMeta": {
+          "zod": {
+            "optional": true
+          }
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock only; packaged bytes, manifest, license, lifecycle/native evidence pending explicit reviewed restore"
+    },
+    {
+      "name": "@babel/runtime",
+      "sourceLockPath": "node_modules/@babel/runtime",
+      "projectedLockPath": "node_modules/@babel/runtime",
+      "archiveFile": "babel-runtime-7.29.2.tgz",
+      "lockEntry": {
+        "version": "7.29.2",
+        "resolved": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.2.tgz",
+        "integrity": "sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g==",
+        "license": "MIT",
+        "engines": {
+          "node": ">=6.9.0"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock only; packaged bytes, manifest, license, lifecycle/native evidence pending explicit reviewed restore"
+    },
+    {
+      "name": "@stablelib/base64",
+      "sourceLockPath": "node_modules/@stablelib/base64",
+      "projectedLockPath": "node_modules/@stablelib/base64",
+      "archiveFile": "stablelib-base64-1.0.1.tgz",
+      "lockEntry": {
+        "version": "1.0.1",
+        "resolved": "https://registry.npmjs.org/@stablelib/base64/-/base64-1.0.1.tgz",
+        "integrity": "sha512-1bnPQqSxSuc3Ii6MhBysoWCg58j97aUjuCSZrGSmDxNqtytIi0k8utUenAwTZN4V5mXXYGsVUI9zeBqy+jBOSQ==",
+        "license": "MIT"
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock only; packaged bytes, manifest, license, lifecycle/native evidence pending explicit reviewed restore"
+    },
+    {
+      "name": "fast-sha256",
+      "sourceLockPath": "node_modules/fast-sha256",
+      "projectedLockPath": "node_modules/fast-sha256",
+      "archiveFile": "fast-sha256-1.3.0.tgz",
+      "lockEntry": {
+        "version": "1.3.0",
+        "resolved": "https://registry.npmjs.org/fast-sha256/-/fast-sha256-1.3.0.tgz",
+        "integrity": "sha512-n11RGP/lrWEFI/bWdygLxhI+pVeo1ZYIVwvvPkW7azl/rOy+F3HYRZ2K5zeE9mmkhQppyv9sQFx0JM9UabnpPQ==",
+        "license": "Unlicense"
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock only; packaged bytes, manifest, license, lifecycle/native evidence pending explicit reviewed restore"
+    },
+    {
+      "name": "json-schema-to-ts",
+      "sourceLockPath": "node_modules/json-schema-to-ts",
+      "projectedLockPath": "node_modules/json-schema-to-ts",
+      "archiveFile": "json-schema-to-ts-3.1.1.tgz",
+      "lockEntry": {
+        "version": "3.1.1",
+        "resolved": "https://registry.npmjs.org/json-schema-to-ts/-/json-schema-to-ts-3.1.1.tgz",
+        "integrity": "sha512-+DWg8jCJG2TEnpy7kOm/7/AxaYoaRbjVB4LFZLySZlWn8exGs3A4OLJR966cVvU26N7X9TWxl+Jsw7dzAqKT6g==",
+        "license": "MIT",
+        "dependencies": {
+          "@babel/runtime": "^7.18.3",
+          "ts-algebra": "^2.0.0"
+        },
+        "engines": {
+          "node": ">=16"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock only; packaged bytes, manifest, license, lifecycle/native evidence pending explicit reviewed restore"
+    },
+    {
+      "name": "partial-json",
+      "sourceLockPath": "node_modules/partial-json",
+      "projectedLockPath": "node_modules/partial-json",
+      "archiveFile": "partial-json-0.1.7.tgz",
+      "lockEntry": {
+        "version": "0.1.7",
+        "resolved": "https://registry.npmjs.org/partial-json/-/partial-json-0.1.7.tgz",
+        "integrity": "sha512-Njv/59hHaokb/hRUjce3Hdv12wd60MtM9Z5Olmn+nehe0QDAsRtRbJPvJ0Z91TusF0SuZRIvnM+S4l6EIP8leA==",
+        "license": "MIT"
+      },
+      "reuseVerifiedCacheArchive": true,
+      "authority": "Canonical upstream lock and previously qualified local archive/installed-byte fingerprints; revalidate read-only"
+    },
+    {
+      "name": "standardwebhooks",
+      "sourceLockPath": "node_modules/standardwebhooks",
+      "projectedLockPath": "node_modules/standardwebhooks",
+      "archiveFile": "standardwebhooks-1.1.1.tgz",
+      "lockEntry": {
+        "version": "1.1.1",
+        "resolved": "https://registry.npmjs.org/standardwebhooks/-/standardwebhooks-1.1.1.tgz",
+        "integrity": "sha512-bCbX9ZEyFkWPsRz7Bl3NuQUJohmwGSev/yhr7vhaGPlc4AfIrspIRa6cPTBuI1ItmrTDJ4d/S2hCsfe4+vQGnQ==",
+        "license": "MIT",
+        "dependencies": {
+          "@stablelib/base64": "^1.0.0",
+          "fast-sha256": "^1.3.0"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock and exact inert observed archive/manifest/lifecycle evidence; declared-MIT-only task-local development exception with packaged root license absent and redistribution license closure false; fresh reviewed-root acquisition/install evidence pending"
+    },
+    {
+      "name": "ts-algebra",
+      "sourceLockPath": "node_modules/ts-algebra",
+      "projectedLockPath": "node_modules/ts-algebra",
+      "archiveFile": "ts-algebra-2.0.0.tgz",
+      "lockEntry": {
+        "version": "2.0.0",
+        "resolved": "https://registry.npmjs.org/ts-algebra/-/ts-algebra-2.0.0.tgz",
+        "integrity": "sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw==",
+        "license": "MIT"
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock only; packaged bytes, manifest, license, lifecycle/native evidence pending explicit reviewed restore"
+    }
+  ],
+  "reusedSeed": {
+    "name": "partial-json",
+    "version": "0.1.7",
+    "archiveSource": "Existing content-addressed npm cache; no new network or writable access to the old cache",
+    "archiveSha256": "30eafeed6fdc25fb2ca24f34c37796d9f98f0bf5e156452b98a2c356762f6322",
+    "manifestSha256": "42b3ae6c99ec959249f8eb4d3da7fdb44ec1f96ec627fa7f9ca5487a4e80963f",
+    "files": {
+      "files": 9,
+      "sha256": "b1c730b893ef274e6d457f23eebc9c39162cd6aaf777247942b9ad0cc1f1cb8e"
+    }
+  },
+  "setupProposal": {
+    "registry": "https://registry.npmjs.org/",
+    "networkHosts": [
+      "registry.npmjs.org"
+    ],
+    "newRequiredArchives": [
+      "https://registry.npmjs.org/@anthropic-ai/sdk/-/sdk-0.124.0.tgz",
+      "https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.2.tgz",
+      "https://registry.npmjs.org/@stablelib/base64/-/base64-1.0.1.tgz",
+      "https://registry.npmjs.org/fast-sha256/-/fast-sha256-1.3.0.tgz",
+      "https://registry.npmjs.org/json-schema-to-ts/-/json-schema-to-ts-3.1.1.tgz",
+      "https://registry.npmjs.org/standardwebhooks/-/standardwebhooks-1.1.1.tgz",
+      "https://registry.npmjs.org/ts-algebra/-/ts-algebra-2.0.0.tgz"
+    ],
+    "reuseArchives": [
+      "https://registry.npmjs.org/partial-json/-/partial-json-0.1.7.tgz"
+    ],
+    "npmBootstrapNetworkExpected": false,
+    "restoreArguments": [
+      "ci",
+      "--ignore-scripts",
+      "--omit=optional",
+      "--omit=peer",
+      "--no-audit",
+      "--no-fund",
+      "--bin-links=false",
+      "--registry=https://registry.npmjs.org/"
+    ],
+    "dynamicArguments": [
+      "--prefix <newOracle>",
+      "--cache <newOracle>/cache",
+      "--userconfig <newOracle>/config/user.npmrc",
+      "--globalconfig <newOracle>/config/global.npmrc"
+    ],
+    "archiveAcquisition": "Explicit --restore only: anonymous GETs for seven exact official registry lock URLs, no redirects; SHA512 SRI and confined inert package/license/lifecycle/native inspection before npm ci. Existing partial-json cache content and npm bootstrap are copied read-only into new owned root.",
+    "environment": "Credential-free explicit child env; task-local home/appdata/temp/npm cache/config; no inherited user npm/git credentials, provider/cloud/proxy variables, NODE_OPTIONS or certificate overrides",
+    "lifecycleScripts": false,
+    "licenseAdmissionScope": "task-local-development-only; no product distribution or SDK bundling permission",
+    "redistributionLicenseClosure": false,
+    "licenseReviewStatus": "P1-02 HOLD",
+    "nativeBuilds": false,
+    "binLinks": false,
+    "typescriptBuilds": false,
+    "modelCatalogGeneration": false,
+    "globalInstall": false,
+    "permanentPathChange": false,
+    "systemConfigurationChange": false,
+    "sourceTransformOrModuleReplacement": false,
+    "providerCalls": false,
+    "actualPrepareExecuted": false,
+    "actualRestoreExecuted": false
+  },
+  "reusedArchiveInspector": {
+    "path": "tools/PiReferenceRunner/setup-responses-sdk-oracle.mjs",
+    "sha256": "1da4ce53bf9b7ccc462bad540294353fd7ab42ba35ca171d3921916409d2b513",
+    "export": "inspectPackageArchive",
+    "rule": "Hash before import; reuse only existing inert archive parser export. Importing its module does not run its setup main."
+  },
+  "genuineCaptureBoundary": {
+    "entryModule": "upstream/packages/ai/src/api/anthropic-messages.ts",
+    "exports": [
+      "stream",
+      "streamSimple"
+    ],
+    "firstProfile": "Invoke unchanged public stream with inert authored key, supported options.fetch and awaited onPayload/onResponse/onProviderStreamEvent. onPayload returns undefined; actual SDK client.beta.messages.create(...,{maxRetries:0}).asResponse() serializes the request and uses fake in-memory Response with authored SSE. No options.client substitute.",
+    "rawBoundaries": [
+      "actual fetch Request method/URL/headers/body",
+      "onPayload complete built params",
+      "onResponse status/header record",
+      "onProviderStreamEvent parsed provider DTO before normalization",
+      "mutable normalized frames snapshotted on emission and terminal/result"
+    ],
+    "sourceWholeModuleRule": "No private function extraction, source transforms, import replacement, module patches, copied builder or SDK shim. Actual installed SDK is required.",
+    "decoderBoundary": "SDK receives/serializes the actual request and returns raw Response; unchanged Pi iterateAnthropicEvents parses SSE. This does not qualify the SDK streaming decoder.",
+    "retries": 0,
+    "apiKey": "authored inert literal only; no provider credential lookup/setup",
+    "providerNetwork": false,
+    "offlinePreload": {
+      "existingObserver": "tools/PiReferenceRunner/full-preload.mjs",
+      "observerSha256": "e1f62a2048bc484a162085430a5afb6f88547d78049b6f29b2a0e4f65fcd79e2",
+      "existingGuard": "tools/PiReferenceRunner/offline-guard.mjs",
+      "guardSha256": "ae3741bdce496451bd04afcf8628df6ddc5bc5cfad8af6ee5e52cbc7b065a094",
+      "sourceResolverUnchanged": true,
+      "networkAndChildProcessesDisabledInCaptureChild": true
+    },
+    "determinism": "Retain actual raw request headers/body, including dynamic SDK and Pi OS/user-agent fields. Pin observed OS/runtime/environment; do not normalize unexpected randomness. Source Date.now may be overridden only in a separately disclosed child fixture environment for full stream timestamp output; no source edit or whole-environment-unchanged claim. A request-only family can omit timestamp output without clock override.",
+    "wholeWrapperQualified": false,
+    "actualLoadedClosureQualified": false
+  },
+  "qualificationRequirements": [
+    "Verify all2093 canonical source blobs, acquired fingerprint and exactly two declared CRLF attribute conversions, pinned Node/npm, original cache/source and reused partial-json archive/installed tree before and after setup.",
+    "Acquire only seven exact anonymous official URLs in root-reviewed --restore. Verify SHA512 SRI before confined inert archive inspection; reject links, special files, traversal, collisions, native addons/build declarations, bundles and unexpected package/dependency/bin/peer/lifecycle declarations. Admit only the exact byte-pinned standardwebhooks prepare/build declarations under --ignore-scripts; never execute them.",
+    "Require packaged root license text matching MIT or Unlicense declarations and retain all license/notice text and byte hashes for every other selected package. Only the exact pinned standardwebhooks archive with licenses exactly empty is admitted for task-local development as declared-MIT-only; packagedRootLicenseVerified and redistributionLicenseClosure remain false. Full P1-02 stays HOLD. fast-sha256 Unlicense is new packaged authority; root records observed notices after actual restore.",
+    "Allow only @anthropic-ai/sdk0.124.0 known optional zod peer declarations and omit its installation; all other peers/optional dependencies rejected. SDK CLI bin is recorded but no link/execution admitted.",
+    "Run pinned task-local npm11.6.2 ci with scripts, binlinks, optional/peer installation, audit and fund disabled; owned prefix/cache/config/home/temp and scrubbed env.",
+    "Require exactly eight installed package directories including exact scoped directory layouts, every installed file equal to inspected archives, hidden lock matching all selected entries and no zod/.bin. Preserve uncertain partial state.",
+    "After root confirms restore, load whole module with unchanged resolver/observer/guard; record actual source/SDK loaded file closure, supported seam inventory, raw outputs and two fresh-child repeatability. Report missing imports or unstable output instead of replacing runtime modules."
+  ],
+  "approval": {
+    "setupPreparationScope": "Root reviews these exact revised four files and invokes local --prepare at the fresh reviewed root after freeze; revision author has not invoked setup. Original blocked root is preserved unchanged.",
+    "networkRestoreScope": "Root submits concrete seven-archive/eight-package --restore command to applicable executor require_escalated auto-review; no author network acquisition or installation performed.",
+    "executorRejectionRule": "Do not bypass a rejection; report exact action/reason and leave the original qualified oracles unchanged."
+  },
+  "limitations": [
+    "Canonical source lock version/SRI/license declarations do not prove newly packaged license texts, absent native/lifecycle effects, installed bytes or actual module load before restore. Exact standardwebhooks archive lacks packaged notices and is admitted only for task-local development as declared-MIT-only, with packagedRootLicenseVerified:false and redistributionLicenseClosure:false. Official library MIT declaration and repository root Apache-2.0 license are separate unresolved evidence; no MIT grant is invented from that root license. Full P1-02 remains HOLD; no product distribution or SDK bundling permission is inferred.",
+    "Eight-package static closure is the smallest selected Anthropic profile; optional zod remains omitted and other upstream SDKs are outside this setup.",
+    "Actual SDK request handling plus Pi SSE parser is a distinct boundary from SDK stream decoding, OAuth credential/environment behavior, full provider compatibility and live API qualification.",
+    "Source direct stream and streamSimple have different numeric/default paths; no native parity, numeric normalization or request-header equivalence is claimed by setup.",
+    "Source and packaged notices, broader license review/signatures/attestations and all unfinished provider/phase gates remain open.",
+    "No existing oracle/cache/source/golden/product dependency is modified."
+  ],
+  "reusedCacheFingerprint": {
+    "files": 4,
+    "sha256": "f6bf4652949b6947179ec6003f73d8ee3582500176d545c9be0ca81f648f7573"
+  }
+}

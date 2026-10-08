@@ -1,0 +1,633 @@
+{
+  "schemaVersion": 1,
+  "kind": "unchanged-whole-upstream-config-openai-actual-recursive-structural-profile",
+  "status": "authored static candidate; root runtime controls/capture and independent completeness review pending",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "oracle": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-public-triage-openai-v0.99.1",
+  "receipt": {
+    "path": ".pisharp-public-triage-openai-admitted.json",
+    "sha256": "1e7f61d543738e4c7ad81df5cacdf98c8d75190633f881fd3741a127c6d8a577",
+    "payloadFiles": 8129,
+    "sourceFiles": 2093,
+    "compilerFiles": 529,
+    "previousNodePackageFiles": 114,
+    "previousNodeDeclarations": 108,
+    "typeboxPackageFiles": 1385,
+    "typeboxDeclarations": 691,
+    "leafPackageFiles": 416,
+    "leafDeclarations": 129,
+    "allAddedPackageFiles": 5463,
+    "allAdmittedDeclarations": 1712,
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+    "actualAdmissionPinPending": false,
+    "bytes": 2376214,
+    "catalogFiles": 43,
+    "catalogBytes": 902551,
+    "openaiPackageFiles": 3548,
+    "openaiDeclarations": 784
+  },
+  "metadataPins": [
+    {
+      "path": ".pisharp-public-triage-openai-owner.json",
+      "bytes": 1056,
+      "sha256": "4127140b92c3f08286a4282762133a52249cd4ff60f749f8671b404618eda639"
+    },
+    {
+      "path": ".pisharp-public-triage-openai-prepared.json",
+      "bytes": 891153,
+      "sha256": "d9edc969c251471020991fa9a23b7f998175cbaf44c1b90d004c10be962634fa"
+    },
+    {
+      "path": ".pisharp-public-triage-openai-admission-started.json",
+      "bytes": 602487,
+      "sha256": "a22307dbfb71ece4cf670f0759050b586134c4b2d810245e1093a697e5ef5b44"
+    }
+  ],
+  "origin": {
+    "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1",
+    "receipt": ".pisharp-released-catalog-admitted.json",
+    "receiptBytes": 1887205,
+    "receiptSha256": "2e5fea6e5ed55fdff54dfc507499eb98e0bfba6851a9004d6c5e9b1af09981f4",
+    "payloadFiles": 4581,
+    "originalCanonicalSourceRows": 2093,
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+    "verifier": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+    "metadataPins": [
+      {
+        "path": ".pisharp-released-catalog-owner.json",
+        "bytes": 1158,
+        "sha256": "ad5b94ff5e58844681731c1e5b646a5d93ed75e47f4e6fb470f0b5c454ef5929"
+      },
+      {
+        "path": ".pisharp-released-catalog-prepared.json",
+        "bytes": 881483,
+        "sha256": "3e7be90b2ec154bcc12149d2b247e4eb26241e9daf1f2acd4978fd4b702a6111"
+      },
+      {
+        "path": ".pisharp-released-catalog-admission-started.json",
+        "bytes": 8126,
+        "sha256": "552efc063d32a4fc3c9e10bf126d8919e6f8f5e65a393779bf3dbf7d8f3f35c3"
+      },
+      {
+        "path": ".pisharp-released-catalog-admitted.json",
+        "bytes": 1887205,
+        "sha256": "2e5fea6e5ed55fdff54dfc507499eb98e0bfba6851a9004d6c5e9b1af09981f4"
+      }
+    ],
+    "archivedEvidence": [
+      {
+        "path": "archives/released-baseline/SHA256SUMS",
+        "bytes": 823,
+        "sha256": "1490fbb52c4cbf6f175b1b66147702b5e6584504277fc0c424745c32770bdbba"
+      },
+      {
+        "path": "archives/released-baseline/acquire.mjs",
+        "bytes": 22861,
+        "sha256": "fa8b32ff4dc22d9be52c3796c353f89983b9ae2aa3720a75eaaf303112f7b517"
+      },
+      {
+        "path": "archives/released-baseline/evidence.lock.json",
+        "bytes": 1263,
+        "sha256": "6fe01c9a77d39505c154b1b20c65d838513a8efba17ea58164aaa38e7b81456c"
+      },
+      {
+        "path": "archives/released-baseline/inspection.json",
+        "bytes": 41808,
+        "sha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b"
+      },
+      {
+        "path": "archives/released-baseline/metadata.json",
+        "bytes": 72880,
+        "sha256": "1aafbfc3e2a0610b4066dd4cd94e239a64bc3b08506cd0d67f41cd18a34af789"
+      },
+      {
+        "path": "archives/released-baseline/pi-0.99.1-source.tar.gz",
+        "bytes": 8646242,
+        "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b"
+      },
+      {
+        "path": "archives/source-leaves-admitted.json",
+        "bytes": 1038729,
+        "sha256": "0c3bb31d39dd7ed9c63dcefb11b7c3677b05352505a6fa63d418c567f691f1ae"
+      },
+      {
+        "path": "archives/source-original-semantic-receipt.json",
+        "bytes": 1287964,
+        "sha256": "1dd4d68e2702eaa3327bfd3d21b9df052bb0dffd931375974b9891088c67b28d"
+      }
+    ]
+  },
+  "protectedOracleRoots": [
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1",
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-responses-sdk-oracle-v0.99.1",
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-leaves-v0.99.1",
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-typebox-v0.99.1",
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-node-v0.99.1",
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-oracle-v0.99.1",
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-extension-reducers-oracle-v0.99.1-license-corrected",
+    "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/PiSharp-semantic-public-triage-work"
+  ],
+  "runtime": {
+    "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "native": {
+    "path": "node_modules/@typescript/typescript-win32-x64/lib/tsc.exe",
+    "sha256": "f9ecfbdc93753d2c972d66a8d0d75f5bd737fd4a5f88b422d9091ea282bcb2c7",
+    "arguments": [
+      "--api",
+      "--async",
+      "--cwd",
+      "{oracle}/upstream",
+      "--callbacks=readFile,fileExists,directoryExists,getAccessibleEntries,realpath"
+    ],
+    "stdio": [
+      "pipe",
+      "pipe",
+      "inherit"
+    ],
+    "exitTimeoutMs": 30000
+  },
+  "sourcePins": [
+    {
+      "path": "upstream/tsconfig.json",
+      "sha256": "1ef1041faebef510f59480731ece80657f7e67b1091a0b0dcf05ca51e8a267a6"
+    },
+    {
+      "path": "upstream/tsconfig.base.json",
+      "sha256": "eea9b73c99e36e35d2afca6fb313899ebb214840beedad7a67ec07d880857f1b"
+    },
+    {
+      "path": "upstream/package-lock.json",
+      "sha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d"
+    }
+  ],
+  "publicEntrypointPlan": {
+    "path": "compatibility/public-entrypoints.plan.json",
+    "sha256": "9524ccdeaaaaec2409f17c823a8baf0f9da0acd27c5492fdaf986e63fd815857"
+  },
+  "baseline": {
+    "pins": [
+      {
+        "path": "fixtures/semantic-full-project-catalog/expected.json",
+        "bytes": 13305865,
+        "sha256": "5999081da5235765a1a0dc7090ca770ba32a11e939a824973fb1d3317b7a77df"
+      },
+      {
+        "path": "fixtures/semantic-full-project-catalog/manifest.json",
+        "bytes": 2720,
+        "sha256": "2aa4925eca091516b7ea6f15eaa744c310a66c000404a52ed70f7581be0e960a"
+      }
+    ],
+    "snapshotSha256": "5999081da5235765a1a0dc7090ca770ba32a11e939a824973fb1d3317b7a77df",
+    "sourceFiles": 2443,
+    "rootFiles": 1661,
+    "unresolvedRecords": 711,
+    "diagnosticCounts": {
+      "getConfigFileParsingDiagnostics": 0,
+      "getGlobalDiagnostics": 0,
+      "getProgramDiagnostics": 0,
+      "getSyntacticDiagnostics": 0,
+      "getBindDiagnostics": 0,
+      "getSemanticDiagnostics": 1246,
+      "getSuggestionDiagnostics": 832,
+      "getDeclarationDiagnostics": 0
+    },
+    "nearestLockInstances": 26,
+    "mandatoryNearestLockInstances": 34,
+    "originalMandatorySpecifierGroups": 43,
+    "entrypointConditionRecords": 150,
+    "comparison": "complete unfiltered diagnostic families/unresolved/structural declaration handles and raw snapshots; no diagnostic forecast or path normalizer"
+  },
+  "configurationFacts": {
+    "originalNoEmit": true,
+    "originalSkipLibCheck": true,
+    "originalAmbientTypes": [
+      "node"
+    ],
+    "originalExclusions": [
+      "**/dist/**",
+      "packages/coding-agent/examples/extensions/gondolin/**"
+    ],
+    "compatibilityScopeExclusionsApproved": false
+  },
+  "diagnosticMethods": [
+    "getConfigFileParsingDiagnostics",
+    "getGlobalDiagnostics",
+    "getProgramDiagnostics",
+    "getSyntacticDiagnostics",
+    "getBindDiagnostics",
+    "getSemanticDiagnostics",
+    "getSuggestionDiagnostics",
+    "getDeclarationDiagnostics"
+  ],
+  "limits": {
+    "fileBytes": 33554432,
+    "snapshotBytes": 536870912,
+    "protocolBytes": 2147483648,
+    "driverTimeoutMs": 1800000,
+    "jsonDepth": 128,
+    "jsonNodes": 32000000
+  },
+  "executionBoundary": {
+    "parentNativeExecution": "root reviewed invocation only",
+    "runtimeModulePrefix": "node_modules/typescript/",
+    "vfsPayloadFiles": 8129,
+    "sourceCorpus": "all2093 original canonical rows plus43 publisher-source JSONs plus5463 complete inert package members and529 compiler/native members; exact officialOpenAI3548members retained at nested canonical lock path",
+    "upstreamModulesExecuted": false,
+    "addedPackageRuntimeExecuted": false,
+    "scratch": "explicit fresh absolute caller-owned --run-root (--scratch legacy alias), disjoint from repository/protected oracles; all home/temp/config/protocol/output there",
+    "nodeGuardIsNativeOsSandbox": false,
+    "apiCloseIsHelperExitJoin": false
+  },
+  "fullStructuralTypeInventoryPending": true,
+  "semanticPublicClosure": false,
+  "remainingDeclarationClosure": "all34 original mandatory instances and43groups retained; genuine catalog1246semantic/711unresolved preserved; officialOpenAI admission does not qualify remaining SDK/Vitest/optional peer/public ownership closure",
+  "phaseGatesPassed": [],
+  "sharedProfilePins": [
+    {
+      "path": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "bytes": 18430,
+      "sha256": "df5b99d591731d56607d4d8eb505bfbdb25581d50a2652c2dbd90cc05dc00eba"
+    }
+  ],
+  "catalogSetup": {
+    "plan": "compatibility/semantic-released-catalog.plan.json",
+    "helper": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+    "pins": [
+      {
+        "path": "compatibility/semantic-released-catalog.plan.json",
+        "bytes": 17168,
+        "sha256": "9a14334508d418ed0bdc46f38fa31f368390a017f31c4ea49250965d58b6d3a0"
+      },
+      {
+        "path": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+        "bytes": 28626,
+        "sha256": "5c38f84d281796838e392e1148850eb8130ffff7e0c47ccef31929f5752ae81c"
+      },
+      {
+        "path": "tools/SemanticInventory/semantic-released-catalog.test.mjs",
+        "bytes": 7861,
+        "sha256": "fcc5b2a1124c4cee33ea4d457cd9e298348e1c441825800c1471c63302a1e59b"
+      },
+      {
+        "path": "docs/compatibility/semantic-released-catalog-setup.md",
+        "bytes": 9346,
+        "sha256": "0f7dcd321da4506c974a9e5d993da00456ec9c538f662b9c4c3fc5c898c0f7a6"
+      }
+    ]
+  },
+  "publicArtifactEvidence": {
+    "pins": [
+      {
+        "path": "tools/SemanticInventory/node-declaration-archive.mjs",
+        "bytes": 6790,
+        "sha256": "baee47b869aab6d2409c0a3906b1e0ea5bf5fe236ca24837fae71aa81d633ffd"
+      },
+      {
+        "path": "artifacts/released-baseline/inspection.json",
+        "bytes": 41808,
+        "sha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b"
+      },
+      {
+        "path": "artifacts/released-baseline/metadata.json",
+        "bytes": 72880,
+        "sha256": "1aafbfc3e2a0610b4066dd4cd94e239a64bc3b08506cd0d67f41cd18a34af789"
+      },
+      {
+        "path": "artifacts/released-npm-ai/evidence.lock.json",
+        "bytes": 1532,
+        "sha256": "35fe3e5e8713163c4277fa72747de1ad38a2f842ea7543d00f567f3865ee0d94"
+      },
+      {
+        "path": "artifacts/released-npm-ai/inspection.json",
+        "bytes": 157841,
+        "sha256": "0c385e57ebdc3a01e0a7a50748af231a6fbefdea91b643356d6d0e239ebf6168"
+      },
+      {
+        "path": "artifacts/released-npm-ai/pi-ai-0.99.1.tgz",
+        "bytes": 760966,
+        "sha256": "f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3"
+      }
+    ],
+    "packageArchivesAdmittedToVfs": false,
+    "registrySignaturesVerified": false,
+    "sourceArchiveDataReceiptSeparate": true,
+    "missingPublishedArchives": [
+      "@earendil-works/pi-coding-agent",
+      "@earendil-works/pi-tui"
+    ]
+  },
+  "requiredPublishedOwnershipBlockers": [
+    {
+      "manifestPath": "packages/ai/package.json",
+      "field": "bin",
+      "subpath": "pi-ai",
+      "target": "dist/cli.js"
+    },
+    {
+      "manifestPath": "packages/coding-agent/package.json",
+      "field": "bin",
+      "subpath": "pi",
+      "target": "dist/bundle/cli.js"
+    },
+    {
+      "manifestPath": "packages/tui/package.json",
+      "field": "main",
+      "subpath": ".",
+      "target": "dist/index.js"
+    }
+  ],
+  "publicTargetClassifier": {
+    "literalPackageRelativeFields": [
+      "main",
+      "bin",
+      "source",
+      "types",
+      "typings"
+    ],
+    "exportsRequiresDotSlash": true,
+    "distToSourceInference": false,
+    "unknownBecomesResolved": false,
+    "rawConditionsAndTargetsRetained": true,
+    "previousProfileClassificationsRetained": true,
+    "semanticOwnershipQualification": false
+  },
+  "buildConfigurationPaths": [
+    "packages/ai/tsconfig.build.json",
+    "packages/coding-agent/tsconfig.build.json",
+    "packages/tui/tsconfig.build.json"
+  ],
+  "openaiSetup": {
+    "plan": "compatibility/semantic-public-triage-openai.plan.json",
+    "helper": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+    "pins": [
+      {
+        "path": "compatibility/semantic-public-triage-openai.plan.json",
+        "bytes": 649027,
+        "sha256": "8feaf1cdd0e6bb8285f87cf4be7517e5e741abf9b3101b6ef6030e28913082d7"
+      },
+      {
+        "path": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+        "bytes": 25898,
+        "sha256": "bac3f7b1c37627bda0705b3711e7ab9c0854bd06bfe5f4c49403ddaed27478fd"
+      },
+      {
+        "path": "tools/SemanticReference/semantic-public-triage-openai.test.mjs",
+        "bytes": 11198,
+        "sha256": "7e976e5b7e9bf260139a2e30ca60a05a2b7945278be3212d23ef315717198642"
+      }
+    ]
+  },
+  "sdkDeclarationResolution": {
+    "actualConditionSelectionPending": true,
+    "addedPackageRuntimeExecuted": false,
+    "optionalPeersAreNotExemptions": true,
+    "knownDeclarationImports": [
+      "ws",
+      "zod/v3",
+      "undici",
+      "stream/web",
+      "#x509-transport-state"
+    ],
+    "missingCanonicalPeerInstances": [
+      "node_modules/@types/ws",
+      "node_modules/@smithy/hash-node"
+    ],
+    "sourceOrConfigChanges": false,
+    "diagnosticReductionPromised": false,
+    "structuralTypeInventoryExhaustive": false
+  },
+  "predecessorProfilePins": [
+    {
+      "path": "compatibility/semantic-full-project-catalog.plan.json",
+      "bytes": 11376,
+      "sha256": "398d02d6f33e63a1bd933ce0ee6875baa7aa0f4db58d60ba03d613b089bac202"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "bytes": 15169,
+      "sha256": "1c8fb8f5c386e4b7ff9f91a419afea3cb9086952d095b1bbad3380d234daa44c"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog-driver.mjs",
+      "bytes": 12416,
+      "sha256": "36fb36dae3e43b6bb46629c8fa4a1c827a84b17fc768ad5280f7c70c63f60395"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog-preload.mjs",
+      "bytes": 8586,
+      "sha256": "eb92f092ebd850e1acac0cf1a4e1aecfc894ec5a6155a4df63a4e41e00ddb39c"
+    },
+    {
+      "path": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "bytes": 7166,
+      "sha256": "3e4486556f452675e70eab476f6271326de32422e4869a9e3acad48d7d622893"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog.test.mjs",
+      "bytes": 11463,
+      "sha256": "509d1e750703d4df5f67d420db6e62e9cb0b5d91c5dac1bef2a0de606e89ba06"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-catalog.md",
+      "bytes": 14170,
+      "sha256": "560046af8b802cb2ee2442c1e9fc2ef2511f07a1096e52f1f24f758c2a199372"
+    }
+  ],
+  "previousWholeProfilePins": [
+    {
+      "path": "compatibility/semantic-full-project-openai.plan.json",
+      "bytes": 16203,
+      "sha256": "3401b676e50b7546a4b3179e76282a4f8e1309a107e8d6efad173924cf9db3eb"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai-common.mjs",
+      "bytes": 11415,
+      "sha256": "94b555a1686a1f2076f9a9473ad2b3e505263c401ae6197c6a52fe98134dbcdd"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai-preload.mjs",
+      "bytes": 8573,
+      "sha256": "4df776003700fbc4140fb0a2618c0e712db5b8ce923174beb07aef1f1c761bf9"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai-driver.mjs",
+      "bytes": 14024,
+      "sha256": "97a455b3163cf23384458e7639e922f3cc05d197a2a6c49a69497d952ba3fe3a"
+    },
+    {
+      "path": "tools/SemanticReference/run-full-project-openai.mjs",
+      "bytes": 7302,
+      "sha256": "50ef6d69df24363dd7c5d18fba2d32f07fbf5a91ab388a5686f0c5c4a26a04b7"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai.test.mjs",
+      "bytes": 14847,
+      "sha256": "c90d6e480f8d2aeb15898f9bf8f3391929792d47a5ab0576fdce14d0f088a7f1"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-openai.md",
+      "bytes": 12913,
+      "sha256": "bf1cf3d4fe08dcf1cc6e969daec366f97de459068faf9c0146c5bf0b193a4d5a"
+    },
+    {
+      "path": "fixtures/semantic-full-project-openai/expected.json",
+      "bytes": 15195616,
+      "sha256": "b317776cc214fa757abf19769de3fec25323e4489226d705559441100876c107"
+    },
+    {
+      "path": "fixtures/semantic-full-project-openai/manifest.json",
+      "bytes": 2793,
+      "sha256": "497c0a65c2f418239bd91d78baa73a3c1647bf120c6d852d19f98d603224865a"
+    }
+  ],
+  "nativeApiDeclarationPins": [
+    {
+      "path": "node_modules/typescript/dist/api/async/api.d.ts",
+      "bytes": 28351,
+      "sha256": "cacef4a7c1c1c493176139a8f1450d8767267993916235dd45d38456b4710341"
+    },
+    {
+      "path": "node_modules/typescript/dist/api/async/types.d.ts",
+      "bytes": 13407,
+      "sha256": "15c2f0ed2c0b262eba2bd798b7f9ce58525beef27ee8f27e841492eb175294a7"
+    },
+    {
+      "path": "node_modules/typescript/dist/api/proto.d.ts",
+      "bytes": 7820,
+      "sha256": "6497af1102e27dc68405cef9dea0e87e1e1bdd461cc51432bbcd14ca486d71e9"
+    },
+    {
+      "path": "node_modules/typescript/dist/ast/ast.generated.d.ts",
+      "bytes": 64591,
+      "sha256": "d380a6813bb07a1d05a07a08282ff1b63166c40c944db15bc9b27edb7b884e04"
+    },
+    {
+      "path": "node_modules/typescript/dist/ast/ast.d.ts",
+      "bytes": 4511,
+      "sha256": "91a9b19cfe2e36376eceae2c8f5bb269de4e541b28041b38f0da0bda34b0aaf5"
+    },
+    {
+      "path": "node_modules/typescript/dist/api/node/node.generated.d.ts",
+      "bytes": 7918,
+      "sha256": "7921505897ee04d88863ed917cc653f4af885dab205ce797860179e5425bfa86"
+    }
+  ],
+  "currentWholeBaseline": {
+    "path": "fixtures/semantic-full-project-openai/expected.json",
+    "bytes": 15195616,
+    "sha256": "b317776cc214fa757abf19769de3fec25323e4489226d705559441100876c107",
+    "moduleCandidates": 800,
+    "moduleSymbolTables": 742,
+    "moduleCandidatesWithoutSymbol": 46,
+    "moduleCandidatesOutsideProgram": 12,
+    "emptyModuleExportTables": 16,
+    "exportOccurrences": 7393,
+    "aliasOccurrences": 2440,
+    "declarationHandleOccurrences": 7449,
+    "moduleDeclarationHandleOccurrences": 745,
+    "exportValueDeclarationHandleOccurrences": 2343,
+    "moduleValueDeclarationHandleOccurrences": 742,
+    "rootFiles": 1661,
+    "originalCanonicalSourceRows": 2093,
+    "sourceFiles": 2773,
+    "declarationFiles": 1065,
+    "manifestRecords": 23,
+    "bindingRecords": 44,
+    "entrypointRecords": 150,
+    "mandatoryLockInstances": 34,
+    "mandatoryLockSpecifierGroups": 43,
+    "publishedOwnershipBlockers": 3,
+    "canonicalTargetPresentConditions": 27,
+    "publishedMemberPresentWithoutCanonicalConditions": 19,
+    "unacquiredWithoutCanonicalConditions": 104,
+    "admittedProgramMembers": 993,
+    "admittedProgramDeclarations": 993,
+    "semanticDiagnostics": 1203,
+    "unresolvedRecords": 691,
+    "diagnosticCounts": {
+      "getConfigFileParsingDiagnostics": 0,
+      "getGlobalDiagnostics": 0,
+      "getProgramDiagnostics": 0,
+      "getSyntacticDiagnostics": 0,
+      "getBindDiagnostics": 0,
+      "getSemanticDiagnostics": 1203,
+      "getSuggestionDiagnostics": 832,
+      "getDeclarationDiagnostics": 0
+    },
+    "sdkProgramMembers": 330,
+    "sdkProgramDtsMembers": 165,
+    "sdkProgramDmtsMembers": 165,
+    "sdkProgramCtsMembers": 0,
+    "structuralAvailableCheckerOperations": 8,
+    "structuralExecutedCheckerOperations": 0
+  },
+  "structuralInventory": {
+    "allModuleCandidates": 800,
+    "allEntrypointRows": 150,
+    "allCanonicalSourceRows": 2093,
+    "nativeIdentityMemoization": true,
+    "nativeIdsInRawProvenance": true,
+    "traversalReferenceArraysOrdered": true,
+    "methodPresenceIsExecution": false,
+    "formatStringsAreStructuralTypes": false,
+    "budgetOverflow": "hard-fail-preserve-raw-artifacts-no-truncation",
+    "limits": {
+      "symbols": 150000,
+      "types": 150000,
+      "signatures": 75000,
+      "declarations": 250000,
+      "syntaxNodes": 2000000,
+      "syntaxDepth": 256,
+      "operations": 3000000
+    },
+    "unsupportedCheckerFields": [
+      "getDefaultFromTypeParameter",
+      "instantiated mapped key/remapping/readonly/optional metadata",
+      "conditional distributivity and inferred parameters",
+      "signature minimum argument count",
+      "tuple label metadata and instantiated generic variance"
+    ],
+    "unsupportedArePermanentExemptions": false,
+    "graphTraversalCompletenessOnly": true,
+    "semanticPublicClosure": false,
+    "queryFailure": "hard-fail-with-operation-and-native-identity",
+    "unknownAndErrorTypes": "retain-exact-real-native-result-and-block-qualification",
+    "syntaxSchema": {
+      "sources": [
+        "node_modules/typescript/dist/ast/ast.d.ts",
+        "node_modules/typescript/dist/ast/ast.generated.d.ts"
+      ],
+      "publicPrototypeGetters": true,
+      "nativeNodeArrayIteration": true,
+      "decoderStorageIsPublicSyntax": false,
+      "unknownSyntaxKind": "hard-fail-no-generic-empty-AST"
+    }
+  },
+  "provenanceFormat": {
+    "schemaVersion": 2,
+    "orderedSidecars": true,
+    "firstReceiptBeforeEncoding": true,
+    "receiptAndManifestShareAggregateBudget": true,
+    "snapshotAggregateBytes": 536870912,
+    "receiptInlineUtf8Bytes": 4096,
+    "streamingChunkCodeUnits": 4096,
+    "originalFailureRemainsAuthoritative": true,
+    "consumerVerifiesEverySidecar": true,
+    "oldFailedCaptureQualified": false
+  },
+  "symbolQueryFailureIsolation": {
+    "enabled": true,
+    "method": "getTypeOfSymbol",
+    "errorCode": -32603,
+    "panicPrefix": "panic: interface conversion: checker.TypeData is *checker.TypeReference, not *checker.TupleType",
+    "scope": "individual-symbol-value-type",
+    "continueExistingQueue": true,
+    "substituteSemanticFacts": false,
+    "fullCaptureMustFail": true,
+    "partialObservationSuffix": ".partial.json",
+    "referenceExecutionQualified": false
+  }
+}

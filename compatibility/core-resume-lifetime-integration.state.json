@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "status": "CORE_RESUME_LIFETIME_AND_HOST_WIRING_AUTHORED_UNQUALIFIED",
+  "base": "754251be28928b24eaae5895b744c423450c91a3",
+  "baseTree": "738429cf70aa4609938e398d3ef00b5836bf157c",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "policyDependency": "d2ba1b6d9d0410783673e57d88d03cc94344d586",
+  "policyFixtureFix": "735fdf27b1a0b659980cc82f09f9323a2bb0a8d1",
+  "api": [
+    "SessionRuntimeRegistryOptions.LifetimeToolSelection : AllowedToolSelection?",
+    "SessionRuntimeRegistryOptions.InitialActiveToolNames : ImmutableArray<string>?",
+    "PersistentAgentSessionOptions.LifetimeToolSelection : AllowedToolSelection?",
+    "SessionRuntimeRegistry.Resolve last optional initialActiveToolNames argument",
+    "SessionRegisteredTool.IsExtension : bool (default false; explicit trusted catalog origin metadata)"
+  ],
+  "supported": [
+    "Effective initial selection before historical binding lookup, strict selected declaration matching",
+    "Initial recorded-name removal and effective current declarations through existing owned durable configuration checkpoint before open returns",
+    "Immutable cap applied before catalog/callable/namespace/prepare construction; invocation-owner clones retain exact policy and drain state",
+    "Denied cap activation fails before durable mutation; settings-only remains unrestricted",
+    "Lifecycle Open/Create/Fork/Clone factories carry original policy to each incoming registry before resolution",
+    "Custom replacement widening factory refused under target reservation before source retirement",
+    "Failed initial admission closes full constructed session or raw admission resources and joins reporter original",
+    "Retained policy SelectInitial recomputes against each actual incoming catalog, retaining default-active declarable extensions for unrestricted policies and exact empty caps",
+    "Legacy explicit activation and ordinary recorded replay preserve Direct/ModelOnly/Codemode/Deferred; Hidden remains excluded. New initial projection still permits only Direct/ModelOnly; lifetime cap filtering/refusal unchanged for every origin.",
+    "Actual OpenWithRuntimeFactoryAsync checkpoints selection.Configuration.Tools after effective initial Resolve, so legacy activation normalization cannot reintroduce raw Codemode/Deferred/Hidden intent during startup."
+  ],
+  "authoredNewGroups": 10,
+  "policyGroups": 6,
+  "updatedExistingHostGroup": "Absent unavailable binding still fails unchanged; explicit read/empty/settings now safely resume through RPC and one-shot",
+  "registration": "Spread into existing startup tools Cases; shared Program.cs unchanged",
+  "testsExecuted": 0,
+  "buildsExecuted": 0,
+  "mainMerged": false,
+  "publicPush": false,
+  "limitations": [
+    "Native capped activation is stricter than upstream silent filtering: forbidden requests fail instead of clearing current selection, preserving current native authoritative failure contract. Uncapped unknown-name normalization unchanged.",
+    "Historical same-name declarations that remain selected must match; unselected historical declarations remain structurally bounded/validated.",
+    "A trusted custom replacement factory must carry the exact policy before admission; core cannot reverse effects performed by that factory before it returns. Source attachment remains authoritative on refusal.",
+    "New no-tools/exclude flags, actual reload/MCP/resource owners must consume retained policy; separately coordinated.",
+    "Runtime and source parity acceptance pending"
+  ],
+  "qualification": [
+    "Fresh CodingAgent full expected 628 and focused startup28 groups after the added actual-open regression; distinct counts to be confirmed by coordinator runner",
+    "Fresh RPC full107 because CodingAgent session admission dependency changed",
+    "Fresh Extensions.ContractTests full189 including unchanged ToolActivationTests.Persistence and callback/loadout/namespace paths",
+    "Three affected terminal companions or exact case-level unchanged-path association",
+    "Existing registry/configure/activation/drain/replacement/lifecycle suites",
+    "Independent source review and coordinator authorized exact-source build/test allocation"
+  ],
+  "hostOwnership": "Separate coordinator-owned profile hunk marks published extension registrations IsExtension=true; builtins keep default false. Prior initial/lifetime options injection retained.",
+  "reviewCorrection": "CORE_RESUME_LIFETIME_D7E2384_STATIC_REVIEW P2: raw InitialNames omitted default-active extensions during registry retention. SelectInitial now receives name/exposure/defaultActive/accurate origin for every incoming registered tool.; R280 final runtime review: unconditional Direct/ModelOnly restriction broke historical explicit Codemode activation and replay. Legacy predicates restored; initial projection unchanged.; actual-open follow-up: opened.SetActiveToolsAsync now receives resolved effective names, with one real six-scenario open/reopen regression."
+}

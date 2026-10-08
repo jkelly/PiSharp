@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "runtime": {
+    "node": "24.19.0",
+    "acorn": "8.17.0",
+    "ada": "3.4.4",
+    "amaro": "1.1.10",
+    "ares": "1.34.6",
+    "brotli": "1.2.0",
+    "cldr": "48.0",
+    "icu": "78.3",
+    "llhttp": "9.4.3",
+    "merve": "1.2.2",
+    "modules": "137",
+    "napi": "10",
+    "nbytes": "0.1.4",
+    "ncrypto": "0.0.1",
+    "nghttp2": "1.69.0",
+    "nghttp3": "",
+    "ngtcp2": "",
+    "openssl": "3.5.7",
+    "simdjson": "4.6.4",
+    "simdutf": "6.4.0",
+    "sqlite": "3.53.3",
+    "tz": "2026b",
+    "undici": "7.29.0",
+    "unicode": "17.0",
+    "uv": "1.52.1",
+    "uvwasi": "0.0.23",
+    "v8": "13.6.233.17-node.51",
+    "zlib": "1.3.2.1-motley-3246f1b",
+    "zstd": "1.5.7"
+  },
+  "generator": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-dictionary-work\\tests\\PiSharp.Tui.Editor.Tests\\generate-pinned-dictionary-data.mjs",
+    "bytes": 4781,
+    "sha256": "f6d290add2808483593014e277dba39e84f569e45f47b383a21f80263adf01a9"
+  },
+  "officialBundledDataVerification": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-dictionary-work\\artifacts\\reference-icu\\official-node-icu-data-verification.json",
+    "bytes": 2419,
+    "sha256": "6d03538aab3af201a3b4081defef4fa9840e19060b6c58a7c2749a0ebf97fa6b"
+  },
+  "normalization": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-dictionary-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78\\normalization-and-script-data.json",
+    "bytes": 116723,
+    "sha256": "c66eb5009782666af89b49022babeb4896be4b1112715d276095431d0c4e8309"
+  },
+  "counts": {
+    "mapping": 5914,
+    "ccc": 968,
+    "compose": 961,
+    "flags": 418
+  },
+  "data": [
+    {
+      "name": "Cjk",
+      "original": {
+        "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-dictionary-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78\\pinned-cjdict.dict",
+        "bytes": 2007296,
+        "sha256": "3850478c713b2004cbb96ef4b9f049caf16d6faf32a883d2e63c09659d0c59c7"
+      },
+      "compressedBytes": 1579736,
+      "base64Characters": 2106316
+    },
+    {
+      "name": "Thai",
+      "original": {
+        "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-dictionary-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78\\pinned-thaidict.dict",
+        "bytes": 126144,
+        "sha256": "ea47ae521cea65077bf047a75d1e9d28c495ec2f8cf4d2734fcb65a888229be9"
+      },
+      "compressedBytes": 93267,
+      "base64Characters": 124356
+    },
+    {
+      "name": "Normalization",
+      "original": {
+        "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-dictionary-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78\\normalization-and-script-data.json",
+        "bytes": 116723,
+        "sha256": "c66eb5009782666af89b49022babeb4896be4b1112715d276095431d0c4e8309"
+      },
+      "compressedBytes": 38698,
+      "base64Characters": 51600
+    }
+  ],
+  "generated": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-dictionary-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78\\PinnedWordDictionaryData.generated.cs.txt",
+    "bytes": 2606403,
+    "sha256": "44f8b072544eddd034c3eba6151338e18ec9e87195dc41e0912015d96bdeea3a"
+  }
+}

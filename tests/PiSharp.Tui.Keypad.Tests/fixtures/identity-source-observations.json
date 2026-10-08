@@ -1,0 +1,514 @@
+{
+  "createdUtc": "2026-10-03T06:11:33.107Z",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "node": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "bytes": 92825416,
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "manifest": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\source-manifest.json",
+    "bytes": 969151,
+    "sha256": "772c23326a8a341cc40235a95366639ea28cca1823089969cee1c5deb58b4048"
+  },
+  "inputs": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-keypad-compatible-contract-r2\\identity-source-inputs.json",
+    "bytes": 6576,
+    "sha256": "b283cd2d8985edfceb01bc9c1ed2ed528caeacccc6d02b7beca24274ff0f382a"
+  },
+  "driver": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-keypad-compatible-contract-r2\\capture-identity-source.mjs",
+    "bytes": 2900,
+    "sha256": "d5aaefba93c43cd7a53f0a8251d9cba3022fb56f15048c85dc5368fbeb931926"
+  },
+  "loadedFiles": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+    }
+  ],
+  "effects": [],
+  "cases": [
+    {
+      "id": "keypad-enter-modifier-1-action-1",
+      "raw": "\u001b[57414;1:1u",
+      "modifier": 0,
+      "action": 0,
+      "sourceParsedKey": "enter",
+      "sourcePrintable": "",
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-1-action-2",
+      "raw": "\u001b[57414;1:2u",
+      "modifier": 0,
+      "action": 1,
+      "sourceParsedKey": "enter",
+      "sourcePrintable": "",
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-1-action-3",
+      "raw": "\u001b[57414;1:3u",
+      "modifier": 0,
+      "action": 2,
+      "sourceParsedKey": "enter",
+      "sourcePrintable": "",
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-2-action-1",
+      "raw": "\u001b[57414;2:1u",
+      "modifier": 1,
+      "action": 0,
+      "sourceParsedKey": "shift+enter",
+      "sourcePrintable": "",
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-2-action-2",
+      "raw": "\u001b[57414;2:2u",
+      "modifier": 1,
+      "action": 1,
+      "sourceParsedKey": "shift+enter",
+      "sourcePrintable": "",
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-2-action-3",
+      "raw": "\u001b[57414;2:3u",
+      "modifier": 1,
+      "action": 2,
+      "sourceParsedKey": "shift+enter",
+      "sourcePrintable": "",
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-3-action-1",
+      "raw": "\u001b[57414;3:1u",
+      "modifier": 2,
+      "action": 0,
+      "sourceParsedKey": "alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-3-action-2",
+      "raw": "\u001b[57414;3:2u",
+      "modifier": 2,
+      "action": 1,
+      "sourceParsedKey": "alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-3-action-3",
+      "raw": "\u001b[57414;3:3u",
+      "modifier": 2,
+      "action": 2,
+      "sourceParsedKey": "alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-4-action-1",
+      "raw": "\u001b[57414;4:1u",
+      "modifier": 3,
+      "action": 0,
+      "sourceParsedKey": "shift+alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-4-action-2",
+      "raw": "\u001b[57414;4:2u",
+      "modifier": 3,
+      "action": 1,
+      "sourceParsedKey": "shift+alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-4-action-3",
+      "raw": "\u001b[57414;4:3u",
+      "modifier": 3,
+      "action": 2,
+      "sourceParsedKey": "shift+alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-5-action-1",
+      "raw": "\u001b[57414;5:1u",
+      "modifier": 4,
+      "action": 0,
+      "sourceParsedKey": "ctrl+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-5-action-2",
+      "raw": "\u001b[57414;5:2u",
+      "modifier": 4,
+      "action": 1,
+      "sourceParsedKey": "ctrl+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-5-action-3",
+      "raw": "\u001b[57414;5:3u",
+      "modifier": 4,
+      "action": 2,
+      "sourceParsedKey": "ctrl+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-6-action-1",
+      "raw": "\u001b[57414;6:1u",
+      "modifier": 5,
+      "action": 0,
+      "sourceParsedKey": "shift+ctrl+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-6-action-2",
+      "raw": "\u001b[57414;6:2u",
+      "modifier": 5,
+      "action": 1,
+      "sourceParsedKey": "shift+ctrl+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-6-action-3",
+      "raw": "\u001b[57414;6:3u",
+      "modifier": 5,
+      "action": 2,
+      "sourceParsedKey": "shift+ctrl+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-7-action-1",
+      "raw": "\u001b[57414;7:1u",
+      "modifier": 6,
+      "action": 0,
+      "sourceParsedKey": "ctrl+alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-7-action-2",
+      "raw": "\u001b[57414;7:2u",
+      "modifier": 6,
+      "action": 1,
+      "sourceParsedKey": "ctrl+alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-7-action-3",
+      "raw": "\u001b[57414;7:3u",
+      "modifier": 6,
+      "action": 2,
+      "sourceParsedKey": "ctrl+alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-8-action-1",
+      "raw": "\u001b[57414;8:1u",
+      "modifier": 7,
+      "action": 0,
+      "sourceParsedKey": "shift+ctrl+alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-8-action-2",
+      "raw": "\u001b[57414;8:2u",
+      "modifier": 7,
+      "action": 1,
+      "sourceParsedKey": "shift+ctrl+alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-8-action-3",
+      "raw": "\u001b[57414;8:3u",
+      "modifier": 7,
+      "action": 2,
+      "sourceParsedKey": "shift+ctrl+alt+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-9-action-1",
+      "raw": "\u001b[57414;9:1u",
+      "modifier": 8,
+      "action": 0,
+      "sourceParsedKey": "super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-9-action-2",
+      "raw": "\u001b[57414;9:2u",
+      "modifier": 8,
+      "action": 1,
+      "sourceParsedKey": "super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-9-action-3",
+      "raw": "\u001b[57414;9:3u",
+      "modifier": 8,
+      "action": 2,
+      "sourceParsedKey": "super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-10-action-1",
+      "raw": "\u001b[57414;10:1u",
+      "modifier": 9,
+      "action": 0,
+      "sourceParsedKey": "shift+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-10-action-2",
+      "raw": "\u001b[57414;10:2u",
+      "modifier": 9,
+      "action": 1,
+      "sourceParsedKey": "shift+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-10-action-3",
+      "raw": "\u001b[57414;10:3u",
+      "modifier": 9,
+      "action": 2,
+      "sourceParsedKey": "shift+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-11-action-1",
+      "raw": "\u001b[57414;11:1u",
+      "modifier": 10,
+      "action": 0,
+      "sourceParsedKey": "alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-11-action-2",
+      "raw": "\u001b[57414;11:2u",
+      "modifier": 10,
+      "action": 1,
+      "sourceParsedKey": "alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-11-action-3",
+      "raw": "\u001b[57414;11:3u",
+      "modifier": 10,
+      "action": 2,
+      "sourceParsedKey": "alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-12-action-1",
+      "raw": "\u001b[57414;12:1u",
+      "modifier": 11,
+      "action": 0,
+      "sourceParsedKey": "shift+alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-12-action-2",
+      "raw": "\u001b[57414;12:2u",
+      "modifier": 11,
+      "action": 1,
+      "sourceParsedKey": "shift+alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-12-action-3",
+      "raw": "\u001b[57414;12:3u",
+      "modifier": 11,
+      "action": 2,
+      "sourceParsedKey": "shift+alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-13-action-1",
+      "raw": "\u001b[57414;13:1u",
+      "modifier": 12,
+      "action": 0,
+      "sourceParsedKey": "ctrl+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-13-action-2",
+      "raw": "\u001b[57414;13:2u",
+      "modifier": 12,
+      "action": 1,
+      "sourceParsedKey": "ctrl+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-13-action-3",
+      "raw": "\u001b[57414;13:3u",
+      "modifier": 12,
+      "action": 2,
+      "sourceParsedKey": "ctrl+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-14-action-1",
+      "raw": "\u001b[57414;14:1u",
+      "modifier": 13,
+      "action": 0,
+      "sourceParsedKey": "shift+ctrl+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-14-action-2",
+      "raw": "\u001b[57414;14:2u",
+      "modifier": 13,
+      "action": 1,
+      "sourceParsedKey": "shift+ctrl+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-14-action-3",
+      "raw": "\u001b[57414;14:3u",
+      "modifier": 13,
+      "action": 2,
+      "sourceParsedKey": "shift+ctrl+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-15-action-1",
+      "raw": "\u001b[57414;15:1u",
+      "modifier": 14,
+      "action": 0,
+      "sourceParsedKey": "ctrl+alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-15-action-2",
+      "raw": "\u001b[57414;15:2u",
+      "modifier": 14,
+      "action": 1,
+      "sourceParsedKey": "ctrl+alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-15-action-3",
+      "raw": "\u001b[57414;15:3u",
+      "modifier": 14,
+      "action": 2,
+      "sourceParsedKey": "ctrl+alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-16-action-1",
+      "raw": "\u001b[57414;16:1u",
+      "modifier": 15,
+      "action": 0,
+      "sourceParsedKey": "shift+ctrl+alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "keypad-enter-modifier-16-action-2",
+      "raw": "\u001b[57414;16:2u",
+      "modifier": 15,
+      "action": 1,
+      "sourceParsedKey": "shift+ctrl+alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "keypad-enter-modifier-16-action-3",
+      "raw": "\u001b[57414;16:3u",
+      "modifier": 15,
+      "action": 2,
+      "sourceParsedKey": "shift+ctrl+alt+super+enter",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    }
+  ]
+}

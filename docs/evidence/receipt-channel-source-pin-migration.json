@@ -1,0 +1,14 @@
+{
+  "status": "STATIC FOLLOWUP PIN RECONCILIATION",
+  "previousCandidate": "1c7e7facab60826eba66a3bb728eb5bf919627aa",
+  "reviewedChain": "1baa3a5425e894fac7a6b4f37b4208145c48691b",
+  "changedMember": "src/PiSharp.Cli/Interactive/TerminalSubmissionReceipts.cs",
+  "previousBytes": 7711,
+  "previousSha256": "d8006cb325976aa863bed2a43640c4e8ed107a48832eb53748387b3c176810f2",
+  "actualBytes": 9133,
+  "actualSha256": "0fe496217ee0ed4d038687cfb1f2c46be4b67d4773cf4804f028fa6a30c6bd81",
+  "sourceMembers": 14,
+  "scenarioAssertionsChanged": false,
+  "nativeChildrenBeforeStoppedPreflight": 0,
+  "originalFrozenCandidatePreserved": true
+}

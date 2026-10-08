@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": "identity-successor-r1",
+  "status": "AUTHORED_ADMISSION_PLAN_PENDING_REVIEW_AND_EXECUTION",
+  "featureBase": "55cd2e86404cdfec325d4884bcec276a56d62862",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "referenceSource": {
+    "path": "packages/ai/src/api/pi-messages.ts",
+    "sha256": "8808e3f3d4e19fc0e3c292ce0f4bc45dbdf7d1daa6b023eb4f392c5c6040cfe0",
+    "basis": "READ-ONLY EXISTING PINNED SOURCE TEXT; NOT NEW CAPTURE"
+  },
+  "genuineSourceFixturePin": null,
+  "genuineSourceOutputPin": null,
+  "genuineCaptureBlocker": "Original retained fixture and 12db report declare zero genuine Pi Messages captures. No denied dependency capture attempted.",
+  "filePins": [
+    {
+      "path": "Directory.Build.props",
+      "bytes": 380,
+      "sha256": "ac5ce47d0629f5b040a1615dbc4cc69ce4babde81f727f8392252c3b06a40ad9"
+    },
+    {
+      "path": "global.json",
+      "bytes": 75,
+      "sha256": "9969064a379ad96f0fd9358b4133bf2652018a32c60d44f37a0638168381a90d"
+    },
+    {
+      "path": "src/PiSharp.AI/PiSharp.AI.csproj",
+      "bytes": 155,
+      "sha256": "b7e3054f8844ae019166e87b004abd147d40890e35d1ca4bcd8c82711384cf4a"
+    },
+    {
+      "path": "src/PiSharp.Contracts/PiSharp.Contracts.csproj",
+      "bytes": 36,
+      "sha256": "8d654c44b7bebb6b31a9f2f606927f45b5072193adc4eef8cce3f3cf3b278df3"
+    },
+    {
+      "path": "src/PiSharp.Agent/PiSharp.Agent.csproj",
+      "bytes": 222,
+      "sha256": "22dd98a254492a66d9eb564760a8ec6510bf572a4f1abc3f6bfe4cd45f587650"
+    },
+    {
+      "path": "src/PiSharp.AI/Protocols/PiMessages/PiMessagesEventMapper.cs",
+      "bytes": 13875,
+      "sha256": "267a41ee44b7499c97eaa877dc009d2daa32d5d9a03c191dad4c481ffde538b9"
+    },
+    {
+      "path": "src/PiSharp.AI/Protocols/PiMessages/PiMessagesHttpSseTransport.cs",
+      "bytes": 9588,
+      "sha256": "6679a290aab8bc4ac681aa1673410c7ec24f7f3e3917a7fcdfeabb809c078947"
+    },
+    {
+      "path": "src/PiSharp.AI/Streaming/AssistantStreamReducer.cs",
+      "bytes": 16448,
+      "sha256": "d28bb5bf102e5b55e1d82c54ae3ad4738e559a5602ed04eea0d95850500bf8e9"
+    },
+    {
+      "path": "src/PiSharp.AI/Streaming/ChatRun.cs",
+      "bytes": 25508,
+      "sha256": "194ac9b2552393f28e92b4a8a630d0ff1e65714c89e6105309605d3f76a96d15"
+    },
+    {
+      "path": "src/PiSharp.Contracts/Streaming/StreamEvents.cs",
+      "bytes": 4316,
+      "sha256": "da6aed50cc09f24ae800a62d2f928fe947808407f947f30bcf86b6aeb0d86f4a"
+    },
+    {
+      "path": "src/PiSharp.Contracts/Serialization/PiWireJson.cs",
+      "bytes": 13762,
+      "sha256": "c9364c82e3571ce8c6995e86c450836768e8a092f221e925211e861c29096008"
+    },
+    {
+      "path": "src/PiSharp.Agent/Agent.cs",
+      "bytes": 33376,
+      "sha256": "b077931e7df7b8a3ba196e8245efe2a44c551af7e03e49012498c0c68a0dd68d"
+    },
+    {
+      "path": "src/PiSharp.Agent/AgentLoopRunner.cs",
+      "bytes": 28827,
+      "sha256": "1ea69ff567d4faba27e28e33bc1760d5fbef21c9f12b558f9639ce1f9debe327"
+    },
+    {
+      "path": "src/PiSharp.Agent/TurnRunner.cs",
+      "bytes": 4162,
+      "sha256": "58a9e442c11c7f66ba641b29339f4fe8a3c898869f75dff087257d536f25f3d1"
+    },
+    {
+      "path": "src/PiSharp.Agent/ToolBatchScheduler.cs",
+      "bytes": 25420,
+      "sha256": "e2471706459f4bde64ecf67dc0bbbb654555c296c03359c3d75ad1eadb8c93a6"
+    },
+    {
+      "path": "src/PiSharp.Agent/ToolInvoker.cs",
+      "bytes": 37006,
+      "sha256": "237af0f4cd8f4568e1a1595548153b005b831a4b6ac89f752327b0c51d7f5b07"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/PiSharp.PiMessages.Tests.csproj",
+      "bytes": 434,
+      "sha256": "01e7efa7089a0770044e7b15b9a98972803b52b850e637838372ab823103a8b8"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/packages.lock.json",
+      "bytes": 443,
+      "sha256": "2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/Program.cs",
+      "bytes": 35774,
+      "sha256": "ec588617e43eca8359677137c175dbfe74107f6158d36d8ee8b1a815939c41ff"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/HeldOwnershipHarnessR2.cs",
+      "bytes": 17353,
+      "sha256": "5b7e90624001d830cff4fad49136ac83b37081ff58a5cb49e86b493bd4cefc63"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/AssertionLedger.cs",
+      "bytes": 6016,
+      "sha256": "a4580dd8fd7666e526286f00f8ffbc07ae52667a015e3bad93be4466fbb9d963"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/PiMessagesIdentityReplacementCases.cs",
+      "bytes": 24836,
+      "sha256": "0e7dfdd7c6f86c0098422461ba9bda6652fddd43c3a5b0d7d34a87e6cff8fb0a"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/IdentitySuccessorAdmission.cs",
+      "bytes": 8091,
+      "sha256": "a2017726bb5c0106fe4fdca0fbd9c96db958461c71260ed2b996572b426c3c01"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/ReportLifetimeControls.cs",
+      "bytes": 2550,
+      "sha256": "b1384bd8a5c20de711c57c51fb049aa1a6f361e107da291489f303457ab7588c"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/IdentitySuccessorContinuation.cs",
+      "bytes": 9746,
+      "sha256": "ebe8574dcb9e3500171b0d46ad1d358d4f8b94830916e6c56106edef4b4eda69"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/identity-successor-case-r1.json",
+      "bytes": 1987,
+      "sha256": "ee6505f14fcd43d1ba7d488c2dc0e03951512a2d6a897b0cc1ac742b3f21ccfa"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/identity-successor-output-r1.json",
+      "bytes": 17690,
+      "sha256": "93c80e37db4fa20ef386594beeb6a609f5c9996738ed7de45373543dbfaf2a52"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/authored-cases-r2.json",
+      "bytes": 868723,
+      "sha256": "1b8a6fbb80726e6f1a6cb1848d2df9b7da41c9015d91592d9f077f2aa8c04891"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/criterion-dependencies-r3.json",
+      "bytes": 22877,
+      "sha256": "5a2ede772b7b4e906671c92a12a26654d3e1f69588bcf0b519bcb96c43aabb81"
+    },
+    {
+      "path": "tests/PiSharp.PiMessages.Tests/LegacyIdentitySuccessor.cs",
+      "bytes": 9983,
+      "sha256": "785933c82379ee44e83ff5360712e37730228f2b95ca76d2773a5e149048f06e"
+    }
+  ],
+  "selectedTargets": [
+    {
+      "id": "pi-messages-identity-provider-r1",
+      "project": "tests/PiSharp.PiMessages.Tests/PiSharp.PiMessages.Tests.csproj",
+      "entryAssembly": "tests/PiSharp.PiMessages.Tests/bin/Release/net10.0/PiSharp.PiMessages.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--identity-successor-r1"
+        },
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.PiMessages.Tests/identity-successor-case-r1.json"
+        },
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.PiMessages.Tests/identity-successor-admission-r1.json"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "reportName": "pi-messages-identity-provider-r1.json",
+      "timeoutSeconds": 180,
+      "expectedSourceCases": 0
+    },
+    {
+      "id": "pi-messages-identity-agent-controls-r1",
+      "project": "tests/PiSharp.PiMessages.Tests/PiSharp.PiMessages.Tests.csproj",
+      "entryAssembly": "tests/PiSharp.PiMessages.Tests/bin/Release/net10.0/PiSharp.PiMessages.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--identity-controls-r1"
+        },
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.PiMessages.Tests/identity-successor-admission-r1.json"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "reportName": "pi-messages-identity-agent-controls-r1.json",
+      "timeoutSeconds": 300,
+      "expectedControlGroups": 8,
+      "expectedSourceCases": 0
+    }
+  ],
+  "controlIds": [
+    "pi-identity.final-replacement-projection-immutable-progress",
+    "pi-identity.reducer-opt-in-and-default-identity",
+    "pi-identity.malformed-duplicate-type-mismatch-and-limits",
+    "pi-identity.agent-final-prepared-action-policy",
+    "pi-identity.agent-partial-cancel-cleanup-no-authority",
+    "pi-identity.agent-malformed-end-no-authority",
+    "pi-identity.agent-outer-iterator-join-no-authority",
+    "pi-identity.agent-two-turn-final-policy-continuation-r1"
+  ],
+  "producedOutputPins": [
+    {
+      "target": "pi-messages-identity-provider-r1",
+      "sha256": null,
+      "state": "NOT_PRODUCED"
+    },
+    {
+      "target": "pi-messages-identity-agent-controls-r1",
+      "sha256": null,
+      "state": "NOT_PRODUCED"
+    }
+  ],
+  "runtimeAdmissionRequirements": [
+    "Coordinator explicitly admits both versioned profiles after independent review; do not alter original 26-target gate scope",
+    "Seal entire immutable candidate sources/generated products, not only this bounded file-pin subset",
+    "Fresh permitted locked offline restore/build; no previously compiled consumer with different source inputs",
+    "Hash AI/Agent/Contracts/consumer DLLs and match recorded report runtimeAssemblies against exact build/source receipt",
+    "Hash both fresh reports and index all failed/open/incomplete/unjoined groups and full actuals",
+    "Reviewer accepts successor case expectations, two-turn mapping and safety-control receipts before any criterion advancement"
+  ],
+  "continuationCriterion": {
+    "id": "PM-NATIVE-TOOL-CONTINUATION/3",
+    "status": "OPEN_UNEXECUTED_UNREVIEWED",
+    "requiredTargets": [
+      "pi-messages-identity-provider-r1",
+      "pi-messages-identity-agent-controls-r1"
+    ],
+    "requiredControl": "pi-identity.agent-two-turn-final-policy-continuation-r1",
+    "acceptanceRecord": null,
+    "frozenDependencyRewriteAllowed": false
+  },
+  "allEightPhaseGates": "OPEN",
+  "nativeExecutions": 0,
+  "legacyFullRunnerMigration": {
+    "status": "AUTHORED_FULL_RUNNER_MIGRATION; UNEXECUTED",
+    "base": "2be4f6d77a2e68795d76ef4f3d3b7a14c8392cc1",
+    "caseId": "PM-TOOL-IDENTITY-REPLACEMENT",
+    "historicalCallbacks": 4,
+    "effectiveCallbacks": 5,
+    "historicalFixtureBytesChanged": false,
+    "goldenBytesChanged": false,
+    "historicalCriteria": "OPEN",
+    "authoredControls": 3,
+    "nativeExecutions": 0
+  }
+}

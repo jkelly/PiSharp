@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 2,
+  "status": "SOURCE-ONLY CORRECTION AFTER STATIC HOLD; NO COMPILE/CONSUMER QUALIFICATION",
+  "originalPackage": "P2-08",
+  "base": "0671c335007ae03246ee044f460d93069e2a6356",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "successorBase": "a8606666129cfbc1156bcf743571e021e0b6972c",
+  "staticReviewFinding": "SIMPLE-PAYLOAD-HOOK-1",
+  "correctedDelegation": "FromAsyncRequestFactory -> direct.CreateAsync with the original lifecycle hooks and invocation cancellation token",
+  "authoredConsumerCorrections": [
+    "Fixture SHA-256, Source/base/Node identity and exact 69-case/count admission before execution",
+    "Complete actual observations and Source expectations retained on mismatches, including byte/undefined/binary64 differences",
+    "Controller-held payload/response/provider barriers with an owned case deadline and bounded start/disposal joins",
+    "Attempted, completed and unexecuted criteria remain distinct; unjoined owners stop the batch",
+    "Executed assembly identities recorded for future authorized independent review"
+  ],
+  "admittedTransportPreferences": [null, "sse", "auto"],
+  "autoTransportNegotiationQualified": false,
+  "types": [
+    {
+      "name": "CompletionsSimpleOptions",
+      "constructor": "(JsonData ModelMetadata, string? Reasoning = null)",
+      "properties": [
+        "ModelMetadata",
+        "Reasoning",
+        "ApiKey",
+        "DirectOptions",
+        "HttpOptions",
+        "TransportPreference",
+        "TelemetryContext",
+        "Metadata",
+        "Environment",
+        "TimeoutMilliseconds",
+        "WebsocketConnectTimeoutMilliseconds",
+        "MaximumContextMessages",
+        "MaximumContextCharacters"
+      ],
+      "methods": [
+        "ToString() sanitized"
+      ]
+    },
+    {
+      "name": "CompletionsContextUsageEstimate",
+      "constructor": "(double Tokens, double UsageTokens, double TrailingTokens, int? LastUsageIndex)"
+    },
+    {
+      "name": "CompletionsSimpleResolution",
+      "constructor": "(CompletionsContextUsageEstimate ContextEstimate, double MaxTokens, ImmutableArray<string> SupportedLevels, string? ResolvedThinkingLevel, string? ReasoningEffort)"
+    },
+    {
+      "name": "CompletionsSimpleRequestFactory",
+      "constructor": "(HttpClient client, Uri endpoint, ModelDescriptor model, CompletionsSimpleOptions options)",
+      "methods": [
+        "Resolve(ChatRequest)",
+        "GetSupportedThinkingLevels()",
+        "ClampThinkingLevel(string)",
+        "StartAsync(ChatRequest, CancellationToken = default)",
+        "StreamAsync(ChatRequest, CancellationToken = default)"
+      ],
+      "implements": [
+        "IChatTransport"
+      ]
+    }
+  ],
+  "forwardedExistingSeams": [
+    "DirectOptions headers/cache/session/sampling/thinking budgets",
+    "HttpOptions real lifecycle callbacks/body readers/retry/limits",
+    "Existing CompletionsRun SourceResult/Next/Return/live handle and joined canonical cleanup"
+  ],
+  "explicitOpenSourceBoundaries": [
+    "Opaque telemetry, metadata, env/default dispatch, per-request timeout and WebSocket timeout require unsupported typed failure when configured",
+    "Full callback Source model shape vs native ModelDescriptor",
+    "Nested raw JS object aliases vs owned native snapshot revisions",
+    "Full raw SDK bytes/headers/WHATWG observations and catalog714",
+    "Non-JSON/nonfinite/invalid runtime values outside bounded domain"
+  ],
+  "sourceFixture": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-3\\PiSharp-completions-simple-work\\fixtures\\reference\\completions-simple.json",
+    "bytes": 8622028,
+    "sha256": "3a1887bd368cfb1ac3f3120931aada3c91400552746ced89becb64aca1bcad21"
+  },
+  "nativeBuilds": 0,
+  "nativeAssertionsExecuted": 0,
+  "fullNativeApiInventoryQualified": false,
+  "all79ScopesRetained": true,
+  "allEightPhaseGates": "OPEN"
+}

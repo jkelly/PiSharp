@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>PublishedFixture.TerminalCompanion</AssemblyName>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../../PiSharp.Terminal.SelectList.Integration.Tests/StartupPublishedExtension.cs" Link="StartupPublishedExtension.cs" />
+    <Compile Include="../../../../PiSharp.CodingAgent.Tests/OwnedChildShutdownFixture.cs" Link="OwnedChildShutdownFixture.cs" />
+    <ProjectReference Include="../../../../../src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="../../../../../src/PiSharp.Contracts/PiSharp.Contracts.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>

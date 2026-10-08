@@ -30,9 +30,15 @@ public sealed class PluginAssemblyLoader : IAsyncDisposable
 
     public async Task<LoadedExtension> LoadAsync(JsonData metadata, string packageRoot, ExtensionSourceScope sourceScope,
         string effectiveScopeId, ExtensionTrustDecision? inspectionDecision, PluginExecutionDecision? executionDecision,
-        ExtensionRegistry registry, CancellationToken cancellationToken = default)
+        ExtensionRegistry registry, CancellationToken cancellationToken = default,
+        Func<string, IPiSharpExtension, CancellationToken, Task<RegistrationScope>>? activateOwner = null,
+        Func<RegistrationScope, Task>? retireOwner = null)
     {
         ArgumentNullException.ThrowIfNull(registry);
+        if (activateOwner is not null && activateOwner.GetInvocationList().Length != 1)
+            throw new ArgumentException("One explicitly admitted owner initializer required.", nameof(activateOwner));
+        if (retireOwner is not null && (activateOwner is null || retireOwner.GetInvocationList().Length != 1))
+            throw new ArgumentException("One admitted retirement paired with the initializer required.", nameof(retireOwner));
         cancellationToken.ThrowIfCancellationRequested();
         var parsed = reader.Read(metadata);
         if (!parsed.IsValid) throw Failure(PluginLoadFailure.MetadataRejected, "invalid-owner", "manifest");
@@ -50,6 +56,7 @@ public sealed class PluginAssemblyLoader : IAsyncDisposable
         PluginLoadContext? context = null;
         OwnedPluginInstance? instance = null;
         RegistrationScope? scope = null;
+        Task<RegistrationScope>? activationOriginal = null;
         try
         {
             operation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
@@ -75,31 +82,40 @@ public sealed class PluginAssemblyLoader : IAsyncDisposable
             operation.Token.ThrowIfCancellationRequested();
             instance = new((IPiSharpExtension)Activator.CreateInstance(type)!);
             operation.Token.ThrowIfCancellationRequested();
-            scope = await registry.ActivateAsync(manifest.Id, instance, operation.Token).ConfigureAwait(false);
+            activationOriginal = activateOwner is null ? registry.ActivateAsync(manifest.Id, instance, operation.Token)
+                : activateOwner(manifest.Id, instance, operation.Token) ?? throw new InvalidOperationException("Initializer returned no original activation.");
+            var activated = await activationOriginal.ConfigureAwait(false);
+            if (activated is null || !ReferenceEquals(activated.Registry, registry) || activated.OwnerId != manifest.Id)
+                throw new InvalidOperationException("Initializer returned a foreign owner; loader has no retirement authority over it.");
+            scope = activated;
+            if (scope.State != RegistrationScopeState.Active || scope.ExtensionLifetimeCancellationToken.IsCancellationRequested)
+                throw new InvalidOperationException("Initializer must return the exact active owner in the admitted native registry.");
             operation.Token.ThrowIfCancellationRequested();
-            var loaded = new LoadedExtension(this, reservation, scope, instance, snapshot, context);
+            var loaded = new LoadedExtension(this, reservation, scope, instance, snapshot, context, retireOwner: retireOwner);
             reservation.Ready.TrySetResult(loaded);
             return loaded;
         }
         catch (Exception original)
         {
             var failures = new List<Exception>();
+            var activationAggregate = activationOriginal?.Exception;
+            if (activationAggregate is not null) original = new AggregateException("Original loader activation fault.", activationAggregate, original);
             if (original is SnapshotCreationFailure snapshotFailure)
             { snapshot = snapshotFailure.Snapshot; failures.Add(snapshotFailure); }
             if (scope is not null)
-                try { await scope.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+                await CollectRollbackAsync(() => RetireScopeAsync(scope, retireOwner), failures).ConfigureAwait(false);
             if (instance is not null)
-                try { await instance.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+                await CollectRollbackAsync(() => instance.DisposeAsync().AsTask(), failures).ConfigureAwait(false);
             if (failures.Count == 0)
             {
                 if (context is not null) try { context.ReleaseRootsAndRequestUnload(); } catch (Exception error) { failures.Add(error); }
                 if (failures.Count == 0 && snapshot is not null)
-                    try { await snapshot.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+                    await CollectRollbackAsync(() => snapshot.DisposeAsync().AsTask(), failures).ConfigureAwait(false);
             }
             if (failures.Count != 0)
             {
                 var cleanup = Failure(PluginLoadFailure.CleanupFailed, manifest.Id, "load-rollback", new AggregateException(failures.Prepend(original)));
-                reservation.Ready.TrySetResult(new LoadedExtension(this, reservation, null, instance, snapshot, context, cleanup));
+                reservation.Ready.TrySetResult(new LoadedExtension(this, reservation, null, instance, snapshot, context, cleanup, retireOwner));
                 throw cleanup;
             }
             Release(reservation);
@@ -109,6 +125,22 @@ public sealed class PluginAssemblyLoader : IAsyncDisposable
                 manifest.Id, "activate", original);
         }
         finally { operation?.Dispose(); }
+    }
+
+    private static async Task CollectRollbackAsync(Func<Task> invoke, List<Exception> failures)
+    {
+        Task? original = null;
+        try { original = invoke() ?? throw new InvalidOperationException("Rollback returned no original."); await original.ConfigureAwait(false); }
+        catch (Exception error) { if (original?.Exception is { } aggregate) failures.Add(aggregate); failures.Add(error); }
+    }
+    internal static async Task RetireScopeAsync(RegistrationScope scope, Func<RegistrationScope, Task>? retireOwner)
+    {
+        var failures = new List<Exception>();
+        if (retireOwner is not null) await CollectRollbackAsync(() => retireOwner(scope), failures).ConfigureAwait(false);
+        // The hook may update metadata, but cannot substitute completion for actual owner drainage.
+        // Scope disposal is idempotent and its original is always joined, including hook failure.
+        await CollectRollbackAsync(() => scope.DisposeAsync().AsTask(), failures).ConfigureAwait(false);
+        if (failures.Count != 0) throw new AggregateException("Admitted retirement hook and exact native scope cleanup originals.", failures);
     }
 
     private void CheckExecution(PluginExecutionDecision? decision, ExtensionManifest manifest, string hash, string root,

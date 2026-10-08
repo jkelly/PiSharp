@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "kind": "authored-native-protocol-rejections",
+  "sourceCapture": false,
+  "cases": [
+    {
+      "wire": "{\"version\":2,\"kind\":\"hello\",\"workerGeneration\":3,\"sessionGeneration\":7,\"features\":[]}\n",
+      "failure": "UnsupportedVersion"
+    },
+    {
+      "wire": "{\"version\":1,\"version\":1}\n",
+      "failure": "DuplicateProperty"
+    },
+    {
+      "wire": "{\"version\":1,\"kind\":\"response\",\"workerGeneration\":3,\"sessionGeneration\":7,\"id\":1,\"value\":{\"presence\":\"json\",\"data\":{\"x\":1,\"\\u0078\":2}}}\n",
+      "failure": "DuplicateProperty"
+    },
+    {
+      "wire": "{\"version\":1,\"kind\":\"response\",\"workerGeneration\":3,\"sessionGeneration\":7,\"id\":1,\"value\":{\"presence\":\"json\",\"data\":\"\\uD800\"}}\n",
+      "failure": "InvalidUnicode"
+    },
+    {
+      "wire": "{\"version\":1,\"kind\":\"response\",\"workerGeneration\":3,\"sessionGeneration\":7,\"id\":1,\"value\":{\"presence\":\"json\",\"data\":1e400}}\n",
+      "failure": "NonFiniteNumber"
+    },
+    {
+      "wire": "{\"version\":1,\"kind\":\"response\",\"workerGeneration\":3,\"sessionGeneration\":7,\"id\":1,\"value\":{\"presence\":\"json\",\"data\":null}}",
+      "failure": "PartialFinalFrame"
+    },
+    {
+      "wire": "[]\n",
+      "failure": "InvalidEnvelope"
+    },
+    {
+      "wire": "\n",
+      "failure": "MalformedFrame"
+    },
+    {
+      "wire": "{\"version\":1,\"kind\":\"shutdown\",\"workerGeneration\":3,\"sessionGeneration\":7,\"ignored\":true}\n",
+      "failure": "InvalidEnvelope"
+    }
+  ]
+}

@@ -1,0 +1,136 @@
+{
+  "status": "AUTHORED_SSE_ORIGINAL_FAILURE_RECEIPT_SUCCESSOR_UNCOMPILED_UNEXECUTED_REVIEW_PENDING",
+  "schemaVersion": 1,
+  "branch": "fix/mcp-sse-original-failures",
+  "baseCommit": "35c20c6d3f6d7624d3b683d33ac8a6bc2fb0d4dc",
+  "runtimeAncestor": "bcf8c9e4e53a7aa38e869b5d8fd9b10ae5d2c1c4",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "approval": {
+    "sha256": "358fee4c934b768d2a705b3fd28dcc3799712ad1a509344ec002636b4399664f",
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\MCP_CONCRETE_TRANSPORT_AND_ACQUISITION_SEAMS_R270.json"
+  },
+  "sourcePins": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\mcp\\src\\transports\\stdio.ts",
+      "bytes": 7616,
+      "sha256": "1f69dae42bae51698bee843d6340225072b6f29c006ca422a60f19a798d7bde6"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\mcp\\src\\transports\\streamable-http.ts",
+      "bytes": 17820,
+      "sha256": "09ccd5fb550fe4cda755eb53416042a0db98794a3bfcf42c3d6c90787a23dfe8"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\mcp\\src\\transports\\transport.ts",
+      "bytes": 1954,
+      "sha256": "eaa06b1ac3cdd1de573ba96e5619d1f32aeb5650be5ad5bde2395fe3543c4dfd"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\mcp\\src\\protocol\\jsonrpc.ts",
+      "bytes": 3173,
+      "sha256": "2c37ff9ab0aa3d99ae7b600bc1c78939d4fab74f932f867507e1812ecbf19cc2"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\mcp\\src\\client.ts",
+      "bytes": 21398,
+      "sha256": "968d75671423ed12f35cd57b9918ebf72e4be538e09b5f69eafec9c22823ce79"
+    }
+  ],
+  "postimages": [
+    {
+      "path": "src/PiSharp.Extensions.Abstractions/Mcp/Transport/McpTransportContracts.cs",
+      "bytes": 2787,
+      "sha256": "35d89ceda98ae87f4a521d2d5d4eb1e26d147b1c2a85f6882499f06994a3ec99"
+    },
+    {
+      "path": "src/PiSharp.Extensions.Runtime/Mcp/Transport/McpWirePrimitives.cs",
+      "bytes": 5418,
+      "sha256": "20c535fd85fbfe3905596fc76f1c9249b9e7875096624d7f25460858d45c3a7c"
+    },
+    {
+      "path": "src/PiSharp.Extensions.Runtime/Mcp/Transport/McpStdioTransport.cs",
+      "bytes": 4583,
+      "sha256": "6255a94ced3d324da331d5957d787c10c479ba230f4fceaef22b98fe32b5a1c9"
+    },
+    {
+      "path": "src/PiSharp.Extensions.Runtime/Mcp/Transport/McpStreamableHttpTransport.cs",
+      "bytes": 18072,
+      "sha256": "ca356882f861b3ab288c1143f907e5832699fbbef2aac065d6a8538e58e5de33"
+    },
+    {
+      "path": "src/PiSharp.Extensions.Runtime/Mcp/Transport/McpJsonRpcRequestChannel.cs",
+      "bytes": 16716,
+      "sha256": "bfa8593016faba77b2fdbc40a7867170f81498bdbcf0978b2088cba0cc1ff13b"
+    },
+    {
+      "path": "tests/PiSharp.Extensions.ContractTests/McpTransportTests.cs",
+      "bytes": 41032,
+      "sha256": "dfda6a50339bc732eb1004660876e210bf6087c370b92703cccef9a009f058e8"
+    },
+    {
+      "path": "docs/contracts/mcp-concrete-adapters.md",
+      "bytes": 9861,
+      "sha256": "6a11ab39cbf834691d5f777bb2faca909b6b25d379e9f79e747df2b5432a2c8e"
+    }
+  ],
+  "API": [
+    "IMcpAdmittedDuplexLease Input=stdin write Output=stdout read; original Start/Close",
+    "McpHttpExchange explicit admitted original send",
+    "McpHttpBinding immutable endpoint/headers + explicit profile",
+    "McpStdioTransport",
+    "McpStreamableHttpTransport",
+    "McpJsonRpcRequestChannel implementing IMcpAdmittedRequestChannel",
+    "McpNotificationHandler bounded tracked serial host callback"
+  ],
+  "tests": {
+    "authoredGroups": 24,
+    "registrationRequired": ".Concat(McpTransportTests.Cases())",
+    "filter": "--filter mcp-transport.",
+    "framework": "existing synthetic runner; supplied streams/exchange only",
+    "runnerModified": false,
+    "executedGroups": 0
+  },
+  "remaining": [
+    "Actual admitted duplex process lease and original process/job/stderr acquisition",
+    "Coordinator approved HttpClient closure and reachable host factory",
+    "Prepared registered invocation and atomic generation/catalog publication",
+    "Resources/auth/OAuth/config expansion/content projection",
+    "Exact synthetic and native/loopback execution qualification",
+    "Native restriction/source differential validation"
+  ],
+  "limitations": [
+    "Reader faults on malformed frames instead of recoverable upstream error events",
+    "JsonData depth/duplicate rejection; Unicode decoding/trim differential pending",
+    "Unknown response IDs have no diagnostic event",
+    "Only ping/immutable roots incoming handlers; no generic handler cancel/elicitation/sampling",
+    "GET total retry cap/clamped retry profile differs from upstream healthy resets",
+    "HTTP status bodies/auth challenges excluded; DELETE faults retained",
+    "POST SSE ends on matching reply plus acquired chunk; future trailing data not consumed",
+    "Deadline native timer-range cap; disabled nonpositive/nonfinite timers",
+    "Supplied leases/exchanges must join and honor finite stop; host limits external invocation concurrency"
+  ],
+  "ownership": [
+    "No process start/kill/client construction/credential resolution",
+    "Borrowed process streams never disposed by adapter",
+    "Host network and executable/environment/workdir permissions external",
+    "Original pump/send/read/body/progress/cancel/notification/close work joined",
+    "Shared registry/activation/provider/process/runner sources unchanged"
+  ],
+  "builds": 0,
+  "testsExecuted": 0,
+  "nodeExecutions": 0,
+  "npmExecutions": 0,
+  "packagesAdded": 0,
+  "processesStarted": 0,
+  "httpRequests": 0,
+  "credentialsReadOrWritten": false,
+  "mainMerge": false,
+  "publicPush": false,
+  "sourceParityGateAdvanced": false,
+  "review": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-13\\mcp-concrete-adapters-source-review-35c20c6d.json",
+    "sha256": "fd8f0160934d7b99b67c4fa14072cf579982eabaf29673d25ff24ee8d33d64a9",
+    "finding": "MCP-HTTP-SSE-ORIGINAL-FAILURE"
+  },
+  "newAuthoredGroups": 2
+}

@@ -1,0 +1,3710 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "Additive full public Editor dictionary/ambiguity/normalization/mixed-script movement, word kills, ring, undo and complete callbacks. Original32/443 word corpus retained without rewriting.",
+  "runtimeEvidence": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-dictionary-work\\artifacts\\word-dictionary-runtime-observations.json",
+    "sha256": "66a2f2c952b4b93bf1153d32f44210540d8576b69a603166523466fc4135f2b7"
+  },
+  "cases": [
+    {
+      "id": "dictionary-full-public-editor-0",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "你好世界 中文测试"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-1",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "カタカナテスト あいうえお"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-2",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ภาษาไทย ทดสอบ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-3",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "中华人民共和国"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-4",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "南京市长江大桥"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-5",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "今天天气很好"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-6",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "你好世界"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-7",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "中文测试"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-8",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "日本語の文章です"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-9",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "カタカナテスト"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-10",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "あいうえお"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-11",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ｶﾀｶﾅﾃｽﾄ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-12",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ガッコウ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-13",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ガッコウ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-14",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ภาษาไทย"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-15",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ทดสอบ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-16",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "กรุงเทพมหานคร"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-17",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ภาษาไทยทดสอบ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-18",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ภาษาไทยabc中文カタカナ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-19",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "你好𠀀世界"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-20",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "你好́世界"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-21",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ฯๆ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-22",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ກຂຄງ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-23",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "កខគឃ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-24",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကခဂဃ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-25",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "가나다"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "dictionary-full-public-editor-26",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "カタカナ_123.foo"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    }
+  ]
+}

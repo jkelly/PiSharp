@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "status": "dependencies installed via scoped executor approval; runtime oracle qualification in progress",
+  "source": {
+    "repository": "https://github.com/earendil-works/pi",
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "lockPath": "package-lock.json",
+    "lockSha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d"
+  },
+  "workspace": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1",
+  "upstreamSubdirectory": "upstream",
+  "bootstrapSubdirectory": "tools/npm-11.6.2",
+  "packageManager": {
+    "version": "11.6.2",
+    "tarball": "https://registry.npmjs.org/npm/-/npm-11.6.2.tgz",
+    "integrity": "sha512-7iKzNfy8lWYs3zq4oFPa8EXZz5xt9gQNKJZau3B1ErLBb6bF7sBJ00x09485DOvRT2l5Gerbl3VlZNT57MxJVA==",
+    "engine": "^20.17.0 || >=22.9.0",
+    "source": "https://registry.npmjs.org/npm/11.6.2"
+  },
+  "runtime": {
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+    "reuseExisting": true
+  },
+  "projection": {
+    "manifestPath": "compatibility/reference-oracle-dependencies/package.json",
+    "lockPath": "compatibility/reference-oracle-dependencies/package-lock.json",
+    "basis": "Exact two entries from immutable upstream lock, with identical tarball URLs and integrity hashes; not a full monorepo restore"
+  },
+  "dependencies": [
+    {
+      "name": "partial-json",
+      "version": "0.1.7",
+      "resolved": "https://registry.npmjs.org/partial-json/-/partial-json-0.1.7.tgz",
+      "integrity": "sha512-Njv/59hHaokb/hRUjce3Hdv12wd60MtM9Z5Olmn+nehe0QDAsRtRbJPvJ0Z91TusF0SuZRIvnM+S4l6EIP8leA==",
+      "license": "MIT"
+    },
+    {
+      "name": "typebox",
+      "version": "1.3.27",
+      "resolved": "https://registry.npmjs.org/typebox/-/typebox-1.3.27.tgz",
+      "integrity": "sha512-zu+jc1pcy4UiNThxikUr36f0Rybk9PEeCg/NE6adeWr/SKsdNO4EzZHYRDlv2YCVAfj3Odq3dESSo/jNyoBXzA==",
+      "license": "MIT"
+    }
+  ],
+  "registryMetadata": {
+    "readOnlyAcquisitionSucceeded": true,
+    "acquiredOn": "2026-09-30",
+    "versionsAndIntegrityMatchedUpstreamLock": true,
+    "installLifecycleScripts": [],
+    "transitiveDependencies": []
+  },
+  "setup": {
+    "registry": "https://registry.npmjs.org/",
+    "archives": 3,
+    "networkHosts": [
+      "registry.npmjs.org"
+    ],
+    "lifecycleScripts": "disabled --ignore-scripts",
+    "nativeBuilds": "none",
+    "globalInstall": false,
+    "permanentPathChange": false,
+    "systemConfigurationChange": false,
+    "upstreamSourceChange": false,
+    "paidProviderCalls": false,
+    "credentialsRequired": false,
+    "configuration": "Task-local home/cache/temp/userconfig/globalconfig and credential-free subprocess environment; no user npm configuration inherited",
+    "restoreArguments": [
+      "ci",
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+      "--bin-links=false",
+      "--registry=https://registry.npmjs.org/"
+    ],
+    "buildCommand": "none; use installed Node's TS stripping with unmodified pinned upstream source-resolver.ts"
+  },
+  "confirmation": {
+    "needed": "Scoped executor approval was accepted for exact task-local bootstrap and restore",
+    "humanPolicy": "Authorized project restore completed; no further approval outstanding for installed dependency subset"
+  },
+  "scope": {
+    "unblocks": [
+      "P1-06 full awaited agent-loop and assistant-frame oracle seam",
+      "P1-07 representative captured agent/provider-reduction fixtures",
+      "P1-08 repeatability and comparator evidence",
+      "P2-03 stream reduction differential cases",
+      "P2-07 strict/repair tool JSON characterization",
+      "P3-01/P3-03 awaited tool batch event/order reference captures"
+    ],
+    "doesNotClose": [
+      "Full P1 gate",
+      "Released package/catalog/provider wire baseline",
+      "Production providers",
+      "Full P3 agent/session/RPC/tools parity",
+      "Cross-platform qualification"
+    ],
+    "qualificationPending": true
+  },
+  "staticEvidence": {
+    "moduleCount": 28,
+    "externalImports": [
+      "partial-json",
+      "typebox",
+      "typebox/compile",
+      "typebox/value"
+    ],
+    "unresolvedStaticImports": [],
+    "dynamicModules": [
+      "packages/ai/src/auth/context.ts",
+      "packages/ai/src/auth/helpers.ts"
+    ],
+    "limitations": "Advisory static import scan only. auth/context dynamic imports are Node builtins; lazy OAuth helpers are not invoked by explicit fake stream. Runtime load trace and offline captures must verify actual closure."
+  },
+  "acquisition": {
+    "completedOn": "2026-09-30",
+    "command": "node tools/PiReferenceRunner/setup.mjs --execute",
+    "exitCode": 0,
+    "executorApproval": "accepted",
+    "humanApprovalOutstanding": false,
+    "packageManagerVersion": "11.6.2",
+    "npmArchiveSha256": "585f95094ee5cb2788ee11d90f2a518a7c9ef6e083fa141d0b63ca3383675a20",
+    "installedManifests": [
+      {
+        "name": "partial-json",
+        "version": "0.1.7",
+        "sha256": "42b3ae6c99ec959249f8eb4d3da7fdb44ec1f96ec627fa7f9ca5487a4e80963f"
+      },
+      {
+        "name": "typebox",
+        "version": "1.3.27",
+        "sha256": "c59ddfd977ce941f1e8ee8b0a0b14396c332fa27cc5fa6fa165227ffd5a3992f"
+      }
+    ],
+    "sourceModified": false,
+    "record": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-reference-oracle-v0.99.1/.pisharp-oracle-setup.json"
+  }
+}

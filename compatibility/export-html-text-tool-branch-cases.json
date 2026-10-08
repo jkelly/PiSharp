@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "evidenceKind": "authored-native-expectations-with-pinned-source-proof",
+  "upstreamRuntimeExecuted": false,
+  "nativeTestsExecuted": false,
+  "profile": "standalone-static-script-free-html",
+  "pinnedSources": [
+    {
+      "path": "packages/coding-agent/src/core/export-html/index.ts",
+      "sha256": "a82435411f3a49c65c2a81776c784552993d9ad3160eee2bbde3c49381899cf5",
+      "contracts": ["capture header, all entries and selected leaf", "capture optional system prompt and tool definitions", "standalone document", "fallback export background derivation"]
+    },
+    {
+      "path": "packages/coding-agent/src/core/export-html/template.js",
+      "sha256": "b5bbffdf5d9ec8bb519df45c7ff953ac1969af80e8aba33331b9f87983f91fa5",
+      "contracts": ["getPath follows selected parent ancestry", "renderEntry displays stored compaction and branch summary", "escapeHtml encodes ampersand, angle brackets and quotes", "hidden custom messages remain retained"]
+    }
+  ],
+  "cases": [
+    {
+      "nativeCase": "Branches",
+      "entryIdsInPhysicalOrder": ["root", "left", "right", "label", "compact", "info"],
+      "selectedLeaf": "info",
+      "expectedSelectedAncestry": ["root", "left", "compact", "info"],
+      "expectedOtherEntries": ["right", "label"],
+      "expectedJsonlRecords": 7,
+      "compactionDisplay": "ancestry remains visible; export viewer is not an LLM context projection"
+    },
+    {
+      "nativeCase": "ToolsAndContent",
+      "contracts": ["custom tool call name, ID and raw arguments", "separate tool result with name, call ID and isError", "thinking details", "hidden custom text visible with annotation", "branch summary text", "image data retained but not activated", "opaque numeric token 1.00e400 retained"]
+    },
+    {
+      "nativeCase": "EncodingAndDeterminism",
+      "contracts": ["script-closing strings, img and event text encoded", "session IDs never become raw DOM IDs", "optional system prompt and tool definitions encoded", "Unicode restored from decoded archive", "identical UTF-8 output without BOM", "CSP default-src none"]
+    },
+    {
+      "nativeCase": "EmptySelection",
+      "contracts": ["null means empty selected ancestry", "physical leaf retained separately", "empty captured session accepted"]
+    },
+    {
+      "nativeCase": "Admission",
+      "contracts": ["invalid header, uninitialized entries, duplicate IDs, missing parents and cycles rejected", "missing selected leaf rejected", "unpaired optional prompt Unicode rejected", "tools must be an array", "unknown roles retained as escaped raw data"]
+    },
+    {
+      "nativeCase": "BoundsAndCancellation",
+      "contracts": ["inclusive exact UTF-8 byte boundary", "input and entry limits", "precanceled caller token preserved"]
+    },
+    {
+      "nativeCase": "InputAdmissionOrder",
+      "contracts": ["selector charged to inclusive aggregate input before lookup", "oversized selector rejected with ResourceLimit", "metadata overflow stops before first entry", "cumulative record overflow stops before later entries", "header, selector, prompt and tools all charged"]
+    }
+  ],
+  "fixedFallbackBackgrounds": {
+    "sourceUserMessageBg": "#343541",
+    "pageBg": "rgb(36,37,46)",
+    "cardBg": "rgb(44,45,55)",
+    "infoBg": "rgb(72,68,65)"
+  },
+  "limits": ["no named or ambient system theme resolution", "no markdown or syntax-highlighting engine", "no activated images or remote links", "no extension-provided HTML", "no dynamic branch switching, search, download or share UI", "no original-template byte or visual parity claim", "strict existing native forest admission rather than upstream orphan recovery", "no RPC command, output path, writer or cancellation cleanup integration"]
+}

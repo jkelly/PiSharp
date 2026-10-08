@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "normalizerVersion": "object-key-order-v1",
+  "scope": "Seven genuine unchanged low-level runAgentLoop finishTurn captures with fake provider/tool/callback environment; full Agent/session/provider/native acceptance remains open.",
+  "fixtures": [
+    {
+      "fixtureId": "finish-decisions-core",
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "requirementIds": [
+        "events.agent"
+      ],
+      "scenario": "Seven unchanged runAgentLoop finishTurn cases: explicit end; one continue request selected by current context, tool, steering or follow-up; error/aborted assistant hard exits despite continue.",
+      "scenarioIds": [
+        "end-after-tool-before-queues",
+        "continue-context-only-once",
+        "continue-satisfied-by-tool",
+        "continue-satisfied-by-steering",
+        "continue-satisfied-by-follow-up",
+        "error-hard-exit-ignores-continue",
+        "aborted-hard-exit-ignores-continue"
+      ],
+      "clock": {
+        "unixMilliseconds": 1700000000000,
+        "mechanism": "Disclosed harness Date.now override restored in finally; explicit authored message timestamps and IDs; no timestamp normalization."
+      },
+      "seed": "none; explicit authored IDs and awaited first-finishTurn gate per case",
+      "environment": {
+        "platform": "win32",
+        "architecture": "x64",
+        "credentials": "not inherited",
+        "network": "blocked by reused offline guard",
+        "workspace": "two fresh isolated temporary homes/workspaces"
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/finish-decisions/core.input.json",
+        "sha256": "815203f5a198cc2ddf7cb1c7d6856adf46ef051127861391af9e711f7c7500ba"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/finish-decisions/core.expected.json",
+        "sha256": "9f63f961256a9af071c90220adbca8861e6c813fcfdfcaa4ab9fffaa37169e23"
+      },
+      "rawCaptures": [
+        {
+          "path": "fixtures/pi-v0.99.1/finish-decisions/capture-1.raw.json",
+          "sha256": "409a1f0dd0c6dc92828c65a9d748c0c5894cc5789b9381682784f5adaaa4d167",
+          "bytes": 274883
+        },
+        {
+          "path": "fixtures/pi-v0.99.1/finish-decisions/capture-2.raw.json",
+          "sha256": "409a1f0dd0c6dc92828c65a9d748c0c5894cc5789b9381682784f5adaaa4d167",
+          "bytes": 274883
+        }
+      ],
+      "provenance": {
+        "kind": "captured-upstream-finish-decisions-oracle",
+        "inputKind": "authored-finish-decisions-input",
+        "source": "Unchanged pinned runAgentLoop and AssistantMessageEventStream; explicit fake streamFn/tool/public finish/prepare/queue callbacks; disclosed harness Date.now override restored in finally.",
+        "resolver": "Unchanged pinned packages/coding-agent/src/experimental/source-resolver.ts",
+        "dependencyLock": "fixtures/pi-v0.99.1/finish-decisions/reference.lock.json",
+        "environmentLock": "tools/PiReferenceRunner/full-lock.json",
+        "capturedAt": "2026-09-30",
+        "captureCommand": "node tools/PiReferenceRunner/capture-finish-decisions.mjs --capture-new",
+        "providerWireTraffic": false,
+        "nativeDifferential": false,
+        "highLevelAgentQueueModes": false,
+        "abortScope": "Authored aborted terminal response plus supplied controller.abort; no network/provider cancellation claim."
+      }
+    }
+  ]
+}

@@ -1,0 +1,319 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "environmentLockPath": "tools/PiReferenceRunner/full-lock.json",
+  "environmentLockSha256": "66bd6efa573d9f0a160eb4005e0aba325debdbfdde40c042afab975c4c5caa1a",
+  "additionalSourceHashes": [
+    {
+      "path": "upstream/packages/ai/src/api/openai-responses-shared.ts",
+      "sha256": "85db12efcd109d505c98846e34c45cb4a3260edcee88ef28c8afd1db20eac26a",
+      "bytes": 30902,
+      "canonicalGitBlobSha256": "85db12efcd109d505c98846e34c45cb4a3260edcee88ef28c8afd1db20eac26a",
+      "canonicalGitBlobBytes": 30902
+    },
+    {
+      "path": "upstream/packages/ai/src/api/constrained-sampling.ts",
+      "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb",
+      "bytes": 9295,
+      "canonicalGitBlobSha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb",
+      "canonicalGitBlobBytes": 9295
+    },
+    {
+      "path": "upstream/packages/ai/src/api/transform-messages.ts",
+      "sha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669",
+      "bytes": 7666,
+      "canonicalGitBlobSha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669",
+      "canonicalGitBlobBytes": 7666
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/hash.ts",
+      "sha256": "2cdfce4af41810d1a92c7f0a55c78637a3173041038aafd85b378be345761ed8",
+      "bytes": 540,
+      "canonicalGitBlobSha256": "2cdfce4af41810d1a92c7f0a55c78637a3173041038aafd85b378be345761ed8",
+      "canonicalGitBlobBytes": 540
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/sanitize-unicode.ts",
+      "sha256": "f8ef2c957f9f13a77df45ebf344f1b852dfe8f2e3d164d815127ea7290c12e22",
+      "bytes": 1167,
+      "canonicalGitBlobSha256": "f8ef2c957f9f13a77df45ebf344f1b852dfe8f2e3d164d815127ea7290c12e22",
+      "canonicalGitBlobBytes": 1167
+    }
+  ],
+  "loadedModules": [
+    {
+      "path": "node_modules/partial-json/dist/index.js",
+      "sha256": "23f750aa1170c830b7ef180135852317886cc58ce7d2597e5eeee044539072c7",
+      "bytes": 8376
+    },
+    {
+      "path": "node_modules/partial-json/dist/options.js",
+      "sha256": "779b2aded6d4e2ec6171ea9d5d5d97551e8c3258b6e78a01d2e9fc6235865b36",
+      "bytes": 2849
+    },
+    {
+      "path": "upstream/packages/ai/src/api/constrained-sampling.ts",
+      "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb",
+      "bytes": 9295
+    },
+    {
+      "path": "upstream/packages/ai/src/api/lazy.ts",
+      "sha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a",
+      "bytes": 3203
+    },
+    {
+      "path": "upstream/packages/ai/src/api/openai-responses-shared.ts",
+      "sha256": "85db12efcd109d505c98846e34c45cb4a3260edcee88ef28c8afd1db20eac26a",
+      "bytes": 30902
+    },
+    {
+      "path": "upstream/packages/ai/src/api/transform-messages.ts",
+      "sha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669",
+      "bytes": 7666
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/context.ts",
+      "sha256": "03101bfa711fad214af111e25328b6f607d6b0a7ebfe289af58a89cd55baf639",
+      "bytes": 1345
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/credential-store.ts",
+      "sha256": "50ebde56b80b5862025e031719006ea303edd9aa80fec780fbc64319bb9e2847",
+      "bytes": 2353
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/resolve.ts",
+      "sha256": "d03ed5bf0abcbdc482df879f209156f18f8bfdc381869db77301a8273f990007",
+      "bytes": 6110
+    },
+    {
+      "path": "upstream/packages/ai/src/models-store.ts",
+      "sha256": "34ee433ca1501e98d19f31e0e5adf8d1721902e9f35e46c270626e32d7f711cc",
+      "bytes": 1698
+    },
+    {
+      "path": "upstream/packages/ai/src/models.ts",
+      "sha256": "4739010c7e4f7596607b1dd495b9d5ab6cd921e29f55c5c331259a04b7253269",
+      "bytes": 46331
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/abort.ts",
+      "sha256": "e81dc16de331e82d7f15759b27e38c7d0a3d28955693e0cf157dd52dadea7035",
+      "bytes": 1374
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/diagnostics.ts",
+      "sha256": "06fcbc2347f65a43938078094a7118036b5f12e73147affb5c73cd72753443f0",
+      "bytes": 1399
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/event-stream.ts",
+      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "bytes": 2878
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/hash.ts",
+      "sha256": "2cdfce4af41810d1a92c7f0a55c78637a3173041038aafd85b378be345761ed8",
+      "bytes": 540
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/json-parse.ts",
+      "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "bytes": 2774
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/model-operations.ts",
+      "sha256": "d024c049a08df73498362f297ca10c45a401fb5a3364c0a4d7890ec92a3c4763",
+      "bytes": 2070
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/models-error.ts",
+      "sha256": "f35f82bd86123be7ef05e86036f18e8d3d5df14f394f558b22c38b23d122c12c",
+      "bytes": 794
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/sanitize-unicode.ts",
+      "sha256": "f8ef2c957f9f13a77df45ebf344f1b852dfe8f2e3d164d815127ea7290c12e22",
+      "bytes": 1167
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/text.ts",
+      "sha256": "d37c1825855c7fc71669a545b5b266810242c1c7e58d57228c0c143f29c1c544",
+      "bytes": 1560
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/transcript.ts",
+      "sha256": "cad0c126cdfadc1b4f430cc5a95b1c9285ecd1ee9957642d7773b1357bbc9ac5",
+      "bytes": 9403
+    },
+    {
+      "path": "upstream/packages/coding-agent/src/experimental/source-resolver.ts",
+      "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6",
+      "bytes": 3592
+    }
+  ],
+  "sourceHashes": [
+    {
+      "path": "upstream/packages/ai/src/api/constrained-sampling.ts",
+      "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb",
+      "bytes": 9295,
+      "canonicalGitBlobSha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb",
+      "canonicalGitBlobBytes": 9295
+    },
+    {
+      "path": "upstream/packages/ai/src/api/lazy.ts",
+      "sha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a",
+      "bytes": 3203,
+      "canonicalGitBlobSha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a",
+      "canonicalGitBlobBytes": 3203
+    },
+    {
+      "path": "upstream/packages/ai/src/api/openai-responses-shared.ts",
+      "sha256": "85db12efcd109d505c98846e34c45cb4a3260edcee88ef28c8afd1db20eac26a",
+      "bytes": 30902,
+      "canonicalGitBlobSha256": "85db12efcd109d505c98846e34c45cb4a3260edcee88ef28c8afd1db20eac26a",
+      "canonicalGitBlobBytes": 30902
+    },
+    {
+      "path": "upstream/packages/ai/src/api/transform-messages.ts",
+      "sha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669",
+      "bytes": 7666,
+      "canonicalGitBlobSha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669",
+      "canonicalGitBlobBytes": 7666
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/context.ts",
+      "sha256": "03101bfa711fad214af111e25328b6f607d6b0a7ebfe289af58a89cd55baf639",
+      "bytes": 1345,
+      "canonicalGitBlobSha256": "03101bfa711fad214af111e25328b6f607d6b0a7ebfe289af58a89cd55baf639",
+      "canonicalGitBlobBytes": 1345
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/credential-store.ts",
+      "sha256": "50ebde56b80b5862025e031719006ea303edd9aa80fec780fbc64319bb9e2847",
+      "bytes": 2353,
+      "canonicalGitBlobSha256": "50ebde56b80b5862025e031719006ea303edd9aa80fec780fbc64319bb9e2847",
+      "canonicalGitBlobBytes": 2353
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/resolve.ts",
+      "sha256": "d03ed5bf0abcbdc482df879f209156f18f8bfdc381869db77301a8273f990007",
+      "bytes": 6110,
+      "canonicalGitBlobSha256": "d03ed5bf0abcbdc482df879f209156f18f8bfdc381869db77301a8273f990007",
+      "canonicalGitBlobBytes": 6110
+    },
+    {
+      "path": "upstream/packages/ai/src/models-store.ts",
+      "sha256": "34ee433ca1501e98d19f31e0e5adf8d1721902e9f35e46c270626e32d7f711cc",
+      "bytes": 1698,
+      "canonicalGitBlobSha256": "34ee433ca1501e98d19f31e0e5adf8d1721902e9f35e46c270626e32d7f711cc",
+      "canonicalGitBlobBytes": 1698
+    },
+    {
+      "path": "upstream/packages/ai/src/models.ts",
+      "sha256": "4739010c7e4f7596607b1dd495b9d5ab6cd921e29f55c5c331259a04b7253269",
+      "bytes": 46331,
+      "canonicalGitBlobSha256": "4739010c7e4f7596607b1dd495b9d5ab6cd921e29f55c5c331259a04b7253269",
+      "canonicalGitBlobBytes": 46331
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/abort.ts",
+      "sha256": "e81dc16de331e82d7f15759b27e38c7d0a3d28955693e0cf157dd52dadea7035",
+      "bytes": 1374,
+      "canonicalGitBlobSha256": "e81dc16de331e82d7f15759b27e38c7d0a3d28955693e0cf157dd52dadea7035",
+      "canonicalGitBlobBytes": 1374
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/diagnostics.ts",
+      "sha256": "06fcbc2347f65a43938078094a7118036b5f12e73147affb5c73cd72753443f0",
+      "bytes": 1399,
+      "canonicalGitBlobSha256": "06fcbc2347f65a43938078094a7118036b5f12e73147affb5c73cd72753443f0",
+      "canonicalGitBlobBytes": 1399
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/event-stream.ts",
+      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "bytes": 2878,
+      "canonicalGitBlobSha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "canonicalGitBlobBytes": 2878
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/hash.ts",
+      "sha256": "2cdfce4af41810d1a92c7f0a55c78637a3173041038aafd85b378be345761ed8",
+      "bytes": 540,
+      "canonicalGitBlobSha256": "2cdfce4af41810d1a92c7f0a55c78637a3173041038aafd85b378be345761ed8",
+      "canonicalGitBlobBytes": 540
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/json-parse.ts",
+      "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "bytes": 2774,
+      "canonicalGitBlobSha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "canonicalGitBlobBytes": 2774
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/model-operations.ts",
+      "sha256": "d024c049a08df73498362f297ca10c45a401fb5a3364c0a4d7890ec92a3c4763",
+      "bytes": 2070,
+      "canonicalGitBlobSha256": "d024c049a08df73498362f297ca10c45a401fb5a3364c0a4d7890ec92a3c4763",
+      "canonicalGitBlobBytes": 2070
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/models-error.ts",
+      "sha256": "f35f82bd86123be7ef05e86036f18e8d3d5df14f394f558b22c38b23d122c12c",
+      "bytes": 794,
+      "canonicalGitBlobSha256": "f35f82bd86123be7ef05e86036f18e8d3d5df14f394f558b22c38b23d122c12c",
+      "canonicalGitBlobBytes": 794
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/sanitize-unicode.ts",
+      "sha256": "f8ef2c957f9f13a77df45ebf344f1b852dfe8f2e3d164d815127ea7290c12e22",
+      "bytes": 1167,
+      "canonicalGitBlobSha256": "f8ef2c957f9f13a77df45ebf344f1b852dfe8f2e3d164d815127ea7290c12e22",
+      "canonicalGitBlobBytes": 1167
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/text.ts",
+      "sha256": "d37c1825855c7fc71669a545b5b266810242c1c7e58d57228c0c143f29c1c544",
+      "bytes": 1560,
+      "canonicalGitBlobSha256": "d37c1825855c7fc71669a545b5b266810242c1c7e58d57228c0c143f29c1c544",
+      "canonicalGitBlobBytes": 1560
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/transcript.ts",
+      "sha256": "cad0c126cdfadc1b4f430cc5a95b1c9285ecd1ee9957642d7773b1357bbc9ac5",
+      "bytes": 9403,
+      "canonicalGitBlobSha256": "cad0c126cdfadc1b4f430cc5a95b1c9285ecd1ee9957642d7773b1357bbc9ac5",
+      "canonicalGitBlobBytes": 9403
+    },
+    {
+      "path": "upstream/packages/coding-agent/src/experimental/source-resolver.ts",
+      "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6",
+      "bytes": 3592,
+      "canonicalGitBlobSha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6",
+      "canonicalGitBlobBytes": 3592
+    }
+  ],
+  "harnessFiles": [
+    {
+      "path": "tools/PiReferenceRunner/responses-replay-run.mjs",
+      "sha256": "7c8b0ce3c9f8122c4923a3ab32d57b06dbe25f6f295af2f16ef2030e195cd19a"
+    },
+    {
+      "path": "tools/PiReferenceRunner/responses-replay-capture.mjs",
+      "sha256": "23f6264c74d37af1d578c2f944dffb91b94c5afa6a3d207d87b84e52cca55f0e"
+    },
+    {
+      "path": "tools/PiReferenceRunner/full-preload.mjs",
+      "sha256": "e1f62a2048bc484a162085430a5afb6f88547d78049b6f29b2a0e4f65fcd79e2"
+    },
+    {
+      "path": "tools/PiReferenceRunner/offline-guard.mjs",
+      "sha256": "ae3741bdce496451bd04afcf8628df6ddc5bc5cfad8af6ee5e52cbc7b065a094"
+    },
+    {
+      "path": "tools/CompatibilityReport/raw-json.mjs",
+      "sha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9"
+    }
+  ]
+}

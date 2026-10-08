@@ -4,6 +4,8 @@ using System.Text.Json;
 using PiSharp.Agent;
 using PiSharp.Contracts;
 using PiSharp.CodingAgent;
+using PiSharp.CodingAgent.Resources;
+using PiSharp.Rpc.Protocol;
 using PiSharp.Extensions.Agent;
 using PiSharp.Extensions.Runtime;
 using PiSharp.Extensions.Runtime.Discovery;
@@ -11,11 +13,11 @@ using PiSharp.Extensions.Runtime.Loading;
 using PiSharp.Extensions;
 using PiSharp.Extensions.Events;
 using PiSharp.Sessions.Context;
-
+using PiSharp.Extensions.Facade.Context;
 namespace PiSharp.Cli.Extensions;
 
 /// <summary>Owns one approved published generation and its actual transactional registry.</summary>
-internal sealed class NativeExtensionActivation : IAsyncDisposable
+internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPromptTemplateCommandAdmission, IRpcExtensionCommandCatalog
 {
     private readonly object _gate = new();
     private readonly ExtensionRegistry _registry;
@@ -23,20 +25,28 @@ internal sealed class NativeExtensionActivation : IAsyncDisposable
     private readonly CancellationTokenSource _closing = new();
     private readonly ImmutableDictionary<string, NativeToolObjectSchema> _schemas;
     private readonly NativeSessionSnapshotProvider _sessionViews;
+    private readonly NativeExtensionContextFacadeHost _facadeHost;
+    private readonly NativeExtensionRegistrationBridge? _registrationBridge;
     private readonly NativeExtensionConfiguration _configuration;
     private readonly Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? _reportInputDiagnostic;
+    private readonly NativeLoadoutDiagnostics? _loadoutDiagnostics;
     private Task? _disposal;
     internal ImmutableDictionary<string, string> Targets { get; }
     internal ExtensionAgentBinding Binding { get; private set; } = null!;
     internal IPromptInputAdmission InputAdmission { get; private set; } = null!;
+    internal IPromptInputAdmission RawInputHandlers { get; private set; } = null!;
 
     private NativeExtensionActivation(NativeExtensionConfiguration configuration, ExtensionRegistry registry,
         PluginAssemblyLoader loader, ExtensionRegistrySnapshot snapshot, ImmutableDictionary<string, NativeToolObjectSchema> schemas,
         NativeSessionSnapshotProvider sessionViews,
-        Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? reportInputDiagnostic)
+        Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? reportInputDiagnostic,
+        NativeExtensionContextFacadeHost facadeHost, NativeExtensionRegistrationBridge? registrationBridge = null)
     {
         _configuration = configuration; _registry = registry; _loader = loader; _schemas = schemas; _sessionViews = sessionViews;
+        _facadeHost = facadeHost;
+        _registrationBridge = registrationBridge;
         _reportInputDiagnostic = reportInputDiagnostic;
+        if (reportInputDiagnostic is not null) _loadoutDiagnostics = new(reportInputDiagnostic, _closing.Token);
         Targets = snapshot.Tools.Where(tool => configuration.EnabledTools.Contains(tool.Name, StringComparer.Ordinal) &&
                 !configuration.DeniedTools.Contains(tool.Name, StringComparer.Ordinal))
             .ToImmutableDictionary(tool => tool.Name, tool => tool.OwnerId + "/" + tool.OwnerGeneration.ToString(CultureInfo.InvariantCulture) +
@@ -45,31 +55,91 @@ internal sealed class NativeExtensionActivation : IAsyncDisposable
 
     internal static async Task<NativeExtensionActivation> LoadAsync(NativeExtensionPreflight preflight, CancellationToken token,
         IExtensionUiProvider? uiProvider = null,
-        Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? reportInputDiagnostic = null)
+        Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? reportInputDiagnostic = null,
+        NativeExtensionContextFacadeHost? configuredFacadeHost = null,
+        IExtensionContextReadHost? configuredFacadeCapabilities = null,
+        IExtensionRegistrationActionHost? configuredRegistrationActions = null,
+        PromptTemplateCatalogSnapshot? configuredPromptTemplates = null,
+        NativeExtensionInitializerInstallation? configuredInitializerInstallation = null,
+        Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null)
     {
+        if (configuredExecInstallation is not null && configuredExecInstallation.GetInvocationList().Length != 1)
+            throw new ArgumentException("One explicitly supplied execution installation factory required.");
         var sessionViews = new NativeSessionSnapshotProvider();
+        var facadeHost = configuredFacadeHost ?? new NativeExtensionContextFacadeHost();
+        NativeExtensionActivation? admittedActivation = null;
+        PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation? execInstallation = null;
+        if (configuredFacadeCapabilities is not null && configuredRegistrationActions is not null)
+            throw new ArgumentException("Supply one explicit combined facade capability, or the attached host and registration action capability.");
+        var registrationActions = configuredRegistrationActions ?? new NativeExistingSessionRegistrationActions(facadeHost,
+            () => admittedActivation?.InputAdmission ?? throw new NotSupportedException("The native input pipeline has not been bound."),
+            configuredPromptTemplates is null ? null : () =>
+            {
+                var activation = admittedActivation ?? throw new NotSupportedException("The native input pipeline has not been bound.");
+                return new PromptTemplateInputAdmission(configuredPromptTemplates, PromptTemplateInputOperation.Prompt,
+                    activation.RawInputHandlers, activation, expandTemplates: true);
+            });
+        if (configuredExecInstallation is not null && configuredFacadeCapabilities is not null)
+            throw new ArgumentException("Execution callback bridge requires the loader-owned combined facade; custom wrappers need explicit aggregate composition.");
+        var executionContext = configuredExecInstallation is null ? null :
+            new PiSharp.Cli.Extensions.Execution.NativeExtensionExecContextHost(facadeHost, () => execInstallation);
+        IExtensionContextReadHost facadeCapabilities = configuredFacadeCapabilities ??
+            new NativeExtensionRegistrationFacadeHost(facadeHost, registrationActions, executionContext);
         var registry = new ExtensionRegistry(new() { MaximumOwners = 1, MaximumRegistrations = 64, MaximumRegistrationsPerOwner = 64 },
-            uiProvider ?? new UnavailableExtensionUiProvider(), sessionViews);
+            uiProvider ?? new UnavailableExtensionUiProvider(), sessionViews, facadeCapabilities);
         var loader = new PluginAssemblyLoader(new() { SnapshotParentDirectory = preflight.Configuration.SnapshotRoot,
             MaximumOwnedPackages = 1 });
+        NativeExtensionRegistrationBridge? registrationBridge = null;
+        PiSharp.Cli.Mcp.McpExtensionRegistrationBridge? mcpBridge = null;
+        Task<LoadedExtension>? loadOriginal = null;
         try
         {
-            await loader.LoadAsync(preflight.Metadata, preflight.Configuration.Package, ExtensionSourceScope.Explicit,
-                NativeExtensionConfiguration.Scope, preflight.Inspection, preflight.Execution, registry, token).ConfigureAwait(false);
+            configuredInitializerInstallation?.Validate();
+            if (configuredInitializerInstallation is not null)
+            {
+                var candidateBridge = configuredInitializerInstallation.CreateRegistrationBridge(registry) ?? throw new InvalidOperationException("No admitted registration bridge returned.");
+                if (!candidateBridge.IsBoundTo(registry)) throw new InvalidOperationException("Registration factory returned a foreign registry bridge.");
+                registrationBridge = candidateBridge;
+                var candidateMcp = configuredInitializerInstallation.CreateMcpBridge?.Invoke(registry);
+                if (configuredInitializerInstallation.CreateMcpBridge is not null && (candidateMcp is null || !candidateMcp.IsBoundTo(registry)))
+                    throw new InvalidOperationException("MCP factory returned no matching native registry bridge.");
+                mcpBridge = candidateMcp;
+            }
+            if (configuredExecInstallation is not null)
+            {
+                token.ThrowIfCancellationRequested();
+                try { execInstallation = configuredExecInstallation(registry) ?? throw new InvalidOperationException("No execution installation returned."); }
+                catch (OperationCanceledException callbackFailure)
+                { throw new PiSharp.Cli.Extensions.Execution.NativeExtensionExecFault("synchronous installation factory", null, callbackFailure); }
+                if (!execInstallation.IsBoundTo(registry)) throw new InvalidOperationException("Execution installation returned a foreign registry.");
+            }
+            loadOriginal = loader.LoadAsync(preflight.Metadata, preflight.Configuration.Package, ExtensionSourceScope.Explicit,
+                NativeExtensionConfiguration.Scope, preflight.Inspection, preflight.Execution, registry, token,
+                configuredInitializerInstallation is null && execInstallation is null ? null : (owner, extension, current) =>
+                {
+                    var supplied = execInstallation?.Decorate(registry, extension) ?? extension;
+                    return configuredInitializerInstallation is null ? registry.ActivateAsync(owner, supplied, current) : ActivateConfiguredOwnerAsync(
+                        configuredInitializerInstallation, registrationBridge!, mcpBridge, preflight.Configuration.Package, owner, supplied, current);
+                },
+                registrationBridge is null ? null : scope => RetireConfiguredOwnerAsync(registrationBridge, mcpBridge, scope));
+            await loadOriginal.ConfigureAwait(false);
             var snapshot = registry.CaptureSnapshot();
-            if (snapshot.Registrations.Any(entry => entry.Kind is not ("Tool" or "Command" or "InputHandler" or "ToolCallHandler" or "ToolResultHandler" or "Observation" or "SessionSwitchHandler" or "SessionCreationHandler" or "ContextHandler" or "ContextWithSystemHandler" or "BeforeAgentStartHandler")) ||
+            if (snapshot.Registrations.Any(entry => entry.Kind is not ("Tool" or "Command" or "InputHandler" or "ToolCallHandler" or "ToolResultHandler" or "Observation" or "SessionSwitchHandler" or "SessionCreationHandler" or "ContextHandler" or "ContextWithSystemHandler" or "BeforeAgentStartHandler" or "SessionBeforeTreeHandler")) ||
                 preflight.Configuration.EnabledTools.Any(name => snapshot.Tools.Count(tool => tool.Name == name) != 1) ||
                 preflight.Configuration.EnabledCommands.Any(name => snapshot.Commands.Count(command => command.Name == name) != 1))
                 throw new NativeExtensionException(NativeExtensionFailure.InvalidConfiguration);
             var schemas = snapshot.Tools.ToImmutableDictionary(tool => tool.Name, tool => NativeToolObjectSchema.Read(tool.Parameters), StringComparer.Ordinal);
             token.ThrowIfCancellationRequested();
-            return new(preflight.Configuration, registry, loader, snapshot, schemas, sessionViews, reportInputDiagnostic);
+            admittedActivation = new(preflight.Configuration, registry, loader, snapshot, schemas, sessionViews, reportInputDiagnostic, facadeHost, registrationBridge);
+            return admittedActivation;
         }
         catch (Exception original)
         {
             var failures = new List<Exception>();
-            try { await loader.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
-            try { await registry.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+            if (loadOriginal?.Exception is { } loadFault) failures.Add(loadFault);
+            await CollectNativeCleanupAsync(loader.DisposeAsync, failures).ConfigureAwait(false);
+            await CollectNativeCleanupAsync(registry.DisposeAsync, failures).ConfigureAwait(false);
+            try { registrationBridge?.Dispose(); } catch (Exception error) { failures.Add(error); }
             if (failures.Count > 0) throw new NativeExtensionException(NativeExtensionFailure.CleanupFailed, new AggregateException(failures.Prepend(original)));
             if (original is OperationCanceledException && token.IsCancellationRequested) throw;
             if (original is NativeExtensionException) throw;
@@ -88,28 +158,41 @@ internal sealed class NativeExtensionActivation : IAsyncDisposable
         {
             RestoreSystemMessage = (messages, token) => new SessionSystemReplay().Replay(messages, token).CurrentMessage,
             ReadSystemPrompt = (messages, token) => new SessionSystemReplay().Replay(messages, token).Prompt,
-            ReportEventDiagnostic = _reportInputDiagnostic
+            ReportEventDiagnostic = _reportInputDiagnostic,
+            ReportLoadoutDiagnostic = CaptureLoadoutDiagnostic
         }, sessionCancellationToken: _closing.Token);
+        _loadoutDiagnostics?.Bind(Binding.Snapshot);
         // Capture exactly the binding revision, never a second per-operation handler set.
         var input = new RegisteredExtensionInputAdmission(_registry, Binding.Snapshot, sessionCancellationToken: _closing.Token,
             reportDiagnostic: _reportInputDiagnostic);
+        RawInputHandlers = input;
         InputAdmission = new CommandInputAdmission(this, input);
     }
+
+    internal void CaptureLoadoutDiagnostic(string toolName, Exception failure) => _loadoutDiagnostics?.Capture(toolName, failure);
+    internal ValueTask DrainLoadoutDiagnosticsAsync(CancellationToken token) =>
+        _loadoutDiagnostics?.DrainAsync(token) ?? ValueTask.CompletedTask;
+    internal void RefuseReporterInitiatedDisposal() => _loadoutDiagnostics?.RefuseReporterInitiatedDisposal();
 
     internal void AttachOwner(ReplaceableAgentSession owner)
     {
         _sessionViews.Attach(owner);
+        _facadeHost.Attach(owner);
         var compaction = new NativeSessionCompactionObservationBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         compaction.Attach(owner, owner.Current);
+        var metadata = new NativeSessionInfoChangedBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
+        metadata.Attach(owner, owner.Current);
         var replacementStart = new NativeReplacementSessionStartBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         _sessionViews.BeforeSwitch = new NativeSessionBeforeSwitchBinding(_registry, Binding.Snapshot, _closing.Token).BeforeSwitchAsync;
         _sessionViews.AfterSwitch = async replacement =>
         {
             compaction.Attach(owner, replacement.Current);
+            metadata.Attach(owner, replacement.Current);
             await replacementStart.PublishAsync(owner, replacement).ConfigureAwait(false);
         };
         owner.BeforeReplacement = _sessionViews.BeforeSwitch;
         owner.AfterReplacement = _sessionViews.AfterSwitch;
+        owner.BeforeRetirement = new NativeSessionShutdownBinding(_registry, Binding.Snapshot, _reportInputDiagnostic).PublishAsync;
         owner.ValidateTargetAttachment = (previous, target, token) =>
         {
             var state = target.Snapshot;
@@ -135,12 +218,27 @@ internal sealed class NativeExtensionActivation : IAsyncDisposable
     }
     internal async ValueTask DispatchSessionStartAsync(string reason, CancellationToken token)
     {
+        await DrainLoadoutDiagnosticsAsync(token).ConfigureAwait(false);
         await _registry.DispatchObservationsAsync(Binding.Snapshot, "session_start",
             JsonData.Parse(JsonSerializer.Serialize(new { type = "session_start", reason })), token, _closing.Token).ConfigureAwait(false);
     }
 
     internal ImmutableArray<IPreparedToolAdapter> EnabledAdapters => Binding.Adapters
         .Where(adapter => _configuration.EnabledTools.Contains(adapter.Name, StringComparer.Ordinal)).ToImmutableArray();
+
+    internal ExtensionSessionSnapshot? CaptureShutdownSessionSnapshot(AgentSessionAttachment? attached)
+        => NativeSessionShutdownBinding.CaptureSnapshot(_registry, attached);
+
+    internal ValueTask<bool> DispatchSessionShutdownAsync(ExtensionSessionSnapshot? retained) =>
+        DispatchSessionShutdownAsync(retained, "quit");
+
+    internal ValueTask<bool> DispatchSessionShutdownAsync(ExtensionSessionSnapshot? retained, string reason)
+    {
+        if (reason is not ("quit" or "reload")) throw new ArgumentException("Unsupported native shutdown reason.", nameof(reason));
+        return
+        _registry.DispatchSessionShutdownAsync(Binding.Snapshot,
+            JsonData.Parse(JsonSerializer.Serialize(new { type = "session_shutdown", reason })), _reportInputDiagnostic, retained);
+    }
     internal ImmutableArray<ExtensionToolRegistrationInfo> EnabledRegistrations => Binding.Registrations
         .Where(tool => _configuration.EnabledTools.Contains(tool.Name, StringComparer.Ordinal)).ToImmutableArray();
     internal ImmutableArray<JsonData> EnabledDeclarations => Binding.Registrations
@@ -148,11 +246,38 @@ internal sealed class NativeExtensionActivation : IAsyncDisposable
             JsonData.Parse(JsonSerializer.Serialize(new { name = tool.Name, description = tool.Description, parameters = tool.Parameters.Value })))
         .ToImmutableArray();
 
-    internal JsonData CommandCatalog => Binding.Snapshot.CommandCatalog;
-    internal ValueTask<JsonData> CompleteCommandAsync(string name, string prefix, CancellationToken token)
+    public JsonData CommandCatalog => Binding.Snapshot.CommandCatalog;
+    public ValueTask<JsonData> CompleteCommandAsync(string name, string prefix, CancellationToken token)
     {
         if (!_configuration.EnabledCommands.Contains(name, StringComparer.Ordinal)) throw new NativeExtensionException(NativeExtensionFailure.InvalidConfiguration);
         return _registry.CompleteCommandAsync(Binding.Snapshot, name, prefix, token, _closing.Token);
+    }
+
+    public bool IsRegisteredCommand(string text)
+    {
+        _closing.Token.ThrowIfCancellationRequested();
+        if (!text.StartsWith('/')) return false;
+        var separator = text.IndexOf(' '); var name = separator < 0 ? text[1..] : text[1..separator];
+        return _configuration.EnabledCommands.Contains(name, StringComparer.Ordinal);
+    }
+
+    public async ValueTask<bool> TryExecuteAsync(string text, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!IsRegisteredCommand(text)) return false;
+        var separator = text.IndexOf(' '); var name = separator < 0 ? text[1..] : text[1..separator];
+        var arguments = separator < 0 ? "" : text[(separator + 1)..];
+        var lifecycleOrigin = BeginLifecycleOrigin();
+        Task? invocationOriginal = null; Exception? invocationDirect = null;
+        try
+        {
+            invocationOriginal = _registry.InvokeCommandAsync(Binding.Snapshot, name,
+                JsonData.Parse(JsonSerializer.Serialize(arguments)), token, _closing.Token).AsTask();
+            await invocationOriginal.ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception error) { invocationDirect = error; throw; }
+        finally { EndLifecycleOrigin(lifecycleOrigin, invocationOriginal, invocationDirect); }
     }
 
     private sealed class CommandInputAdmission(NativeExtensionActivation owner, IPromptInputAdmission inputHandlers) : IPromptInputAdmission
@@ -161,23 +286,15 @@ internal sealed class NativeExtensionActivation : IAsyncDisposable
         {
             token.ThrowIfCancellationRequested(); owner._closing.Token.ThrowIfCancellationRequested();
             // Extension-injected input bypasses interactive command parsing just as it bypasses the original source handler.
-            if (input.Source != PromptInputSource.Extension && input.Text.StartsWith('/'))
-            {
-                var separator = input.Text.IndexOf(' '); var name = separator < 0 ? input.Text[1..] : input.Text[1..separator];
-                if (owner._configuration.EnabledCommands.Contains(name, StringComparer.Ordinal))
-                {
-                    var arguments = separator < 0 ? "" : input.Text[(separator + 1)..];
-                    await owner._registry.InvokeCommandAsync(owner.Binding.Snapshot, name,
-                        JsonData.Parse(JsonSerializer.Serialize(arguments)), token, owner._closing.Token).ConfigureAwait(false);
-                    return new(PromptInputAction.Handled);
-                }
-            }
+            if (input.Source != PromptInputSource.Extension && await owner.TryExecuteAsync(input.Text, token).ConfigureAwait(false))
+                return new(PromptInputAction.Handled);
             return await inputHandlers.ReduceAsync(input, token).ConfigureAwait(false);
         }
     }
 
     public ValueTask DisposeAsync()
     {
+        RefuseReporterInitiatedDisposal();
         TaskCompletionSource? settlement = null; Task pending;
         lock (_gate)
         {
@@ -191,8 +308,11 @@ internal sealed class NativeExtensionActivation : IAsyncDisposable
     {
         var failures = new List<Exception>();
         try { _closing.Cancel(); } catch (Exception error) { failures.Add(error); }
-        try { await _loader.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
-        try { await _registry.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+        // Retire before joining: no queued report may start as current, but every admitted original reporter must settle.
+        try { await DrainLoadoutDiagnosticsAsync(CancellationToken.None).ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+        await CollectNativeCleanupAsync(_loader.DisposeAsync, failures).ConfigureAwait(false);
+        await CollectNativeCleanupAsync(_registry.DisposeAsync, failures).ConfigureAwait(false);
+        try { _registrationBridge?.Dispose(); } catch (Exception error) { failures.Add(error); }
         try { _closing.Dispose(); } catch (Exception error) { failures.Add(error); }
         if (failures.Count > 0) settlement.TrySetException(new NativeExtensionException(NativeExtensionFailure.CleanupFailed, new AggregateException(failures)));
         else settlement.TrySetResult();

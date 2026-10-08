@@ -1,0 +1,7 @@
+# Public native SDK consumer slice
+
+This separate consumer compiles against Extensions.Abstractions and its Contracts dependency only. The executable harness references Extensions.Runtime and the consumer. Neither assembly uses internals, reflection, Node, credentials, terminal services, agent state or a live provider.
+
+Four authored, unexecuted controls use actual ExtensionRegistry activation and callback admission: typed Input transformation plus command capture; fresh immutable captured branch views and expired headless UI; held tool callback joining owner disposal; and exact host capture failure before plugin entry. The session provider is explicitly inert synthetic ancestry, not evidence of original all-session graph support. Headless UI tests unavailable/stale outcomes, not interactive rendering. Public model/provider/OAuth APIs and complete binary compatibility remain outside this slice.
+
+Run only under a separately reviewed finite preparation/consumer grant. The harness expects `--report` and a fresh absolute report path. It serially awaits each original case, stops on the first failure, returns managed exit 1 and writes bounded structural fault identities without messages or stack traces. A physical deadline termination is a failed/blocking operation, not evidence of cooperative callback joins. Project locks were statically authored from existing project-only dependencies; they are not NuGet-generated or restore-accepted.

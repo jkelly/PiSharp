@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "677235d373d40cf8075037957dad9037802845a7",
+  "reviewRequiredBeforeExecution": true,
+  "harness": {
+    "bytes": 12103,
+    "sha256": "6269e623a7d78fa320c27488790e246b3ee4ad2143c64b63632a45b21320a187",
+    "path": "tools/NodeCommandInputBridge/original-corpus.mjs"
+  },
+  "planSha256": "abdd66ab03c89157bc8bd63aeae708daa09be0b15b8a1437d8007a301044b9ee",
+  "roots": {
+    "oracle": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-extension-reducers-oracle-v0.99.1-license-corrected",
+    "jiti": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-real-extension-jiti-v2.7.0-canonical",
+    "reference": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\PiSharp-node-real-extension-reference-canonical-work",
+    "commandInputReference": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\PiSharp-node-command-input-reference-work"
+  },
+  "runtimePath": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+  "runtimeSha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+  "authoredCases": 7,
+  "executed": false,
+  "nativeCSharpExecuted": false,
+  "hostReceipts": "Authored unavailable Print notification receipts; no actual native host",
+  "dependenciesChanged": false,
+  "supervisorPinsChanged": false,
+  "originalSources": [
+    "pirate.ts",
+    "hello.ts"
+  ],
+  "processLocalEnvironment": {
+    "JITI_FS_CACHE": "false",
+    "PISHARP_REAL_EXTENSION_ORACLE": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-extension-reducers-oracle-v0.99.1-license-corrected"
+  },
+  "environmentContract": "Pinned canonical plan/manifest and full source/dependency inventory verified before assignment; existing Jiti and reference roots verified by unchanged loader; both assigned variables restored in finally; no additional root required.",
+  "preservedFailedEvidence": [
+    {
+      "bytes": 6168,
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-7\\node-original-corpus-677235d\\preflight.json",
+      "sha256": "fad2727d7c38e1a3840f94053e6e7f584a5f08ff63f764f7dd254a8fb07efa45"
+    },
+    {
+      "bytes": 587,
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-7\\node-original-corpus-677235d\\command.txt",
+      "sha256": "89046e3d063fb94d89f709925697a605e2c873be2ce3b3210e41fb65bde1af48"
+    },
+    {
+      "bytes": 894,
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-7\\node-original-corpus-677235d\\execution.json",
+      "sha256": "d6d7c98055ef0439866bf41bfdc2e79f43e632813ec8cdb82f2377a6301dc16d"
+    },
+    {
+      "bytes": 313332,
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-7\\node-original-corpus-677235d\\stdout.json",
+      "sha256": "8ba14156d0bf7abb5b8c1b922fd473d01cd00f9755d13755400a75ae5d49c4e3"
+    },
+    {
+      "bytes": 0,
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-7\\node-original-corpus-677235d\\stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 3964,
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-7\\node-original-corpus-677235d\\result.json",
+      "sha256": "a8b159d27c867bcfa28ee0990946108e6c8e69c545fa880d07ccb59b9b686c05"
+    },
+    {
+      "bytes": 755,
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-7\\node-original-corpus-677235d\\diagnosis.txt",
+      "sha256": "ae1c79bdbc9da2a7d7d4948224679bba4dfe29bfe5681c8fe64f3e6d2c4b859f"
+    }
+  ]
+}

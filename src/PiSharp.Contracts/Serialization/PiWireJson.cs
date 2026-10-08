@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 namespace PiSharp.Contracts;
 
 /// <summary>Explicit wire adapter; default CLR record serialization is not a Pi protocol.</summary>
-public static class PiWireJson
+public static partial class PiWireJson
 {
     public static AssistantMessage ReadMessage(JsonElement value)
     {

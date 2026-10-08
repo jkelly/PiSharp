@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "admissionRegressionCorrection": {
+    "base": "0848259fe6e10c48473d2e633ad2e871ce912c10",
+    "review": "FOUR_SLICE_COMPLETED_FAILURE_REVIEW_HANDOFF_R139",
+    "test": "rpc.dispatch-errors-bounds-parse-recovery-backpressure-and-awaited-owned-cleanup",
+    "status": "AUTHORED_UNEXECUTED_COORDINATOR_QUALIFICATION_PENDING",
+    "compactExpectation": "Correlated prerequisite failure without result or lifecycle when host/generator are absent",
+    "classificationCoverage": "Existing unknown check preserved; export_html exercises known unfinished workflow",
+    "productionChanges": 0,
+    "buildsExecutedHere": 0,
+    "testsExecutedHere": 0
+  },
+  "base": "68878a0e246110a915c494cd9733412dd28d8208",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "status": "AUTHORED_RPC_COMPACTION_ALIASES_REVIEW_AND_QUALIFICATION_PENDING",
+  "commands": [
+    "compact",
+    "set_auto_compaction"
+  ],
+  "authoredGroups": 8,
+  "buildsExecuted": 0,
+  "testsExecuted": 0,
+  "apiCalls": 0,
+  "providerCalls": 0,
+  "upstreamCaptures": 0,
+  "sourceParityAccepted": false,
+  "mainMerged": false,
+  "publicPush": false,
+  "sharedNativeTransaction": true,
+  "manualFrames": [
+    "compaction_start",
+    "compaction_end"
+  ],
+  "startObservesActualReservation": true,
+  "endObservesReleasedReservation": true,
+  "completeResponseAndEndPreflightBeforeAppend": true,
+  "automaticModelWindowConfigured": true,
+  "automaticSourceFramesSupported": false,
+  "settingsPersistenceSupported": false,
+  "nativeAdmission": "idle with no pending input; no implicit abort",
+  "offlineSeams": [
+    "ISessionSummaryGenerator",
+    "IChatTransport"
+  ],
+  "unsupported": [
+    "implicit upstream compact abort of active work",
+    "settings persistence/per-model overrides and retained runtime options on toggle",
+    "upstream automatic frames/overflow-retry notification parity",
+    "hosts lacking owning session/explicit generator and native bounds/profile differences"
+  ],
+  "regressionScope": [
+    "8 rpc.upstream-compaction groups",
+    "5 existing rpc.compaction groups",
+    "full PiSharp.Rpc.Tests",
+    "full PiSharp.CodingAgent.Tests",
+    "full PiSharp.Sessions.Tests"
+  ],
+  "remaining": [
+    "independent source review",
+    "authorized candidate-pinned preparation and offline test receipts"
+  ]
+}

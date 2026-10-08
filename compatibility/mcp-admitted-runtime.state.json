@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORED_ADMITTED_MCP_METHOD_RUNTIME_UNCOMPILED_UNEXECUTED_NOT_FULL_PARITY",
+  "branch": "feat/mcp-admitted-runtime",
+  "baseCommit": "525100d214e35330b08b3586cda0668235d0ea3f",
+  "verifiedMainAncestor": "754251be28928b24eaae5895b744c423450c91a3",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "authorization": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\CLI_FLAGS_AND_MCP_RUNTIME_SEAM_HANDOFF_R267.json",
+    "sha256": "0e3deee3e9f4a9542d7d19535230f48ede137d61df3a298a74c531688fce20dd"
+  },
+  "sourcePins": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\extensions\\mcp\\runtime.ts",
+      "bytes": 16734,
+      "sha256": "d9d672780f5a142ed6443162c4795368cf815233419d5b192de61191c7550905"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\extensions\\mcp\\index.ts",
+      "bytes": 40025,
+      "sha256": "d6d178d67d4c62bb74d78a01c42549b3cef0f0f39ddfcff71a028a781387e95a"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\extensions\\mcp\\tools.ts",
+      "bytes": 13489,
+      "sha256": "75de530ec3b46ae2340cfcd964322b01b89ecd021330e26faaffb617e1686256"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\mcp\\src\\client.ts",
+      "bytes": 21398,
+      "sha256": "968d75671423ed12f35cd57b9918ebf72e4be538e09b5f69eafec9c22823ce79"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream\\packages\\mcp\\src\\protocol\\types.ts",
+      "bytes": 3329,
+      "sha256": "87de9c4635ac1915abc17c981768e9d2d87a2c95404f3910eb5692a7b9f50f77"
+    }
+  ],
+  "postimages": [
+    {
+      "path": "src/PiSharp.Extensions.Abstractions/Mcp/Runtime/McpRuntimeContracts.cs",
+      "bytes": 3986,
+      "sha256": "4d8b71d153687dc9d15c598a3baefd4504c1dd0edaa2b09c74041d896525d5d8"
+    },
+    {
+      "path": "src/PiSharp.Extensions.Runtime/Mcp/McpServerRuntime.cs",
+      "bytes": 23955,
+      "sha256": "df6f5cf78486fb6b8de41393db0557c6248d0475d1b1c9d2454eecd456adb18f"
+    },
+    {
+      "path": "tests/PiSharp.Extensions.ContractTests/McpServerRuntimeTests.cs",
+      "bytes": 27892,
+      "sha256": "2a56fa7c21d2500b12314fc37e326f496f38a2b6c1ec4b84f3577196bcbffd30"
+    },
+    {
+      "path": "docs/contracts/mcp-admitted-runtime.md",
+      "bytes": 6460,
+      "sha256": "525e9eb25be4f4a1d4608caf2e30155629174c7d42966710706990bc04440f23"
+    }
+  ],
+  "API": [
+    "IMcpAdmittedRequestChannel supplied independent lease",
+    "McpServerRuntime.ConnectAsync",
+    "RefreshToolsAsync",
+    "HandleNotificationAsync",
+    "CallToolAsync with actual invocation context",
+    "Snapshot acknowledged generation/revision",
+    "CloseAsync original Task; DisposeAsync same underlying Task",
+    "McpCatalogPublisher matching actual commit receipt"
+  ],
+  "tests": {
+    "authoredGroups": 20,
+    "executedGroups": 0,
+    "filter": "--filter mcp-runtime.",
+    "registrationRequired": ".Concat(McpServerRuntimeTests.Cases())",
+    "path": "tests/PiSharp.Extensions.ContractTests/McpServerRuntimeTests.cs",
+    "runnerModified": false,
+    "framework": "existing synthetic contract runner"
+  },
+  "implemented": [
+    "Actual initialize/initialized/tools-list paging/tools-call over admitted semantic channel",
+    "Captured native invocation identity; joined serialized progress",
+    "Finite response/schema/catalog/page/tool limits",
+    "Acknowledged publication revisions and last-ack withdrawal",
+    "Canceled and late operations joined and fenced",
+    "No uncertain request replay; later definite-disconnect lazy reconnect",
+    "Publication and progress reentry refusal; repeat close task/fault identity"
+  ],
+  "remaining": [
+    "Concrete HTTP/stdio MCP client framing and multiplexing adapters",
+    "Physical cancellation writes and progress-reset deadlines",
+    "Host prepared callback and atomic registry generation admission",
+    "Resources/read/catalog and MCP-app rendering",
+    "Auth/OAuth and config-value resolution",
+    "Session-expired retry and qualified HTTP reconnect policy",
+    "Native output/schema/content conversion",
+    "Host lifecycle withdrawals; activation and CLI persistence",
+    "Coordinator test registration and compiled/executed verification"
+  ],
+  "limitations": [
+    "Semantic channel fixtures do not prove wire conformance",
+    "Finite native profile bounds differ from upstream unrestricted counts",
+    "Instruction trimming and progress number formatting not JS-qualified",
+    "Output schema retained raw without independent schema interpretation",
+    "Existing JsonData rejects duplicate members and bounds JSON depth at 64",
+    "Late-acquisition cleanup fault belongs to startup original; close joins but does not duplicate invocation faults"
+  ],
+  "reservedPaths": [
+    "src/PiSharp.CodingAgent/SessionRuntimeRegistry.cs",
+    "src/PiSharp.Cli/Extensions/NativeExtensionActivation.cs",
+    "src/PiSharp.Cli/Program.cs",
+    "tests/PiSharp.Extensions.ContractTests/Program.cs",
+    "IExtensionRegistry/ExtensionRegistry/PluginAssemblyLoader"
+  ],
+  "runtimeBuilds": 0,
+  "runtimeTests": 0,
+  "nodeExecutions": 0,
+  "packagesAdded": 0,
+  "serversConnected": 0,
+  "credentialsReadOrWritten": false,
+  "mainMerge": false,
+  "publicPush": false,
+  "sourceParityGateAdvanced": false
+}

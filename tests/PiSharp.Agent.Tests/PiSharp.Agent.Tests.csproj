@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Agent/PiSharp.Agent.csproj" />
+    <Content Include="../../fixtures/pi-v0.99.1/agent/awaited-parallel.input.json" Link="Fixtures/awaited-parallel.input.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../fixtures/pi-v0.99.1/agent/awaited-parallel.expected.json" Link="Fixtures/awaited-parallel.expected.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../PiSharp.PiMessages.Tests/authored-cases-r2.json" Link="Fixtures/pi-messages-authored-cases-r2.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

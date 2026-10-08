@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORED_UNBUILT_UNEXECUTED_INDEPENDENT_REVIEW_PENDING",
+  "baseCandidate": "fe31f2d943aa3a87c010b016cb701a80324ec511",
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "workPackages": [
+    "P3-04",
+    "P6-06"
+  ],
+  "sourceContract": "packages/coding-agent/src/core/extensions/types.ts:367-394",
+  "sourceRunner": "packages/coding-agent/src/core/nested-tool-calls.ts",
+  "production": "Generation-bound native executeTool bridge through the existing prepared invocation and final-action policy pipeline",
+  "coreTestsAuthored": 15,
+  "nativeSdkTestsAuthored": 7,
+  "testsExecuted": 0,
+  "nativeBuilds": 0,
+  "sourceCaptures": 0,
+  "paidCalls": 0,
+  "credentialReads": 0,
+  "dependencyDownloads": 0,
+  "sourceParityQualified": false,
+  "fullWorkPackagesClosed": false,
+  "phaseGatesClosed": [],
+  "allEightPhaseGates": "OPEN",
+  "completionPercentage": null,
+  "hostScopeInstallation": "Shared CLI offline session profile opts into actual ReplaceableAgentSession generation/lifetime binding before publication; authored, unbuilt and unexecuted",
+  "remaining": [
+    "Independent static review and permitted identified native execution",
+    "Genuine unchanged-source nested call differential evidence",
+    "Complete callable descriptor and activation/exposure compatibility",
+    "Optional Node facade mapping and frontend parent-event wire handling",
+    "Full schemas/platforms and original package/phase criteria",
+    "Independent review and execution of host/usage successor and delivery correction"
+  ],
+  "reviewGuide": "docs/contracts/native-nested-tool-broker.md",
+  "correctionCommit": "0b452d88e666c542a309e3d61a48b2baeb5358d0",
+  "hostTestsAuthored": 3,
+  "nestedUsage": "All finalized descendant usage carried independently of bounded records and added once during root message projection; valid source Usage field semantics"
+}

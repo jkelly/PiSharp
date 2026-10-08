@@ -1,0 +1,47 @@
+[
+  {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\fixture-api-qualification-evidence-r298\\coding-full-799.tests.json",
+    "bytes": 9608744,
+    "sha256": "8a122255cadf5f964c1718294a96f63993c901185205c1d34944de3b60137efa"
+  },
+  {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\fixture-api-qualification-evidence-r298\\coding-full-799\\operation.stderr.log",
+    "bytes": 93615,
+    "sha256": "9d937d72f97457ee69146f947581f48e723ca0d5a0a121f84a29d09e5c155f0a"
+  },
+  {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\fixture-api-qualification-evidence-r298\\coding-full-799\\operation.stdout.json",
+    "bytes": 646493,
+    "sha256": "a6ea77263dbc1d31675cf2e9bbfb1e86cb43276c8c94254c47ca039c79728069"
+  },
+  {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\fixture-api-qualification-evidence-r298\\extensions-full-274.tests.json",
+    "bytes": 100658,
+    "sha256": "f68aa885a57f25c8d5022c696cc8e02c94c428b209bc5e54896172aef372f5e3"
+  },
+  {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\fixture-api-qualification-evidence-r298\\extensions-full-274\\operation.stderr.log",
+    "bytes": 2447,
+    "sha256": "036f69a2a612b80142000ed0847df1276ff78761f75c9362bc1ea477ba90ff14"
+  },
+  {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\fixture-api-qualification-evidence-r298\\extensions-full-274\\operation.stdout.json",
+    "bytes": 23742,
+    "sha256": "24297d232de3b9d25e151a62de4c46227d8060d329f52b63270819edd812a0aa"
+  },
+  {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\fixture-api-qualification-evidence-r298\\mcp-runtime-24.tests.json",
+    "bytes": 4946,
+    "sha256": "69019129a9ebe984174afba6469a0a95dc3ed265961439ae33ebb719c89c5c9a"
+  },
+  {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\fixture-api-qualification-evidence-r298\\mcp-runtime-24\\operation.stderr.log",
+    "bytes": 1515,
+    "sha256": "a50592baf53f3fdeea53109b8af8c153ac87cc52e68e29e5d90413f309275873"
+  },
+  {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\fixture-api-qualification-evidence-r298\\mcp-runtime-24\\operation.stdout.json",
+    "bytes": 1685,
+    "sha256": "418638eff1ee608950da849726f3c19bfcf2e8350f2ff6557719c3d64681fa06"
+  }
+]

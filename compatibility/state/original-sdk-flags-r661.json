@@ -1,0 +1,15 @@
+{
+  "profile": "owner-bound-native-flags-r661",
+  "baseCommit": "a9df14f95d530157de021da81bc9fd17f69e2fd0",
+  "originalCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "apis": ["registerFlag", "getFlag"],
+  "sourceOnly": true,
+  "runtimeQualificationExecuted": false,
+  "standaloneGroups": 6,
+  "admittedHostDependencyRequired": true,
+  "explicitPostActivationCommitRequired": true,
+  "metadataMarkerEffects": "none",
+  "cliParserWired": false,
+  "remainingLane2Apis": ["registerProvider", "unregisterProvider", "providerOAuth", "customStreamSimple", "modelCatalogAndSelection", "sendMessage", "sendUserMessage"],
+  "nextAction": "independent source review and root-owned finite standalone qualification; admitted application host integration remains explicit"
+}

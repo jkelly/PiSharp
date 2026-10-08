@@ -77,10 +77,16 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         ReadHeaders(_options.ModelHeaders, configured, ref supplied);
         ReadHeaders(_options.Headers, configured, ref supplied);
         var betaFeatures = projectionOptions.BetaFeatures;
-        foreach (var header in configured)
-            if (header.Key.Equals("anthropic-beta", StringComparison.OrdinalIgnoreCase))
-                betaFeatures = header.Value is null ? [] : header.Value.Split(',').Select(value => value.Trim()).Where(value => value.Length != 0)
-                    .Distinct(StringComparer.Ordinal).ToImmutableArray();
+        // Pi getBetaFeatures scans each source in precedence order. A case-sensitive
+        // merged dictionary retains old insertion slots when a request updates a key.
+        foreach (var source in new[] { _options.ModelHeaders, _options.Headers })
+        {
+            if (source is null) continue;
+            foreach (var header in source.Value.EnumerateObject())
+                if (header.Name.Equals("anthropic-beta", StringComparison.OrdinalIgnoreCase))
+                    betaFeatures = header.Value.ValueKind == JsonValueKind.Null ? [] : header.Value.GetString()!.Split(',')
+                        .Select(value => value.Trim()).Where(value => value.Length != 0).Distinct(StringComparer.Ordinal).ToImmutableArray();
+        }
         foreach (var header in configured) merged[header.Key] = header.Value;
         _headers = merged.ToImmutableArray();
         try
@@ -97,6 +103,9 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
     }
 
     public HttpRequestMessage Create(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
+        => CreateCore(request, explicitApiKey, cancellationToken, null);
+
+    public AnthropicMessagesPreparedRequest Prepare(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
@@ -104,23 +113,28 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         if (explicitApiKey.Length > _options.MaximumKeyCharacters) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         if (explicitApiKey.Any(value => value is < '!' or > '~')) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
         if (explicitApiKey.Contains("sk-ant-oat", StringComparison.Ordinal)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
-        var projected = _projector.Project(request, cancellationToken);
+        var projected = AnthropicMessagesPreparedRequest.Project(_projector.Project(request, cancellationToken), Raw, cancellationToken);
+        _ = PreparedHeaders(projected, explicitApiKey);
+        return new(projected, _options, (payload, token) => CreateCore(request, explicitApiKey, token, payload), cancellationToken);
+    }
+
+    private HttpRequestMessage CreateCore(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken, JsonData? prepared)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
+        if (string.IsNullOrEmpty(explicitApiKey)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
+        if (explicitApiKey.Length > _options.MaximumKeyCharacters) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
+        if (explicitApiKey.Any(value => value is < '!' or > '~')) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
+        if (explicitApiKey.Contains("sk-ant-oat", StringComparison.Ordinal)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
+        var projected = prepared ?? _projector.Project(request, cancellationToken);
         CheckDepth(projected.Value, 0, cancellationToken);
-        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["x-api-key"] = explicitApiKey };
-        foreach (var pair in _headers)
-            if (pair.Value is null) headers.Remove(pair.Key); else headers[pair.Key] = pair.Value.Trim(' ', '\t');
-        headers["content-type"] = "application/json"; // SDK's JSON encoder body headers override client defaults.
-        if (projected.Value.TryGetProperty("betas", out var betas))
-            headers["anthropic-beta"] = string.Join(',', betas.EnumerateArray().Select(value => value.GetString()));
-        if (!headers.TryGetValue("x-api-key", out var admittedKey) || admittedKey.Length == 0)
-            throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
-        CheckHeaders(headers);
+        var headers = PreparedHeaders(projected, explicitApiKey);
         // Count the exact compact raw representation before allocating UTF-8 or acquiring an HTTP request/content.
         long bytes = 2; var fields = 0;
         foreach (var property in projected.Value.EnumerateObject())
         {
             if (property.Name == "betas") continue;
-            var raw = Raw(property);
+            var raw = prepared is null ? Raw(property) : property.Value.GetRawText();
             bytes += Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(property.Name)) + 1L + Encoding.UTF8.GetByteCount(raw) + (fields++ == 0 ? 0 : 1);
             if (bytes > _options.MaximumPayloadBytes) throw Fail(AnthropicMessagesKeyAuthRequestFailure.ResourceLimit);
         }
@@ -133,7 +147,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (property.Name == "betas") continue;
-                writer.WritePropertyName(property.Name); writer.WriteRawValue(Raw(property));
+                writer.WritePropertyName(property.Name); writer.WriteRawValue(prepared is null ? Raw(property) : property.Value.GetRawText());
             }
             writer.WriteEndObject();
         }
@@ -152,6 +166,19 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         catch (AnthropicMessagesKeyAuthRequestException) { result?.Dispose(); content?.Dispose(); throw; }
         catch (OperationCanceledException) { result?.Dispose(); content?.Dispose(); throw; }
         catch (Exception) { result?.Dispose(); content?.Dispose(); throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidConfiguration); }
+    }
+    private Dictionary<string,string> PreparedHeaders(JsonData projected, string explicitApiKey)
+    {
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["x-api-key"] = explicitApiKey };
+        foreach (var pair in _headers)
+            if (pair.Value is null) headers.Remove(pair.Key); else headers[pair.Key] = pair.Value.Trim(' ', '\t');
+        headers["content-type"] = "application/json"; // SDK's JSON encoder body headers override client defaults.
+        if (projected.Value.TryGetProperty("betas", out var betas))
+            headers["anthropic-beta"] = string.Join(',', betas.EnumerateArray().Select(value => value.GetString()));
+        if (!headers.TryGetValue("x-api-key", out var admittedKey) || admittedKey.Length == 0)
+            throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
+        CheckHeaders(headers);
+        return headers;
     }
     private string Raw(JsonProperty property) => property.Name == "max_tokens" && _options.MaxTokens is { } count
         ? Number(count) : property.Value.GetRawText();

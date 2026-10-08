@@ -1,0 +1,2220 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "anthropic-sdk-direct-stream-three-requests",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "captured-unchanged-anthropic-wrapper-sdk-oracle",
+  "observations": {
+    "cases": [
+      {
+        "caseId": "defaults-model-max",
+        "numberConversions": [],
+        "payloadSnapshots": [
+          {
+            "params": {
+              "model": "pisharp-anthropic-authored-model",
+              "messages": [
+                {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Reply with pi: π\r\nsecond line",
+                      "cache_control": {
+                        "type": "ephemeral"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "max_tokens": 64,
+              "stream": true,
+              "system": [
+                {
+                  "type": "text",
+                  "text": "Keep opaque strings: 001 and π.",
+                  "cache_control": {
+                    "type": "ephemeral"
+                  }
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "fetchRequests": [
+          {
+            "url": "https://pisharp-anthropic-oracle.invalid/v1/messages?beta=true",
+            "method": "POST",
+            "headers": [
+              [
+                "accept",
+                "application/json"
+              ],
+              [
+                "anthropic-dangerous-direct-browser-access",
+                "true"
+              ],
+              [
+                "anthropic-version",
+                "2023-06-01"
+              ],
+              [
+                "content-type",
+                "application/json"
+              ],
+              [
+                "user-agent",
+                "pi (win32 10.0.26200; x64)"
+              ],
+              [
+                "x-api-key",
+                "pisharp-authored-inert-key-noncredential"
+              ],
+              [
+                "x-stainless-arch",
+                "x64"
+              ],
+              [
+                "x-stainless-lang",
+                "js"
+              ],
+              [
+                "x-stainless-os",
+                "Windows"
+              ],
+              [
+                "x-stainless-package-version",
+                "0.124.0"
+              ],
+              [
+                "x-stainless-retry-count",
+                "0"
+              ],
+              [
+                "x-stainless-runtime",
+                "node"
+              ],
+              [
+                "x-stainless-runtime-version",
+                "v24.19.0"
+              ],
+              [
+                "x-stainless-timeout",
+                "600"
+              ]
+            ],
+            "rawBody": "{\"model\":\"pisharp-anthropic-authored-model\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Reply with pi: π\\r\\nsecond line\",\"cache_control\":{\"type\":\"ephemeral\"}}]}],\"max_tokens\":64,\"stream\":true,\"system\":[{\"type\":\"text\",\"text\":\"Keep opaque strings: 001 and π.\",\"cache_control\":{\"type\":\"ephemeral\"}}]}",
+            "rawBodyUtf8Bytes": 316,
+            "rawBodyUtf8Sha256": "ffd2fc5932f2ffbf4361a8a76855d24de33acc4b73644acadff6b46fd36555ac",
+            "fetchInputType": "string",
+            "initOwnKeys": [
+              "signal",
+              "method",
+              "headers",
+              "body"
+            ],
+            "initHeadersKind": "Headers",
+            "signalAborted": false
+          }
+        ],
+        "responseHooks": [
+          {
+            "response": {
+              "status": 200,
+              "headers": {
+                "content-type": "text/event-stream; charset=utf-8",
+                "request-id": "req_authored_wire",
+                "x-fixture": "authored-response"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "providerEvents": [
+          {
+            "type": "message_start",
+            "message": {
+              "id": "msg_authored_wire",
+              "type": "message",
+              "role": "assistant",
+              "model": "pisharp-anthropic-authored-model",
+              "content": [],
+              "stop_reason": null,
+              "stop_sequence": null,
+              "usage": {
+                "input_tokens": 11,
+                "output_tokens": 0,
+                "cache_read_input_tokens": 2,
+                "cache_creation_input_tokens": 3
+              }
+            }
+          },
+          {
+            "type": "content_block_start",
+            "index": 4,
+            "content_block": {
+              "type": "text",
+              "text": ""
+            }
+          },
+          {
+            "type": "content_block_delta",
+            "index": 4,
+            "delta": {
+              "type": "text_delta",
+              "text": "Observed π"
+            }
+          },
+          {
+            "type": "content_block_delta",
+            "index": 4,
+            "delta": {
+              "type": "text_delta",
+              "text": " 😀\n"
+            }
+          },
+          {
+            "type": "content_block_stop",
+            "index": 4
+          },
+          {
+            "type": "message_delta",
+            "delta": {
+              "stop_reason": "end_turn",
+              "stop_sequence": null
+            },
+            "usage": {
+              "output_tokens": 2,
+              "input_tokens": null,
+              "cache_read_input_tokens": null,
+              "cache_creation_input_tokens": null
+            }
+          },
+          {
+            "type": "message_stop"
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Observed π",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": " 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Observed π 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 2,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 18,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire",
+              "rawStopReason": "end_turn"
+            }
+          }
+        ],
+        "emissionOwnUndefined": [
+          {
+            "emissionIndex": 0,
+            "paths": []
+          },
+          {
+            "emissionIndex": 1,
+            "paths": []
+          },
+          {
+            "emissionIndex": 2,
+            "paths": []
+          },
+          {
+            "emissionIndex": 3,
+            "paths": []
+          },
+          {
+            "emissionIndex": 4,
+            "paths": []
+          },
+          {
+            "emissionIndex": 5,
+            "paths": []
+          }
+        ],
+        "drainedFrames": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Observed π",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": " 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Observed π 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 2,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 18,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire",
+              "rawStopReason": "end_turn"
+            }
+          }
+        ],
+        "finalResult": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Observed π 😀\n"
+            }
+          ],
+          "api": "anthropic-messages",
+          "provider": "anthropic",
+          "model": "pisharp-anthropic-authored-model",
+          "usage": {
+            "input": 11,
+            "output": 2,
+            "cacheRead": 2,
+            "cacheWrite": 3,
+            "totalTokens": 18,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            },
+            "cacheWrite1h": 0
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000000,
+          "responseId": "msg_authored_wire",
+          "rawStopReason": "end_turn"
+        },
+        "finalOwnUndefined": [],
+        "trace": [
+          "onPayload",
+          "fetch",
+          "onResponse",
+          "emit:start",
+          "provider:message_start",
+          "provider:content_block_start",
+          "emit:text_start",
+          "provider:content_block_delta",
+          "emit:text_delta",
+          "provider:content_block_delta",
+          "emit:text_delta",
+          "provider:content_block_stop",
+          "emit:text_end",
+          "provider:message_delta",
+          "provider:message_stop",
+          "emit:done"
+        ]
+      },
+      {
+        "caseId": "zero-numeric-arguments",
+        "numberConversions": [
+          {
+            "field": "one",
+            "authoredLexeme": "1.0",
+            "mechanism": "Number(authoredLexeme) before unchanged public stream",
+            "numberToString": "1",
+            "jsonStringifyNumber": "1",
+            "negativeZero": false,
+            "finite": true
+          },
+          {
+            "field": "negativeZero",
+            "authoredLexeme": "-0",
+            "mechanism": "Number(authoredLexeme) before unchanged public stream",
+            "numberToString": "0",
+            "jsonStringifyNumber": "0",
+            "negativeZero": true,
+            "finite": true
+          },
+          {
+            "field": "fixedBoundary",
+            "authoredLexeme": "1e-6",
+            "mechanism": "Number(authoredLexeme) before unchanged public stream",
+            "numberToString": "0.000001",
+            "jsonStringifyNumber": "0.000001",
+            "negativeZero": false,
+            "finite": true
+          },
+          {
+            "field": "exponentBoundary",
+            "authoredLexeme": "1e-7",
+            "mechanism": "Number(authoredLexeme) before unchanged public stream",
+            "numberToString": "1e-7",
+            "jsonStringifyNumber": "1e-7",
+            "negativeZero": false,
+            "finite": true
+          },
+          {
+            "field": "largeFixed",
+            "authoredLexeme": "1e20",
+            "mechanism": "Number(authoredLexeme) before unchanged public stream",
+            "numberToString": "100000000000000000000",
+            "jsonStringifyNumber": "100000000000000000000",
+            "negativeZero": false,
+            "finite": true
+          },
+          {
+            "field": "largeExponent",
+            "authoredLexeme": "1e21",
+            "mechanism": "Number(authoredLexeme) before unchanged public stream",
+            "numberToString": "1e+21",
+            "jsonStringifyNumber": "1e+21",
+            "negativeZero": false,
+            "finite": true
+          },
+          {
+            "field": "roundedInteger",
+            "authoredLexeme": "9007199254740993",
+            "mechanism": "Number(authoredLexeme) before unchanged public stream",
+            "numberToString": "9007199254740992",
+            "jsonStringifyNumber": "9007199254740992",
+            "negativeZero": false,
+            "finite": true
+          },
+          {
+            "field": "roundedDecimal",
+            "authoredLexeme": "0.123456789012345678901",
+            "mechanism": "Number(authoredLexeme) before unchanged public stream",
+            "numberToString": "0.12345678901234568",
+            "jsonStringifyNumber": "0.12345678901234568",
+            "negativeZero": false,
+            "finite": true
+          }
+        ],
+        "payloadSnapshots": [
+          {
+            "params": {
+              "model": "pisharp-anthropic-authored-model",
+              "messages": [
+                {
+                  "role": "user",
+                  "content": "Observe number projection."
+                },
+                {
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "type": "tool_use",
+                      "id": "authored-numeric-call",
+                      "name": "echo_number",
+                      "input": {
+                        "opaque": "001",
+                        "retainedNull": null,
+                        "one": 1,
+                        "negativeZero": 0,
+                        "fixedBoundary": 0.000001,
+                        "exponentBoundary": 1e-7,
+                        "largeFixed": 100000000000000000000,
+                        "largeExponent": 1e+21,
+                        "roundedInteger": 9007199254740992,
+                        "roundedDecimal": 0.12345678901234568
+                      }
+                    }
+                  ]
+                },
+                {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "tool_result",
+                      "tool_use_id": "authored-numeric-call",
+                      "content": "Authored recorded tool result.",
+                      "is_error": false
+                    }
+                  ]
+                },
+                {
+                  "role": "user",
+                  "content": "Finish with text."
+                }
+              ],
+              "max_tokens": 0,
+              "stream": true,
+              "system": [
+                {
+                  "type": "text",
+                  "text": "Echo numbers without executing a tool."
+                }
+              ],
+              "temperature": 0,
+              "tools": [
+                {
+                  "name": "echo_number",
+                  "description": "Authored inert tool declaration only.",
+                  "eager_input_streaming": true,
+                  "input_schema": {
+                    "type": "object",
+                    "properties": {
+                      "one": {
+                        "type": "number"
+                      },
+                      "negativeZero": {
+                        "type": "number"
+                      },
+                      "fixedBoundary": {
+                        "type": "number"
+                      },
+                      "exponentBoundary": {
+                        "type": "number"
+                      },
+                      "largeFixed": {
+                        "type": "number"
+                      },
+                      "largeExponent": {
+                        "type": "number"
+                      },
+                      "roundedInteger": {
+                        "type": "number"
+                      },
+                      "roundedDecimal": {
+                        "type": "number"
+                      },
+                      "opaque": {
+                        "type": "string"
+                      },
+                      "retainedNull": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": []
+                  }
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "fetchRequests": [
+          {
+            "url": "https://pisharp-anthropic-oracle.invalid/v1/messages?beta=true",
+            "method": "POST",
+            "headers": [
+              [
+                "accept",
+                "application/json"
+              ],
+              [
+                "anthropic-dangerous-direct-browser-access",
+                "true"
+              ],
+              [
+                "anthropic-version",
+                "2023-06-01"
+              ],
+              [
+                "content-type",
+                "application/json"
+              ],
+              [
+                "user-agent",
+                "pi (win32 10.0.26200; x64)"
+              ],
+              [
+                "x-api-key",
+                "pisharp-authored-inert-key-noncredential"
+              ],
+              [
+                "x-stainless-arch",
+                "x64"
+              ],
+              [
+                "x-stainless-lang",
+                "js"
+              ],
+              [
+                "x-stainless-os",
+                "Windows"
+              ],
+              [
+                "x-stainless-package-version",
+                "0.124.0"
+              ],
+              [
+                "x-stainless-retry-count",
+                "0"
+              ],
+              [
+                "x-stainless-runtime",
+                "node"
+              ],
+              [
+                "x-stainless-runtime-version",
+                "v24.19.0"
+              ],
+              [
+                "x-stainless-timeout",
+                "5"
+              ]
+            ],
+            "rawBody": "{\"model\":\"pisharp-anthropic-authored-model\",\"messages\":[{\"role\":\"user\",\"content\":\"Observe number projection.\"},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"authored-numeric-call\",\"name\":\"echo_number\",\"input\":{\"opaque\":\"001\",\"retainedNull\":null,\"one\":1,\"negativeZero\":0,\"fixedBoundary\":0.000001,\"exponentBoundary\":1e-7,\"largeFixed\":100000000000000000000,\"largeExponent\":1e+21,\"roundedInteger\":9007199254740992,\"roundedDecimal\":0.12345678901234568}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"authored-numeric-call\",\"content\":\"Authored recorded tool result.\",\"is_error\":false}]},{\"role\":\"user\",\"content\":\"Finish with text.\"}],\"max_tokens\":0,\"stream\":true,\"system\":[{\"type\":\"text\",\"text\":\"Echo numbers without executing a tool.\"}],\"temperature\":0,\"tools\":[{\"name\":\"echo_number\",\"description\":\"Authored inert tool declaration only.\",\"eager_input_streaming\":true,\"input_schema\":{\"type\":\"object\",\"properties\":{\"one\":{\"type\":\"number\"},\"negativeZero\":{\"type\":\"number\"},\"fixedBoundary\":{\"type\":\"number\"},\"exponentBoundary\":{\"type\":\"number\"},\"largeFixed\":{\"type\":\"number\"},\"largeExponent\":{\"type\":\"number\"},\"roundedInteger\":{\"type\":\"number\"},\"roundedDecimal\":{\"type\":\"number\"},\"opaque\":{\"type\":\"string\"},\"retainedNull\":{\"type\":[\"string\",\"null\"]}},\"required\":[]}}]}",
+            "rawBodyUtf8Bytes": 1287,
+            "rawBodyUtf8Sha256": "321aafaaedb0d65a1f40e349e539fa4e32de351d5fdb1b8a2576719b79b3bfed",
+            "fetchInputType": "string",
+            "initOwnKeys": [
+              "signal",
+              "method",
+              "headers",
+              "body"
+            ],
+            "initHeadersKind": "Headers",
+            "signalAborted": false
+          }
+        ],
+        "responseHooks": [
+          {
+            "response": {
+              "status": 200,
+              "headers": {
+                "content-type": "text/event-stream; charset=utf-8",
+                "request-id": "req_authored_wire",
+                "x-fixture": "authored-response"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "providerEvents": [
+          {
+            "type": "message_start",
+            "message": {
+              "id": "msg_authored_wire",
+              "type": "message",
+              "role": "assistant",
+              "model": "pisharp-anthropic-authored-model",
+              "content": [],
+              "stop_reason": null,
+              "stop_sequence": null,
+              "usage": {
+                "input_tokens": 11,
+                "output_tokens": 0,
+                "cache_read_input_tokens": 2,
+                "cache_creation_input_tokens": 3
+              }
+            }
+          },
+          {
+            "type": "content_block_start",
+            "index": 4,
+            "content_block": {
+              "type": "text",
+              "text": ""
+            }
+          },
+          {
+            "type": "content_block_delta",
+            "index": 4,
+            "delta": {
+              "type": "text_delta",
+              "text": "Observed π"
+            }
+          },
+          {
+            "type": "content_block_delta",
+            "index": 4,
+            "delta": {
+              "type": "text_delta",
+              "text": " 😀\n"
+            }
+          },
+          {
+            "type": "content_block_stop",
+            "index": 4
+          },
+          {
+            "type": "message_delta",
+            "delta": {
+              "stop_reason": "end_turn",
+              "stop_sequence": null
+            },
+            "usage": {
+              "output_tokens": 2,
+              "input_tokens": null,
+              "cache_read_input_tokens": null,
+              "cache_creation_input_tokens": null
+            }
+          },
+          {
+            "type": "message_stop"
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Observed π",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": " 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Observed π 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 2,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 18,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire",
+              "rawStopReason": "end_turn"
+            }
+          }
+        ],
+        "emissionOwnUndefined": [
+          {
+            "emissionIndex": 0,
+            "paths": []
+          },
+          {
+            "emissionIndex": 1,
+            "paths": []
+          },
+          {
+            "emissionIndex": 2,
+            "paths": []
+          },
+          {
+            "emissionIndex": 3,
+            "paths": []
+          },
+          {
+            "emissionIndex": 4,
+            "paths": []
+          },
+          {
+            "emissionIndex": 5,
+            "paths": []
+          }
+        ],
+        "drainedFrames": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Observed π",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": " 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Observed π 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 2,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 18,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire",
+              "rawStopReason": "end_turn"
+            }
+          }
+        ],
+        "finalResult": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Observed π 😀\n"
+            }
+          ],
+          "api": "anthropic-messages",
+          "provider": "anthropic",
+          "model": "pisharp-anthropic-authored-model",
+          "usage": {
+            "input": 11,
+            "output": 2,
+            "cacheRead": 2,
+            "cacheWrite": 3,
+            "totalTokens": 18,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            },
+            "cacheWrite1h": 0
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000000,
+          "responseId": "msg_authored_wire",
+          "rawStopReason": "end_turn"
+        },
+        "finalOwnUndefined": [],
+        "trace": [
+          "onPayload",
+          "fetch",
+          "onResponse",
+          "emit:start",
+          "provider:message_start",
+          "provider:content_block_start",
+          "emit:text_start",
+          "provider:content_block_delta",
+          "emit:text_delta",
+          "provider:content_block_delta",
+          "emit:text_delta",
+          "provider:content_block_stop",
+          "emit:text_end",
+          "provider:message_delta",
+          "provider:message_stop",
+          "emit:done"
+        ]
+      },
+      {
+        "caseId": "negative-headers-long-cache-session",
+        "numberConversions": [],
+        "payloadSnapshots": [
+          {
+            "params": {
+              "model": "pisharp-anthropic-authored-model",
+              "messages": [
+                {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Reply with pi: π\r\nsecond line",
+                      "cache_control": {
+                        "type": "ephemeral",
+                        "ttl": "1h"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "max_tokens": -1,
+              "stream": true,
+              "betas": [
+                "alpha",
+                "beta"
+              ],
+              "system": [
+                {
+                  "type": "text",
+                  "text": "Keep opaque strings: 001 and π.",
+                  "cache_control": {
+                    "type": "ephemeral",
+                    "ttl": "1h"
+                  }
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "fetchRequests": [
+          {
+            "url": "https://pisharp-anthropic-oracle.invalid/v1/messages?beta=true",
+            "method": "POST",
+            "headers": [
+              [
+                "accept",
+                "application/json"
+              ],
+              [
+                "anthropic-beta",
+                "alpha,beta"
+              ],
+              [
+                "anthropic-dangerous-direct-browser-access",
+                "true"
+              ],
+              [
+                "anthropic-version",
+                "2023-06-01"
+              ],
+              [
+                "content-type",
+                "application/json"
+              ],
+              [
+                "user-agent",
+                "pi (win32 10.0.26200; x64)"
+              ],
+              [
+                "x-api-key",
+                "pisharp-authored-inert-key-noncredential"
+              ],
+              [
+                "x-model",
+                "option-owned"
+              ],
+              [
+                "x-session-affinity",
+                "authored-anthropic-session"
+              ],
+              [
+                "x-stainless-arch",
+                "x64"
+              ],
+              [
+                "x-stainless-lang",
+                "js"
+              ],
+              [
+                "x-stainless-os",
+                "Windows"
+              ],
+              [
+                "x-stainless-package-version",
+                "0.124.0"
+              ],
+              [
+                "x-stainless-retry-count",
+                "0"
+              ],
+              [
+                "x-stainless-runtime",
+                "node"
+              ],
+              [
+                "x-stainless-runtime-version",
+                "v24.19.0"
+              ],
+              [
+                "x-stainless-timeout",
+                "5"
+              ]
+            ],
+            "rawBody": "{\"model\":\"pisharp-anthropic-authored-model\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Reply with pi: π\\r\\nsecond line\",\"cache_control\":{\"type\":\"ephemeral\",\"ttl\":\"1h\"}}]}],\"max_tokens\":-1,\"stream\":true,\"system\":[{\"type\":\"text\",\"text\":\"Keep opaque strings: 001 and π.\",\"cache_control\":{\"type\":\"ephemeral\",\"ttl\":\"1h\"}}]}",
+            "rawBodyUtf8Bytes": 338,
+            "rawBodyUtf8Sha256": "20da9fb451fbce03370bd66405919f848afb7d848c441e3e269820e44a3e9dee",
+            "fetchInputType": "string",
+            "initOwnKeys": [
+              "signal",
+              "method",
+              "headers",
+              "body"
+            ],
+            "initHeadersKind": "Headers",
+            "signalAborted": false
+          }
+        ],
+        "responseHooks": [
+          {
+            "response": {
+              "status": 200,
+              "headers": {
+                "content-type": "text/event-stream; charset=utf-8",
+                "request-id": "req_authored_wire",
+                "x-fixture": "authored-response"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "providerEvents": [
+          {
+            "type": "message_start",
+            "message": {
+              "id": "msg_authored_wire",
+              "type": "message",
+              "role": "assistant",
+              "model": "pisharp-anthropic-authored-model",
+              "content": [],
+              "stop_reason": null,
+              "stop_sequence": null,
+              "usage": {
+                "input_tokens": 11,
+                "output_tokens": 0,
+                "cache_read_input_tokens": 2,
+                "cache_creation_input_tokens": 3
+              }
+            }
+          },
+          {
+            "type": "content_block_start",
+            "index": 4,
+            "content_block": {
+              "type": "text",
+              "text": ""
+            }
+          },
+          {
+            "type": "content_block_delta",
+            "index": 4,
+            "delta": {
+              "type": "text_delta",
+              "text": "Observed π"
+            }
+          },
+          {
+            "type": "content_block_delta",
+            "index": 4,
+            "delta": {
+              "type": "text_delta",
+              "text": " 😀\n"
+            }
+          },
+          {
+            "type": "content_block_stop",
+            "index": 4
+          },
+          {
+            "type": "message_delta",
+            "delta": {
+              "stop_reason": "end_turn",
+              "stop_sequence": null
+            },
+            "usage": {
+              "output_tokens": 2,
+              "input_tokens": null,
+              "cache_read_input_tokens": null,
+              "cache_creation_input_tokens": null
+            }
+          },
+          {
+            "type": "message_stop"
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Observed π",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": " 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Observed π 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 2,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 18,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire",
+              "rawStopReason": "end_turn"
+            }
+          }
+        ],
+        "emissionOwnUndefined": [
+          {
+            "emissionIndex": 0,
+            "paths": []
+          },
+          {
+            "emissionIndex": 1,
+            "paths": []
+          },
+          {
+            "emissionIndex": 2,
+            "paths": []
+          },
+          {
+            "emissionIndex": 3,
+            "paths": []
+          },
+          {
+            "emissionIndex": 4,
+            "paths": []
+          },
+          {
+            "emissionIndex": 5,
+            "paths": []
+          }
+        ],
+        "drainedFrames": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Observed π",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": " 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n",
+                  "index": 4
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Observed π 😀\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 0,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 16,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Observed π 😀\n"
+                }
+              ],
+              "api": "anthropic-messages",
+              "provider": "anthropic",
+              "model": "pisharp-anthropic-authored-model",
+              "usage": {
+                "input": 11,
+                "output": 2,
+                "cacheRead": 2,
+                "cacheWrite": 3,
+                "totalTokens": 18,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                },
+                "cacheWrite1h": 0
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "msg_authored_wire",
+              "rawStopReason": "end_turn"
+            }
+          }
+        ],
+        "finalResult": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Observed π 😀\n"
+            }
+          ],
+          "api": "anthropic-messages",
+          "provider": "anthropic",
+          "model": "pisharp-anthropic-authored-model",
+          "usage": {
+            "input": 11,
+            "output": 2,
+            "cacheRead": 2,
+            "cacheWrite": 3,
+            "totalTokens": 18,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            },
+            "cacheWrite1h": 0
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000000,
+          "responseId": "msg_authored_wire",
+          "rawStopReason": "end_turn"
+        },
+        "finalOwnUndefined": [],
+        "trace": [
+          "onPayload",
+          "fetch",
+          "onResponse",
+          "emit:start",
+          "provider:message_start",
+          "provider:content_block_start",
+          "emit:text_start",
+          "provider:content_block_delta",
+          "emit:text_delta",
+          "provider:content_block_delta",
+          "emit:text_delta",
+          "provider:content_block_stop",
+          "emit:text_end",
+          "provider:message_delta",
+          "provider:message_stop",
+          "emit:done"
+        ]
+      }
+    ],
+    "responseWire": {
+      "utf8Sha256": "877e03e04b486d0e7dbec1dd5d1adb1c78d281f2a7540c22e7a1eabadcb5198e",
+      "bytes": 1083,
+      "chunkBytes": 7
+    },
+    "checks": {
+      "caseCount": 3,
+      "fakeFetchCalls": 3,
+      "sourceSeam": "Unchanged exported stream; real SDK beta.messages.create/asResponse; unchanged Pi SSE parser; supported fake fetch/callbacks",
+      "sdkStreamingDecoderQualified": false,
+      "noSourceTransformOrSdkShim": true,
+      "childDateNowOverride": {
+        "unixMilliseconds": 1700000000000,
+        "mechanism": "Capture child explicitly replaces Date.now for output timestamps; source/SDK unchanged; actual OS/runtime/headers and crypto are not replaced."
+      },
+      "actualHeadersRetained": true,
+      "networkAndProcessesBlocked": true
+    }
+  }
+}

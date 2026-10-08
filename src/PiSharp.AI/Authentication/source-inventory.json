@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "sourceTag": "v0.99.1",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceRoot": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1\\upstream",
+  "files": [
+    {
+      "path": "packages/ai/src/env-api-keys.ts",
+      "bytes": 7616,
+      "sha256": "b511a61d0353ced580019476ed506f4f078284cd16407acda8558a587819d057"
+    },
+    {
+      "path": "packages/ai/src/providers/anthropic.ts",
+      "bytes": 1934,
+      "sha256": "dda69449a53c84b8b0a17b28f80fba278988d85665557be2db0dc3b20557567a"
+    },
+    {
+      "path": "packages/ai/src/utils/provider-env.ts",
+      "bytes": 1718,
+      "sha256": "3829251ae0674cef7ca09800cee9f46d4e305770129b72b822ea2f6f85efe675"
+    },
+    {
+      "path": "packages/ai/src/auth/types.ts",
+      "bytes": 8661,
+      "sha256": "8fb9acd4c998502826b22df2d88bcded441cc473a606c5b7bdf21271afd1a74a"
+    }
+  ],
+  "baseCommit": "25eb103ff17c2f2ecf61b25fab48ce983bf1bb40",
+  "sourceExecuted": false,
+  "nativeBuildRun": false,
+  "testsRun": false,
+  "authoredTestCases": 20,
+  "sourceMappingPairs": 39,
+  "ambientAcquisition": "Unsupported, no ADC/AWS probes or authenticated markers synthesized",
+  "storage": "Injected api_key lookup only; no persistent credentials or stored OAuth",
+  "providerFactoriesChanged": false
+}

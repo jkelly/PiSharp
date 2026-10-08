@@ -1,0 +1,2181 @@
+{
+  "createdUtc": "2026-10-03T08:29:10.507Z",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "boundary": "Unchanged public TuiAltScreen.start/setFocus/input callback/renderNow/stop and Editor state/render; public terminal interface resize; no private Source state/method/input replacement",
+  "manifest": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\source-manifest.json",
+    "bytes": 969151,
+    "sha256": "772c23326a8a341cc40235a95366639ea28cca1823089969cee1c5deb58b4048"
+  },
+  "inputs": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-indic-conjunct-preparation\\indic-source-inputs.json",
+    "bytes": 6976,
+    "sha256": "3ef564e277f38a1cab6b2ea547d9bd99a0d667d1cd569c3802181641ae698688"
+  },
+  "driver": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-indic-conjunct-preparation\\capture-indic-source.mjs",
+    "bytes": 5151,
+    "sha256": "62ce26b259f8f32710ebe970cc41b5ce8a03505d0c9547c5fa8f6543dc540f5e"
+  },
+  "node": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "bytes": 92825416,
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "loadedFiles": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\editor.ts",
+      "bytes": 84348,
+      "sha256": "30a47fd49042579be7b85262677df62d4ff37a8f9a3a0e6c41ce3cf1d402b9c3"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keybindings.ts",
+      "bytes": 10125,
+      "sha256": "eea5e3fe258ad50337595bb5320955a6d97bac0c8f6c0a838f988d75079bcf38"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\kill-ring.ts",
+      "bytes": 1295,
+      "sha256": "d829ae816560b12d2800a38db9f7278f76d9ef43d0e53e004a86add9b56c559a"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\tui.ts",
+      "bytes": 49604,
+      "sha256": "92dcb7f5f9a3a9575421d8de366be5cc78890be8df38d86c4ed3c0d77c7f88a4"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\terminal-colors.ts",
+      "bytes": 3082,
+      "sha256": "72d1ef298837bfe520bd8a060cb93ea27547dcbff04a167ace0f55b5183e550d"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\terminal-image.ts",
+      "bytes": 23218,
+      "sha256": "b901b8df0ad84e04ac0ee612c419b45d960430f63d2bdaa974c8dd9d89f3e6e5"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\utils.ts",
+      "bytes": 38919,
+      "sha256": "5ecbc6c9b4850e78bf19de1fe8859b99b9c4c5f8a6384728d255a8e7e8a610ee"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\index.js",
+      "bytes": 730,
+      "sha256": "d7b1ba05914c0fc311c20e5618bf8d0893c9c74078a07975e2df981445e64887"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\lookup.js",
+      "bytes": 2671,
+      "sha256": "c80ecc22b120b27ef5ea9facb7000b8fd4ec037a84d9231d215f1c44bc9c21d0"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\lookup-data.js",
+      "bytes": 4734,
+      "sha256": "f6b40f86c9a2a6808ec808fa8ddcb8da261254cc6121d37ffaeb2bf35dad1d5b"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\utilities.js",
+      "bytes": 650,
+      "sha256": "4b08a7e9e3ffacbcf198a6abceb2338d52ac671899e52ccc2851c898bfccac42"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\undo-stack.ts",
+      "bytes": 643,
+      "sha256": "1373c1e0a1e2c58ac90c93d32a9e5c1226d7f53314c77dd3d0f8ec349d2b3627"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\word-navigation.ts",
+      "bytes": 3987,
+      "sha256": "b73e915a524926ac8881731e89026b0bc7b5b0bd465de67257af81a420465c7f"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\select-list.ts",
+      "bytes": 9385,
+      "sha256": "0fc369801e745eff15567d72829bf67887f5efec8bc6816aaf1ee65338618373"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\tui-alt-screen.ts",
+      "bytes": 63272,
+      "sha256": "04f22573b153bb26eaa0d02b53d0bc2b812cec0c506873f6d031a8f2263a2142"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\alt-screen-search.ts",
+      "bytes": 11087,
+      "sha256": "7d339e83cf0f160847335dc9be0d1f1db2a0945c463c3d636c7b84ceb9665d40"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\input.ts",
+      "bytes": 15230,
+      "sha256": "416ceeb28f10b7146f6a284f276589797763b604d439574fbdc2a3ca52c00234"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\alt-screen-flash.ts",
+      "bytes": 1289,
+      "sha256": "6d341546b59958e93e4d33fdc1766b10d13c98a779031e2c01b827f0a4c6e30c"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\scroll-view.ts",
+      "bytes": 8168,
+      "sha256": "76dfd9f8a88cabc064f0652b83f16a945fbc988c9fe7c0423a4cd796907ef77d"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\layout-node.ts",
+      "bytes": 1364,
+      "sha256": "31dd68c9edafdc4f882bbb6c16f8deb1c514111020b647f0037b34d6b8c70a85"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\layout.ts",
+      "bytes": 15758,
+      "sha256": "7530a8eaa30f44fef82e8b7020b5068ba89d34884463c6cb526073b20fcdeef0"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\stack.ts",
+      "bytes": 5216,
+      "sha256": "93208d326fa43431b930eaa3250a1e19747063d696e97ec2f002f5feaa54fc18"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\wheel-scroll.ts",
+      "bytes": 2897,
+      "sha256": "a969a50d0a3627fde0052f766443e3668a6355b3ecf312ea078025080d303f82"
+    }
+  ],
+  "effects": [],
+  "cases": [
+    {
+      "id": "devanagari-conjunct-editing",
+      "cluster": "क्ष",
+      "clusterSegments": [
+        {
+          "index": 0,
+          "segment": "क्ष"
+        }
+      ],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~Aक्षZ\u001b[201~"
+          },
+          "columns": 20,
+          "text": "Aक्षZ",
+          "expandedText": "Aक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aक्षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aक्षZ",
+          "expandedText": "Aक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aक्ष\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aक्षZ",
+          "expandedText": "Aक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mक्ष\u001b[0mZ                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aक्षZ",
+          "expandedText": "Aक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aक्ष\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": ""
+          },
+          "columns": 20,
+          "text": "AZ",
+          "expandedText": "AZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                  ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्षZ",
+            "AZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "Aक्षZ",
+          "expandedText": "Aक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aक्ष\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्षZ",
+            "AZ",
+            "Aक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[H"
+          },
+          "columns": 20,
+          "text": "Aक्षZ",
+          "expandedText": "Aक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aक्ष\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्षZ",
+            "AZ",
+            "Aक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aक्षZ",
+          "expandedText": "Aक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aक्षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्षZ",
+            "AZ",
+            "Aक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[3~"
+          },
+          "columns": 20,
+          "text": "Aक्षZ",
+          "expandedText": "Aक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aक्षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्षZ",
+            "AZ",
+            "Aक्षZ",
+            "Aक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "",
+          "expandedText": "",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "cursorUtf16Offset": 0,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्षZ",
+            "AZ",
+            "Aक्षZ",
+            "Aक्षZ",
+            ""
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "bengali-conjunct-editing",
+      "cluster": "ক্ষ",
+      "clusterSegments": [
+        {
+          "index": 0,
+          "segment": "ক্ষ"
+        }
+      ],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~Aক্ষZ\u001b[201~"
+          },
+          "columns": 20,
+          "text": "Aক্ষZ",
+          "expandedText": "Aক্ষZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aক্ষZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aক্ষZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aক্ষZ",
+          "expandedText": "Aক্ষZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aক্ষ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aক্ষZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aক্ষZ",
+          "expandedText": "Aক্ষZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mক্ষ\u001b[0mZ                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aক্ষZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aক্ষZ",
+          "expandedText": "Aক্ষZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aক্ষ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aক্ষZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": ""
+          },
+          "columns": 20,
+          "text": "AZ",
+          "expandedText": "AZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                  ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aক্ষZ",
+            "AZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "Aক্ষZ",
+          "expandedText": "Aক্ষZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aক্ষ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aক্ষZ",
+            "AZ",
+            "Aক্ষZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[H"
+          },
+          "columns": 20,
+          "text": "Aক্ষZ",
+          "expandedText": "Aক্ষZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aক্ষ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aক্ষZ",
+            "AZ",
+            "Aক্ষZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aক্ষZ",
+          "expandedText": "Aক্ষZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aক্ষZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aক্ষZ",
+            "AZ",
+            "Aক্ষZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[3~"
+          },
+          "columns": 20,
+          "text": "Aক্ষZ",
+          "expandedText": "Aক্ষZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aক্ষZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aক্ষZ",
+            "AZ",
+            "Aক্ষZ",
+            "Aক্ষZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "",
+          "expandedText": "",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "cursorUtf16Offset": 0,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aক্ষZ",
+            "AZ",
+            "Aক্ষZ",
+            "Aক্ষZ",
+            ""
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "gujarati-conjunct-editing",
+      "cluster": "ક્ષ",
+      "clusterSegments": [
+        {
+          "index": 0,
+          "segment": "ક્ષ"
+        }
+      ],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~Aક્ષZ\u001b[201~"
+          },
+          "columns": 20,
+          "text": "Aક્ષZ",
+          "expandedText": "Aક્ષZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aક્ષZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aક્ષZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aક્ષZ",
+          "expandedText": "Aક્ષZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aક્ષ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aક્ષZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aક્ષZ",
+          "expandedText": "Aક્ષZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mક્ષ\u001b[0mZ                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aક્ષZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aક્ષZ",
+          "expandedText": "Aક્ષZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aક્ષ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aક્ષZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": ""
+          },
+          "columns": 20,
+          "text": "AZ",
+          "expandedText": "AZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                  ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aક્ષZ",
+            "AZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "Aક્ષZ",
+          "expandedText": "Aક્ષZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aક્ષ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aક્ષZ",
+            "AZ",
+            "Aક્ષZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[H"
+          },
+          "columns": 20,
+          "text": "Aક્ષZ",
+          "expandedText": "Aક્ષZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aક્ષ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aક્ષZ",
+            "AZ",
+            "Aક્ષZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aક્ષZ",
+          "expandedText": "Aક્ષZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aક્ષZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aક્ષZ",
+            "AZ",
+            "Aક્ષZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[3~"
+          },
+          "columns": 20,
+          "text": "Aક્ષZ",
+          "expandedText": "Aક્ષZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aક્ષZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aક્ષZ",
+            "AZ",
+            "Aક્ષZ",
+            "Aક્ષZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "",
+          "expandedText": "",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "cursorUtf16Offset": 0,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aક્ષZ",
+            "AZ",
+            "Aક્ષZ",
+            "Aક્ષZ",
+            ""
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "oriya-conjunct-editing",
+      "cluster": "କ୍ଷ",
+      "clusterSegments": [
+        {
+          "index": 0,
+          "segment": "କ୍ଷ"
+        }
+      ],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~Aକ୍ଷZ\u001b[201~"
+          },
+          "columns": 20,
+          "text": "Aକ୍ଷZ",
+          "expandedText": "Aକ୍ଷZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aକ୍ଷZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aକ୍ଷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aକ୍ଷZ",
+          "expandedText": "Aକ୍ଷZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aକ୍ଷ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aକ୍ଷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aକ୍ଷZ",
+          "expandedText": "Aକ୍ଷZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mକ୍ଷ\u001b[0mZ                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aକ୍ଷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aକ୍ଷZ",
+          "expandedText": "Aକ୍ଷZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aକ୍ଷ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aକ୍ଷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": ""
+          },
+          "columns": 20,
+          "text": "AZ",
+          "expandedText": "AZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                  ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aକ୍ଷZ",
+            "AZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "Aକ୍ଷZ",
+          "expandedText": "Aକ୍ଷZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aକ୍ଷ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aକ୍ଷZ",
+            "AZ",
+            "Aକ୍ଷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[H"
+          },
+          "columns": 20,
+          "text": "Aକ୍ଷZ",
+          "expandedText": "Aକ୍ଷZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aକ୍ଷ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aକ୍ଷZ",
+            "AZ",
+            "Aକ୍ଷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aକ୍ଷZ",
+          "expandedText": "Aକ୍ଷZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aକ୍ଷZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aକ୍ଷZ",
+            "AZ",
+            "Aକ୍ଷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[3~"
+          },
+          "columns": 20,
+          "text": "Aକ୍ଷZ",
+          "expandedText": "Aକ୍ଷZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aକ୍ଷZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aକ୍ଷZ",
+            "AZ",
+            "Aକ୍ଷZ",
+            "Aକ୍ଷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "",
+          "expandedText": "",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "cursorUtf16Offset": 0,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aକ୍ଷZ",
+            "AZ",
+            "Aକ୍ଷZ",
+            "Aକ୍ଷZ",
+            ""
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "telugu-conjunct-editing",
+      "cluster": "క్ష",
+      "clusterSegments": [
+        {
+          "index": 0,
+          "segment": "క్ష"
+        }
+      ],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~Aక్షZ\u001b[201~"
+          },
+          "columns": 20,
+          "text": "Aక్షZ",
+          "expandedText": "Aక్షZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aక్షZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aక్షZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aక్షZ",
+          "expandedText": "Aక్షZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aక్ష\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aక్షZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aక్షZ",
+          "expandedText": "Aక్షZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mక్ష\u001b[0mZ                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aక్షZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aక్షZ",
+          "expandedText": "Aక్షZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aక్ష\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aక్షZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": ""
+          },
+          "columns": 20,
+          "text": "AZ",
+          "expandedText": "AZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                  ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aక్షZ",
+            "AZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "Aక్షZ",
+          "expandedText": "Aక్షZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aక్ష\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aక్షZ",
+            "AZ",
+            "Aక్షZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[H"
+          },
+          "columns": 20,
+          "text": "Aక్షZ",
+          "expandedText": "Aక్షZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aక్ష\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aక్షZ",
+            "AZ",
+            "Aక్షZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aక్షZ",
+          "expandedText": "Aక్షZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aక్షZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aక్షZ",
+            "AZ",
+            "Aక్షZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[3~"
+          },
+          "columns": 20,
+          "text": "Aక్షZ",
+          "expandedText": "Aక్షZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aక్షZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aక్షZ",
+            "AZ",
+            "Aక్షZ",
+            "Aక్షZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "",
+          "expandedText": "",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "cursorUtf16Offset": 0,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aక్షZ",
+            "AZ",
+            "Aక్షZ",
+            "Aక్షZ",
+            ""
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "malayalam-conjunct-editing",
+      "cluster": "ക്ഷ",
+      "clusterSegments": [
+        {
+          "index": 0,
+          "segment": "ക്ഷ"
+        }
+      ],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~Aക്ഷZ\u001b[201~"
+          },
+          "columns": 20,
+          "text": "Aക്ഷZ",
+          "expandedText": "Aക്ഷZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aക്ഷZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aക്ഷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aക്ഷZ",
+          "expandedText": "Aക്ഷZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aക്ഷ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aക്ഷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aക്ഷZ",
+          "expandedText": "Aക്ഷZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mക്ഷ\u001b[0mZ                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aക്ഷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aക്ഷZ",
+          "expandedText": "Aക്ഷZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aക്ഷ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aക്ഷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": ""
+          },
+          "columns": 20,
+          "text": "AZ",
+          "expandedText": "AZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                  ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aക്ഷZ",
+            "AZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "Aക്ഷZ",
+          "expandedText": "Aക്ഷZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aക്ഷ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aക്ഷZ",
+            "AZ",
+            "Aക്ഷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[H"
+          },
+          "columns": 20,
+          "text": "Aക്ഷZ",
+          "expandedText": "Aക്ഷZ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aക്ഷ\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aക്ഷZ",
+            "AZ",
+            "Aക്ഷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aക്ഷZ",
+          "expandedText": "Aക്ഷZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aക്ഷZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aക്ഷZ",
+            "AZ",
+            "Aക്ഷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[3~"
+          },
+          "columns": 20,
+          "text": "Aക്ഷZ",
+          "expandedText": "Aക്ഷZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aക്ഷZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aക്ഷZ",
+            "AZ",
+            "Aക്ഷZ",
+            "Aക്ഷZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "",
+          "expandedText": "",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "cursorUtf16Offset": 0,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aക്ഷZ",
+            "AZ",
+            "Aക്ഷZ",
+            "Aക്ഷZ",
+            ""
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "devanagari-zwj-conjunct",
+      "cluster": "क्‍ष",
+      "clusterSegments": [
+        {
+          "index": 0,
+          "segment": "क्‍ष"
+        }
+      ],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~Aक्‍षZ\u001b[201~"
+          },
+          "columns": 20,
+          "text": "Aक्‍षZ",
+          "expandedText": "Aक्‍षZ",
+          "cursor": {
+            "line": 0,
+            "col": 6
+          },
+          "cursorUtf16Offset": 6,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aक्‍षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्‍षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aक्‍षZ",
+          "expandedText": "Aक्‍षZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aक्‍ष\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्‍षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[D"
+          },
+          "columns": 20,
+          "text": "Aक्‍षZ",
+          "expandedText": "Aक्‍षZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mक्‍ष\u001b[0mZ                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्‍षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 20,
+          "text": "Aक्‍षZ",
+          "expandedText": "Aक्‍षZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aक्‍ष\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्‍षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": ""
+          },
+          "columns": 20,
+          "text": "AZ",
+          "expandedText": "AZ",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                  ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्‍षZ",
+            "AZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "Aक्‍षZ",
+          "expandedText": "Aक्‍षZ",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Aक्‍ष\u001b_pi:c\u0007\u001b[7mZ\u001b[0m                ",
+            "────────────────────"
+          ],
+          "changes": [
+            "Aक्‍षZ",
+            "AZ",
+            "Aक्‍षZ"
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "devanagari-conjunct-soft-wrap-and-resize",
+      "cluster": "क्ष",
+      "clusterSegments": [
+        {
+          "index": 0,
+          "segment": "क्ष"
+        }
+      ],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~AAक्षZ\u001b[201~"
+          },
+          "columns": 20,
+          "text": "AAक्षZ",
+          "expandedText": "AAक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 6
+          },
+          "cursorUtf16Offset": 6,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "AAक्षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m              ",
+            "────────────────────"
+          ],
+          "changes": [
+            "AAक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "resize",
+            "columns": 4
+          },
+          "columns": 4,
+          "text": "AAक्षZ",
+          "expandedText": "AAक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 6
+          },
+          "cursorUtf16Offset": 6,
+          "focused": true,
+          "rows": [
+            "────",
+            "AA  ",
+            "क्षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+            "────"
+          ],
+          "changes": [
+            "AAक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[H"
+          },
+          "columns": 4,
+          "text": "AAक्षZ",
+          "expandedText": "AAक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 6
+          },
+          "cursorUtf16Offset": 6,
+          "focused": true,
+          "rows": [
+            "────",
+            "AA  ",
+            "क्षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+            "────"
+          ],
+          "changes": [
+            "AAक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 4,
+          "text": "AAक्षZ",
+          "expandedText": "AAक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 6
+          },
+          "cursorUtf16Offset": 6,
+          "focused": true,
+          "rows": [
+            "────",
+            "AA  ",
+            "क्षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+            "────"
+          ],
+          "changes": [
+            "AAक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 4,
+          "text": "AAक्षZ",
+          "expandedText": "AAक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 6
+          },
+          "cursorUtf16Offset": 6,
+          "focused": true,
+          "rows": [
+            "────",
+            "AA  ",
+            "क्षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+            "────"
+          ],
+          "changes": [
+            "AAक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[C"
+          },
+          "columns": 4,
+          "text": "AAक्षZ",
+          "expandedText": "AAक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 6
+          },
+          "cursorUtf16Offset": 6,
+          "focused": true,
+          "rows": [
+            "────",
+            "AA  ",
+            "क्षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+            "────"
+          ],
+          "changes": [
+            "AAक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "resize",
+            "columns": 20
+          },
+          "columns": 20,
+          "text": "AAक्षZ",
+          "expandedText": "AAक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 6
+          },
+          "cursorUtf16Offset": 6,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "AAक्षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m              ",
+            "────────────────────"
+          ],
+          "changes": [
+            "AAक्षZ"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": ""
+          },
+          "columns": 20,
+          "text": "AAक्ष",
+          "expandedText": "AAक्ष",
+          "cursor": {
+            "line": 0,
+            "col": 5
+          },
+          "cursorUtf16Offset": 5,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "AAक्ष\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "AAक्षZ",
+            "AAक्ष"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "AAक्षZ",
+          "expandedText": "AAक्षZ",
+          "cursor": {
+            "line": 0,
+            "col": 6
+          },
+          "cursorUtf16Offset": 6,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "AAक्षZ\u001b_pi:c\u0007\u001b[7m \u001b[0m              ",
+            "────────────────────"
+          ],
+          "changes": [
+            "AAक्षZ",
+            "AAक्ष",
+            "AAक्षZ"
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    }
+  ]
+}

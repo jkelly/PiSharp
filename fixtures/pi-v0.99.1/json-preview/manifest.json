@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "normalizerVersion": "object-key-order-v1",
+  "scope": "One genuine unchanged upstream streaming JSON preview corpus; no native projection or provider wire qualification",
+  "fixtures": [
+    {
+      "fixtureId": "core-preview",
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "requirementIds": [
+        "stream.indexed-events"
+      ],
+      "scenario": "Streaming JSON preview across empty, complete, incomplete, escaped, malformed and numeric-limit inputs",
+      "clock": {
+        "mechanism": "No clock calls"
+      },
+      "seed": "none; ordered case IDs",
+      "environment": {
+        "platform": "win32",
+        "architecture": "x64",
+        "credentials": "not inherited",
+        "network": "disabled",
+        "workspace": "isolated home/workspace"
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/json-preview/core-preview.input.json",
+        "sha256": "5d05b574b515c99d27a71d74b862487d0ae729dd98414d31c8a73a36f21be975"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/json-preview/core-preview.expected.json",
+        "sha256": "246182c3bc276f6d92e659bf4403447bcaacadd8aa8666c89d58c0145595ce28"
+      },
+      "provenance": {
+        "kind": "captured-upstream-json-preview-oracle",
+        "inputKind": "authored-synthetic-input",
+        "source": "Unmodified pinned parseStreamingJson and upstream-locked partial-json",
+        "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+        "dependencyLock": "tools/PiReferenceRunner/json-preview-lock.json",
+        "capturedAt": "2026-09-30",
+        "captureCommand": "node tools/PiReferenceRunner/json-preview-run.mjs --capture-new",
+        "nativeProjection": false,
+        "providerWireTraffic": false
+      }
+    }
+  ]
+}

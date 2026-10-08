@@ -1,0 +1,7 @@
+# R296 release artifact metadata leaf
+
+This implements a pure manifest consistency validator in tools/release/ReleaseArtifactManifest.ps1. It enforces exactly the four proposed JIT payload profiles: runtime-dependent dotnet tool plus self-contained win-x64/linux-x64/osx-arm64 archives. Exact commit/tree and artifact producer associations, hashes/lengths, unique flat filenames, typed metadata and duplicate JSON keys are checked. Thirteen synthetic controls are authored, unexecuted.
+
+The function consumes an already supplied JsonElement. It does not acquire, extract, install, inspect credential paths, read artifact bytes or start processes. metadataConsistent never implies releaseAccepted/publishPermitted/artifactBytesVerified; all three remain false. The four-profile plan is proposed by docs/plans/08-hardening-and-packaging.md, not an approved final support matrix.
+
+Remaining implementation: owner-admitted payload build/archive pipeline, physical byte verification, SBOM/license/signature/provenance generation and verification, external SDK/plugin corpus, real platform/terminal and Node-absent clean-machine install/update/remove/rollback evidence. Artifact metadata cannot close SDK/parity/platform gates. Existing projects, packages, lock files, build scripts and shared files remain untouched. No package building, native execution, network, publication, credential or trust change occurred.

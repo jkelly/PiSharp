@@ -1,0 +1,1899 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "session-branches-replayed",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "authored-valid-v3-branch-history-wire-input",
+  "requirementIds": [
+    "P4-03"
+  ],
+  "provenance": {
+    "entries": "Authored valid wire data only; no user sessions, provider execution or real tool output. The compaction case expands the existing authored session-context input, never its expected output.",
+    "idsAndDates": "Authored IDs and timestamps are explicit. Actual appendLabelChange/appendSessionInfo IDs and timestamps are source-generated and captured verbatim; no Date/RNG override.",
+    "graphs": "Unique acyclic IDs with present parents or explicit null roots. No malformed cycles are executed.",
+    "accounting": "Assistant and usage records are retained raw; no additional usage-totals module or accounting implementation is imported.",
+    "expected": "Generated only after explicit runtime grant by unchanged whole SessionManager plus public convertToLlm.",
+    "systemReplay": "Actual already-qualified transcript.getCurrentSystemMessage/getCurrentTools/getCurrentSystemPrompt observe ordered content, section set/delete/reinsert and tool remove/replace/readd; no extra module closure."
+  },
+  "cases": [
+    {
+      "caseId": "empty-root",
+      "header": {
+        "type": "session",
+        "version": 3,
+        "id": "authored-empty-root",
+        "timestamp": "2023-11-14T22:13:20.000Z",
+        "cwd": "C:\\authored\\session-branches\\empty-root",
+        "opaque": {
+          "futureHeader": [
+            null,
+            "retained"
+          ]
+        }
+      },
+      "entries": [],
+      "operations": []
+    },
+    {
+      "caseId": "two-sibling-branch-settings",
+      "header": {
+        "type": "session",
+        "version": 3,
+        "id": "authored-two-sibling-branch-settings",
+        "timestamp": "2023-11-14T22:13:20.000Z",
+        "cwd": "C:\\authored\\session-branches\\two-sibling-branch-settings",
+        "opaque": {
+          "futureHeader": [
+            null,
+            "retained"
+          ]
+        }
+      },
+      "entries": [
+        {
+          "type": "message",
+          "id": "common-system",
+          "parentId": null,
+          "timestamp": "2023-11-14T22:13:20.000Z",
+          "message": {
+            "role": "system",
+            "content": "Common system",
+            "timestamp": 1700000000000,
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Authored read tool.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "sections": {
+              "alpha": "Alpha initial",
+              "beta": "Beta initial",
+              "gamma": "Gamma initial"
+            }
+          }
+        },
+        {
+          "type": "model_change",
+          "id": "common-model",
+          "parentId": "common-system",
+          "timestamp": "2023-11-14T22:13:21.000Z",
+          "provider": "fixture",
+          "modelId": "base-model"
+        },
+        {
+          "type": "thinking_level_change",
+          "id": "common-thinking",
+          "parentId": "common-model",
+          "timestamp": "2023-11-14T22:13:22.000Z",
+          "thinkingLevel": "low"
+        },
+        {
+          "type": "message",
+          "id": "common-user",
+          "parentId": "common-thinking",
+          "timestamp": "2023-11-14T22:13:23.000Z",
+          "message": {
+            "role": "user",
+            "content": "Choose a branch",
+            "timestamp": 1700000003000
+          }
+        },
+        {
+          "type": "model_change",
+          "id": "left-model",
+          "parentId": "common-user",
+          "timestamp": "2023-11-14T22:13:24.000Z",
+          "provider": "left-provider",
+          "modelId": "left-declared"
+        },
+        {
+          "type": "thinking_level_change",
+          "id": "left-thinking",
+          "parentId": "left-model",
+          "timestamp": "2023-11-14T22:13:25.000Z",
+          "thinkingLevel": "high"
+        },
+        {
+          "type": "message",
+          "id": "left-system",
+          "parentId": "left-thinking",
+          "timestamp": "2023-11-14T22:13:26.000Z",
+          "message": {
+            "role": "system",
+            "content": "Left system",
+            "timestamp": 1700000006000,
+            "toolsRemoved": [
+              {
+                "name": "read"
+              }
+            ],
+            "toolsAdded": [
+              {
+                "name": "write",
+                "description": "Authored write tool.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "name": "read",
+                "description": "Left readded read.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "owned": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "opaque": {
+              "owned": null
+            },
+            "sections": {
+              "alpha": "Alpha replaced",
+              "beta": null
+            }
+          }
+        },
+        {
+          "type": "message",
+          "id": "left-system-final",
+          "parentId": "left-system",
+          "timestamp": "2023-11-14T22:13:26.500Z",
+          "message": {
+            "role": "system",
+            "content": [
+              {
+                "type": "text",
+                "text": "Left appended content"
+              }
+            ],
+            "sections": {
+              "beta": "Beta reinserted",
+              "gamma": null,
+              "alpha": ""
+            },
+            "toolsRemoved": [
+              {
+                "name": "write"
+              }
+            ],
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read replacement keeps position.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "name": "write",
+                "description": "Write readded at tail.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000006500,
+            "opaque": {
+              "notEffective": "raw only"
+            }
+          }
+        },
+        {
+          "type": "message",
+          "id": "left-answer",
+          "parentId": "left-system-final",
+          "timestamp": "2023-11-14T22:13:27.000Z",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Left answer",
+                "textSignature": "authored-signature"
+              }
+            ],
+            "timestamp": 1700000007000,
+            "api": "openai-responses",
+            "provider": "fixture",
+            "model": "left-actual",
+            "usage": {
+              "input": 11,
+              "output": 5,
+              "cacheRead": 2,
+              "cacheWrite": 3,
+              "reasoning": 1,
+              "totalTokens": 21,
+              "cost": {
+                "input": 0.0011,
+                "output": 0.0025,
+                "cacheRead": 0.0002,
+                "cacheWrite": 0.0003,
+                "total": 0.0041
+              }
+            },
+            "stopReason": "stop",
+            "opaque": {
+              "retained": null
+            }
+          }
+        },
+        {
+          "type": "model_change",
+          "id": "right-model",
+          "parentId": "common-user",
+          "timestamp": "2023-11-14T22:13:28.000Z",
+          "provider": "right-provider",
+          "modelId": "right-declared"
+        },
+        {
+          "type": "thinking_level_change",
+          "id": "right-thinking",
+          "parentId": "right-model",
+          "timestamp": "2023-11-14T22:13:29.000Z",
+          "thinkingLevel": "minimal"
+        },
+        {
+          "type": "message",
+          "id": "right-system",
+          "parentId": "right-thinking",
+          "timestamp": "2023-11-14T22:13:30.000Z",
+          "message": {
+            "role": "system",
+            "content": "Right system",
+            "timestamp": 1700000010000,
+            "toolsAdded": [
+              {
+                "name": "search",
+                "description": "Authored search tool.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "name": "read",
+                "description": "Right replacement keeps first position.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "toolsRemoved": [
+              {
+                "name": "write"
+              }
+            ],
+            "sections": {
+              "beta": "Right beta",
+              "gamma": null,
+              "delta": "Right delta"
+            }
+          }
+        },
+        {
+          "type": "message",
+          "id": "right-question",
+          "parentId": "right-system",
+          "timestamp": "2023-11-14T22:13:31.000Z",
+          "message": {
+            "role": "user",
+            "content": "Right question",
+            "timestamp": 1700000011000
+          }
+        }
+      ],
+      "operations": []
+    },
+    {
+      "caseId": "three-sibling-hidden-state",
+      "header": {
+        "type": "session",
+        "version": 3,
+        "id": "authored-three-sibling-hidden-state",
+        "timestamp": "2023-11-14T22:13:20.000Z",
+        "cwd": "C:\\authored\\session-branches\\three-sibling-hidden-state",
+        "opaque": {
+          "futureHeader": [
+            null,
+            "retained"
+          ]
+        }
+      },
+      "entries": [
+        {
+          "type": "message",
+          "id": "root-system",
+          "parentId": null,
+          "timestamp": "2023-11-14T22:13:20.000Z",
+          "message": {
+            "role": "system",
+            "content": "Common system",
+            "timestamp": 1700000000000
+          }
+        },
+        {
+          "type": "message",
+          "id": "root-user",
+          "parentId": "root-system",
+          "timestamp": "2023-11-14T22:13:21.000Z",
+          "message": {
+            "role": "user",
+            "content": "Three choices",
+            "timestamp": 1700000001000
+          }
+        },
+        {
+          "type": "message",
+          "id": "a-answer",
+          "parentId": "root-user",
+          "timestamp": "2023-11-14T22:13:22.000Z",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "First answer",
+                "textSignature": "authored-signature"
+              }
+            ],
+            "timestamp": 1700000002000,
+            "api": "openai-responses",
+            "provider": "fixture",
+            "model": "a-model",
+            "usage": {
+              "input": 11,
+              "output": 5,
+              "cacheRead": 2,
+              "cacheWrite": 3,
+              "reasoning": 1,
+              "totalTokens": 21,
+              "cost": {
+                "input": 0.0011,
+                "output": 0.0025,
+                "cacheRead": 0.0002,
+                "cacheWrite": 0.0003,
+                "total": 0.0041
+              }
+            },
+            "stopReason": "stop",
+            "opaque": {
+              "retained": null
+            }
+          }
+        },
+        {
+          "type": "custom_message",
+          "id": "a-hidden",
+          "parentId": "a-answer",
+          "timestamp": "2023-11-14T22:13:23.000Z",
+          "customType": "fixture.hidden",
+          "content": [
+            {
+              "type": "text",
+              "text": "First hidden"
+            },
+            {
+              "type": "image",
+              "data": "AA==",
+              "mimeType": "image/png"
+            }
+          ],
+          "display": false,
+          "details": {
+            "notModelInput": {
+              "retain": null
+            }
+          }
+        },
+        {
+          "type": "custom",
+          "id": "a-state",
+          "parentId": "a-hidden",
+          "timestamp": "2023-11-14T22:13:24.000Z",
+          "customType": "fixture.owner/state",
+          "data": {
+            "version": 1,
+            "value": "a",
+            "future": {
+              "values": [
+                1.25,
+                null,
+                "λ"
+              ],
+              "disabledOwner": true
+            }
+          }
+        },
+        {
+          "type": "message",
+          "id": "b-answer",
+          "parentId": "root-user",
+          "timestamp": "2023-11-14T22:13:25.000Z",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Second answer",
+                "textSignature": "authored-signature"
+              }
+            ],
+            "timestamp": 1700000005000,
+            "api": "openai-responses",
+            "provider": "fixture",
+            "model": "b-model",
+            "usage": {
+              "input": 11,
+              "output": 5,
+              "cacheRead": 2,
+              "cacheWrite": 3,
+              "reasoning": 1,
+              "totalTokens": 21,
+              "cost": {
+                "input": 0.0011,
+                "output": 0.0025,
+                "cacheRead": 0.0002,
+                "cacheWrite": 0.0003,
+                "total": 0.0041
+              }
+            },
+            "stopReason": "stop",
+            "opaque": {
+              "retained": null
+            }
+          }
+        },
+        {
+          "type": "custom_message",
+          "id": "b-hidden",
+          "parentId": "b-answer",
+          "timestamp": "2023-11-14T22:13:26.000Z",
+          "customType": "fixture.hidden",
+          "content": [
+            {
+              "type": "text",
+              "text": "Second hidden"
+            },
+            {
+              "type": "image",
+              "data": "AA==",
+              "mimeType": "image/png"
+            }
+          ],
+          "display": false,
+          "details": {
+            "notModelInput": {
+              "retain": null
+            }
+          }
+        },
+        {
+          "type": "custom",
+          "id": "b-state",
+          "parentId": "b-hidden",
+          "timestamp": "2023-11-14T22:13:27.000Z",
+          "customType": "fixture.owner/state",
+          "data": {
+            "version": 1,
+            "value": "b",
+            "future": {
+              "values": [
+                1.25,
+                null,
+                "λ"
+              ],
+              "disabledOwner": true
+            }
+          }
+        },
+        {
+          "type": "message",
+          "id": "c-answer",
+          "parentId": "root-user",
+          "timestamp": "2023-11-14T22:13:28.000Z",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Third answer",
+                "textSignature": "authored-signature"
+              }
+            ],
+            "timestamp": 1700000008000,
+            "api": "openai-responses",
+            "provider": "fixture",
+            "model": "c-model",
+            "usage": {
+              "input": 11,
+              "output": 5,
+              "cacheRead": 2,
+              "cacheWrite": 3,
+              "reasoning": 1,
+              "totalTokens": 21,
+              "cost": {
+                "input": 0.0011,
+                "output": 0.0025,
+                "cacheRead": 0.0002,
+                "cacheWrite": 0.0003,
+                "total": 0.0041
+              }
+            },
+            "stopReason": "stop",
+            "opaque": {
+              "retained": null
+            }
+          }
+        },
+        {
+          "type": "custom",
+          "id": "c-state",
+          "parentId": "c-answer",
+          "timestamp": "2023-11-14T22:13:29.000Z",
+          "customType": "fixture.owner/state",
+          "data": {
+            "version": 1,
+            "value": "c",
+            "future": {
+              "values": [
+                1.25,
+                null,
+                "λ"
+              ],
+              "disabledOwner": true
+            }
+          }
+        },
+        {
+          "type": "future_record",
+          "id": "c-unknown",
+          "parentId": "c-state",
+          "timestamp": "2023-11-14T22:13:30.000Z",
+          "data": {
+            "ordered": [
+              "c",
+              null
+            ],
+            "nested": {
+              "command": "inert"
+            }
+          },
+          "opaque": null
+        }
+      ],
+      "operations": []
+    },
+    {
+      "caseId": "multi-root-forest",
+      "header": {
+        "type": "session",
+        "version": 3,
+        "id": "authored-multi-root-forest",
+        "timestamp": "2023-11-14T22:13:20.000Z",
+        "cwd": "C:\\authored\\session-branches\\multi-root-forest",
+        "opaque": {
+          "futureHeader": [
+            null,
+            "retained"
+          ]
+        }
+      },
+      "entries": [
+        {
+          "type": "message",
+          "id": "one-system",
+          "parentId": null,
+          "timestamp": "2023-11-14T22:13:20.000Z",
+          "message": {
+            "role": "system",
+            "content": "First root system",
+            "timestamp": 1700000000000,
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Authored read tool.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "message",
+          "id": "one-user",
+          "parentId": "one-system",
+          "timestamp": "2023-11-14T22:13:21.000Z",
+          "message": {
+            "role": "user",
+            "content": "First root user",
+            "timestamp": 1700000001000
+          }
+        },
+        {
+          "type": "custom",
+          "id": "one-state",
+          "parentId": "one-user",
+          "timestamp": "2023-11-14T22:13:22.000Z",
+          "customType": "fixture.owner/state",
+          "data": {
+            "version": 1,
+            "value": "one",
+            "future": {
+              "values": [
+                1.25,
+                null,
+                "λ"
+              ],
+              "disabledOwner": true
+            }
+          }
+        },
+        {
+          "type": "message",
+          "id": "two-system",
+          "parentId": null,
+          "timestamp": "2023-11-14T22:13:23.000Z",
+          "message": {
+            "role": "system",
+            "content": "Second root system",
+            "timestamp": 1700000003000,
+            "toolsAdded": [
+              {
+                "name": "write",
+                "description": "Authored write tool.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "model_change",
+          "id": "two-model",
+          "parentId": "two-system",
+          "timestamp": "2023-11-14T22:13:24.000Z",
+          "provider": "fixture",
+          "modelId": "two-model"
+        },
+        {
+          "type": "message",
+          "id": "two-answer",
+          "parentId": "two-model",
+          "timestamp": "2023-11-14T22:13:25.000Z",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Second root answer",
+                "textSignature": "authored-signature"
+              }
+            ],
+            "timestamp": 1700000005000,
+            "api": "openai-responses",
+            "provider": "fixture",
+            "model": "two-answer-model",
+            "usage": {
+              "input": 11,
+              "output": 5,
+              "cacheRead": 2,
+              "cacheWrite": 3,
+              "reasoning": 1,
+              "totalTokens": 21,
+              "cost": {
+                "input": 0.0011,
+                "output": 0.0025,
+                "cacheRead": 0.0002,
+                "cacheWrite": 0.0003,
+                "total": 0.0041
+              }
+            },
+            "stopReason": "stop",
+            "opaque": {
+              "retained": null
+            }
+          }
+        },
+        {
+          "type": "custom",
+          "id": "three-state",
+          "parentId": null,
+          "timestamp": "2023-11-14T22:13:26.000Z",
+          "customType": "fixture.owner/state",
+          "data": {
+            "version": 1,
+            "value": "third metadata root",
+            "future": {
+              "values": [
+                1.25,
+                null,
+                "λ"
+              ],
+              "disabledOwner": true
+            }
+          }
+        },
+        {
+          "type": "custom_message",
+          "id": "three-hidden",
+          "parentId": "three-state",
+          "timestamp": "2023-11-14T22:13:27.000Z",
+          "customType": "fixture.hidden",
+          "content": [
+            {
+              "type": "text",
+              "text": "Third hidden root"
+            },
+            {
+              "type": "image",
+              "data": "AA==",
+              "mimeType": "image/png"
+            }
+          ],
+          "display": false,
+          "details": {
+            "notModelInput": {
+              "retain": null
+            }
+          }
+        },
+        {
+          "type": "label",
+          "id": "global-label",
+          "parentId": "three-hidden",
+          "timestamp": "2023-11-14T22:13:28.000Z",
+          "targetId": "one-user",
+          "label": "First root bookmark"
+        },
+        {
+          "type": "session_info",
+          "id": "global-name",
+          "parentId": "global-label",
+          "timestamp": "2023-11-14T22:13:29.000Z",
+          "name": "Global forest name"
+        }
+      ],
+      "operations": []
+    },
+    {
+      "caseId": "global-labels-and-names",
+      "header": {
+        "type": "session",
+        "version": 3,
+        "id": "authored-global-labels-and-names",
+        "timestamp": "2023-11-14T22:13:20.000Z",
+        "cwd": "C:\\authored\\session-branches\\global-labels-and-names",
+        "opaque": {
+          "futureHeader": [
+            null,
+            "retained"
+          ]
+        }
+      },
+      "entries": [
+        {
+          "type": "message",
+          "id": "global-root",
+          "parentId": null,
+          "timestamp": "2023-11-14T22:13:20.000Z",
+          "message": {
+            "role": "user",
+            "content": "Common global root",
+            "timestamp": 1700000000000
+          }
+        },
+        {
+          "type": "message",
+          "id": "left-leaf",
+          "parentId": "global-root",
+          "timestamp": "2023-11-14T22:13:21.000Z",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Left answer",
+                "textSignature": "authored-signature"
+              }
+            ],
+            "timestamp": 1700000001000,
+            "api": "openai-responses",
+            "provider": "fixture",
+            "model": "answer-model",
+            "usage": {
+              "input": 11,
+              "output": 5,
+              "cacheRead": 2,
+              "cacheWrite": 3,
+              "reasoning": 1,
+              "totalTokens": 21,
+              "cost": {
+                "input": 0.0011,
+                "output": 0.0025,
+                "cacheRead": 0.0002,
+                "cacheWrite": 0.0003,
+                "total": 0.0041
+              }
+            },
+            "stopReason": "stop",
+            "opaque": {
+              "retained": null
+            }
+          }
+        },
+        {
+          "type": "message",
+          "id": "right-leaf",
+          "parentId": "global-root",
+          "timestamp": "2023-11-14T22:13:22.000Z",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Right answer",
+                "textSignature": "authored-signature"
+              }
+            ],
+            "timestamp": 1700000002000,
+            "api": "openai-responses",
+            "provider": "fixture",
+            "model": "answer-model",
+            "usage": {
+              "input": 11,
+              "output": 5,
+              "cacheRead": 2,
+              "cacheWrite": 3,
+              "reasoning": 1,
+              "totalTokens": 21,
+              "cost": {
+                "input": 0.0011,
+                "output": 0.0025,
+                "cacheRead": 0.0002,
+                "cacheWrite": 0.0003,
+                "total": 0.0041
+              }
+            },
+            "stopReason": "stop",
+            "opaque": {
+              "retained": null
+            }
+          }
+        },
+        {
+          "type": "label",
+          "id": "old-label",
+          "parentId": "right-leaf",
+          "timestamp": "2023-11-14T22:13:23.000Z",
+          "targetId": "left-leaf",
+          "label": "Initial left bookmark"
+        },
+        {
+          "type": "session_info",
+          "id": "old-name",
+          "parentId": "old-label",
+          "timestamp": "2023-11-14T22:13:24.000Z",
+          "name": "Initial name"
+        }
+      ],
+      "operations": [
+        {
+          "operationId": "select-right",
+          "kind": "branch",
+          "entryId": "right-leaf"
+        },
+        {
+          "operationId": "rename-left-from-right",
+          "kind": "label",
+          "targetId": "left-leaf",
+          "label": "Renamed globally"
+        },
+        {
+          "operationId": "clear-left-from-right",
+          "kind": "label",
+          "targetId": "left-leaf",
+          "clear": true
+        },
+        {
+          "operationId": "label-left-again",
+          "kind": "label",
+          "targetId": "left-leaf",
+          "label": "Final left bookmark"
+        },
+        {
+          "operationId": "rename-session",
+          "kind": "name",
+          "name": "  Renamed\r\n globally  "
+        },
+        {
+          "operationId": "clear-session-name",
+          "kind": "name",
+          "name": " \r\n "
+        },
+        {
+          "operationId": "final-session-name",
+          "kind": "name",
+          "name": "Final global name"
+        }
+      ]
+    },
+    {
+      "caseId": "compaction-preserves-raw-history",
+      "header": {
+        "type": "session",
+        "version": 3,
+        "id": "authored-compaction-preserves-raw-history",
+        "timestamp": "2023-11-14T22:13:20.000Z",
+        "cwd": "C:\\authored\\session-branches\\compaction-preserves-raw-history",
+        "opaque": {
+          "futureHeader": [
+            null,
+            "retained"
+          ]
+        }
+      },
+      "entries": [
+        {
+          "type": "message",
+          "id": "root-system",
+          "parentId": null,
+          "timestamp": "2023-11-14T22:13:20.000Z",
+          "message": {
+            "role": "system",
+            "content": "System �.",
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read an authored logical file.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000000,
+            "opaque": {
+              "keep": null,
+              "ordered": [
+                "b",
+                "a"
+              ]
+            }
+          }
+        },
+        {
+          "type": "model_change",
+          "id": "root-model",
+          "parentId": "root-system",
+          "timestamp": "2023-11-14T22:13:21.000Z",
+          "provider": "openai",
+          "modelId": "declared-base"
+        },
+        {
+          "type": "thinking_level_change",
+          "id": "root-thinking",
+          "parentId": "root-model",
+          "timestamp": "2023-11-14T22:13:22.000Z",
+          "thinkingLevel": "low"
+        },
+        {
+          "type": "message",
+          "id": "root-user",
+          "parentId": "root-thinking",
+          "timestamp": "2023-11-14T22:13:23.000Z",
+          "message": {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Root line\r\n�"
+              }
+            ],
+            "timestamp": 1700000003000,
+            "opaque": {
+              "nullValue": null
+            }
+          }
+        },
+        {
+          "type": "message",
+          "id": "left-system",
+          "parentId": "root-user",
+          "timestamp": "2023-11-14T22:13:24.000Z",
+          "message": {
+            "role": "system",
+            "content": "",
+            "toolsRemoved": [
+              {
+                "name": "read"
+              }
+            ],
+            "toolsAdded": [
+              {
+                "name": "write",
+                "description": "Write authored text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000004000
+          }
+        },
+        {
+          "type": "message",
+          "id": "left-user",
+          "parentId": "left-system",
+          "timestamp": "2023-11-14T22:13:25.000Z",
+          "message": {
+            "role": "user",
+            "content": "Left question.",
+            "timestamp": 1700000005000,
+            "opaque": {
+              "keep": [
+                "left",
+                null
+              ]
+            }
+          }
+        },
+        {
+          "type": "message",
+          "id": "left-assistant",
+          "parentId": "left-user",
+          "timestamp": "2023-11-14T22:13:26.000Z",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "Authored thought.",
+                "thinkingSignature": "{\"opaque\":[\"signature\",null]}"
+              },
+              {
+                "type": "toolCall",
+                "id": "call_left|fc_left",
+                "name": "write",
+                "arguments": {
+                  "path": "logical.txt",
+                  "content": "owned �"
+                },
+                "namespace": "opaque-namespace",
+                "toolCallSignature": {
+                  "keep": null
+                },
+                "thoughtSignature": "opaque-thought-signature"
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "assistant-left",
+            "usage": {
+              "input": 4,
+              "output": 2,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "reasoning": 0,
+              "totalTokens": 6,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1700000006000,
+            "responseId": "response-left"
+          }
+        },
+        {
+          "type": "message",
+          "id": "left-result",
+          "parentId": "left-assistant",
+          "timestamp": "2023-11-14T22:13:27.000Z",
+          "message": {
+            "role": "toolResult",
+            "toolCallId": "call_left|fc_left",
+            "toolName": "write",
+            "content": [
+              {
+                "type": "text",
+                "text": "Recorded tool result\r\n"
+              }
+            ],
+            "isError": false,
+            "timestamp": 1700000007000,
+            "opaque": {
+              "result": null
+            }
+          }
+        },
+        {
+          "type": "custom_message",
+          "id": "left-custom-message",
+          "parentId": "left-result",
+          "timestamp": "2023-11-14T22:13:28.000Z",
+          "customType": "authored.note",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hidden display, visible context."
+            },
+            {
+              "type": "image",
+              "data": "AA==",
+              "mimeType": "image/png"
+            }
+          ],
+          "display": false,
+          "details": null
+        },
+        {
+          "type": "custom",
+          "id": "left-custom-state",
+          "parentId": "left-custom-message",
+          "timestamp": "2023-11-14T22:13:29.000Z",
+          "customType": "authored.state",
+          "data": {
+            "instruction": "inert metadata",
+            "keep": null
+          }
+        },
+        {
+          "type": "usage",
+          "id": "left-usage",
+          "parentId": "left-custom-state",
+          "timestamp": "2023-11-14T22:13:30.000Z",
+          "kind": "cache_warm",
+          "provider": "openai",
+          "model": "usage-only-model",
+          "usage": {
+            "input": 4,
+            "output": 2,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 0,
+            "totalTokens": 6,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "note": "Authored accounting; no model-context contribution."
+        },
+        {
+          "type": "label",
+          "id": "left-label",
+          "parentId": "left-usage",
+          "timestamp": "2023-11-14T22:13:31.000Z",
+          "targetId": "left-user",
+          "label": "Left bookmark"
+        },
+        {
+          "type": "session_info",
+          "id": "left-info",
+          "parentId": "left-label",
+          "timestamp": "2023-11-14T22:13:32.000Z",
+          "name": "Authored display name"
+        },
+        {
+          "type": "future_record",
+          "id": "left-leaf",
+          "parentId": "left-info",
+          "timestamp": "2023-11-14T22:13:33.000Z",
+          "data": {
+            "command": "must remain inert",
+            "ordered": [
+              null,
+              "x"
+            ]
+          },
+          "opaque": null
+        },
+        {
+          "type": "model_change",
+          "id": "right-model",
+          "parentId": "root-user",
+          "timestamp": "2023-11-14T22:13:34.000Z",
+          "provider": "foreign-provider",
+          "modelId": "declared-right"
+        },
+        {
+          "type": "thinking_level_change",
+          "id": "right-thinking",
+          "parentId": "right-model",
+          "timestamp": "2023-11-14T22:13:35.000Z",
+          "thinkingLevel": "high"
+        },
+        {
+          "type": "message",
+          "id": "right-user",
+          "parentId": "right-thinking",
+          "timestamp": "2023-11-14T22:13:36.000Z",
+          "message": {
+            "role": "user",
+            "content": "Right question.",
+            "timestamp": 1700000016000
+          }
+        },
+        {
+          "type": "message",
+          "id": "right-assistant",
+          "parentId": "right-user",
+          "timestamp": "2023-11-14T22:13:37.000Z",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Right answer.",
+                "textSignature": "opaque-text-signature"
+              }
+            ],
+            "api": "foreign-api",
+            "provider": "foreign-provider",
+            "model": "assistant-right",
+            "usage": {
+              "input": 4,
+              "output": 2,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "reasoning": 0,
+              "totalTokens": 6,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "stop",
+            "timestamp": 1700000017000,
+            "opaque": {
+              "retained": null
+            }
+          }
+        },
+        {
+          "type": "custom_message",
+          "id": "right-custom-message",
+          "parentId": "right-assistant",
+          "timestamp": "2023-11-14T22:13:38.000Z",
+          "customType": "authored.right",
+          "content": "Custom string.",
+          "display": true
+        },
+        {
+          "type": "context_edit",
+          "id": "left-edit-before",
+          "parentId": "left-leaf",
+          "timestamp": "2023-11-14T22:13:40.000Z",
+          "targetId": "left-user",
+          "replacement": {
+            "content": "First replacement before compaction."
+          }
+        },
+        {
+          "type": "compaction",
+          "id": "left-compaction",
+          "parentId": "left-edit-before",
+          "timestamp": "2023-11-14T22:13:41.000Z",
+          "summary": "Authored compacted history �.",
+          "firstKeptEntryId": "left-user",
+          "tokensBefore": 128,
+          "details": {
+            "keep": null
+          },
+          "systemMessage": {
+            "role": "system",
+            "content": "Checkpoint system.",
+            "toolsAdded": [
+              {
+                "name": "write",
+                "description": "Write authored text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000021000,
+            "opaque": {
+              "checkpoint": null
+            },
+            "sections": {
+              "checkpoint": "Compacted checkpoint section"
+            }
+          }
+        },
+        {
+          "type": "branch_summary",
+          "id": "left-branch-summary",
+          "parentId": "left-compaction",
+          "timestamp": "2023-11-14T22:13:42.000Z",
+          "fromId": "right-custom-message",
+          "summary": "Authored summary of the sibling branch.",
+          "details": {
+            "notSent": null
+          }
+        },
+        {
+          "type": "message",
+          "id": "left-bash",
+          "parentId": "left-branch-summary",
+          "timestamp": "2023-11-14T22:13:43.000Z",
+          "message": {
+            "role": "bashExecution",
+            "command": "authored-command",
+            "output": "Recorded stdout\r\n",
+            "exitCode": 1,
+            "cancelled": false,
+            "truncated": true,
+            "fullOutputPath": "logical-output.txt",
+            "timestamp": 1700000023000,
+            "excludeFromContext": false
+          }
+        },
+        {
+          "type": "message",
+          "id": "left-bash-hidden",
+          "parentId": "left-bash",
+          "timestamp": "2023-11-14T22:13:44.000Z",
+          "message": {
+            "role": "bashExecution",
+            "command": "authored-hidden-command",
+            "output": "Hidden recorded output",
+            "exitCode": 0,
+            "cancelled": false,
+            "truncated": false,
+            "timestamp": 1700000024000,
+            "excludeFromContext": true
+          }
+        },
+        {
+          "type": "context_edit",
+          "id": "left-edit-after",
+          "parentId": "left-bash-hidden",
+          "timestamp": "2023-11-14T22:13:45.000Z",
+          "targetId": "left-user",
+          "replacement": {
+            "content": "Last replacement after compaction �."
+          }
+        },
+        {
+          "type": "context_edit",
+          "id": "left-edit-tool",
+          "parentId": "left-edit-after",
+          "timestamp": "2023-11-14T22:13:46.000Z",
+          "targetId": "left-result",
+          "replacement": {
+            "content": "Edited tool result string."
+          }
+        },
+        {
+          "type": "context_edit",
+          "id": "left-advanced-leaf",
+          "parentId": "left-edit-tool",
+          "timestamp": "2023-11-14T22:13:47.000Z",
+          "targetId": "left-custom-message",
+          "replacement": null
+        }
+      ],
+      "operations": []
+    },
+    {
+      "caseId": "context-edit-restore-and-siblings",
+      "header": {
+        "type": "session",
+        "version": 3,
+        "id": "authored-context-edit-restore-and-siblings",
+        "timestamp": "2023-11-14T22:13:20.000Z",
+        "cwd": "C:\\authored\\session-branches\\context-edit-restore-and-siblings",
+        "opaque": {
+          "futureHeader": [
+            null,
+            "retained"
+          ]
+        }
+      },
+      "entries": [
+        {
+          "type": "message",
+          "id": "edit-root",
+          "parentId": null,
+          "timestamp": "2023-11-14T22:13:20.000Z",
+          "message": {
+            "role": "system",
+            "content": "Edit system",
+            "timestamp": 1700000000000,
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Authored read tool.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "message",
+          "id": "edit-user",
+          "parentId": "edit-root",
+          "timestamp": "2023-11-14T22:13:21.000Z",
+          "message": {
+            "role": "user",
+            "content": "Original user text",
+            "timestamp": 1700000001000
+          }
+        },
+        {
+          "type": "message",
+          "id": "edit-answer",
+          "parentId": "edit-user",
+          "timestamp": "2023-11-14T22:13:22.000Z",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Original assistant text",
+                "textSignature": "authored-signature"
+              }
+            ],
+            "timestamp": 1700000002000,
+            "api": "openai-responses",
+            "provider": "fixture",
+            "model": "answer-model",
+            "usage": {
+              "input": 11,
+              "output": 5,
+              "cacheRead": 2,
+              "cacheWrite": 3,
+              "reasoning": 1,
+              "totalTokens": 21,
+              "cost": {
+                "input": 0.0011,
+                "output": 0.0025,
+                "cacheRead": 0.0002,
+                "cacheWrite": 0.0003,
+                "total": 0.0041
+              }
+            },
+            "stopReason": "stop",
+            "opaque": {
+              "retained": null
+            }
+          }
+        },
+        {
+          "type": "custom_message",
+          "id": "edit-hidden",
+          "parentId": "edit-answer",
+          "timestamp": "2023-11-14T22:13:23.000Z",
+          "customType": "fixture.hidden",
+          "content": [
+            {
+              "type": "text",
+              "text": "Original hidden text"
+            },
+            {
+              "type": "image",
+              "data": "AA==",
+              "mimeType": "image/png"
+            }
+          ],
+          "display": false,
+          "details": {
+            "notModelInput": {
+              "retain": null
+            }
+          }
+        },
+        {
+          "type": "context_edit",
+          "id": "first-edit",
+          "parentId": "edit-hidden",
+          "timestamp": "2023-11-14T22:13:24.000Z",
+          "targetId": "edit-user",
+          "replacement": {
+            "content": "First user replacement"
+          }
+        },
+        {
+          "type": "context_edit",
+          "id": "second-edit",
+          "parentId": "first-edit",
+          "timestamp": "2023-11-14T22:13:25.000Z",
+          "targetId": "edit-user",
+          "replacement": {
+            "content": "Last user replacement"
+          }
+        },
+        {
+          "type": "context_edit",
+          "id": "restore-edit",
+          "parentId": "second-edit",
+          "timestamp": "2023-11-14T22:13:26.000Z",
+          "targetId": "edit-user",
+          "replacement": null
+        },
+        {
+          "type": "context_edit",
+          "id": "assistant-edit",
+          "parentId": "restore-edit",
+          "timestamp": "2023-11-14T22:13:27.000Z",
+          "targetId": "edit-answer",
+          "replacement": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Edited assistant text"
+              }
+            ]
+          }
+        },
+        {
+          "type": "context_edit",
+          "id": "hidden-edit",
+          "parentId": "assistant-edit",
+          "timestamp": "2023-11-14T22:13:28.000Z",
+          "targetId": "edit-hidden",
+          "replacement": {
+            "content": "Edited hidden text"
+          }
+        },
+        {
+          "type": "custom",
+          "id": "edited-state",
+          "parentId": "hidden-edit",
+          "timestamp": "2023-11-14T22:13:29.000Z",
+          "customType": "fixture.owner/state",
+          "data": {
+            "version": 1,
+            "value": "edited",
+            "future": {
+              "values": [
+                1.25,
+                null,
+                "λ"
+              ],
+              "disabledOwner": true
+            }
+          }
+        },
+        {
+          "type": "message",
+          "id": "sibling-answer",
+          "parentId": "edit-user",
+          "timestamp": "2023-11-14T22:13:30.000Z",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Sibling original answer",
+                "textSignature": "authored-signature"
+              }
+            ],
+            "timestamp": 1700000010000,
+            "api": "openai-responses",
+            "provider": "fixture",
+            "model": "sibling-model",
+            "usage": {
+              "input": 11,
+              "output": 5,
+              "cacheRead": 2,
+              "cacheWrite": 3,
+              "reasoning": 1,
+              "totalTokens": 21,
+              "cost": {
+                "input": 0.0011,
+                "output": 0.0025,
+                "cacheRead": 0.0002,
+                "cacheWrite": 0.0003,
+                "total": 0.0041
+              }
+            },
+            "stopReason": "stop",
+            "opaque": {
+              "retained": null
+            }
+          }
+        },
+        {
+          "type": "custom",
+          "id": "sibling-state",
+          "parentId": "sibling-answer",
+          "timestamp": "2023-11-14T22:13:31.000Z",
+          "customType": "fixture.owner/state",
+          "data": {
+            "version": 1,
+            "value": "sibling",
+            "future": {
+              "values": [
+                1.25,
+                null,
+                "λ"
+              ],
+              "disabledOwner": true
+            }
+          }
+        }
+      ],
+      "operations": []
+    },
+    {
+      "caseId": "metadata-only-three-roots",
+      "header": {
+        "type": "session",
+        "version": 3,
+        "id": "authored-metadata-only-three-roots",
+        "timestamp": "2023-11-14T22:13:20.000Z",
+        "cwd": "C:\\authored\\session-branches\\metadata-only-three-roots",
+        "opaque": {
+          "futureHeader": [
+            null,
+            "retained"
+          ]
+        }
+      },
+      "entries": [
+        {
+          "type": "model_change",
+          "id": "meta-model",
+          "parentId": null,
+          "timestamp": "2023-11-14T22:13:20.000Z",
+          "provider": "fixture",
+          "modelId": "metadata-model"
+        },
+        {
+          "type": "thinking_level_change",
+          "id": "meta-thinking",
+          "parentId": "meta-model",
+          "timestamp": "2023-11-14T22:13:21.000Z",
+          "thinkingLevel": "medium"
+        },
+        {
+          "type": "custom",
+          "id": "meta-state",
+          "parentId": "meta-thinking",
+          "timestamp": "2023-11-14T22:13:22.000Z",
+          "customType": "fixture.owner/state",
+          "data": {
+            "version": 1,
+            "value": "setup",
+            "future": {
+              "values": [
+                1.25,
+                null,
+                "λ"
+              ],
+              "disabledOwner": true
+            }
+          }
+        },
+        {
+          "type": "custom",
+          "id": "disabled-state",
+          "parentId": null,
+          "timestamp": "2023-11-14T22:13:23.000Z",
+          "customType": "fixture.owner/state",
+          "data": {
+            "version": 1,
+            "value": "disabled owner",
+            "future": {
+              "values": [
+                1.25,
+                null,
+                "λ"
+              ],
+              "disabledOwner": true
+            }
+          }
+        },
+        {
+          "type": "custom_message",
+          "id": "disabled-hidden",
+          "parentId": "disabled-state",
+          "timestamp": "2023-11-14T22:13:24.000Z",
+          "customType": "fixture.hidden",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hidden metadata root"
+            },
+            {
+              "type": "image",
+              "data": "AA==",
+              "mimeType": "image/png"
+            }
+          ],
+          "display": false,
+          "details": {
+            "notModelInput": {
+              "retain": null
+            }
+          }
+        },
+        {
+          "type": "future_record",
+          "id": "future-root",
+          "parentId": null,
+          "timestamp": "2023-11-14T22:13:25.000Z",
+          "data": {
+            "command": "inert unknown root",
+            "values": [
+              null,
+              "future"
+            ]
+          }
+        },
+        {
+          "type": "label",
+          "id": "future-label",
+          "parentId": "future-root",
+          "timestamp": "2023-11-14T22:13:26.000Z",
+          "targetId": "meta-state",
+          "label": "Metadata bookmark"
+        }
+      ],
+      "operations": []
+    }
+  ]
+}

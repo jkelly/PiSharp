@@ -1,0 +1,56 @@
+{
+  "schema": "original-todo-node-lifecycle-source-contract-v1",
+  "pinnedPiVersion": "0.99.1",
+  "pinnedPiCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "nativeCounterpartCandidate": "a519ae9dfde165f05da6731bfb52b7e93a3e4247",
+  "nativeCounterpartTree": "876031fce855114d05b9de4ed33bec061cb62435",
+  "nativeAbiAcknowledged": true,
+  "independentlyReviewed": false,
+  "runtimeQualified": false,
+  "method": "command-input.session-event",
+  "sessionHandlers": [
+    "callbackId",
+    "sourcePath",
+    "topic"
+  ],
+  "supportedEvents": [
+    "session_start",
+    "session_tree"
+  ],
+  "snapshotFields": [
+    "sessionId",
+    "generation",
+    "selectedLeafId",
+    "branchEntries",
+    "persistence"
+  ],
+  "snapshotPresence": [
+    "unavailable",
+    "none",
+    "json"
+  ],
+  "snapshotBytes": 131072,
+  "currentBranchOnly": true,
+  "methods": [
+    "getBranch",
+    "getLeafId",
+    "getSessionId"
+  ],
+  "unsupported": [
+    "getTree",
+    "getEntries",
+    "getHeader",
+    "getSessionFile",
+    "appendMessage",
+    "branch",
+    "resetLeaf",
+    "mutation"
+  ],
+  "ownership": "Actual worker owner/generation/callback-topic/operation and native borrowed-context settlement retained. Every facade method checks creator ALS identity, cancellation and settled fence. Native snapshot generation identifies actual host attachment; it is not equated with unrelated launch/UI generation.",
+  "runner": "Actual original ExtensionRunner.emit, with only the individually admitted callback in its handler snapshot. Original callback retained by reference; original onError evidence and unsubscribe preserved. No duplicate fanout across registry observations.",
+  "nativeRendererMetadata": "Validate optional native snapshot metadata on existing contextual renderer requests; never supply a renderer sessionManager or change component/renderer authority.",
+  "unsupportedCustomRendering": "Existing original custom UI capability/owner checks and unsupported registration diagnostics retained.",
+  "sourceDifferentials": "Four original SessionManager snapshots supplied directly to source loader. These are explicitly source-only, not actual native callback snapshot evidence.",
+  "missingHostSeam": "No current committed selected-leaf navigation -> session_tree observation producer in CLI/core; requires owner outside Node lane.",
+  "execution": "None performed. Exact reviewed packet and qualified owner grant still required; separate checkout/output/cache/TEMP/actor and no live/process/file-write tools."
+}

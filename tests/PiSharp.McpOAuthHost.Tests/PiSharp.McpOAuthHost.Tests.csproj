@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Library</OutputType><AssemblyName>PiSharp.McpOAuthHost.Tests</AssemblyName></PropertyGroup><ItemGroup><ProjectReference Include="../../src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" /></ItemGroup></Project>

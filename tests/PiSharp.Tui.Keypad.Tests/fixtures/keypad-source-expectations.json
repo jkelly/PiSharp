@@ -1,0 +1,918 @@
+{
+  "createdUtc": "2026-10-03T05:52:27.325Z",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceObservations": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-p5-08-post-r3-audit\\keypad-source-observations.json",
+    "bytes": 13820,
+    "sha256": "b2de22acdfea6171678562a000419773b7a290f323f60c2b1d41a36263767166"
+  },
+  "inputs": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-p5-08-post-r3-audit\\keypad-inputs.json",
+    "bytes": 3859,
+    "sha256": "72ef52a7cfdd8d6813ee0df84d62d020118e4014947c7b1e79623d4ede0a8493"
+  },
+  "cases": [
+    {
+      "id": "kitty-keypad-0",
+      "raw": "\u001b[57399u",
+      "expected": {
+        "kind": "key",
+        "key": "0",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "0",
+      "sourcePrintable": "0",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-1",
+      "raw": "\u001b[57400u",
+      "expected": {
+        "kind": "key",
+        "key": "1",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "1",
+      "sourcePrintable": "1",
+      "sourcePublicEditor": {
+        "text": "ab1",
+        "expandedText": "ab1",
+        "cursor": {
+          "line": 0,
+          "col": 3
+        },
+        "changes": [
+          "ab",
+          "ab1"
+        ],
+        "submits": [],
+        "renderRequests": 0
+      },
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-2",
+      "raw": "\u001b[57401u",
+      "expected": {
+        "kind": "key",
+        "key": "2",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "2",
+      "sourcePrintable": "2",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-3",
+      "raw": "\u001b[57402u",
+      "expected": {
+        "kind": "key",
+        "key": "3",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "3",
+      "sourcePrintable": "3",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-4",
+      "raw": "\u001b[57403u",
+      "expected": {
+        "kind": "key",
+        "key": "4",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "4",
+      "sourcePrintable": "4",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-5",
+      "raw": "\u001b[57404u",
+      "expected": {
+        "kind": "key",
+        "key": "5",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "5",
+      "sourcePrintable": "5",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-6",
+      "raw": "\u001b[57405u",
+      "expected": {
+        "kind": "key",
+        "key": "6",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "6",
+      "sourcePrintable": "6",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-7",
+      "raw": "\u001b[57406u",
+      "expected": {
+        "kind": "key",
+        "key": "7",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "7",
+      "sourcePrintable": "7",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-8",
+      "raw": "\u001b[57407u",
+      "expected": {
+        "kind": "key",
+        "key": "8",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "8",
+      "sourcePrintable": "8",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-9",
+      "raw": "\u001b[57408u",
+      "expected": {
+        "kind": "key",
+        "key": "9",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "9",
+      "sourcePrintable": "9",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-decimal",
+      "raw": "\u001b[57409u",
+      "expected": {
+        "kind": "key",
+        "key": ".",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": ".",
+      "sourcePrintable": ".",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-divide",
+      "raw": "\u001b[57410u",
+      "expected": {
+        "kind": "key",
+        "key": "/",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "/",
+      "sourcePrintable": "/",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-multiply",
+      "raw": "\u001b[57411u",
+      "expected": {
+        "kind": "key",
+        "key": "*",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "*",
+      "sourcePrintable": "*",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-subtract",
+      "raw": "\u001b[57412u",
+      "expected": {
+        "kind": "key",
+        "key": "-",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "-",
+      "sourcePrintable": "-",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-add",
+      "raw": "\u001b[57413u",
+      "expected": {
+        "kind": "key",
+        "key": "+",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "+",
+      "sourcePrintable": "+",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-enter",
+      "raw": "\u001b[57414u",
+      "expected": {
+        "kind": "key",
+        "key": "Enter",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "enter",
+      "sourcePrintable": "",
+      "sourcePublicEditor": {
+        "text": "",
+        "expandedText": "",
+        "cursor": {
+          "line": 0,
+          "col": 0
+        },
+        "changes": [
+          "ab",
+          ""
+        ],
+        "submits": [
+          "ab"
+        ],
+        "renderRequests": 0
+      },
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-equal",
+      "raw": "\u001b[57415u",
+      "expected": {
+        "kind": "key",
+        "key": "=",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "=",
+      "sourcePrintable": "=",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-separator",
+      "raw": "\u001b[57416u",
+      "expected": {
+        "kind": "key",
+        "key": ",",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": ",",
+      "sourcePrintable": ",",
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-left",
+      "raw": "\u001b[57417u",
+      "expected": {
+        "kind": "key",
+        "key": "Left",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "left",
+      "sourcePrintable": null,
+      "sourcePublicEditor": {
+        "text": "ab",
+        "expandedText": "ab",
+        "cursor": {
+          "line": 0,
+          "col": 1
+        },
+        "changes": [
+          "ab"
+        ],
+        "submits": [],
+        "renderRequests": 0
+      },
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-right",
+      "raw": "\u001b[57418u",
+      "expected": {
+        "kind": "key",
+        "key": "Right",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "right",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-up",
+      "raw": "\u001b[57419u",
+      "expected": {
+        "kind": "key",
+        "key": "Up",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "up",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-down",
+      "raw": "\u001b[57420u",
+      "expected": {
+        "kind": "key",
+        "key": "Down",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "down",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-pageup",
+      "raw": "\u001b[57421u",
+      "expected": {
+        "kind": "key",
+        "key": "PageUp",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "pageUp",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-pagedown",
+      "raw": "\u001b[57422u",
+      "expected": {
+        "kind": "key",
+        "key": "PageDown",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "pageDown",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-home",
+      "raw": "\u001b[57423u",
+      "expected": {
+        "kind": "key",
+        "key": "Home",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "home",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-end",
+      "raw": "\u001b[57424u",
+      "expected": {
+        "kind": "key",
+        "key": "End",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "end",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-insert",
+      "raw": "\u001b[57425u",
+      "expected": {
+        "kind": "key",
+        "key": "Insert",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "insert",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-delete",
+      "raw": "\u001b[57426u",
+      "expected": {
+        "kind": "key",
+        "key": "Delete",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "delete",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "kitty-keypad-enter-shift",
+      "raw": "\u001b[57414;2u",
+      "expected": {
+        "kind": "key",
+        "key": "Enter",
+        "modifiers": "Shift",
+        "action": "Press"
+      },
+      "sourceParsedKey": "shift+enter",
+      "sourcePrintable": "",
+      "sourcePublicEditor": {
+        "text": "ab\n",
+        "expandedText": "ab\n",
+        "cursor": {
+          "line": 1,
+          "col": 0
+        },
+        "changes": [
+          "ab",
+          "ab\n"
+        ],
+        "submits": [],
+        "renderRequests": 0
+      },
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "kitty-keypad-enter-alt",
+      "raw": "\u001b[57414;3u",
+      "expected": {
+        "kind": "key",
+        "key": "Enter",
+        "modifiers": "Alt",
+        "action": "Press"
+      },
+      "sourceParsedKey": "alt+enter",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "kitty-keypad-enter-ctrl",
+      "raw": "\u001b[57414;5u",
+      "expected": {
+        "kind": "key",
+        "key": "Enter",
+        "modifiers": "Control",
+        "action": "Press"
+      },
+      "sourceParsedKey": "ctrl+enter",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "kitty-keypad-enter-super",
+      "raw": "\u001b[57414;9u",
+      "expected": {
+        "kind": "key",
+        "key": "Enter",
+        "modifiers": "Super",
+        "action": "Press"
+      },
+      "sourceParsedKey": "super+enter",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "legacy-keypad-enter-ss3-m",
+      "raw": "\u001bOM",
+      "expected": {
+        "kind": "key",
+        "key": "Enter",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "enter",
+      "sourcePrintable": null,
+      "sourcePublicEditor": {
+        "text": "",
+        "expandedText": "",
+        "cursor": {
+          "line": 0,
+          "col": 0
+        },
+        "changes": [
+          "ab",
+          ""
+        ],
+        "submits": [
+          "ab"
+        ],
+        "renderRequests": 0
+      },
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "control-primary-enter-cr",
+      "raw": "\r",
+      "expected": {
+        "kind": "key",
+        "key": "Enter",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "enter",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "control-primary-arrow-left",
+      "raw": "\u001b[D",
+      "expected": {
+        "kind": "key",
+        "key": "Left",
+        "modifiers": "None",
+        "action": "Press"
+      },
+      "sourceParsedKey": "left",
+      "sourcePrintable": null,
+      "sourcePublicEditor": null,
+      "splitOffsets": [
+        0,
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "expectedCases": 35,
+  "expectedSplitSchedules": 306,
+  "expectationBoundary": "Exact public-source35key identities; parsed key name capitalization maps to established native TerminalKey names. No native current result used to define a future expected key. Source printable identity is retained separately for pending-jump routing."
+}

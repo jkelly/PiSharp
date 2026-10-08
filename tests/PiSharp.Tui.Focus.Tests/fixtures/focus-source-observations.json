@@ -1,0 +1,2144 @@
+{
+  "createdUtc": "2026-10-03T07:27:08.670Z",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "boundary": "Unchanged public TuiAltScreen.setFocus/start/installed terminal input callback/renderNow/stop and Editor public state; no private state/method/input replacement",
+  "manifest": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\source-manifest.json",
+    "bytes": 969151,
+    "sha256": "772c23326a8a341cc40235a95366639ea28cca1823089969cee1c5deb58b4048"
+  },
+  "inputs": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-focus-ownership-preparation\\focus-source-inputs.json",
+    "bytes": 3211,
+    "sha256": "ca63942667054b55c71386dc1701cf7ca64d0e36229510059d687efa3fb54d50"
+  },
+  "driver": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-focus-ownership-preparation\\capture-focus-source.mjs",
+    "bytes": 5028,
+    "sha256": "19d0bce240fb1186e3df051428de1fcb954a09471a7e321f03683370e77de9e7"
+  },
+  "node": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "bytes": 92825416,
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "loadedFiles": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\editor.ts",
+      "bytes": 84348,
+      "sha256": "30a47fd49042579be7b85262677df62d4ff37a8f9a3a0e6c41ce3cf1d402b9c3"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keybindings.ts",
+      "bytes": 10125,
+      "sha256": "eea5e3fe258ad50337595bb5320955a6d97bac0c8f6c0a838f988d75079bcf38"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\kill-ring.ts",
+      "bytes": 1295,
+      "sha256": "d829ae816560b12d2800a38db9f7278f76d9ef43d0e53e004a86add9b56c559a"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\tui.ts",
+      "bytes": 49604,
+      "sha256": "92dcb7f5f9a3a9575421d8de366be5cc78890be8df38d86c4ed3c0d77c7f88a4"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\terminal-colors.ts",
+      "bytes": 3082,
+      "sha256": "72d1ef298837bfe520bd8a060cb93ea27547dcbff04a167ace0f55b5183e550d"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\terminal-image.ts",
+      "bytes": 23218,
+      "sha256": "b901b8df0ad84e04ac0ee612c419b45d960430f63d2bdaa974c8dd9d89f3e6e5"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\utils.ts",
+      "bytes": 38919,
+      "sha256": "5ecbc6c9b4850e78bf19de1fe8859b99b9c4c5f8a6384728d255a8e7e8a610ee"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\index.js",
+      "bytes": 730,
+      "sha256": "d7b1ba05914c0fc311c20e5618bf8d0893c9c74078a07975e2df981445e64887"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\lookup.js",
+      "bytes": 2671,
+      "sha256": "c80ecc22b120b27ef5ea9facb7000b8fd4ec037a84d9231d215f1c44bc9c21d0"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\lookup-data.js",
+      "bytes": 4734,
+      "sha256": "f6b40f86c9a2a6808ec808fa8ddcb8da261254cc6121d37ffaeb2bf35dad1d5b"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\utilities.js",
+      "bytes": 650,
+      "sha256": "4b08a7e9e3ffacbcf198a6abceb2338d52ac671899e52ccc2851c898bfccac42"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\undo-stack.ts",
+      "bytes": 643,
+      "sha256": "1373c1e0a1e2c58ac90c93d32a9e5c1226d7f53314c77dd3d0f8ec349d2b3627"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\word-navigation.ts",
+      "bytes": 3987,
+      "sha256": "b73e915a524926ac8881731e89026b0bc7b5b0bd465de67257af81a420465c7f"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\select-list.ts",
+      "bytes": 9385,
+      "sha256": "0fc369801e745eff15567d72829bf67887f5efec8bc6816aaf1ee65338618373"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\tui-alt-screen.ts",
+      "bytes": 63272,
+      "sha256": "04f22573b153bb26eaa0d02b53d0bc2b812cec0c506873f6d031a8f2263a2142"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\alt-screen-search.ts",
+      "bytes": 11087,
+      "sha256": "7d339e83cf0f160847335dc9be0d1f1db2a0945c463c3d636c7b84ceb9665d40"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\input.ts",
+      "bytes": 15230,
+      "sha256": "416ceeb28f10b7146f6a284f276589797763b604d439574fbdc2a3ca52c00234"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\alt-screen-flash.ts",
+      "bytes": 1289,
+      "sha256": "6d341546b59958e93e4d33fdc1766b10d13c98a779031e2c01b827f0a4c6e30c"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\scroll-view.ts",
+      "bytes": 8168,
+      "sha256": "76dfd9f8a88cabc064f0652b83f16a945fbc988c9fe7c0423a4cd796907ef77d"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\layout-node.ts",
+      "bytes": 1364,
+      "sha256": "31dd68c9edafdc4f882bbb6c16f8deb1c514111020b647f0037b34d6b8c70a85"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\layout.ts",
+      "bytes": 15758,
+      "sha256": "7530a8eaa30f44fef82e8b7020b5068ba89d34884463c6cb526073b20fcdeef0"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\stack.ts",
+      "bytes": 5216,
+      "sha256": "93208d326fa43431b930eaa3250a1e19747063d696e97ec2f002f5feaa54fc18"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\wheel-scroll.ts",
+      "bytes": 2897,
+      "sha256": "a969a50d0a3627fde0052f766443e3668a6355b3ecf312ea078025080d303f82"
+    }
+  ],
+  "effects": [],
+  "cases": [
+    {
+      "id": "editor-null-editor-ownership",
+      "steps": [
+        {
+          "operation": {
+            "kind": "focus",
+            "target": "first"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "ab"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "ab",
+              "expandedText": "ab",
+              "cursor": {
+                "line": 0,
+                "col": 2
+              },
+              "rows": [
+                "────────────────────",
+                "ab\u001b_pi:c\u0007\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "ab"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "focus",
+            "target": null
+          },
+          "declaredOwner": null,
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "ab",
+              "expandedText": "ab",
+              "cursor": {
+                "line": 0,
+                "col": 2
+              },
+              "rows": [
+                "────────────────────",
+                "ab\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "ab"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "x"
+          },
+          "declaredOwner": null,
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "ab",
+              "expandedText": "ab",
+              "cursor": {
+                "line": 0,
+                "col": 2
+              },
+              "rows": [
+                "────────────────────",
+                "ab\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "ab"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~漢😀\u001b[201~"
+          },
+          "declaredOwner": null,
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "ab",
+              "expandedText": "ab",
+              "cursor": {
+                "line": 0,
+                "col": 2
+              },
+              "rows": [
+                "────────────────────",
+                "ab\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "ab"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\r"
+          },
+          "declaredOwner": null,
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "ab",
+              "expandedText": "ab",
+              "cursor": {
+                "line": 0,
+                "col": 2
+              },
+              "rows": [
+                "────────────────────",
+                "ab\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "ab"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u0003"
+          },
+          "declaredOwner": null,
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "ab",
+              "expandedText": "ab",
+              "cursor": {
+                "line": 0,
+                "col": 2
+              },
+              "rows": [
+                "────────────────────",
+                "ab\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "ab"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "focus",
+            "target": "first"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "ab",
+              "expandedText": "ab",
+              "cursor": {
+                "line": 0,
+                "col": 2
+              },
+              "rows": [
+                "────────────────────",
+                "ab\u001b_pi:c\u0007\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "ab"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;3H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "y"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "aby",
+              "expandedText": "aby",
+              "cursor": {
+                "line": 0,
+                "col": 3
+              },
+              "rows": [
+                "────────────────────",
+                "aby\u001b_pi:c\u0007\u001b[7m \u001b[0m                ",
+                "────────────────────"
+              ],
+              "changes": [
+                "ab",
+                "aby"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kaby\u001b[7m \u001b[0m                \u001b[0m\u001b]8;;\u0007\u001b[2;4H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\r"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [
+                "ab",
+                "aby",
+                ""
+              ],
+              "submits": [
+                "aby"
+              ]
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kaby\u001b[7m \u001b[0m                \u001b[0m\u001b]8;;\u0007\u001b[2;4H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[?25h\u001b[?2026l"
+          ]
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "editor-owner-transfer",
+      "steps": [
+        {
+          "operation": {
+            "kind": "focus",
+            "target": "first"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "a"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "a",
+              "expandedText": "a",
+              "cursor": {
+                "line": 0,
+                "col": 1
+              },
+              "rows": [
+                "────────────────────",
+                "a\u001b_pi:c\u0007\u001b[7m \u001b[0m                  ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka\u001b[7m \u001b[0m                  \u001b[0m\u001b]8;;\u0007\u001b[2;2H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "focus",
+            "target": "second"
+          },
+          "declaredOwner": "second",
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "a",
+              "expandedText": "a",
+              "cursor": {
+                "line": 0,
+                "col": 1
+              },
+              "rows": [
+                "────────────────────",
+                "a\u001b[7m \u001b[0m                  ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": true,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka\u001b[7m \u001b[0m                  \u001b[0m\u001b]8;;\u0007\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[5;1H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "漢"
+          },
+          "declaredOwner": "second",
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "a",
+              "expandedText": "a",
+              "cursor": {
+                "line": 0,
+                "col": 1
+              },
+              "rows": [
+                "────────────────────",
+                "a\u001b[7m \u001b[0m                  ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": true,
+              "text": "漢",
+              "expandedText": "漢",
+              "cursor": {
+                "line": 0,
+                "col": 1
+              },
+              "rows": [
+                "────────────────────",
+                "漢\u001b_pi:c\u0007\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "漢"
+              ],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka\u001b[7m \u001b[0m                  \u001b[0m\u001b]8;;\u0007\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[5;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[5;1H\u001b[2K漢\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[5;3H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "focus",
+            "target": "first"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "a",
+              "expandedText": "a",
+              "cursor": {
+                "line": 0,
+                "col": 1
+              },
+              "rows": [
+                "────────────────────",
+                "a\u001b_pi:c\u0007\u001b[7m \u001b[0m                  ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "漢",
+              "expandedText": "漢",
+              "cursor": {
+                "line": 0,
+                "col": 1
+              },
+              "rows": [
+                "────────────────────",
+                "漢\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "漢"
+              ],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka\u001b[7m \u001b[0m                  \u001b[0m\u001b]8;;\u0007\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[5;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[5;1H\u001b[2K漢\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[5;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;2H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "b"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "ab",
+              "expandedText": "ab",
+              "cursor": {
+                "line": 0,
+                "col": 2
+              },
+              "rows": [
+                "────────────────────",
+                "ab\u001b_pi:c\u0007\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a",
+                "ab"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "漢",
+              "expandedText": "漢",
+              "cursor": {
+                "line": 0,
+                "col": 1
+              },
+              "rows": [
+                "────────────────────",
+                "漢\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "漢"
+              ],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka\u001b[7m \u001b[0m                  \u001b[0m\u001b]8;;\u0007\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[5;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[5;1H\u001b[2K漢\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[5;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l"
+          ]
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "terminal-window-reports-are-not-component-focus",
+      "steps": [
+        {
+          "operation": {
+            "kind": "focus",
+            "target": "first"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "a"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "a",
+              "expandedText": "a",
+              "cursor": {
+                "line": 0,
+                "col": 1
+              },
+              "rows": [
+                "────────────────────",
+                "a\u001b_pi:c\u0007\u001b[7m \u001b[0m                  ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka\u001b[7m \u001b[0m                  \u001b[0m\u001b]8;;\u0007\u001b[2;2H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[O"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "a",
+              "expandedText": "a",
+              "cursor": {
+                "line": 0,
+                "col": 1
+              },
+              "rows": [
+                "────────────────────",
+                "a\u001b_pi:c\u0007\u001b[7m \u001b[0m                  ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka\u001b[7m \u001b[0m                  \u001b[0m\u001b]8;;\u0007\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;2H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "b"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "ab",
+              "expandedText": "ab",
+              "cursor": {
+                "line": 0,
+                "col": 2
+              },
+              "rows": [
+                "────────────────────",
+                "ab\u001b_pi:c\u0007\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a",
+                "ab"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka\u001b[7m \u001b[0m                  \u001b[0m\u001b]8;;\u0007\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[I"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "ab",
+              "expandedText": "ab",
+              "cursor": {
+                "line": 0,
+                "col": 2
+              },
+              "rows": [
+                "────────────────────",
+                "ab\u001b_pi:c\u0007\u001b[7m \u001b[0m                 ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a",
+                "ab"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka\u001b[7m \u001b[0m                  \u001b[0m\u001b]8;;\u0007\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;3H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "c"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "abc",
+              "expandedText": "abc",
+              "cursor": {
+                "line": 0,
+                "col": 3
+              },
+              "rows": [
+                "────────────────────",
+                "abc\u001b_pi:c\u0007\u001b[7m \u001b[0m                ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a",
+                "ab",
+                "abc"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka\u001b[7m \u001b[0m                  \u001b[0m\u001b]8;;\u0007\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;2H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kab\u001b[7m \u001b[0m                 \u001b[0m\u001b]8;;\u0007\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;3H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kabc\u001b[7m \u001b[0m                \u001b[0m\u001b]8;;\u0007\u001b[2;4H\u001b[?25h\u001b[?2026l"
+          ]
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "owner-recreation",
+      "steps": [
+        {
+          "operation": {
+            "kind": "focus",
+            "target": "first"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "a漢😀"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "a漢😀",
+              "expandedText": "a漢😀",
+              "cursor": {
+                "line": 0,
+                "col": 4
+              },
+              "rows": [
+                "────────────────────",
+                "a漢😀\u001b_pi:c\u0007\u001b[7m \u001b[0m              ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a漢😀"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka漢😀\u001b[7m \u001b[0m              \u001b[0m\u001b]8;;\u0007\u001b[2;6H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "focus",
+            "target": null
+          },
+          "declaredOwner": null,
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "a漢😀",
+              "expandedText": "a漢😀",
+              "cursor": {
+                "line": 0,
+                "col": 4
+              },
+              "rows": [
+                "────────────────────",
+                "a漢😀\u001b[7m \u001b[0m              ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a漢😀"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka漢😀\u001b[7m \u001b[0m              \u001b[0m\u001b]8;;\u0007\u001b[2;6H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "recreate",
+            "target": "first"
+          },
+          "declaredOwner": null,
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a漢😀"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka漢😀\u001b[7m \u001b[0m              \u001b[0m\u001b]8;;\u0007\u001b[2;6H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "x"
+          },
+          "declaredOwner": null,
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a漢😀"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka漢😀\u001b[7m \u001b[0m              \u001b[0m\u001b]8;;\u0007\u001b[2;6H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "focus",
+            "target": "first"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a漢😀"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka漢😀\u001b[7m \u001b[0m              \u001b[0m\u001b]8;;\u0007\u001b[2;6H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[5;1H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "b"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "b",
+              "expandedText": "b",
+              "cursor": {
+                "line": 0,
+                "col": 1
+              },
+              "rows": [
+                "────────────────────",
+                "b\u001b_pi:c\u0007\u001b[7m \u001b[0m                  ",
+                "────────────────────"
+              ],
+              "changes": [
+                "a漢😀",
+                "b"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Ka漢😀\u001b[7m \u001b[0m              \u001b[0m\u001b]8;;\u0007\u001b[2;6H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[5;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[5;1H\u001b[2Kb\u001b[7m \u001b[0m                  \u001b[0m\u001b]8;;\u0007\u001b[5;2H\u001b[?25h\u001b[?2026l"
+          ]
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "pending-jump-survives-owner-null",
+      "steps": [
+        {
+          "operation": {
+            "kind": "focus",
+            "target": "first"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b_pi:c\u0007\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "abca"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "abca",
+              "expandedText": "abca",
+              "cursor": {
+                "line": 0,
+                "col": 4
+              },
+              "rows": [
+                "────────────────────",
+                "abca\u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+                "────────────────────"
+              ],
+              "changes": [
+                "abca"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kabca\u001b[7m \u001b[0m               \u001b[0m\u001b]8;;\u0007\u001b[2;5H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u0001"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "abca",
+              "expandedText": "abca",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b_pi:c\u0007\u001b[7ma\u001b[0mbca                ",
+                "────────────────────"
+              ],
+              "changes": [
+                "abca"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kabca\u001b[7m \u001b[0m               \u001b[0m\u001b]8;;\u0007\u001b[2;5H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2K\u001b[7ma\u001b[0mbca                \u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001d"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "abca",
+              "expandedText": "abca",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b_pi:c\u0007\u001b[7ma\u001b[0mbca                ",
+                "────────────────────"
+              ],
+              "changes": [
+                "abca"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kabca\u001b[7m \u001b[0m               \u001b[0m\u001b]8;;\u0007\u001b[2;5H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2K\u001b[7ma\u001b[0mbca                \u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "focus",
+            "target": null
+          },
+          "declaredOwner": null,
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "abca",
+              "expandedText": "abca",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7ma\u001b[0mbca                ",
+                "────────────────────"
+              ],
+              "changes": [
+                "abca"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kabca\u001b[7m \u001b[0m               \u001b[0m\u001b]8;;\u0007\u001b[2;5H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2K\u001b[7ma\u001b[0mbca                \u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "b"
+          },
+          "declaredOwner": null,
+          "editors": {
+            "first": {
+              "focused": false,
+              "text": "abca",
+              "expandedText": "abca",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7ma\u001b[0mbca                ",
+                "────────────────────"
+              ],
+              "changes": [
+                "abca"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kabca\u001b[7m \u001b[0m               \u001b[0m\u001b]8;;\u0007\u001b[2;5H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2K\u001b[7ma\u001b[0mbca                \u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "focus",
+            "target": "first"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "abca",
+              "expandedText": "abca",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b_pi:c\u0007\u001b[7ma\u001b[0mbca                ",
+                "────────────────────"
+              ],
+              "changes": [
+                "abca"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kabca\u001b[7m \u001b[0m               \u001b[0m\u001b]8;;\u0007\u001b[2;5H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2K\u001b[7ma\u001b[0mbca                \u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l"
+          ]
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "a"
+          },
+          "declaredOwner": "first",
+          "editors": {
+            "first": {
+              "focused": true,
+              "text": "abca",
+              "expandedText": "abca",
+              "cursor": {
+                "line": 0,
+                "col": 3
+              },
+              "rows": [
+                "────────────────────",
+                "abc\u001b_pi:c\u0007\u001b[7ma\u001b[0m                ",
+                "────────────────────"
+              ],
+              "changes": [
+                "abca"
+              ],
+              "submits": []
+            },
+            "second": {
+              "focused": false,
+              "text": "",
+              "expandedText": "",
+              "cursor": {
+                "line": 0,
+                "col": 0
+              },
+              "rows": [
+                "────────────────────",
+                "\u001b[7m \u001b[0m                   ",
+                "────────────────────"
+              ],
+              "changes": [],
+              "submits": []
+            }
+          },
+          "writes": [
+            "\u001b[?1049h\u001b[?7l\u001b[?1000h\u001b[?1002h\u001b[?1003h\u001b[?1004h\u001b[?1006h\u001b[2J\u001b[H\u001b[?25l",
+            "HIDE",
+            "\u001b[?2026h\u001b[2J\u001b[1;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[3;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[4;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[5;1H\u001b[2K\u001b[7m \u001b[0m                   \u001b[0m\u001b]8;;\u0007\u001b[6;1H\u001b[2K────────────────────\u001b[0m\u001b]8;;\u0007\u001b[7;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[8;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[9;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[10;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[11;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[12;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[13;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[14;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[15;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[16;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[17;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[18;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[19;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[20;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[21;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[22;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[23;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[24;1H\u001b[2K\u001b[0m\u001b]8;;\u0007\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kabca\u001b[7m \u001b[0m               \u001b[0m\u001b]8;;\u0007\u001b[2;5H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2K\u001b[7ma\u001b[0mbca                \u001b[0m\u001b]8;;\u0007\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[?25l\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[?25h\u001b[?2026l",
+            "\u001b[?2026h\u001b[2;1H\u001b[2Kabc\u001b[7ma\u001b[0m                \u001b[0m\u001b]8;;\u0007\u001b[2;4H\u001b[?25h\u001b[?2026l"
+          ]
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+# Azure Responses and Mistral Conversations admission preparation
+
+This source-only composition starts from canonical main `872aa3708f86e0d4c0c048d6b909c43f8b79d8d8` and recovers Azure `be0ae03455f37aca0252d2bdda48c356f381c08c` and Mistral `3d4474e530392ea6ed057ad7a8d70d81ae23e701`. The user confirmed inclusion of both API providers. Their reviewed source slices and shared Mistral routing are preserved; this update registers their existing offline consumers for coordinator review, not live API qualification.
+
+The paused composition `2733c346c5de7b7faa2c20d7f4c6a90bb9540260`, its five uncommitted admission drafts, and `PROVIDER_ADMISSION_PAUSED_HANDOFF.json` remain historical evidence. The latter's SHA-256 is `da37c61a14a6d7aada6fb05525ed076a718d325e71f381d3e51ab71464eff3b5`. Nothing in that worktree was corrected or overwritten. Its known Mistral scope defect is corrected only in this fresh composition.
+
+## Current admission shape
+
+The original 30 current companion records remain in the same order, including the no-worker Node loadout metadata consumer. Azure Responses and Mistral text append in that order, making **32 companions**. Both projects enter the solution's companion folders; their existing project/lock/inventory hashes are pinned. Exact unique prepared roots increase from **51 to 53**, retaining every current root and adding only the two new test output directories. No Node worker target, package acquisition or new dependency is introduced.
+
+Azure's prepared scope has exactly `PiSharp.AzureResponses.Tests`, `PiSharp.AI`, `PiSharp.Agent`, and `PiSharp.Contracts`. Mistral's prepared scope has exactly `PiSharp.MistralConversations.Tests`, `PiSharp.AI`, and `PiSharp.Contracts`; the paused draft incorrectly expected `PiSharp.MistralText.Tests` and an extra Agent assembly. Scope receipts require actual successful original locked-restore/full-solution-build steps, matching logs and source/project/lock/solution/host/product identities. Existing source closure, SDK policy, output joins and deadlines remain in force. Prepared-scope declarations are not passing runtime receipts.
+
+All **100 current admission controls** retain their IDs and assertions, with cardinality expectations updated for the two appended consumers. Controls **101-172** carry forward the paused provider declaration coverage against current roots/order/counts; **173-174** explicitly reject the two prior Mistral defects. Exact positive three-assembly Mistral and four-assembly Azure scope controls are included. None of these controls has run on this candidate. Azure's 15 and Mistral's 23 authored offline provider groups remain unexecuted here; prior main baseline or tool-smoke results are not transferred to this composition.
+
+## Coordinator handoff and limits
+
+Review the immutable composition plus admission patch and freshly pinned source before integration. The coordinator owns subsequent canonical integration, new source admission, locked offline preparation, controls and provider consumer runs after the current lifecycle run. Any later base/source/generated/receipt change requires matching pins and its own evidence. No compile, test, provider launch, credential lookup, live API call, main merge, push or publication occurred in this lane. The compiler security pause remains in effect; this source review does not authorize compiler execution.
+
+The adapters remain bounded explicit-configuration slices described in the [Azure contract](../contracts/azure-responses-explicit-adapter.md) and [Mistral handoff](../../src/PiSharp.AI/Protocols/MistralConversations/HANDOFF.md). Whole-provider/catalog parity, upstream/source differential evidence, broader session/platform behavior, live API qualification and phase/release acceptance remain open. No broad phase percentage or original acceptance gate is updated.

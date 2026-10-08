@@ -34,6 +34,7 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
     private readonly List<CancellationTokenSource> lifetimes = [];
     private readonly List<PersistentAgentSession> sessions = [];
     private CancellationTokenSource? transitionCancellation;
+    private CancellationTokenSource? committedNotificationLifetime;
     private AgentSessionAttachment current;
     private Task? disposal;
     private bool closed, cancellationCallbackFailed;
@@ -44,8 +45,15 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
     public ReplaceableAgentSession(PersistentAgentSession initial,
         Func<AgentSessionSwitchRequest, CancellationToken, Task<PersistentAgentSession>> openReplacement,
         PersistentSessionLifecycle? creationServices)
+        : this(initial, openReplacement, creationServices, false) { }
+
+    private ReplaceableAgentSession(PersistentAgentSession initial,
+        Func<AgentSessionSwitchRequest, CancellationToken, Task<PersistentAgentSession>> openReplacement,
+        PersistentSessionLifecycle? creationServices, bool retainInitialReservation)
     {
         ArgumentNullException.ThrowIfNull(initial); ArgumentNullException.ThrowIfNull(openReplacement);
+        if (initial.RequiresRuntimeOwnerBinding && !retainInitialReservation)
+            throw new ArgumentException("Owned runtime binding requires asynchronous lifecycle attachment.", nameof(initial));
         var state = initial.Snapshot;
         if (state.IsDisposed || state.IsRetired || state.IsAdmittingInput || state.IsConfiguring || state.IsAppendingExtensionEntry || state.IsEditingContext ||
             state.Agent.IsRunning || state.IsProcessingOperation || state.IsCompacting || state.Fault is not null)
@@ -54,8 +62,13 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
         var lifetime = new CancellationTokenSource();
         try
         {
-            using var reservation = initial.ReserveReplacement();
-            initial.BindInvocationOwner(1, lifetime.Token);
+            var reservation = initial.ReserveReplacement();
+            try
+            {
+                initial.BindInvocationOwner(1, lifetime.Token);
+                if (retainInitialReservation) initialRuntimeReservation = reservation;
+            }
+            finally { if (!retainInitialReservation || initialRuntimeReservation is null) reservation.Dispose(); }
         }
         catch { lifetime.Dispose(); throw; }
         lifetimes.Add(lifetime);
@@ -74,7 +87,12 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(initial); ArgumentNullException.ThrowIfNull(services);
         ReplaceableAgentSession? result = null;
-        result = new(initial, (request, token) => services.OpenAsync(request, result!.Current.Session.Snapshot.Agent.Model, token), services);
+        result = new(initial, (request, token) =>
+        {
+            var captured = result!.Current;
+            return services.OpenForAttachmentAsync(request, captured.Session.Snapshot.Agent.Model,
+                checked(captured.Generation + 1), token);
+        }, services);
         return result;
     }
     public Task<SessionCatalogPage> ListSessionsAsync(AgentSessionAttachment expected, SessionCatalogQuery query,
@@ -149,6 +167,10 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
     public Func<AgentSessionAttachment, PersistentAgentSession, CancellationToken, ValueTask<bool>>? BeforeReplacement { get; set; }
     public Func<AgentSessionReplacement, ValueTask>? AfterReplacement { get; set; }
     public Func<AgentSessionReplacement, ValueTask>? AttachmentChanged { get; set; }
+    /// <summary>Final admitted outgoing-session notification, after target preflight and vetoes,
+    /// before writer/capability retirement. Awaited under the original transition reservation;
+    /// caller cancellation is shielded once admitted. Failure retains the source and rolls back staging.</summary>
+    public Func<AgentSessionAttachment, PersistentAgentSession, string, ValueTask>? BeforeRetirement { get; set; }
     /// <summary>Host policy for every actual reserved target, including contexts delivered by lifecycle
     /// notifications. A failure precedes physical source retirement and publication.</summary>
     public Func<AgentSessionAttachment, PersistentAgentSession, CancellationToken, ValueTask>? ValidateTargetAttachment { get; set; }
@@ -158,8 +180,24 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
         lock (gate)
         {
             if (closed) throw new ObjectDisposedException(nameof(ReplaceableAgentSession));
-            if (!ReferenceEquals(current, attachment)) throw new InvalidOperationException("Session context is stale.");
+            if (!ReferenceEquals(current, attachment) || ReferenceEquals(reloadInvalidatedAttachment, attachment))
+                throw new InvalidOperationException("Session context is stale.");
         }
+    }
+
+    public async Task<PiSharp.Sessions.Serialization.SessionEntry> SetSessionNameAsync(AgentSessionAttachment attachment,
+        string name, CancellationToken token = default)
+    {
+        RejectTransitionReentrancy(); ValidateAttachment(attachment);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, closing.Token, attachment.LifetimeToken);
+        await mutations.WaitAsync(linked.Token).ConfigureAwait(false);
+        var priorMutation = inMutation.Value; inMutation.Value = true;
+        try
+        {
+            ValidateAttachment(attachment);
+            return await attachment.Session.SetSessionNameAsync(attachment.Session.Snapshot.Log.Header.Id, name, linked.Token).ConfigureAwait(false);
+        }
+        finally { inMutation.Value = priorMutation; mutations.Release(); }
     }
 
     public async Task<SessionExtensionEntryReceipt> AppendExtensionEntryAsync(AgentSessionAttachment attachment,
@@ -196,14 +234,15 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
 
     public async Task<SessionSummaryCheckpointReceipt?> CompactAsync(AgentSessionAttachment attachment,
         SessionCompactionRequest request, ISessionSummaryGenerator generator, CancellationToken token = default,
-        Func<SessionSummaryCheckpointPreview, CancellationToken, ValueTask>? preflight = null)
+        Func<SessionSummaryCheckpointPreview, CancellationToken, ValueTask>? preflight = null,
+        Func<CancellationToken, ValueTask>? onStarted = null)
     {
         RejectTransitionReentrancy(); ValidateAttachment(attachment);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, closing.Token, attachment.LifetimeToken);
         await mutations.WaitAsync(linked.Token).ConfigureAwait(false);
         var priorMutation = inMutation.Value; inMutation.Value = true;
         try { ValidateAttachment(attachment); return await attachment.Session.CompactAsync(attachment.Session.Snapshot.Log.Header.Id,
-            request, generator, linked.Token, preflight).ConfigureAwait(false); }
+            request, generator, linked.Token, preflight, onStarted).ConfigureAwait(false); }
         finally { inMutation.Value = priorMutation; mutations.Release(); }
     }
     public async Task ConfigureAutomaticCompactionAsync(AgentSessionAttachment attachment, ISessionSummaryGenerator? generator,
@@ -282,13 +321,18 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
         Func<AgentSessionAttachment, PersistentAgentSession, CancellationToken, ValueTask<bool>>? beforeSwitch,
         Func<AgentSessionReplacement, ValueTask>? afterSwitch,
         Func<PersistentAgentSession, string?, CancellationToken, ValueTask>? beforeAttach, CancellationToken cancellationToken,
-        string replacementReason = "switch")
+        string replacementReason = "switch", SessionCreationSetupCallback? setup = null,
+        Func<PersistentAgentSession, CancellationToken, ValueTask>? validateAfterSetup = null)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, closing.Token, expected.LifetimeToken);
         await mutations.WaitAsync(linked.Token).ConfigureAwait(false);
         PersistentAgentSession? staged = null;
         CancellationTokenSource? stagedLifetime = null;
+        CancellationTokenSource? notificationLifetime = null;
         PersistentSessionLifecycle.PreparedCreation? created = null;
+        Exception? replacementPrimary = null;
+        var replacementOriginals = new SessionBoundaryOriginals();
+        SessionCreationSetupWriter? setupManager = null;
         var priorTransition = inTransition.Value; inTransition.Value = true;
         try
         {
@@ -296,6 +340,7 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
             lock (gate) transitionCancellation = linked;
             lock (gate) if (lifetimes.Count >= MaximumAttachments) throw new InvalidOperationException("Session attachment limit reached; restart the host.");
             using var reservation = expected.Session.ReserveReplacement();
+            var retainedRetry = expected.Session.CaptureRetryAdmission();
             if (creation is not null)
             {
                 if (BeforeCreation is { } veto && !await veto(expected, creation, linked.Token).ConfigureAwait(false)) return null;
@@ -315,14 +360,30 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
             // A factory or preflight callback may retain the actual target coordinator. Its idle snapshot is
             // only an observation; reserve availability through publication so those handles cannot start
             // a checkpoint, input, configuration, queue mutation or disposal in the intervening interval.
+            staged.RetainRetryAdmission(retainedRetry);
             using var targetReservation = staged.ReserveReplacement();
+            if (expected.Session.LifetimeToolSelection is { } retainedSelection && !ReferenceEquals(staged.LifetimeToolSelection, retainedSelection))
+                throw new InvalidOperationException("Replacement factory must retain the attachment's exact lifetime tool selection before admission.");
             var preflight = creation is null ? beforeSwitch ?? BeforeReplacement : null;
             if (preflight is not null && !await preflight(expected, staged, linked.Token).ConfigureAwait(false)) return null;
             if (beforeAttach is not null) await beforeAttach(staged, created?.SelectedText, linked.Token).ConfigureAwait(false);
+            if (setup is not null)
+            {
+                setupManager = targetReservation.CreateSetupWriter(linked.Token);
+                await replacementOriginals.Join(setupManager.Run(setup, linked.Token), "replacement-setup").ConfigureAwait(false);
+            }
+            if (validateAfterSetup is not null)
+                await replacementOriginals.Join(validateAfterSetup(staged, linked.Token).AsTask(), "replacement-post-setup-validator").ConfigureAwait(false);
             if (ValidateTargetAttachment is { } validateTarget) await validateTarget(expected, staged, linked.Token).ConfigureAwait(false);
             linked.Token.ThrowIfCancellationRequested();
             stagedLifetime = new CancellationTokenSource();
             staged.BindInvocationOwner(checked(expected.Generation + 1), stagedLifetime.Token);
+            await targetReservation.DrainLoadoutDiagnosticsAsync(linked.Token).ConfigureAwait(false);
+            linked.Token.ThrowIfCancellationRequested();
+            var reason = creation?.Kind == AgentSessionCreationKind.New ? "new" : creation is not null ? "fork" : replacementReason;
+            if (BeforeRetirement is { } retiring) await retiring(expected, staged, reason).ConfigureAwait(false);
+            await InitiateOwnedResourceStopsAsync(expected).ConfigureAwait(false);
+            await RetireOwnedResourcesAsync(expected, reservation, joinAll: true).ConfigureAwait(false);
             // The owner serializes all its writes and the coordinator reservation prevents direct mutations.
             await reservation.RetireWriterAsync().ConfigureAwait(false);
             // Old execution is idle under its reservation; retire its capability before publication.
@@ -336,10 +397,36 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
                 attached = new(staged, checked(expected.Generation + 1), lifetime.Token);
                 current = attached; sessions.Add(staged); staged = null;
             }
-            // The new attachment is now committed. Release its staging reservation before any host/lifetime
-            // callback receives the fresh attachment; lifecycle handlers can use its actual durable writer.
+            // Bind admitted runtime owners against the actual committed attachment while its target
+            // reservation still excludes native calls. General host/lifecycle callbacks follow release.
+            try { BindRuntimeUnderReservation(attached, targetReservation); }
+            catch (Exception bindingError)
+            {
+                var failures = new List<Exception>(); AddRuntimeBindingFailure(failures, bindingError);
+                try { await InitiateOwnedResourceStopsAsync(attached).ConfigureAwait(false); } catch (Exception error) { AddRuntimeBindingFailure(failures, error); }
+                try { await RetireOwnedResourcesAsync(attached, targetReservation, joinAll: true).ConfigureAwait(false); } catch (Exception error) { AddRuntimeBindingFailure(failures, error); }
+                try { await attached.Session.ReleaseRuntimeAfterBindingFailureAsync().ConfigureAwait(false); } catch (Exception error) { AddRuntimeBindingFailure(failures, error); }
+                try { await targetReservation.RetireWriterAsync().ConfigureAwait(false); } catch (Exception error) { AddRuntimeBindingFailure(failures, error); }
+                try { attached.Session.RetireInvocationOwner(); } catch (Exception error) { AddRuntimeBindingFailure(failures, error); }
+                try { attachedLifetime.Cancel(); } catch (Exception error) { AddRuntimeBindingFailure(failures, error); }
+                created?.CommitAttachment();
+                try { previousLifetime.Cancel(); } catch (Exception error) { AddRuntimeBindingFailure(failures, error); }
+                try { await expected.Session.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { AddRuntimeBindingFailure(failures, error); }
+                throw new AgentSessionReplacementNotificationException(new(expected, attached) { Reason = reason, SelectedText = created?.SelectedText },
+                    failures.Count == 1 ? failures[0] : new AggregateException("Committed runtime binding and cleanup failed.", failures));
+            }
             targetReservation.Dispose();
             created?.CommitAttachment();
+            lock (gate)
+            {
+                // Resource retirement and committed runtime/creation publication have acknowledged.
+                // Only the committed notification phase may borrow early shutdown cancellation.
+                notificationLifetime = attachedLifetime;
+                committedNotificationLifetime = attachedLifetime;
+                // If shutdown sampled before this phase was published, it closed admission first.
+                // Recheck atomically so that path still cancels the committed target before notifying.
+                cancelAttached |= closed;
+            }
             // Cancel outside the state lock: trusted registrations may execute arbitrary callbacks.
             try { previousLifetime.Cancel(); } catch (Exception) { lock (gate) cancellationCallbackFailed = true; }
             if (cancelAttached)
@@ -353,30 +440,52 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
             lock (gate) retirements.Add(retirement);
             var result = new AgentSessionReplacement(expected, attached)
             {
-                Reason = creation?.Kind == AgentSessionCreationKind.New ? "new" : creation is not null ? "fork" : replacementReason,
+                Reason = reason,
                 SelectedText = created?.SelectedText
             };
             try
             {
-                if (AttachmentChanged is { } changed) await changed(result).ConfigureAwait(false);
-                var notification = afterSwitch ?? AfterReplacement;
-                if (notification is not null) await notification(result).ConfigureAwait(false);
+                var priorRegistration = resourceRegistrationAttachment.Value; resourceRegistrationAttachment.Value = attached;
+                try
+                {
+                    if (AttachmentChanged is { } changed) await changed(result).ConfigureAwait(false);
+                    var notification = afterSwitch ?? AfterReplacement;
+                    if (notification is not null) await notification(result).ConfigureAwait(false);
+                }
+                finally { resourceRegistrationAttachment.Value = priorRegistration; }
             }
             catch (Exception error) { throw new AgentSessionReplacementNotificationException(result, error); }
             return result;
         }
+        catch (Exception error) { replacementPrimary = error; throw; }
         finally
         {
+            var rollbackOriginals = new SessionBoundaryOriginals();
+            var rollbackFailures = new List<Exception>();
             try
             {
-                if (staged is not null) await staged.DisposeAsync().ConfigureAwait(false);
-                if (created is not null) await created.DisposeAsync().ConfigureAwait(false);
+                if (staged is not null)
+                    try { await rollbackOriginals.Join(staged.DisposeAsync().AsTask(), "replacement-staged-close").ConfigureAwait(false); }
+                    catch (Exception error) { SessionBoundaryOriginals.Add(rollbackFailures, error); }
+                if (created is not null)
+                    try { await rollbackOriginals.Join(created.DisposeAsync().AsTask(), "replacement-created-release").ConfigureAwait(false); }
+                    catch (Exception error) { SessionBoundaryOriginals.Add(rollbackFailures, error); }
             }
             finally
             {
-                stagedLifetime?.Dispose();
-                lock (gate) if (ReferenceEquals(transitionCancellation, linked)) transitionCancellation = null;
+                try { stagedLifetime?.Dispose(); } catch (Exception error) { SessionBoundaryOriginals.Add(rollbackFailures, error); }
+                lock (gate)
+                {
+                    if (ReferenceEquals(committedNotificationLifetime, notificationLifetime)) committedNotificationLifetime = null;
+                    if (ReferenceEquals(transitionCancellation, linked)) transitionCancellation = null;
+                }
                 inTransition.Value = priorTransition; mutations.Release();
+            }
+            if (rollbackFailures.Count != 0)
+            {
+                if (replacementPrimary is not null) SessionBoundaryOriginals.Add(rollbackFailures, replacementPrimary);
+                throw new SessionReplacementRollbackException(replacementPrimary,
+                    replacementOriginals.Snapshot().AddRange(setupManager?.CaptureOriginals() ?? []).AddRange(rollbackOriginals.Snapshot()), rollbackFailures);
             }
         }
     }
@@ -399,6 +508,12 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
 
     private void RejectTransitionReentrancy()
     {
+        if (resourceStopCallback.Value is not null)
+            throw new InvalidOperationException("Owned resource stop callbacks cannot await their own lifecycle settlement.");
+        PersistentAgentSession retrySession; lock (gate) retrySession = current.Session;
+        retrySession.RejectRetryOwnedSelfWait();
+        if (resourceTransaction.Value is not null)
+            throw new InvalidOperationException("Owned resource callbacks cannot await their own lifecycle settlement.");
         if (inShutdown.Value || Volatile.Read(ref shutdownCancellationThread) == Environment.CurrentManagedThreadId)
             throw new InvalidOperationException("Shutdown callbacks cannot await their own host settlement or disposal.");
         if (inTransition.Value) throw new InvalidOperationException("A replacement lifecycle callback cannot await the transition it is running in.");
@@ -418,7 +533,7 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
         RejectTransitionReentrancy();
         PersistentAgentSession[] attached;
         lock (gate) attached = sessions.ToArray();
-        foreach (var session in attached) _ = session.WaitForIdleAsync(); // Reject self-disposal even after A was replaced by B.
+        foreach (var session in attached) session.RejectOwnedResourceSelfWait(); // Reject self-disposal even after A was replaced by B.
         TaskCompletionSource? completion = null;
         lock (gate)
         {
@@ -442,6 +557,8 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
             try { closing.Dispose(); } catch (Exception error) { failures.Add(error); }
             foreach (var lifetime in attachedLifetimes)
                 try { lifetime.Dispose(); } catch (Exception error) { failures.Add(error); }
+            foreach (var resource in ownedResources)
+                try { resource.AdmissionCancellation?.Dispose(); } catch (Exception error) { failures.Add(error); }
         }
         catch (Exception error) { failures.Add(error); }
         finally { inShutdown.Value = priorShutdown; }

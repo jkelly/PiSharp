@@ -1,0 +1,223 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "queue-order-first-terminal",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "upstream-event-stream-input",
+  "scenario": "Queue preserves order and ignores pushes after terminal",
+  "requirementIds": [
+    "stream.terminal-settlement"
+  ],
+  "clock": {
+    "unixMilliseconds": 1700000000000
+  },
+  "seed": "none",
+  "normalizerVersion": "object-key-order-v1",
+  "provenance": {
+    "kind": "authored-synthetic-input",
+    "origin": "New synthetic operations executed against exact pinned event-stream.ts"
+  },
+  "operations": [
+    {
+      "kind": "push",
+      "event": {
+        "type": "start",
+        "partial": {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "authored-synthetic",
+          "model": "fixture-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      }
+    },
+    {
+      "kind": "push",
+      "event": {
+        "type": "text_start",
+        "contentIndex": 0,
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": ""
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "authored-synthetic",
+          "model": "fixture-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      }
+    },
+    {
+      "kind": "push",
+      "event": {
+        "type": "text_delta",
+        "contentIndex": 0,
+        "delta": "Hello π\r\n",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hello π\r\n"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "authored-synthetic",
+          "model": "fixture-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      }
+    },
+    {
+      "kind": "push",
+      "event": {
+        "type": "text_end",
+        "contentIndex": 0,
+        "content": "Hello π\r\n",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hello π\r\n"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "authored-synthetic",
+          "model": "fixture-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      }
+    },
+    {
+      "kind": "push",
+      "event": {
+        "type": "done",
+        "reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hello π\r\n"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "authored-synthetic",
+          "model": "fixture-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000000
+        }
+      }
+    },
+    {
+      "kind": "push",
+      "event": {
+        "type": "error",
+        "reason": "error",
+        "error": {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "authored-synthetic",
+          "model": "fixture-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "error",
+          "timestamp": 1700000000000,
+          "errorMessage": "ignored later terminal"
+        }
+      }
+    }
+  ]
+}

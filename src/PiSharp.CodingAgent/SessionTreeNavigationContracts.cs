@@ -40,7 +40,11 @@ public sealed class SessionTreeNavigationView
 
 /// <summary>No-summary same-file selection. A null target explicitly selects the empty root.
 /// User/custom-message targets resolve to their parent and canonical editor text.</summary>
-public sealed record SessionTreeNavigationRequest(string? TargetId, SessionTreeNavigationRevision ExpectedRevision);
+public sealed record SessionTreeNavigationRequest(string? TargetId, SessionTreeNavigationRevision ExpectedRevision)
+{
+    public SessionTreeNavigationOptions Options { get; init; } = new();
+    public SessionTreeNavigationExecution? Execution { get; init; }
+}
 public enum SessionTreeNavigationDisposition { Selected, NoOp, Vetoed, Aborted }
 public enum SessionTreeNavigationFailure { StaleSelection, UnknownTarget, InvalidRequest }
 public sealed class SessionTreeNavigationException(SessionTreeNavigationFailure failure)
@@ -65,6 +69,8 @@ public sealed record SessionTreeNavigationReceipt(SessionTreeNavigationDispositi
     SessionTreeNavigationView View, AgentSnapshot Agent, string? EditorText)
 {
     public bool CancellationCallbackFailed { get; init; }
+    public SessionTreeCheckpoint? Checkpoint { get; init; }
+    public ImmutableArray<SessionBoundaryOriginalEvidence> Originals { get; init; } = [];
     public bool Cancelled => Disposition is SessionTreeNavigationDisposition.Vetoed or SessionTreeNavigationDisposition.Aborted;
     public bool Aborted => Disposition == SessionTreeNavigationDisposition.Aborted;
     public bool NoOp => Disposition == SessionTreeNavigationDisposition.NoOp;

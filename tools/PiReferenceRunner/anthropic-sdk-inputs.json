@@ -1,0 +1,266 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "anthropic-sdk-direct-stream-three-requests",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "authored-transcript-options-number-lexemes-and-in-memory-anthropic-wire",
+  "requirementIds": [
+    "api.anthropic-messages",
+    "stream.indexed-events",
+    "stream.terminal-settlement"
+  ],
+  "clock": {
+    "unixMilliseconds": 1700000000000,
+    "mechanism": "Capture child explicitly replaces Date.now for output timestamps; source/SDK unchanged; actual OS/runtime/headers and crypto are not replaced."
+  },
+  "seed": "No RNG replacement; authored IDs/key and SSE values only.",
+  "normalizerVersion": "raw-json-v1-lossless-numeric-lexemes-object-key-order-only",
+  "model": {
+    "id": "pisharp-anthropic-authored-model",
+    "name": "Authored Anthropic oracle model",
+    "api": "anthropic-messages",
+    "provider": "anthropic",
+    "baseUrl": "https://pisharp-anthropic-oracle.invalid",
+    "reasoning": false,
+    "input": [
+      "text"
+    ],
+    "contextWindow": 4096,
+    "maxTokens": 64,
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+    }
+  },
+  "commonOptions": {
+    "apiKey": "pisharp-authored-inert-key-noncredential",
+    "maxRetries": 0,
+    "env": {}
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream; charset=utf-8",
+      "request-id": "req_authored_wire",
+      "x-fixture": "authored-response"
+    },
+    "chunkBytes": 7,
+    "sseText": ": authored comment\r\n\r\nevent: message_start\r\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_authored_wire\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"pisharp-anthropic-authored-model\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":11,\"output_tokens\":0,\"cache_read_input_tokens\":2,\"cache_creation_input_tokens\":3}}}\r\n\r\nevent: content_block_start\r\ndata: {\"type\":\"content_block_start\",\"index\":4,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\r\n\r\nevent: content_block_delta\r\ndata: {\"type\":\"content_block_delta\",\"index\":4,\"delta\":{\"type\":\"text_delta\",\"text\":\"Observed π\"}}\r\n\r\nevent: content_block_delta\r\ndata: {\"type\":\"content_block_delta\",\"index\":4,\"delta\":{\"type\":\"text_delta\",\"text\":\" 😀\\n\"}}\r\n\r\nevent: content_block_stop\r\ndata: {\"type\":\"content_block_stop\",\"index\":4}\r\n\r\nevent: message_delta\r\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":2,\"input_tokens\":null,\"cache_read_input_tokens\":null,\"cache_creation_input_tokens\":null}}\r\n\r\nevent: message_stop\r\ndata: {\"type\":\"message_stop\"}\r\n\r\n"
+  },
+  "cases": [
+    {
+      "caseId": "defaults-model-max",
+      "context": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep opaque strings: 001 and π.",
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "user",
+            "content": "Reply with pi: π\r\nsecond line",
+            "timestamp": 1700000000000
+          }
+        ]
+      },
+      "options": {}
+    },
+    {
+      "caseId": "zero-numeric-arguments",
+      "context": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "Echo numbers without executing a tool.",
+            "toolsAdded": [
+              {
+                "name": "echo_number",
+                "description": "Authored inert tool declaration only.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "one": {
+                      "type": "number"
+                    },
+                    "negativeZero": {
+                      "type": "number"
+                    },
+                    "fixedBoundary": {
+                      "type": "number"
+                    },
+                    "exponentBoundary": {
+                      "type": "number"
+                    },
+                    "largeFixed": {
+                      "type": "number"
+                    },
+                    "largeExponent": {
+                      "type": "number"
+                    },
+                    "roundedInteger": {
+                      "type": "number"
+                    },
+                    "roundedDecimal": {
+                      "type": "number"
+                    },
+                    "opaque": {
+                      "type": "string"
+                    },
+                    "retainedNull": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": []
+                }
+              }
+            ],
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "user",
+            "content": "Observe number projection.",
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "authored-numeric-call",
+                "name": "echo_number",
+                "arguments": {
+                  "opaque": "001",
+                  "retainedNull": null
+                }
+              }
+            ],
+            "api": "anthropic-messages",
+            "provider": "anthropic",
+            "model": "pisharp-anthropic-authored-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "toolResult",
+            "toolCallId": "authored-numeric-call",
+            "toolName": "echo_number",
+            "content": [
+              {
+                "type": "text",
+                "text": "Authored recorded tool result."
+              }
+            ],
+            "isError": false,
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "user",
+            "content": "Finish with text.",
+            "timestamp": 1700000000000
+          }
+        ]
+      },
+      "options": {
+        "maxTokens": 0,
+        "cacheRetention": "none",
+        "temperature": 0,
+        "timeoutMs": 5000
+      },
+      "numberConversions": {
+        "messageIndex": 2,
+        "contentIndex": 0,
+        "fields": [
+          {
+            "field": "one",
+            "lexeme": "1.0"
+          },
+          {
+            "field": "negativeZero",
+            "lexeme": "-0"
+          },
+          {
+            "field": "fixedBoundary",
+            "lexeme": "1e-6"
+          },
+          {
+            "field": "exponentBoundary",
+            "lexeme": "1e-7"
+          },
+          {
+            "field": "largeFixed",
+            "lexeme": "1e20"
+          },
+          {
+            "field": "largeExponent",
+            "lexeme": "1e21"
+          },
+          {
+            "field": "roundedInteger",
+            "lexeme": "9007199254740993"
+          },
+          {
+            "field": "roundedDecimal",
+            "lexeme": "0.123456789012345678901"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "negative-headers-long-cache-session",
+      "context": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "Keep opaque strings: 001 and π.",
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "user",
+            "content": "Reply with pi: π\r\nsecond line",
+            "timestamp": 1700000000000
+          }
+        ]
+      },
+      "modelOverrides": {
+        "headers": {
+          "x-model": "model-owned",
+          "x-remove": "remove-with-null"
+        },
+        "compat": {
+          "sendSessionAffinityHeaders": true,
+          "supportsLongCacheRetention": true
+        }
+      },
+      "options": {
+        "maxTokens": -1,
+        "cacheRetention": "long",
+        "sessionId": "authored-anthropic-session",
+        "timeoutMs": 5000,
+        "headers": {
+          "x-model": "option-owned",
+          "x-remove": null,
+          "anthropic-beta": " alpha , beta, alpha "
+        }
+      }
+    }
+  ]
+}

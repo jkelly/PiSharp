@@ -207,6 +207,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         private bool _hasFinishReason;
         private bool _sourceResponseIdAssigned;
         private JsonData? _sourceResponseId;
+        private JsonData? _errorThinkingSignature;
+        private bool _errorThinkingSignatureAttempted;
         private StopReason _reason = StopReason.Pending;
         public StreamStarted Start { get; }
 
@@ -520,6 +522,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                 catch (Exception error) { failure = Classify(error, CancellationToken.None); }
             }
             var finalSnapshot = _reducer.Snapshot();
+            if (failure is not null) finalSnapshot = RetainErrorThinkingDetails(finalSnapshot);
             // Pi finalizes blocks while their publication partials are still pending, then infers the terminal reason.
             if (failure is null && !_hasFinishReason && !_options.SupportsFinishReason)
                 _reason = _tools.Count > 0 ? StopReason.ToolUse : StopReason.Stop;
@@ -551,6 +554,33 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                 }
             }
             progress.Add(terminal); return progress;
+        }
+
+        private AssistantMessage RetainErrorThinkingDetails(AssistantMessage snapshot)
+        {
+            if (_reasoningDetails.Count == 0 || _thinkingIndex is not { } index ||
+                snapshot.Content[index] is not ThinkingContent thinking) return snapshot;
+            if (!_errorThinkingSignatureAttempted)
+            {
+                _errorThinkingSignatureAttempted = true;
+                try
+                {
+                    // Pi's catch applies accumulated replay metadata without publishing thinking_end.
+                    // Charge the owned terminal overlay once, including repeated cancellation Finish calls.
+                    var signature = TextData(EcmaScriptJsonProjection.Project(_reasoningDetails.ToJsonString(), ProjectionLimits()));
+                    var previous = thinking.ExtraProperties is { } properties && properties.TryGet("thinkingSignature", out var old)
+                        ? old!.ToString().Length : 0;
+                    Charge(signature.ToString().Length - previous);
+                    _errorThinkingSignature = signature;
+                }
+                catch (StreamLimitException) { }
+                catch (EcmaScriptJsonProjectionException error) when (error.Failure == EcmaScriptJsonProjectionFailure.ResourceLimit) { }
+                // Resource exhaustion still settles the original sanitized error/abort terminal.
+            }
+            if (_errorThinkingSignature is not { } retained) return snapshot;
+            var updated = new ThinkingContent(thinking.Thinking,
+                (thinking.ExtraProperties ?? JsonFields.Empty).Set("thinkingSignature", retained));
+            return snapshot with { Content = snapshot.Content.SetItem(index, updated) };
         }
 
         private EcmaScriptJsonProjectionOptions ProjectionLimits() => new(

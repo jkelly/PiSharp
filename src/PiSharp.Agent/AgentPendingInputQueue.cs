@@ -29,7 +29,7 @@ public sealed class AgentPendingInputException : Exception
     public AgentPendingInputFailure Failure { get; }
     internal AgentPendingInputException(AgentPendingInputFailure failure) : base(failure == AgentPendingInputFailure.ResourceLimit
         ? "Pending agent input exceeds configured limits."
-        : "Pending agent input must be an owned system/user message with matching role.") => Failure = failure;
+        : "Pending agent input must be an owned system/user/custom message with matching role.") => Failure = failure;
 }
 
 /// <summary>
@@ -193,7 +193,7 @@ public sealed class AgentPendingInputQueue
         cancellationToken.ThrowIfCancellationRequested();
         try
         {
-            if (message is null || message.Role is not ("system" or "user") || message.WireBody is null ||
+            if (message is null || message.Role is not ("system" or "user" or "custom") || message.WireBody is null ||
                 message.WireBody.Value.ValueKind != JsonValueKind.Object ||
                 !message.WireBody.Value.TryGetProperty("role", out var role) || role.ValueKind != JsonValueKind.String ||
                 role.GetString() != message.Role) throw Failure(AgentPendingInputFailure.InvalidInput);

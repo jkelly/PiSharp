@@ -1,22 +1,131 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/PiSharp.Contracts/PiSharp.Contracts.csproj" />
     <Project Path="src/PiSharp.AI/PiSharp.AI.csproj" />
     <Project Path="src/PiSharp.Agent/PiSharp.Agent.csproj" />
-    <Project Path="src/PiSharp.Cli/PiSharp.Cli.csproj" />
-    <Project Path="src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
-    <Project Path="src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
-    <Project Path="src/PiSharp.Contracts/PiSharp.Contracts.csproj" />
-    <Project Path="src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj" />
-    <Project Path="src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" />
-    <Project Path="src/PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
-    <Project Path="src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
-    <Project Path="src/PiSharp.Rpc/PiSharp.Rpc.csproj" />
     <Project Path="src/PiSharp.Sessions/PiSharp.Sessions.csproj" />
     <Project Path="src/PiSharp.Tools/PiSharp.Tools.csproj" />
+    <Project Path="src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <Project Path="src/PiSharp.PromptTemplates.Yaml/PiSharp.PromptTemplates.Yaml.csproj" />
+    <Project Path="src/PiSharp.Cli/PiSharp.Cli.csproj" />
+    <Project Path="src/PiSharp.Rpc/PiSharp.Rpc.csproj" />
     <Project Path="src/PiSharp.Tui/PiSharp.Tui.csproj" />
+    <Project Path="src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" />
+    <Project Path="src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+    <Project Path="src/PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
+    <Project Path="src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj" />
+    <Project Path="src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
   </Folder>
-  <Folder Name="/tests/public-offline/">
+  <Folder Name="/tests/">
+    <Project Path="tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj" />
+    <Project Path="tests/PiSharp.Agent.Tests/PiSharp.Agent.Tests.csproj" />
+    <Project Path="tests/PiSharp.Transport.Tests/PiSharp.Transport.Tests.csproj" />
+    <Project Path="tests/PiSharp.Sessions.Tests/PiSharp.Sessions.Tests.csproj" />
+    <Project Path="tests/PiSharp.Tools.Tests/PiSharp.Tools.Tests.csproj" />
+    <Project Path="tests/PiSharp.CodingAgent.Tests/PiSharp.CodingAgent.Tests.csproj" />
+    <Project Path="tests/fixtures/extensions/native/PublishedFixture.SessionLifecycle/PublishedFixture.SessionLifecycle.csproj" />
+    <Project Path="tests/PiSharp.Rpc.Tests/PiSharp.Rpc.Tests.csproj" />
+    <Project Path="tests/PiSharp.Tui.Tests/PiSharp.Tui.Tests.csproj" />
+    <Project Path="tests/PiSharp.Extensions.ContractTests/PiSharp.Extensions.ContractTests.csproj" />
+    <Project Path="tests/PiSharp.Extensions.ContractTests/Consumer/PublishedConsumer.csproj" />
+    <Project Path="tests/PiSharp.ExtensionHost.Tests/PiSharp.ExtensionHost.Tests.csproj" />
+    <Project Path="tests/PiSharp.ExtensionHost.ProcessTests/PiSharp.ExtensionHost.ProcessTests.csproj" />
+    <Project Path="tests/PiSharp.Compatibility.Node.ProcessTests/PiSharp.Compatibility.Node.ProcessTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.CompletionsAnchored.Tests/">
+    <Project Path="tests/PiSharp.CompletionsAnchored.Tests/PiSharp.CompletionsAnchored.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.CompletionsAnchored.Tests/Controls/">
+    <Project Path="tests/PiSharp.CompletionsAnchored.Tests/Controls/Controls.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.OpenRouterBinding.Tests/">
+    <Project Path="tests/PiSharp.OpenRouterBinding.Tests/PiSharp.OpenRouterBinding.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.OpenRouterBinding.Tests/Controls/">
+    <Project Path="tests/PiSharp.OpenRouterBinding.Tests/Controls/Controls.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.Tui.LockModifiers.Tests/">
+    <Project Path="tests/PiSharp.Tui.LockModifiers.Tests/PiSharp.Tui.LockModifiers.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.OpenRouterCacheProfile.Tests/">
+    <Project Path="tests/PiSharp.OpenRouterCacheProfile.Tests/PiSharp.OpenRouterCacheProfile.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.OpenRouterCacheProfile.Tests/Controls/">
+    <Project Path="tests/PiSharp.OpenRouterCacheProfile.Tests/Controls/Controls.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.OpenRouterReasoning.Tests/">
+    <Project Path="tests/PiSharp.OpenRouterReasoning.Tests/PiSharp.OpenRouterReasoning.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.OpenRouterReasoning.Tests/Controls/">
+    <Project Path="tests/PiSharp.OpenRouterReasoning.Tests/Controls/Controls.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.Tui.Keypad.Tests/">
+    <Project Path="tests/PiSharp.Tui.Keypad.Tests/PiSharp.Tui.Keypad.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.Tui.ModifyOtherKeys.Tests/">
+    <Project Path="tests/PiSharp.Tui.ModifyOtherKeys.Tests/PiSharp.Tui.ModifyOtherKeys.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.CompletionsGrammar.Tests/">
+    <Project Path="tests/PiSharp.CompletionsGrammar.Tests/PiSharp.CompletionsGrammar.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.CompletionsGrammar.Tests/Agent/">
+    <Project Path="tests/PiSharp.CompletionsGrammar.Tests/Agent/Agent.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.CompletionsGrammar.Tests/Controls/">
+    <Project Path="tests/PiSharp.CompletionsGrammar.Tests/Controls/Controls.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.CompletionsGrammar.Tests/Controls/Strict/">
+    <Project Path="tests/PiSharp.CompletionsGrammar.Tests/Controls/Strict/Strict.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.Tui.Focus.Tests/">
+    <Project Path="tests/PiSharp.Tui.Focus.Tests/PiSharp.Tui.Focus.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.CompletionsThinking.Tests/">
+    <Project Path="tests/PiSharp.CompletionsThinking.Tests/PiSharp.CompletionsThinking.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.CompletionsThinking.Tests/Agent/">
+    <Project Path="tests/PiSharp.CompletionsThinking.Tests/Agent/Agent.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.Tui.IndicConjunct.Tests/">
+    <Project Path="tests/PiSharp.Tui.IndicConjunct.Tests/PiSharp.Tui.IndicConjunct.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.CompletionsSimple.Tests/">
+    <Project Path="tests/PiSharp.CompletionsSimple.Tests/PiSharp.CompletionsSimple.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.Tui.KittyAlternate.Tests/">
+    <Project Path="tests/PiSharp.Tui.KittyAlternate.Tests/PiSharp.Tui.KittyAlternate.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.Tui.Keybindings.Tests/">
+    <Project Path="tests/PiSharp.Tui.Keybindings.Tests/PiSharp.Tui.Keybindings.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.PiMessages.Tests/">
+    <Project Path="tests/PiSharp.PiMessages.Tests/PiSharp.PiMessages.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.GoogleGenerativeAI.Tests/">
+    <Project Path="tests/PiSharp.GoogleGenerativeAI.Tests/PiSharp.GoogleGenerativeAI.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.Tui.SelectList.Tests/">
+    <Project Path="tests/PiSharp.Tui.SelectList.Tests/PiSharp.Tui.SelectList.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.Terminal.SelectList.Integration.Tests/">
+    <Project Path="tests/PiSharp.Terminal.SelectList.Integration.Tests/PiSharp.Terminal.SelectList.Integration.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.AnthropicSimple.Tests/">
+    <Project Path="tests/PiSharp.AnthropicSimple.Tests/PiSharp.AnthropicSimple.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.Authentication.Tests/">
+    <Project Path="tests/PiSharp.Authentication.Tests/PiSharp.Authentication.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.Terminal.Ownership.Tests/">
+    <Project Path="tests/PiSharp.Terminal.Ownership.Tests/PiSharp.Terminal.Ownership.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/NodeLoadoutMetadata/">
+    <Project Path="tools/NodeCommandInputBridge/NativeAdmissionTests/NativeAdmissionTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.AzureResponses.Tests/">
     <Project Path="tests/PiSharp.AzureResponses.Tests/PiSharp.AzureResponses.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/companions/PiSharp.MistralConversations.Tests/">
     <Project Path="tests/PiSharp.MistralConversations.Tests/PiSharp.MistralConversations.Tests.csproj" />
   </Folder>
 </Solution>

@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" /></ItemGroup>
+</Project>

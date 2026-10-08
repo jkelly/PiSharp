@@ -1,0 +1,364 @@
+{
+  "status": "PINNED TEXTUAL IMPORT COMPARISON; NO COMPILER OR RUNTIME EVIDENCE",
+  "originalCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceRoot": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-oracle-v0.99.1\\upstream",
+  "specifiers": [
+    {
+      "specifier": "typebox",
+      "suppliedSlice": true,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "typebox/compile",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "typebox/value",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@sinclair/typebox",
+      "suppliedSlice": true,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@sinclair/typebox/compile",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@sinclair/typebox/value",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@earendil-works/pi-agent-core",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@earendil-works/pi-tui",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@earendil-works/pi-ai",
+      "suppliedSlice": true,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@earendil-works/pi-ai/compat",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@earendil-works/pi-ai/oauth",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@earendil-works/pi-ai/providers/all",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@earendil-works/pi-coding-agent",
+      "suppliedSlice": true,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@mariozechner/pi-agent-core",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@mariozechner/pi-tui",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@mariozechner/pi-ai",
+      "suppliedSlice": true,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@mariozechner/pi-ai/compat",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@mariozechner/pi-ai/oauth",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@mariozechner/pi-ai/providers/all",
+      "suppliedSlice": false,
+      "fullNamespaceQualified": false
+    },
+    {
+      "specifier": "@mariozechner/pi-coding-agent",
+      "suppliedSlice": true,
+      "fullNamespaceQualified": false
+    }
+  ],
+  "suppliedSliceCount": 6,
+  "originalSpecifierCount": 20,
+  "countCorrection": "R814 and prior summary said22; pinned virtual-modules.ts with matching9a6cdf hash contains20 actual keys; no entries invented",
+  "consumers": [
+    {
+      "path": "packages/coding-agent/examples/extensions/todo.ts",
+      "imports": [
+        {
+          "module": "@earendil-works/pi-ai",
+          "clause": "{ StringEnum }",
+          "typeOnly": false
+        },
+        {
+          "module": "@earendil-works/pi-coding-agent",
+          "clause": "type { ExtensionAPI, ExtensionContext, Theme }",
+          "typeOnly": true
+        },
+        {
+          "module": "@earendil-works/pi-tui",
+          "clause": "{ matchesKey, Text, truncateToWidth }",
+          "typeOnly": false
+        },
+        {
+          "module": "typebox",
+          "clause": "{ Type }",
+          "typeOnly": false
+        }
+      ],
+      "wholePluginAccepted": false
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/tic-tac-toe.ts",
+      "imports": [
+        {
+          "module": "@earendil-works/pi-ai",
+          "clause": "{ StringEnum }",
+          "typeOnly": false
+        },
+        {
+          "module": "@earendil-works/pi-coding-agent",
+          "clause": "type { ExtensionAPI, ExtensionContext, Theme, ToolExecutionMode }",
+          "typeOnly": true
+        },
+        {
+          "module": "@earendil-works/pi-tui",
+          "clause": "{ type Component, matchesKey, Text, truncateToWidth, visibleWidth }",
+          "typeOnly": false
+        },
+        {
+          "module": "typebox",
+          "clause": "{ Type }",
+          "typeOnly": false
+        }
+      ],
+      "wholePluginAccepted": false
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/subagent/index.ts",
+      "imports": [
+        {
+          "module": "node:child_process",
+          "clause": "{ spawn }",
+          "typeOnly": false
+        },
+        {
+          "module": "node:fs",
+          "clause": "* as fs",
+          "typeOnly": false
+        },
+        {
+          "module": "node:os",
+          "clause": "* as os",
+          "typeOnly": false
+        },
+        {
+          "module": "node:path",
+          "clause": "* as path",
+          "typeOnly": false
+        },
+        {
+          "module": "@earendil-works/pi-agent-core",
+          "clause": "type { AgentToolResult, ThinkingLevel }",
+          "typeOnly": true
+        },
+        {
+          "module": "@earendil-works/pi-ai",
+          "clause": "type { Message }",
+          "typeOnly": true
+        },
+        {
+          "module": "@earendil-works/pi-ai",
+          "clause": "{ StringEnum }",
+          "typeOnly": false
+        },
+        {
+          "module": "@earendil-works/pi-coding-agent",
+          "clause": "{\n\tCONFIG_DIR_NAME,\n\ttype ExtensionAPI,\n\tgetAgentDir,\n\tgetMarkdownTheme,\n\twithFileMutationQueue,\n}",
+          "typeOnly": false
+        },
+        {
+          "module": "@earendil-works/pi-tui",
+          "clause": "{ Container, Markdown, Spacer, Text }",
+          "typeOnly": false
+        },
+        {
+          "module": "typebox",
+          "clause": "{ Type }",
+          "typeOnly": false
+        },
+        {
+          "module": "./agents.ts",
+          "clause": "{ type AgentConfig, type AgentScope, discoverAgents }",
+          "typeOnly": false
+        }
+      ],
+      "wholePluginAccepted": false
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/truncated-tool.ts",
+      "imports": [
+        {
+          "module": "node:fs/promises",
+          "clause": "{ mkdtemp, writeFile }",
+          "typeOnly": false
+        },
+        {
+          "module": "@earendil-works/pi-coding-agent",
+          "clause": "type { ExtensionAPI }",
+          "typeOnly": true
+        },
+        {
+          "module": "@earendil-works/pi-coding-agent",
+          "clause": "{\n\tDEFAULT_MAX_BYTES,\n\tDEFAULT_MAX_LINES,\n\tformatSize,\n\ttype TruncationResult,\n\ttruncateHead,\n\twithFileMutationQueue,\n}",
+          "typeOnly": false
+        },
+        {
+          "module": "@earendil-works/pi-tui",
+          "clause": "{ Text }",
+          "typeOnly": false
+        },
+        {
+          "module": "child_process",
+          "clause": "{ execSync }",
+          "typeOnly": false
+        },
+        {
+          "module": "os",
+          "clause": "{ tmpdir }",
+          "typeOnly": false
+        },
+        {
+          "module": "path",
+          "clause": "{ join }",
+          "typeOnly": false
+        },
+        {
+          "module": "typebox",
+          "clause": "{ Type }",
+          "typeOnly": false
+        }
+      ],
+      "wholePluginAccepted": false
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/gondolin/index.ts",
+      "imports": [
+        {
+          "module": "node:path",
+          "clause": "path",
+          "typeOnly": false
+        },
+        {
+          "module": "@earendil-works/gondolin",
+          "clause": "{ RealFSProvider, VM }",
+          "typeOnly": false
+        },
+        {
+          "module": "@earendil-works/pi-coding-agent",
+          "clause": "type { ExtensionAPI, ExtensionContext }",
+          "typeOnly": true
+        },
+        {
+          "module": "@earendil-works/pi-coding-agent",
+          "clause": "{\n\ttype BashOperations,\n\tcreateBashTool,\n\tcreateEditTool,\n\tcreateFindTool,\n\tcreateGrepTool,\n\tcreateLsTool,\n\tcreateReadTool,\n\tcreateWriteTool,\n\tDEFAULT_MAX_BYTES,\n\ttype EditOperations,\n\ttype FindOperations,\n\tformatSize,\n\ttype GrepToolDetails,\n\ttype GrepToolInput,\n\ttype LsOperations,\n\ttype ReadOperations,\n\ttruncateHead,\n\ttruncateLine,\n\ttype WriteOperations,\n}",
+          "typeOnly": false
+        }
+      ],
+      "wholePluginAccepted": false
+    }
+  ],
+  "pins": [
+    {
+      "path": "packages/ai/src/utils/typebox-helpers.ts",
+      "bytes": 789,
+      "sha256": "caf756258ce20c793dc8002cb8130a8efce18a7b5262ba0c54832b96f5a76e9f"
+    },
+    {
+      "path": "packages/ai/src/index.ts",
+      "bytes": 2395,
+      "sha256": "c909ef4f82daff2f494ce1aa29d8bd68390f6513c5aff047088cadb3fa96ecea"
+    },
+    {
+      "path": "packages/ai/src/compat.ts",
+      "bytes": 10806,
+      "sha256": "fe077a90f918a69fa6595cf9a7b4571e28e78b57fd52ccde498c5151838569be"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/truncate.ts",
+      "bytes": 9255,
+      "sha256": "8e4507c3ed7ca7548cf7c2d7f77d07f2ae63a38b756789cbb44e9062db6c8762"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/index.ts",
+      "bytes": 6784,
+      "sha256": "3c66ea1e03530fb85436ee639f35add8bf72718ac6e76b738a1f41be58a2b472"
+    },
+    {
+      "path": "packages/coding-agent/src/index.ts",
+      "bytes": 12660,
+      "sha256": "775b147324d9bdce8d3cc8a0eacf1d434251fc12b748f4db1ebd5bfb189b65ac"
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/virtual-modules.ts",
+      "bytes": 2010,
+      "sha256": "9a6cdfd7c21fd38fcf1e885990886e38a45f0f0355b918a4bbd757f460470622"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/todo.ts",
+      "bytes": 8848,
+      "sha256": "e46824d00217e25242c186d41837cc84ca81b23f978500323448502a9a424ee2"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/tic-tac-toe.ts",
+      "bytes": 35382,
+      "sha256": "479597f4e76ef1eae3dae71ec9d5c26978c5b9221f950e3e134078c5b532314b"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/subagent/index.ts",
+      "bytes": 35714,
+      "sha256": "4facaa61c9c781748dd000eb5d2ec0a75289986d1a6e11ce13971ca5653dc252"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/truncated-tool.ts",
+      "bytes": 6490,
+      "sha256": "4ed5fbeb6da53eab8d1e04721d77961b8d1b3bf5e11d1512a17fc5a3f58f9955"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/gondolin/index.ts",
+      "bytes": 16647,
+      "sha256": "9a9897639de8127a2abe6bb0d00f0005cd9e9cf9d51fd15893a827e67326bf62"
+    }
+  ],
+  "limitations": [
+    "Mixed inline type imports remain raw clauses; type erasure not experimentally qualified",
+    "No caller package/module admission borrowed or altered",
+    "No whole original namespace or unchanged plugin acceptance"
+  ]
+}

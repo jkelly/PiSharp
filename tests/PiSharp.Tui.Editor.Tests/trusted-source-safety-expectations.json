@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "approvalSourceThread": "redacted-private-approval-thread-001",
+  "approval": "Joe approved documented compatibility differences that keep user terminal commands inert, use validated cursor metadata, and handle tiny windows safely. This authorizes these safety expectations; it does not qualify the actual default boundary or close unrelated parity criteria.",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "originalObservations": [
+    { "name": "renderer-contract-source-observations.json", "sha256": "1d9bc338dbb9fb8070cab3485b8718d40295b54d593aeabdde51677462d9d229", "cases": 55 },
+    { "name": "renderer-contract-supplemental-source-observations.json", "sha256": "1cc21878323f63dae1c001699909ccdf537b53733262d58bc83d5c0e4257ad30", "cases": 8 }
+  ],
+  "approvedSafetyExpectations": [
+    {
+      "id": "inert-draft-controls",
+      "rule": "Every user ESC/C0/C1/DEL scalar in a source row is displayed as literal lowercase ASCII \\uXXXX. User SGR/CSI/OSC/APC/DCS packets and Pi marker copies retain only data provenance. LF remains the authoritative source row boundary. Recalled HT is three spaces; source set/insert HT normalization remains four spaces.",
+      "examples": [
+        { "input": "a\u001b]52;c;ZGVtbw==\u0007b", "displayPrefix": "a\\u001b]52;c;ZGVtbw==\\u0007b", "focusedAnchorColumn": 28 },
+        { "input": "a\u001b_pi:c\u0007bc", "displayPrefix": "a\\u001b_pi:c\\u0007bc", "focusedAnchorColumn": 20 }
+      ],
+      "explicitSourceDifference": "Unsafe upstream packet execution, invisible controls, and forged first-marker cursor selection are deliberately not reproduced. The source map remains unchanged; escaped row positions are derived from its scalar source offsets. Safe expansion does not introduce another wrapping algorithm."
+    },
+    {
+      "id": "typed-caret-and-style",
+      "rule": "Only a construction-sealed SourcePolicyId map authorizes the internally owned inverse span and anchor. Source segmentation selects the caret suffix. No APC marker is emitted; user text cannot authorize a style or hardware target. Hardware cursor is hidden; focused representable anchor is positioned for IME. Unfocused inverse appearance remains, without a hardware anchor.",
+      "allowedPackets": ["SGR0", "SGR7", "ED2", "EL2", "bounded positive CUP", "cursor show/hide"],
+      "explicitSourceDifference": "A spoofed source marker cannot move the typed anchor. Native VT full/diff framing differs from TuiAltScreen; retained exact source component observations are a separate boundary."
+    },
+    {
+      "id": "safe-bounded-window",
+      "rule": "Source focus-preserving component crop handles heights1/2/3. Each row is bounded at whole grapheme edges without mutating the source draft or wrapping it again. Row/control expansion or component crop reports IsClipped. A caret whose full inverse selection does not fit is hidden and unanchored; resizing rebuilds it from the same unchanged draft.",
+      "explicitSourceDifference": "Unplaceable carets and escaped control overflow do not emit invalid positions or unsafe packets. An indivisible CJK wider than the existing source map remains a pure builder ResourceLimit rather than upstream recursive failure; actual host recovery for this pre-factory failure remains lead-owned. Viewports outside declared existing limits fail before output."
+    },
+    {
+      "id": "safe-transcript",
+      "rule": "Transcript rows remain untrusted. Non-ASCII and controls are represented by literal ASCII \\uXXXX/\\UXXXXXXXX; backslashes are doubled. The newest bounded rows are bottom-aligned above the editor, and surplus row text is explicitly clipped. Transcript data cannot affect caret authority."
+    }
+  ],
+  "originalObservationsChanged": false,
+  "sourceIntegrationCases": 40,
+  "sourceIntegrationCheckpoints": 745,
+  "originalDefaultHold": { "cases": 18, "checkpoints": 178 },
+  "newDefaultHold": { "cases": 8, "checkpoints": 80 },
+  "actualDefaultBoundaryQualified": false,
+  "independentReviewComplete": false,
+  "allOriginal79ScopesAnd8GatesRemainOpen": true,
+  "newOptionalProfiles": 0
+}

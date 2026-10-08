@@ -1,0 +1,111 @@
+{
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "expectationKind": "authored-from-static-pinned-source-not-captured",
+  "source": {
+    "relative": "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\coding-agent\\src\\modes\\interactive\\interactive-mode.ts",
+    "gitBlob": "b7eb9205477a74f227cfb718ada65d61296b39cb",
+    "bytes": 241874,
+    "sha256": "444b21cb8677d061807d92562b3ac4ef7ea703dba186e08ea6b343d9f99d690f"
+  },
+  "sourceChild": "TruncatedText(prefix+canonical message,1,0); dim theme omitted by declared native inert profile",
+  "approvedDifferences": [
+    "No Source spacer/theme/dequeue edit hint; existing native editor and full-screen selector overlay retained",
+    "Earliest FIFO preview cropped to existing transcript slots; entire canonical event snapshot retained",
+    "ANSI/control projection before geometry; raw Source rows are never terminal-authorized"
+  ],
+  "vectors": [
+    {
+      "id": "fifo-duplicates-first-lf-mixed",
+      "columns": 32,
+      "steering": [
+        "one",
+        "one",
+        "first\nsecond"
+      ],
+      "followUp": [
+        "two"
+      ],
+      "sourceRows": [
+        [
+          " Steering: one                  "
+        ],
+        [
+          " Steering: one                  "
+        ],
+        [
+          " Steering: first                "
+        ],
+        [
+          " Follow-up: two                 "
+        ]
+      ],
+      "nativeRows": [
+        " Steering: one                  ",
+        " Steering: one                  ",
+        " Steering: first                ",
+        " Follow-up: two                 "
+      ]
+    },
+    {
+      "id": "default-three-dot-source-reset-versus-inert",
+      "columns": 18,
+      "steering": [
+        "abcdefghij"
+      ],
+      "followUp": [
+        "abcdefghij"
+      ],
+      "sourceRows": [
+        [
+          " Steering: abc\u001b[0m...\u001b[0m "
+        ],
+        [
+          " Follow-up: ab\u001b[0m...\u001b[0m "
+        ]
+      ],
+      "nativeRows": [
+        " Steering: abc... ",
+        " Follow-up: ab... "
+      ]
+    },
+    {
+      "id": "cjk-combining-emoji",
+      "columns": 40,
+      "steering": [
+        "文é🙂"
+      ],
+      "followUp": [
+        "z"
+      ],
+      "sourceRows": [
+        [
+          " Steering: 文é🙂                        "
+        ],
+        [
+          " Follow-up: z                           "
+        ]
+      ],
+      "nativeRows": [
+        " Steering: 文é🙂                        ",
+        " Follow-up: z                           "
+      ]
+    },
+    {
+      "id": "raw-sgr-versus-inert-geometry",
+      "columns": 48,
+      "steering": [
+        "\u001b[31mred\u001b[0m"
+      ],
+      "followUp": [],
+      "sourceRows": [
+        [
+          " Steering: \u001b[31mred\u001b[0m                                  "
+        ]
+      ],
+      "nativeRows": [
+        " Steering: \\u001b[31mred\\u001b[0m               "
+      ]
+    }
+  ]
+}

@@ -12,12 +12,14 @@ $version = '0.1.0-preview.1'
 $results = [Collections.Generic.List[object]]::new()
 
 function New-FixtureFiles {
-    param([switch]$Standalone, [ValidateSet('win-x64', 'linux-x64', 'osx-arm64')][string]$Rid = 'win-x64')
+    param([switch]$Standalone, [ValidateSet('win-x64', 'linux-x64', 'osx-arm64')][string]$Rid = 'win-x64',
+        [bool]$EnablePromptTemplateYaml = $true)
     $files = [Collections.Generic.Dictionary[string,byte[]]]::new([StringComparer]::Ordinal)
     foreach ($name in @('LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md')) { $files.Add($name, [IO.File]::ReadAllBytes((Join-Path $Repo $name))) }
     $provenance = @{ schemaVersion = 1; sourceCommit = $commit; version = $version; baselineTag = 'v0.99.1';
         baselineCommit = 'd86654abb8862e201933517d6f1fce9f88dd117f'; sdk = '10.0.401';
-        kind = $(if ($Standalone) { 'standalone' } else { 'tool' }); rid = $(if ($Standalone) { $Rid } else { $null }) }
+        kind = $(if ($Standalone) { 'standalone' } else { 'tool' }); rid = $(if ($Standalone) { $Rid } else { $null });
+        enablePromptTemplateYaml = $EnablePromptTemplateYaml }
     $files.Add('provenance.json', [Text.Encoding]::UTF8.GetBytes(($provenance | ConvertTo-Json)))
     $prefix = if ($Standalone) { '' } else { 'tools/net10.0/any/' }
     foreach ($name in @('Cli', 'AI', 'Agent', 'Contracts', 'CodingAgent', 'Tools', 'Rpc', 'Tui', 'Sessions',
@@ -28,7 +30,21 @@ function New-FixtureFiles {
         else { '{"runtimeOptions":{"tfm":"net10.0","framework":{"name":"Microsoft.NETCore.App","version":"10.0.0"}}}' }
     $files.Add($prefix + 'PiSharp.Cli.runtimeconfig.json', [Text.Encoding]::UTF8.GetBytes($config))
     $target = if ($Standalone) { '.NETCoreApp,Version=v10.0/' + $Rid } else { '.NETCoreApp,Version=v10.0' }
-    $files.Add($prefix + 'PiSharp.Cli.deps.json', [Text.Encoding]::UTF8.GetBytes('{"runtimeTarget":{"name":"' + $target + '"},"libraries":{"PiSharp.Cli/0.1.0":{"type":"project"}}}'))
+    $libraries = @{ 'PiSharp.Cli/0.1.0' = @{ type = 'project' } }
+    $runtime = @{ 'PiSharp.Cli/0.1.0' = @{ runtime = @{ 'PiSharp.Cli.dll' = @{} } } }
+    if ($EnablePromptTemplateYaml) {
+        $lock = Get-Content -LiteralPath (Join-Path $Repo 'src/PiSharp.Cli/packages.lock.json') -Raw | ConvertFrom-Json -AsHashtable
+        $libraries['YamlDotNet/16.3.0'] = @{ type = 'package'; sha512 = 'sha512-' + $lock.dependencies['net10.0'].YamlDotNet.contentHash }
+        $libraries['PiSharp.PromptTemplates.Yaml/1.0.0'] = @{ type = 'project' }
+        $runtime['YamlDotNet/16.3.0'] = @{ runtime = @{ 'lib/net8.0/YamlDotNet.dll' = @{} } }
+        $runtime['PiSharp.PromptTemplates.Yaml/1.0.0'] = @{ runtime = @{ 'PiSharp.PromptTemplates.Yaml.dll' = @{} } }
+        foreach ($name in @('YamlDotNet', 'PiSharp.PromptTemplates.Yaml')) {
+            $files.Add($prefix + "$name.dll", [Text.Encoding]::UTF8.GetBytes("fixture-only-$name"))
+        }
+        $files.Add($prefix + 'licenses/YamlDotNet.LICENSE.txt', [IO.File]::ReadAllBytes((Join-Path $Repo 'third-party/YamlDotNet.LICENSE.txt')))
+    }
+    $deps = @{ runtimeTarget = @{ name = $target }; libraries = $libraries; targets = @{ $target = $runtime } }
+    $files.Add($prefix + 'PiSharp.Cli.deps.json', [Text.Encoding]::UTF8.GetBytes(($deps | ConvertTo-Json -Depth 10)))
     if ($Standalone) {
         $runtimeNames = switch ($Rid) {
             'win-x64' { @('PiSharp.Cli.exe', 'coreclr.dll', 'hostpolicy.dll', 'hostfxr.dll', 'System.Private.CoreLib.dll') }
@@ -82,6 +98,96 @@ try {
     Test-Case 'tool metadata and documents' { $report = Assert-PiSharpDistribution -Path $tool @argsTool; if ($report.platformQualified) { throw 'Qualification overstated.' } }
     $standalone = Write-Fixture -Files (New-FixtureFiles -Standalone) -Name 'standalone'
     Test-Case 'self-contained Windows payload' { Assert-PiSharpDistribution -Path $standalone -Repo $Repo -Kind standalone -Version $version -SourceCommit $commit -Rid win-x64 | Out-Null }
+    $disabledTool = Write-Fixture -Files (New-FixtureFiles -EnablePromptTemplateYaml:$false) -Name 'yaml-disabled-tool'
+    $argsDisabled = $argsTool.Clone(); $argsDisabled.EnablePromptTemplateYaml = $false
+    Test-Case 'disabled tool excludes YAML assets and dependencies' {
+        $report = Assert-PiSharpDistribution -Path $disabledTool @argsDisabled
+        if ($report.enablePromptTemplateYaml) { throw 'Disabled feature overstated.' }
+    }
+    $disabledStandalone = Write-Fixture -Files (New-FixtureFiles -Standalone -EnablePromptTemplateYaml:$false) -Name 'yaml-disabled-standalone'
+    Test-Case 'disabled standalone excludes YAML assets and dependencies' {
+        Assert-PiSharpDistribution -Path $disabledStandalone -Repo $Repo -Kind standalone -Version $version -SourceCommit $commit -Rid win-x64 -EnablePromptTemplateYaml:$false | Out-Null
+    }
+    Test-Case 'feature provenance must match enabled validation' { Assert-Rejected { Assert-PiSharpDistribution -Path $disabledTool @argsTool } 'YAML feature provenance mismatch' }
+    Test-Case 'feature provenance must match disabled validation' { Assert-Rejected { Assert-PiSharpDistribution -Path $tool @argsDisabled } 'YAML feature provenance mismatch' }
+    foreach ($setting in @('absent', 'string')) {
+        $files = New-FixtureFiles
+        $provenance = [Text.Encoding]::UTF8.GetString($files['provenance.json']) | ConvertFrom-Json -AsHashtable
+        if ($setting -eq 'absent') { $provenance.Remove('enablePromptTemplateYaml') } else { $provenance.enablePromptTemplateYaml = 'true' }
+        $files['provenance.json'] = [Text.Encoding]::UTF8.GetBytes(($provenance | ConvertTo-Json))
+        $bad = Write-Fixture -Files $files -Name ('yaml-provenance-' + $setting)
+        Test-Case ("reject $setting YAML provenance") { Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsTool } 'YAML feature provenance mismatch' }
+    }
+    foreach ($location in @('selected', 'other')) {
+        $files = New-FixtureFiles
+        $deps = [Text.Encoding]::UTF8.GetString($files['tools/net10.0/any/PiSharp.Cli.deps.json']) | ConvertFrom-Json -AsHashtable
+        $targetName = $deps.runtimeTarget.name
+        if ($location -eq 'other') { $targetName += '/win-x64'; $deps.targets[$targetName] = @{} }
+        $deps.targets[$targetName]['YamlDotNet/99.0.0'] = @{ runtime = @{ 'lib/net8.0/YamlDotNet.dll' = @{} } }
+        $files['tools/net10.0/any/PiSharp.Cli.deps.json'] = [Text.Encoding]::UTF8.GetBytes(($deps | ConvertTo-Json -Depth 10))
+        $bad = Write-Fixture -Files $files -Name ('unexpected-enabled-yaml-target-' + $location)
+        Test-Case ("enabled tool rejects unexpected YAML identity in $location target") {
+            Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsTool } 'Unexpected YAML dependency target identity'
+        }
+    }
+    $files = New-FixtureFiles
+    $deps = [Text.Encoding]::UTF8.GetString($files['tools/net10.0/any/PiSharp.Cli.deps.json']) | ConvertFrom-Json -AsHashtable
+    $deps.targets[($deps.runtimeTarget.name + '/win-x64')] = $deps.targets[$deps.runtimeTarget.name]
+    $files['tools/net10.0/any/PiSharp.Cli.deps.json'] = [Text.Encoding]::UTF8.GetBytes(($deps | ConvertTo-Json -Depth 10))
+    $duplicateTargets = Write-Fixture -Files $files -Name 'enabled-expected-yaml-multiple-targets'
+    Test-Case 'enabled tool allows admitted YAML identities in multiple targets' {
+        Assert-PiSharpDistribution -Path $duplicateTargets @argsTool | Out-Null
+    }
+    foreach ($name in @('YamlDotNet.dll', 'PiSharp.PromptTemplates.Yaml.dll', 'licenses/YamlDotNet.LICENSE.txt')) {
+        $files = New-FixtureFiles; $files.Remove('tools/net10.0/any/' + $name) | Out-Null
+        $bad = Write-Fixture -Files $files -Name ('missing-yaml-' + $results.Count)
+        Test-Case ("enabled tool requires $name") { Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsTool } 'Missing YAML payload' }
+    }
+    $files = New-FixtureFiles; $files['tools/net10.0/any/licenses/YamlDotNet.LICENSE.txt'] = [Text.Encoding]::UTF8.GetBytes('declaration only')
+    $bad = Write-Fixture -Files $files -Name 'yaml-license-bytes'
+    Test-Case 'YAML notice matches retained source bytes' { Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsTool } 'YAML license differs' }
+    foreach ($change in @('version', 'hash', 'package-type', 'runtime', 'adapter-runtime', 'target')) {
+        $files = New-FixtureFiles
+        $deps = [Text.Encoding]::UTF8.GetString($files['tools/net10.0/any/PiSharp.Cli.deps.json']) | ConvertFrom-Json -AsHashtable
+        $runtime = $deps.targets[$deps.runtimeTarget.name]
+        switch ($change) {
+            'version' { $deps.libraries['YamlDotNet/16.3.1'] = $deps.libraries['YamlDotNet/16.3.0']; $deps.libraries.Remove('YamlDotNet/16.3.0') }
+            'hash' { $deps.libraries['YamlDotNet/16.3.0'].sha512 = 'sha512-wrong' }
+            'package-type' { $deps.libraries['YamlDotNet/16.3.0'].type = 'project' }
+            'runtime' { $runtime['YamlDotNet/16.3.0'].runtime.Clear() }
+            'adapter-runtime' { $runtime['PiSharp.PromptTemplates.Yaml/1.0.0'].runtime.Clear() }
+            'target' { $deps.targets.Clear() }
+        }
+        $files['tools/net10.0/any/PiSharp.Cli.deps.json'] = [Text.Encoding]::UTF8.GetBytes(($deps | ConvertTo-Json -Depth 10))
+        $bad = Write-Fixture -Files $files -Name ('yaml-deps-' + $change)
+        $message = switch ($change) { 'runtime' { 'YAML runtime assets missing' }; 'adapter-runtime' { 'YAML runtime assets missing' }; 'target' { 'Dependency runtime target missing' }; default { 'YAML package identity mismatch' } }
+        Test-Case ("enabled YAML dependency validation $change") { Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsTool } $message }
+    }
+    foreach ($name in @('YamlDotNet.dll', 'PiSharp.PromptTemplates.Yaml.dll', 'licenses/YamlDotNet.LICENSE.txt')) {
+        $files = New-FixtureFiles -EnablePromptTemplateYaml:$false
+        $files.Add('tools/net10.0/any/' + $name, [byte[]]@(1))
+        $bad = Write-Fixture -Files $files -Name ('disabled-stale-yaml-' + $results.Count)
+        Test-Case ("disabled tool rejects $name") { Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsDisabled } 'YAML payload or dependency' }
+    }
+    foreach ($location in @('libraries', 'targets', 'runtime-assets')) {
+        $files = New-FixtureFiles -EnablePromptTemplateYaml:$false
+        $deps = [Text.Encoding]::UTF8.GetString($files['tools/net10.0/any/PiSharp.Cli.deps.json']) | ConvertFrom-Json -AsHashtable
+        if ($location -eq 'libraries') { $deps.libraries['YamlDotNet/16.3.0'] = @{ type = 'package' } }
+        elseif ($location -eq 'targets') { $deps.targets[$deps.runtimeTarget.name]['PiSharp.PromptTemplates.Yaml/1.0.0'] = @{ runtime = @{} } }
+        else { $deps.targets[$deps.runtimeTarget.name]['PiSharp.Cli/0.1.0'].runtime['YamlDotNet.dll'] = @{} }
+        $files['tools/net10.0/any/PiSharp.Cli.deps.json'] = [Text.Encoding]::UTF8.GetBytes(($deps | ConvertTo-Json -Depth 10))
+        $bad = Write-Fixture -Files $files -Name ('disabled-yaml-deps-' + $location)
+        Test-Case ("disabled tool rejects dependency in $location") { Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsDisabled } 'YAML payload or dependency' }
+    }
+    Test-Case 'disabled wrapper propagates feature expectation' {
+        $repeatDisabled = Write-Fixture -Files (New-FixtureFiles -EnablePromptTemplateYaml:$false) -Name 'disabled-wrapper-repeat'
+        & (Join-Path $Repo 'tools/packaging/validate-distribution.ps1') -Artifact $disabledTool -ExpectedSha256 (Get-FileHash -LiteralPath $disabledTool -Algorithm SHA256).Hash.ToLowerInvariant() -RepeatArtifact $repeatDisabled @argsDisabled | Out-Null
+    }
+    Test-Case 'disabled wrapper rejects enabled repeat artifact' {
+        Assert-Rejected {
+            & (Join-Path $Repo 'tools/packaging/validate-distribution.ps1') -Artifact $disabledTool -ExpectedSha256 (Get-FileHash -LiteralPath $disabledTool -Algorithm SHA256).Hash.ToLowerInvariant() -RepeatArtifact $tool @argsDisabled
+        } 'YAML feature provenance mismatch'
+    }
     Test-Case 'RID mismatch' { Assert-Rejected { Assert-PiSharpDistribution -Path $standalone -Repo $Repo -Kind standalone -Version $version -SourceCommit $commit -Rid linux-x64 } 'provenance mismatch' }
     Test-Case 'missing RID' { Assert-Rejected { Assert-PiSharpDistribution -Path $standalone -Repo $Repo -Kind standalone -Version $version -SourceCommit $commit } 'RID required' }
     foreach ($path in @('../escape', '/absolute', 'C:/drive', 'bad\separator', 'CON.txt', 'trailing./file', 'README.MD', 'LICENSE/child', 'node.exe', 'node_modules/package/index.js', '.env', 'credential.pfx', 'PiSharp.Compatibility.Node.dll')) {

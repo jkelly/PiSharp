@@ -563,6 +563,32 @@ public sealed class CompletionsKeyAuthRequestFactory
         return clamped > 0 ? clamped : null;
     }
 
+    // Capability admission uses the same resolved wire profile as AddThinkingFields, for every provider route.
+    internal bool SupportsNativeThinkingControl(string level)
+    {
+        if (!_projectionOptions.Reasoning) return false;
+        var ceiling = _options.MaxTokens is { } maximum && maximum != 0 ? maximum : _modelMaxTokens;
+        var hasBudget = ceiling is { } cap && Math.Min(_thinkingBudgets[level is "xhigh" or "max" ? "high" : level], Math.Max(0, cap - 1024)) > 0;
+        bool HasTemplateControl(JsonData? template) => template is { } raw && raw.Value.EnumerateObject().Any(property =>
+            IsOwnTemplateField(property.Name) && property.Value.ValueKind == JsonValueKind.Object && property.Value.TryGetProperty("$var", out var variable) &&
+            (variable.GetString() is "thinking.enabled" or "thinking.effort" || variable.GetString() == "thinking.budget" && hasBudget));
+        var formatControl = _thinkingFormat switch
+        {
+            "zai" or "qwen" or "qwen-chat-template" or "deepseek" or "together" or "string-thinking" or "openrouter" => true,
+            "chat-template" => HasTemplateControl(_chatTemplateKwargs),
+            "baseten" => HasTemplateControl(_chatTemplateArgs) || _options.SupportsReasoningEffort,
+            "ant-ling" => _thinkingLevelMap.TryGetValue(level, out var effort) && effort is not null,
+            _ => _options.SupportsReasoningEffort
+        };
+        return formatControl || _thinkingTokenBudgetField is not null && hasBudget;
+    }
+
+    internal void AdmitNativeThinkingOff()
+    {
+        if (_projectionOptions.Reasoning && _thinkingLevelMap.TryGetValue("off", out var off) && off != "none")
+            throw new ArgumentException("Native thinking off is unsupported by the configured profile.");
+    }
+
     private ImmutableDictionary<string, double> ReadThinkingBudgets(JsonData? source)
     {
         var result = ImmutableDictionary.CreateBuilder<string, double>(StringComparer.Ordinal);
@@ -592,6 +618,8 @@ public sealed class CompletionsKeyAuthRequestFactory
         }
     }
 
+    private static bool IsOwnTemplateField(string name) => name != "__proto__";
+
     private JsonData? ResolveTemplate(JsonData? source, double? budget, CancellationToken token)
     {
         if (source is null) return null;
@@ -601,7 +629,7 @@ public sealed class CompletionsKeyAuthRequestFactory
             token.ThrowIfCancellationRequested(); var value = property.Value;
             // Assignment to the ordinary Source object invokes its prototype setter.
             // Every supported resolved value is primitive, so this key is never an own field.
-            if (property.Name == "__proto__") continue;
+            if (!IsOwnTemplateField(property.Name)) continue;
             if (value.ValueKind != JsonValueKind.Object) { result[property.Name] = JsonNode.Parse(value.GetRawText()); continue; }
             if (requested is null && value.TryGetProperty("omitWhenOff", out var omit) && omit.GetBoolean()) continue;
             switch (value.GetProperty("$var").GetString())

@@ -1,0 +1,682 @@
+{
+  "schemaVersion": 1,
+  "status": "reviewable edit setup plan/helper; preparation, five-archive acquisition, restore and genuine edit capture not executed",
+  "source": {
+    "repository": "https://github.com/earendil-works/pi",
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "lockPath": "package-lock.json",
+    "lockSha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d",
+    "canonicalFingerprint": {
+      "files": 2093,
+      "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+    },
+    "pins": [
+      {
+        "path": "package-lock.json",
+        "bytes": 186139,
+        "sha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d"
+      },
+      {
+        "path": "packages/coding-agent/package.json",
+        "bytes": 4163,
+        "sha256": "c701ddbf28b5170deb478b8586ee713f9372027c04736946a4ffe82168ece5ba"
+      },
+      {
+        "path": "packages/tui/package.json",
+        "bytes": 1594,
+        "sha256": "bfe1aa9bb42fa627e833cb1de27c417d38615cb261c1f46214c73850d353c817"
+      },
+      {
+        "path": "packages/coding-agent/src/core/tools/edit.ts",
+        "bytes": 8564,
+        "sha256": "31a368c14cf5437ecac157765660001b16063302d9bd746303d6d1b1dcb5625d"
+      },
+      {
+        "path": "packages/coding-agent/src/core/tools/edit-diff.ts",
+        "bytes": 18079,
+        "sha256": "f85a9809eb44b9828236050cf38a8e45933e5cfd583a186e9a0e55a664dd3e8d"
+      },
+      {
+        "path": "packages/coding-agent/src/core/tools/renderers/edit.ts",
+        "bytes": 8081,
+        "sha256": "0c1bafcf74ad2b703bf5ab193e72084a1da80231a77abddefc23c5bb20558731"
+      },
+      {
+        "path": "packages/coding-agent/src/core/tools/tool-definition-wrapper.ts",
+        "bytes": 2153,
+        "sha256": "bae3cdd9f2aa21fb168ef42a47584f3b19536c0815ec14d94389af530eef9358"
+      },
+      {
+        "path": "packages/coding-agent/src/core/tools/file-mutation-queue.ts",
+        "bytes": 1697,
+        "sha256": "33cb06ac9bcdf32c8b84d9d12e33be44c503a7670f668e003a3262cd34294d11"
+      },
+      {
+        "path": "packages/coding-agent/src/core/tools/path-utils.ts",
+        "bytes": 3626,
+        "sha256": "ab6f420d2388a41366113c17a25e356867820b87b02a169d044cfcf83e1997d3"
+      },
+      {
+        "path": "packages/coding-agent/src/core/tools/render-utils.ts",
+        "bytes": 4117,
+        "sha256": "6bd0f21d1c1cefcf6bb1de023de46ad1250e096d36327b4d42fbb71a06414956"
+      },
+      {
+        "path": "packages/coding-agent/src/utils/paths.ts",
+        "bytes": 4950,
+        "sha256": "64c3ebef724fa21ed0042e127908b4323a5d2f1b8aaa91eee550442332fe8502"
+      },
+      {
+        "path": "packages/coding-agent/src/utils/child-process.ts",
+        "bytes": 4146,
+        "sha256": "cd324f5b9a1abadd85ab5a331750d475c8bd51ec65cae091ad9b416245ec85d4"
+      },
+      {
+        "path": "packages/coding-agent/src/utils/text.ts",
+        "bytes": 404,
+        "sha256": "bb323f9607c499115b532021f4f0163c6df04d834aee9c32c3c77b273bd2d7c6"
+      },
+      {
+        "path": "packages/tui/src/index.ts",
+        "bytes": 4970,
+        "sha256": "279b578543913b3333f00beffaacfa346b67e574ab8f4f8fc7603ecd00c6d66e"
+      },
+      {
+        "path": "packages/tui/src/native-platform.ts",
+        "bytes": 2571,
+        "sha256": "693d33898358804541d36aff089db74e1eb3be8f1a1722ffe6d821036b925959"
+      },
+      {
+        "path": "packages/tui/src/native-modifiers.ts",
+        "bytes": 388,
+        "sha256": "8bfe66389dee2e6e962cb82f54050f8fe10df0d0b26d56186a581a00f70d6d8e"
+      },
+      {
+        "path": "packages/coding-agent/src/modes/interactive/theme/theme.ts",
+        "bytes": 38308,
+        "sha256": "082e9706529d468cfd3315f1d4c865a60ecd463e9fdd207b0b43607998a58ddc"
+      },
+      {
+        "path": "packages/coding-agent/src/utils/syntax-highlight.ts",
+        "bytes": 5581,
+        "sha256": "ead0ebee63d7ac661568a5aafdb09e28d6d8e893a8389aa64143b00e707416bb"
+      },
+      {
+        "path": "packages/coding-agent/src/experimental/source-resolver.ts",
+        "bytes": 3592,
+        "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6"
+      },
+      {
+        "path": "tsconfig.json",
+        "bytes": 3988,
+        "sha256": "1ef1041faebef510f59480731ece80657f7e67b1091a0b0dcf05ca51e8a267a6"
+      }
+    ],
+    "requiredEagerImport": "Whole edit.ts imports edit-diff.ts (diff), renderers/edit.ts (whole pi-tui index and theme), typebox, and path-utils.ts -> utils/paths.ts -> child-process.ts -> cross-spawn. TUI requires marked/get-east-asian-width; theme requires chalk and highlight.js. Renderer/native operations are not invoked.",
+    "rootCrossSpawnDeclaration": "7.0.6",
+    "excludedLockEntries": [
+      "node_modules/execa/node_modules/cross-spawn (6.0.6 and its older dev-only closure)",
+      "packages/ai/node_modules/openai and all provider SDKs"
+    ],
+    "directDeclarations": [
+      {
+        "packageLockPath": "packages/coding-agent",
+        "name": "cross-spawn",
+        "version": "7.0.6"
+      },
+      {
+        "packageLockPath": "packages/coding-agent",
+        "name": "diff",
+        "version": "8.0.4"
+      },
+      {
+        "packageLockPath": "packages/coding-agent",
+        "name": "chalk",
+        "version": "6.0.0"
+      },
+      {
+        "packageLockPath": "packages/coding-agent",
+        "name": "highlight.js",
+        "version": "10.7.3"
+      },
+      {
+        "packageLockPath": "packages/coding-agent",
+        "name": "typebox",
+        "version": "1.3.27"
+      },
+      {
+        "packageLockPath": "packages/tui",
+        "name": "marked",
+        "version": "18.0.11"
+      },
+      {
+        "packageLockPath": "packages/tui",
+        "name": "get-east-asian-width",
+        "version": "1.6.0"
+      }
+    ]
+  },
+  "runtime": {
+    "version": "v24.19.0",
+    "absoluteExecutable": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+    "reuseExisting": true,
+    "sourceExecution": "Node native TypeScript stripping; unchanged whole edit.ts/edit-diff.ts and canonical experimental source resolver"
+  },
+  "packageManager": {
+    "version": "11.6.2",
+    "existingVerifiedArchive": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1\\archives\\npm-11.6.2.tgz",
+    "archiveBytes": 2663834,
+    "sha256": "585f95094ee5cb2788ee11d90f2a518a7c9ef6e083fa141d0b63ca3383675a20",
+    "integrity": "sha512-7iKzNfy8lWYs3zq4oFPa8EXZz5xt9gQNKJZau3B1ErLBb6bF7sBJ00x09485DOvRT2l5Gerbl3VlZNT57MxJVA==",
+    "tarballIfMissing": "https://registry.npmjs.org/npm/-/npm-11.6.2.tgz",
+    "bootstrapReuse": "Verify and copy the existing archive into the new owned workspace, inspect confined member/link paths before unpacking only the npm CLI into its tools directory; no global installation",
+    "cacheReuse": "Copy verified existing cache contents into the new workspace's owned cache; never point a writable npm cache at the accepted oracle's cache",
+    "engine": "^20.17.0 || >=22.9.0"
+  },
+  "workspace": {
+    "proposedRoot": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-edit-oracle-v0.99.1",
+    "existedAtResearch": false,
+    "upstreamSubdirectory": "upstream",
+    "sourceAcquisition": "Fresh task-local Git clone without hardlinks from the already acquired public pinned checkout; no Git network required",
+    "existingQualifiedOracle": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1",
+    "existingQualifiedOracleMutation": false,
+    "requiredOwnedDirectories": [
+      "upstream",
+      "archives",
+      "tools/npm-11.6.2",
+      "cache",
+      "config",
+      "home",
+      "tmp",
+      "captures"
+    ],
+    "existingTargetPolicy": "Refuse a preexisting nonempty or incomplete target; exact owned prepared/restored layouts may be validated idempotently; no deletion or overwrite of uncertain state",
+    "existedAtPlanCreation": false,
+    "olderQualifiedOraclesRemainImmutable": [
+      "Pi-reference-oracle-v0.99.1",
+      "Pi-responses-sdk-oracle-v0.99.1",
+      "Pi-session-context-oracle-v0.99.1"
+    ]
+  },
+  "projection": {
+    "packageJson": {
+      "name": "pisharp-edit-reference-oracle",
+      "version": "0.0.0",
+      "private": true,
+      "type": "module",
+      "dependencies": {
+        "chalk": "6.0.0",
+        "cross-spawn": "7.0.6",
+        "diff": "8.0.4",
+        "get-east-asian-width": "1.6.0",
+        "highlight.js": "10.7.3",
+        "isexe": "2.0.0",
+        "marked": "18.0.11",
+        "partial-json": "0.1.7",
+        "path-key": "3.1.1",
+        "shebang-command": "2.0.0",
+        "shebang-regex": "3.0.0",
+        "typebox": "1.3.27",
+        "which": "2.0.2"
+      }
+    },
+    "lockfileVersion": 3,
+    "requires": true,
+    "rule": "Fresh isolated root explicitly pins 13 reviewed packages, preserving selected original node_modules entries unchanged. Static edit graph requires12; partial-json is explicitly retained as immutable qualified-session profile reuse, not asserted to be imported by edit.",
+    "additionalPackageCount": 5,
+    "dependencyGraph": {
+      "cross-spawn": [
+        "path-key",
+        "shebang-command",
+        "which"
+      ],
+      "shebang-command": [
+        "shebang-regex"
+      ],
+      "which": [
+        "isexe"
+      ]
+    },
+    "optionalPeersInstalled": [],
+    "runtimeClosureProved": false,
+    "externalPackageProfileCount": 13,
+    "staticRequiredPackageCount": 12
+  },
+  "packages": [
+    {
+      "name": "chalk",
+      "sourceLockPath": "node_modules/chalk",
+      "projectedLockPath": "node_modules/chalk",
+      "lockEntry": {
+        "version": "6.0.0",
+        "resolved": "https://registry.npmjs.org/chalk/-/chalk-6.0.0.tgz",
+        "integrity": "sha512-2uNTXIuTTxk7ciZgAU1BQcgnchcG0xXnrs6jzkQfj9SsRa9M2s5zE8WT96hS6KmG4MzWHSrvH43DF1m4XRkrFg==",
+        "license": "MIT",
+        "engines": {
+          "node": ">=22"
+        },
+        "funding": {
+          "url": "https://github.com/chalk/chalk?sponsor=1"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock only; new packaged bytes/declarations/lifecycle/native/license evidence pending explicit reviewed restore"
+    },
+    {
+      "name": "cross-spawn",
+      "sourceLockPath": "node_modules/cross-spawn",
+      "projectedLockPath": "node_modules/cross-spawn",
+      "lockEntry": {
+        "version": "7.0.6",
+        "resolved": "https://registry.npmjs.org/cross-spawn/-/cross-spawn-7.0.6.tgz",
+        "integrity": "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==",
+        "license": "MIT",
+        "dependencies": {
+          "path-key": "^3.1.0",
+          "shebang-command": "^2.0.0",
+          "which": "^2.0.1"
+        },
+        "engines": {
+          "node": ">= 8"
+        }
+      },
+      "reuseVerifiedCacheArchive": true,
+      "authority": "Canonical upstream lock; eight exact archive/installed trees observed in immutable qualified-session setup receipt, revalidated read-only here"
+    },
+    {
+      "name": "diff",
+      "sourceLockPath": "node_modules/diff",
+      "projectedLockPath": "node_modules/diff",
+      "lockEntry": {
+        "version": "8.0.4",
+        "resolved": "https://registry.npmjs.org/diff/-/diff-8.0.4.tgz",
+        "integrity": "sha512-DPi0FmjiSU5EvQV0++GFDOJ9ASQUVFh5kD+OzOnYdi7n3Wpm9hWWGfB/O2blfHcMVTL5WkQXSnRiK9makhrcnw==",
+        "license": "BSD-3-Clause",
+        "engines": {
+          "node": ">=0.3.1"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock only; new packaged bytes/declarations/lifecycle/native/license evidence pending explicit reviewed restore"
+    },
+    {
+      "name": "get-east-asian-width",
+      "sourceLockPath": "node_modules/get-east-asian-width",
+      "projectedLockPath": "node_modules/get-east-asian-width",
+      "lockEntry": {
+        "version": "1.6.0",
+        "resolved": "https://registry.npmjs.org/get-east-asian-width/-/get-east-asian-width-1.6.0.tgz",
+        "integrity": "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA==",
+        "license": "MIT",
+        "engines": {
+          "node": ">=18"
+        },
+        "funding": {
+          "url": "https://github.com/sponsors/sindresorhus"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock only; new packaged bytes/declarations/lifecycle/native/license evidence pending explicit reviewed restore"
+    },
+    {
+      "name": "highlight.js",
+      "sourceLockPath": "node_modules/highlight.js",
+      "projectedLockPath": "node_modules/highlight.js",
+      "lockEntry": {
+        "version": "10.7.3",
+        "resolved": "https://registry.npmjs.org/highlight.js/-/highlight.js-10.7.3.tgz",
+        "integrity": "sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==",
+        "license": "BSD-3-Clause",
+        "engines": {
+          "node": "*"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock only; new packaged bytes/declarations/lifecycle/native/license evidence pending explicit reviewed restore"
+    },
+    {
+      "name": "isexe",
+      "sourceLockPath": "node_modules/isexe",
+      "projectedLockPath": "node_modules/isexe",
+      "lockEntry": {
+        "version": "2.0.0",
+        "resolved": "https://registry.npmjs.org/isexe/-/isexe-2.0.0.tgz",
+        "integrity": "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==",
+        "license": "ISC"
+      },
+      "reuseVerifiedCacheArchive": true,
+      "authority": "Canonical upstream lock; eight exact archive/installed trees observed in immutable qualified-session setup receipt, revalidated read-only here"
+    },
+    {
+      "name": "marked",
+      "sourceLockPath": "node_modules/marked",
+      "projectedLockPath": "node_modules/marked",
+      "lockEntry": {
+        "version": "18.0.11",
+        "resolved": "https://registry.npmjs.org/marked/-/marked-18.0.11.tgz",
+        "integrity": "sha512-HnslJfsZkRPBDJRHvVtAaWlZHEpSu7u8LgQuJCELjRKuWR+hpq4A7sLq3p8HaI9ypVoXDXxV34CsQJEe1+J5Aw==",
+        "license": "MIT",
+        "bin": {
+          "marked": "bin/marked.js"
+        },
+        "engines": {
+          "node": ">= 20"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Canonical upstream lock only; new packaged bytes/declarations/lifecycle/native/license evidence pending explicit reviewed restore"
+    },
+    {
+      "name": "partial-json",
+      "sourceLockPath": "node_modules/partial-json",
+      "projectedLockPath": "node_modules/partial-json",
+      "lockEntry": {
+        "version": "0.1.7",
+        "resolved": "https://registry.npmjs.org/partial-json/-/partial-json-0.1.7.tgz",
+        "integrity": "sha512-Njv/59hHaokb/hRUjce3Hdv12wd60MtM9Z5Olmn+nehe0QDAsRtRbJPvJ0Z91TusF0SuZRIvnM+S4l6EIP8leA==",
+        "license": "MIT"
+      },
+      "reuseVerifiedCacheArchive": true,
+      "authority": "Canonical upstream lock; eight exact archive/installed trees observed in immutable qualified-session setup receipt, revalidated read-only here"
+    },
+    {
+      "name": "path-key",
+      "sourceLockPath": "node_modules/path-key",
+      "projectedLockPath": "node_modules/path-key",
+      "lockEntry": {
+        "version": "3.1.1",
+        "resolved": "https://registry.npmjs.org/path-key/-/path-key-3.1.1.tgz",
+        "integrity": "sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q==",
+        "license": "MIT",
+        "engines": {
+          "node": ">=8"
+        }
+      },
+      "reuseVerifiedCacheArchive": true,
+      "authority": "Canonical upstream lock; eight exact archive/installed trees observed in immutable qualified-session setup receipt, revalidated read-only here"
+    },
+    {
+      "name": "shebang-command",
+      "sourceLockPath": "node_modules/shebang-command",
+      "projectedLockPath": "node_modules/shebang-command",
+      "lockEntry": {
+        "version": "2.0.0",
+        "resolved": "https://registry.npmjs.org/shebang-command/-/shebang-command-2.0.0.tgz",
+        "integrity": "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==",
+        "license": "MIT",
+        "dependencies": {
+          "shebang-regex": "^3.0.0"
+        },
+        "engines": {
+          "node": ">=8"
+        }
+      },
+      "reuseVerifiedCacheArchive": true,
+      "authority": "Canonical upstream lock; eight exact archive/installed trees observed in immutable qualified-session setup receipt, revalidated read-only here"
+    },
+    {
+      "name": "shebang-regex",
+      "sourceLockPath": "node_modules/shebang-regex",
+      "projectedLockPath": "node_modules/shebang-regex",
+      "lockEntry": {
+        "version": "3.0.0",
+        "resolved": "https://registry.npmjs.org/shebang-regex/-/shebang-regex-3.0.0.tgz",
+        "integrity": "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==",
+        "license": "MIT",
+        "engines": {
+          "node": ">=8"
+        }
+      },
+      "reuseVerifiedCacheArchive": true,
+      "authority": "Canonical upstream lock; eight exact archive/installed trees observed in immutable qualified-session setup receipt, revalidated read-only here"
+    },
+    {
+      "name": "typebox",
+      "sourceLockPath": "node_modules/typebox",
+      "projectedLockPath": "node_modules/typebox",
+      "lockEntry": {
+        "version": "1.3.27",
+        "resolved": "https://registry.npmjs.org/typebox/-/typebox-1.3.27.tgz",
+        "integrity": "sha512-zu+jc1pcy4UiNThxikUr36f0Rybk9PEeCg/NE6adeWr/SKsdNO4EzZHYRDlv2YCVAfj3Odq3dESSo/jNyoBXzA==",
+        "license": "MIT"
+      },
+      "reuseVerifiedCacheArchive": true,
+      "authority": "Canonical upstream lock; eight exact archive/installed trees observed in immutable qualified-session setup receipt, revalidated read-only here"
+    },
+    {
+      "name": "which",
+      "sourceLockPath": "node_modules/which",
+      "projectedLockPath": "node_modules/which",
+      "lockEntry": {
+        "version": "2.0.2",
+        "resolved": "https://registry.npmjs.org/which/-/which-2.0.2.tgz",
+        "integrity": "sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==",
+        "license": "ISC",
+        "dependencies": {
+          "isexe": "^2.0.0"
+        },
+        "bin": {
+          "node-which": "bin/node-which"
+        },
+        "engines": {
+          "node": ">= 8"
+        }
+      },
+      "reuseVerifiedCacheArchive": true,
+      "authority": "Canonical upstream lock; eight exact archive/installed trees observed in immutable qualified-session setup receipt, revalidated read-only here"
+    }
+  ],
+  "setupProposal": {
+    "registry": "https://registry.npmjs.org/",
+    "networkHosts": [
+      "registry.npmjs.org"
+    ],
+    "newRequiredArchives": [
+      "https://registry.npmjs.org/chalk/-/chalk-6.0.0.tgz",
+      "https://registry.npmjs.org/diff/-/diff-8.0.4.tgz",
+      "https://registry.npmjs.org/get-east-asian-width/-/get-east-asian-width-1.6.0.tgz",
+      "https://registry.npmjs.org/highlight.js/-/highlight.js-10.7.3.tgz",
+      "https://registry.npmjs.org/marked/-/marked-18.0.11.tgz"
+    ],
+    "reuseArchives": [
+      "https://registry.npmjs.org/cross-spawn/-/cross-spawn-7.0.6.tgz",
+      "https://registry.npmjs.org/isexe/-/isexe-2.0.0.tgz",
+      "https://registry.npmjs.org/partial-json/-/partial-json-0.1.7.tgz",
+      "https://registry.npmjs.org/path-key/-/path-key-3.1.1.tgz",
+      "https://registry.npmjs.org/shebang-command/-/shebang-command-2.0.0.tgz",
+      "https://registry.npmjs.org/shebang-regex/-/shebang-regex-3.0.0.tgz",
+      "https://registry.npmjs.org/typebox/-/typebox-1.3.27.tgz",
+      "https://registry.npmjs.org/which/-/which-2.0.2.tgz"
+    ],
+    "npmBootstrapNetworkExpected": false,
+    "restoreArguments": [
+      "ci",
+      "--ignore-scripts",
+      "--omit=optional",
+      "--omit=peer",
+      "--no-audit",
+      "--no-fund",
+      "--bin-links=false",
+      "--registry=https://registry.npmjs.org/"
+    ],
+    "dynamicArguments": [
+      "--prefix <newOracle>",
+      "--cache <newOracle>/cache",
+      "--userconfig <newOracle>/config/user.npmrc",
+      "--globalconfig <newOracle>/config/global.npmrc"
+    ],
+    "archiveAcquisition": "Explicit --restore only: anonymous exact five official-lock URL GETs, no redirects; SRI and inert confined tar/package/license/lifecycle/native inspection before npm ci. Eight previously verified session archives and cache are copied read-only into new owned root.",
+    "environment": "Credential-free explicit child env; task-local home/appdata/temp/npm cache/config; no inherited user npm/git credentials, provider/cloud/proxy variables, NODE_OPTIONS or certificate overrides",
+    "lifecycleScripts": false,
+    "nativeBuilds": false,
+    "binLinks": false,
+    "typescriptBuilds": false,
+    "modelCatalogGeneration": false,
+    "globalInstall": false,
+    "permanentPathChange": false,
+    "systemConfigurationChange": false,
+    "sourceTransformOrModuleReplacement": false,
+    "providerCalls": false,
+    "actualPrepareExecuted": false,
+    "actualRestoreExecuted": false
+  },
+  "reusedArchiveInspector": {
+    "path": "tools/PiReferenceRunner/setup-responses-sdk-oracle.mjs",
+    "sha256": "1da4ce53bf9b7ccc462bad540294353fd7ab42ba35ca171d3921916409d2b513",
+    "export": "inspectPackageArchive",
+    "rule": "Hash before import; reuse only existing inert archive parser export. Importing its module does not run its setup main."
+  },
+  "genuineCaptureBoundary": {
+    "entryModules": [
+      "upstream/packages/coding-agent/src/core/tools/edit-diff.ts",
+      "upstream/packages/coding-agent/src/core/tools/edit.ts"
+    ],
+    "exports": [
+      "applyEditsToNormalizedContent",
+      "fuzzyFindText",
+      "normalizeForFuzzyMatch",
+      "detectLineEnding",
+      "normalizeToLF",
+      "restoreLineEndings",
+      "generateDiffString",
+      "generateUnifiedPatch",
+      "computeEditsDiff",
+      "createEditToolDefinition",
+      "createEditTool"
+    ],
+    "selectedFirstProfile": "Authored small matching plans against original content and public factory execution using default real FS operations only on owned confined temp files; record input/output bytes, returned result/diff/patch/errors. Supported public prepareArguments may be observed separately.",
+    "sourceWholeModuleRule": "Load unchanged whole modules including eager renderer/TUI/theme imports; no private extraction, source copying, import erasure, module replacement, shim or native renderer invocation.",
+    "fakeClockOrIdRequired": false,
+    "offlinePreload": {
+      "existingObserver": "tools/PiReferenceRunner/full-preload.mjs",
+      "observerSha256": "e1f62a2048bc484a162085430a5afb6f88547d78049b6f29b2a0e4f65fcd79e2",
+      "existingGuard": "tools/PiReferenceRunner/offline-guard.mjs",
+      "guardSha256": "ae3741bdce496451bd04afcf8628df6ddc5bc5cfad8af6ee5e52cbc7b065a094",
+      "sourceResolverUnchanged": true,
+      "networkAndChildProcessesDisabledInCaptureChild": true
+    },
+    "editCaptureQualified": false,
+    "filesystemScope": "Own verified-confined mkdtemp layout only; source preview reads and actual default edit operations access/read/write confined authored relative paths. Cleanup verifies resolved path before recursive removal; no user files.",
+    "excludedCalls": [
+      "TUI terminal construction or start",
+      "render callbacks/theme initialization or watchers",
+      "clipboard/native modifier helpers",
+      "child processes",
+      "network/providers",
+      "source session filesystem APIs"
+    ]
+  },
+  "qualificationRequirements": [
+    "Verify unchanged pinned source2093 canonical blobs and exact two declared Windows attribute conversions, runtime/npm and reused eight dependency trees/archives before and after setup.",
+    "Acquire only five exact anonymous HTTPS registry tarballs in reviewed --restore; SHA512 SRI before inert tar/package inspection. Reject native addons, links/special/escaping/colliding paths, unexpected dependencies/peers/bundles/bin declarations and install/prepare lifecycle declarations.",
+    "Inspect retained root packaged license text against declared MIT/ISC/BSD-3-Clause admission; broader license/signature/attestation gates remain open.",
+    "Run task-local npm11.6.2 ci with scripts/binlinks/optional peers/audit/fund disabled, explicit owned prefix/cache/config and scrubbed child environment.",
+    "Require exact13 installed directories with every installed file matching its inspected archive, unchanged projected manifest/lock, hidden lock identity and original cache/source/archive/installed trees unchanged. Preserve partial writes on failure.",
+    "After root-approved successful restore prove unchanged whole edit module load under offline guard; report missing imports rather than install/substitute automatically.",
+    "Freeze separately observed matching, actual owned-FS results and diff/patch outputs with exact loaded closure and two-fresh-child repeatability; stronger native conflict checks or bounded formatter gaps stay explicit."
+  ],
+  "approval": {
+    "setupPreparationScope": "Root reviews this new three-file plan/helper/doc; root invokes local --prepare after freeze.",
+    "networkRestoreScope": "Root submits the concrete exact-package --restore command to applicable executor require_escalated auto-review; this helper has not performed downloads or installation.",
+    "executorRejectionRule": "Do not bypass a rejection; report exact action/reason and leave the original qualified oracles unchanged."
+  },
+  "limitations": [
+    "Whole edit.ts cannot be qualified with diff alone: eager renderer graph needs marked/get-east-asian-width/chalk/highlight.js even when render callbacks are not invoked.",
+    "Static closure is12 required packages plus intentionally retained partial-json, not actual whole-module load evidence or the full coding-agent dependency closure.",
+    "New five packaged license/lifecycle/native/dependency admission and installed-byte comparison remain pending; declared source-lock license is not packaged license proof.",
+    "Native helpers are lazy in unchanged TUI sources; capture will not instantiate terminals, render callbacks, clipboard or native modifiers. No native installation/build is in scope.",
+    "Source default edit performs ordinary writes without the stronger native exact-byte reread conflict check; cancellation after effects does not imply rollback.",
+    "Actual source diff/patch observations do not imply the native bounded formatter has jsdiff tie or patch parity.",
+    "No accepted oracle, old lock/golden, source module or product dependency is changed."
+  ],
+  "reusedSessionReceipt": {
+    "absolutePath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\.pisharp-session-context-restored.json",
+    "bytes": 15667,
+    "sha256": "3e43ae32f145a1cb62d277deda4659d91e78fd49bb0615f88b06fa9c8f2c7f61",
+    "status": "eight exact dependencies installed; whole session module qualification pending",
+    "installed": [
+      {
+        "name": "cross-spawn",
+        "version": "7.0.6",
+        "files": {
+          "files": 9,
+          "sha256": "ba72b9234e47f979c9938a5fe3e0bc95d6e26b91efdca9c1eb43b82aebb48d8a"
+        },
+        "archiveSha256": "188c320cdc413adfec03098fda72af7a9b02152ba13d3a8f87f172d93ced38ea",
+        "manifestSha256": "2e106cd9b4ae4e34ead35218371a0d4e172da72515a4f8f97d69a2e1fe3dee82"
+      },
+      {
+        "name": "isexe",
+        "version": "2.0.0",
+        "files": {
+          "files": 8,
+          "sha256": "b7667089801bc4b1e8c039f04e0c5e57780d91386eb91035cad2f64931caff9e"
+        },
+        "archiveSha256": "47cfe872e088e28c53b736fef305324b57cc1cfc9f72a9b0f769f92731cb8359",
+        "manifestSha256": "395c2af9abeeaafe7391974c1eacfb2a2bdeef187f21c3f5582c49e0368e59bf"
+      },
+      {
+        "name": "partial-json",
+        "version": "0.1.7",
+        "files": {
+          "files": 9,
+          "sha256": "b1c730b893ef274e6d457f23eebc9c39162cd6aaf777247942b9ad0cc1f1cb8e"
+        },
+        "archiveSha256": "30eafeed6fdc25fb2ca24f34c37796d9f98f0bf5e156452b98a2c356762f6322",
+        "manifestSha256": "42b3ae6c99ec959249f8eb4d3da7fdb44ec1f96ec627fa7f9ca5487a4e80963f"
+      },
+      {
+        "name": "path-key",
+        "version": "3.1.1",
+        "files": {
+          "files": 5,
+          "sha256": "6ac2c1a195bff17fbb5d24d5f4abddcccda3acdef5327234dd85d10a7f7420c7"
+        },
+        "archiveSha256": "4b8999acb914830edcd3c5b8fec632b32c6bc759ac3edc86336f5a9e08ba7b92",
+        "manifestSha256": "25594dab72681c910d9cc919263a4daf27d77a75e0d2c26a4d958d6d6b798f86"
+      },
+      {
+        "name": "shebang-command",
+        "version": "2.0.0",
+        "files": {
+          "files": 4,
+          "sha256": "f002dd6b9045846243d11a2512bfcccf0de1ab6144fa75280ee7fecd87f73902"
+        },
+        "archiveSha256": "9acba5bd18a51e9cdf5898380e4df63f803e1844def64ae1a46f88cff86d556e",
+        "manifestSha256": "44de390ae5ed6c5f9758b8b9c90b93fa53977d5361731600429f1de08f4b3f30"
+      },
+      {
+        "name": "shebang-regex",
+        "version": "3.0.0",
+        "files": {
+          "files": 5,
+          "sha256": "5e14378a819f5ec437cba4c696f38fcae5b6e120dbe929ca3219f44a24ca5c39"
+        },
+        "archiveSha256": "fedbabaa6db26c6be0183f82777dfa852d59a62f8885de93bd32ebc28758958f",
+        "manifestSha256": "b8018c6b8cc9900dfd1ac18a54956ba34c453fdc2da5e5fe555ee8f04133a1c5"
+      },
+      {
+        "name": "typebox",
+        "version": "1.3.27",
+        "files": {
+          "files": 1385,
+          "sha256": "9762e85e6a6e12cc6593cee73c1ffcc85857ba4c7f6d2ab52feeb4b28954ed25"
+        },
+        "archiveSha256": "5a288bcd3d68f44567de84b185e04d205ef7d5b53602846bc3db30fdd219dda3",
+        "manifestSha256": "c59ddfd977ce941f1e8ee8b0a0b14396c332fa27cc5fa6fa165227ffd5a3992f"
+      },
+      {
+        "name": "which",
+        "version": "2.0.2",
+        "files": {
+          "files": 6,
+          "sha256": "1ba286268b83272bf342d7374558066d12020123159aa508100dce289b2a6b63"
+        },
+        "archiveSha256": "a13adf5fddeb769655edce551e81fbb11904b9c9be76d95e41da8c4c499d4edc",
+        "manifestSha256": "43010039ed5e89f7186960be682b3cb5cda5ab6cdfb06cbfd4f081cf0e7b4260"
+      }
+    ],
+    "rule": "Hash receipt before parsing; verify eight archives SRI/SHA256, manifests, license evidence, full original installed trees and archive-byte equality before any preparation; original archives/cache/source are read-only"
+  }
+}

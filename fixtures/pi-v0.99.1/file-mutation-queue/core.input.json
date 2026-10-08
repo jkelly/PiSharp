@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "file-mutation-queue-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "authored-filesystem-queue-probes",
+  "requirementIds": ["P3-05", "tools.file-mutation-ordering"],
+  "normalizerVersion": "object-key-order-v1; callback-values-and-error-fields-retained",
+  "scenario": "Existing FIFO with awaited callback cleanup/failure recovery, junction and hardlink aliases, missing fallback and resolver rejection recovery",
+  "clock": "No clock or sleeps; explicit promise gates only",
+  "seed": "Explicit case, callback and return-value labels; no RNG replacement",
+  "fileUtf8": "Authored queue target.\n",
+  "callbackFailure": {"name": "AuthoredCallbackError", "message": "authored callback failure"},
+  "invalidResolverPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\pisharp-oracle-invalid\\bad\u0000path",
+  "cases": [
+    {"caseId": "existing-fifo", "probe": "existing-fifo", "returns": {"first": "existing-first", "second": "unused-authored-failure-value", "unrelated": "existing-unrelated", "subsequent": "existing-subsequent"}},
+    {"caseId": "filesystem-aliases", "probe": "filesystem-aliases", "returns": {"first": "alias-first", "second": "alias-second", "unrelated": "alias-unrelated", "subsequent": "alias-subsequent"}},
+    {"caseId": "missing-fallback", "probe": "missing-fallback", "returns": {"first": "missing-first", "second": "missing-second", "unrelated": "missing-unrelated", "subsequent": "missing-subsequent"}},
+    {"caseId": "resolver-rejection", "probe": "resolver-rejection", "returns": {"afterFailure": "registered-after-resolver-rejection"}}
+  ],
+  "provenance": {
+    "kind": "authored-synthetic-input",
+    "filesystem": "Fresh owned task-local directory per child, ordinary Windows directory junction and hardlink; no source/user file writes",
+    "callbackBehavior": "Authored labels, values, gates and one failure; actual callback execution/order/returned outcomes observed through unchanged exported function",
+    "resolverError": "Authored absolute path containing NUL, validated by Node before filesystem access; no denied permissions are manufactured",
+    "expectedValues": "Only captured from unchanged whole public file-mutation-queue.ts; no authored expected output",
+    "scopeExclusions": ["Native differential", "Tool writes/edit patches", "Cancellation API", "Atomic/durable storage", "Cross-process or cross-platform locking", "Full phase closure"]
+  }
+}

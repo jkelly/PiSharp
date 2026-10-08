@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "base": "d761b863ba90164cf60c9d79fcef65c83a18183f",
+  "status": "AUTHORED_LIVE_CLI_COMPOSITION_REVIEW_PENDING",
+  "liveDefault": false,
+  "explicitLiveFlag": true,
+  "providerSelection": "explicit supported provider and pinned chat model",
+  "offlineCommandsPreserved": true,
+  "defaultMaximumOutputTokens": 1024,
+  "maximumOutputTokenOption": 8192,
+  "monetarySpendGuarantee": false,
+  "runtimeEnvironmentKeys": [
+    "OPENAI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "ANTHROPIC_API_KEY"
+  ],
+  "credentialsWritten": 0,
+  "networkCallsExecuted": 0,
+  "buildsExecuted": 0,
+  "testsExecuted": 0,
+  "testsAuthoredByThisLane": 0,
+  "automaticStartupHttpSend": false,
+  "toolPolicyChanged": false,
+  "providerTransportImplementationsChanged": 0,
+  "terminalViewInputImplementationsChanged": 0,
+  "flow": "CLI terminal -> RPC -> persistent session -> Agent -> existing provider factory/HTTP/SSE -> existing prepared tools/final policy -> terminal events",
+  "providerApiMatrix": {
+    "anthropic": "anthropic-messages",
+    "openai": "openai-responses",
+    "openrouter": "openai-completions"
+  },
+  "catalogPackageSha256": "f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3",
+  "catalogShardHashes": {
+    "anthropic": "3ff00b68990382e42626ebd1b65dcc28ae3cad9e6faa8920331ba92f067f1b3a",
+    "openai": "ca5ec1028efc512502591bf2562a2a6dc330f26a5f4c4a08c8a149a43c5bd7da",
+    "openrouter": "b49405ced089750d475945738a91ac669fa00e04d574da7720935bcfe16ba272"
+  },
+  "ownership": {
+    "tui": "existing view/input files, independent lane",
+    "tests": "E2E worker authored five cases; composition supplies fixture alignment, adapter and runner registration",
+    "provider": "reviewed NativeProviderFactory dependency; composition owns pinned selection and live profile binding",
+    "composition": "Program/RpcSessionCommand/TerminalSessionCommand/OfflineSessionProfile"
+  },
+  "remaining": [
+    "independent composition/adapter source review",
+    "candidate-pinned approved offline build/run of five live-interactive and four provider-factory cases plus regressions",
+    "TUI lane integration and qualification",
+    "explicit authenticated user launch handoff"
+  ],
+  "sourceParityAccepted": false,
+  "liveProviderQualified": false,
+  "phaseAccepted": false,
+  "mainMerged": false,
+  "providerFactoryDependency": "4c6fe6798e92f2b0901df5ba0b0a5431afd13e84",
+  "e2eDependency": "8ab05aa096bca95415beb8e0cc6e4386ce6d3de2",
+  "acceptanceCasesAuthored": 5,
+  "factoryCasesAuthored": 4,
+  "adapterAndRunnerRegistration": "composition lane; real terminal/RPC/profile/Agent/provider flow with caller-owned inert HTTP handler",
+  "nativeTestsExecuted": 0,
+  "recoveryFence": "get_state.data.pisharpRunOwnerSettled reflects _run absence under dispatcher gate; event publication alone is insufficient",
+  "fixtureConfiguration": "RunObservedConfiguredAsync with in-memory defaults and no user settings reads",
+  "fixtureDisposal": "cancel then await original host task before disposing handler; no timeout proxy on physical join"
+}

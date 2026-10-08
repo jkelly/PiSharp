@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <PropertyGroup Condition="'$(PublicSdkPackageConsumer)' == 'true'">
+    <NuGetLockFilePath>$(PublicSdkPackageLockRoot)/harness/packages.lock.json</NuGetLockFilePath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Consumer/**/*.cs" />
+    <ProjectReference Include="Consumer/PiSharp.PublicSdkConsumer.R511.Consumer.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PublicSdkPackageConsumer)' != 'true'">
+    <ProjectReference Include="../../src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PublicSdkPackageConsumer)' == 'true'">
+    <PackageReference Include="PiSharp.Extensions.Runtime" Version="[$(PublicSdkPackageVersion)]" />
+  </ItemGroup>
+  <Target Name="RequirePublicSdkPackageHarnessInputs" BeforeTargets="CollectPackageReferences;Restore;PrepareForBuild"
+          Condition="'$(PublicSdkPackageConsumer)' == 'true'">
+    <Error Condition="'$(PublicSdkPackageVersion)' == ''" Text="An explicit pinned private SDK package version is required." />
+    <Error Condition="'$(PublicSdkPackageLockRoot)' == ''" Text="A separate admitted private SDK package lock root is required." />
+  </Target>
+</Project>

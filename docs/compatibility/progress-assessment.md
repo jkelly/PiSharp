@@ -1,0 +1,11 @@
+# Full-plan qualification status
+
+The original denominator remains 79 work packages across eight phases, including the optional Node bridge. All eight full phase gates remain open. A current completion percentage is unsupported; older effort bands and the retired 20% estimate are not current measurements. File, commit, scaffold and test counts do not measure full-port completion.
+
+Independently accepted immutable session milestones include complete original P4-08 own-scope lifecycle behavior at `2759aba53fd9485611de1b769bde1e69186be44d` and P4-03 own-scope history/tree behavior at `b3c1942bc5eebc6d73c3157e20e25b797afbecc7`. Their whole dependent packages remain open where original prerequisites are unqualified. Each passed 942 and 961 native groups respectively, plus five original Commands/Input, two genuine terminal, five unchanged SDK and two unchanged reservation schedules. These counts substantiate those scopes and do not imply a phase gate.
+
+P1-04 remains blocked. Independently accepted bounded diagnostic consumer `ef220611bd65a66c40b747dd4239407199cf4605` verifies the preserved actual six-query compiler execution `c4679e90a1b9cdfd2bc92375631bda3de44af9ec`, which reproduces the pinned native API TypeReference/TupleType panic. Complete minimal provenance does not qualify incomplete full recursive provenance or waive the mandatory recursive metadata, SDK, optional peer, platform and three published ownership conditions.
+
+P4-05 import/migration/export qualification is active in a separate descendant of the accepted history candidate. It adds exact inert archival export and explicit retention reporting, while preserving prior actual native export/readback evidence and all disclosed numeric/own-undefined differences. Its [original-scope matrix](p4-05-interoperability-milestone.md) and independent immutable handoff determine acceptance. Authored fixtures, actual native executions and actual unchanged upstream observations remain distinguishable.
+
+The original eight-phase plans remain authoritative for every unqualified requirement. The mutable external qualification ledger preserves original scope ownership, dependency gates, bounded accepted snapshot boundaries and immutable supporting evidence. No mandatory deferred requirement is silently removed or counted as accepted because a related component passed.

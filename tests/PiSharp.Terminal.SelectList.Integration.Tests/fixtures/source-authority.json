@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "status": "STATIC SOURCE INVENTORY; NO CAPTURE OR SOURCE EXECUTION",
+  "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "tree": "200bd10bb146773516f862a02b8aaebeed163e00",
+  "members": [
+    {
+      "relative": "packages/coding-agent/src/modes/interactive/components/extension-selector.ts",
+      "bytes": 3526,
+      "sha256": "d83767b09d73264eb0cb9af54b6f13e0e9c15a429a6dd7b9c8e7498e013b7704"
+    },
+    {
+      "relative": "packages/coding-agent/src/modes/interactive/interactive-mode.ts",
+      "bytes": 241874,
+      "sha256": "444b21cb8677d061807d92562b3ac4ef7ea703dba186e08ea6b343d9f99d690f"
+    },
+    {
+      "relative": "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
+      "bytes": 24168,
+      "sha256": "d534e0fa1484844a097963d5f4fb4df9397c5a1b5e29e42aed7575ab6f67989b"
+    },
+    {
+      "relative": "packages/tui/src/components/select-list.ts",
+      "bytes": 9385,
+      "sha256": "0fc369801e745eff15567d72829bf67887f5efec8bc6816aaf1ee65338618373"
+    },
+    {
+      "relative": "packages/tui/src/keybindings.ts",
+      "bytes": 10125,
+      "sha256": "eea5e3fe258ad50337595bb5320955a6d97bac0c8f6c0a838f988d75079bcf38"
+    },
+    {
+      "relative": "packages/tui/src/keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+    }
+  ],
+  "extensionSelectorRules": [
+    "tools expansion precedes up/down/confirm/cancel",
+    "up/down clamp; literal raw k/j aliases",
+    "confirm accepts configured key or raw newline; empty choice remains pending",
+    "hide restores editor focus; abort/timeout cancels"
+  ],
+  "nativeProfile": "Bounded safe SelectList rows with inert heading; title can be cropped in short windows. Exact ExtensionSelector borders, spacing, colors, countdown and tools expansion remain unqualified.",
+  "genuineSourceDifferential": false,
+  "nativeExecutions": 0,
+  "sourceCaptures": 0
+}

@@ -1,0 +1,139 @@
+{
+  "events": [
+    {
+      "type": "start",
+      "partial": {
+        "role": "assistant",
+        "content": [],
+        "api": "openai-responses",
+        "provider": "authored-synthetic",
+        "model": "fixture-model",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 0,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "pending",
+        "timestamp": 1700000000000,
+        "futureMetadata": {
+          "explicitNull": null,
+          "ordered": [
+            "b",
+            "a"
+          ]
+        }
+      }
+    },
+    {
+      "type": "text_start",
+      "contentIndex": 0,
+      "content": {
+        "type": "text",
+        "text": ""
+      }
+    },
+    {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "draft "
+    },
+    {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "π"
+    },
+    {
+      "type": "text_end",
+      "contentIndex": 0,
+      "content": "Authoritative π\r\nC:\\temp\\π",
+      "textSignature": "opaque-text=="
+    },
+    {
+      "type": "done",
+      "reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Authoritative π\r\nC:\\temp\\π",
+            "textSignature": "opaque-text=="
+          }
+        ],
+        "api": "openai-responses",
+        "provider": "authored-synthetic",
+        "model": "fixture-model",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 0,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "stop",
+        "timestamp": 1700000000000,
+        "futureMetadata": {
+          "explicitNull": null,
+          "ordered": [
+            "b",
+            "a"
+          ]
+        },
+        "responseId": "authored-response-1"
+      }
+    }
+  ],
+  "result": {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "Authoritative π\r\nC:\\temp\\π",
+        "textSignature": "opaque-text=="
+      }
+    ],
+    "api": "openai-responses",
+    "provider": "authored-synthetic",
+    "model": "fixture-model",
+    "usage": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 0,
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+      }
+    },
+    "stopReason": "stop",
+    "timestamp": 1700000000000,
+    "futureMetadata": {
+      "explicitNull": null,
+      "ordered": [
+        "b",
+        "a"
+      ]
+    },
+    "responseId": "authored-response-1"
+  }
+}

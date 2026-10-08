@@ -1,0 +1,78 @@
+{
+  "kind": "recursive-sdk-ordinal-source-data-integrity-r298",
+  "frozenGraphSha256": "d363672a5f121b0c8738b994cd321200e2294a30b76c4c39ea1c5c13a6675bec",
+  "correctedGraphSha256": "20013de8c1947b9e57f46bbfa414224d1fff778f5501de6a89fb6cd9e5d43c6c",
+  "before": {
+    "nodes": 1018,
+    "edges": 2764,
+    "duplicateExactNodes": 0,
+    "danglingExactTargetEdges": 208,
+    "missingDistinctExactTargets": 50,
+    "danglingExactSourceEdges": 92,
+    "missingDistinctExactSources": 92,
+    "declarationIdentityMismatches": 25
+  },
+  "after": {
+    "nodes": 1075,
+    "edges": 2415,
+    "duplicateExactNodes": 0,
+    "danglingExactTargetEdges": 0,
+    "missingDistinctExactTargets": 0,
+    "danglingExactSourceEdges": 0,
+    "missingDistinctExactSources": 0,
+    "declarationIdentityMismatches": 0
+  },
+  "summary": {
+    "astCertifiedNodes": 0,
+    "caseVariantWitnessGroups": 2,
+    "dependencyCandidateEdges": 2415,
+    "directImportSourceNodes": 92,
+    "directImportedNames": 92,
+    "qualifiedPluginScenarios": 0,
+    "recursiveCandidateNodes": 1075,
+    "sourceFilesRead": 134,
+    "transitiveCandidateNodes": 983
+  },
+  "caseWitnesses": [
+    "packages/ai/src/types.ts::ToolCall",
+    "packages/ai/src/auth/types.ts::Credential",
+    "packages/coding-agent/src/modes/interactive/theme/theme.ts::Theme",
+    "packages/coding-agent/src/modes/interactive/theme/theme.ts::theme",
+    "packages/tui/src/colors.ts::IndexedColor",
+    "packages/tui/src/colors.ts::indexedColor"
+  ],
+  "caseVariantGroups": [
+    {
+      "allDistinctOrdinal": true,
+      "ids": [
+        "packages/coding-agent/src/modes/interactive/theme/theme.ts::Theme",
+        "packages/coding-agent/src/modes/interactive/theme/theme.ts::theme"
+      ],
+      "key": "packages/coding-agent/src/modes/interactive/theme/theme.ts::Theme"
+    },
+    {
+      "allDistinctOrdinal": true,
+      "ids": [
+        "packages/tui/src/colors.ts::IndexedColor",
+        "packages/tui/src/colors.ts::indexedColor"
+      ],
+      "key": "packages/tui/src/colors.ts::IndexedColor"
+    }
+  ],
+  "sourceHashReferencesVerified": 134,
+  "nativeSourceHashesVerified": 15,
+  "seedMembersVerified": 562,
+  "crosswalkReferencesVerified": 112,
+  "generatorSha256": "532416bf4857d6b0a62e9ea8207cbc9cbb614faac5b6f9d796a7b1fb838c1949",
+  "generatorParameters": [
+    "SourceRoot",
+    "OutputPath"
+  ],
+  "generatorStaticParseErrors": 0,
+  "verificationScriptSha256": "3360b518bf927c2c8a556db0e8a1f5a10063b339b7ad1beb0cd031aea503237f",
+  "limitations": [
+    "Pure source-data generation, JSON integrity validation and static PowerShell parse only; no compiler/build/tests or upstream/native product execution.",
+    "No AST/type/public ABI/plugin behavior acceptance.",
+    "Native type references are lexical; member semantics and exposed profile remain unresolved where stated."
+  ]
+}

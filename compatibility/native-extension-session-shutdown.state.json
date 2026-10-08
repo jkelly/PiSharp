@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "scope": "CURRENT Pi v0.99.1 shutdown API, shared quit and actual outgoing replacement notifications",
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "suppliedSourceCandidate": "bf9ed062f0bbcccb5e598a7b08269ceecc339d21",
+  "status": "replacement-shutdown-source-authored-awaiting-coordinator-qualification",
+  "contract": "docs/contracts/native-extension-session-shutdown.md",
+  "testSuite": "SessionShutdownRegistryTests + NativeShutdownPlacementTests + ReplacementSessionShutdownTests",
+  "testFilter": "session-shutdown-registry. OR native shutdown placement OR replacement session-shutdown",
+  "testGroupsAuthored": 19,
+  "testGroupsExecuted": 0,
+  "buildsExecuted": 0,
+  "remaining": [
+    "Coordinator exact source review, allocation, native build and five new replacement groups",
+    "No native extension reload transition: reload caller remains unavailable",
+    "Existing idle replacement differs from upstream active-response abort; no lifetime redesign",
+    "Full lifecycle/source/platform differential qualification"
+  ],
+  "fixtureRegressionGroupsAdded": 2,
+  "historicalCoordinatorEvidence": {
+    "buildsPassed": 4,
+    "shutdownHostGroupsFailed": 3,
+    "promptCasesNotRun": 32,
+    "correctionQualified": false,
+    "handoffSha256": "0e0e9266f689e42e4abac5f4f29ff5ff3ab78cbd93cd6482107988b24931f40d",
+    "fixtureDeleteMaskedOriginal": true,
+    "candidate": "db658cfb2d9c89f1eeb6bd6acd0f9fb3491dfa09",
+    "shutdownGroupsPassed": 9
+  },
+  "replacementGroupsAuthored": 5,
+  "acceptedCoordinatorEvidence": {
+    "candidate": "bf9ed062f0bbcccb5e598a7b08269ceecc339d21",
+    "callerGroupsPassed": 7,
+    "registryGroupsPassedPreviously": 7,
+    "r16PromptGroupsPassed": 32,
+    "successorExecuted": false
+  }
+}

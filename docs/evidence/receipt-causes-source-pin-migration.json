@@ -1,0 +1,28 @@
+{
+  "status": "STATIC SOURCE PIN MIGRATION; NATIVE UNEXECUTED",
+  "base": "fe214859e6387cc06196c2ea82f28bb0fbdf1dd5",
+  "reviewedReceipt": "1baa3a5425e894fac7a6b4f37b4208145c48691b",
+  "historicalDeclaration": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.before-receipt-causes.json",
+  "historicalPin": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\PiSharp-receipt-selector-validation\\tests\\PiSharp.Tui.KittyAlternate.Tests\\fixtures\\held-io-source-boundary.json",
+    "bytes": 15427,
+    "sha256": "24c45a73251f23459b2eabdec55bfe083e65b50fa8a8e0f66c918548444c0ad8"
+  },
+  "relative": "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+  "previous": {
+    "bytes": 39798,
+    "sha256": "8e91372ccb67f0fd18f68f4a0f91141d27bb6c5af1ecd2bc58d934b6f526528d"
+  },
+  "actual": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\PiSharp-receipt-selector-validation\\src\\PiSharp.Cli\\Interactive\\TerminalChatInput.cs",
+    "bytes": 41354,
+    "sha256": "e525ffd9b040b79426cf648aa12f076ecfdfc3dd1a3d9c5ef7c120155f3b3346"
+  },
+  "sourceMembers": 14,
+  "scenarios": 8,
+  "scenarioAssertionsChanged": false,
+  "productionEdits": 0,
+  "targetIdsOrDeadlinesChanged": false,
+  "originalReceiptsChanged": false,
+  "registryReferencesUpdated": 2
+}

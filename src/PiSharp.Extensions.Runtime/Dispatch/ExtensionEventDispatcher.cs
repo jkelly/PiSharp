@@ -54,7 +54,7 @@ public sealed class ExtensionEventDispatcher
         if (!Text(input.Prompt) || !Text(input.SystemPrompt)) throw new ArgumentException("Invalid prompt snapshot.");
         var current = input with { Images = Images(input.Images) };
         string? forced = null;
-        var messages = ImmutableArray.CreateBuilder<ExtensionCustomMessage>();
+        var messages = ImmutableArray.CreateBuilder<global::PiSharp.Extensions.Events.ExtensionCustomMessage>();
         var admittedMessages = ImmutableArray<TranscriptEntry>.Empty;
         var diagnostics = ImmutableArray.CreateBuilder<ExtensionEventDiagnostic>();
         foreach (var entry in snapshot.Entries)

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORED_CORE_LOADOUT_DRAIN_SOURCE_REVIEW_AND_RUNTIME_QUALIFICATION_PENDING",
+  "base": "5d3b08ddf42f1947f3dac377762995d43e8c1799",
+  "baseTree": "64457987b3a627d663d1c4d5d4aa07f86970ec2f",
+  "mainAtAllocation": "2405f51e2fd2fe3889b871c2c13e8e0dfae8d7db",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "coordination": "CORE_LOADOUT_DRAIN_API_COORDINATION_R217",
+  "api": {
+    "option": "SessionRuntimeRegistryOptions.DrainLoadoutDiagnostics : Func<CancellationToken, ValueTask>?",
+    "session": "Task PersistentAgentSession.DrainLoadoutDiagnosticsAsync(CancellationToken cancellationToken = default)",
+    "awaitedSelection": "Task<SessionToolActivationSelection> PersistentAgentSession.ScheduleToolActivationAsync(ImmutableArray<string> names, CancellationToken cancellationToken = default)",
+    "injection": "DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync",
+    "registryClone": "Same exact borrowed callback, semaphore and reentrancy scope carried through invocation-owner clones; no registry or binding snapshot recapture"
+  },
+  "supported": [
+    "Create bootstrap and replay/open await borrowed drain before returning/publishing new session, including failed admission cleanup",
+    "Configure and SetActiveTools drain pending diagnostics, then actual preparation diagnostics before prospective durable append",
+    "Synchronous logical selection only captures; next prompt/run request boundary or explicit awaited selection drains before provider/loadout publication",
+    "Tree navigation replay drains before branch selection and its existing preflight/publication",
+    "Replacement drains staged owner-bind diagnostics under original target reservation before source retirement; cancellation rechecked after awaited reporter",
+    "Initial synchronous owner bind remains capture-only; coordinator explicit initial startup drain owns acknowledgement",
+    "Registry drain serialization ensures captures during an admitted report get a following drain instead of being skipped by bridge single-flight",
+    "Bounded session drain/preparation work and original task tracking; idle/close join admitted work before runtime disposal",
+    "Close final drain uses non-cancelled admission after prior work joins; host owns captured generation retirement and reporter lifetime",
+    "Original admission and reporting exceptions preserved as exact aggregate causes; no retry of uncertain reporter effects",
+    "Reporter session/owner disposal, stop/idle/self-drain and activation reentry refused before own settlement or disposal is installed"
+  ],
+  "testClass": "tests/PiSharp.CodingAgent.Tests/SessionLoadoutDiagnosticDrainTests.cs",
+  "testPrefix": "session loadout drain ",
+  "authoredGroups": 8,
+  "registrationApplied": false,
+  "registrationOwner": "coordinator reserved CodingAgent.Tests/Program.cs",
+  "registration": [
+    ".Concat(SessionLoadoutDiagnosticDrainTests.Cases())",
+    "Route SessionLoadoutDiagnosticDrainTests.Prefix through existing direct original-await runner branch"
+  ],
+  "buildsExecuted": 0,
+  "testsExecuted": 0,
+  "apiCalls": 0,
+  "sourceCompilerExecutions": 0,
+  "sourceParityAccepted": false,
+  "mainMerged": false,
+  "publicPush": false,
+  "limitations": [
+    "Borrowed callback must drain/retain synchronous capture refusal receipts using the exact actual Binding.Snapshot and generation lifetime. Core creates no extension registry/snapshot/reporter authority",
+    "Pure synchronous APIs cannot await diagnostics. Initial attachment and synchronous logical selection require the explicit startup/next-owned boundary; no detached work is started",
+    "Reporting failure after accepted logical selection does not roll back that pending selection; durable configure/navigation remain prepublication",
+    "Existing prepare fallback, sanitized diagnostics and tool reachability unchanged; no extension reload/unload/SDK parity claim",
+    "Reporter failures are trusted original exceptions, not new serialized public fields; caller callback owns suppression/receipt policy",
+    "No CLI/activation/profile/component/harness changes; coordinator exact injection, activation self-disposal correction and actual-host tests remain separately owned"
+  ],
+  "regressionScope": [
+    "8 new session loadout drain groups after coordinator registration",
+    "Existing ToolLoadout/CallbackToolActivation and pending activation groups selected by coordinator",
+    "Existing registry/configure/navigation/replacement/shutdown tests",
+    "7 component bridge groups and actual activation startup/close/self-dispose groups"
+  ],
+  "remaining": [
+    "Independent core source review",
+    "Coordinator callback injection and direct-await test registration",
+    "Coordinator complete composed successor compilation and authorized offline tests"
+  ]
+}

@@ -19,7 +19,10 @@ public sealed record AgentHooks(
     public Func<AgentRequestBoundary, CancellationToken, ValueTask<AgentRequestPreparation?>>? PrepareRequestBoundary { get; init; }
 }
 public sealed record AgentConfiguration(ModelDescriptor Model, IChatTransport Transport, ImmutableArray<ToolDefinition> Tools,
-    IToolHooks? ToolHooks = null, ToolExecutionMode ExecutionMode = ToolExecutionMode.Parallel, AgentHooks? Hooks = null);
+    IToolHooks? ToolHooks = null, ToolExecutionMode ExecutionMode = ToolExecutionMode.Parallel, AgentHooks? Hooks = null)
+{
+    public string ThinkingLevel { get; init; } = "off";
+}
 public enum AgentCancellationBehavior { Propagate, SettleAborted }
 public sealed record AgentOptions(AgentLoopOptions? Loop = null, AgentPendingInputQueueOptions? Queue = null,
     int MaximumTools = 128, int StreamCapacity = 32, int MaximumSubscribers = 128,
@@ -58,6 +61,11 @@ public sealed class Agent : IAsyncDisposable
     private Run? _active;
     private bool _disposed;
     private Task? _disposal;
+    private Task? _idleMessageNotification;
+    private TaskCompletionSource? _idleMessageNotificationIdle;
+    private sealed class IdleNotificationFrame { internal int Active = 1; }
+    private readonly AsyncLocal<IdleNotificationFrame?> _idleMessageNotificationCallback = new();
+    private TranscriptEntry? _lastIdleNotifiedMessage;
     private ImmutableArray<Subscription> _subscriptions = [];
     private sealed class Subscription(IAgentEventSink sink) { public readonly IAgentEventSink Sink = sink; }
     private sealed class SubscriptionLease(Agent owner, Subscription subscription) : IDisposable
@@ -74,6 +82,8 @@ public sealed class Agent : IAsyncDisposable
         public readonly ImmutableArray<TranscriptEntry> History = history;
         public readonly ImmutableArray<TranscriptEntry> Inputs = inputs;
         public readonly List<TranscriptEntry> Pending = [.. inputs];
+        public readonly List<TranscriptEntry> ContextOnly = [];
+        public bool ContextOnlyAdmissionOpen = true;
         public readonly CancellationTokenSource Cancellation = new();
         public readonly TaskCompletionSource<AgentLoopResult> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public readonly TaskCompletionSource Idle = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -305,7 +315,7 @@ public sealed class Agent : IAsyncDisposable
                     await InCallbackAsync(run, () => final(result, cancellation)).ConfigureAwait(false);
             }
             var turn = new TurnRunner(new ChatClient(config.Transport, _options.StreamCapacity),
-                new ToolBatchScheduler(config.Tools, config.ToolHooks, config.ExecutionMode, _progressOptions, _options.ResultValues));
+                new ToolBatchScheduler(config.Tools, config.ToolHooks, config.ExecutionMode, _progressOptions, _options.ResultValues), config.ThinkingLevel);
             async ValueTask<AgentLoopRequestPreparation?> PrepareBoundary(AgentRequestBoundary boundary, CancellationToken cancellation, int attempt = 0)
             {
                 if (attempt >= 16) throw new InvalidOperationException("Request boundary revision retry limit exceeded.");
@@ -313,8 +323,8 @@ public sealed class Agent : IAsyncDisposable
                 var update = await InCallbackAsync(run, () => prepare(boundary, cancellation)).ConfigureAwait(false);
                 if (update is null) return null;
                 var admitted = ValidateConfiguration(update.Configuration);
-                if (admitted.Model != config.Model || !ReferenceEquals(admitted.Transport, config.Transport))
-                    throw new ArgumentException("Request boundaries retain model and transport.");
+                if (admitted.Model != config.Model || !ReferenceEquals(admitted.Transport, config.Transport) || admitted.ThinkingLevel != config.ThinkingLevel)
+                    throw new ArgumentException("Request boundaries retain model, transport and thinking level.");
                 ValidateMessages(update.AdditionalSystemMessages, inputsOnly: true);
                 var projectedInputs = update.ProjectedPendingInputs ?? boundary.PendingInputs;
                 ValidateMessages(projectedInputs, inputsOnly: false);
@@ -330,7 +340,7 @@ public sealed class Agent : IAsyncDisposable
                     (long)boundary.Snapshot.Transcript.Length + boundary.PendingInputs.Length + update.AdditionalSystemMessages.Length + 1 > _loopOptions.MaximumTranscriptMessages)
                     throw new ArgumentException("Invalid boundary system update.");
                 var nextRunner = new TurnRunner(new ChatClient(admitted.Transport, _options.StreamCapacity),
-                    new ToolBatchScheduler(admitted.Tools, admitted.ToolHooks, admitted.ExecutionMode, _progressOptions, _options.ResultValues));
+                    new ToolBatchScheduler(admitted.Tools, admitted.ToolHooks, admitted.ExecutionMode, _progressOptions, _options.ResultValues), admitted.ThinkingLevel);
                 cancellation.ThrowIfCancellationRequested();
                 var published = false;
                 try { await InCallbackAsync(run, () => update.PublishAsync(() =>
@@ -371,7 +381,8 @@ public sealed class Agent : IAsyncDisposable
                 hooks.FinishTurn is { } finish ? (completed, cancellation) => InCallbackAsync(run, () => finish(completed, cancellation)) : null,
                 hooks.FinishTurnDecision is { } decision ? (completed, cancellation) => InCallbackAsync(run, () => decision(completed, cancellation)) : null)
             {
-                TransformRequestMessages = Project, PrepareRequestBoundary = (boundary, cancellation) => PrepareBoundary(boundary, cancellation)
+                TransformRequestMessages = Project, PrepareRequestBoundary = (boundary, cancellation) => PrepareBoundary(boundary, cancellation),
+                GetContextOnlyMessages = cancellation => PollContextOnly(run, cancellation)
             };
             var eventSink = new EventSink((observation, cancellation) => CommitAndEmitAsync(run, observation, cancellation));
             run.Result = _options.CancellationBehavior == AgentCancellationBehavior.SettleAborted ?
@@ -398,6 +409,88 @@ public sealed class Agent : IAsyncDisposable
             return ValueTask.FromResult(inputs);
         }
     }
+    /// <summary>Admits bounded custom context to the active turn's post-tool boundary, without continuation.</summary>
+    public void QueueContextOnly(TranscriptEntry message, CancellationToken token = default)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        ValidateMessages([message], inputsOnly: true);
+        if (message.Role != "custom") throw new ArgumentException("Only custom context is admitted.", nameof(message));
+        var limits = _options.Queue ?? new AgentPendingInputQueueOptions();
+        lock (_gate)
+        {
+            ThrowDisposed(); token.ThrowIfCancellationRequested();
+            var run = _active ?? throw new InvalidOperationException("Context-only delivery requires an active turn.");
+            if (run.Done || run.Settling || !run.ContextOnlyAdmissionOpen)
+                throw new InvalidOperationException("The active turn has fenced context-only admission.");
+            var characters = message.WireBody.ToString().Length;
+            if (characters > limits.MaximumMessageCharacters || run.ContextOnly.Count >= limits.MaximumMessagesPerQueue ||
+                run.ContextOnly.Sum(value => (long)value.WireBody.ToString().Length) + characters > limits.MaximumCharactersPerQueue)
+                throw new ArgumentException("Context-only queue exceeds the admitted pending-input limits.");
+            run.ContextOnly.Add(message); run.Pending.Add(message);
+        }
+    }
+    public int ContextOnlyPendingCount { get { lock (_gate) return _active?.Pending.Count(message => message.Role == "custom") ?? 0; } }
+    /// <summary>Notify subscribers of an already acknowledged idle custom checkpoint. This method
+    /// never appends history or invokes the primary durable sink again. The exact returned original
+    /// remains owned through callback completion and is joined by concurrent Agent disposal.</summary>
+    public Task NotifyIdleCustomCheckpointAsync(TranscriptEntry message, CancellationToken token = default)
+    {
+        Task original; var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_gate)
+        {
+            ThrowIdle(); token.ThrowIfCancellationRequested();
+            if (_idleMessageNotification is { IsFaulted: true } previousNotification)
+                throw new AggregateException("A prior acknowledged notification fault requires owner retirement.", previousNotification.Exception!);
+            if (_messages.IsEmpty || message.Role != "custom" || !ReferenceEquals(_messages[^1], message) ||
+                ReferenceEquals(_lastIdleNotifiedMessage, message)) throw new ArgumentException("One new acknowledged canonical custom checkpoint is required.", nameof(message));
+            _lastIdleNotifiedMessage = message;
+            var idle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _idleMessageNotificationIdle = idle;
+            original = NotifyIdleCustomCoreAsync(message, _subscriptions, token, start.Task, idle);
+            _idleMessageNotification = original;
+        }
+        start.TrySetResult(); return original;
+    }
+    private async Task NotifyIdleCustomCoreAsync(TranscriptEntry message, ImmutableArray<Subscription> subscriptions,
+        CancellationToken token, Task start, TaskCompletionSource idle)
+    {
+        await start.ConfigureAwait(false);
+        var previous = _idleMessageNotificationCallback.Value; var frame = new IdleNotificationFrame(); _idleMessageNotificationCallback.Value = frame;
+        var failures = new List<Exception>();
+        try
+        {
+            foreach (var observation in new AgentEvent[] { new AgentLoopInputMessageStarted(message), new AgentLoopInputMessageEnded(message) })
+                foreach (var subscription in subscriptions)
+                {
+                    Task? original = null;
+                    try { original = subscription.Sink.EmitAsync(observation, token).AsTask(); await original.ConfigureAwait(false); }
+                    catch (Exception error)
+                    {
+                        if (original?.IsCanceled == true || original is null && error is OperationCanceledException canceled &&
+                            token.IsCancellationRequested && canceled.CancellationToken == token) throw;
+                        if (original?.Exception is { } aggregate) failures.Add(aggregate);
+                        failures.Add(error); throw new AggregateException("Idle custom notification original.", failures);
+                    }
+                }
+        }
+        finally
+        {
+            Volatile.Write(ref frame.Active, 0); _idleMessageNotificationCallback.Value = previous;
+            lock (_gate) if (ReferenceEquals(_idleMessageNotificationIdle, idle)) _idleMessageNotificationIdle = null;
+            idle.TrySetResult();
+        }
+    }
+    private ValueTask<ImmutableArray<TranscriptEntry>> PollContextOnly(Run run, CancellationToken token)
+    {
+        lock (_gate)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(_active, run)) throw new InvalidOperationException("Context-only generation is stale.");
+            run.ContextOnlyAdmissionOpen = false;
+            var messages = run.ContextOnly.ToImmutableArray(); run.ContextOnly.Clear();
+            return ValueTask.FromResult(messages);
+        }
+    }
     private async ValueTask CommitAndEmitAsync(Run run, AgentEvent observation, CancellationToken token)
     {
         ImmutableArray<Subscription> subscriptions;
@@ -411,6 +504,7 @@ public sealed class Agent : IAsyncDisposable
         lock (_gate)
         {
             if (!ReferenceEquals(_active, run)) throw new InvalidOperationException("Agent generation is no longer active.");
+            if (observation is AgentLoopTurnStarted) run.ContextOnlyAdmissionOpen = true;
             if (entry is not null)
             {
                 _messages = _messages.Add(entry);
@@ -508,7 +602,7 @@ public sealed class Agent : IAsyncDisposable
     public Task WaitForIdleAsync(CancellationToken cancellationToken = default)
     {
         Task idle;
-        lock (_gate) { ThrowSelfWait(); idle = _active?.Idle.Task ?? Task.CompletedTask; }
+        lock (_gate) { ThrowSelfWait(); idle = _active?.Idle.Task ?? _idleMessageNotificationIdle?.Task ?? Task.CompletedTask; }
         return cancellationToken.CanBeCanceled ? idle.WaitAsync(cancellationToken) : idle;
     }
     public ValueTask DisposeAsync()
@@ -532,16 +626,22 @@ public sealed class Agent : IAsyncDisposable
         try
         {
             if (run is not null) { RequestAbort(run); await run.Idle.Task.ConfigureAwait(false); }
+            Task? notification; lock (_gate) notification = _idleMessageNotification;
+            if (notification is not null)
+                try { await notification.ConfigureAwait(false); }
+                catch (Exception error) { throw new AggregateException("Owned idle notification fault during Agent disposal.", notification.Exception ?? error); }
             lock (_gate) _subscriptions = [];
             completion.TrySetResult();
         }
         catch (Exception error) { completion.TrySetException(error); }
+        finally { lock (_gate) _subscriptions = []; }
     }
     private AgentConfiguration ValidateConfiguration(AgentConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(configuration.Model);
         ArgumentNullException.ThrowIfNull(configuration.Transport);
+        ThinkingLevels.Validate(configuration.Transport, configuration.Model, configuration.ThinkingLevel);
         if (string.IsNullOrWhiteSpace(configuration.Model.Id) || string.IsNullOrWhiteSpace(configuration.Model.Api) ||
             string.IsNullOrWhiteSpace(configuration.Model.Provider) || configuration.Tools.IsDefault ||
             configuration.Tools.Length > _options.MaximumTools) throw new ArgumentException("Invalid Agent configuration.", nameof(configuration));
@@ -553,14 +653,16 @@ public sealed class Agent : IAsyncDisposable
         if (messages.IsDefault || messages.Length > _loopOptions.MaximumTranscriptMessages) throw new ArgumentException("Invalid Agent messages.", nameof(messages));
         foreach (var message in messages)
             if (message is null || message.WireBody is null || message.WireBody.Value.ValueKind != JsonValueKind.Object ||
-                (inputsOnly ? message.Role is not ("system" or "user") : message.Role is not ("system" or "user" or "assistant" or "toolResult" or "custom")) ||
+                (inputsOnly ? message.Role is not ("system" or "user" or "custom") : message.Role is not ("system" or "user" or "assistant" or "toolResult" or "custom")) ||
                 !message.WireBody.Value.TryGetProperty("role", out var role) || role.ValueKind != JsonValueKind.String || role.GetString() != message.Role)
                 throw new ArgumentException("Invalid Agent message role or ownership.", nameof(messages));
     }
     private void ThrowDisposed() { if (_disposed) throw new ObjectDisposedException(nameof(Agent)); }
-    private void ThrowIdle() { ThrowDisposed(); if (_active is not null) throw new InvalidOperationException("Agent is already processing."); }
+    private void ThrowIdle() { ThrowDisposed(); if (_active is not null || _idleMessageNotificationIdle is not null || _idleMessageNotification is { IsCompleted: false }) throw new InvalidOperationException("Agent is already processing."); }
     private void ThrowSelfWait()
     {
+        if (_idleMessageNotificationCallback.Value is { } notificationFrame && Volatile.Read(ref notificationFrame.Active) != 0)
+            throw new InvalidOperationException("An idle message callback cannot await its own settlement.");
         if (_active is { } run && _callbackGeneration.Value == run.Generation)
             throw new InvalidOperationException("An active Agent callback cannot await its own settlement.");
     }

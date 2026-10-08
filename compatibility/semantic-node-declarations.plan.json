@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "kind": "two-exact-node-ambient-declaration-offline-admission",
+  "status": "authored; official archives/acquisition/assembly/typechecker follow-up pending root review",
+  "oracle": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-node-v0.99.1",
+  "origin": {
+    "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-oracle-v0.99.1",
+    "receipt": ".pisharp-semantic-api-oracle.json",
+    "receiptSha256": "1dd4d68e2702eaa3327bfd3d21b9df052bb0dffd931375974b9891088c67b28d",
+    "immutableFiles": 2623,
+    "sourceFiles": 2093,
+    "compilerFiles": 529,
+    "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+    "lockSha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d"
+  },
+  "runtime": {
+    "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "dependencies": [
+    {
+      "path": "tools/SemanticInventory/setup-typescript-semantic-oracle.mjs",
+      "sha256": "26b352b36670f0a686d7a1978e9cb1e79682c8c9db72ad8632d1c8e5974d616d"
+    },
+    {
+      "path": "compatibility/semantic-api.plan.json",
+      "sha256": "731aa2cee6eda951b7d6f3d9fb0a4cdad3472389787e65d50c8e46b09827bcfd"
+    },
+    {
+      "path": "tools/SurfaceInventory/inspect-ast-archives.mjs",
+      "sha256": "ac6c53f6dd692b2c69bd8ecfcd1003370f6d389a776a4a269f6d14be370db763"
+    },
+    {
+      "path": "compatibility/ast-archive-admission.json",
+      "sha256": "b019f67110323622948e54771e015f7fbe2e8a4d1ec99ed1be450064f914c3e2"
+    },
+    {
+      "path": "tools/CompatibilityReport/raw-json.mjs",
+      "sha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9"
+    },
+    {
+      "path": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "sha256": "baee47b869aab6d2409c0a3906b1e0ea5bf5fe236ca24837fae71aa81d633ffd"
+    }
+  ],
+  "packages": [
+    {
+      "name": "@types/node",
+      "lockPath": "node_modules/@types/node",
+      "lockEntry": {
+        "version": "22.19.19",
+        "resolved": "https://registry.npmjs.org/@types/node/-/node-22.19.19.tgz",
+        "integrity": "sha512-dyh/xO2Fh5bYrfWaaqGrRQQGkNdmYw6AmaAUvYeUMNTWQtvb796ikLdmTchRmOlOiIJ1TDXfWgVx1QkUlQ6Hew==",
+        "license": "MIT",
+        "dependencies": {
+          "undici-types": "~6.21.0"
+        }
+      },
+      "archivePath": "archives/node-22.19.19.tgz",
+      "target": "upstream/node_modules/@types/node",
+      "admittedArchiveRoot": "node v22.19",
+      "acquired": {
+        "bytes": 445223,
+        "sha256": "c32937b40ab720ef6242de0bf4c8b8e48f1e4a29fbb4cb9d9f596471ee58d5c4"
+      },
+      "observedHeaderLayout": "exact source-locked Node archive: POSIX USTAR magic/version;130-byte prefix, NUL475, strict-octal times476/488, zero500..511; all83headers have times; no header rewrite"
+    },
+    {
+      "name": "undici-types",
+      "lockPath": "node_modules/undici-types",
+      "lockEntry": {
+        "version": "6.21.0",
+        "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz",
+        "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==",
+        "license": "MIT"
+      },
+      "archivePath": "archives/undici-types-6.21.0.tgz",
+      "target": "upstream/node_modules/undici-types",
+      "admittedArchiveRoot": "package",
+      "acquired": {
+        "bytes": 21020,
+        "sha256": "cfa1a9a5e18988850e548f4f6b629c58da32dc32bebb116e58ea301e516fd16d"
+      }
+    }
+  ],
+  "limits": {
+    "compressedBytes": 4194304,
+    "expandedBytes": 33554432,
+    "memberBytes": 8388608,
+    "members": 12000,
+    "depth": 32,
+    "pathUtf8Bytes": 1024,
+    "componentUtf8Bytes": 255,
+    "paxBytes": 65536,
+    "jsonBytes": 2097152,
+    "noticeBytes": 2097152,
+    "declarationTextBytes": 8388608,
+    "regularTotalBytes": 33554432,
+    "compressionRatio": 256,
+    "originFileBytes": 33554432,
+    "originTotalBytes": 536870912
+  },
+  "modes": {
+    "check": "read-only origin verification; if new oracle exists verify exact prepared/admitted state",
+    "prepare": "exclusive fresh root; byte-copy original2623 immutable files and exact already-acquired2archives+acquisitionreceipt; no network or package extraction",
+    "admit": "root-supplied exactly2tgz files only; preinspect both fully before inert regular-file writes; immutable receipt; no overwrite/resume uncertain admission"
+  },
+  "guard": {
+    "network": false,
+    "npm": false,
+    "childProcesses": false,
+    "packageCodeImport": false,
+    "compilerApiImport": false,
+    "nativeExecution": false,
+    "newNativePayloads": false,
+    "lifecycleScripts": false,
+    "binLinks": false,
+    "sourceOrOldOracleWrites": false,
+    "existingRootPrepare": false,
+    "uncertainAdmissionRetry": false
+  },
+  "evidenceBoundary": {
+    "actualWholeConfigCaptureSha256": "ad2f8b8926dbb9a3485023a460fd139f982c488d6f413e5f0bc32851b6ea3008",
+    "actualUnresolvedRecords": 892,
+    "actualOtherLockInstances": 34,
+    "typeReferenceCensus": "inert lexical candidates plus full unchanged member bytes; not an AST/typechecker semantic proof",
+    "unknownArchivePrefix": "actual exact publisher roots node v22.19/ and package/ admitted by separately pinned fresh adaptation of unchanged strict reviewed parser; no archive/header rewrites",
+    "archiveMetadataAndNoticeStatus": "root acquisition genuine; helper inert inspection will qualify actual manifest/type-condition/reference candidates/LICENSE full texts before assembly",
+    "oldFullProfileImmutable": true,
+    "newFullProfileStillRequired": true,
+    "semanticPublicClosure": false,
+    "phaseGatesPassed": []
+  },
+  "acquisition": {
+    "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/semantic-node-declaration-archives-second",
+    "receipt": "acquisition.json",
+    "receiptBytes": 1381,
+    "receiptSha256": "51d629aff533ae361fa27230b6ecbed6d12ec202c1d841b10b73330143fcecbe",
+    "targetReceipt": "archives/acquisition.json",
+    "rootPerformed": true,
+    "rootApproval": "actual require_escalated auto-review approved exact2anonymousofficialreads; no acquisition in this helper"
+  }
+}

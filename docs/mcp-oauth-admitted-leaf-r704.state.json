@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "status": "SOURCE_ONLY_JOINED_FIXTURE_SUCCESSOR_UNEXECUTED",
+  "originalPiVersion": "0.99.1",
+  "originalPiCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "originalSourcePath": "packages/mcp/src/oauth/provider.ts",
+  "originalSourceSha256": "fc0ae0e6d54ef0ddcba715f3555b570ddebd93d914dd3f8489ae08304151395d",
+  "originalSourceBytes": 5646,
+  "base": "6a92567c91f84fb97faad470753599f9d2b5b806",
+  "branch": "mcp-oauth-joined-fixture-r746sdk",
+  "productionScope": "Exact-server admitted OAuth provider-state serialization, token expiry, verifier, metadata and selective invalidation",
+  "admittedDependencies": [
+    "IMcpAdmittedOAuthStateStore",
+    "Func<double> unixMilliseconds"
+  ],
+  "externalEffectsPerformed": 0,
+  "nativeBuildExecutions": 0,
+  "compilerExecutions": 0,
+  "runtimeTestExecutions": 0,
+  "authoredControls": 6,
+  "registeredControls": 0,
+  "runtimeQualified": false,
+  "fullOriginalOAuthParity": false,
+  "fullOriginalMcpParity": false,
+  "requiredOwnerActions": [
+    "Independent source review",
+    "Register Cases and mcp-oauth-state prefix in root-owned harness",
+    "Root-owned serial compile and focused synthetic qualification",
+    "Explicit host store and clock admission and provider installation"
+  ],
+  "blockers": [
+    "Full flow/discovery/refresh/PKCE/callback/transport integration remains",
+    "WHATWG versus .NET Uri normalization equivalence unqualified",
+    "Archived original checkout has no local Git HEAD metadata"
+  ],
+  "affectedFiles": [
+    {
+      "relativePath": "src/PiSharp.Extensions.Abstractions/Mcp/Authentication/McpOAuthContracts.cs",
+      "sha256": "103b508463944b5fc03b4f5ee4c0c39ac659ef75e6efa61e06d1407f5fcbe372",
+      "bytes": 1689
+    },
+    {
+      "relativePath": "src/PiSharp.Extensions.Runtime/Mcp/Authentication/McpAdmittedOAuthStateProvider.cs",
+      "sha256": "8d6eedf66e9dd92a2f4bac5fd81bf6a714274e17843643c7c7b71788701da4da",
+      "bytes": 4540
+    },
+    {
+      "relativePath": "tests/PiSharp.Extensions.ContractTests/McpAdmittedOAuthStateProviderTests.cs",
+      "sha256": "6141061313b1ffc16ebbace02dd01c110dc9b862918b51f2361fa1c47f289073",
+      "bytes": 13611
+    },
+    {
+      "relativePath": "docs/mcp-oauth-admitted-leaf-r704.md",
+      "sha256": "ae4e40ecd83e4dc0a4747479b34506abe0a73a07ca9a5102744560a0f89c2ef8",
+      "bytes": 3937
+    }
+  ],
+  "productionFilesUnchanged": true,
+  "correctedFindings": [
+    "OAUTH-HELD-FAILURE-JOIN-01",
+    "OAUTH-ORIGINAL-STATUS-CONTROLS-02"
+  ],
+  "additionalControls": [
+    "Primary plus two original full fault inventories with repeated/shared causes",
+    "Faulted clear-token OCE store Task retains exact cause and Faulted wrapper",
+    "Canceled store Task retains original Canceled status/token and Faulted wrapper",
+    "Faulted clear-token OCE and canceled Load originals retain status and permit recovery without poisoning writes"
+  ]
+}

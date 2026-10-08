@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceVersion": "0.99.1",
+  "basis": "READ_ONLY_PINNED_LOCAL_SOURCE_TEXT; AUTHORED_EXPECTATIONS; NO_SOURCE_EXECUTION",
+  "files": [
+    {
+      "path": "packages/ai/src/api/anthropic-messages.ts",
+      "bytes": 51170,
+      "sha256": "b3f7b44f85b46fa4bee89a5f6e82240a6f40c014c4c64d3c64132090fc66572a"
+    },
+    {
+      "path": "packages/ai/src/api/simple-options.ts",
+      "bytes": 3256,
+      "sha256": "8bb50ff92c1759434ead59d1b4111826b6be47d13f744b8cc3b775c684536d46"
+    },
+    {
+      "path": "packages/ai/src/utils/estimate.ts",
+      "bytes": 4270,
+      "sha256": "8df2512ca8c3e71eea5574b3d56c3569963e1fdabaef4bd17baaba86186c1840"
+    },
+    {
+      "path": "packages/ai/src/utils/text.ts",
+      "bytes": 1560,
+      "sha256": "d37c1825855c7fc71669a545b5b266810242c1c7e58d57228c0c143f29c1c544"
+    }
+  ],
+  "authoredWholeBodyCases": 38,
+  "authoredNativeGroups": 9,
+  "successorRegression": {
+    "baseCandidate": "f5482d7153b797b9182ed5371e81077b41f02762",
+    "originalWholeBodyExpectationsPreserved": 38,
+    "addedStringFormWholeBodyCases": 1,
+    "addedPrimaryFailureOwnershipGroups": 3,
+    "totalWholeBodyCases": 39,
+    "totalNativeGroups": 13,
+    "nativeExecutions": 0
+  },
+  "nativeExecutions": 0,
+  "genuineSourceCaptures": 0
+}

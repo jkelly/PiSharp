@@ -1,0 +1,16 @@
+diff --git a/src/PiSharp.Extensions.Runtime/Registration/ExtensionRegistrySnapshot.cs b/src/PiSharp.Extensions.Runtime/Registration/ExtensionRegistrySnapshot.cs
+index acd1473..0e50d50 100644
+--- a/src/PiSharp.Extensions.Runtime/Registration/ExtensionRegistrySnapshot.cs
++++ b/src/PiSharp.Extensions.Runtime/Registration/ExtensionRegistrySnapshot.cs
+@@ -452,9 +452,9 @@ internal sealed class CallbackFrame : IDisposable
+     }
+ 
+     internal static bool IsExecuting(RegistrationScope scope) =>
+-        Frames().Any(frame => frame.scopes.Any(candidate => ReferenceEquals(candidate, scope)));
++        TerminalInputRegistryCleanupFrame.IsExecuting(scope) || Frames().Any(frame => frame.scopes.Any(candidate => ReferenceEquals(candidate, scope)));
+     internal static bool IsExecuting(ExtensionRegistry registry) =>
+-        Frames().Any(frame => frame.scopes.Any(scope => ReferenceEquals(scope.Registry, registry)));
++        TerminalInputRegistryCleanupFrame.IsExecuting(registry) || Frames().Any(frame => frame.scopes.Any(scope => ReferenceEquals(scope.Registry, registry)));
+ 
+     internal static CallbackFrame? Capture(RegistrationScope scope) =>
+         Frames().FirstOrDefault(frame => frame.scopes.Any(candidate => ReferenceEquals(candidate, scope)));

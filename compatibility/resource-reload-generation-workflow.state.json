@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "status": "INDEPENDENT_WORKFLOW_IMPLEMENTED_SHARED_RELOAD_INTEGRATION_OPEN",
+  "sourceBaseline": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "nativeBase": "754251be28928b24eaae5895b744c423450c91a3",
+  "nativeBaseTree": "738429cf70aa4609938e398d3ef00b5836bf157c",
+  "coordination": "ACTIVE_OWNER_SEAMS_AND_INTEGRATION_QUALIFICATION_R266",
+  "owner": "Oct4task8",
+  "authoredGroups": 10,
+  "executedGroups": 0,
+  "executionOwner": "Coordinator01a1036b-12fa-734b-9ce8-6a3a50d3f0c1",
+  "testClass": "ResourceReloadWorkflowTests",
+  "testPrefix": "resource-reload.",
+  "testRegistration": "COORDINATOR_RESERVED_NOT_EDITED",
+  "implemented": [
+    "Bounded immutable extensible catalog identity/fingerprint change planning",
+    "One admitted original-task reload workflow with explicit host operations",
+    "Joined candidate rollback before publication and joined acknowledged old retirement",
+    "Old/new/none/unknown authority with exact generation and original exception identities",
+    "Admission-only caller cancellation and callback self-wait refusal"
+  ],
+  "remaining": [
+    "Shared activation publication, actual session reload reservation and CLI/RPC entrypoints",
+    "Approved real resource discovery/payload staging, settings reload, skills and MCP catalog integration",
+    "Actual stale context invalidation and original registry/loader/reporter joins supplied by host",
+    "Previous flag/active-tool carryover and conditional start/MCP/extension-resource lifecycle",
+    "Coordinator test registration, locked build and actual-entrypoint/full-suite qualification",
+    "Original-source/API/compiler/platform and PiMessages acceptance holds"
+  ],
+  "nativeAdaptation": "Unexposed approved preparation precedes old shutdown; pinned upstream invalidates before rebuilding and does not roll back after invalidation.",
+  "packagesAdded": 0,
+  "sharedFilesEdited": 0,
+  "paidOrLiveRequests": 0
+}

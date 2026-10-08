@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "file-mutation-queue-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "P3-05",
+    "tools.file-mutation-ordering"
+  ],
+  "clock": "No clock or sleeps; explicit promise gates only",
+  "seed": "Explicit case, callback and return-value labels; no RNG replacement",
+  "normalizerVersion": "object-key-order-v1; callback-values-and-error-fields-retained",
+  "input": {
+    "path": "fixtures/pi-v0.99.1/file-mutation-queue/core.input.json",
+    "sha256": "eaaf7eef1b4102cb671b11b04361bc1bdfdde111c14e48c18302e98ed1b1b09d",
+    "kind": "authored-filesystem-queue-probes"
+  },
+  "expected": {
+    "path": "fixtures/pi-v0.99.1/file-mutation-queue/core.expected.json",
+    "sha256": "0dcc0c947e7a71d876155f7e923852d5ed74376bcd35d0f68e4ba791e30c4ae7",
+    "kind": "captured-whole-file-mutation-queue-oracle"
+  },
+  "lock": {
+    "path": "fixtures/pi-v0.99.1/file-mutation-queue/oracle.lock.json",
+    "sha256": "7448645f29a63b58fac6a45977876d798a12f77afc4973b0dce3e0a77adbed8f"
+  },
+  "provenance": {
+    "source": "packages/coding-agent/src/core/tools/file-mutation-queue.ts",
+    "sourceSha256": "33cb06ac9bcdf32c8b84d9d12e33be44c503a7670f668e003a3262cd34294d11",
+    "mechanism": "Whole unchanged exported withFileMutationQueue; authored callbacks/gates and actual owned Windows filesystem",
+    "repeatRuns": 2,
+    "byteIdentical": true,
+    "authoredExpectedOutput": false,
+    "sourceModified": false,
+    "privateFunctionExtraction": false,
+    "dependenciesInstalled": false,
+    "networkOrProviderCalls": false,
+    "actualTemporaryPathsReturnedBySource": false,
+    "observationProjection": "Source callback order and returned values/errors; authored logical labels; selected filesystem relation booleans, no inode/path normalization",
+    "captureCommand": "node tools/PiReferenceRunner/capture-file-mutation-queue.mjs --capture-new"
+  },
+  "scope": "Four bounded source-only filesystem queue cases; no native differential/tool-write/durability/cancellation/cross-process/phase claim"
+}

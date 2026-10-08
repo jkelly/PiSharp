@@ -1,0 +1,5 @@
+# Preactivation bridge identity guards
+
+Both explicit factory products must satisfy the receiving bridge owner's internal IsBoundTo(actualRegistry) before adoption, decoration, initializer binding or activation. A foreign registration bridge is not adopted or disposed; a foreign MCP bridge is not activated or retired. Only the newly admitted registry/loader and a same-registry registration bridge are cleaned on rejection. The additive C8da05 and MCP84a45 identity predicates are owned by their respective source authors and composed unchanged.
+
+The standalone fixture now has eight groups: five B real-session cases, a real loader installation case, and two wrong-factory cases. Wrong-factory controls assert a genuinely faulted joined Load original, zero binder calls/initializer log, zero foreign registration rows/default flag effects, no created snapshot, and continued foreign bridge usability before the fixture itself joins its explicitly owned foreign registry cleanup. Expected original errors remain retained if a later body/report/cleanup error occurs. No build or test executed in this source lane.

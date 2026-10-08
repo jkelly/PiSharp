@@ -1,0 +1,825 @@
+{
+  "schemaVersion": 3,
+  "status": "AUTHORED CONSTITUENT DEPENDENCIES; NOT EXECUTED",
+  "finding": "PM-CRITERION-MAPPING-1",
+  "predecessorFixtureSha256": "1b8a6fbb80726e6f1a6cb1848d2df9b7da41c9015d91592d9f077f2aa8c04891",
+  "caseCount": 46,
+  "criterionCount": 66,
+  "completionRule": "COMPLETED only when every required group is COMPLETED in every required variant; FAILED and OPEN are retained; missing dependencies stay UNEXECUTED/INCOMPLETE.",
+  "statuses": [
+    "UNEXECUTED",
+    "INCOMPLETE",
+    "FAILED",
+    "OPEN",
+    "COMPLETED"
+  ],
+  "cases": {
+    "PM-REQUEST-DEFAULT": [
+      {
+        "id": "PM-REQUEST-DEFAULT/1",
+        "name": "POST https://pi-messages.invalid/base/messages; request body keys model/context/options",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "request"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-REQUEST-DEFAULT/2",
+        "name": "Bearer key plus accept/content-type; no network fallback",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "request",
+          "provider",
+          "frames"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-REQUEST-DEFAULT/3",
+        "name": "Raw history and input options unchanged",
+        "priorGroup": "input-unchanged",
+        "requiredGroups": [
+          "input-unchanged",
+          "payload",
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-AUTH-MISSING": [
+      {
+        "id": "PM-AUTH-MISSING/1",
+        "name": "Source returns its error event stream; do not borrow Completions synchronous-rejection semantics",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "payload",
+          "request",
+          "provider",
+          "frames"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-AUTH-MISSING/2",
+        "name": "Error assistant content empty; usage zero; no start event/send",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "request",
+          "provider",
+          "frames",
+          "ownership",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-OPTIONS-SIMPLE": [
+      {
+        "id": "PM-OPTIONS-SIMPLE/1",
+        "name": "reasoning xhigh unchanged; no Completions context clamp",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "payload",
+          "request"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-OPTIONS-SIMPLE/2",
+        "name": "Exact options/body and ?debug=1 URL",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "payload",
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-HEADERS-OVERRIDE": [
+      {
+        "id": "PM-HEADERS-OVERRIDE/1",
+        "name": "Observe physical emitted headers, not constructed expected headers",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "request"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-HEADERS-OVERRIDE/2",
+        "name": "No model-only header lookup invented",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-CACHE-SCOPED": [
+      {
+        "id": "PM-CACHE-SCOPED/1",
+        "name": "Capture cacheRetention long; no ambient environment lookup in the future harness",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "payload",
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-PAYLOAD-HELD-UNDEFINED": [
+      {
+        "id": "PM-PAYLOAD-HELD-UNDEFINED/1",
+        "name": "Explicit entered/release barriers; zero sends before release",
+        "priorGroup": "hook-gate",
+        "requiredGroups": [
+          "hook-gate",
+          "payload",
+          "request"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-PAYLOAD-HELD-UNDEFINED/2",
+        "name": "Actual payload/model observations, body and publication ordering retained",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "hook-gate",
+          "payload",
+          "request",
+          "frames"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-PAYLOAD-REPLACE": [
+      {
+        "id": "PM-PAYLOAD-REPLACE/1",
+        "name": "No field merge; sent whole replacement and no send before release",
+        "priorGroup": "hook-gate",
+        "requiredGroups": [
+          "hook-gate",
+          "payload",
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-PAYLOAD-NULL": [
+      {
+        "id": "PM-PAYLOAD-NULL/1",
+        "name": "Observe sent body null",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "request"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-PAYLOAD-NULL/2",
+        "name": "Native options must distinguish retain from literal null; coordinate API before production",
+        "priorGroup": "payload",
+        "requiredGroups": [
+          "payload",
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-PAYLOAD-THROW": [
+      {
+        "id": "PM-PAYLOAD-THROW/1",
+        "name": "Zero sends; terminal empty assistant with zero usage; owned request cleanup",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "request",
+          "frames",
+          "ownership",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-RESPONSE-HELD": [
+      {
+        "id": "PM-RESPONSE-HELD/1",
+        "name": "One send; no provider hook or public publication while held",
+        "priorGroup": "hook-gate",
+        "requiredGroups": [
+          "hook-gate",
+          "request",
+          "provider",
+          "frames"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-RESPONSE-HELD/2",
+        "name": "Exact response status/headers/model retained",
+        "priorGroup": "response",
+        "requiredGroups": [
+          "response"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-PROVIDER-HELD": [
+      {
+        "id": "PM-PROVIDER-HELD/1",
+        "name": "Record actual incoming DTO/model; no conversion/publication of held delta",
+        "priorGroup": "hook-gate",
+        "requiredGroups": [
+          "hook-gate",
+          "provider",
+          "frames"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-PROVIDER-HELD/2",
+        "name": "Result and canonical completion pending; explicit release",
+        "priorGroup": "hook-gate",
+        "requiredGroups": [
+          "hook-gate",
+          "frames",
+          "ownership",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-TEXT-AUTHORITATIVE-END": [
+      {
+        "id": "PM-TEXT-AUTHORITATIVE-END/1",
+        "name": "Final text final, not draft; textSignature present",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "frames"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-TEXT-AUTHORITATIVE-END/2",
+        "name": "Whole progress/final/ownUndefined/serialized bytes",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "frames"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-THINKING-AUTHORITATIVE-END": [
+      {
+        "id": "PM-THINKING-AUTHORITATIVE-END/1",
+        "name": "Final content/signature/redacted exact",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "frames"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-TOOL-AUTHORITATIVE-END": [
+      {
+        "id": "PM-TOOL-AUTHORITATIVE-END/1",
+        "name": "Partial value1 versus final value7; final strict object validation",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "frames"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-TOOL-AUTHORITATIVE-END/2",
+        "name": "Provider and parser never invoke a tool",
+        "priorGroup": "effects",
+        "requiredGroups": [
+          "frames",
+          "effects"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-INTERLEAVED-SLOTS": [
+      {
+        "id": "PM-INTERLEAVED-SLOTS/1",
+        "name": "content indices remain0/1/2; exact authoritative end values",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "frames"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-INTERLEAVED-SLOTS/2",
+        "name": "Absent signatures represented separately from null",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "frames"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-DONE-METADATA": [
+      {
+        "id": "PM-DONE-METADATA/1",
+        "name": "Do not recompute server-supplied usage/costs",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "frames"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-DONE-METADATA/2",
+        "name": "Whole diagnostic presence/opaque fields and final reason",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "frames"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-USAGE-ZERO": [
+      {
+        "id": "PM-USAGE-ZERO/1",
+        "name": "Compare whole zero usage/cost object and absence sidecars",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "frames"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-WIRE-ERROR-PARTIAL": [
+      {
+        "id": "PM-WIRE-ERROR-PARTIAL/1",
+        "name": "No tool authority/continuation",
+        "priorGroup": "effects",
+        "requiredGroups": [
+          "frames",
+          "effects",
+          "ownership",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-WIRE-ERROR-PARTIAL/2",
+        "name": "Distinct from catch-created empty error assistant",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "frames"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-EOF-PARTIAL": [
+      {
+        "id": "PM-EOF-PARTIAL/1",
+        "name": "Whole original events/partial then error with empty content and zero usage",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "provider",
+          "frames"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-EOF-PARTIAL/2",
+        "name": "Actual EOF read plus reader release and joined native disposal",
+        "priorGroup": "eof",
+        "requiredGroups": [
+          "eof",
+          "ownership",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-MALFORMED-JSON": [
+      {
+        "id": "PM-MALFORMED-JSON/1",
+        "name": "Retain exact actual failure and prior publications; no success terminal",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "provider",
+          "frames"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-HTTP-ERROR-STRUCTURED": [
+      {
+        "id": "PM-HTTP-ERROR-STRUCTURED/1",
+        "name": "Zero provider events; no fabricated retry (Source Pi Messages does not consume maxRetries here)",
+        "priorGroup": "provider",
+        "requiredGroups": [
+          "request",
+          "response",
+          "provider",
+          "frames"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-HTTP-ERROR-STRUCTURED/2",
+        "name": "Response failure diagnostic includes unknown error fields; no API key in error/trace",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "frames"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-FRAME-FIRST-DATA": [
+      {
+        "id": "PM-FRAME-FIRST-DATA/1",
+        "name": "Generic SSE multiline joining must not be substituted",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "provider",
+          "frames"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-FRAME-CRLF-FRAGMENT": [
+      {
+        "id": "PM-FRAME-CRLF-FRAGMENT/1",
+        "name": "Same whole events/body/final at every split; no sleeps/time-based gate",
+        "priorGroup": "fragmentation",
+        "requiredGroups": [
+          "payload",
+          "request",
+          "response",
+          "provider",
+          "frames",
+          "fragmentation",
+          "ownership",
+          "operation-join"
+        ],
+        "scope": "ALL_VARIANTS"
+      }
+    ],
+    "PM-FRAME-EOF-PENDING": [
+      {
+        "id": "PM-FRAME-EOF-PENDING/1",
+        "name": "Actual pending terminal admitted before unexpected-EOF classification",
+        "priorGroup": "eof",
+        "requiredGroups": [
+          "eof",
+          "provider",
+          "frames",
+          "ownership",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-FRAME-DONE-SENTINEL": [
+      {
+        "id": "PM-FRAME-DONE-SENTINEL/1",
+        "name": "Missing terminal still fails; no synthetic done",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "provider",
+          "frames",
+          "ownership",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-FRAME-LONE-CR": [
+      {
+        "id": "PM-FRAME-LONE-CR/1",
+        "name": "Compare actual Source parse/failure; do not silently use standard SSE CR separation",
+        "priorGroup": "frames",
+        "requiredGroups": [
+          "provider",
+          "frames"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-TOOL-IDENTITY-REPLACEMENT": [
+      {
+        "id": "PM-TOOL-IDENTITY-REPLACEMENT/1",
+        "name": "Retain as explicit Source/native contract conflict until lead releases a solution",
+        "priorGroup": "domain-gap",
+        "requiredGroups": [
+          "domain-gap",
+          "frames",
+          "effects"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-TOOL-IDENTITY-REPLACEMENT/2",
+        "name": "Do not modify shared reducer or treat rejection as parity",
+        "priorGroup": "domain-gap",
+        "requiredGroups": [
+          "domain-gap",
+          "frames",
+          "effects"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-CANCEL-HELD": [
+      {
+        "id": "PM-CANCEL-HELD/1",
+        "name": "Token-aware callback exits; no later conversion/tool effect",
+        "priorGroup": "hook-gate",
+        "requiredGroups": [
+          "hook-gate",
+          "provider",
+          "frames",
+          "effects"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-CANCEL-HELD/2",
+        "name": "Release/join only own reader/response; retain Source error shape and cleanup outcome",
+        "priorGroup": "ownership",
+        "requiredGroups": [
+          "hook-gate",
+          "ownership",
+          "frames",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-NATIVE-TOOL-CONTINUATION": [
+      {
+        "id": "PM-NATIVE-TOOL-CONTINUATION/1",
+        "name": "Use actual native finalized tool args7; fake inspect effect once after awaited assistant barrier",
+        "priorGroup": "continuation",
+        "requiredGroups": [
+          "continuation",
+          "effects",
+          "frames",
+          "ownership",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-NATIVE-TOOL-CONTINUATION/2",
+        "name": "Append actual assistant/toolResult; compare second physical request; never seed Source assistant output",
+        "priorGroup": "continuation",
+        "requiredGroups": [
+          "continuation",
+          "payload",
+          "request",
+          "frames",
+          "input-unchanged",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      },
+      {
+        "id": "PM-NATIVE-TOOL-CONTINUATION/3",
+        "name": "Existing Agent/ToolInvoker source unchanged; ownership approval required for integration assertions",
+        "priorGroup": "integration-open",
+        "requiredGroups": [
+          "integration-open"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-TOOLCHOICE-AUTO": [
+      {
+        "id": "PM-TOOLCHOICE-AUTO/1",
+        "name": "Construct options with JsonData scalar; exact callback and physical body retain toolChoice auto",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "payload",
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-TOOLCHOICE-NONE": [
+      {
+        "id": "PM-TOOLCHOICE-NONE/1",
+        "name": "Construct options with JsonData scalar; exact callback and physical body retain toolChoice none",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "payload",
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-TOOLCHOICE-REQUIRED": [
+      {
+        "id": "PM-TOOLCHOICE-REQUIRED/1",
+        "name": "Construct options with JsonData scalar; exact callback and physical body retain toolChoice required",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "payload",
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-DEBUG-EXISTING": [
+      {
+        "id": "PM-DEBUG-EXISTING/1",
+        "name": "Whole factory Endpoint and physical RequestUri match authored WHATWG URL vector; debug is replaced once",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-DEBUG-DUPLICATES": [
+      {
+        "id": "PM-DEBUG-DUPLICATES/1",
+        "name": "Whole factory Endpoint and physical RequestUri match authored WHATWG URL vector; debug is replaced once",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-DEBUG-ENCODING": [
+      {
+        "id": "PM-DEBUG-ENCODING/1",
+        "name": "Whole factory Endpoint and physical RequestUri match authored WHATWG URL vector; debug is replaced once",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-DEBUG-REPLACEMENT": [
+      {
+        "id": "PM-DEBUG-REPLACEMENT/1",
+        "name": "Whole factory Endpoint and physical RequestUri match authored WHATWG URL vector; debug is replaced once",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-DEBUG-FRAGMENT": [
+      {
+        "id": "PM-DEBUG-FRAGMENT/1",
+        "name": "Whole factory Endpoint and physical RequestUri match authored WHATWG URL vector; debug is replaced once",
+        "priorGroup": "request",
+        "requiredGroups": [
+          "request"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-CLEANUP-HELD": [
+      {
+        "id": "PM-CLEANUP-HELD/1",
+        "name": "No terminal publication, terminal delivery, or tool effect while reader DisposeAsync is held; release explicitly then settle all owners",
+        "priorGroup": "ownership",
+        "requiredGroups": [
+          "cleanup-gate",
+          "ownership",
+          "frames",
+          "effects",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-CLEANUP-HELD-CANCEL": [
+      {
+        "id": "PM-CLEANUP-HELD-CANCEL/1",
+        "name": "Cancel held callback without release; held cleanup still prevents terminal publication/delivery/effects until explicit cleanup release",
+        "priorGroup": "ownership",
+        "requiredGroups": [
+          "hook-gate",
+          "cleanup-gate",
+          "provider",
+          "ownership",
+          "frames",
+          "effects",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-CLEANUP-FAULT-READER": [
+      {
+        "id": "PM-CLEANUP-FAULT-READER/1",
+        "name": "Every owner is attempted and settled exactly once; retained reader fault produces fresh error and no success terminal",
+        "priorGroup": "ownership",
+        "requiredGroups": [
+          "ownership",
+          "frames",
+          "effects",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-CLEANUP-FAULT-RESPONSE": [
+      {
+        "id": "PM-CLEANUP-FAULT-RESPONSE/1",
+        "name": "Every owner is attempted and settled exactly once; retained response fault produces fresh error and no success terminal",
+        "priorGroup": "ownership",
+        "requiredGroups": [
+          "ownership",
+          "frames",
+          "effects",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-CLEANUP-FAULT-REQUEST": [
+      {
+        "id": "PM-CLEANUP-FAULT-REQUEST/1",
+        "name": "Every owner is attempted and settled exactly once; retained request fault produces fresh error and no success terminal",
+        "priorGroup": "ownership",
+        "requiredGroups": [
+          "ownership",
+          "frames",
+          "effects",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-EARLY-RETURN-HELD": [
+      {
+        "id": "PM-EARLY-RETURN-HELD/1",
+        "name": "Iterator DisposeAsync pending at held reader barrier; terminal publication/delivery/effects zero; release joins own request/response/reader",
+        "priorGroup": "early-return",
+        "requiredGroups": [
+          "cleanup-gate",
+          "early-return",
+          "ownership",
+          "frames",
+          "effects",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-EARLY-RETURN-FAULT": [
+      {
+        "id": "PM-EARLY-RETURN-FAULT/1",
+        "name": "Early DisposeAsync throws CleanupFailed after all owners settle; zero terminal publication/delivery/effects",
+        "priorGroup": "early-return",
+        "requiredGroups": [
+          "early-return",
+          "ownership",
+          "frames",
+          "effects",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-TERMINAL-OBSERVER-THROW": [
+      {
+        "id": "PM-TERMINAL-OBSERVER-THROW/1",
+        "name": "Cleanup settled inside terminal observer; observer fault propagates once; zero terminal deliveries and no fabricated second error",
+        "priorGroup": "observer-fault",
+        "requiredGroups": [
+          "observer-fault",
+          "ownership",
+          "frames",
+          "effects",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ],
+    "PM-CLEANUP-HELD-CONTINUATION": [
+      {
+        "id": "PM-CLEANUP-HELD-CONTINUATION/1",
+        "name": "No tool effect or second request at held cleanup; finalized args7 trigger one effect after terminal delivery; actual assistant/tool result form the second request",
+        "priorGroup": "continuation",
+        "requiredGroups": [
+          "cleanup-gate",
+          "continuation",
+          "effects",
+          "frames",
+          "ownership",
+          "payload",
+          "request",
+          "operation-join"
+        ],
+        "scope": "CASE"
+      }
+    ]
+  }
+}

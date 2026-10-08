@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "base": "8a686c03ceac85a68ff2d5ecf1579ff12b35b02f",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "status": "AUTHORED_RPC_SESSION_METADATA_ATTACHMENT_CONSISTENCY_CORRECTION_REVIEW_PENDING",
+  "commands": [
+    "get_session_stats",
+    "set_session_name"
+  ],
+  "authoredGroups": 7,
+  "buildsExecuted": 0,
+  "testsExecuted": 0,
+  "providerCalls": 0,
+  "upstreamCaptures": 0,
+  "sourceParityAccepted": false,
+  "mainMerged": false,
+  "publicPush": false,
+  "wholeFileAccounting": true,
+  "selectedBranchContext": true,
+  "durableNameCheckpoint": true,
+  "nameNotificationsSupported": true,
+  "nativeNameAdmission": "idle only; pending input rejected",
+  "unsupported": [
+    "upstream streaming name mutation",
+    "non-finite accounting and codec/projector bounds outside existing native profile",
+    "independent limits-model override and byte-identical ID/JSON serialization"
+  ],
+  "regressionScope": [
+    "PiSharp.Rpc.Tests --filter rpc.session-metadata.",
+    "full PiSharp.Rpc.Tests",
+    "full PiSharp.CodingAgent.Tests",
+    "full PiSharp.Sessions.Tests"
+  ],
+  "remaining": [
+    "independent source review",
+    "authorized offline compilation/execution and candidate-pinned receipts"
+  ],
+  "correctionBase": "20fd91fff07de03d7ac3f86ca4eb2ca50176fe51",
+  "correction": "Use validated attachment.Session consistently for snapshot and serialized path during Current publication before dispatcher rebind",
+  "replacementRegression": "Real host publication and old lifetime cancellation gated before original dispatcher callback; old/new identity and counts; originals directly joined",
+  "notificationSuccessor": {
+    "base": "8f6dd81e3dea8346af73d5d51a6b0735c5f66b18",
+    "state": "compatibility/native-session-info-changed.state.json",
+    "newGroupsAuthored": 6,
+    "existingCheckpointGroupExpanded": 1,
+    "buildsExecuted": 0,
+    "testsExecuted": 0,
+    "sourceParityAccepted": false
+  }
+}

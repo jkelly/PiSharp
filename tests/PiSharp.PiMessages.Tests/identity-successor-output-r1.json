@@ -1,0 +1,522 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "historicalDomainGapRetained": true,
+  "genuineSourceOutputPin": null,
+  "expected": {
+    "authority": "VERSIONED AUTHORED FROM PINNED SOURCE TEXT; NOT GENUINE CAPTURE; NATIVE/REVIEW QUALIFICATION OPEN",
+    "payload": {
+      "value": {
+        "model": "authored-inert-model",
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {}
+      },
+      "ownUndefinedPaths": [
+        "/options/cacheRetention",
+        "/options/maxTokens",
+        "/options/reasoning",
+        "/options/sessionId",
+        "/options/temperature",
+        "/options/toolChoice"
+      ]
+    },
+    "request": {
+      "uri": "https://pi-messages.invalid/base/messages",
+      "method": "POST",
+      "headers": {
+        "authorization": [
+          "Bearer authored-inert-key"
+        ],
+        "accept": [
+          "text/event-stream"
+        ],
+        "content-type": [
+          "application/json"
+        ]
+      },
+      "bodyUtf8Base64": "eyJtb2RlbCI6ImF1dGhvcmVkLWluZXJ0LW1vZGVsIiwiY29udGV4dCI6eyJtZXNzYWdlcyI6W3sicm9sZSI6InN5c3RlbSIsInN5c3RlbU1lc3NhZ2UiOiJBdXRob3JlZCBpbmVydCBzeXN0ZW0uIiwidGltZXN0YW1wIjoxMjN9LHsicm9sZSI6InVzZXIiLCJjb250ZW50IjoiQXV0aG9yZWQgaW5lcnQgcmVxdWVzdC4iLCJ0aW1lc3RhbXAiOjEyM31dfSwib3B0aW9ucyI6e319",
+      "body": {
+        "model": "authored-inert-model",
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    "response": {
+      "value": {
+        "status": 200,
+        "headers": {
+          "content-type": "text/event-stream"
+        }
+      },
+      "ownUndefinedPaths": []
+    },
+    "provider": [
+      {
+        "value": {
+          "type": "start"
+        },
+        "ownUndefinedPaths": []
+      },
+      {
+        "value": {
+          "type": "toolcall_start",
+          "contentIndex": 0,
+          "id": "authored-call-1",
+          "toolName": "inspect"
+        },
+        "ownUndefinedPaths": []
+      },
+      {
+        "value": {
+          "type": "toolcall_delta",
+          "contentIndex": 0,
+          "delta": "{\"value\":1}"
+        },
+        "ownUndefinedPaths": []
+      },
+      {
+        "value": {
+          "type": "toolcall_end",
+          "contentIndex": 0,
+          "toolCall": {
+            "type": "toolCall",
+            "id": "authored-replaced-call",
+            "name": "other",
+            "arguments": {
+              "value": 7
+            }
+          }
+        },
+        "ownUndefinedPaths": []
+      },
+      {
+        "value": {
+          "type": "done",
+          "reason": "toolUse",
+          "usage": {
+            "input": 11,
+            "output": 7,
+            "cacheRead": 3,
+            "cacheWrite": 2,
+            "totalTokens": 23,
+            "cost": {
+              "input": 0.011,
+              "output": 0.014,
+              "cacheRead": 0.003,
+              "cacheWrite": 0.004,
+              "total": 0.032
+            }
+          }
+        },
+        "ownUndefinedPaths": []
+      }
+    ],
+    "incoming": [
+      {
+        "type": "start"
+      },
+      {
+        "type": "toolcall_start",
+        "contentIndex": 0,
+        "id": "authored-call-1",
+        "toolName": "inspect"
+      },
+      {
+        "type": "toolcall_delta",
+        "contentIndex": 0,
+        "delta": "{\"value\":1}"
+      },
+      {
+        "type": "toolcall_end",
+        "contentIndex": 0,
+        "toolCall": {
+          "type": "toolCall",
+          "id": "authored-replaced-call",
+          "name": "other",
+          "arguments": {
+            "value": 7
+          }
+        }
+      },
+      {
+        "type": "done",
+        "reason": "toolUse",
+        "usage": {
+          "input": 11,
+          "output": 7,
+          "cacheRead": 3,
+          "cacheWrite": 2,
+          "totalTokens": 23,
+          "cost": {
+            "input": 0.011,
+            "output": 0.014,
+            "cacheRead": 0.003,
+            "cacheWrite": 0.004,
+            "total": 0.032
+          }
+        }
+      }
+    ],
+    "frames": [
+      {
+        "wire": {
+          "type": "start",
+          "partial": {
+            "role": "assistant",
+            "content": [],
+            "api": "pi-messages",
+            "provider": "authored-inert-provider",
+            "model": "authored-inert-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "pending",
+            "timestamp": 123
+          }
+        },
+        "snapshot": {
+          "value": {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "pi-messages",
+              "provider": "authored-inert-provider",
+              "model": "authored-inert-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 123
+            }
+          },
+          "ownUndefinedPaths": []
+        },
+        "sourceSnapshotUtf8Base64": "eyJ2YWx1ZSI6eyJ0eXBlIjoic3RhcnQiLCJwYXJ0aWFsIjp7InJvbGUiOiJhc3Npc3RhbnQiLCJjb250ZW50IjpbXSwiYXBpIjoicGktbWVzc2FnZXMiLCJwcm92aWRlciI6ImF1dGhvcmVkLWluZXJ0LXByb3ZpZGVyIiwibW9kZWwiOiJhdXRob3JlZC1pbmVydC1tb2RlbCIsInVzYWdlIjp7ImlucHV0IjowLCJvdXRwdXQiOjAsImNhY2hlUmVhZCI6MCwiY2FjaGVXcml0ZSI6MCwidG90YWxUb2tlbnMiOjAsImNvc3QiOnsiaW5wdXQiOjAsIm91dHB1dCI6MCwiY2FjaGVSZWFkIjowLCJjYWNoZVdyaXRlIjowLCJ0b3RhbCI6MH19LCJzdG9wUmVhc29uIjoicGVuZGluZyIsInRpbWVzdGFtcCI6MTIzfX0sIm93blVuZGVmaW5lZFBhdGhzIjpbXX0=",
+        "compareSourceSnapshotBytes": true
+      },
+      {
+        "wire": {
+          "type": "toolcall_start",
+          "contentIndex": 0,
+          "toolCall": {
+            "type": "toolCall",
+            "id": "authored-call-1",
+            "name": "inspect",
+            "arguments": {}
+          }
+        },
+        "snapshot": {
+          "value": {
+            "type": "toolcall_start",
+            "contentIndex": 0,
+            "id": "authored-call-1",
+            "toolName": "inspect",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "authored-call-1",
+                  "name": "inspect",
+                  "arguments": {}
+                }
+              ],
+              "api": "pi-messages",
+              "provider": "authored-inert-provider",
+              "model": "authored-inert-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 123
+            }
+          },
+          "ownUndefinedPaths": []
+        },
+        "sourceSnapshotUtf8Base64": "eyJ2YWx1ZSI6eyJ0eXBlIjoidG9vbGNhbGxfc3RhcnQiLCJjb250ZW50SW5kZXgiOjAsImlkIjoiYXV0aG9yZWQtY2FsbC0xIiwidG9vbE5hbWUiOiJpbnNwZWN0IiwicGFydGlhbCI6eyJyb2xlIjoiYXNzaXN0YW50IiwiY29udGVudCI6W3sidHlwZSI6InRvb2xDYWxsIiwiaWQiOiJhdXRob3JlZC1jYWxsLTEiLCJuYW1lIjoiaW5zcGVjdCIsImFyZ3VtZW50cyI6e319XSwiYXBpIjoicGktbWVzc2FnZXMiLCJwcm92aWRlciI6ImF1dGhvcmVkLWluZXJ0LXByb3ZpZGVyIiwibW9kZWwiOiJhdXRob3JlZC1pbmVydC1tb2RlbCIsInVzYWdlIjp7ImlucHV0IjowLCJvdXRwdXQiOjAsImNhY2hlUmVhZCI6MCwiY2FjaGVXcml0ZSI6MCwidG90YWxUb2tlbnMiOjAsImNvc3QiOnsiaW5wdXQiOjAsIm91dHB1dCI6MCwiY2FjaGVSZWFkIjowLCJjYWNoZVdyaXRlIjowLCJ0b3RhbCI6MH19LCJzdG9wUmVhc29uIjoicGVuZGluZyIsInRpbWVzdGFtcCI6MTIzfX0sIm93blVuZGVmaW5lZFBhdGhzIjpbXX0=",
+        "compareSourceSnapshotBytes": true
+      },
+      {
+        "wire": {
+          "type": "toolcall_delta",
+          "contentIndex": 0,
+          "delta": "{\"value\":1}"
+        },
+        "snapshot": {
+          "value": {
+            "type": "toolcall_delta",
+            "contentIndex": 0,
+            "delta": "{\"value\":1}",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "authored-call-1",
+                  "name": "inspect",
+                  "arguments": {
+                    "value": 1
+                  }
+                }
+              ],
+              "api": "pi-messages",
+              "provider": "authored-inert-provider",
+              "model": "authored-inert-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 123
+            }
+          },
+          "ownUndefinedPaths": []
+        },
+        "sourceSnapshotUtf8Base64": "eyJ2YWx1ZSI6eyJ0eXBlIjoidG9vbGNhbGxfZGVsdGEiLCJjb250ZW50SW5kZXgiOjAsImRlbHRhIjoie1widmFsdWVcIjoxfSIsInBhcnRpYWwiOnsicm9sZSI6ImFzc2lzdGFudCIsImNvbnRlbnQiOlt7InR5cGUiOiJ0b29sQ2FsbCIsImlkIjoiYXV0aG9yZWQtY2FsbC0xIiwibmFtZSI6Imluc3BlY3QiLCJhcmd1bWVudHMiOnsidmFsdWUiOjF9fV0sImFwaSI6InBpLW1lc3NhZ2VzIiwicHJvdmlkZXIiOiJhdXRob3JlZC1pbmVydC1wcm92aWRlciIsIm1vZGVsIjoiYXV0aG9yZWQtaW5lcnQtbW9kZWwiLCJ1c2FnZSI6eyJpbnB1dCI6MCwib3V0cHV0IjowLCJjYWNoZVJlYWQiOjAsImNhY2hlV3JpdGUiOjAsInRvdGFsVG9rZW5zIjowLCJjb3N0Ijp7ImlucHV0IjowLCJvdXRwdXQiOjAsImNhY2hlUmVhZCI6MCwiY2FjaGVXcml0ZSI6MCwidG90YWwiOjB9fSwic3RvcFJlYXNvbiI6InBlbmRpbmciLCJ0aW1lc3RhbXAiOjEyM319LCJvd25VbmRlZmluZWRQYXRocyI6W119",
+        "compareSourceSnapshotBytes": true
+      },
+      {
+        "wire": {
+          "type": "toolcall_end",
+          "contentIndex": 0,
+          "id": "authored-replaced-call",
+          "name": "other",
+          "arguments": {
+            "value": 7
+          }
+        },
+        "snapshot": {
+          "value": {
+            "type": "toolcall_end",
+            "contentIndex": 0,
+            "toolCall": {
+              "type": "toolCall",
+              "id": "authored-replaced-call",
+              "name": "other",
+              "arguments": {
+                "value": 7
+              }
+            },
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "authored-replaced-call",
+                  "name": "other",
+                  "arguments": {
+                    "value": 7
+                  }
+                }
+              ],
+              "api": "pi-messages",
+              "provider": "authored-inert-provider",
+              "model": "authored-inert-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 123
+            }
+          },
+          "ownUndefinedPaths": []
+        },
+        "sourceSnapshotUtf8Base64": "eyJ2YWx1ZSI6eyJ0eXBlIjoidG9vbGNhbGxfZW5kIiwiY29udGVudEluZGV4IjowLCJ0b29sQ2FsbCI6eyJ0eXBlIjoidG9vbENhbGwiLCJpZCI6ImF1dGhvcmVkLXJlcGxhY2VkLWNhbGwiLCJuYW1lIjoib3RoZXIiLCJhcmd1bWVudHMiOnsidmFsdWUiOjd9fSwicGFydGlhbCI6eyJyb2xlIjoiYXNzaXN0YW50IiwiY29udGVudCI6W3sidHlwZSI6InRvb2xDYWxsIiwiaWQiOiJhdXRob3JlZC1yZXBsYWNlZC1jYWxsIiwibmFtZSI6Im90aGVyIiwiYXJndW1lbnRzIjp7InZhbHVlIjo3fX1dLCJhcGkiOiJwaS1tZXNzYWdlcyIsInByb3ZpZGVyIjoiYXV0aG9yZWQtaW5lcnQtcHJvdmlkZXIiLCJtb2RlbCI6ImF1dGhvcmVkLWluZXJ0LW1vZGVsIiwidXNhZ2UiOnsiaW5wdXQiOjAsIm91dHB1dCI6MCwiY2FjaGVSZWFkIjowLCJjYWNoZVdyaXRlIjowLCJ0b3RhbFRva2VucyI6MCwiY29zdCI6eyJpbnB1dCI6MCwib3V0cHV0IjowLCJjYWNoZVJlYWQiOjAsImNhY2hlV3JpdGUiOjAsInRvdGFsIjowfX0sInN0b3BSZWFzb24iOiJwZW5kaW5nIiwidGltZXN0YW1wIjoxMjN9fSwib3duVW5kZWZpbmVkUGF0aHMiOltdfQ==",
+        "compareSourceSnapshotBytes": true
+      },
+      {
+        "wire": {
+          "type": "done",
+          "reason": "toolUse",
+          "message": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "authored-replaced-call",
+                "name": "other",
+                "arguments": {
+                  "value": 7
+                }
+              }
+            ],
+            "api": "pi-messages",
+            "provider": "authored-inert-provider",
+            "model": "authored-inert-model",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 123
+          }
+        },
+        "snapshot": {
+          "value": {
+            "type": "done",
+            "reason": "toolUse",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "authored-replaced-call",
+                  "name": "other",
+                  "arguments": {
+                    "value": 7
+                  }
+                }
+              ],
+              "api": "pi-messages",
+              "provider": "authored-inert-provider",
+              "model": "authored-inert-model",
+              "usage": {
+                "input": 11,
+                "output": 7,
+                "cacheRead": 3,
+                "cacheWrite": 2,
+                "totalTokens": 23,
+                "cost": {
+                  "input": 0.011,
+                  "output": 0.014,
+                  "cacheRead": 0.003,
+                  "cacheWrite": 0.004,
+                  "total": 0.032
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 123
+            }
+          },
+          "ownUndefinedPaths": [
+            "/message/responseId"
+          ]
+        },
+        "sourceSnapshotUtf8Base64": "eyJ2YWx1ZSI6eyJ0eXBlIjoiZG9uZSIsInJlYXNvbiI6InRvb2xVc2UiLCJtZXNzYWdlIjp7InJvbGUiOiJhc3Npc3RhbnQiLCJjb250ZW50IjpbeyJ0eXBlIjoidG9vbENhbGwiLCJpZCI6ImF1dGhvcmVkLXJlcGxhY2VkLWNhbGwiLCJuYW1lIjoib3RoZXIiLCJhcmd1bWVudHMiOnsidmFsdWUiOjd9fV0sImFwaSI6InBpLW1lc3NhZ2VzIiwicHJvdmlkZXIiOiJhdXRob3JlZC1pbmVydC1wcm92aWRlciIsIm1vZGVsIjoiYXV0aG9yZWQtaW5lcnQtbW9kZWwiLCJ1c2FnZSI6eyJpbnB1dCI6MTEsIm91dHB1dCI6NywiY2FjaGVSZWFkIjozLCJjYWNoZVdyaXRlIjoyLCJ0b3RhbFRva2VucyI6MjMsImNvc3QiOnsiaW5wdXQiOjAuMDExLCJvdXRwdXQiOjAuMDE0LCJjYWNoZVJlYWQiOjAuMDAzLCJjYWNoZVdyaXRlIjowLjAwNCwidG90YWwiOjAuMDMyfX0sInN0b3BSZWFzb24iOiJ0b29sVXNlIiwidGltZXN0YW1wIjoxMjN9fSwib3duVW5kZWZpbmVkUGF0aHMiOlsiL21lc3NhZ2UvcmVzcG9uc2VJZCJdfQ==",
+        "compareSourceSnapshotBytes": true
+      }
+    ],
+    "messageRule": null,
+    "domainGap": true,
+    "expectedEffects": 0,
+    "nativeClock": 123,
+    "sourceClockQualification": "OPEN: Source Date.now samples are not qualified by native request.Timestamp",
+    "fullSourceErrorSerializationQualification": "OPEN: JS exception message/stack/own-undefined and catch property ordering require genuine capture"
+  },
+  "agentContinuation": {
+    "expectedPhysicalRequests": 2,
+    "finalCallId": "authored-replaced-call",
+    "finalToolName": "other",
+    "finalArguments": {
+      "value": 7
+    },
+    "transformedTarget": "/allowed/transformed/7",
+    "finalAssistantText": "continued",
+    "criterion": "PM-NATIVE-TOOL-CONTINUATION/3",
+    "qualification": "OPEN_PENDING_ADMITTED_RUNTIME_AND_REVIEW",
+    "nativeInputs": [
+      {
+        "role": "system",
+        "content": "Authored inert system.",
+        "timestamp": 123
+      },
+      {
+        "role": "user",
+        "content": "Authored inert request.",
+        "timestamp": 123
+      }
+    ],
+    "inputAdmission": "Separate native Agent profile materializes the authored systemMessage as native system content; provider profile and historical input remain byte-preserved."
+  }
+}

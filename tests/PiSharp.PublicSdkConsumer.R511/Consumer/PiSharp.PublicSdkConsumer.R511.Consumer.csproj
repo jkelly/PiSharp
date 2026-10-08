@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Condition="'$(PublicSdkPackageConsumer)' == 'true'">
+    <NuGetLockFilePath>$(PublicSdkPackageLockRoot)/consumer/packages.lock.json</NuGetLockFilePath>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(PublicSdkPackageConsumer)' != 'true'">
+    <ProjectReference Include="../../../src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PublicSdkPackageConsumer)' == 'true'">
+    <PackageReference Include="PiSharp.Extensions.Abstractions" Version="[$(PublicSdkPackageVersion)]" />
+  </ItemGroup>
+  <Target Name="RequirePublicSdkPackageConsumerInputs" BeforeTargets="CollectPackageReferences;Restore;PrepareForBuild"
+          Condition="'$(PublicSdkPackageConsumer)' == 'true'">
+    <Error Condition="'$(PublicSdkPackageVersion)' == ''" Text="An explicit pinned private SDK package version is required." />
+    <Error Condition="'$(PublicSdkPackageLockRoot)' == ''" Text="A separate admitted private SDK package lock root is required." />
+  </Target>
+</Project>

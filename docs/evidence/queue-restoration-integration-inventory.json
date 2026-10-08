@@ -1,0 +1,215 @@
+{
+  "status": "STATIC_SOURCE_CHECKS_ONLY",
+  "sourceMerge": "8044c539dc7686265f2fac4b9f2932dafb666ed7",
+  "base": "aca9ce52fc6611b94ce743b2d049014df7fb3869",
+  "coreCorrection": "aeec350c4a5c3f8c3f222aa30b4ce2ef630b604d",
+  "terminal": "51d208bb1580021cbd646212641c497612d62dbe",
+  "checks": [
+    {
+      "file": "src/PiSharp.Cli/Commands/TerminalSessionCommand.cs",
+      "tip": "51d208bb1580021cbd646212641c497612d62dbe",
+      "expected": "1bdb1a090fa06448341fdad575dc37fcc173fd56",
+      "actual": "1bdb1a090fa06448341fdad575dc37fcc173fd56"
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs",
+      "tip": "51d208bb1580021cbd646212641c497612d62dbe",
+      "expected": "b09dd2e9df4c6a7efda7f52ba0797b8a43f65ccd",
+      "actual": "b09dd2e9df4c6a7efda7f52ba0797b8a43f65ccd"
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+      "tip": "51d208bb1580021cbd646212641c497612d62dbe",
+      "expected": "16e2d9b49b7cb4a7c38ff97ea6b47f344a9ac578",
+      "actual": "16e2d9b49b7cb4a7c38ff97ea6b47f344a9ac578"
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/TerminalQueueRestoration.cs",
+      "tip": "51d208bb1580021cbd646212641c497612d62dbe",
+      "expected": "ce63d567970ec3f2338e5126f1b94636f946c777",
+      "actual": "ce63d567970ec3f2338e5126f1b94636f946c777"
+    },
+    {
+      "file": "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+      "tip": "51d208bb1580021cbd646212641c497612d62dbe",
+      "expected": "a3b4ce965d5737d4d1264cda57348caadb6f90ac",
+      "actual": "a3b4ce965d5737d4d1264cda57348caadb6f90ac"
+    },
+    {
+      "file": "src/PiSharp.Rpc/Protocol/RpcQueueRestorationPlan.cs",
+      "tip": "51d208bb1580021cbd646212641c497612d62dbe",
+      "expected": "91ed8648fbaa32fe8a7e1f719c6b82af6ee18638",
+      "actual": "91ed8648fbaa32fe8a7e1f719c6b82af6ee18638"
+    },
+    {
+      "file": "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs",
+      "tip": "51d208bb1580021cbd646212641c497612d62dbe",
+      "expected": "e7b00568980fc71e897f9dbb2158a1217a1fcd02",
+      "actual": "e7b00568980fc71e897f9dbb2158a1217a1fcd02"
+    },
+    {
+      "file": "tests/PiSharp.Rpc.Tests/RpcQueueRestorationTests.cs",
+      "tip": "51d208bb1580021cbd646212641c497612d62dbe",
+      "expected": "bc994e7708dbd9d61027842f8230e9b1c7c95868",
+      "actual": "bc994e7708dbd9d61027842f8230e9b1c7c95868"
+    },
+    {
+      "file": "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+      "tip": "51d208bb1580021cbd646212641c497612d62dbe",
+      "expected": "2a5fc96100cda968382dd926d92bf984a8e17dd2",
+      "actual": "2a5fc96100cda968382dd926d92bf984a8e17dd2"
+    },
+    {
+      "file": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalQueueRestorationCases.cs",
+      "tip": "51d208bb1580021cbd646212641c497612d62dbe",
+      "expected": "87622e0ba8e2535d15f413ca1bd087e9c8e6333b",
+      "actual": "87622e0ba8e2535d15f413ca1bd087e9c8e6333b"
+    },
+    {
+      "file": "src/PiSharp.Agent/Agent.cs",
+      "tip": "aeec350c4a5c3f8c3f222aa30b4ce2ef630b604d",
+      "expected": "08a552493251012a61e210847174cb657af9a071",
+      "actual": "08a552493251012a61e210847174cb657af9a071"
+    },
+    {
+      "file": "src/PiSharp.Agent/AgentPendingInputQueue.cs",
+      "tip": "aeec350c4a5c3f8c3f222aa30b4ce2ef630b604d",
+      "expected": "afe6d6bf9ce360ce5bb83fab884163a9695f502f",
+      "actual": "afe6d6bf9ce360ce5bb83fab884163a9695f502f"
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/PersistentAgentSession.cs",
+      "tip": "aeec350c4a5c3f8c3f222aa30b4ce2ef630b604d",
+      "expected": "7812d70ffeb7f34e2b3c74d37f9cb3621ef9c0f8",
+      "actual": "7812d70ffeb7f34e2b3c74d37f9cb3621ef9c0f8"
+    },
+    {
+      "file": "tests/PiSharp.CodingAgent.Tests/AtomicQueueTakeTests.cs",
+      "tip": "aeec350c4a5c3f8c3f222aa30b4ce2ef630b604d",
+      "expected": "e5f6c7856ed05892011986b823d67999d8d600b8",
+      "actual": "e5f6c7856ed05892011986b823d67999d8d600b8"
+    }
+  ],
+  "registrations": [
+    {
+      "file": "tests/PiSharp.Rpc.Tests/Program.cs",
+      "marker": "ResponsesCheckpointProjectionTests.Cases()",
+      "count": 1
+    },
+    {
+      "file": "tests/PiSharp.Rpc.Tests/Program.cs",
+      "marker": "RpcQueueRestorationTests.Cases()",
+      "count": 1
+    },
+    {
+      "file": "tests/PiSharp.Rpc.Tests/Program.cs",
+      "marker": "RpcQueueRestorationTests.Prefix",
+      "count": 1
+    },
+    {
+      "file": "tests/PiSharp.CodingAgent.Tests/Program.cs",
+      "marker": "AtomicQueueTakeTests.Cases()",
+      "count": 1
+    },
+    {
+      "file": "tests/PiSharp.CodingAgent.Tests/Program.cs",
+      "marker": "AtomicQueueTakeTests.Prefix",
+      "count": 1
+    },
+    {
+      "file": "tests/PiSharp.CodingAgent.Tests/Program.cs",
+      "marker": "\"native before-start \"",
+      "count": 1
+    },
+    {
+      "file": "tests/PiSharp.CodingAgent.Tests/Program.cs",
+      "marker": "\"nested-host \"",
+      "count": 1
+    },
+    {
+      "file": "tests/PiSharp.Terminal.SelectList.Integration.Tests/Program.cs",
+      "marker": "TerminalQueueRestorationCases.Cases(args)",
+      "count": 1
+    }
+  ],
+  "heldIoPins": [
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/HeldIoTests.cs",
+      "expected": "a4dc73ee294a84f9e52cc15b6e092db472430c1a47c8a96bafb1a8b024bd6bc3",
+      "actual": "a4dc73ee294a84f9e52cc15b6e092db472430c1a47c8a96bafb1a8b024bd6bc3"
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/Program.cs",
+      "expected": "67de8756784db53f2531b173e4cf7dd7a0db0753a6ac93b2848679a8b8886d9a",
+      "actual": "67de8756784db53f2531b173e4cf7dd7a0db0753a6ac93b2848679a8b8886d9a"
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/AlternateKeyControls.cs",
+      "expected": "3a73bd3fb1c26282b7a36156d48e051fe03c5ea6423c3d6d534cc36d1ce72446",
+      "actual": "3a73bd3fb1c26282b7a36156d48e051fe03c5ea6423c3d6d534cc36d1ce72446"
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/shift-space-source-observations.json",
+      "expected": "d71057f550e047c30684d427865561d12c7a8c0d7db6dd1378c2ddf42bfbfb1c",
+      "actual": "d71057f550e047c30684d427865561d12c7a8c0d7db6dd1378c2ddf42bfbfb1c"
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-failure-cancellation-design.json",
+      "expected": "b1f4a5b2bbd7ab1df1e9ac7b0fb3a8af0cb325a4d9ef5ab8bad99e58d27d845d",
+      "actual": "b1f4a5b2bbd7ab1df1e9ac7b0fb3a8af0cb325a4d9ef5ab8bad99e58d27d845d"
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+      "expected": "61bba3c7e83a5e84bc82a9da49f9a99324f6759245cb2a6a18ce45e397fc135e",
+      "actual": "61bba3c7e83a5e84bc82a9da49f9a99324f6759245cb2a6a18ce45e397fc135e"
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/TerminalSessionView.cs",
+      "expected": "36bd9b9808735ea85f006b6ccce373d1d165d8a3e559d80407623c14f4b05e9e",
+      "actual": "36bd9b9808735ea85f006b6ccce373d1d165d8a3e559d80407623c14f4b05e9e"
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/TerminalSubmissionReceipts.cs",
+      "expected": "d8006cb325976aa863bed2a43640c4e8ed107a48832eb53748387b3c176810f2",
+      "actual": "d8006cb325976aa863bed2a43640c4e8ed107a48832eb53748387b3c176810f2"
+    },
+    {
+      "file": "src/PiSharp.Tui/Input/TerminalInputDecoder.cs",
+      "expected": "749b61b948b408a08ccd4084dd47e33268f5085edbf69987866e15537e9a974a",
+      "actual": "749b61b948b408a08ccd4084dd47e33268f5085edbf69987866e15537e9a974a"
+    },
+    {
+      "file": "src/PiSharp.Tui/Input/TerminalEditorFocusOwner.cs",
+      "expected": "6cfef2aa45dcd878492753eb4e99a4abf052823bbdf232ab9fa3539e43e51b21",
+      "actual": "6cfef2aa45dcd878492753eb4e99a4abf052823bbdf232ab9fa3539e43e51b21"
+    },
+    {
+      "file": "src/PiSharp.Tui/Input/TerminalTextEditorPasteController.cs",
+      "expected": "63407650ff0ed5a59e9990069bc0ea90adc242ca5390464d7bba895b3152c4fe",
+      "actual": "63407650ff0ed5a59e9990069bc0ea90adc242ca5390464d7bba895b3152c4fe"
+    },
+    {
+      "file": "src/PiSharp.Tui/Rendering/VtRenderer.cs",
+      "expected": "fd9a92436dac74536ad5270cfee756119c9b7afd09dad8727082b6a2ac9b7bdf",
+      "actual": "fd9a92436dac74536ad5270cfee756119c9b7afd09dad8727082b6a2ac9b7bdf"
+    },
+    {
+      "file": "src/PiSharp.Tui/Rendering/TerminalEditorFrameFactory.cs",
+      "expected": "a166e5ec4daeb3ad7fd726b175c73bc770274f6701b2deaae8c1971e188c7a27",
+      "actual": "a166e5ec4daeb3ad7fd726b175c73bc770274f6701b2deaae8c1971e188c7a27"
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/HeldIoEvidence.cs",
+      "expected": "352f7bfb6e04c52a201facc7b7d17dffd16cacb4a8ec9427f19a69aeae18d495",
+      "actual": "352f7bfb6e04c52a201facc7b7d17dffd16cacb4a8ec9427f19a69aeae18d495"
+    }
+  ],
+  "missingProjectReferences": [],
+  "nativeBuilds": 0,
+  "testsExecuted": 0,
+  "unresolved": [
+    "Provider test-ownership P2 remains open; provider b2b24e9e not imported",
+    "Independent review of live-reader test correction and combined source",
+    "No native runtime qualification"
+  ]
+}

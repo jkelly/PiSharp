@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "cases": [
+    { "id": "whole-cluster-navigation-deletion", "steps": [
+      { "kind": "set", "data": "Aé中🙂👩‍👩‍👧‍👦🇺🇸👍🏽B" },
+      { "kind": "input", "data": "\u001b[D" }, { "kind": "input", "data": "\u001b[D" },
+      { "kind": "input", "data": "\u007f" }, { "kind": "input", "data": "\u001b[3~" },
+      { "kind": "input", "data": "\u001b[H" }, { "kind": "input", "data": "\u001b[C" },
+      { "kind": "input", "data": "\u001b[3~" }, { "kind": "input", "data": "\u001b[F" }
+    ] },
+    { "id": "multiline-logical-line-navigation-joins", "steps": [
+      { "kind": "set", "data": "é中\n🙂B\nC" },
+      { "kind": "input", "data": "\u001b[H" }, { "kind": "input", "data": "\u007f" },
+      { "kind": "input", "data": "\u001b[H" }, { "kind": "input", "data": "\u001b[C" },
+      { "kind": "input", "data": "\u001b[3~" }, { "kind": "input", "data": "\u001b[F" },
+      { "kind": "input", "data": "\u001b[D" }, { "kind": "input", "data": "Z" }
+    ] },
+    { "id": "literal-small-multiline-paste", "steps": [
+      { "kind": "set", "data": "ab" }, { "kind": "input", "data": "\u001b[D" },
+      { "kind": "input", "data": "\u001b[200~é\n中🙂\u001b[201~" },
+      { "kind": "input", "data": "\u001b[D" }, { "kind": "input", "data": "\u001b[3~" }
+    ] },
+    { "id": "zwj-insertion-cursor-safety-difference", "steps": [
+      { "kind": "set", "data": "👩👩" }, { "kind": "input", "data": "\u001b[D" },
+      { "kind": "input", "data": "‍" }, { "kind": "input", "data": "\u007f" }
+    ] },
+    { "id": "regional-indicator-deletion-seam-difference", "steps": [
+      { "kind": "set", "data": "🇺X🇸" }, { "kind": "input", "data": "\u001b[D" },
+      { "kind": "input", "data": "\u007f" }, { "kind": "input", "data": "\u001b[D" }
+    ] },
+    { "id": "line-join-combining-mark-cursor-difference", "steps": [
+      { "kind": "set", "data": "a\ńb" }, { "kind": "input", "data": "\u001b[H" },
+      { "kind": "input", "data": "\u007f" }, { "kind": "input", "data": "\u001b[3~" }
+    ] },
+    { "id": "newline-tab-normalization-difference", "steps": [
+      { "kind": "set", "data": "a\r\nb\rc\td" },
+      { "kind": "input", "data": "\u001b[H" }, { "kind": "input", "data": "\u001b[F" }
+    ] },
+    { "id": "paste-control-filter-difference", "steps": [
+      { "kind": "set", "data": "x" },
+      { "kind": "input", "data": "\u001b[200~\u0003\u001b[31m\u001b[201~" }
+    ] },
+    { "id": "no-op-source-change-callback-difference", "steps": [
+      { "kind": "set", "data": "" }, { "kind": "input", "data": "\u007f" },
+      { "kind": "input", "data": "\u001b[3~" }, { "kind": "input", "data": "\u001b[D" }
+    ] }
+  ]
+}

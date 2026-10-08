@@ -1,0 +1,235 @@
+{
+  "originalReferenceFixturesChanged": false,
+  "heldProvidersEdited": false,
+  "admissionRevision": "bounded-tier-a-namespace-metadata-1",
+  "staticallyClearedSource": "c6d3cea3f7de85ba17bc8bfd18c2cf1c57987dfd",
+  "currentHelperCount": 7,
+  "compositionBase": "5bddf1a6b9b10409bdb1a638451174b3a972bd08",
+  "originalCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceRoot": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1\\upstream",
+  "authoredGetterComparisons": 7,
+  "launcherPin": {
+    "bytes": 6939,
+    "path": "src/PiSharp.ExtensionHost/Supervision/NodeCommandInputWorkerLaunch.cs",
+    "sha256": "664bfeb498d5d371e58147ef9574e083518eeaaaace007b7976b80f67a6e683e"
+  },
+  "executedCorpusCredit": 0,
+  "helperAddition": "Only statically-cleared local tool-loadout.mjs, explicitly SHA-pinned; no wildcard/roots/package/module expansion",
+  "exactAuthoredArtifactPins": [
+    {
+      "bytes": 11796,
+      "path": "compatibility/node/command-input-bridge.plan.json",
+      "sha256": "fde6bae32f17a92d4abc3130772a31d91abeab8bb3c2440ad2196c5d26924d11"
+    },
+    {
+      "bytes": 31418,
+      "path": "src/PiSharp.Compatibility.Node/NodeCommandInputExtension.cs",
+      "sha256": "9306c942565d1501aa9d5e7763510a59cc267f7d5af408a548c0fdcdb13d1de8"
+    },
+    {
+      "bytes": 6339,
+      "path": "src/PiSharp.Compatibility.Node/NodeTierAAdmission.cs",
+      "sha256": "ce6903f3bb8507748d903193f19daed9a2665ff9c4d37bb233f1b5fdc7ed9db5"
+    },
+    {
+      "bytes": 6276,
+      "path": "src/PiSharp.Compatibility.Node/NodeToolLoadoutMetadata.cs",
+      "sha256": "1406187f6f91853068430bbbf303aba0435a2fe3bdcadba9e188067f11785be1"
+    },
+    {
+      "bytes": 6939,
+      "path": "src/PiSharp.ExtensionHost/Supervision/NodeCommandInputWorkerLaunch.cs",
+      "sha256": "664bfeb498d5d371e58147ef9574e083518eeaaaace007b7976b80f67a6e683e"
+    },
+    {
+      "bytes": 5679,
+      "path": "tools/NodeCommandInputBridge/admission.mjs",
+      "sha256": "0ddf8553bc600a581ebe5116e5c4f372c6689baf4dcd816714ea01a69e5fe164"
+    },
+    {
+      "bytes": 5040,
+      "path": "tools/NodeCommandInputBridge/admission.test.mjs",
+      "sha256": "59039d8e89e3edac7aefb17d4d0a4d2b86fcd75829cd9751e58d6fb4b6e38913"
+    },
+    {
+      "bytes": 30043,
+      "path": "tools/NodeCommandInputBridge/module-loader.mjs",
+      "sha256": "5441e13bbff31f2c4614205f3eaa6dd8f3f960e9bf63748290f235eac952938d"
+    },
+    {
+      "bytes": 18718,
+      "path": "tools/NodeCommandInputBridge/namespace-admission.request.json",
+      "sha256": "7bd0cff3b6ecfe4192322a59e05d86e1e6a8afb13f72d8b0a2600c3644e531cd"
+    },
+    {
+      "bytes": 3570,
+      "path": "tools/NodeCommandInputBridge/namespace-corpus.mjs",
+      "sha256": "b81b3449c8987cc98294c76c5fd282bc03e122bbde7f09f7fba8de18b4581b1c"
+    },
+    {
+      "bytes": 6485,
+      "path": "tools/NodeCommandInputBridge/NAMESPACE-METADATA-HANDOFF.md",
+      "sha256": "39b681912fefc4e5401aaf05702828d0591aa7f5a811985d78b1d63b3099f1da"
+    },
+    {
+      "bytes": 5014,
+      "path": "tools/NodeCommandInputBridge/namespace-native-registration.proposed.json",
+      "sha256": "5123066ae13062f4cf5a3a48e8285c93eb111abe0382b1b6ecaf75bb049d1b38"
+    },
+    {
+      "bytes": 3788,
+      "path": "tools/NodeCommandInputBridge/NAMESPACE-PIN-INTEGRATION-HANDOFF.md",
+      "sha256": "5cc8955707a62c331cb27d7965801b1557279bc0e7203edab36e235a25708887"
+    },
+    {
+      "bytes": 4259,
+      "path": "tools/NodeCommandInputBridge/NativeAdmissionTests/NativeToolLoadoutMetadataTests.cs",
+      "sha256": "5470940e641c3d2c82d9fd0ca2ad2fd0334707872e64ecf1ce5df0f51f87c5f0"
+    },
+    {
+      "bytes": 915,
+      "path": "tools/NodeCommandInputBridge/NativeAdmissionTests/packages.lock.json",
+      "sha256": "05c9708303905fc59ce80b480f08074ec3de6a3d7fdfb0629e469ba321dbd9ce"
+    },
+    {
+      "bytes": 7217,
+      "path": "tools/NodeCommandInputBridge/NativeAdmissionTests/Program.cs",
+      "sha256": "4f26e9a7d69cafa23c09c4340546e78eee97d5cf8505b3b497ffbc765ee26be6"
+    },
+    {
+      "bytes": 12103,
+      "path": "tools/NodeCommandInputBridge/original-corpus.mjs",
+      "sha256": "1f3f67effd51985cc2e4ea57a2e054542566e359d1ea2cefcae239ce460c7322"
+    },
+    {
+      "bytes": 5212,
+      "path": "tools/NodeCommandInputBridge/tool-loadout.mjs",
+      "sha256": "896ff1779c110bf5086449732695e184a8da90b65d2ead2a8b521c87240242f6"
+    },
+    {
+      "bytes": 5881,
+      "path": "tools/NodeCommandInputBridge/tool-loadout.test.mjs",
+      "sha256": "1f85ee642b67a381672a6ac3ceb4c3e5a4d091db22b6a88e2f929f857a2094b7"
+    },
+    {
+      "bytes": 10442,
+      "path": "tools/NodeCommandInputBridge/worker.mjs",
+      "sha256": "1e3ac9ab26bdb36e8dc471913dcb73443adb9bc34a108dabe732b6f83d625a9a"
+    }
+  ],
+  "status": "SOURCE_AND_PIN_SUCCESSOR_INDEPENDENT_REVIEW_REQUIRED_NO_EXECUTION",
+  "nativeExecuted": false,
+  "originalVersion": "v0.99.1",
+  "preservedBridgeHelperPins": [
+    {
+      "bytes": 10011,
+      "path": "tools/NodeBridge/wire.mjs",
+      "sha256": "83dd5314526f8ece061ea85da50326ed45867fe7edb76d37ac67f208775d3deb"
+    },
+    {
+      "bytes": 666,
+      "path": "tools/NodeCommandInputBridge/tool-context.mjs",
+      "sha256": "4e0131c01d02883b170135e1b2882b962f9e0e1f302f13a2561948e8c9371689"
+    },
+    {
+      "bytes": 3389,
+      "path": "tools/NodeCommandInputBridge/tool-progress.mjs",
+      "sha256": "424eb65472142f7e0c2f9f1e2a2abad7f0f6b494557e8c12611a084f663f520c"
+    }
+  ],
+  "nativeInstallationRequiresNode": false,
+  "planPin": {
+    "bytes": 11796,
+    "path": "compatibility/node/command-input-bridge.plan.json",
+    "sha256": "fde6bae32f17a92d4abc3130772a31d91abeab8bb3c2440ad2196c5d26924d11"
+  },
+  "originalGetterMappingPins": [
+    {
+      "bytes": 155372,
+      "path": "packages/coding-agent/src/core/agent-session.ts",
+      "sha256": "26e76e13456757b0419df26b1f4d9bce9faa28c2588ad66af3e4cc3e9b179e0a"
+    },
+    {
+      "bytes": 81892,
+      "path": "packages/coding-agent/src/core/extensions/types.ts",
+      "sha256": "de0ccce3b8b222d19a2ecef24902fc72aab62b6573129cbf886bc064dd6ab505"
+    },
+    {
+      "bytes": 21422,
+      "path": "packages/coding-agent/src/extensions/codemode/tool.ts",
+      "sha256": "a5b378fbfe93c8adfb400f4c0d85756a87717a52b63520094a3be12486395248"
+    },
+    {
+      "bytes": 10215,
+      "path": "packages/coding-agent/src/extensions/tool-search/tool.ts",
+      "sha256": "d459a0724be4be107f011b2b94a5ea18fe6296def07295f55fee097bd91c8671"
+    }
+  ],
+  "nodeExecuted": false,
+  "authoredNewNodeUnitControls": 9,
+  "nativeAdapterRegistration": "Proposed node-loadout-metadata target,5groupedcontracts,--metadata-only --report freshpath;29to30targets/50to51roots; coordinator files unchanged",
+  "registrationProposalPin": {
+    "bytes": 5014,
+    "path": "tools/NodeCommandInputBridge/namespace-native-registration.proposed.json",
+    "sha256": "5123066ae13062f4cf5a3a48e8285c93eb111abe0382b1b6ecaf75bb049d1b38"
+  },
+  "plannedNodeTests": [
+    {
+      "newCases": 2,
+      "cases": 9,
+      "file": "tools/NodeCommandInputBridge/admission.test.mjs"
+    },
+    {
+      "newCases": 7,
+      "cases": 7,
+      "file": "tools/NodeCommandInputBridge/tool-loadout.test.mjs"
+    },
+    {
+      "newCases": 0,
+      "cases": 10,
+      "file": "tools/NodeCommandInputBridge/tool-parity.test.mjs"
+    }
+  ],
+  "corpusExecuted": false,
+  "originalExtensionPrepareLoadoutCoverage": false,
+  "dependencyModuleAllowlistChanged": false,
+  "preservedPlanFields": [
+    "sourcePins",
+    "sourceReference",
+    "qualifiedInputs",
+    "runtime",
+    "profile",
+    "sourceCommit",
+    "sourceReferenceExpectedSha256"
+  ],
+  "authoredNativeGroupedContracts": 5,
+  "entryPin": {
+    "bytes": 10442,
+    "path": "tools/NodeCommandInputBridge/worker.mjs",
+    "sha256": "1e3ac9ab26bdb36e8dc471913dcb73443adb9bc34a108dabe732b6f83d625a9a"
+  },
+  "originalSourceAllowlistChanged": false,
+  "priorHelperCount": 6,
+  "reviewPending": [
+    "Independent current-main source/pin successor review",
+    "Coordinator applies/reviews native registration proposal with fresh provenance",
+    "Explicit native/Node test allocation",
+    "Synchronous preparation/lifetime regressions and retained ancestor controls"
+  ],
+  "originalCorpusHarnessPin": {
+    "bytes": 12103,
+    "path": "tools/NodeCommandInputBridge/original-corpus.mjs",
+    "sha256": "1f3f67effd51985cc2e4ea57a2e054542566e359d1ea2cefcae239ce460c7322"
+  },
+  "plannedGetterCorpus": {
+    "harness": "tools/NodeCommandInputBridge/namespace-corpus.mjs",
+    "arguments": [
+      "--source-root",
+      "EXPLICIT_SHA_PINNED_ORIGINAL_UPSTREAM_ROOT",
+      "--report",
+      "FRESH_ABSOLUTE_REPORT_PATH"
+    ],
+    "scope": "Exact pinned getNamespace expression over authored maps; no original extension callback coverage"
+  },
+  "schemaVersion": 1
+}

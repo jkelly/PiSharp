@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "awaited-parallel",
+  "kind": "authored-full-agent-input",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": ["events.agent"],
+  "scenario": "Awaited assistant message_end blocks tools; sequential preflight A/B/C, parallel starts, C/A/B completion and A/B/C committed results; all-terminate stops continuation",
+  "clock": {"unixMilliseconds": 1700000000000, "mechanism": "Harness Date.now override; no upstream source changes"},
+  "seed": "none; explicit tool call IDs and gated scheduling",
+  "normalizerVersion": "object-key-order-v1",
+  "model": {"id": "oracle-model", "name": "Synthetic oracle model", "api": "openai-responses", "provider": "synthetic-oracle", "baseUrl": "https://invalid.example", "reasoning": false, "input": ["text"], "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}, "contextWindow": 8192, "maxTokens": 1024},
+  "prompts": [{"role": "user", "content": "Run the three synthetic tools", "timestamp": 1700000000000}],
+  "toolParameters": {"type": "object", "properties": {"value": {"type": "integer"}}, "required": ["value"], "additionalProperties": false},
+  "toolCalls": [{"id": "call-A", "name": "toolA"}, {"id": "call-B", "name": "toolB"}, {"id": "call-C", "name": "toolC"}],
+  "completionOrder": ["call-C", "call-A", "call-B"],
+  "assistantMessage": {
+    "role": "assistant",
+    "content": [{"type": "toolCall", "id": "call-A", "name": "toolA", "arguments": {"value": 1}}, {"type": "toolCall", "id": "call-B", "name": "toolB", "arguments": {"value": 2}}, {"type": "toolCall", "id": "call-C", "name": "toolC", "arguments": {"value": 3}}],
+    "api": "openai-responses", "provider": "synthetic-oracle", "model": "oracle-model",
+    "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 0, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}},
+    "stopReason": "toolUse", "timestamp": 1700000000000
+  },
+  "provenance": {"kind": "authored-synthetic-input", "origin": "New input script executed by unmodified pinned runAgentLoop and supported explicit streamFn/tools/hooks; no provider wire traffic"}
+}

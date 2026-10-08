@@ -1,0 +1,17 @@
+# R809 registered terminal input candidate
+
+This isolated source candidate implements actual native raw-input callback admission and the three terminal entrypoint hooks. It is not a qualified or merged product. No compiler, restore, test, Node, or native process was run by its author.
+
+Each input subscription is a charged hidden EventBus registration entry. Registry-gated admission checks the actual RegistrationScope reference, current owner generation, active state and live entry; native ActiveCallbacks/Idle counters retain the original callback through fresh callback context creation, user Task settlement and UI cleanup. Scope removal and close fence the entry and synchronously remove physical raw membership through the existing event-bus retirement hook. That hook performs no user callback, task wait, or cancellation-registration join under the registry gate.
+
+RegisteredTerminalInputSession binds persistent raw ownership to an actual native callback context and actual extension lifetime. Owner lifetime cancellation synchronously joins the real raw-scope disposal. Session retirement first fences physical admission and hidden entries; final disposal retains and joins actual close tasks and cancellation registrations. TerminalExtensionInputAdmission retains all old-generation close tasks and joins them in host cleanup. TerminalChatInput captures generation before physical read and checks it after callback settlement before decoder admission. RPC cleanup closes this input owner before extension profile disposal.
+
+Pinned Pi ordering is color-query response (only a pending admitted query), color-scheme report, raw listeners, cell-size response on transformed data, ordinary input decoding. The native terminal has no color query or image dimension owner; optional response owners are explicit delegates, and the default color-query consumer is absent. Exact recognized scheme and cell-size records are consumed in the appropriate positions. Chunk assembly and original component rendering are not claimed by this leaf.
+
+MANDATORY OWNER PATCH: docs/tui-r809/SHARED_CALLBACK_FRAME_OWNER.patch extends the shared native CallbackFrame scope/registry guard with the real synchronous terminal cancellation seed. The shared source was not edited. The frame-free cleanup regression deliberately requires this patch; root must allocate/apply it in its isolated composition before qualification. Test runner registration is likewise reserved to root; the new Cases methods are directly awaitable source controls.
+
+The historical already-cancelled frame-free normal Register immediate-invocation same-original join hazard remains explicit. This leaf protects pre-registered handlers running inside the actual guarded cancellation boundary; it does not claim universal reentry safety.
+
+Three native bridge controls cover hidden metadata and held owner cleanup, actual native own-close refusal with unrelated close allowed, and pre-registered frame-free parent cleanup. One actual TerminalChatInput virtual-console control covers transformed editor submission and scheme-before/cell-size-after listener ordering, retaining and joining all original host operations. They have not been executed.
+
+The custom component/Node owner-realm renderer bridge is a separately assigned next slice, not implemented or silently ignored by this candidate. R807 proposed ownership transfers are superseded by root's explicit exclusive assignment of the three entrypoints to this author; final root merge remains separate.

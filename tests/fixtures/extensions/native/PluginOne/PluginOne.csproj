@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>PublishedFixture.One</AssemblyName>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <NoWarn>$(NoWarn);CA2255</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../FixtureEntry.cs" Link="FixtureEntry.cs" />
+    <ProjectReference Include="../PrivateOne/PrivateOne.csproj" />
+    <ProjectReference Include="../../../../../src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="../../../../../src/PiSharp.Contracts/PiSharp.Contracts.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>

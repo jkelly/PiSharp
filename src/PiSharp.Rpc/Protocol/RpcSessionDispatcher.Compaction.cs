@@ -1,0 +1,118 @@
+using PiSharp.CodingAgent;
+using PiSharp.Contracts;
+using PiSharp.Sessions.Compaction;
+using PiSharp.Sessions.Context;
+using PiSharp.Sessions.Serialization;
+
+namespace PiSharp.Rpc.Protocol;
+
+public sealed partial class RpcSessionDispatcher
+{
+    private async Task<JsonData?> SummaryCommandAsync(RpcCommandEnvelope command,
+        AgentSessionAttachment? attachment, CancellationToken token)
+    {
+        var manualWire = command.Type == "compact";
+        var upstreamToggle = command.Type == "set_auto_compaction";
+        if (_sessionOwner is null || attachment is null ||
+            _summaryGenerator is null && !(upstreamToggle && command.Mode == "disabled"))
+            throw new RpcCommandException(command.Id, command.Type, command.Type == "pisharp_set_auto_compaction"
+                ? "Automatic summaries require an owning native session host and explicit transport."
+                : "Summaries require an owning native session host and explicit summary transport.");
+        _sessionOwner.ValidateAttachment(attachment); token.ThrowIfCancellationRequested();
+        if (!manualWire && !upstreamToggle && command.ExpectedGeneration != attachment.Generation)
+            throw new RpcCommandException(command.Id, command.Type, command.Type == "pisharp_set_auto_compaction"
+                ? "Automatic summary configuration generation is stale." : "Summary session generation is stale.");
+        if (upstreamToggle || command.Type == "pisharp_set_auto_compaction")
+        {
+            var request = upstreamToggle ? new SessionCompactionRequest(ContextWindow: SummaryContextWindow(command, attachment), Automatic: true)
+                : command.Compaction!;
+            _ = RpcCommandCodec.Success(command, null, _options);
+            await _sessionOwner.ConfigureAutomaticCompactionAsync(attachment,
+                command.Mode == "enabled" ? _summaryGenerator : null, request, token, _recoveryDesiredMaxOutput).ConfigureAwait(false);
+            return null;
+        }
+        // The native transaction requires idle admission; unlike upstream compact(), this command does not implicitly abort a run.
+        if (manualWire)
+        {
+            lock (_gate) if (_run is not null)
+                throw new RpcCommandException(command.Id, command.Type, "Session is processing or settling; manual compaction requires idle admission.");
+        }
+        var operation = new ContextEditCommand(); lock (_gate) { ThrowOpen(); _contextEdits.Add(operation); }
+        try
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token, operation.Abort.Token);
+            JsonData NativeResponse(SessionEntry? entry) => RpcCommandCodec.Build(writer =>
+            {
+                writer.WriteBoolean("checkpointAcknowledged", entry is not null);
+                writer.WriteBoolean("skipped", entry is null); writer.WriteNumber("generation", attachment.Generation);
+                writer.WriteString("sessionId", attachment.Session.Snapshot.Log.Header.Id);
+                if (entry is not null) { writer.WriteString("entryId", entry.Id); writer.WriteString("leafId", entry.Id); }
+            }, _options.MaximumOutputBytes);
+            if (!manualWire) _ = RpcCommandCodec.Success(command, NativeResponse(null), _options);
+            else
+            {
+                _ = OriginalCompactionEventProjector.End(SessionCompactionReason.Manual, null, false, false, "Compaction failed: RPC command failed.", _options);
+                _ = OriginalCompactionEventProjector.End(SessionCompactionReason.Manual, null, true, false, options: _options);
+                _ = OriginalCompactionEventProjector.Start(SessionCompactionReason.Manual, _options);
+            }
+            try
+            {
+                ValueTask Validate(SessionSummaryCheckpointPreview prospective, CancellationToken work)
+                {
+                    work.ThrowIfCancellationRequested();
+                    var data = manualWire ? ManualCompactionResult(prospective.Entry, prospective.Context) : NativeResponse(prospective.Entry);
+                    _ = RpcCommandCodec.Success(command, data, _options);
+                    return ValueTask.CompletedTask;
+                }
+                var receipt = command.Compaction is not null
+                    ? await _sessionOwner.CompactAsync(attachment, command.Compaction, _summaryGenerator!, cancellation.Token, Validate).ConfigureAwait(false)
+                    : await _sessionOwner.SummarizeBranchAsync(attachment, command.BranchSummary!, _summaryGenerator!, cancellation.Token, Validate).ConfigureAwait(false);
+                if (!manualWire) return NativeResponse(receipt?.Entry);
+                if (receipt is null)
+                {
+                    var last = attachment.Session.Snapshot.Context.Ancestry.LastOrDefault();
+                    throw new RpcCommandException(command.Id, command.Type, last?.Kind == SessionEntryKind.Compaction
+                        ? "Already compacted" : "Nothing to compact (session too small)");
+                }
+                var result = ManualCompactionResult(receipt.Entry, receipt.Context);
+                // The session transaction has already delivered its genuine settled terminal before this response.
+                return result;
+            }
+            catch (Exception error) when (manualWire && error is not RpcDispatchException { Failure: RpcDispatchFailure.OutputFailed })
+            {
+                var message = error switch
+                {
+                    RpcCommandException rpc => rpc.Message,
+                    SessionCompactionException summary => summary.Message,
+                    PersistentAgentSessionException session => session.Message,
+                    OperationCanceledException => "Compaction cancelled",
+                    _ => "RPC command failed."
+                };
+                throw new RpcCommandException(command.Id, command.Type, message);
+            }
+        }
+        finally
+        {
+            Task cancelIdle;
+            lock (_gate) { _contextEdits.Remove(operation); cancelIdle = operation.CancelUsers == 0 ? Task.CompletedTask : operation.CancelIdle!.Task; }
+            await cancelIdle.ConfigureAwait(false); operation.Abort.Dispose();
+        }
+    }
+
+    private double SummaryContextWindow(RpcCommandEnvelope command, AgentSessionAttachment attachment)
+    {
+        if (!_models.TryGetValue(attachment.Session.Snapshot.Agent.Model, out var model) ||
+            !model.Value.GetProperty("contextWindow").TryGetDouble(out var window) || !double.IsFinite(window) || window <= 0)
+            throw new RpcCommandException(command.Id, command.Type, "Automatic compaction requires a positive finite model context window.");
+        return window;
+    }
+    private JsonData ManualCompactionResult(SessionEntry entry, SessionContextProjection context)
+    {
+        var body = entry.WireBody.Value; var after = context.Messages.Sum(SessionCompactionTokenEstimator.EstimateTokens);
+        if (!double.IsFinite(after)) throw new RpcDispatchException(RpcDispatchFailure.ResourceLimit);
+        return OriginalCompactionEventProjector.Result(body.GetProperty("summary").GetString()!,
+            body.GetProperty("firstKeptEntryId").GetString()!, body.GetProperty("tokensBefore").GetDouble(), after,
+            body.TryGetProperty("usage", out var usage) ? JsonData.FromElement(usage) : null,
+            body.TryGetProperty("details", out var details) ? JsonData.FromElement(details) : null, _options);
+    }
+}

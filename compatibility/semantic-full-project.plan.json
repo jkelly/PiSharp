@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "kind": "unchanged-upstream-configuration-semantic-diagnostics-reachability",
+  "status": "authored; genuine root native capture pending",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "oracle": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-oracle-v0.99.1",
+  "receipt": {
+    "path": ".pisharp-semantic-api-oracle.json",
+    "sha256": "1dd4d68e2702eaa3327bfd3d21b9df052bb0dffd931375974b9891088c67b28d",
+    "packageFiles": 529,
+    "sourceFiles": 2093,
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+  },
+  "runtime": {
+    "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "native": {
+    "path": "node_modules/@typescript/typescript-win32-x64/lib/tsc.exe",
+    "sha256": "f9ecfbdc93753d2c972d66a8d0d75f5bd737fd4a5f88b422d9091ea282bcb2c7",
+    "arguments": ["--api", "--async", "--cwd", "{oracle}/upstream", "--callbacks=readFile,fileExists,directoryExists,getAccessibleEntries,realpath"],
+    "stdio": ["pipe", "pipe", "inherit"],
+    "exitTimeoutMs": 30000
+  },
+  "sourcePins": [
+    {"path": "upstream/tsconfig.json", "sha256": "1ef1041faebef510f59480731ece80657f7e67b1091a0b0dcf05ca51e8a267a6"},
+    {"path": "upstream/tsconfig.base.json", "sha256": "eea9b73c99e36e35d2afca6fb313899ebb214840beedad7a67ec07d880857f1b"},
+    {"path": "upstream/package-lock.json", "sha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d"}
+  ],
+  "publicEntrypointPlan": {"path": "compatibility/public-entrypoints.plan.json", "sha256": "9524ccdeaaaaec2409f17c823a8baf0f9da0acd27c5492fdaf986e63fd815857"},
+  "configurationFacts": {
+    "originalNoEmit": true,
+    "originalSkipLibCheck": true,
+    "originalAmbientTypes": ["node"],
+    "originalExclusions": ["**/dist/**", "packages/coding-agent/examples/extensions/gondolin/**"],
+    "compatibilityScopeExclusionsApproved": false
+  },
+  "diagnosticMethods": ["getConfigFileParsingDiagnostics", "getGlobalDiagnostics", "getProgramDiagnostics", "getSyntacticDiagnostics", "getBindDiagnostics", "getSemanticDiagnostics", "getSuggestionDiagnostics", "getDeclarationDiagnostics"],
+  "limits": {"fileBytes": 33554432, "snapshotBytes": 134217728, "protocolBytes": 536870912, "driverTimeoutMs": 300000, "jsonDepth": 64, "jsonNodes": 4000000},
+  "newSetup": {"downloads": false, "npm": false, "extraction": false, "sourceChanges": false, "oldOracleWrites": false, "upstreamModulesExecuted": false},
+  "immediateDeclarationPrerequisites": [
+    {"name": "@types/node", "version": "22.19.19", "lockPath": "node_modules/@types/node", "url": "https://registry.npmjs.org/@types/node/-/node-22.19.19.tgz", "integrity": "sha512-dyh/xO2Fh5bYrfWaaqGrRQQGkNdmYw6AmaAUvYeUMNTWQtvb796ikLdmTchRmOlOiIJ1TDXfWgVx1QkUlQ6Hew==", "declaredLicense": "MIT", "status": "unacquired/unadmitted; no restore requested by this profile"},
+    {"name": "undici-types", "version": "6.21.0", "lockPath": "node_modules/undici-types", "url": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz", "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==", "declaredLicense": "MIT", "status": "unacquired/unadmitted; no restore requested by this profile"}
+  ],
+  "furtherClosure": "Derive exact declaration package instances/export conditions/optional peers from actual diagnostics and canonical lock; distinct SDK versions, tests/examples, native/WASM package metadata and missing published targets remain mandatory.",
+  "semanticPublicClosure": false,
+  "phaseGatesPassed": []
+}

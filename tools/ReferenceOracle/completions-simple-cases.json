@@ -1,0 +1,773 @@
+{
+  "schemaVersion": 2,
+  "status": "SEPARATELY PINNED R28 PREPARATION; NO SOURCE CASE EXECUTED YET",
+  "acceptedNativeBase": "0671c335007ae03246ee044f460d93069e2a6356",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "cases": [
+    {
+      "id": "default-options",
+      "group": "base",
+      "context": "basic"
+    },
+    {
+      "id": "requested-off",
+      "group": "levels",
+      "context": "basic",
+      "options": {
+        "reasoning": "off"
+      }
+    },
+    {
+      "id": "requested-minimal",
+      "group": "levels",
+      "context": "basic",
+      "options": {
+        "reasoning": "minimal"
+      }
+    },
+    {
+      "id": "requested-low",
+      "group": "levels",
+      "context": "basic",
+      "options": {
+        "reasoning": "low"
+      }
+    },
+    {
+      "id": "requested-medium",
+      "group": "levels",
+      "context": "basic",
+      "options": {
+        "reasoning": "medium"
+      }
+    },
+    {
+      "id": "requested-high",
+      "group": "levels",
+      "context": "basic",
+      "options": {
+        "reasoning": "high"
+      }
+    },
+    {
+      "id": "requested-xhigh",
+      "group": "levels",
+      "context": "basic",
+      "options": {
+        "reasoning": "xhigh"
+      }
+    },
+    {
+      "id": "requested-max",
+      "group": "levels",
+      "context": "basic",
+      "options": {
+        "reasoning": "max"
+      }
+    },
+    {
+      "id": "nonreasoning-off",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "reasoning": false
+      },
+      "options": {
+        "reasoning": "off"
+      }
+    },
+    {
+      "id": "nonreasoning-minimal",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "reasoning": false
+      },
+      "options": {
+        "reasoning": "minimal"
+      }
+    },
+    {
+      "id": "nonreasoning-low",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "reasoning": false
+      },
+      "options": {
+        "reasoning": "low"
+      }
+    },
+    {
+      "id": "nonreasoning-medium",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "reasoning": false
+      },
+      "options": {
+        "reasoning": "medium"
+      }
+    },
+    {
+      "id": "nonreasoning-high",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "reasoning": false
+      },
+      "options": {
+        "reasoning": "high"
+      }
+    },
+    {
+      "id": "nonreasoning-xhigh",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "reasoning": false
+      },
+      "options": {
+        "reasoning": "xhigh"
+      }
+    },
+    {
+      "id": "nonreasoning-max",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "reasoning": false
+      },
+      "options": {
+        "reasoning": "max"
+      }
+    },
+    {
+      "id": "mapped-low-upward-high",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "thinkingLevelMap": {
+          "low": null,
+          "medium": null,
+          "high": "mapped-high"
+        }
+      },
+      "options": {
+        "reasoning": "low"
+      }
+    },
+    {
+      "id": "mapped-high-downward-medium",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "thinkingLevelMap": {
+          "high": null,
+          "xhigh": null,
+          "max": null
+        }
+      },
+      "options": {
+        "reasoning": "high"
+      }
+    },
+    {
+      "id": "max-explicit-support",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "thinkingLevelMap": {
+          "max": "mapped-max"
+        }
+      },
+      "options": {
+        "reasoning": "max"
+      }
+    },
+    {
+      "id": "max-falls-back-xhigh",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "thinkingLevelMap": {
+          "xhigh": "mapped-xhigh"
+        }
+      },
+      "options": {
+        "reasoning": "max"
+      }
+    },
+    {
+      "id": "only-max-supported",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": null,
+          "low": null,
+          "medium": null,
+          "high": null,
+          "xhigh": null,
+          "max": "mapped-max"
+        }
+      },
+      "options": {
+        "reasoning": "minimal"
+      }
+    },
+    {
+      "id": "no-levels-supported",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "thinkingLevelMap": {
+          "off": null,
+          "minimal": null,
+          "low": null,
+          "medium": null,
+          "high": null,
+          "xhigh": null,
+          "max": null
+        }
+      },
+      "options": {
+        "reasoning": "high"
+      }
+    },
+    {
+      "id": "mapped-empty-effort",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "thinkingLevelMap": {
+          "high": ""
+        }
+      },
+      "options": {
+        "reasoning": "high"
+      }
+    },
+    {
+      "id": "mapped-off-direct-field",
+      "group": "levels",
+      "context": "basic",
+      "model": {
+        "thinkingLevelMap": {
+          "off": "disabled"
+        }
+      },
+      "options": {
+        "reasoning": "off"
+      }
+    },
+    {
+      "id": "empty-context-default-ceiling",
+      "group": "context",
+      "context": "empty"
+    },
+    {
+      "id": "overfull-context-floors-answer-room",
+      "group": "context",
+      "context": "long",
+      "model": {
+        "contextWindow": 32
+      }
+    },
+    {
+      "id": "small-explicit-context-cap",
+      "group": "context",
+      "context": "basic",
+      "model": {
+        "contextWindow": 5000
+      },
+      "options": {
+        "maxTokens": 17
+      }
+    },
+    {
+      "id": "large-explicit-context-cap",
+      "group": "context",
+      "context": "basic",
+      "model": {
+        "contextWindow": 5000,
+        "maxTokens": 500
+      },
+      "options": {
+        "maxTokens": 20000
+      }
+    },
+    {
+      "id": "explicit-context-cap-0",
+      "group": "runtime-literals",
+      "context": "basic",
+      "model": {
+        "contextWindow": 5000
+      },
+      "options": {
+        "maxTokens": 0
+      }
+    },
+    {
+      "id": "explicit-context-cap--3",
+      "group": "runtime-literals",
+      "context": "basic",
+      "model": {
+        "contextWindow": 5000
+      },
+      "options": {
+        "maxTokens": -3
+      }
+    },
+    {
+      "id": "explicit-context-cap-7.25",
+      "group": "runtime-literals",
+      "context": "basic",
+      "model": {
+        "contextWindow": 5000
+      },
+      "options": {
+        "maxTokens": 7.25
+      }
+    },
+    {
+      "id": "nonpositive-window-0-cap-default",
+      "group": "runtime-literals",
+      "context": "basic",
+      "model": {
+        "contextWindow": 0
+      }
+    },
+    {
+      "id": "nonpositive-window-0-cap-0",
+      "group": "runtime-literals",
+      "context": "basic",
+      "model": {
+        "contextWindow": 0
+      },
+      "options": {
+        "maxTokens": 0
+      }
+    },
+    {
+      "id": "nonpositive-window-0-cap-7.25",
+      "group": "runtime-literals",
+      "context": "basic",
+      "model": {
+        "contextWindow": 0
+      },
+      "options": {
+        "maxTokens": 7.25
+      }
+    },
+    {
+      "id": "nonpositive-window--100-cap-default",
+      "group": "runtime-literals",
+      "context": "basic",
+      "model": {
+        "contextWindow": -100
+      }
+    },
+    {
+      "id": "nonpositive-window--100-cap-0",
+      "group": "runtime-literals",
+      "context": "basic",
+      "model": {
+        "contextWindow": -100
+      },
+      "options": {
+        "maxTokens": 0
+      }
+    },
+    {
+      "id": "nonpositive-window--100-cap-7.25",
+      "group": "runtime-literals",
+      "context": "basic",
+      "model": {
+        "contextWindow": -100
+      },
+      "options": {
+        "maxTokens": 7.25
+      }
+    },
+    {
+      "id": "latest-usage",
+      "group": "estimate",
+      "context": "latest-usage",
+      "model": {
+        "contextWindow": 6000
+      }
+    },
+    {
+      "id": "fallback-usage-components",
+      "group": "estimate",
+      "context": "fallback-usage-components",
+      "model": {
+        "contextWindow": 6000
+      }
+    },
+    {
+      "id": "aborted-usage-excluded",
+      "group": "estimate",
+      "context": "aborted-usage-excluded",
+      "model": {
+        "contextWindow": 6000
+      }
+    },
+    {
+      "id": "error-usage-excluded",
+      "group": "estimate",
+      "context": "error-usage-excluded",
+      "model": {
+        "contextWindow": 6000
+      }
+    },
+    {
+      "id": "later-prefix-invalidates-usage",
+      "group": "estimate",
+      "context": "later-prefix-invalidates-usage",
+      "model": {
+        "contextWindow": 6000
+      }
+    },
+    {
+      "id": "trailing-user-after-usage",
+      "group": "estimate",
+      "context": "trailing-user-after-usage",
+      "model": {
+        "contextWindow": 6000
+      }
+    },
+    {
+      "id": "images",
+      "group": "estimate",
+      "context": "images",
+      "model": {
+        "contextWindow": 6000
+      }
+    },
+    {
+      "id": "utf16",
+      "group": "estimate",
+      "context": "utf16",
+      "model": {
+        "contextWindow": 6000
+      }
+    },
+    {
+      "id": "system-tool-deltas",
+      "group": "estimate",
+      "context": "system-tool-deltas",
+      "model": {
+        "contextWindow": 6000
+      }
+    },
+    {
+      "id": "thinking-and-arguments",
+      "group": "estimate",
+      "context": "thinking-and-arguments",
+      "model": {
+        "contextWindow": 6000
+      }
+    },
+    {
+      "id": "budget-after-context-thinking_token_budget",
+      "group": "budget",
+      "context": "basic",
+      "model": {
+        "contextWindow": 6000,
+        "compat": {
+          "thinkingFormat": "chat-template",
+          "thinkingTokenBudgetField": "thinking_token_budget",
+          "chatTemplateKwargs": {
+            "enabled": {
+              "$var": "thinking.enabled"
+            },
+            "effort": {
+              "$var": "thinking.effort"
+            },
+            "budget": {
+              "$var": "thinking.budget"
+            }
+          }
+        }
+      },
+      "options": {
+        "reasoning": "high",
+        "thinkingBudgets": {
+          "high": 5000
+        }
+      }
+    },
+    {
+      "id": "budget-after-context-thinking_budget",
+      "group": "budget",
+      "context": "basic",
+      "model": {
+        "contextWindow": 6000,
+        "compat": {
+          "thinkingFormat": "chat-template",
+          "thinkingTokenBudgetField": "thinking_budget",
+          "chatTemplateKwargs": {
+            "enabled": {
+              "$var": "thinking.enabled"
+            },
+            "effort": {
+              "$var": "thinking.effort"
+            },
+            "budget": {
+              "$var": "thinking.budget"
+            }
+          }
+        }
+      },
+      "options": {
+        "reasoning": "high",
+        "thinkingBudgets": {
+          "high": 5000
+        }
+      }
+    },
+    {
+      "id": "budget-after-context-thinking_budget_tokens",
+      "group": "budget",
+      "context": "basic",
+      "model": {
+        "contextWindow": 6000,
+        "compat": {
+          "thinkingFormat": "chat-template",
+          "thinkingTokenBudgetField": "thinking_budget_tokens",
+          "chatTemplateKwargs": {
+            "enabled": {
+              "$var": "thinking.enabled"
+            },
+            "effort": {
+              "$var": "thinking.effort"
+            },
+            "budget": {
+              "$var": "thinking.budget"
+            }
+          }
+        }
+      },
+      "options": {
+        "reasoning": "high",
+        "thinkingBudgets": {
+          "high": 5000
+        }
+      }
+    },
+    {
+      "id": "sampling-overrides-simple-cap",
+      "group": "budget",
+      "context": "basic",
+      "model": {
+        "contextWindow": 6000,
+        "compat": {
+          "thinkingFormat": "chat-template",
+          "thinkingTokenBudgetField": "thinking_budget",
+          "chatTemplateKwargs": {
+            "enabled": {
+              "$var": "thinking.enabled"
+            },
+            "budget": {
+              "$var": "thinking.budget"
+            }
+          }
+        }
+      },
+      "options": {
+        "reasoning": "high",
+        "samplingParams": {
+          "max_tokens": 333,
+          "thinking_budget": 77
+        }
+      }
+    },
+    {
+      "id": "base-option-forwarding",
+      "group": "options",
+      "context": "basic",
+      "options": {
+        "reasoning": "low",
+        "temperature": 0.25,
+        "maxTokens": 200,
+        "cacheRetention": "long",
+        "sessionId": "authored-inert-simple-session",
+        "headers": {
+          "x-authored-option": "retained"
+        },
+        "metadata": {
+          "retained": null
+        },
+        "toolChoice": "auto",
+        "timeoutMs": 10000,
+        "maxRetries": 0,
+        "maxRetryDelayMs": 3
+      }
+    },
+    {
+      "id": "authorization-header-without-key",
+      "group": "auth",
+      "context": "basic",
+      "auth": "authorization-header"
+    },
+    {
+      "id": "cloudflare-header-without-key",
+      "group": "auth",
+      "context": "basic",
+      "auth": "cloudflare-header"
+    },
+    {
+      "id": "missing-auth-pre-generation",
+      "group": "auth",
+      "context": "basic",
+      "auth": "missing",
+      "expectedSynchronousError": true
+    },
+    {
+      "id": "empty-auth-header-pre-generation",
+      "group": "auth",
+      "context": "basic",
+      "auth": "empty-header",
+      "expectedSynchronousError": true
+    },
+    {
+      "id": "tool-flow-recomputes-second-context",
+      "group": "two-turn",
+      "context": "tool-flow",
+      "options": {
+        "reasoning": "low"
+      },
+      "turns": 2
+    },
+    {
+      "id": "tool-flow-budget-context-interaction",
+      "group": "two-turn",
+      "context": "tool-flow",
+      "model": {
+        "contextWindow": 6000,
+        "compat": {
+          "thinkingFormat": "chat-template",
+          "thinkingTokenBudgetField": "thinking_token_budget",
+          "chatTemplateKwargs": {
+            "enabled": {
+              "$var": "thinking.enabled"
+            },
+            "budget": {
+              "$var": "thinking.budget"
+            }
+          }
+        }
+      },
+      "options": {
+        "reasoning": "max"
+      },
+      "turns": 2
+    },
+    {
+      "id": "isolated-forward-signal",
+      "group": "options-proof",
+      "context": "basic",
+      "runtimeField": "signal"
+    },
+    {
+      "id": "isolated-forward-telemetryContext",
+      "group": "options-proof",
+      "context": "basic",
+      "runtimeField": "telemetryContext"
+    },
+    {
+      "id": "isolated-forward-transport",
+      "group": "options-proof",
+      "context": "basic",
+      "runtimeField": "transport"
+    },
+    {
+      "id": "isolated-forward-websocketConnectTimeoutMs",
+      "group": "options-proof",
+      "context": "basic",
+      "runtimeField": "websocketConnectTimeoutMs"
+    },
+    {
+      "id": "isolated-forward-env",
+      "group": "options-proof",
+      "context": "basic",
+      "runtimeField": "env"
+    },
+    {
+      "id": "hook-payload-async-undefined",
+      "group": "hook-proof",
+      "context": "basic",
+      "hook": "payload-async-undefined"
+    },
+    {
+      "id": "hook-payload-async-replacement",
+      "group": "hook-proof",
+      "context": "basic",
+      "hook": "payload-async-replacement"
+    },
+    {
+      "id": "hook-payload-throw",
+      "group": "hook-proof",
+      "context": "basic",
+      "hook": "payload-throw",
+      "expectedTerminal": "error"
+    },
+    {
+      "id": "hook-response-async-await",
+      "group": "hook-proof",
+      "context": "basic",
+      "hook": "response-async-await"
+    },
+    {
+      "id": "hook-response-throw",
+      "group": "hook-proof",
+      "context": "basic",
+      "hook": "response-throw",
+      "expectedTerminal": "error"
+    },
+    {
+      "id": "hook-provider-async-await",
+      "group": "hook-proof",
+      "context": "basic",
+      "hook": "provider-async-await"
+    },
+    {
+      "id": "hook-provider-throw",
+      "group": "hook-proof",
+      "context": "basic",
+      "hook": "provider-throw",
+      "expectedTerminal": "error"
+    }
+  ],
+  "releasedCatalogSmoke": {
+    "enabled": false,
+    "models": 714,
+    "reason": "Separate explicit catalog wave: every hashed model identity will need default/low/high/max vectors and lifecycle comparison; not substituted by targeted synthetic vectors."
+  },
+  "revisionOf": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-3\\preparation\\completions-simple-r2\\completions-simple-cases.json",
+    "bytes": 17691,
+    "sha256": "d1eb3d85936a856f0c3080cc3f311fffb0b22cf06b8346f065f26dcbd6706748"
+  },
+  "qualificationCoverage": {
+    "captureDraftIncludes": [
+      "57 retained original finite option/level/context/auth/two-turn inputs; utf16 constructor corrected",
+      "5 isolated missing-field forwarding probes",
+      "7 actual async hook/replacement/error provider paths",
+      "Actual model arguments and retained live reference observations"
+    ],
+    "captureDraftDoesNotExercise": [
+      "EOF/malformed/duplicate-terminal physical response faults",
+      "SDK/provider cancellation, timeout or retry",
+      "Explicit next/return DTO/consumer abandonment",
+      "Native joined cleanup/backpressure/tool effects"
+    ],
+    "faultAndPublicPlan": "completions-simple-fault-and-public-test-plan.json; authored only, not a captured fixture",
+    "helperIdentityChecks": "Independent real buildBaseOptions probes after actual provider settlement; not instrumentation of streamSimple internal calls",
+    "fullApiCatalogPackageOrPhaseAcceptance": false
+  },
+  "preparationRevision": "r28-capture-r1"
+}

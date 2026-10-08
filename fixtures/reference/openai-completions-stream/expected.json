@@ -1,0 +1,3766 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "openai-completions-stream-three-cases",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "captured-unchanged-openai-completions-wrapper-sdk",
+  "observations": {
+    "cases": [
+      {
+        "caseId": "text-and-final-usage",
+        "payloadSnapshots": [
+          {
+            "value": {
+              "model": "pisharp-authored-completions-model",
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Keep exact text, controls and Unicode."
+                },
+                {
+                  "role": "user",
+                  "content": "Reply with pi π and a supplementary character 😀."
+                }
+              ],
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 64,
+              "temperature": 0
+            },
+            "ownUndefinedPaths": [
+              "/prompt_cache_key",
+              "/prompt_cache_retention"
+            ]
+          }
+        ],
+        "fetchRequests": [
+          {
+            "url": "https://pisharp-completions-oracle.invalid/v1/chat/completions",
+            "method": "POST",
+            "headers": [
+              [
+                "accept",
+                "application/json"
+              ],
+              [
+                "authorization",
+                "Bearer pisharp-authored-inert-noncredential"
+              ],
+              [
+                "content-type",
+                "application/json"
+              ],
+              [
+                "user-agent",
+                "PiSharp Completions offline oracle"
+              ],
+              [
+                "x-client-request-id",
+                "authored-completions-request"
+              ],
+              [
+                "x-model",
+                "authored-model-header"
+              ],
+              [
+                "x-override",
+                "options-value"
+              ],
+              [
+                "x-stainless-arch",
+                "x64"
+              ],
+              [
+                "x-stainless-lang",
+                "js"
+              ],
+              [
+                "x-stainless-os",
+                "Windows"
+              ],
+              [
+                "x-stainless-package-version",
+                "7.19.0"
+              ],
+              [
+                "x-stainless-retry-count",
+                "0"
+              ],
+              [
+                "x-stainless-runtime",
+                "node"
+              ],
+              [
+                "x-stainless-runtime-version",
+                "v24.19.0"
+              ]
+            ],
+            "body": "{\"model\":\"pisharp-authored-completions-model\",\"messages\":[{\"role\":\"system\",\"content\":\"Keep exact text, controls and Unicode.\"},{\"role\":\"user\",\"content\":\"Reply with pi π and a supplementary character 😀.\"}],\"stream\":true,\"stream_options\":{\"include_usage\":true},\"store\":false,\"max_completion_tokens\":64,\"temperature\":0}",
+            "bodyUtf8Sha256": "d9fcae42e321d902a1621841a43062192f13066f045776f0f78aaa90d8f4109e",
+            "bodyJson": {
+              "model": "pisharp-authored-completions-model",
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Keep exact text, controls and Unicode."
+                },
+                {
+                  "role": "user",
+                  "content": "Reply with pi π and a supplementary character 😀."
+                }
+              ],
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 64,
+              "temperature": 0
+            },
+            "initOwnKeys": [
+              "signal",
+              "method",
+              "headers",
+              "body"
+            ],
+            "signalAborted": false
+          }
+        ],
+        "responseHooks": [
+          {
+            "value": {
+              "status": 200,
+              "headers": {
+                "content-type": "text/event-stream; charset=utf-8",
+                "x-fixture": "owned-in-memory-sse",
+                "x-request-id": "req_authored_completions"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "providerEvents": [
+          {
+            "value": {
+              "id": "chat_text_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "role": "assistant",
+                    "content": "Hello "
+                  },
+                  "finish_reason": null
+                }
+              ],
+              "opaque": {
+                "keep": null,
+                "order": [
+                  2,
+                  1
+                ]
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_text_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "authored-returned-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "π 😀\u0000\r\n"
+                  },
+                  "finish_reason": null
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_text_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "authored-returned-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {},
+                  "finish_reason": "stop"
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_text_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "authored-returned-model",
+              "choices": [],
+              "usage": {
+                "prompt_tokens": 11,
+                "completion_tokens": 3,
+                "total_tokens": 14
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "value": {
+              "type": "start",
+              "partial": {
+                "role": "assistant",
+                "content": [],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_start",
+              "contentIndex": 0,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": ""
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_text_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Hello ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hello "
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_text_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "π 😀\u0000\r\n",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hello π 😀\u0000\r\n"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_text_owned",
+                "responseModel": "authored-returned-model"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_end",
+              "contentIndex": 0,
+              "content": "Hello π 😀\u0000\r\n",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hello π 😀\u0000\r\n"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 11,
+                  "output": 3,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 14,
+                  "cost": {
+                    "input": 0.000022,
+                    "output": 0.000018,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000039999999999999996
+                  }
+                },
+                "stopReason": "stop",
+                "timestamp": 1700000000000,
+                "responseId": "chat_text_owned",
+                "responseModel": "authored-returned-model",
+                "rawStopReason": "stop"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "done",
+              "reason": "stop",
+              "message": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hello π 😀\u0000\r\n"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 11,
+                  "output": 3,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 14,
+                  "cost": {
+                    "input": 0.000022,
+                    "output": 0.000018,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000039999999999999996
+                  }
+                },
+                "stopReason": "stop",
+                "timestamp": 1700000000000,
+                "responseId": "chat_text_owned",
+                "responseModel": "authored-returned-model",
+                "rawStopReason": "stop"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "drainedFrames": [
+          {
+            "value": {
+              "type": "start",
+              "partial": {
+                "role": "assistant",
+                "content": [],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_start",
+              "contentIndex": 0,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hello "
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_text_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "Hello ",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hello "
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_text_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "π 😀\u0000\r\n",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hello π 😀\u0000\r\n"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_text_owned",
+                "responseModel": "authored-returned-model"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_end",
+              "contentIndex": 0,
+              "content": "Hello π 😀\u0000\r\n",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hello π 😀\u0000\r\n"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 11,
+                  "output": 3,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 14,
+                  "cost": {
+                    "input": 0.000022,
+                    "output": 0.000018,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000039999999999999996
+                  }
+                },
+                "stopReason": "stop",
+                "timestamp": 1700000000000,
+                "responseId": "chat_text_owned",
+                "responseModel": "authored-returned-model",
+                "rawStopReason": "stop"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "done",
+              "reason": "stop",
+              "message": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hello π 😀\u0000\r\n"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 11,
+                  "output": 3,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 14,
+                  "cost": {
+                    "input": 0.000022,
+                    "output": 0.000018,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000039999999999999996
+                  }
+                },
+                "stopReason": "stop",
+                "timestamp": 1700000000000,
+                "responseId": "chat_text_owned",
+                "responseModel": "authored-returned-model",
+                "rawStopReason": "stop"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "finalResult": {
+          "value": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hello π 😀\u0000\r\n"
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "openai",
+            "model": "pisharp-authored-completions-model",
+            "usage": {
+              "input": 11,
+              "output": 3,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "reasoning": 0,
+              "totalTokens": 14,
+              "cost": {
+                "input": 0.000022,
+                "output": 0.000018,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0.000039999999999999996
+              }
+            },
+            "stopReason": "stop",
+            "timestamp": 1700000000000,
+            "responseId": "chat_text_owned",
+            "responseModel": "authored-returned-model",
+            "rawStopReason": "stop"
+          },
+          "ownUndefinedPaths": []
+        },
+        "trace": [
+          "onPayload",
+          "fetch",
+          "onResponse",
+          "emit:start",
+          "provider:0",
+          "emit:text_start",
+          "emit:text_delta",
+          "provider:1",
+          "emit:text_delta",
+          "provider:2",
+          "provider:3",
+          "emit:text_end",
+          "emit:done"
+        ],
+        "responseWire": {
+          "sseText": ": authored comment\r\n\r\ndata: {\"id\":\"chat_text_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Hello \"},\"finish_reason\":null}],\"opaque\":{\"keep\":null,\"order\":[2,1]}}\r\n\r\ndata: {\"id\":\"chat_text_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"authored-returned-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"π 😀\\u0000\\r\\n\"},\"finish_reason\":null}]}\r\n\r\ndata: {\"id\":\"chat_text_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"authored-returned-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\r\n\r\ndata: {\"id\":\"chat_text_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"authored-returned-model\",\"choices\":[],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":3,\"total_tokens\":14}}\r\n\r\ndata: [DONE]\r\n\r\n",
+          "utf8Sha256": "18e1fa35ec1470a4a3cd6eb3b39fa8b42e5ba194502926ce47ee4174d6ab7b52",
+          "bytes": 892,
+          "chunkBytes": 7
+        }
+      },
+      {
+        "caseId": "interleaved-two-tools-and-text",
+        "payloadSnapshots": [
+          {
+            "value": {
+              "model": "pisharp-authored-completions-model",
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Declare inert tools; never execute them in this oracle."
+                },
+                {
+                  "role": "user",
+                  "content": "Return two tool calls and text."
+                }
+              ],
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 64,
+              "temperature": 0,
+              "tools": [
+                {
+                  "type": "function",
+                  "function": {
+                    "name": "alpha",
+                    "description": "Inert authored alpha declaration.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                {
+                  "type": "function",
+                  "function": {
+                    "name": "beta",
+                    "description": "Inert authored beta declaration.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "keep": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "keep"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              ],
+              "tool_choice": "auto"
+            },
+            "ownUndefinedPaths": [
+              "/prompt_cache_key",
+              "/prompt_cache_retention"
+            ]
+          }
+        ],
+        "fetchRequests": [
+          {
+            "url": "https://pisharp-completions-oracle.invalid/v1/chat/completions",
+            "method": "POST",
+            "headers": [
+              [
+                "accept",
+                "application/json"
+              ],
+              [
+                "authorization",
+                "Bearer pisharp-authored-inert-noncredential"
+              ],
+              [
+                "content-type",
+                "application/json"
+              ],
+              [
+                "user-agent",
+                "PiSharp Completions offline oracle"
+              ],
+              [
+                "x-client-request-id",
+                "authored-completions-request"
+              ],
+              [
+                "x-model",
+                "authored-model-header"
+              ],
+              [
+                "x-override",
+                "options-value"
+              ],
+              [
+                "x-stainless-arch",
+                "x64"
+              ],
+              [
+                "x-stainless-lang",
+                "js"
+              ],
+              [
+                "x-stainless-os",
+                "Windows"
+              ],
+              [
+                "x-stainless-package-version",
+                "7.19.0"
+              ],
+              [
+                "x-stainless-retry-count",
+                "0"
+              ],
+              [
+                "x-stainless-runtime",
+                "node"
+              ],
+              [
+                "x-stainless-runtime-version",
+                "v24.19.0"
+              ]
+            ],
+            "body": "{\"model\":\"pisharp-authored-completions-model\",\"messages\":[{\"role\":\"system\",\"content\":\"Declare inert tools; never execute them in this oracle.\"},{\"role\":\"user\",\"content\":\"Return two tool calls and text.\"}],\"stream\":true,\"stream_options\":{\"include_usage\":true},\"store\":false,\"max_completion_tokens\":64,\"temperature\":0,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"alpha\",\"description\":\"Inert authored alpha declaration.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"value\":{\"type\":\"string\"}},\"required\":[\"value\"],\"additionalProperties\":false}}},{\"type\":\"function\",\"function\":{\"name\":\"beta\",\"description\":\"Inert authored beta declaration.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"count\":{\"type\":\"integer\"},\"keep\":{\"type\":\"null\"}},\"required\":[\"count\",\"keep\"],\"additionalProperties\":false}}}],\"tool_choice\":\"auto\"}",
+            "bodyUtf8Sha256": "aacee9aeaa48afb78d8beaf80855cdb60c0121bb085618b694c1e2098a10e778",
+            "bodyJson": {
+              "model": "pisharp-authored-completions-model",
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Declare inert tools; never execute them in this oracle."
+                },
+                {
+                  "role": "user",
+                  "content": "Return two tool calls and text."
+                }
+              ],
+              "stream": true,
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 64,
+              "temperature": 0,
+              "tools": [
+                {
+                  "type": "function",
+                  "function": {
+                    "name": "alpha",
+                    "description": "Inert authored alpha declaration.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                {
+                  "type": "function",
+                  "function": {
+                    "name": "beta",
+                    "description": "Inert authored beta declaration.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "keep": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "keep"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              ],
+              "tool_choice": "auto"
+            },
+            "initOwnKeys": [
+              "signal",
+              "method",
+              "headers",
+              "body"
+            ],
+            "signalAborted": false
+          }
+        ],
+        "responseHooks": [
+          {
+            "value": {
+              "status": 200,
+              "headers": {
+                "content-type": "text/event-stream; charset=utf-8",
+                "x-fixture": "owned-in-memory-sse",
+                "x-request-id": "req_authored_completions"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "providerEvents": [
+          {
+            "value": {
+              "id": "chat_tools_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "tool_calls": [
+                      {
+                        "index": 4,
+                        "id": "call_alpha",
+                        "type": "function",
+                        "function": {
+                          "name": "alpha",
+                          "arguments": "{\"value\":\""
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": null
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_tools_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "Working π",
+                    "tool_calls": [
+                      {
+                        "index": 9,
+                        "type": "function",
+                        "function": {
+                          "name": "beta",
+                          "arguments": "{\"count\":"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": null
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_tools_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "tool_calls": [
+                      {
+                        "index": 9,
+                        "id": "call_beta",
+                        "function": {
+                          "arguments": "2,\"keep\":null}"
+                        }
+                      },
+                      {
+                        "index": 4,
+                        "function": {
+                          "arguments": "\\u03"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": null
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_tools_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "tool_calls": [
+                      {
+                        "index": 4,
+                        "function": {
+                          "arguments": "c0\\n\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": null
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_tools_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {},
+                  "finish_reason": "tool_calls"
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_tools_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [],
+              "usage": {
+                "prompt_tokens": 17,
+                "completion_tokens": 5,
+                "total_tokens": 22
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "value": {
+              "type": "start",
+              "partial": {
+                "role": "assistant",
+                "content": [],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "toolcall_start",
+              "contentIndex": 0,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {},
+                    "partialArgs": "",
+                    "streamIndex": 4
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": "{\"value\":\"",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "text_start",
+              "contentIndex": 1,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": ""
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": "Working π",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_start",
+              "contentIndex": 2,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "",
+                    "name": "beta",
+                    "arguments": {},
+                    "partialArgs": "",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_delta",
+              "contentIndex": 2,
+              "delta": "{\"count\":",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "",
+                    "name": "beta",
+                    "arguments": {},
+                    "partialArgs": "{\"count\":",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_delta",
+              "contentIndex": 2,
+              "delta": "2,\"keep\":null}",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    },
+                    "partialArgs": "{\"count\":2,\"keep\":null}",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": "\\u03",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"\\u03",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    },
+                    "partialArgs": "{\"count\":2,\"keep\":null}",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": "c0\\n\"}",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": "π\n"
+                    },
+                    "partialArgs": "{\"value\":\"\\u03c0\\n\"}",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    },
+                    "partialArgs": "{\"count\":2,\"keep\":null}",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_end",
+              "contentIndex": 0,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_alpha",
+                "name": "alpha",
+                "arguments": {
+                  "value": "π\n"
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": "π\n"
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    },
+                    "partialArgs": "{\"count\":2,\"keep\":null}",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 17,
+                  "output": 5,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 22,
+                  "cost": {
+                    "input": 0.000034,
+                    "output": 0.00003,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000064
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned",
+                "rawStopReason": "tool_calls"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "text_end",
+              "contentIndex": 1,
+              "content": "Working π",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": "π\n"
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    },
+                    "partialArgs": "{\"count\":2,\"keep\":null}",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 17,
+                  "output": 5,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 22,
+                  "cost": {
+                    "input": 0.000034,
+                    "output": 0.00003,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000064
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned",
+                "rawStopReason": "tool_calls"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_end",
+              "contentIndex": 2,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_beta",
+                "name": "beta",
+                "arguments": {
+                  "count": 2,
+                  "keep": null
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": "π\n"
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    }
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 17,
+                  "output": 5,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 22,
+                  "cost": {
+                    "input": 0.000034,
+                    "output": 0.00003,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000064
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned",
+                "rawStopReason": "tool_calls"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "done",
+              "reason": "toolUse",
+              "message": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": "π\n"
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    }
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 17,
+                  "output": 5,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 22,
+                  "cost": {
+                    "input": 0.000034,
+                    "output": 0.00003,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000064
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned",
+                "rawStopReason": "tool_calls"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "drainedFrames": [
+          {
+            "value": {
+              "type": "start",
+              "partial": {
+                "role": "assistant",
+                "content": [],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "toolcall_start",
+              "contentIndex": 0,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": "{\"value\":\"",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "text_start",
+              "contentIndex": 1,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "",
+                    "name": "beta",
+                    "arguments": {},
+                    "partialArgs": "{\"count\":",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": "Working π",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "",
+                    "name": "beta",
+                    "arguments": {},
+                    "partialArgs": "{\"count\":",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_start",
+              "contentIndex": 2,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "",
+                    "name": "beta",
+                    "arguments": {},
+                    "partialArgs": "{\"count\":",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_delta",
+              "contentIndex": 2,
+              "delta": "{\"count\":",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "",
+                    "name": "beta",
+                    "arguments": {},
+                    "partialArgs": "{\"count\":",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_delta",
+              "contentIndex": 2,
+              "delta": "2,\"keep\":null}",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"\\u03",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    },
+                    "partialArgs": "{\"count\":2,\"keep\":null}",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": "\\u03",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": ""
+                    },
+                    "partialArgs": "{\"value\":\"\\u03",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    },
+                    "partialArgs": "{\"count\":2,\"keep\":null}",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": "c0\\n\"}",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": "π\n"
+                    },
+                    "partialArgs": "{\"value\":\"\\u03c0\\n\"}",
+                    "streamIndex": 4
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    },
+                    "partialArgs": "{\"count\":2,\"keep\":null}",
+                    "streamIndex": 9
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned"
+              }
+            },
+            "ownUndefinedPaths": [
+              "/partial/content/0/customInput",
+              "/partial/content/2/customInput"
+            ]
+          },
+          {
+            "value": {
+              "type": "toolcall_end",
+              "contentIndex": 0,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_alpha",
+                "name": "alpha",
+                "arguments": {
+                  "value": "π\n"
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": "π\n"
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    }
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 17,
+                  "output": 5,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 22,
+                  "cost": {
+                    "input": 0.000034,
+                    "output": 0.00003,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000064
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned",
+                "rawStopReason": "tool_calls"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_end",
+              "contentIndex": 1,
+              "content": "Working π",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": "π\n"
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    }
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 17,
+                  "output": 5,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 22,
+                  "cost": {
+                    "input": 0.000034,
+                    "output": 0.00003,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000064
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned",
+                "rawStopReason": "tool_calls"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "toolcall_end",
+              "contentIndex": 2,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "call_beta",
+                "name": "beta",
+                "arguments": {
+                  "count": 2,
+                  "keep": null
+                }
+              },
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": "π\n"
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    }
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 17,
+                  "output": 5,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 22,
+                  "cost": {
+                    "input": 0.000034,
+                    "output": 0.00003,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000064
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned",
+                "rawStopReason": "tool_calls"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "done",
+              "reason": "toolUse",
+              "message": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "call_alpha",
+                    "name": "alpha",
+                    "arguments": {
+                      "value": "π\n"
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "text": "Working π"
+                  },
+                  {
+                    "type": "toolCall",
+                    "id": "call_beta",
+                    "name": "beta",
+                    "arguments": {
+                      "count": 2,
+                      "keep": null
+                    }
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 17,
+                  "output": 5,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 22,
+                  "cost": {
+                    "input": 0.000034,
+                    "output": 0.00003,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0.000064
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1700000000000,
+                "responseId": "chat_tools_owned",
+                "rawStopReason": "tool_calls"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "finalResult": {
+          "value": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call_alpha",
+                "name": "alpha",
+                "arguments": {
+                  "value": "π\n"
+                }
+              },
+              {
+                "type": "text",
+                "text": "Working π"
+              },
+              {
+                "type": "toolCall",
+                "id": "call_beta",
+                "name": "beta",
+                "arguments": {
+                  "count": 2,
+                  "keep": null
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "openai",
+            "model": "pisharp-authored-completions-model",
+            "usage": {
+              "input": 17,
+              "output": 5,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "reasoning": 0,
+              "totalTokens": 22,
+              "cost": {
+                "input": 0.000034,
+                "output": 0.00003,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0.000064
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1700000000000,
+            "responseId": "chat_tools_owned",
+            "rawStopReason": "tool_calls"
+          },
+          "ownUndefinedPaths": []
+        },
+        "trace": [
+          "onPayload",
+          "fetch",
+          "onResponse",
+          "emit:start",
+          "provider:0",
+          "emit:toolcall_start",
+          "emit:toolcall_delta",
+          "provider:1",
+          "emit:text_start",
+          "emit:text_delta",
+          "emit:toolcall_start",
+          "emit:toolcall_delta",
+          "provider:2",
+          "emit:toolcall_delta",
+          "emit:toolcall_delta",
+          "provider:3",
+          "emit:toolcall_delta",
+          "provider:4",
+          "provider:5",
+          "emit:toolcall_end",
+          "emit:text_end",
+          "emit:toolcall_end",
+          "emit:done"
+        ],
+        "responseWire": {
+          "sseText": ": authored comment\r\n\r\ndata: {\"id\":\"chat_tools_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":4,\"id\":\"call_alpha\",\"type\":\"function\",\"function\":{\"name\":\"alpha\",\"arguments\":\"{\\\"value\\\":\\\"\"}}]},\"finish_reason\":null}]}\r\n\r\ndata: {\"id\":\"chat_tools_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Working π\",\"tool_calls\":[{\"index\":9,\"type\":\"function\",\"function\":{\"name\":\"beta\",\"arguments\":\"{\\\"count\\\":\"}}]},\"finish_reason\":null}]}\r\n\r\ndata: {\"id\":\"chat_tools_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":9,\"id\":\"call_beta\",\"function\":{\"arguments\":\"2,\\\"keep\\\":null}\"}},{\"index\":4,\"function\":{\"arguments\":\"\\\\u03\"}}]},\"finish_reason\":null}]}\r\n\r\ndata: {\"id\":\"chat_tools_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":4,\"function\":{\"arguments\":\"c0\\\\n\\\"}\"}}]},\"finish_reason\":null}]}\r\n\r\ndata: {\"id\":\"chat_tools_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\r\n\r\ndata: {\"id\":\"chat_tools_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[],\"usage\":{\"prompt_tokens\":17,\"completion_tokens\":5,\"total_tokens\":22}}\r\n\r\ndata: [DONE]\r\n\r\n",
+          "utf8Sha256": "3a518147aabccd5f21f143433513b1aaaab602023d8639d394827a9549ed5ba6",
+          "bytes": 1644,
+          "chunkBytes": 7
+        }
+      },
+      {
+        "caseId": "thinking-signature-and-cache-usage",
+        "payloadSnapshots": [
+          {
+            "value": {
+              "model": "pisharp-authored-completions-model",
+              "messages": [
+                {
+                  "role": "developer",
+                  "content": "Return authored reasoning metadata and a bounded answer."
+                },
+                {
+                  "role": "user",
+                  "content": "Explain briefly."
+                }
+              ],
+              "stream": true,
+              "prompt_cache_key": "authored-completions-session",
+              "prompt_cache_retention": "24h",
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 64,
+              "temperature": 0,
+              "reasoning_effort": "high"
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "fetchRequests": [
+          {
+            "url": "https://pisharp-completions-oracle.invalid/v1/chat/completions",
+            "method": "POST",
+            "headers": [
+              [
+                "accept",
+                "application/json"
+              ],
+              [
+                "authorization",
+                "Bearer pisharp-authored-inert-noncredential"
+              ],
+              [
+                "content-type",
+                "application/json"
+              ],
+              [
+                "user-agent",
+                "PiSharp Completions offline oracle"
+              ],
+              [
+                "x-client-request-id",
+                "authored-completions-request"
+              ],
+              [
+                "x-model",
+                "authored-model-header"
+              ],
+              [
+                "x-override",
+                "options-value"
+              ],
+              [
+                "x-stainless-arch",
+                "x64"
+              ],
+              [
+                "x-stainless-lang",
+                "js"
+              ],
+              [
+                "x-stainless-os",
+                "Windows"
+              ],
+              [
+                "x-stainless-package-version",
+                "7.19.0"
+              ],
+              [
+                "x-stainless-retry-count",
+                "0"
+              ],
+              [
+                "x-stainless-runtime",
+                "node"
+              ],
+              [
+                "x-stainless-runtime-version",
+                "v24.19.0"
+              ]
+            ],
+            "body": "{\"model\":\"pisharp-authored-completions-model\",\"messages\":[{\"role\":\"developer\",\"content\":\"Return authored reasoning metadata and a bounded answer.\"},{\"role\":\"user\",\"content\":\"Explain briefly.\"}],\"stream\":true,\"prompt_cache_key\":\"authored-completions-session\",\"prompt_cache_retention\":\"24h\",\"stream_options\":{\"include_usage\":true},\"store\":false,\"max_completion_tokens\":64,\"temperature\":0,\"reasoning_effort\":\"high\"}",
+            "bodyUtf8Sha256": "3fbdd4afc66ccdc75d7f2c0ba621031d0e9a6c96c5cd18adbedc585f1e605b13",
+            "bodyJson": {
+              "model": "pisharp-authored-completions-model",
+              "messages": [
+                {
+                  "role": "developer",
+                  "content": "Return authored reasoning metadata and a bounded answer."
+                },
+                {
+                  "role": "user",
+                  "content": "Explain briefly."
+                }
+              ],
+              "stream": true,
+              "prompt_cache_key": "authored-completions-session",
+              "prompt_cache_retention": "24h",
+              "stream_options": {
+                "include_usage": true
+              },
+              "store": false,
+              "max_completion_tokens": 64,
+              "temperature": 0,
+              "reasoning_effort": "high"
+            },
+            "initOwnKeys": [
+              "signal",
+              "method",
+              "headers",
+              "body"
+            ],
+            "signalAborted": false
+          }
+        ],
+        "responseHooks": [
+          {
+            "value": {
+              "status": 200,
+              "headers": {
+                "content-type": "text/event-stream; charset=utf-8",
+                "x-fixture": "owned-in-memory-sse",
+                "x-request-id": "req_authored_completions"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "providerEvents": [
+          {
+            "value": {
+              "id": "chat_thinking_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "reasoning_content": "First π",
+                    "reasoning": "ignored competing field",
+                    "reasoning_text": "ignored third field",
+                    "reasoning_details": [
+                      {
+                        "type": "reasoning.summary",
+                        "summary": "Sum ",
+                        "id": null,
+                        "index": 6,
+                        "opaque": {
+                          "keep": null
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": null
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_thinking_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "reasoning_text": " then second",
+                    "reasoning_details": [
+                      {
+                        "type": "reasoning.summary",
+                        "summary": "mary",
+                        "id": "summary_owned",
+                        "format": "authored-format",
+                        "index": 6
+                      },
+                      {
+                        "type": "reasoning.encrypted",
+                        "data": "opaque+/=\u0000",
+                        "id": "encrypted_owned",
+                        "format": "authored-format",
+                        "index": 7,
+                        "nativeLooking": {
+                          "type": "ClrNeverLoaded",
+                          "value": null
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": null
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_thinking_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {
+                    "content": "Answer"
+                  },
+                  "finish_reason": null
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_thinking_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [
+                {
+                  "index": 0,
+                  "delta": {},
+                  "finish_reason": "length"
+                }
+              ]
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "id": "chat_thinking_owned",
+              "object": "chat.completion.chunk",
+              "created": 1700000000,
+              "model": "pisharp-authored-completions-model",
+              "choices": [],
+              "usage": {
+                "prompt_tokens": 20,
+                "completion_tokens": 9,
+                "total_tokens": 100,
+                "cached_tokens": 8,
+                "prompt_cache_hit_tokens": 4,
+                "prompt_tokens_details": {
+                  "cached_tokens": 3,
+                  "cache_write_tokens": 2
+                },
+                "completion_tokens_details": {
+                  "reasoning_tokens": 4
+                },
+                "opaque": null
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "value": {
+              "type": "start",
+              "partial": {
+                "role": "assistant",
+                "content": [],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "thinking_start",
+              "contentIndex": 0,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "",
+                    "thinkingSignature": "reasoning_content"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "First π",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π",
+                    "thinkingSignature": "reasoning_content"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " then second",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "reasoning_content"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_start",
+              "contentIndex": 1,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "reasoning_content"
+                  },
+                  {
+                    "type": "text",
+                    "text": ""
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": "Answer",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "reasoning_content"
+                  },
+                  {
+                    "type": "text",
+                    "text": "Answer"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "thinking_end",
+              "contentIndex": 0,
+              "content": "First π then second",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "[{\"type\":\"reasoning.summary\",\"summary\":\"Sum mary\",\"id\":\"summary_owned\",\"index\":6,\"opaque\":{\"keep\":null},\"format\":\"authored-format\"},{\"type\":\"reasoning.encrypted\",\"data\":\"opaque+/=\\u0000\",\"id\":\"encrypted_owned\",\"format\":\"authored-format\",\"index\":7,\"nativeLooking\":{\"type\":\"ClrNeverLoaded\",\"value\":null}}]"
+                  },
+                  {
+                    "type": "text",
+                    "text": "Answer"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 15,
+                  "output": 9,
+                  "cacheRead": 3,
+                  "cacheWrite": 2,
+                  "reasoning": 4,
+                  "totalTokens": 29,
+                  "cost": {
+                    "input": 0.000029999999999999997,
+                    "output": 0.000054,
+                    "cacheRead": 0.0000015,
+                    "cacheWrite": 0.000002,
+                    "total": 0.00008749999999999999
+                  }
+                },
+                "stopReason": "length",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned",
+                "rawStopReason": "length"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_end",
+              "contentIndex": 1,
+              "content": "Answer",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "[{\"type\":\"reasoning.summary\",\"summary\":\"Sum mary\",\"id\":\"summary_owned\",\"index\":6,\"opaque\":{\"keep\":null},\"format\":\"authored-format\"},{\"type\":\"reasoning.encrypted\",\"data\":\"opaque+/=\\u0000\",\"id\":\"encrypted_owned\",\"format\":\"authored-format\",\"index\":7,\"nativeLooking\":{\"type\":\"ClrNeverLoaded\",\"value\":null}}]"
+                  },
+                  {
+                    "type": "text",
+                    "text": "Answer"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 15,
+                  "output": 9,
+                  "cacheRead": 3,
+                  "cacheWrite": 2,
+                  "reasoning": 4,
+                  "totalTokens": 29,
+                  "cost": {
+                    "input": 0.000029999999999999997,
+                    "output": 0.000054,
+                    "cacheRead": 0.0000015,
+                    "cacheWrite": 0.000002,
+                    "total": 0.00008749999999999999
+                  }
+                },
+                "stopReason": "length",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned",
+                "rawStopReason": "length"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "done",
+              "reason": "length",
+              "message": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "[{\"type\":\"reasoning.summary\",\"summary\":\"Sum mary\",\"id\":\"summary_owned\",\"index\":6,\"opaque\":{\"keep\":null},\"format\":\"authored-format\"},{\"type\":\"reasoning.encrypted\",\"data\":\"opaque+/=\\u0000\",\"id\":\"encrypted_owned\",\"format\":\"authored-format\",\"index\":7,\"nativeLooking\":{\"type\":\"ClrNeverLoaded\",\"value\":null}}]"
+                  },
+                  {
+                    "type": "text",
+                    "text": "Answer"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 15,
+                  "output": 9,
+                  "cacheRead": 3,
+                  "cacheWrite": 2,
+                  "reasoning": 4,
+                  "totalTokens": 29,
+                  "cost": {
+                    "input": 0.000029999999999999997,
+                    "output": 0.000054,
+                    "cacheRead": 0.0000015,
+                    "cacheWrite": 0.000002,
+                    "total": 0.00008749999999999999
+                  }
+                },
+                "stopReason": "length",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned",
+                "rawStopReason": "length"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "drainedFrames": [
+          {
+            "value": {
+              "type": "start",
+              "partial": {
+                "role": "assistant",
+                "content": [],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "thinking_start",
+              "contentIndex": 0,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π",
+                    "thinkingSignature": "reasoning_content"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "First π",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π",
+                    "thinkingSignature": "reasoning_content"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " then second",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "reasoning_content"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_start",
+              "contentIndex": 1,
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "reasoning_content"
+                  },
+                  {
+                    "type": "text",
+                    "text": "Answer"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_delta",
+              "contentIndex": 1,
+              "delta": "Answer",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "reasoning_content"
+                  },
+                  {
+                    "type": "text",
+                    "text": "Answer"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "pending",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "thinking_end",
+              "contentIndex": 0,
+              "content": "First π then second",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "[{\"type\":\"reasoning.summary\",\"summary\":\"Sum mary\",\"id\":\"summary_owned\",\"index\":6,\"opaque\":{\"keep\":null},\"format\":\"authored-format\"},{\"type\":\"reasoning.encrypted\",\"data\":\"opaque+/=\\u0000\",\"id\":\"encrypted_owned\",\"format\":\"authored-format\",\"index\":7,\"nativeLooking\":{\"type\":\"ClrNeverLoaded\",\"value\":null}}]"
+                  },
+                  {
+                    "type": "text",
+                    "text": "Answer"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 15,
+                  "output": 9,
+                  "cacheRead": 3,
+                  "cacheWrite": 2,
+                  "reasoning": 4,
+                  "totalTokens": 29,
+                  "cost": {
+                    "input": 0.000029999999999999997,
+                    "output": 0.000054,
+                    "cacheRead": 0.0000015,
+                    "cacheWrite": 0.000002,
+                    "total": 0.00008749999999999999
+                  }
+                },
+                "stopReason": "length",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned",
+                "rawStopReason": "length"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "text_end",
+              "contentIndex": 1,
+              "content": "Answer",
+              "partial": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "[{\"type\":\"reasoning.summary\",\"summary\":\"Sum mary\",\"id\":\"summary_owned\",\"index\":6,\"opaque\":{\"keep\":null},\"format\":\"authored-format\"},{\"type\":\"reasoning.encrypted\",\"data\":\"opaque+/=\\u0000\",\"id\":\"encrypted_owned\",\"format\":\"authored-format\",\"index\":7,\"nativeLooking\":{\"type\":\"ClrNeverLoaded\",\"value\":null}}]"
+                  },
+                  {
+                    "type": "text",
+                    "text": "Answer"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 15,
+                  "output": 9,
+                  "cacheRead": 3,
+                  "cacheWrite": 2,
+                  "reasoning": 4,
+                  "totalTokens": 29,
+                  "cost": {
+                    "input": 0.000029999999999999997,
+                    "output": 0.000054,
+                    "cacheRead": 0.0000015,
+                    "cacheWrite": 0.000002,
+                    "total": 0.00008749999999999999
+                  }
+                },
+                "stopReason": "length",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned",
+                "rawStopReason": "length"
+              }
+            },
+            "ownUndefinedPaths": []
+          },
+          {
+            "value": {
+              "type": "done",
+              "reason": "length",
+              "message": {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "First π then second",
+                    "thinkingSignature": "[{\"type\":\"reasoning.summary\",\"summary\":\"Sum mary\",\"id\":\"summary_owned\",\"index\":6,\"opaque\":{\"keep\":null},\"format\":\"authored-format\"},{\"type\":\"reasoning.encrypted\",\"data\":\"opaque+/=\\u0000\",\"id\":\"encrypted_owned\",\"format\":\"authored-format\",\"index\":7,\"nativeLooking\":{\"type\":\"ClrNeverLoaded\",\"value\":null}}]"
+                  },
+                  {
+                    "type": "text",
+                    "text": "Answer"
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "openai",
+                "model": "pisharp-authored-completions-model",
+                "usage": {
+                  "input": 15,
+                  "output": 9,
+                  "cacheRead": 3,
+                  "cacheWrite": 2,
+                  "reasoning": 4,
+                  "totalTokens": 29,
+                  "cost": {
+                    "input": 0.000029999999999999997,
+                    "output": 0.000054,
+                    "cacheRead": 0.0000015,
+                    "cacheWrite": 0.000002,
+                    "total": 0.00008749999999999999
+                  }
+                },
+                "stopReason": "length",
+                "timestamp": 1700000000000,
+                "responseId": "chat_thinking_owned",
+                "rawStopReason": "length"
+              }
+            },
+            "ownUndefinedPaths": []
+          }
+        ],
+        "finalResult": {
+          "value": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "First π then second",
+                "thinkingSignature": "[{\"type\":\"reasoning.summary\",\"summary\":\"Sum mary\",\"id\":\"summary_owned\",\"index\":6,\"opaque\":{\"keep\":null},\"format\":\"authored-format\"},{\"type\":\"reasoning.encrypted\",\"data\":\"opaque+/=\\u0000\",\"id\":\"encrypted_owned\",\"format\":\"authored-format\",\"index\":7,\"nativeLooking\":{\"type\":\"ClrNeverLoaded\",\"value\":null}}]"
+              },
+              {
+                "type": "text",
+                "text": "Answer"
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "openai",
+            "model": "pisharp-authored-completions-model",
+            "usage": {
+              "input": 15,
+              "output": 9,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "reasoning": 4,
+              "totalTokens": 29,
+              "cost": {
+                "input": 0.000029999999999999997,
+                "output": 0.000054,
+                "cacheRead": 0.0000015,
+                "cacheWrite": 0.000002,
+                "total": 0.00008749999999999999
+              }
+            },
+            "stopReason": "length",
+            "timestamp": 1700000000000,
+            "responseId": "chat_thinking_owned",
+            "rawStopReason": "length"
+          },
+          "ownUndefinedPaths": []
+        },
+        "trace": [
+          "onPayload",
+          "fetch",
+          "onResponse",
+          "emit:start",
+          "provider:0",
+          "emit:thinking_start",
+          "emit:thinking_delta",
+          "provider:1",
+          "emit:thinking_delta",
+          "provider:2",
+          "emit:text_start",
+          "emit:text_delta",
+          "provider:3",
+          "provider:4",
+          "emit:thinking_end",
+          "emit:text_end",
+          "emit:done"
+        ],
+        "responseWire": {
+          "sseText": ": authored comment\r\n\r\ndata: {\"id\":\"chat_thinking_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"First π\",\"reasoning\":\"ignored competing field\",\"reasoning_text\":\"ignored third field\",\"reasoning_details\":[{\"type\":\"reasoning.summary\",\"summary\":\"Sum \",\"id\":null,\"index\":6,\"opaque\":{\"keep\":null}}]},\"finish_reason\":null}]}\r\n\r\ndata: {\"id\":\"chat_thinking_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[{\"index\":0,\"delta\":{\"reasoning_text\":\" then second\",\"reasoning_details\":[{\"type\":\"reasoning.summary\",\"summary\":\"mary\",\"id\":\"summary_owned\",\"format\":\"authored-format\",\"index\":6},{\"type\":\"reasoning.encrypted\",\"data\":\"opaque+/=\\u0000\",\"id\":\"encrypted_owned\",\"format\":\"authored-format\",\"index\":7,\"nativeLooking\":{\"type\":\"ClrNeverLoaded\",\"value\":null}}]},\"finish_reason\":null}]}\r\n\r\ndata: {\"id\":\"chat_thinking_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Answer\"},\"finish_reason\":null}]}\r\n\r\ndata: {\"id\":\"chat_thinking_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"length\"}]}\r\n\r\ndata: {\"id\":\"chat_thinking_owned\",\"object\":\"chat.completion.chunk\",\"created\":1700000000,\"model\":\"pisharp-authored-completions-model\",\"choices\":[],\"usage\":{\"prompt_tokens\":20,\"completion_tokens\":9,\"total_tokens\":100,\"cached_tokens\":8,\"prompt_cache_hit_tokens\":4,\"prompt_tokens_details\":{\"cached_tokens\":3,\"cache_write_tokens\":2},\"completion_tokens_details\":{\"reasoning_tokens\":4},\"opaque\":null}}\r\n\r\ndata: [DONE]\r\n\r\n",
+          "utf8Sha256": "6a99daf4723f39d9439e0675e2aa984e8a24dd0193019cd673ecbe033fb0792b",
+          "bytes": 1776,
+          "chunkBytes": 7
+        }
+      }
+    ],
+    "checks": {
+      "caseCount": 3,
+      "fakeFetchCalls": 3,
+      "sourceSeam": "Unchanged exported stream; private createClient/buildParams/chunk loop; real OpenAI SDK create/serialize/SSE decode; supported options.fetch",
+      "fakeClock": "Date.now replaced and restored; no RNG replacement",
+      "noSourceTransformOrSdkShim": true,
+      "networkAndProcessesBlocked": true,
+      "noNativeImportOrDifferentialClaim": true
+    }
+  }
+}

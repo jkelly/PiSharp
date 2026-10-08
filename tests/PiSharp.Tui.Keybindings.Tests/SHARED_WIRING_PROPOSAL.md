@@ -1,0 +1,39 @@
+# Pending shared keybindings wiring
+
+Prepared from immutable R40 `5fe305aabc801dd1e6aad01c384f429d227a7bd4` and Astra's sealed static review (seal SHA-256 `0426ec40aa10e7a2956cc9bea1ced364992e9b62bda4b38024818fcc8f4e4bf6`). This is a proposed edit sequence, not implemented code. The lead must allocate a current immutable base and each shared path before edits. The R41 changes are confined to this isolated test project; production and admission-pin logic are unchanged.
+
+## 1. Original input matching
+
+Allocate `src/PiSharp.Tui/Input/TerminalInputDecoder.cs` first. Add private weak provenance for every decoded bindable event: exact raw span, protocol mode at decoding, original control-byte identity, and existing Kitty alternate/base/lock/action or modifyOtherKeys origin. Populate it at Control/ESC/CSI/SS3 event emission, preserve it on original queued instances and internally derived projections, and retain the existing rule that constructed/cloned keys do not acquire original wire provenance. Paste payloads must remain paste data, never shortcut input. Preserve split, timeout, completion and resource accounting.
+
+Proposed matching entrypoint: `MatchesKey(TerminalInputEvent original, string keyId)` uses that event's mode and provenance. An event-based resolver can iterate `registry.GetKeys(action)` and use this entrypoint, retaining multiple matching actions and contextual order without changing the R40 registry API. A live decoder-mode closure is insufficient because queued events may predate a mode/reload change. Define constructed-event fallback explicitly and test it separately; never invent original raw bytes from Key/Modifiers. Obtain unchanged Source captures for legacy/Kitty/modifyOtherKeys/SS3, ambiguous control bytes, alternatives, lock masks, releases and all incremental splits before claiming matcher parity.
+
+## 2. Controller decisions and layout
+
+Allocate `src/PiSharp.Tui/Input/TerminalTextEditorPasteController.cs` and coordinate the event-based resolver API. Add a per-owner configured constructor/dispatch option while preserving existing default entrypoints. Resolve an action decision from the original event before fixed default projection can discard alternate matches. Replace configurable hard-coded aliases with action matches; keep Source's direct exceptions.
+
+Use one side-effect-free contextual decision for both `RequiresConfiguredLayout(original)` and configured dispatch. Keep static `RequiresLayout` for existing callers if needed, but change the configured CLI path to the instance decision. Vertical/page decisions must obtain a current `TerminalEditorVisualMap` and validate its geometry using the existing bounded three-attempt rebuild. Do not dispatch remapped Up/Down/Page through the no-map overload. Explicit history actions use the existing history operations without a visual map. A missing/stale map must preserve text, undo, paste, history and revision ownership.
+
+Ordinary dispatch order from pinned editor.ts: pending jump cancel/target; paste; copy/undo; active autocomplete; tab; deleteToLineEnd; deleteToLineStart; deleteWordBackward; deleteWordForward; deleteCharBackward including direct Shift+Backspace; deleteCharForward including direct Shift+Delete; yank; yankPop; explicit previous/next history; line start/end; word left/right; newline; submit; cursor up/down; right; left; page up/down; jump forward/backward; Shift+Space and printable insertion.
+
+Newline retains Source's direct LF, Alt+Enter and legacy fallback checks even when its configured array is empty. Preserve disableSubmit, backslash-enter and shouldSubmitOnBackslashEnter behavior. An empty configured key list suppresses its configurable aliases, not the direct exceptions above. Context determines a conflict winner; the registry must continue exposing both matches.
+
+## 3. Both CLI loops and composition
+
+Allocate `src/PiSharp.Cli/Interactive/TerminalChatInput.cs` and `src/PiSharp.Cli/Commands/TerminalSessionCommand.cs` together with the controller.
+
+At TerminalSessionCommand.RunOwnedAsync, create/load one per-session binding owner before constructing `TerminalSessionView` and the `TerminalChatInput` in ReadTerminalAsync. Preserve existing overload/caller shapes and pass the owner explicitly. The second input loop is TerminalChatInput.RunAsync, not TerminalSessionView.
+
+Change **both** RunAcknowledgedAsync and RunAsync: inject the same owner into the draft, resolve configured submit/cancel/empty-draft exit alongside contextual editor handling, and remove the fixed Enter/Escape/Ctrl+D intercepts from the configured path. Newline and earlier editing matches must win before an editor submit match. Introduce an explicit configured dispatch result for submission/cancellation/exit rather than treating every remapped terminal event as a synthetic named key. Preserve expanded submission trim, receipts, accepted-line history application, reset, callback errors and every existing reader/render/receipt join. RunAsync also needs a coordinated geometry supplier/helper for remapped layout actions; do not silently fake a map.
+
+TerminalChatInput.Read.Publish currently consumes fixed Ctrl+C **before** queue admission. Changing only either consumer loop or the controller leaves it unconfigurable. Keep the immediate cancellation/interrupt behavior needed when the owner awaits a host callback, while making shortcut decisions against an immutable published binding/context snapshot; the producer must never call the owner's mutable registry or editor. Tie snapshot publication and focus/config revisions to InputAdmissions' existing FIFO gate. Specify handling of pending focus admissions, app interrupt/clear versus editor copy, and blocked callbacks with the lead before selecting the exact fast-path algorithm. Preserve the original32 key/eight focus capacities and all admitted task joins. Existing MOK/Kitty interrupt and held-I/O controls remain mandatory, not silently superseded by an enqueue-only change.
+
+Allocate `src/PiSharp.Cli/Interactive/TerminalSessionView.cs` only for binding/context propagation to viewport or widget interception and geometry composition. It owns render/layout/focus state; it is not a second key-input loop. No changes to RPC, context-edit SDK/frontend or session storage are proposed here.
+
+## 4. Configuration and extension paths
+
+Select exact new loader/startup and extension-registration paths with the lead before reservation. Load agent definitions in Source order, platform overrides (including Windows/WSL undo/suspend and word ordering), modern-name-over-legacy migration, known-definition order then sorted extras, BOM removal and missing/unreadable/malformed fallback. Filter JSON to strings and string arrays. **Reject/ignore JSON null** as Source agent loading does; the pure registry's internal null-as-undefined adaptation is not a JSON loader rule. Reload replaces the complete configuration on the UI owner and publishes a new immutable producer snapshot. Scope extension shortcuts separately; do not invent global registry arbitration.
+
+## 5. Required evidence before acceptance
+
+Retain the 15 registry vectors, 47 static defaults and eight **unwired** historical schedules. Author a new integrated consumer with desired configured outcomes for all six differences and both guards; the historical six expected mismatches should not be reinterpreted as passing editing parity. Test both CLI loops, acknowledgment and callbacks, focus ordering, producer interruptions while callbacks block, all remapped layout actions and geometry rejection, overlapping context bindings, direct exceptions despite disabled arrays, configuration filtering/migration/reload/platform cases, and extension ownership. Pin exact source, DLL, runtime and reports for independent comparison to unchanged Source. Full native and physical three-platform gates remain lead-owned and open.

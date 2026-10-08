@@ -25,6 +25,20 @@ public sealed partial class PersistentAgentSession
             _compactionObservation = observer;
         }
     }
+    internal void ConfigureCompactionObservationForBinding(ReplaceableAgentSession owner, AgentSessionAttachment attachment,
+        ReplacementReservation? reservation,
+        Func<SessionCompactionObservation, ValueTask>? observer)
+    {
+        lock (_gate)
+        {
+            if (!ReferenceEquals(attachment.Session, this)) throw new InvalidOperationException("Observation session differs from the attachment.");
+            owner.ValidateRuntimeObservationBinding(attachment, reservation);
+            if (reservation is null) ThrowAvailable(); else reservation.ValidateCatalogAuthority(this);
+            ThrowInputMutation(); ThrowConfigurationSelfWait();
+            if (_active is not null || _inputSubmission is not null) throw new InvalidOperationException("Compaction observation binding requires an idle session.");
+            _compactionObservation = observer;
+        }
+    }
     private SessionAutomaticCompactionStatus? _lastAutomaticCompaction;
     public void ConfigureAutomaticCompaction(ISessionSummaryGenerator? generator, SessionCompactionSettings? settings = null,
         double contextWindow = 128_000, SessionSummaryRequestOptions? summaryOptions = null,
@@ -70,13 +84,14 @@ public sealed partial class PersistentAgentSession
     }
     public Task<SessionSummaryCheckpointReceipt?> CompactAsync(string expectedSessionId, SessionCompactionRequest request,
         ISessionSummaryGenerator generator, CancellationToken cancellationToken = default,
-        Func<SessionSummaryCheckpointPreview, CancellationToken, ValueTask>? preflight = null)
+        Func<SessionSummaryCheckpointPreview, CancellationToken, ValueTask>? preflight = null,
+        Func<CancellationToken, ValueTask>? onStarted = null)
     {
         ArgumentNullException.ThrowIfNull(request); ArgumentNullException.ThrowIfNull(generator);
         if (!Enum.IsDefined(request.Reason) || request.Reason != SessionCompactionReason.Overflow && request.WillRetry)
             throw new ArgumentException("Unsupported compaction observation origin/retry metadata.", nameof(request));
         var reservation = ReserveSummary(expectedSessionId, cancellationToken);
-        return SummaryCoreAsync(request, null, generator, cancellationToken, reservation.Idle, reservation.Abort, reservation.InputAbort, preflight);
+        return SummaryCoreAsync(request, null, generator, cancellationToken, reservation.Idle, reservation.Abort, reservation.InputAbort, preflight, onStarted: onStarted);
     }
     public async Task<SessionSummaryCheckpointReceipt> SummarizeBranchAsync(string expectedSessionId,
         SessionBranchSummaryRequest request, ISessionSummaryGenerator generator, CancellationToken cancellationToken = default,
@@ -109,10 +124,16 @@ public sealed partial class PersistentAgentSession
     private async Task<SessionSummaryCheckpointReceipt?> SummaryCoreAsync(SessionCompactionRequest? request,
         SessionBranchSummaryRequest? branchRequest, ISessionSummaryGenerator generator, CancellationToken token,
         TaskCompletionSource idle, ContextEditCancellation abort, CancellationToken inputAbort,
-        Func<SessionSummaryCheckpointPreview, CancellationToken, ValueTask>? preflight, bool releaseReservation = true)
+        Func<SessionSummaryCheckpointPreview, CancellationToken, ValueTask>? preflight, bool releaseReservation = true,
+        Func<CancellationToken, ValueTask>? onStarted = null)
     {
         var commitHeld = false; var writeAdmitted = false;
         SessionSummaryCheckpointReceipt? completed = null; SessionCompactionObservation? observation = null;
+        var failures = new List<Exception>(); Exception? bodyFailure = null;
+        var lifecycle = request is not null && !(request.OverrideRetainedBoundary && request.FirstKeptEntryId is null);
+        var started = false; var aborted = false; JsonData? originalResult = null; string? noPlanMessage = null;
+        ImmutableArray<OperationSubscription> lifecycleSubscriptions; long operation;
+        lock (_gate) { lifecycleSubscriptions = _operationSubscriptions; operation = _operationGeneration; }
         Func<SessionCompactionObservation, ValueTask>? observer; lock (_gate) observer = _compactionObservation;
         var priorCallback = _configurationCallback.Value; _configurationCallback.Value = idle;
         try
@@ -121,6 +142,14 @@ public sealed partial class PersistentAgentSession
             {
                 using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token, _closing.Token, inputAbort, abort.Abort.Token);
                 var work = cancellation.Token; await _commits.WaitAsync(work).ConfigureAwait(false); commitHeld = true;
+                if (lifecycle && request!.Reason == SessionCompactionReason.Manual)
+                {
+                    started = true;
+                    await EmitCompactionAsync(lifecycleSubscriptions, new SessionCompactionStarted(operation, request.Reason)).ConfigureAwait(false);
+                }
+                // Trusted host start delivery observes the actual reserved compaction, before planning/inference or durable effects.
+                if (onStarted is not null) await onStarted(work).ConfigureAwait(false);
+                work.ThrowIfCancellationRequested();
                 SessionContextProjection previous; SessionLogStoreSnapshot log; AgentConfiguration configuration;
                 lock (_gate) { previous = _context; log = _acknowledgedLog; configuration = _configuration; }
                 SessionCompactionPlan? plan = null; SessionBranchSummaryPlan? branchPlan = null;
@@ -130,10 +159,26 @@ public sealed partial class PersistentAgentSession
                 {
                     var settings = request.Settings ?? new();
                     if (request.Automatic && !SessionCompactionTokenEstimator.ShouldCompact(
-                        SessionCompactionTokenEstimator.EstimateProjectedContextTokens(previous).Tokens, request.ContextWindow, settings)) return null;
+                        SessionCompactionTokenEstimator.EstimateProjectedContextTokens(previous).Tokens, request.ContextWindow, settings))
+                    {
+                        noPlanMessage = previous.Ancestry.LastOrDefault()?.Kind == SessionEntryKind.Compaction
+                            ? "Already compacted" : "Nothing to compact (session too small)";
+                        return null;
+                    }
                     plan = request.OverrideRetainedBoundary ? new SessionCompactionPlanner().PrepareWithBoundary(previous, request.FirstKeptEntryId, settings, work)
                         : new SessionCompactionPlanner().Prepare(previous, settings, work);
-                    if (plan is null) return null;
+                    if (plan is null)
+                    {
+                        noPlanMessage = previous.Ancestry.LastOrDefault()?.Kind == SessionEntryKind.Compaction
+                            ? "Already compacted" : "Nothing to compact (session too small)";
+                        return null;
+                    }
+                    if (lifecycle && !started)
+                    {
+                        started = true;
+                        await EmitCompactionAsync(lifecycleSubscriptions, new SessionCompactionStarted(operation, request.Reason)).ConfigureAwait(false);
+                        work.ThrowIfCancellationRequested();
+                    }
                     parent = previous.LeafId; firstKept = plan.FirstKeptEntryId; tokensBefore = plan.TokensBefore;
                     provided = request.ExtensionSummary; files = plan.FileOps;
                     // Construct/bound every prospective provider request before starting the first transport.
@@ -207,6 +252,12 @@ public sealed partial class PersistentAgentSession
                 await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
                     probe.ConfigureAndReplaceMessages(configuration, SessionContextProjector.AgentMessages(prospective));
                 if (preflight is not null) await preflight(new(entry, prospective, log), work).ConfigureAwait(false);
+                if (lifecycle)
+                {
+                    var result = CompactionResult(entry, prospective);
+                    await EmitCompactionAsync(lifecycleSubscriptions, new SessionCompactionPrepared(operation, request!.Reason,
+                        result, request.WillRetry)).ConfigureAwait(false);
+                }
                 work.ThrowIfCancellationRequested(); writeAdmitted = true;
                 var acknowledged = await _store.AppendAsync([entry], work).ConfigureAwait(false);
                 if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
@@ -216,6 +267,7 @@ public sealed partial class PersistentAgentSession
                     _acknowledgedLog = acknowledged.Snapshot; _context = prospective;
                 }
                 completed = new(acknowledged.Entries.Single(), acknowledged, prospective, plan, branchPlan);
+                if (lifecycle) originalResult = CompactionResult(completed.Entry, completed.Context);
                 if (request is not null)
                 {
                     // Pi searches all saved entries in storage order, including older identical summaries.
@@ -241,17 +293,52 @@ public sealed partial class PersistentAgentSession
             if (observation is not null && observer is not null) await observer(observation).ConfigureAwait(false);
             return completed;
         }
+        catch (Exception error)
+        {
+            bodyFailure = error; AddDistinctFailure(failures, error);
+            // Cancellation provenance is captured before disposing the original linked sources.
+            aborted = token.IsCancellationRequested || _closing.IsCancellationRequested || inputAbort.IsCancellationRequested || abort.Abort.IsCancellationRequested;
+            throw;
+        }
         finally
         {
-            if (commitHeld) _commits.Release(); Task cancelIdle;
+            if (commitHeld)
+                try { _commits.Release(); } catch (Exception error) { AddDistinctFailure(failures, error); }
+            Task cancelIdle;
             lock (_gate)
             {
                 if (ReferenceEquals(_contextEditCancellation, abort)) _contextEditCancellation = null;
                 cancelIdle = abort.CancelUsers == 0 ? Task.CompletedTask : abort.CancelIdle!.Task;
             }
-            await cancelIdle.ConfigureAwait(false); abort.Abort.Dispose();
+            try { await cancelIdle.ConfigureAwait(false); } catch (Exception error) { AddDistinctFailure(failures, error); }
+            try { abort.Abort.Dispose(); } catch (Exception error) { AddDistinctFailure(failures, error); }
             lock (_gate) if (ReferenceEquals(_active, idle)) { if (releaseReservation) _active = null; _compacting = false; }
-            if (releaseReservation) idle.TrySetResult(); _configurationCallback.Value = priorCallback;
+            try
+            {
+                if (started)
+                {
+                    var failure = bodyFailure ?? failures.FirstOrDefault();
+                    var success = failure is null && completed is not null;
+                    string? message = null;
+                    if (!success && !aborted)
+                    {
+                        var cause = failure?.Message ?? noPlanMessage ?? "Compaction failed";
+                        message = (request!.Reason switch
+                        {
+                            SessionCompactionReason.Manual => "Compaction failed: ",
+                            SessionCompactionReason.Threshold => "Auto-compaction failed: ",
+                            SessionCompactionReason.Overflow => "Context overflow recovery failed: ",
+                            _ => throw new ArgumentOutOfRangeException(nameof(request))
+                        }) + cause;
+                    }
+                    await EmitCompactionAsync(lifecycleSubscriptions, new SessionCompactionEnded(operation, request!.Reason,
+                        success ? originalResult : null, !success && aborted, success && request.WillRetry, message)).ConfigureAwait(false);
+                }
+            }
+            catch (Exception error) { AddDistinctFailure(failures, error); }
+            finally { if (releaseReservation) idle.TrySetResult(); _configurationCallback.Value = priorCallback; }
+            if (failures.Count == 1) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            if (failures.Count > 1) throw new AggregateException("Compaction body and owned settlement failed.", failures);
         }
     }
     private SessionEntry SummaryRecord(bool compaction, string id, string? parent, string? firstKept,

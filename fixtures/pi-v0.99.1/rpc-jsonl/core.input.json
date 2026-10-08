@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "rpc-jsonl-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": ["rpc.framing"],
+  "kind": "authored-rpc-jsonl-chunks-and-serialization-values",
+  "normalizerVersion": "object-key-order-v1; callback-strings-wire-bytes-and-array-order-retained",
+  "clock": "No clock replacement or sleeps; Node stream data/end events only",
+  "seed": "Explicit case IDs and byte split positions; no RNG replacement",
+  "readerCases": [
+    {"caseId":"empty-stream","purpose":"Empty buffer and EOF","wire":{"kind":"utf8","text":""},"fragments":{"mode":"whole-buffer"}},
+    {"caseId":"empty-lines","purpose":"Callback strings for LF/LF/CRLF","wire":{"kind":"utf8","text":"\n\n\r\n"},"fragments":{"mode":"every-byte"}},
+    {"caseId":"lf-every-split","purpose":"Every two-chunk boundary of two LF records","wire":{"kind":"utf8","text":"{\"a\":1}\n{\"b\":2}\n"},"fragments":{"mode":"all-two-chunk-splits"}},
+    {"caseId":"crlf-every-split","purpose":"Every boundary including between CR and LF","wire":{"kind":"utf8","text":"{\"a\":1}\r\n{\"b\":2}\r\n"},"fragments":{"mode":"all-two-chunk-splits"}},
+    {"caseId":"bare-cr-and-double-cr","purpose":"Bare CR inside a line and exactly one terminal CR","wire":{"kind":"utf8","text":"alpha\rbeta\r\ngamma\r\r\n"},"fragments":{"mode":"every-byte"}},
+    {"caseId":"final-complete-cr","purpose":"Complete JSON text with terminal CR and no LF","wire":{"kind":"utf8","text":"{\"tail\":true}\r"},"fragments":{"mode":"every-byte"}},
+    {"caseId":"final-incomplete","purpose":"Framing callback for incomplete final JSON text","wire":{"kind":"utf8","text":"{\"incomplete\":"},"fragments":{"mode":"whole-buffer"}},
+    {"caseId":"unicode-every-split","purpose":"Every UTF-8 split of U2028/U2029/emoji/pi payload","wire":{"kind":"utf8","text":"{\"text\":\"a\u2028b\u2029c😀π\"}\n"},"fragments":{"mode":"all-two-chunk-splits"}},
+    {"caseId":"unicode-every-byte","purpose":"All multibyte codepoints delivered one byte at a time","wire":{"kind":"utf8","text":"{\"text\":\"a\u2028b\u2029c😀π\"}\n"},"fragments":{"mode":"every-byte"}},
+    {"caseId":"escaped-newlines","purpose":"Literal backslash escapes are payload characters","wire":{"kind":"utf8","text":"{\"text\":\"first\\nsecond\\r\\nend\"}\n"},"fragments":{"mode":"every-byte"}},
+    {"caseId":"raw-lf-in-string","purpose":"Raw LF inside quoted text is still a framing delimiter","wire":{"kind":"utf8","text":"{\"text\":\"first\nsecond\"}\n"},"fragments":{"mode":"every-byte"}},
+    {"caseId":"bom-text","purpose":"Observe BOM without treating it as JSON admission","wire":{"kind":"utf8","text":"\ufeff{\"a\":1}\n"},"fragments":{"mode":"whole-buffer"}},
+    {"caseId":"duplicate-keys","purpose":"Line callback never parses duplicate properties","wire":{"kind":"utf8","text":"{\"a\":1,\"a\":2}\n"},"fragments":{"mode":"whole-buffer"}},
+    {"caseId":"escaped-lone-surrogate","purpose":"Unpaired escaped surrogate remains line text","wire":{"kind":"utf8","text":"{\"text\":\"\\ud800\"}\n"},"fragments":{"mode":"whole-buffer"}},
+    {"caseId":"invalid-utf8","purpose":"Actual pinned StringDecoder replacement behavior","wire":{"kind":"hex","hex":"fffe61c3280a"},"fragments":{"mode":"every-byte"}},
+    {"caseId":"incomplete-utf8-eof","purpose":"Actual decoder.end handling of truncated codepoint","wire":{"kind":"hex","hex":"61f09f92"},"fragments":{"mode":"every-byte"}},
+    {"caseId":"mixed-buffer-string","purpose":"Public union-typed data path with pending decoder bytes","chunks":[{"kind":"buffer","hex":"f09f"},{"kind":"string","text":"M"},{"kind":"buffer","hex":"98800a"}]},
+    {"caseId":"string-chunks","purpose":"Direct string chunks and Unicode separators","chunks":[{"kind":"string","text":"a"},{"kind":"string","text":"\u2028b"},{"kind":"string","text":"\u2029c\r"},{"kind":"string","text":"\n"},{"kind":"string","text":"tail"}]},
+    {"caseId":"final-cr-only","purpose":"Nonempty final buffer stripped to an empty callback string","wire":{"kind":"utf8","text":"\r"},"fragments":{"mode":"whole-buffer"}},
+    {"caseId":"final-double-cr","purpose":"Bare CR at EOF with no LF","wire":{"kind":"utf8","text":"\r\ralpha\r\r"},"fragments":{"mode":"every-byte"}},
+    {"caseId":"non-json-lines","purpose":"Comment/trailing comma are emitted without JSON parsing","wire":{"kind":"utf8","text":"#comment\n{\"a\":1,}\n"},"fragments":{"mode":"whole-buffer"}},
+    {"caseId":"raw-scalars-and-whitespace","purpose":"Wide numeric lexeme, decimal, negative zero, null and spaces remain line text","wire":{"kind":"utf8","text":" { \"wide\": 9007199254740993, \"decimal\": 1.0, \"zero\": -0, \"null\": null }\n"},"fragments":{"mode":"whole-buffer"}},
+    {"caseId":"detach-after-first-chunk","purpose":"Returned public cleanup callback with later data and EOF","chunks":[{"kind":"buffer","hex":"66697273740a6275666665726564"},{"kind":"string","text":"ignored\n"},{"kind":"string","text":"tail"}],"detachAfterChunk":0},
+    {"caseId":"detach-before-final-eof","purpose":"Cleanup after the final data chunk with an unfinished tail","chunks":[{"kind":"string","text":"before\npartial"}],"detachAfterChunk":0}
+  ],
+  "serializerCases": [
+    {"caseId":"object-unicode-controls","value":{"text":"a\u2028b\u2029c😀π\n\r\n","keep":null,"ordered":["b","a"]}},
+    {"caseId":"empty-object","value":{}},
+    {"caseId":"array-values","value":[null,false,1.25,"x"]},
+    {"caseId":"top-level-string","value":"literal\nline\u2028paragraph\u2029"},
+    {"caseId":"top-level-null","value":null},
+    {"caseId":"integer-property-order","value":{"2":"two","1":"one","z":null,"a":false}}
+  ],
+  "provenance": {
+    "kind":"authored-synthetic-input",
+    "chunks":"Authored text or exact byte hex; fragments specify transport chunk boundaries, not expected callback values",
+    "serializerValues":"Authored finite safe JSON values materialized by JavaScript; no arbitrary-precision serialization claim",
+    "scope":"Only unchanged public JSONL line/serialization exports and returned cleanup callback; no JSON object admission, RPC dispatcher, process IO, backpressure or full phase claim"
+  }
+}

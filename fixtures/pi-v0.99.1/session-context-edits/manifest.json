@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "session-context-edits",
+  "kind": "two-genuine-whole-manager-context-edit-captures",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "captureExecutionCandidate": "00054a0f61b9f48447115c1064b391d6d732a57b",
+  "caseCount": 6,
+  "repeatRuns": 2,
+  "caseIds": [
+    "manager-repeated-latest-omission",
+    "manager-exact-shape-all-roles",
+    "manager-branch-before-after-sibling",
+    "manager-compaction-before-after",
+    "manager-admission-no-effects",
+    "manager-memory-edit-history"
+  ],
+  "observedCounts": [
+    {
+      "repeat": 1,
+      "cases": [
+        {
+          "caseId": "manager-repeated-latest-omission",
+          "checkpoints": 10,
+          "reopenViews": 1,
+          "operations": 9,
+          "successfulEdits": 4,
+          "rejectedEdits": 0,
+          "checkpointOwnUndefinedPaths": 100,
+          "operationOwnUndefinedPaths": 36,
+          "reopenOwnUndefinedPaths": 0
+        },
+        {
+          "caseId": "manager-exact-shape-all-roles",
+          "checkpoints": 18,
+          "reopenViews": 0,
+          "operations": 17,
+          "successfulEdits": 9,
+          "rejectedEdits": 0,
+          "checkpointOwnUndefinedPaths": 324,
+          "operationOwnUndefinedPaths": 68,
+          "reopenOwnUndefinedPaths": 0
+        },
+        {
+          "caseId": "manager-branch-before-after-sibling",
+          "checkpoints": 12,
+          "reopenViews": 0,
+          "operations": 11,
+          "successfulEdits": 2,
+          "rejectedEdits": 0,
+          "checkpointOwnUndefinedPaths": 122,
+          "operationOwnUndefinedPaths": 52,
+          "reopenOwnUndefinedPaths": 0
+        },
+        {
+          "caseId": "manager-compaction-before-after",
+          "checkpoints": 15,
+          "reopenViews": 0,
+          "operations": 14,
+          "successfulEdits": 4,
+          "rejectedEdits": 0,
+          "checkpointOwnUndefinedPaths": 219,
+          "operationOwnUndefinedPaths": 60,
+          "reopenOwnUndefinedPaths": 0
+        },
+        {
+          "caseId": "manager-admission-no-effects",
+          "checkpoints": 22,
+          "reopenViews": 0,
+          "operations": 21,
+          "successfulEdits": 1,
+          "rejectedEdits": 12,
+          "checkpointOwnUndefinedPaths": 454,
+          "operationOwnUndefinedPaths": 65,
+          "reopenOwnUndefinedPaths": 0
+        },
+        {
+          "caseId": "manager-memory-edit-history",
+          "checkpoints": 10,
+          "reopenViews": 0,
+          "operations": 9,
+          "successfulEdits": 2,
+          "rejectedEdits": 0,
+          "checkpointOwnUndefinedPaths": 114,
+          "operationOwnUndefinedPaths": 40,
+          "reopenOwnUndefinedPaths": 0
+        }
+      ],
+      "checkpoints": 87,
+      "reopenViews": 1,
+      "operations": 81,
+      "successfulEdits": 22,
+      "rejectedEdits": 12,
+      "ownUndefinedPaths": 1654
+    },
+    {
+      "repeat": 2,
+      "cases": [
+        {
+          "caseId": "manager-repeated-latest-omission",
+          "checkpoints": 10,
+          "reopenViews": 1,
+          "operations": 9,
+          "successfulEdits": 4,
+          "rejectedEdits": 0,
+          "checkpointOwnUndefinedPaths": 100,
+          "operationOwnUndefinedPaths": 36,
+          "reopenOwnUndefinedPaths": 0
+        },
+        {
+          "caseId": "manager-exact-shape-all-roles",
+          "checkpoints": 18,
+          "reopenViews": 0,
+          "operations": 17,
+          "successfulEdits": 9,
+          "rejectedEdits": 0,
+          "checkpointOwnUndefinedPaths": 324,
+          "operationOwnUndefinedPaths": 68,
+          "reopenOwnUndefinedPaths": 0
+        },
+        {
+          "caseId": "manager-branch-before-after-sibling",
+          "checkpoints": 12,
+          "reopenViews": 0,
+          "operations": 11,
+          "successfulEdits": 2,
+          "rejectedEdits": 0,
+          "checkpointOwnUndefinedPaths": 122,
+          "operationOwnUndefinedPaths": 52,
+          "reopenOwnUndefinedPaths": 0
+        },
+        {
+          "caseId": "manager-compaction-before-after",
+          "checkpoints": 15,
+          "reopenViews": 0,
+          "operations": 14,
+          "successfulEdits": 4,
+          "rejectedEdits": 0,
+          "checkpointOwnUndefinedPaths": 219,
+          "operationOwnUndefinedPaths": 60,
+          "reopenOwnUndefinedPaths": 0
+        },
+        {
+          "caseId": "manager-admission-no-effects",
+          "checkpoints": 22,
+          "reopenViews": 0,
+          "operations": 21,
+          "successfulEdits": 1,
+          "rejectedEdits": 12,
+          "checkpointOwnUndefinedPaths": 454,
+          "operationOwnUndefinedPaths": 65,
+          "reopenOwnUndefinedPaths": 0
+        },
+        {
+          "caseId": "manager-memory-edit-history",
+          "checkpoints": 10,
+          "reopenViews": 0,
+          "operations": 9,
+          "successfulEdits": 2,
+          "rejectedEdits": 0,
+          "checkpointOwnUndefinedPaths": 114,
+          "operationOwnUndefinedPaths": 40,
+          "reopenOwnUndefinedPaths": 0
+        }
+      ],
+      "checkpoints": 87,
+      "reopenViews": 1,
+      "operations": 81,
+      "successfulEdits": 22,
+      "rejectedEdits": 12,
+      "ownUndefinedPaths": 1654
+    }
+  ],
+  "captureBytes": 2815925,
+  "captureSha256": "eebb9eb01fbcb9ad3d76be90dcde803eab146efd0f71315a89a559857064c96c",
+  "captures": [
+    {
+      "repeat": 1,
+      "path": "capture.json",
+      "bytes": 2815925,
+      "sha256": "eebb9eb01fbcb9ad3d76be90dcde803eab146efd0f71315a89a559857064c96c"
+    },
+    {
+      "repeat": 2,
+      "path": "repeat-2.json",
+      "bytes": 2815925,
+      "sha256": "f6477538a9d2e0191f961b0dc7c658d11705c65e16f1a276c7b85fed0c3059da"
+    }
+  ],
+  "lock": {
+    "path": "oracle.lock.json",
+    "bytes": 155147,
+    "sha256": "279b8b86f4cd256f56e642396a573981590b83499850c22ec866b5750be7f071",
+    "origin": "Authored provenance wrapper around exact captured artifacts and unchanged qualification pins"
+  },
+  "files": [
+    {
+      "path": "capture.json",
+      "bytes": 2815925,
+      "sha256": "eebb9eb01fbcb9ad3d76be90dcde803eab146efd0f71315a89a559857064c96c"
+    },
+    {
+      "path": "repeat-2.json",
+      "bytes": 2815925,
+      "sha256": "f6477538a9d2e0191f961b0dc7c658d11705c65e16f1a276c7b85fed0c3059da"
+    },
+    {
+      "path": "contract.json",
+      "bytes": 199496,
+      "sha256": "d6a7a6916a61b1dbcbb6b65f23342b31f29412bb7b53bbd65fd13137ca98cce4"
+    },
+    {
+      "path": "environment-pins.json",
+      "bytes": 7780,
+      "sha256": "51731b48d1ff48f61544f5e3bd061f23599a3a765bcbc24525168799f422cdfb"
+    },
+    {
+      "path": "report.json",
+      "bytes": 4433,
+      "sha256": "fcdb0ecc04648c53599bd8ad84ab85657cbcf65a5c8c875eeaee331f32e910fc"
+    },
+    {
+      "path": "owner.json",
+      "bytes": 477,
+      "sha256": "002b7fade69ffe28676bda843b5f2496c8d480cbba7392820e28d09f07092d2b"
+    },
+    {
+      "path": "repeat-1.receipt.json",
+      "bytes": 375,
+      "sha256": "1b72630c6c9be462c6c1bf6c1940c46026d47b33a347b58af6b7e3c4be8f0fc4"
+    },
+    {
+      "path": "repeat-2.receipt.json",
+      "bytes": 375,
+      "sha256": "cab6b83473a47d915ca1dab3defe4ee66430cbd4b3d81453cbccb52b4d80b25e"
+    },
+    {
+      "path": "repeat-1.stdout.json",
+      "bytes": 1474860,
+      "sha256": "06bcfc1450ef8a35db45a16bda0c0ca054ace964e60f26c06acb96132329d2e5"
+    },
+    {
+      "path": "repeat-2.stdout.json",
+      "bytes": 1474860,
+      "sha256": "a72a44a00a89da4d91bd217cb917131a7cc8a6e9e919eeb73f9dc5258f9bc9e3"
+    },
+    {
+      "path": "repeat-1.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "repeat-2.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "oracle.lock.json",
+      "bytes": 155147,
+      "sha256": "279b8b86f4cd256f56e642396a573981590b83499850c22ec866b5750be7f071"
+    }
+  ],
+  "scope": "Six actual unchanged whole SessionManager appendContextEdit schedules, each consumed from both genuine runs. No full package/phase/provider closure or compatibility-difference waiver."
+}

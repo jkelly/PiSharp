@@ -1,0 +1,23 @@
+# Branch/history milestone review matrix
+
+This isolated descendant of accepted `2759aba53fd9485611de1b769bde1e69186be44d` addresses the original P4-03 plan, without modifying the frozen accepted lifecycle checkout. It adds read-only history/display/model/accounting separation and explicit system-section/tool-declaration replay to the shared lifecycle API and compiled CLI.
+
+| Original obligation | Implementation and evidence to review |
+| --- | --- |
+| Active-leaf, root/middle/leaf and multiple-root navigation | Existing coordinator/`SessionTreeQueries`/`SessionContextProjector`; new unchanged whole-manager reference selects every admitted entry and explicit root in every fixture phase |
+| Ancestry, labels and session names | Complete raw branch, tree, direct-child, label and name comparisons; actual global label set/clear and rename operations, followed by independent reopen |
+| Branch-specific model/thinking/system/tool state | Existing selected context replay; `SessionSystemReplay` comparisons with already-qualified pinned `getCurrentSystemMessage`, `getCurrentTools` and `getCurrentSystemPrompt`; named sections and ordered tool deltas retained |
+| Full history, display history, model context and accounting remain separate | `SessionHistoryProjector`, shared read-only facade and compiled `session history`; raw history and billed contributions survive compaction/context edits while selected model input changes |
+| Every structural leaf and no sibling leakage | Eight authored admitted forests, every-entry source observations, explicit native all-leaf/full-shape comparisons and 32 generated forests with 1,024 independent ancestry/reopen selections |
+| Missing parents, duplicates, cycles and detached roots | Existing complete-forest diagnostics plus generated controls; native malformed-graph policy rejects deterministically and sanitizes diagnostics; it does not execute upstream's potentially nonterminating cycle case |
+| Reopen and source preservation | Source open/reopen matrices retain exact source bytes; native pure round-trip and compiled read-only command selections preserve the original file |
+| Unknown records remain inert and exportable | Original immutable records retained in whole/selected history; unknown entries have tree identity and zero model/tool authority; prior native exact export acceptance remains separate evidence |
+| Metadata totals survive compaction | Whole-session and separate original-branch counts/usage totals; assistant, tool, standalone usage and summary sources are retained, including failed/aborted assistants; unsupported/nonfinite arithmetic returns explicit unavailable totals with raw contributions |
+
+The unchanged whole-manager reference uses the previously qualified Pi v0.99.1 source/dependency/runtime closure. Its initial read-only preflight timeout is preserved. The successful replay capture uses a fresh directory, two 20-second children with the unchanged 8 MiB stdout bounds, unchanged clocks/RNG, no provider/network calls, and exact source/module/package fingerprints before and after execution. The capture is large because all tree/context fields and every selected entry are retained; evidence-file admission does not enlarge product JSONL or CLI delivery bounds.
+
+The source captures establish manager/tree/context and pure system replay. Stored accounting aggregation additionally follows pinned `agent-session.ts:getSessionStats` and `usage-totals.ts` with authored native controls; the complete AgentSession is not loaded or qualified by these captures. Display filtering is the documented native inspector policy, not source TUI rendering qualification. The existing compiler profile remains blocked by the independent P1 HOLD.
+
+Independent static review held candidate `0716d56ca0d5153cbb254613e70fc352906eefb0`: unsupported optional system shapes escaped the compiled history command as a generic failure. Its 843 source files, 960-group native run and review are preserved outside this checkout. The correction returns `recovery_required` with a typed `historyProjectionFailure` and no partial accounting. Actual compiled CLI controls cover invalid section/tool shapes and bounded source content whose composed replay exceeds its existing limit; source bytes and complete-read status are retained in both cases.
+
+Targeted development, full native/Commands/Input/real-terminal/unchanged SDK/reservation gates and independent review must pass on an immutable candidate before this milestone is accepted. This document alone makes no passing claim. Original P1-05/P3-09 prerequisites, P4-05 import/export interoperability, P4-07 recovery/settlement, supported-platform durability and all eight full phase gates remain mandatory and open.

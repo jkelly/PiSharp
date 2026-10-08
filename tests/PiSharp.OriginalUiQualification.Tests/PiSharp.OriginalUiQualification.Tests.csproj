@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><AssemblyName>PiSharp.CodingAgent.Tests</AssemblyName><StartupObject>PiSharp.Qualification.OriginalUiQualificationEntry</StartupObject></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+    <Compile Include="../PiSharp.NodeUi.Tests/NativeOriginalCommandsDialogPipelineTests.cs" Link="OriginalCommandsControls.cs" />
+    <Compile Include="../PiSharp.NodeUi.Tests/NativeOriginalPrivateDialogPipelineTests.cs" Link="OriginalPrivateControls.cs" />
+    <Compile Include="../PiSharp.NodeUi.Tests/OriginalUiDialogUtf16OutcomeTests.cs" Link="OriginalUtf16Controls.cs" />
+    <Compile Include="../PiSharp.NodeUi.Tests/NativeDialogBorrowFailureTests.cs" Link="OriginalBorrowControls.cs" />
+    <Compile Include="../PiSharp.OriginalProviderQualification.Shared/QualificationEvidence.cs" Link="QualificationEvidence.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>PiSharp.SdkPluginEcho.Qualification.Tests</AssemblyName>
+    <StartupObject>PiSharp.Qualification.SdkPluginEchoEntry</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+    <ProjectReference Include="../PiSharp.SdkPluginEcho.PluginA/PiSharp.SdkPluginEcho.PluginA.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../PiSharp.SdkPluginEcho.PluginB/PiSharp.SdkPluginEcho.PluginB.csproj" ReferenceOutputAssembly="false" />
+    <Compile Include="../PiSharp.SdkPluginEcho.Tests/PluginEchoControls.cs" Link="PluginEchoControls.cs" />
+    <Compile Include="../PiSharp.OriginalProviderQualification.Shared/QualificationEvidence.cs" Link="QualificationEvidence.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,802 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "responses-tools-sdk-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "api.openai-responses",
+    "tools.declaration-replay"
+  ],
+  "kind": "authored-offline-full-wrapper-tool-history-input",
+  "normalizerVersion": "object-key-order-v1; raw-body-and-headers-retained",
+  "scenario": "Five real wrapper requests replay ordered standard function tools and strict-mode capability",
+  "clock": {
+    "unixMilliseconds": 1700000000000,
+    "mechanism": "Harness fixes Date.now; wrapper has no clock option; source and SDK files unchanged"
+  },
+  "seed": "Explicit case/transcript/session/request IDs; no RNG replacement",
+  "model": {
+    "id": "synthetic-tools-sdk-model",
+    "name": "Synthetic standard-tools SDK model",
+    "api": "openai-responses",
+    "provider": "openai",
+    "baseUrl": "https://pisharp-oracle.invalid/v1",
+    "reasoning": false,
+    "input": [
+      "text"
+    ],
+    "contextWindow": 4096,
+    "maxTokens": 1024,
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+    },
+    "headers": {
+      "X-Model": "model-owned",
+      "X-Remove": "remove-with-null"
+    },
+    "compat": {
+      "supportsMidConvoSystemMessages": false,
+      "supportsAdditionalTools": false,
+      "supportsToolSearch": false,
+      "supportsOpenAIGrammarTools": false
+    }
+  },
+  "commonOptions": {
+    "apiKey": "sk-pisharp-oracle-inert-noncredential",
+    "cacheRetention": "short",
+    "sessionId": "pisharp-tools-session",
+    "timeoutMs": 5000,
+    "maxRetries": 0,
+    "temperature": 0,
+    "headers": {
+      "User-Agent": "PiSharp-genuine-tools-oracle/1",
+      "X-Client-Request-Id": "pisharp-tools-request",
+      "X-Fixture": "tools-fixed",
+      "X-Remove": null
+    },
+    "env": {},
+    "maxTokens": 64
+  },
+  "wireFixture": {
+    "path": "fixtures/pi-v0.99.1/responses-sdk/core.input.json",
+    "sha256": "3d4431739bcce4b2218d13a71dba4bf273fe47aab8937f36d3177eb984bf9633",
+    "use": "response"
+  },
+  "cases": [
+    {
+      "caseId": "initial-tools-strict-capable",
+      "compat": {
+        "supportsStrictMode": true
+      },
+      "context": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "Use the active file tools.",
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read authored text π.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false,
+                  "x-fixture-opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "write",
+                "description": "Write original text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "user",
+            "content": "Initial file tools.",
+            "timestamp": 1700000000001
+          }
+        ]
+      },
+      "options": {}
+    },
+    {
+      "caseId": "remove-add-strict-capable",
+      "compat": {
+        "supportsStrictMode": true
+      },
+      "context": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "Use the active file tools.",
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read authored text π.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false,
+                  "x-fixture-opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "write",
+                "description": "Write original text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "user",
+            "content": "Initial file tools.",
+            "timestamp": 1700000000001
+          },
+          {
+            "role": "system",
+            "content": "",
+            "toolsRemoved": [
+              {
+                "name": "read"
+              }
+            ],
+            "toolsAdded": [
+              {
+                "name": "edit",
+                "description": "Edit exact text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "oldText": {
+                      "type": "string"
+                    },
+                    "newText": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "oldText",
+                    "newText"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000002
+          },
+          {
+            "role": "user",
+            "content": "After removing read and adding edit.",
+            "timestamp": 1700000000003
+          }
+        ]
+      },
+      "options": {}
+    },
+    {
+      "caseId": "readd-strict-capable",
+      "compat": {
+        "supportsStrictMode": true
+      },
+      "context": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "Use the active file tools.",
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read authored text π.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false,
+                  "x-fixture-opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "write",
+                "description": "Write original text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "user",
+            "content": "Initial file tools.",
+            "timestamp": 1700000000001
+          },
+          {
+            "role": "system",
+            "content": "",
+            "toolsRemoved": [
+              {
+                "name": "read"
+              }
+            ],
+            "toolsAdded": [
+              {
+                "name": "edit",
+                "description": "Edit exact text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "oldText": {
+                      "type": "string"
+                    },
+                    "newText": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "oldText",
+                    "newText"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000002
+          },
+          {
+            "role": "user",
+            "content": "After removing read and adding edit.",
+            "timestamp": 1700000000003
+          },
+          {
+            "role": "system",
+            "content": "",
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read authored text π.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false,
+                  "x-fixture-opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              }
+            ],
+            "timestamp": 1700000000004
+          },
+          {
+            "role": "user",
+            "content": "After re-adding read.",
+            "timestamp": 1700000000005
+          }
+        ]
+      },
+      "options": {}
+    },
+    {
+      "caseId": "replace-strict-capable",
+      "compat": {
+        "supportsStrictMode": true
+      },
+      "context": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "Use the active file tools.",
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read authored text π.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false,
+                  "x-fixture-opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "write",
+                "description": "Write original text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "user",
+            "content": "Initial file tools.",
+            "timestamp": 1700000000001
+          },
+          {
+            "role": "system",
+            "content": "",
+            "toolsRemoved": [
+              {
+                "name": "read"
+              }
+            ],
+            "toolsAdded": [
+              {
+                "name": "edit",
+                "description": "Edit exact text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "oldText": {
+                      "type": "string"
+                    },
+                    "newText": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "oldText",
+                    "newText"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000002
+          },
+          {
+            "role": "user",
+            "content": "After removing read and adding edit.",
+            "timestamp": 1700000000003
+          },
+          {
+            "role": "system",
+            "content": "",
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read authored text π.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false,
+                  "x-fixture-opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              }
+            ],
+            "timestamp": 1700000000004
+          },
+          {
+            "role": "user",
+            "content": "After re-adding read.",
+            "timestamp": 1700000000005
+          },
+          {
+            "role": "system",
+            "content": "",
+            "toolsAdded": [
+              {
+                "name": "write",
+                "description": "Write replacement definition.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "append",
+                        "replace"
+                      ],
+                      "default": "replace"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000006
+          },
+          {
+            "role": "user",
+            "content": "After replacing write in place.",
+            "timestamp": 1700000000007
+          }
+        ]
+      },
+      "options": {}
+    },
+    {
+      "caseId": "replace-strict-incapable",
+      "compat": {
+        "supportsStrictMode": false
+      },
+      "context": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "Use the active file tools.",
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read authored text π.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false,
+                  "x-fixture-opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "write",
+                "description": "Write original text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "user",
+            "content": "Initial file tools.",
+            "timestamp": 1700000000001
+          },
+          {
+            "role": "system",
+            "content": "",
+            "toolsRemoved": [
+              {
+                "name": "read"
+              }
+            ],
+            "toolsAdded": [
+              {
+                "name": "edit",
+                "description": "Edit exact text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "oldText": {
+                      "type": "string"
+                    },
+                    "newText": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "oldText",
+                    "newText"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000002
+          },
+          {
+            "role": "user",
+            "content": "After removing read and adding edit.",
+            "timestamp": 1700000000003
+          },
+          {
+            "role": "system",
+            "content": "",
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read authored text π.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false,
+                  "x-fixture-opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              }
+            ],
+            "timestamp": 1700000000004
+          },
+          {
+            "role": "user",
+            "content": "After re-adding read.",
+            "timestamp": 1700000000005
+          },
+          {
+            "role": "system",
+            "content": "",
+            "toolsAdded": [
+              {
+                "name": "write",
+                "description": "Write replacement definition.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "append",
+                        "replace"
+                      ],
+                      "default": "replace"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000006
+          },
+          {
+            "role": "user",
+            "content": "After replacing write in place.",
+            "timestamp": 1700000000007
+          }
+        ]
+      },
+      "options": {}
+    }
+  ],
+  "provenance": {
+    "kind": "authored-synthetic-input",
+    "transcript": "Explicit system toolsAdded/toolsRemoved standard JSON-schema declarations and user messages; no legacy context.tools shortcut",
+    "wire": "Reused exact authored response SSE bytes from hash-pinned earlier input, never an earlier golden",
+    "credential": "Inert authored marker only",
+    "expectedValues": "Fresh genuinely observed unchanged exported stream and real SDK request serialization",
+    "advancedInventory": "Grammar/custom tools, strict constrained schema transformation, anchored additional_tools and tool search remain separate unqualified source surfaces; no permanent exclusion decision",
+    "scopeExclusions": [
+      "Live authentication/provider calls",
+      "Native differential",
+      "Actual tool execution",
+      "Full provider payload/gate parity"
+    ]
+  }
+}

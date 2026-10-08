@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>PublishedFixture.SystemImport</AssemblyName>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../../src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj" />
+    <ProjectReference Include="../../../../../src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="../../../../../src/PiSharp.Contracts/PiSharp.Contracts.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+  <Target Name="RemoveSharedAbiCopies" AfterTargets="Publish">
+    <Delete Files="$(PublishDir)PiSharp.Extensions.Abstractions.dll;$(PublishDir)PiSharp.Contracts.dll" />
+  </Target>
+</Project>

@@ -1,0 +1,31 @@
+# Original compaction event projection
+
+Source-only leaf based on commit `6170379555cc9d817cdf3a360857a319ab8ba31b`, tree `8405c976f4ded93746e6ff88532e26d6a4ce0cfc`. No build, tests, upstream runtime, Node, network or provider execution was performed. The projector is not attached to a dispatcher or session lifecycle in this leaf.
+
+## Pinned source contract
+
+The locally supplied original oracle is Pi v0.99.1, pinned `d86654abb8862e201933517d6f1fce9f88dd117f`. The inspected source is [agent-session.ts](https://github.com/badlogic/pi-mono/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/agent-session.ts); its physical SHA256 `26e76e13456757b0419df26b1f4d9bce9faa28c2588ad66af3e4cc3e9b179e0a` matches the supplied `.pisharp-semantic-api-oracle.json` canonical row. Lines 203–214 define `compaction_start` and `compaction_end`, with reason `manual`, `threshold`, or `overflow`. Older `auto_compaction_start` / `auto_compaction_end` names in native alias documentation are stale and must not guide new integration. The external `ORIGINAL_PORT_REMAINING_RECONCILIATION_AND_ASSIGNMENTS_R295.md` was read; its source-only, coordinator-owned integration and open parity gates remain authoritative.
+
+Start serializes `type`, `reason`. End serializes `type`, `reason`, optional `result`, `aborted`, `willRetry`, optional `errorMessage`, in that order. Missing result/error serialize by omission, matching JSON serialization of undefined original fields. The original result order is `summary`, `firstKeptEntryId`, `tokensBefore`, `estimatedTokensAfter`, optional `usage`, optional `details` (manual lines 2782–2788; automatic lines 3113–3122). Details retain arbitrary supplied JSON, including explicit null. Usage, when supplied, must be an object. All numbers must be finite and nonnegative.
+
+`OriginalCompactionEventProjector.Start`, `Result`, and `End` return immutable `JsonData` using the existing bounded RPC codec. End accepts only the original result inventory, validates required values, and projects it in pinned order. It refuses native checkpoint/status/generation wrappers, inconsistent result/abort/error combinations, and retries outside a successful overflow compaction. It does not add IDs, native generations, checkpoint flags, or recovery status. Callers supply the original complete diagnostic text; the projector does not infer a diagnostic from a native exception or status.
+
+Terminal consistency restrictions follow the inspected emission branches, rather than the broader TypeScript event union alone: manual success/failure at 2792–2798 and 2800–2813, automatic success/failure at 3121–3122 and 3130–3142. Success supplies a result with aborted false and no diagnostic; failures omit result and set retry false; aborted failures omit diagnostics. The C# null argument means absent/undefined result or diagnostic. Explicit JSON null is not an original result object, while optional details may contain null.
+
+## Required session and dispatcher integration inputs
+
+Original admission and ordering belong to the original operation, not this pure formatter:
+
+- An admitted start and explicit origin reason. Automatic source start occurs after successful preparation (lines 3035–3036), so a skipped native recovery does not prove that start happened.
+- Acknowledged compaction summary, retained boundary ID, tokens before, optional actual usage/details, and the token estimate of the rebuilt selected context. Automatic source appends and refreshes context before computing that estimate (lines 3092–3095). A checkpoint ID alone cannot populate this result.
+- Actual terminal aborted state and error provenance. Original failure text is `Compaction failed: ...` for manual, `Auto-compaction failed: ...` for threshold, and `Context overflow recovery failed: ...` for overflow; aborted failures omit errorMessage (manual lines 2800–2813, automatic lines 3130–3142).
+- Actual overflow retry intent at successful terminal publication; threshold/manual use false, failed/aborted terminals use false. Origin and retry cannot be guessed from the `Automatic` planning flag.
+- Original start-before-terminal delivery, exactly one terminal for a delivered start, and durable acknowledgement before successful terminal delivery. Manual source clears active compaction state before end listeners (lines 2790–2798). Session ownership, concurrency, settlement, and observer/output failures remain integration responsibilities.
+
+Existing `SessionRecoveryStarted` carries reason/retry but is a native recovery notification. `SessionRecoveryEnded` carries status/retry/checkpoint ID and lacks reason, original result, aborted cause, and exact diagnostic. `SessionCompactionObservation` carries the successful actual compaction entry, reason and retry but lacks rebuilt-context estimate and failure/start lifecycle. Do not synthesize original frames from these incomplete inputs. The root owns shared session/dispatcher changes needed to deliver the missing semantics, including deciding how to expose post-summary state accurately for automatic operations.
+
+## Authored checks and remaining qualification
+
+`tests/PiSharp.Rpc.Tests/OriginalCompactionWireTests.cs` adds six groups: exact starts for all three reasons; successful result/end field order and values; failure/abort omissions; optional nested and null details; invalid native payload and inconsistent input refusal; complete-frame output bounds. Expected wire strings and token numbers are independently fixed against the source contract. These are projection checks, not claims of lifecycle or durable-operation parity.
+
+The existing executable `PiSharp.Rpc.Tests.csproj` references `PiSharp.Rpc` and discovers source files by SDK defaults. No project, package, lock file, or existing source was edited. Program registration is reserved to root: add `OriginalCompactionWireTests.Cases()` to the normal named case collection and corresponding directly awaited verification branch using the existing runner pattern. All six groups are unregistered and unexecuted in this leaf. Runtime qualification, shared integration, and independent review remain outstanding; original compaction wire parity is not accepted here.

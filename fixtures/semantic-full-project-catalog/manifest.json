@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "kind": "genuine-unchanged-upstream-config-released-catalog-semantic-diagnostics-reference",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "receiptSha256": "2e5fea6e5ed55fdff54dfc507499eb98e0bfba6851a9004d6c5e9b1af09981f4",
+  "baselineSnapshotSha256": "9688c7ab648cab659fc12b93cf39d817f9fd398145ed23185c1439790d7a5d28",
+  "harness": [
+    {
+      "path": "compatibility/semantic-full-project-catalog.plan.json",
+      "bytes": 11376,
+      "sha256": "398d02d6f33e63a1bd933ce0ee6875baa7aa0f4db58d60ba03d613b089bac202"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-catalog.md",
+      "bytes": 14170,
+      "sha256": "560046af8b802cb2ee2442c1e9fc2ef2511f07a1096e52f1f24f758c2a199372"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "bytes": 15169,
+      "sha256": "1c8fb8f5c386e4b7ff9f91a419afea3cb9086952d095b1bbad3380d234daa44c"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog-driver.mjs",
+      "bytes": 12416,
+      "sha256": "36fb36dae3e43b6bb46629c8fa4a1c827a84b17fc768ad5280f7c70c63f60395"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog-preload.mjs",
+      "bytes": 8586,
+      "sha256": "eb92f092ebd850e1acac0cf1a4e1aecfc894ec5a6155a4df63a4e41e00ddb39c"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog.test.mjs",
+      "bytes": 11463,
+      "sha256": "509d1e750703d4df5f67d420db6e62e9cb0b5d91c5dac1bef2a0de606e89ba06"
+    },
+    {
+      "path": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "bytes": 7166,
+      "sha256": "3e4486556f452675e70eab476f6271326de32422e4869a9e3acad48d7d622893"
+    }
+  ],
+  "expected": {
+    "path": "fixtures/semantic-full-project-catalog/expected.json",
+    "bytes": 13305865,
+    "sha256": "e3fedaa55a824fe2bcdf8eac26804b563d24c02a403fe6846930deba9291fe52"
+  },
+  "rawProvenance": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-semantic-full-project-catalog-first\\first.json.provenance.json",
+      "sha256": "a4da72698a4acaa064e11c4e1e901a5292bd5f7b0501e195a0e3a5e77275aceb"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-semantic-full-project-catalog-first\\second.json.provenance.json",
+      "sha256": "383aacb95440c927645a3ca49a1dc979e851ca11d37ee5e833bd3298767cf5a4"
+    }
+  ],
+  "originalConfigOpenedUnchanged": true,
+  "admittedPackageFiles": 1915,
+  "admittedDeclarationFiles": 928,
+  "catalogDataFiles": 43,
+  "catalogDataBytes": 902551,
+  "publishedOwnershipBlockers": 3,
+  "diagnosticFiltering": false,
+  "pathNormalization": false,
+  "semanticPublicClosure": false,
+  "phaseGatesPassed": []
+}

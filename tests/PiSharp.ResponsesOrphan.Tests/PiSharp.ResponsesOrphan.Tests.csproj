@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup Condition="'$(ResponsesOrphanRetainedProductsRoot)' == ''">
+    <ProjectReference Include="../../src/PiSharp.AI/PiSharp.AI.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(ResponsesOrphanRetainedProductsRoot)' != ''">
+    <Reference Include="PiSharp.AI"><HintPath>$(ResponsesOrphanRetainedProductsRoot)/PiSharp.AI.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="PiSharp.Contracts"><HintPath>$(ResponsesOrphanRetainedProductsRoot)/PiSharp.Contracts.dll</HintPath><Private>true</Private></Reference>
+  </ItemGroup>
+</Project>

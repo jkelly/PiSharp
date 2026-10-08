@@ -1,0 +1,274 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "normalizerVersion": "object-key-order-v1",
+  "claim": "Authored synthetic contracts and narrow captured upstream queue oracle are separate evidence kinds; no native parity claim",
+  "fixtures": [
+    {
+      "fixtureId": "text-authoritative-end",
+      "requirementIds": [
+        "stream.indexed-events",
+        "stream.terminal-settlement"
+      ],
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "scenario": "Exact Unicode/CRLF/path text, unknown root data and authoritative text end",
+      "clock": {
+        "unixMilliseconds": 1700000000000
+      },
+      "seed": "none",
+      "environment": {
+        "os": "portable JSON input; execution tested on Windows x64",
+        "credentials": "none",
+        "network": "none"
+      },
+      "normalizerVersion": "object-key-order-v1",
+      "provenance": {
+        "kind": "authored-synthetic-contract",
+        "origin": "Newly authored PiSharp fixture; frame shape sourced from pinned public types; expected reduction not captured from upstream",
+        "upstreamOutput": false
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/providers/text-authoritative-end.json",
+        "sha256": "a66edff6bbd09ee5be76044b40934fbe115af411bbf251c502005a679d0b1804"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/providers/text-authoritative-end.expected.json",
+        "sha256": "bb0d13b5ff79de4c8fe02866cfdf9e995608e0895768871fb8541d1da409bb39"
+      },
+      "providerWireFrames": {
+        "state": "Not provided; frame-replay contract only"
+      },
+      "effects": []
+    },
+    {
+      "fixtureId": "interleaved-thinking-tool",
+      "requirementIds": [
+        "stream.indexed-events",
+        "stream.terminal-settlement"
+      ],
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "scenario": "Indexed interleaved text/thinking/tool frames with final arguments and opaque signatures",
+      "clock": {
+        "unixMilliseconds": 1700000000000
+      },
+      "seed": "none",
+      "environment": {
+        "os": "portable JSON input; execution tested on Windows x64",
+        "credentials": "none",
+        "network": "none"
+      },
+      "normalizerVersion": "object-key-order-v1",
+      "provenance": {
+        "kind": "authored-synthetic-contract",
+        "origin": "Newly authored PiSharp fixture; frame shape sourced from pinned public types; expected reduction not captured from upstream",
+        "upstreamOutput": false
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/providers/interleaved-thinking-tool.json",
+        "sha256": "9260b877c797e8b9af1aa7f4fb75397c5b67c4055802476dac275235c9e7a98c"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/providers/interleaved-thinking-tool.expected.json",
+        "sha256": "d5977c5bfc2d67ff6323ae66a03f06f5c08e8887499819a0ac40d778ea6864b9"
+      },
+      "providerWireFrames": {
+        "state": "Not provided; frame-replay contract only"
+      },
+      "effects": []
+    },
+    {
+      "fixtureId": "redacted-thinking-usage",
+      "requirementIds": [
+        "stream.indexed-events",
+        "stream.terminal-settlement"
+      ],
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "scenario": "Empty redacted thinking retains signature; reasoning zero remains present and cacheWrite1h absent",
+      "clock": {
+        "unixMilliseconds": 1700000000000
+      },
+      "seed": "none",
+      "environment": {
+        "os": "portable JSON input; execution tested on Windows x64",
+        "credentials": "none",
+        "network": "none"
+      },
+      "normalizerVersion": "object-key-order-v1",
+      "provenance": {
+        "kind": "authored-synthetic-contract",
+        "origin": "Newly authored PiSharp fixture; frame shape sourced from pinned public types; expected reduction not captured from upstream",
+        "upstreamOutput": false
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/providers/redacted-thinking-usage.json",
+        "sha256": "3784bd8cda7aa19cc094116526b28c830f812a30a11773116814d377e64fb59d"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/providers/redacted-thinking-usage.expected.json",
+        "sha256": "076ab826bfaf629f2020ed03d3558521336798d177c5a8c8e2faf8dd952c4ae7"
+      },
+      "providerWireFrames": {
+        "state": "Not provided; frame-replay contract only"
+      },
+      "effects": []
+    },
+    {
+      "fixtureId": "prestart-error",
+      "requirementIds": [
+        "stream.terminal-settlement"
+      ],
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "scenario": "Error may precede start and settles once",
+      "clock": {
+        "unixMilliseconds": 1700000000000
+      },
+      "seed": "none",
+      "environment": {
+        "os": "portable JSON input; execution tested on Windows x64",
+        "credentials": "none",
+        "network": "none"
+      },
+      "normalizerVersion": "object-key-order-v1",
+      "provenance": {
+        "kind": "authored-synthetic-contract",
+        "origin": "Newly authored PiSharp fixture; frame shape sourced from pinned public types; expected reduction not captured from upstream",
+        "upstreamOutput": false
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/providers/prestart-error.json",
+        "sha256": "b3dcf6f4173dad7cf43ad4e79379b166216d705f189b5e1b709df5496bb1bf88"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/providers/prestart-error.expected.json",
+        "sha256": "1d31f4a5d8db651f937971770dc644c132fc5fd2f68322e141864565686ea553"
+      },
+      "providerWireFrames": {
+        "state": "Not provided; frame-replay contract only"
+      },
+      "effects": []
+    },
+    {
+      "fixtureId": "queue-order-first-terminal",
+      "requirementIds": [
+        "stream.terminal-settlement"
+      ],
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "scenario": "Queue preserves order and ignores pushes after terminal",
+      "clock": {
+        "unixMilliseconds": 1700000000000
+      },
+      "seed": "none",
+      "environment": {
+        "os": "win32",
+        "architecture": "x64",
+        "credentials": "environment not inherited",
+        "network": "disabled by builtin guard"
+      },
+      "normalizerVersion": "object-key-order-v1",
+      "provenance": {
+        "kind": "captured-upstream-oracle",
+        "inputOrigin": "authored synthetic operations",
+        "sourceModule": "packages/ai/src/utils/event-stream.ts",
+        "captureTool": "tools/PiReferenceRunner/capture.mjs",
+        "scope": "Queue order, mutable references, first terminal settlement; no frame reducer/provider execution",
+        "capturedAt": "2026-09-30"
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/reference-inputs/queue-order-first-terminal.json",
+        "sha256": "180e034bff4159a575ce6ce2a59e97930b7856b0bb922895144c18cf0f7c3d1c"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/reference-oracle/queue-order-first-terminal.expected.json",
+        "sha256": "b485f425013760fc5e3efe406c2bdfd92a23b4d36cd53847d750f9334b9c8a0b"
+      },
+      "providerWireFrames": {
+        "state": "Not applicable; upstream queue seam only"
+      },
+      "effects": []
+    },
+    {
+      "fixtureId": "queue-error-before-start",
+      "requirementIds": [
+        "stream.terminal-settlement"
+      ],
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "scenario": "First error before start settles and later start is ignored",
+      "clock": {
+        "unixMilliseconds": 1700000000000
+      },
+      "seed": "none",
+      "environment": {
+        "os": "win32",
+        "architecture": "x64",
+        "credentials": "environment not inherited",
+        "network": "disabled by builtin guard"
+      },
+      "normalizerVersion": "object-key-order-v1",
+      "provenance": {
+        "kind": "captured-upstream-oracle",
+        "inputOrigin": "authored synthetic operations",
+        "sourceModule": "packages/ai/src/utils/event-stream.ts",
+        "captureTool": "tools/PiReferenceRunner/capture.mjs",
+        "scope": "Queue order, mutable references, first terminal settlement; no frame reducer/provider execution",
+        "capturedAt": "2026-09-30"
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/reference-inputs/queue-error-before-start.json",
+        "sha256": "9df32b16874973a2985e796197e703537674ba9e14a1bbed3160d1b5b9857610"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/reference-oracle/queue-error-before-start.expected.json",
+        "sha256": "87a287de4bf1cac6c02aaa30dd02b77f2507d505923dfbc4293bef3d0f7d0096"
+      },
+      "providerWireFrames": {
+        "state": "Not applicable; upstream queue seam only"
+      },
+      "effects": []
+    },
+    {
+      "fixtureId": "queue-mutable-partials",
+      "requirementIds": [
+        "stream.terminal-settlement"
+      ],
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "scenario": "Capture emission snapshots while upstream queue preserves shared live partial references",
+      "clock": {
+        "unixMilliseconds": 1700000000000
+      },
+      "seed": "none",
+      "environment": {
+        "os": "win32",
+        "architecture": "x64",
+        "credentials": "environment not inherited",
+        "network": "disabled by builtin guard"
+      },
+      "normalizerVersion": "object-key-order-v1",
+      "provenance": {
+        "kind": "captured-upstream-oracle",
+        "inputOrigin": "authored synthetic operations",
+        "sourceModule": "packages/ai/src/utils/event-stream.ts",
+        "captureTool": "tools/PiReferenceRunner/capture.mjs",
+        "scope": "Queue order, mutable references, first terminal settlement; no frame reducer/provider execution",
+        "capturedAt": "2026-09-30"
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/reference-inputs/queue-mutable-partials.json",
+        "sha256": "41ae9760e4a675fc2fd62409ffac091751e804370d2fd11ab1fb6bf10ca9960c"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/reference-oracle/queue-mutable-partials.expected.json",
+        "sha256": "896769baec32369ed7ba63bed3f00daec3e4001dad11a5119b17953c6d845a4a"
+      },
+      "providerWireFrames": {
+        "state": "Not applicable; upstream queue seam only"
+      },
+      "effects": []
+    }
+  ],
+  "coverageGaps": [
+    "No recorded upstream provider wire frames",
+    "Frame reducer blocked by absent partial-json dependency",
+    "Agent/tool/session/RPC/extension/terminal reference execution absent",
+    "Generated provider catalogs and release/package artifacts not acquired"
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "node": {
+    "version": "24.19.0",
+    "icu": "78.3",
+    "unicode": "17.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "files": [
+    {
+      "name": "pinned-cjdict.dict",
+      "bytes": 2007296,
+      "sha256": "3850478c713b2004cbb96ef4b9f049caf16d6faf32a883d2e63c09659d0c59c7"
+    },
+    {
+      "name": "pinned-thaidict.dict",
+      "bytes": 126144,
+      "sha256": "ea47ae521cea65077bf047a75d1e9d28c495ec2f8cf4d2734fcb65a888229be9"
+    },
+    {
+      "name": "icu78-cjdict.txt",
+      "bytes": 4195904,
+      "sha256": "e73fd72048981d0cc13e9dc436a7eaba07ffb6eff58c8a59dc75c1df746663a0"
+    },
+    {
+      "name": "icu78-thaidict.txt",
+      "bytes": 493054,
+      "sha256": "3166abde40c0f44ab91c28f5ce96d7d1472cb7882e1c0bda0a72f8f69dba4274"
+    },
+    {
+      "name": "icu78-word.txt",
+      "bytes": 5929,
+      "sha256": "8c623551556473c97f32a1ecc22716c4d73fbf71b8dc500a4b461302ca146171"
+    },
+    {
+      "name": "icu78-dictbe.cpp",
+      "bytes": 63993,
+      "sha256": "7ff35464a40669eb77ef4931f0fe6a041392f12603f07908af309dda3e22a022"
+    },
+    {
+      "name": "icu78-LICENSE",
+      "bytes": 27718,
+      "sha256": "e55522d81edc687a341a4411e0776e54ca654e90147f354a90458aaced4116af"
+    },
+    {
+      "name": "UnicodeData-17.0.0.txt",
+      "bytes": 2198209,
+      "sha256": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c"
+    },
+    {
+      "name": "LineBreak-17.0.0.txt",
+      "bytes": 263180,
+      "sha256": "e6a18fa91f8f6a6f8e534b1d3f128c21ada45bfe152eb6b1bcc5e15fd8ac92e6"
+    },
+    {
+      "name": "NormalizationTest-17.0.0.txt",
+      "bytes": 2827429,
+      "sha256": "5019ffd530751a741900c849c0e010332f142a3612234639bd200b82138a87db"
+    }
+  ],
+  "wordBreakProperty": {
+    "bytes": 114445,
+    "sha256": "72274cac1e6b919507db35655c3e175aa27274668a1ece95c28d2069f2ad9852"
+  }
+}

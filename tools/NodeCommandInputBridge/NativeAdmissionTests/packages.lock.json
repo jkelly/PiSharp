@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "pisharp.compatibility.node": {
+        "dependencies": {
+          "PiSharp.Contracts": "[1.0.0, )",
+          "PiSharp.Extensions.Runtime": "[1.0.0, )",
+          "PiSharp.ExtensionHost": "[1.0.0, )",
+          "PiSharp.Extensions.Abstractions": "[1.0.0, )"
+        },
+        "type": "Project"
+      },
+      "pisharp.contracts": {
+        "type": "Project"
+      },
+      "pisharp.extensionhost": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.0.0, )"
+        }
+      },
+      "pisharp.extensions.abstractions": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.0.0, )"
+        }
+      },
+      "pisharp.extensions.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Extensions.Abstractions": "[1.0.0, )"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+    <ProjectReference Include="../PiSharp.SdkPluginEcho.PluginA/PiSharp.SdkPluginEcho.PluginA.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../PiSharp.SdkPluginEcho.PluginB/PiSharp.SdkPluginEcho.PluginB.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

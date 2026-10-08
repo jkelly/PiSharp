@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../tests/PiSharp.ProviderComparison.Tests/OriginalSdkComparison/AnthropicHookChecks.cs" />
+    <ProjectReference Include="../../src/PiSharp.AI/PiSharp.AI.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Contracts/PiSharp.Contracts.csproj" />
+  </ItemGroup>
+</Project>

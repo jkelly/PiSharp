@@ -1,0 +1,37 @@
+# MCP pre-open discovered capture R288
+
+This source-only leaf acquires one server through an explicitly admitted MCP channel factory before historical tool declaration resolution. It constructs executable adapters only from the actual runtime initialize/tools-list publication. It neither infers permission from configuration nor invents callbacks for historical MCP names. No runtime, process, network, compiler or test execution was performed.
+
+## Acquisition and transfer
+
+`McpPreOpenServerCapture.AcquireAsync(...)` requires the enabled server entry, a fresh dedicated extension registry and active scope, an unbound base runtime registry, its exact final-action policy, an admitted schema validator/channel factory, finite runtime options containing the reserved target generation, and an explicit hook composer. Existing `McpServerRuntime.ConnectAsync` owns actual discovery and all physical request/cleanup originals. The capture privately stages those discovered descriptors and validates their native prepared adapters through `ExtensionAgentBinding` and `SessionRuntimeRegistry.WithToolCatalog`.
+
+`Registry` contains the discovered executable registrations. `CatalogSnapshot` exposes the actual discovered metadata for the activation manager's exposure/discovery-tool requirements. No public publication or refresh API accepts caller-authored offered tools. `TransferRuntimeOwnership()` transfers a dedicated resource-release wrapper once into the host's aggregate `SessionRuntimeLease` resources. During owning retirement this wrapper directly joins the already-started actual capture close-body task, so runtime release does not reenter an owning close API from its shutdown/replacement callback. Before binding/retirement it requests the stable capture close. Calls stay disabled until actual attachment binding.
+
+The current lifecycle seam is `PersistentSessionLifecycle.runtimeForWorkingDirectory` -> `PersistentAgentSession.OpenWithRuntimeFactoryAsync`: the history is projected, a fresh lease is acquired, and only then `registry.Resolve` checks historical declarations against actual discovered declarations. A mismatch rejects open and directly joins transferred resource cleanup. The cwd-only callback does not itself reserve an attachment generation. The root owner must reserve/supply the target generation before discovery and create a fresh capture/lease on every initial/replacement/fork/clone acquisition.
+
+`BindOwner(owner, attachment)` runs once after successful open, inside the owner's admitted attachment-binding phase and before exposure. It verifies exact current attachment, generation, native policy and captured executable catalog provenance. It registers the actual `runtime.CloseAsync` stop body through the authorized d21 stop-before-idle API. Root integration must bind every staged capture before provider/native tool admission.
+
+Reserved binding depends on root's `owner.CaptureToolCatalogRegistryForBinding(attachment)` seam. This reads through a replacement reservation only inside the exact admitted resource-registration attachment callback; outside it uses ordinary capture guards. It confers no mutation authority. If binding fails after earlier captures were bound, root must keep admission fenced, retire those registered resources through their actual stop/close-body originals, and release all still-unbound captures before disposing the aggregate runtime lease or exposing the target. Returning resource wrappers must be used for runtime release, rather than reentering `capture.CloseAsync()` from an owning retirement callback before its body has started.
+
+## Close and generation identity
+
+Close is a stable original task. Before binding it closes the actual runtime and removes only private staged registrations, joining failures independently. After binding the owning resource first initiates actual channel cancellation, joins physical originals before session idle, then withdraws only its own acknowledged catalog subset through the durable owned-resource transaction. Other servers/native registrations remain in the catalog. Durable withdrawal failure remains visible and does not claim successful removal.
+
+Adapter callbacks are sealed to their actual registered scope owner and reserved session generation before open. They reject pre-bind invocation, closing state, a replaced current attachment, cancelled attachment lifetime or a mismatched native invocation identity. A retired adapter is never rebound to a successor generation.
+
+The exact adapter provenance check is the new `SessionRuntimeRegistry.UsesCapturedToolBinding(name, declaration, adapter)` partial in this slice. It requires the same declaration object and same executable leaf adapter, unwrapping only the registry's own `NamedAdapter` wrappers on both supplied and stored references. Same-name, copied-schema or arbitrary forwarding substitutions cannot establish executable ownership. Its required root-owned one-line `NamedAdapter.Original => inner` hook is frozen at commit `9f5a83e3b43003686b338e2ac83faba50105829b`; it does not invoke callbacks or expose the private wrapper type.
+
+## Disjoint integration ownership
+
+The admitted activation manager and genuine codemode/tool_search identity leaf belong to the MCP acquisition worker. The manager composes multiple captures, validates all explicit admissions before acquiring any, checks actual per-tool exposure requirements, rebuilds the genuine discovery bindings and transfers one aggregate runtime lease. Serialized tool names or equal schema text cannot establish genuine codemode/search identity: pinned upstream requires the exact canonical parameter schema object.
+
+Shared CLI profile, lifecycle generation reservation, before-exposure binding, replacement hooks and runner registration belong to root. This slice does not claim those paths are wired, does not register a default native channel, and does not treat an in-repository chat transport as an MCP channel.
+
+## Static evidence and authored regression groups
+
+Six unexecuted groups cover held original discovery, changed historical schema rejection with held original channel cleanup, pre-bind/correct-bind/final-policy call behavior, substituted executable adapters and mismatched reserved generations, transferred runtime release during actual owning shutdown, and physical held call cancellation plus owning cleanup/withdrawal ordering. The held discovery control also rejects reuse of an acquired/closed dedicated registry before another channel acquisition. Tests use synthetic admitted channels and explicitly volatile in-memory session storage. They launch no clients/processes and claim no disk durability. Runner registration and compilation remain unperformed.
+
+The source baseline is authorized `573767101f476ee5dabfe6c4adcdcec480355b1b` plus independently authorized stop correction `d21a69508d7047ba30125b2e9614ef1979996646`, materialized by verified prerequisite bundle imports into the author's clean authorized object store. No denied-source clone, ownership override, qualification checkout or quarantined patch/source bytes were used. Bash source remains frozen in its separate lane.
+
+Behavior was inspected in the parent-pinned Pi v0.99.1 read-only upstream snapshot at commit `d86654abb8862e201933517d6f1fce9f88dd117f`: MCP initialization/registration, core MCP config and codemode/tool_search genuine-identity predicates. The snapshot has no Git metadata; physical hashes and the parent pin are recorded separately in the handoff.

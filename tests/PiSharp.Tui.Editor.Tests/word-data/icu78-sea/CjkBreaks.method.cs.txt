@@ -1,0 +1,56 @@
+        private static List<int> CjkBreaks(string text, int start, int end)
+        {
+            var norm = Normalization.Value; var work = new NormalizationWork(); var normalized = new StringBuilder(end - start);
+            norm.AppendNormalized(text.AsSpan(start, end - start), normalized, work); var value = normalized.ToString();
+            var runes = value.EnumerateRunes().ToArray(); var count = runes.Length; var offsets = new int[count + 1]; offsets[count] = end;
+            if (text.AsSpan(start, end - start).SequenceEqual(value))
+            {
+                var at = start; for (var i = 0; i < count; i++) { offsets[i] = at; at += runes[i].Utf16SequenceLength; }
+            }
+            else
+            {
+                var chunk = new StringBuilder(); var normalizedAt = 0; var cpIndex = 0;
+                for (var at = start; at < end;)
+                {
+                    var chunkStart = at; at += Rune.GetRuneAt(text, at).Utf16SequenceLength;
+                    while (at < end && !norm.BoundaryBefore(Rune.GetRuneAt(text, at).Value)) at += Rune.GetRuneAt(text, at).Utf16SequenceLength;
+                    chunk.Clear(); norm.AppendNormalized(text.AsSpan(chunkStart, at - chunkStart), chunk, work);
+                    for (var i = 0; i < chunk.Length; i++)
+                    {
+                        if (normalizedAt >= value.Length || value[normalizedAt++] != chunk[i]) throw new TerminalTextEditorException(TerminalTextEditorFailure.InvalidOptions);
+                        if (!char.IsLowSurrogate(chunk[i])) offsets[cpIndex++] = chunkStart;
+                    }
+                }
+                if (normalizedAt != value.Length || cpIndex != count) throw new TerminalTextEditorException(TerminalTextEditorFailure.InvalidOptions);
+            }
+            var cost = new uint[count + 1]; Array.Fill(cost, uint.MaxValue); cost[0] = 0;
+            var previous = new int[count + 1]; Array.Fill(previous, -1); var unit = 0; var previousKatakana = false;
+            Span<Candidate> matches = stackalloc Candidate[21];
+            ReadOnlySpan<uint> katakanaCosts = [8192, 984, 408, 240, 204, 252, 300, 372, 480];
+            for (var i = 0; i < count; i++)
+            {
+                if (cost[i] == uint.MaxValue) { unit += runes[i].Utf16SequenceLength; continue; }
+                var matchCount = Cjk.Value.MatchesInto(value, unit, value.Length, 20, matches[..20], out _);
+                if ((matchCount == 0 || matches[0].CodePoints != 1) && (Flags(runes[i].Value) & 4) == 0) matches[matchCount++] = new(runes[i].Utf16SequenceLength, 1, 255);
+                for (var m = 0; m < matchCount; m++)
+                {
+                    var match = matches[m]; var target = i + match.CodePoints; var nextCost = cost[i] + (uint)match.Value;
+                    if (nextCost < cost[target]) { cost[target] = nextCost; previous[target] = i; }
+                }
+                var katakana = IsKatakana(runes[i].Value);
+                if (katakana && !previousKatakana)
+                {
+                    var j = i + 1; while (j < count && j - i < 20 && IsKatakana(runes[j].Value)) j++;
+                    var length = j - i;
+                    if (length < 20)
+                    {
+                        var extra = length <= 8 ? katakanaCosts[length] : 8192; var nextCost = cost[i] + extra;
+                        if (nextCost < cost[j]) { cost[j] = nextCost; previous[j] = i; }
+                    }
+                }
+                previousKatakana = katakana; unit += runes[i].Utf16SequenceLength;
+            }
+            var result = new List<int>();
+            for (var at = count; at > 0; at = previous[at]) { var position = offsets[at]; if (position > start && position < end) result.Add(position); if (previous[at] < 0) break; }
+            result.Sort(); return result.Distinct().ToList();
+        }

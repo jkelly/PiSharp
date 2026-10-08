@@ -62,7 +62,7 @@ internal static class Program
     {
         if (args is ["session", "terminal", ..])
         {
-            if (args.Count(value => value == "--terminal-preview") != 1)
+            if (args.Count(value => value == "--terminal-preview") != 1 && args.Count(value => value == "--live") != 1)
                 return Fail("InvalidArguments", Commands.TerminalSessionCommand.Usage, 2);
             var startup = await Commands.TerminalSessionCommand.ValidateStartupAsync(args, Console.Error).ConfigureAwait(false);
             if (startup.Arguments is null) return startup.Result;
@@ -124,7 +124,8 @@ internal static class Program
     internal static async Task<int> RunTerminalHostAsync(string[] args, CancellationToken cancellationToken,
         Func<CancellationToken, ValueTask<PiSharp.Tui.WindowsConsoleTerminal>>? openConsole = null, TextWriter? errorOutput = null,
         Func<CancellationToken, ValueTask<PiSharp.Tui.IConsoleTerminal>>? openOwnedTestTerminal = null,
-        PiSharp.Cli.Interactive.TerminalKeybindingConfiguration? ownedTestConfiguration = null)
+        PiSharp.Cli.Interactive.TerminalKeybindingConfiguration? ownedTestConfiguration = null,
+        Commands.LiveSessionRuntime? liveRuntime = null)
     {
         var diagnostics = errorOutput ?? Console.Error;
         var startup = await Commands.TerminalSessionCommand.ValidateStartupAsync(args, diagnostics).ConfigureAwait(false);
@@ -146,7 +147,7 @@ internal static class Program
                 throw new InvalidOperationException("Owned terminal must provide its actual viewport.");
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, close?.CancellationToken ?? default);
             exitCode = await Commands.TerminalSessionCommand.RunWithTerminalRestoreAsync(args, terminal, viewport,
-                diagnostics, RestoreTerminalAndJoin, linked.Token, ownedTestConfiguration).ConfigureAwait(false);
+                diagnostics, RestoreTerminalAndJoin, linked.Token, ownedTestConfiguration, liveRuntime).ConfigureAwait(false);
         }
         catch (Exception error) { failure = error; }
         // The process-local close handler remains registered while application work,

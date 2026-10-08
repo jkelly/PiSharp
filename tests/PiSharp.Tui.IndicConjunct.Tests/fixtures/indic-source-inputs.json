@@ -1,0 +1,355 @@
+{
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "purpose": "Concrete user paste/arrow/deletion/undo and wrap flows for GB9c; not a packet-variant inventory",
+  "cases": [
+    {
+      "id": "devanagari-conjunct-editing",
+      "cluster": "क्ष",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~Aक्षZ\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": ""
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u0001"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[3~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "bengali-conjunct-editing",
+      "cluster": "ক্ষ",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~Aক্ষZ\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": ""
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u0001"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[3~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "gujarati-conjunct-editing",
+      "cluster": "ક્ષ",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~Aક્ષZ\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": ""
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u0001"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[3~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "oriya-conjunct-editing",
+      "cluster": "କ୍ଷ",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~Aକ୍ଷZ\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": ""
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u0001"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[3~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "telugu-conjunct-editing",
+      "cluster": "క్ష",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~Aక్షZ\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": ""
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u0001"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[3~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "malayalam-conjunct-editing",
+      "cluster": "ക്ഷ",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~Aക്ഷZ\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": ""
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u0001"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[3~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "devanagari-zwj-conjunct",
+      "cluster": "क्‍ष",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~Aक्‍षZ\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": ""
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "devanagari-conjunct-soft-wrap-and-resize",
+      "cluster": "क्ष",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~AAक्षZ\u001b[201~"
+        },
+        {
+          "kind": "resize",
+          "columns": 4
+        },
+        {
+          "kind": "input",
+          "raw": "\u0001"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[C"
+        },
+        {
+          "kind": "resize",
+          "columns": 20
+        },
+        {
+          "kind": "input",
+          "raw": ""
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        }
+      ]
+    }
+  ],
+  "preparationCorrection": "Preserve first capture; use Ctrl+A for editor line start because actual TuiAltScreen intercepts Home for viewport navigation. No Source implementation or state replacement."
+}

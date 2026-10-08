@@ -1,0 +1,497 @@
+{
+  "createdUtc": "2026-10-03T09:23:58.448Z",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceKittyProtocolMode": true,
+  "boundary": "Unchanged public Source Kitty mode setter, TuiAltScreen.start/setFocus/input callback/renderNow/stop and Editor state/render; public terminal interface resize; no private Source state/method/input replacement",
+  "manifest": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\source-manifest.json",
+    "bytes": 969151,
+    "sha256": "772c23326a8a341cc40235a95366639ea28cca1823089969cee1c5deb58b4048"
+  },
+  "inputs": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-kitty-alternate-key-preparation-r28\\alternate-key-source-inputs.json",
+    "bytes": 1764,
+    "sha256": "821d877f96dda7985cd28397ba8d34342b113e32b372daf5682e5707e209b477"
+  },
+  "driver": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-kitty-alternate-key-preparation-r28\\capture-alternate-key-source.mjs",
+    "bytes": 5357,
+    "sha256": "9cff3bf3f45710158f13836bf810e05068ac6293ee203994473fc1b0604236b4"
+  },
+  "node": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "bytes": 92825416,
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "loadedFiles": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\editor.ts",
+      "bytes": 84348,
+      "sha256": "30a47fd49042579be7b85262677df62d4ff37a8f9a3a0e6c41ce3cf1d402b9c3"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keybindings.ts",
+      "bytes": 10125,
+      "sha256": "eea5e3fe258ad50337595bb5320955a6d97bac0c8f6c0a838f988d75079bcf38"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\kill-ring.ts",
+      "bytes": 1295,
+      "sha256": "d829ae816560b12d2800a38db9f7278f76d9ef43d0e53e004a86add9b56c559a"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\tui.ts",
+      "bytes": 49604,
+      "sha256": "92dcb7f5f9a3a9575421d8de366be5cc78890be8df38d86c4ed3c0d77c7f88a4"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\terminal-colors.ts",
+      "bytes": 3082,
+      "sha256": "72d1ef298837bfe520bd8a060cb93ea27547dcbff04a167ace0f55b5183e550d"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\terminal-image.ts",
+      "bytes": 23218,
+      "sha256": "b901b8df0ad84e04ac0ee612c419b45d960430f63d2bdaa974c8dd9d89f3e6e5"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\utils.ts",
+      "bytes": 38919,
+      "sha256": "5ecbc6c9b4850e78bf19de1fe8859b99b9c4c5f8a6384728d255a8e7e8a610ee"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\index.js",
+      "bytes": 730,
+      "sha256": "d7b1ba05914c0fc311c20e5618bf8d0893c9c74078a07975e2df981445e64887"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\lookup.js",
+      "bytes": 2671,
+      "sha256": "c80ecc22b120b27ef5ea9facb7000b8fd4ec037a84d9231d215f1c44bc9c21d0"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\lookup-data.js",
+      "bytes": 4734,
+      "sha256": "f6b40f86c9a2a6808ec808fa8ddcb8da261254cc6121d37ffaeb2bf35dad1d5b"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\utilities.js",
+      "bytes": 650,
+      "sha256": "4b08a7e9e3ffacbcf198a6abceb2338d52ac671899e52ccc2851c898bfccac42"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\undo-stack.ts",
+      "bytes": 643,
+      "sha256": "1373c1e0a1e2c58ac90c93d32a9e5c1226d7f53314c77dd3d0f8ec349d2b3627"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\word-navigation.ts",
+      "bytes": 3987,
+      "sha256": "b73e915a524926ac8881731e89026b0bc7b5b0bd465de67257af81a420465c7f"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\select-list.ts",
+      "bytes": 9385,
+      "sha256": "0fc369801e745eff15567d72829bf67887f5efec8bc6816aaf1ee65338618373"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\tui-alt-screen.ts",
+      "bytes": 63272,
+      "sha256": "04f22573b153bb26eaa0d02b53d0bc2b812cec0c506873f6d031a8f2263a2142"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\alt-screen-search.ts",
+      "bytes": 11087,
+      "sha256": "7d339e83cf0f160847335dc9be0d1f1db2a0945c463c3d636c7b84ceb9665d40"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\input.ts",
+      "bytes": 15230,
+      "sha256": "416ceeb28f10b7146f6a284f276589797763b604d439574fbdc2a3ca52c00234"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\alt-screen-flash.ts",
+      "bytes": 1289,
+      "sha256": "6d341546b59958e93e4d33fdc1766b10d13c98a779031e2c01b827f0a4c6e30c"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\scroll-view.ts",
+      "bytes": 8168,
+      "sha256": "76dfd9f8a88cabc064f0652b83f16a945fbc988c9fe7c0423a4cd796907ef77d"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\layout-node.ts",
+      "bytes": 1364,
+      "sha256": "31dd68c9edafdc4f882bbb6c16f8deb1c514111020b647f0037b34d6b8c70a85"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\layout.ts",
+      "bytes": 15758,
+      "sha256": "7530a8eaa30f44fef82e8b7020b5068ba89d34884463c6cb526073b20fcdeef0"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\stack.ts",
+      "bytes": 5216,
+      "sha256": "93208d326fa43431b930eaa3250a1e19747063d696e97ec2f002f5feaa54fc18"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\wheel-scroll.ts",
+      "bytes": 2897,
+      "sha256": "a969a50d0a3627fde0052f766443e3668a6355b3ecf312ea078025080d303f82"
+    }
+  ],
+  "effects": [],
+  "cases": [
+    {
+      "id": "shifted-alternate-typing-and-backspace",
+      "cluster": "",
+      "clusterSegments": [],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[97:65;2u"
+          },
+          "columns": 20,
+          "text": "A",
+          "expandedText": "A",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7m \u001b[0m                  ",
+            "────────────────────"
+          ],
+          "changes": [
+            "A"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[98:66;2u"
+          },
+          "columns": 20,
+          "text": "AB",
+          "expandedText": "AB",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "cursorUtf16Offset": 2,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "AB\u001b_pi:c\u0007\u001b[7m \u001b[0m                 ",
+            "────────────────────"
+          ],
+          "changes": [
+            "A",
+            "AB"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": ""
+          },
+          "columns": 20,
+          "text": "A",
+          "expandedText": "A",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "A\u001b_pi:c\u0007\u001b[7m \u001b[0m                  ",
+            "────────────────────"
+          ],
+          "changes": [
+            "A",
+            "AB",
+            "A"
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "cyrillic-base-layout-line-start-and-insert",
+      "cluster": "",
+      "clusterSegments": [],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~alpha beta\u001b[201~"
+          },
+          "columns": 20,
+          "text": "alpha beta",
+          "expandedText": "alpha beta",
+          "cursor": {
+            "line": 0,
+            "col": 10
+          },
+          "cursorUtf16Offset": 10,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "alpha beta\u001b_pi:c\u0007\u001b[7m \u001b[0m         ",
+            "────────────────────"
+          ],
+          "changes": [
+            "alpha beta"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[1092::97;5u"
+          },
+          "columns": 20,
+          "text": "alpha beta",
+          "expandedText": "alpha beta",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "cursorUtf16Offset": 0,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "\u001b_pi:c\u0007\u001b[7ma\u001b[0mlpha beta          ",
+            "────────────────────"
+          ],
+          "changes": [
+            "alpha beta"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "Z"
+          },
+          "columns": 20,
+          "text": "Zalpha beta",
+          "expandedText": "Zalpha beta",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "cursorUtf16Offset": 1,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "Z\u001b_pi:c\u0007\u001b[7ma\u001b[0mlpha beta         ",
+            "────────────────────"
+          ],
+          "changes": [
+            "alpha beta",
+            "Zalpha beta"
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "cyrillic-base-layout-delete-word-and-undo",
+      "cluster": "",
+      "clusterSegments": [],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~one two\u001b[201~"
+          },
+          "columns": 20,
+          "text": "one two",
+          "expandedText": "one two",
+          "cursor": {
+            "line": 0,
+            "col": 7
+          },
+          "cursorUtf16Offset": 7,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "one two\u001b_pi:c\u0007\u001b[7m \u001b[0m            ",
+            "────────────────────"
+          ],
+          "changes": [
+            "one two"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[1094::119;5u"
+          },
+          "columns": 20,
+          "text": "one ",
+          "expandedText": "one ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "one \u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "one two",
+            "one "
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "one two",
+          "expandedText": "one two",
+          "cursor": {
+            "line": 0,
+            "col": 7
+          },
+          "cursorUtf16Offset": 7,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "one two\u001b_pi:c\u0007\u001b[7m \u001b[0m            ",
+            "────────────────────"
+          ],
+          "changes": [
+            "one two",
+            "one ",
+            "one two"
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    },
+    {
+      "id": "latin-codepoint-authoritative-over-conflicting-base",
+      "cluster": "",
+      "clusterSegments": [],
+      "steps": [
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[200~one two\u001b[201~"
+          },
+          "columns": 20,
+          "text": "one two",
+          "expandedText": "one two",
+          "cursor": {
+            "line": 0,
+            "col": 7
+          },
+          "cursorUtf16Offset": 7,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "one two\u001b_pi:c\u0007\u001b[7m \u001b[0m            ",
+            "────────────────────"
+          ],
+          "changes": [
+            "one two"
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[119::97;5u"
+          },
+          "columns": 20,
+          "text": "one ",
+          "expandedText": "one ",
+          "cursor": {
+            "line": 0,
+            "col": 4
+          },
+          "cursorUtf16Offset": 4,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "one \u001b_pi:c\u0007\u001b[7m \u001b[0m               ",
+            "────────────────────"
+          ],
+          "changes": [
+            "one two",
+            "one "
+          ],
+          "submits": []
+        },
+        {
+          "operation": {
+            "kind": "input",
+            "raw": "\u001b[45;5u"
+          },
+          "columns": 20,
+          "text": "one two",
+          "expandedText": "one two",
+          "cursor": {
+            "line": 0,
+            "col": 7
+          },
+          "cursorUtf16Offset": 7,
+          "focused": true,
+          "rows": [
+            "────────────────────",
+            "one two\u001b_pi:c\u0007\u001b[7m \u001b[0m            ",
+            "────────────────────"
+          ],
+          "changes": [
+            "one two",
+            "one ",
+            "one two"
+          ],
+          "submits": []
+        }
+      ],
+      "terminalEvents": [
+        "start",
+        "stop"
+      ],
+      "allSourceTerminalsStopped": true
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "whole-agent-progress-metadata-v1",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "P1-06",
+    "P1-07",
+    "P1-08",
+    "P3-01",
+    "P3-03"
+  ],
+  "input": {
+    "path": "tools/PiReferenceRunner/agent-progress-inputs.json",
+    "bytes": 11592,
+    "sha256": "d1894b264cd5aa070f5774574e6199f253c6fa2f756de34f725ac8913a55551e"
+  },
+  "expected": {
+    "path": "fixtures/pi-v0.99.1/agent-progress/core.expected.json",
+    "sha256": "9646c803429bd3a56b1a1e8fc3f07c01060052f9f32e6b4021265f7249dc8d3e",
+    "kind": "captured-unchanged-whole-agent-progress-oracle"
+  },
+  "lock": {
+    "path": "fixtures/pi-v0.99.1/agent-progress/oracle.lock.json",
+    "sha256": "9d1c348cb9b25901cab362bd5d832d40c433ed6e1f1a5f611f6a9a1aa3b33d53"
+  },
+  "clock": {
+    "unixMilliseconds": 1700000000000,
+    "mechanism": "Child-only Date.now replacement; source bytes unchanged; original restored after capture"
+  },
+  "seed": "none; authored identifiers and values",
+  "normalizerVersion": "raw-json-v1-key-order-only-with-numeric-lexemes",
+  "licenseStatus": {
+    "profile": "Source MIT plus exact minimal partial-json/typebox packaged MIT notices retained here",
+    "fullP102Closure": false,
+    "noNewPackageAcquisition": true
+  },
+  "provenance": {
+    "source": "Whole unchanged packages/agent/src/agent.ts and agent-loop.ts public lifecycle",
+    "input": "authored fake provider frames, tool implementations/results/hooks and gate choreography; no authored expected output",
+    "callbacks": "Authored execute/update and beforeToolCall/afterToolCall/finishTurn; two actual Agent subscribers",
+    "barrierControl": "Authored promise gates; no sleeps or source scheduler replacement",
+    "emissionSnapshot": "First source subscriber snapshots each complete event/state at entry before awaiting its barrier",
+    "jsonUnsupportedValues": "JSON.stringify omission and Set {} retained; own undefined/function/Set inventory is separate",
+    "credentials": "None inherited or required; no API key",
+    "repeatRuns": 2,
+    "byteIdentical": true
+  },
+  "scope": {
+    "qualifiedBoundary": "Only observations captured after root executes the unchanged whole public Agent lifecycle against authored fake streams/tools/hooks/gates on the exact approved minimal oracle",
+    "eventRetention": "All Agent events and fake-provider frames, listener entry/exit trace, tool trace, complete hook context/returns, barrier probes and final public state; no event exclusion",
+    "jsonUnsupportedValues": "JSON.stringify observations plus explicit own-undefined/function/Set inventories; original Set serializes as {} and values are separately recorded",
+    "nativeDifferencesOpen": [
+      "Native awaited/serialized progress versus source void callback and overlapping listeners",
+      "Native late-callback rejection versus source ignored late callbacks"
+    ],
+    "excludes": [
+      "Production providers, SDK/auth/wire mapping",
+      "Native parity or whole phase closure",
+      "Production file tools, durable sessions and RPC",
+      "Other failure/reentrancy/listener rejection paths",
+      "Cross-platform queue/scheduler equivalence"
+    ],
+    "numericScope": "Authored finite representable JS numbers only; retain actual serialized numeric lexemes and null/missing identity; no arbitrary-precision JS claim"
+  }
+}

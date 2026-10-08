@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "environmentLockPath": "tools/PiReferenceRunner/full-lock.json",
+  "environmentLockSha256": "66bd6efa573d9f0a160eb4005e0aba325debdbfdde40c042afab975c4c5caa1a",
+  "loadedModules": [
+    {
+      "path": "node_modules/partial-json/dist/index.js",
+      "sha256": "23f750aa1170c830b7ef180135852317886cc58ce7d2597e5eeee044539072c7",
+      "bytes": 8376
+    },
+    {
+      "path": "node_modules/partial-json/dist/options.js",
+      "sha256": "779b2aded6d4e2ec6171ea9d5d5d97551e8c3258b6e78a01d2e9fc6235865b36",
+      "bytes": 2849
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/assistant-message-frame.ts",
+      "sha256": "e3db9eb5fb4a56f6c45b43ff6a5ef87347c8c19f28b0cbdf389b1ddf1928a6e9",
+      "bytes": 18794
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/json-parse.ts",
+      "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "bytes": 2774
+    },
+    {
+      "path": "upstream/packages/coding-agent/src/experimental/source-resolver.ts",
+      "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6",
+      "bytes": 3592
+    }
+  ],
+  "sourceHashes": [
+    {
+      "path": "upstream/packages/ai/src/utils/assistant-message-frame.ts",
+      "sha256": "e3db9eb5fb4a56f6c45b43ff6a5ef87347c8c19f28b0cbdf389b1ddf1928a6e9",
+      "bytes": 18794,
+      "canonicalGitBlobSha256": "e3db9eb5fb4a56f6c45b43ff6a5ef87347c8c19f28b0cbdf389b1ddf1928a6e9",
+      "canonicalGitBlobBytes": 18794
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/json-parse.ts",
+      "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "bytes": 2774,
+      "canonicalGitBlobSha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "canonicalGitBlobBytes": 2774
+    },
+    {
+      "path": "upstream/packages/coding-agent/src/experimental/source-resolver.ts",
+      "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6",
+      "bytes": 3592,
+      "canonicalGitBlobSha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6",
+      "canonicalGitBlobBytes": 3592
+    }
+  ],
+  "harnessFiles": [
+    {
+      "path": "tools/PiReferenceRunner/frame-run.mjs",
+      "sha256": "da15bd33737a235ef2c6bed325d5ab3a5083bf5b5c32d5a18e9486256f0b70d5"
+    },
+    {
+      "path": "tools/PiReferenceRunner/frame-capture.mjs",
+      "sha256": "d1eb4c013466d18f6fe062a9e4619fd0ec024c80a53529d204d6384f73078c1a"
+    },
+    {
+      "path": "tools/PiReferenceRunner/full-preload.mjs",
+      "sha256": "e1f62a2048bc484a162085430a5afb6f88547d78049b6f29b2a0e4f65fcd79e2"
+    },
+    {
+      "path": "tools/PiReferenceRunner/offline-guard.mjs",
+      "sha256": "ae3741bdce496451bd04afcf8628df6ddc5bc5cfad8af6ee5e52cbc7b065a094"
+    },
+    {
+      "path": "tools/CompatibilityReport/raw-json.mjs",
+      "sha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9"
+    }
+  ]
+}

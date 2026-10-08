@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "environmentPins": {
+    "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "sourceTree": "200bd10bb146773516f862a02b8aaebeed163e00",
+    "executedSource": {
+      "path": "packages/coding-agent/src/core/tools/file-mutation-queue.ts",
+      "bytes": 1697,
+      "sha256": "33cb06ac9bcdf32c8b84d9d12e33be44c503a7670f668e003a3262cd34294d11",
+      "canonicalGitBlobSha256": "33cb06ac9bcdf32c8b84d9d12e33be44c503a7670f668e003a3262cd34294d11"
+    },
+    "runtime": {
+      "version": "v24.19.0",
+      "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+    },
+    "platform": "win32",
+    "architecture": "x64",
+    "externalDependencies": []
+  },
+  "harnessFiles": [
+    {
+      "path": "tools/PiReferenceRunner/capture-file-mutation-queue.mjs",
+      "sha256": "d659a1a88dda04e3fe449d1fdec17c3c0283c7f0c5f8d25959901c595198b1b2",
+      "bytes": 19208
+    },
+    {
+      "path": "tools/PiReferenceRunner/offline-guard.mjs",
+      "sha256": "ae3741bdce496451bd04afcf8628df6ddc5bc5cfad8af6ee5e52cbc7b065a094",
+      "bytes": 784
+    },
+    {
+      "path": "tools/CompatibilityReport/raw-json.mjs",
+      "sha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9",
+      "bytes": 3665
+    }
+  ],
+  "loadedModules": [
+    {
+      "path": "packages/coding-agent/src/core/tools/file-mutation-queue.ts",
+      "bytes": 1697,
+      "sha256": "33cb06ac9bcdf32c8b84d9d12e33be44c503a7670f668e003a3262cd34294d11"
+    }
+  ],
+  "loadedBuiltins": [
+    "node:fs/promises",
+    "node:path"
+  ]
+}

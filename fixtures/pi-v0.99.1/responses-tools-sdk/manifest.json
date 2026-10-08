@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "responses-tools-sdk-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "api.openai-responses",
+    "tools.declaration-replay"
+  ],
+  "clock": {
+    "unixMilliseconds": 1700000000000,
+    "mechanism": "Harness fixes Date.now; wrapper has no clock option; source and SDK files unchanged"
+  },
+  "seed": "Explicit case/transcript/session/request IDs; no RNG replacement",
+  "normalizerVersion": "object-key-order-v1; raw-body-and-headers-retained",
+  "input": {
+    "path": "fixtures/pi-v0.99.1/responses-tools-sdk/core.input.json",
+    "sha256": "ea1a88b031568f136cc288a0918a13f22c477b9efd54f2804a7cc5344fa451a7",
+    "kind": "authored-offline-full-wrapper-tool-history-input"
+  },
+  "expected": {
+    "path": "fixtures/pi-v0.99.1/responses-tools-sdk/core.expected.json",
+    "sha256": "46c27eb741e3edbd38fbe2442545944f1de1d6209c073efce96dfb2208e2d37d",
+    "kind": "captured-unchanged-responses-tools-wrapper-sdk-oracle"
+  },
+  "lock": {
+    "path": "fixtures/pi-v0.99.1/responses-tools-sdk/oracle.lock.json",
+    "sha256": "59ea343a04f610ccbd3cb4598d876ae035e0a30507c865a000df477a73b3950f"
+  },
+  "provenance": {
+    "source": "Unchanged exported packages/ai/src/api/openai-responses.ts stream",
+    "sdk": "Unchanged upstream-locked openai7.19.0 installed archive bytes",
+    "sourceResolver": "Unchanged pinned experimental/source-resolver.ts",
+    "observations": "onPayload returning undefined; real SDK fetch serialization/SSE decoding; emission/result snapshots",
+    "wireInput": "authored in-memory SSE; no provider network",
+    "credentials": "inert authored marker only; credential-free subprocess environment",
+    "repeatRuns": 2,
+    "byteIdentical": true,
+    "captureCommand": "node tools/PiReferenceRunner/capture-responses-tools-sdk.mjs --capture-new"
+  },
+  "scope": "Five standard function declaration histories with strict capability variation; genuine full wrapper request body observed, no native parity/provider authentication/full phase closure"
+}

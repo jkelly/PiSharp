@@ -16,9 +16,90 @@ namespace PiSharp.Rpc.Protocol;
 /// <summary>Exclusive fixed-session RPC admission over actual durable execution and one owned awaited output writer.</summary>
 public sealed partial class RpcSessionDispatcher : IAsyncDisposable
 {
+    private readonly Func<SessionTreeNavigationReceipt, string?, ValueTask>? _selectedTreePublisher;
+    private ImmutableArray<RpcSessionTreePublicationException> _sessionTreePublicationFailures = [];
+    /// <summary>Original postcommit publication failures, retained after wire error mapping and retirement.</summary>
+    public ImmutableArray<RpcSessionTreePublicationException> SessionTreePublicationFailures
+    { get { lock (_gate) return _sessionTreePublicationFailures; } }
     private PersistentAgentSession _session;
     private readonly ReplaceableAgentSession? _sessionOwner;
     private readonly Func<CancellationToken, ValueTask>? _sessionStartup;
+    private readonly Func<PersistentAgentSession, Task>? _postInputSettlement, _postRunSettlement;
+    private sealed record PostOriginEvidence(string Phase, Task? Original, AggregateException? Aggregate, Exception? Direct);
+    private readonly List<TaskCompletionSource<PostOriginEvidence>> _postOriginSlots = [];
+    public (string Phase, Exception Direct)[] CapturedPostOriginSynchronousFailures
+    {
+        get { lock (_gate) return _postOriginSlots.Where(slot => slot.Task.IsCompletedSuccessfully)
+            .Select(slot => slot.Task.Result).Where(row => row.Original is null && row.Direct is not null)
+            .Select(row => (row.Phase, row.Direct!)).ToArray(); }
+    }
+    private readonly Dictionary<Task, (string Phase, AggregateException? Aggregate, Exception? Direct)> _postOriginOriginals = new(ReferenceEqualityComparer.Instance);
+    private int _activePostOrigins;
+    private readonly HashSet<RpcCommandEnvelope> _postInputMovedToRun = new(ReferenceEqualityComparer.Instance);
+    public (string Phase, Task Original, AggregateException? Aggregate, Exception? Direct)[] CapturedPostOriginOriginals
+    { get { lock (_gate) return _postOriginOriginals.Select(pair => (pair.Value.Phase, pair.Key, pair.Value.Aggregate, pair.Value.Direct)).ToArray(); } }
+    private TaskCompletionSource<PostOriginEvidence>? ReservePostOrigin(Func<PersistentAgentSession, Task>? callback)
+    {
+        if (callback is null) return null;
+        lock (_gate)
+        {
+            if (_postOriginSlots.Count >= 4096) throw new RpcDispatchException(RpcDispatchFailure.ResourceLimit);
+            var slot = new TaskCompletionSource<PostOriginEvidence>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _postOriginSlots.Add(slot); return slot;
+        }
+    }
+    private async Task JoinPostOrigin(string phase, Func<PersistentAgentSession, Task>? callback,
+        PersistentAgentSession originating, TaskCompletionSource<PostOriginEvidence>? slot)
+    {
+        if (slot is null) return;
+        Task? original = null; Exception? direct = null; AggregateException? aggregate = null;
+        lock (_gate) _activePostOrigins++;
+        try
+        {
+            try { original = callback!(originating) ?? throw new InvalidOperationException("Post-origin callback returned no Task."); }
+            catch (OperationCanceledException error) { throw new InvalidOperationException("Synchronous post-origin callback failed.", error); }
+            await original.ConfigureAwait(false);
+        }
+        catch (Exception error) { direct = error; }
+        finally
+        {
+            lock (_gate)
+            {
+                if (original is not null && !_postOriginOriginals.ContainsKey(original))
+                {
+                    aggregate = original.IsFaulted ? original.Exception : null;
+                    _postOriginOriginals.Add(original, (phase, aggregate, direct));
+                }
+                if (original is not null && _postOriginOriginals.TryGetValue(original, out var cached))
+                { aggregate = cached.Aggregate; direct = cached.Direct; }
+                slot.TrySetResult(new(phase, original, aggregate, direct)); // Evidence may contain a synchronous failure with no Task.
+                _activePostOrigins--;
+            }
+        }
+        if (direct is not null) SignalFatal(RpcDispatchFailure.SessionRunFailed, (Exception?)aggregate ?? direct);
+    }
+    private async Task JoinPostOriginShutdown(List<Exception> failures)
+    {
+        TaskCompletionSource<PostOriginEvidence>[] slots;
+        lock (_gate) slots = _postOriginSlots.ToArray();
+        foreach (var slot in slots)
+        {
+            var evidence = await slot.Task.ConfigureAwait(false);
+            var original = evidence.Original;
+            if (original is null)
+            {
+                if (evidence.Direct is not null) failures.Add(evidence.Direct);
+                continue;
+            }
+            try { await original.ConfigureAwait(false); }
+            catch (Exception error)
+            {
+                lock (_gate)
+                    failures.Add(_postOriginOriginals.TryGetValue(original, out var cached)
+                        ? (Exception?)cached.Aggregate ?? cached.Direct ?? error : error);
+            }
+        }
+    }
     private readonly TaskCompletionSource _startupReady = NewGate();
     private Task? _startupWork;
     private RpcDispatchException? _startupFailure;
@@ -26,11 +107,15 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     private readonly JsonlWriter _output;
     private readonly Func<long> _clock;
     private readonly ImmutableDictionary<ModelDescriptor, JsonData> _models;
+    private readonly ImmutableArray<ModelDescriptor> _modelOrder;
     private readonly RpcDispatchOptions _options;
     private readonly RpcSessionOwnership _ownership;
     private readonly IPromptInputAdmission? _inputAdmission;
+    private readonly Func<string, IPromptInputAdmission>? _inputAdmissionSelector;
     private readonly IRpcExtensionCommandCatalog? _commandCatalog;
     private readonly ISessionSummaryGenerator? _summaryGenerator;
+    private readonly ToolInvoker? _exportHtmlWriter;
+    private readonly PiSharp.CodingAgent.Export.SessionHtmlRenderer _htmlRenderer;
     private readonly double? _recoveryDesiredMaxOutput;
     private readonly RpcExtensionUiCoordinator? _ui;
     private readonly Queue<DeferredFrame> _deferred = new();
@@ -77,29 +162,45 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     private sealed class EventSink(RpcSessionDispatcher owner) : IAgentEventSink
     { public ValueTask EmitAsync(AgentEvent observation, CancellationToken token) => owner.ObserveAsync(observation); }
     private sealed class OperationSink(RpcSessionDispatcher owner) : ISessionOperationEventSink
-    { public ValueTask EmitAsync(SessionOperationEvent observation, CancellationToken token) => owner.ObserveOperationAsync(observation); }
+    { public ValueTask EmitAsync(SessionOperationEvent observation, CancellationToken token) => owner.ObserveMetadataOrOperationAsync(observation); }
 
     public RpcSessionDispatcher(PersistentAgentSession session, JsonlWriter output, Func<long> clock,
         ImmutableArray<RpcModelDefinition> models, RpcDispatchOptions? options = null,
         RpcSessionOwnership sessionOwnership = RpcSessionOwnership.Owned, IPromptInputAdmission? inputAdmission = null,
         RpcExtensionUiCoordinator? extensionUi = null, IRpcExtensionCommandCatalog? extensionCommandCatalog = null,
         ReplaceableAgentSession? sessionOwner = null, Func<CancellationToken, ValueTask>? sessionStartup = null,
-        ISessionSummaryGenerator? summaryGenerator = null, double? recoveryDesiredMaxOutput = null)
+        ISessionSummaryGenerator? summaryGenerator = null, double? recoveryDesiredMaxOutput = null,
+        Func<string, IPromptInputAdmission>? inputAdmissionSelector = null,
+        ToolInvoker? exportHtmlWriter = null, PiSharp.CodingAgent.Export.SessionHtmlRenderer? htmlRenderer = null,
+        Func<SessionTreeNavigationReceipt, string?, ValueTask>? selectedTreePublisher = null,
+        Func<PersistentAgentSession, Task>? postInputSettlement = null,
+        Func<PersistentAgentSession, Task>? postRunSettlement = null)
     {
         ArgumentNullException.ThrowIfNull(session); ArgumentNullException.ThrowIfNull(output); ArgumentNullException.ThrowIfNull(clock);
+        if (selectedTreePublisher is not null && selectedTreePublisher.GetInvocationList().Length != 1)
+            throw new ArgumentException("Selected tree publication requires one owned callback.", nameof(selectedTreePublisher));
         _options = options ?? new(); _options.Validate(sessionOwnership);
         if (recoveryDesiredMaxOutput is { } desired && (!double.IsFinite(desired) || desired <= 0))
             throw new ArgumentOutOfRangeException(nameof(recoveryDesiredMaxOutput));
         _session = session; _output = output; _clock = clock; _ownership = sessionOwnership; _inputAdmission = inputAdmission;
+        _inputAdmissionSelector = inputAdmissionSelector;
         _ui = extensionUi;
         _commandCatalog = extensionCommandCatalog;
         _summaryGenerator = summaryGenerator;
+        _exportHtmlWriter = exportHtmlWriter; _htmlRenderer = htmlRenderer ?? new();
         _recoveryDesiredMaxOutput = recoveryDesiredMaxOutput;
         _sessionOwner = sessionOwner; _sessionStartup = sessionStartup;
+        _selectedTreePublisher = selectedTreePublisher;
+        if (postInputSettlement?.GetInvocationList().Length > 1 || postRunSettlement?.GetInvocationList().Length > 1)
+            throw new ArgumentException("Each post-origin hook requires one admitted callback.");
+        _postInputSettlement = postInputSettlement; _postRunSettlement = postRunSettlement;
         if (sessionOwner is not null && (!ReferenceEquals(sessionOwner.Current.Session, session) || sessionOwner.AttachmentChanged is not null))
             throw new ArgumentException("RPC requires the exclusive current session attachment.", nameof(sessionOwner));
         if (sessionStartup is null) _startupReady.TrySetResult();
         _models = RpcCommandCodec.Models(models, _options);
+        _modelOrder = models.Select(value => value.Model).ToImmutableArray();
+        if (_modelOrder.Select(value => (value.Provider, value.Id)).Distinct().Count() != _modelOrder.Length)
+            throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
         if (!_models.ContainsKey(session.Snapshot.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
         if (session.Snapshot.Agent.IsRunning || session.Snapshot.IsProcessingOperation || session.Snapshot.IsConfiguring || session.Snapshot.IsAdmittingInput || session.Snapshot.IsEditingContext || session.Snapshot.IsCompacting ||
             session.Snapshot.IsDisposed || session.Snapshot.Fault is not null)
@@ -163,7 +264,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     }
 
     /// <summary>Settles on shared shutdown, including actual run, coordinator, output and stream cleanup.</summary>
-    public Task Completion => _completion.Task;
+    public Task Completion
+    { get { lock (_gate) if (_activePostOrigins != 0) throw new InvalidOperationException("Completion cannot join an active post-origin callback."); return _completion.Task; } }
     /// <summary>Original operation failure and newly encountered cleanup failures, in shutdown order.</summary>
     public sealed record ShutdownSettlement(RpcDispatchException? OperationFailure,
         ImmutableArray<Exception> CleanupFailures, RpcDispatchException? CompletionFailure);
@@ -184,6 +286,9 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     public Task SubmitAsync(JsonData command, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command); cancellationToken.ThrowIfCancellationRequested();
+        if ((_inCallback.Value || _session.IsRetryOwnedCallback) && command.Value.TryGetProperty("type", out var retryType) &&
+            retryType.ValueKind == JsonValueKind.String && retryType.GetString() is "set_auto_retry" or "abort_retry")
+            throw new InvalidOperationException("RPC retry event callbacks cannot await their own controls.");
         if (_inInputCallback.Value && command.Value.TryGetProperty("type", out var type) &&
             type.ValueKind == JsonValueKind.String && type.GetString() is "prompt" or "steer" or "follow_up")
             throw new InvalidOperationException("An input callback cannot await its own RPC input admission.");
@@ -270,6 +375,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     {
         RpcCommandEnvelope? command = null;
         AgentSessionAttachment? originatingAttachment = null;
+        PersistentAgentSession? originatingInput = null;
         try
         {
             if (raw is null)
@@ -287,12 +393,20 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 return;
             }
             originatingAttachment = _sessionOwner?.Current;
+            if (command.Type is "prompt" or "steer" or "follow_up") originatingInput = _session;
             await ExecuteAsync(command, token, originatingAttachment).ConfigureAwait(false);
         }
         catch (RpcCommandException error)
         { await WriteAsync(RpcCommandCodec.Error(error.Id, error.Command, error.Message, _options)).ConfigureAwait(false); }
         catch (RpcDispatchException error) when (error.Failure is RpcDispatchFailure.OutputFailed)
         { throw; }
+        catch (RpcSessionTreePublicationException error)
+        {
+            // Selection is already acknowledged. Preserve its identity on the wire and
+            // the original task/fault in the host; neither cancellation nor retry undoes it.
+            await WriteAsync(TreePublicationFailureResponse(command!, error.CommittedReceipt.SessionId,
+                error.CommittedReceipt.View.Generation, error.CommittedReceipt.LeafId)).ConfigureAwait(false);
+        }
         catch (Exception error)
         {
             var message = error switch
@@ -316,6 +430,12 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         finally
         {
             DeferredFrame? next = null;
+            TaskCompletionSource<PostOriginEvidence>? postSlot = null;
+            bool movedToRun;
+            lock (_gate) movedToRun = command is not null && _postInputMovedToRun.Remove(command);
+            if (originatingInput is not null && !movedToRun)
+                try { postSlot = ReservePostOrigin(_postInputSettlement); }
+                catch (Exception error) { SignalFatal(RpcDispatchFailure.ResourceLimit, error); }
             lock (_gate)
             {
                 _pending--; _retainedCommandBytes -= chargedBytes;
@@ -323,6 +443,10 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 if (_pending == 0) _pendingIdle!.TrySetResult();
                 _capacity.TrySetResult(); _capacity = NewGate();
             }
+            // All actual command/input and response writer awaits finished; input/transition/wire gates
+            // are released. The reserved slot is included in shutdown even after pending reaches zero.
+            if (originatingInput is not null && postSlot is not null)
+                await JoinPostOrigin("input-settled", _postInputSettlement, originatingInput, postSlot).ConfigureAwait(false);
             if (next is not null) _ = ObserveCommandAsync(HandleAsync(next.Record, next.ParseFailure, CancellationToken.None, next.Bytes, wasDeferred: true));
         }
     }
@@ -335,11 +459,11 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         switch (command.Type)
         {
             case "prompt":
-                if (_inputAdmission is not null) await SubmitInputAsync(command, token).ConfigureAwait(false);
+                if (_inputAdmission is not null || _inputAdmissionSelector is not null) await SubmitInputAsync(command, token).ConfigureAwait(false);
                 else await PromptAsync(command, token).ConfigureAwait(false);
                 return;
             case "steer": case "follow_up":
-                if (_inputAdmission is not null) { await SubmitInputAsync(command, token).ConfigureAwait(false); return; }
+                if (_inputAdmission is not null || _inputAdmissionSelector is not null) { await SubmitInputAsync(command, token).ConfigureAwait(false); return; }
                 await QueueAsync(command, command.Type == "steer", token).ConfigureAwait(false);
                 data = Disposition("queued"); break;
             case "abort":
@@ -379,48 +503,18 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 finally { _transitions.Release(); }
                 data = null; break;
             case "get_state": data = State(); break;
-            case "pisharp_set_auto_compaction":
-                if (_sessionOwner is null || originatingAttachment is null || _summaryGenerator is null)
-                    throw new RpcCommandException(command.Id, command.Type, "Automatic summaries require an owning native session host and explicit transport.");
-                if (command.ExpectedGeneration != originatingAttachment.Generation)
-                    throw new RpcCommandException(command.Id, command.Type, "Automatic summary configuration generation is stale.");
-                await _sessionOwner.ConfigureAutomaticCompactionAsync(originatingAttachment,
-                    command.Mode == "enabled" ? _summaryGenerator : null, command.Compaction!, startupCancellation.Token,
-                    _recoveryDesiredMaxOutput).ConfigureAwait(false);
-                data = null; break;
-            case "pisharp_compact": case "pisharp_branch_summary":
-            {
-                if (_sessionOwner is null || originatingAttachment is null || _summaryGenerator is null)
-                    throw new RpcCommandException(command.Id, command.Type, "Summaries require an owning native session host and explicit summary transport.");
-                if (command.ExpectedGeneration != originatingAttachment.Generation)
-                    throw new RpcCommandException(command.Id, command.Type, "Summary session generation is stale.");
-                var operation = new ContextEditCommand(); lock (_gate) { ThrowOpen(); _contextEdits.Add(operation); }
-                try
-                {
-                    using var summaryCancellation = CancellationTokenSource.CreateLinkedTokenSource(startupCancellation.Token, operation.Abort.Token);
-                    JsonData Response(SessionEntry? entry) => RpcCommandCodec.Build(writer =>
-                    {
-                        writer.WriteBoolean("checkpointAcknowledged", entry is not null);
-                        writer.WriteBoolean("skipped", entry is null); writer.WriteNumber("generation", originatingAttachment.Generation);
-                        writer.WriteString("sessionId", originatingAttachment.Session.Snapshot.Log.Header.Id);
-                        if (entry is not null) { writer.WriteString("entryId", entry.Id); writer.WriteString("leafId", entry.Id); }
-                    }, _options.MaximumOutputBytes);
-                    _ = RpcCommandCodec.Success(command, Response(null), _options);
-                    ValueTask Validate(SessionSummaryCheckpointPreview prospective, CancellationToken cancellation)
-                    { cancellation.ThrowIfCancellationRequested(); _ = RpcCommandCodec.Success(command, Response(prospective.Entry), _options); return ValueTask.CompletedTask; }
-                    var receipt = command.Compaction is not null
-                        ? await _sessionOwner.CompactAsync(originatingAttachment, command.Compaction, _summaryGenerator, summaryCancellation.Token, Validate).ConfigureAwait(false)
-                        : await _sessionOwner.SummarizeBranchAsync(originatingAttachment, command.BranchSummary!, _summaryGenerator, summaryCancellation.Token, Validate).ConfigureAwait(false);
-                    data = Response(receipt?.Entry);
-                }
-                finally
-                {
-                    Task cancellationIdle;
-                    lock (_gate) { _contextEdits.Remove(operation); cancellationIdle = operation.CancelUsers == 0 ? Task.CompletedTask : operation.CancelIdle!.Task; }
-                    await cancellationIdle.ConfigureAwait(false); operation.Abort.Dispose();
-                }
-                break;
-            }
+            case "set_auto_retry": case "abort_retry":
+                data = await RetryCommandAsync(command, originatingAttachment, startupCancellation.Token).ConfigureAwait(false); break;
+            case "export_html":
+                data = await ExportHtmlAsync(command, originatingAttachment, startupCancellation.Token).ConfigureAwait(false); break;
+            case "get_session_stats": case "set_session_name":
+                data = await SessionMetadataAsync(command, originatingAttachment, startupCancellation.Token).ConfigureAwait(false); break;
+            case "set_model": case "cycle_model": case "get_available_models":
+            case "set_thinking_level": case "cycle_thinking_level": case "get_available_thinking_levels":
+                data = await ModelThinkingAsync(command, originatingAttachment, startupCancellation.Token).ConfigureAwait(false); break;
+            case "set_auto_compaction": case "pisharp_set_auto_compaction":
+            case "compact": case "pisharp_compact": case "pisharp_branch_summary":
+                data = await SummaryCommandAsync(command, originatingAttachment, startupCancellation.Token).ConfigureAwait(false); break;
             case "pisharp_context_edit":
             {
                 if (_sessionOwner is null || originatingAttachment is null)
@@ -738,7 +832,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     }
     private async Task PromptAsync(RpcCommandEnvelope command, CancellationToken token)
     {
-        var input = Input(command); RunState? run = null; Task<AgentLoopResult>? processing = null; var queued = false;
+        var input = Input(command); RunState? run = null; Task<AgentLoopResult>? processing = null; var queued = false; PersistentAgentSession? originating = null;
         var startedResponse = RpcCommandCodec.Success(command, Disposition("started"), _options);
         var queuedResponse = RpcCommandCodec.Success(command, Disposition("queued"), _options);
         await _transitions.WaitAsync(token).ConfigureAwait(false);
@@ -760,6 +854,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             else
             {
                 if (!_models.ContainsKey(snapshot.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
+                originating = _session;
                 run = new(snapshot.Agent.Messages.Length); lock (_gate) _run = run;
                 try { processing = _session.PromptAsync(input); }
                 catch { lock (_gate) if (ReferenceEquals(_run, run)) _run = null; run.Ready.TrySetResult(); run.Settled.TrySetResult(); throw; }
@@ -778,11 +873,12 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         }
         if (run is null) { await processing!.ConfigureAwait(false); throw new RpcDispatchException(RpcDispatchFailure.SessionRunFailed); }
         // The generation transition is actual admission. Gate observer output until this one authoritative response is written.
-        _ = MonitorAsync(run, processing!);
+        lock (_gate) _postInputMovedToRun.Add(command);
+        _ = MonitorAsync(run, processing!, originating!);
         try { await WriteAsync(startedResponse).ConfigureAwait(false); }
         finally { run.Ready.TrySetResult(); }
     }
-    private sealed class InputAdmission(RpcSessionDispatcher owner, CancellationToken caller) : IPromptInputAdmission
+    private sealed class InputAdmission(RpcSessionDispatcher owner, IPromptInputAdmission selected, CancellationToken caller) : IPromptInputAdmission
     {
         public async ValueTask<PromptInputDecision> ReduceAsync(PromptInput input, CancellationToken token)
         {
@@ -790,7 +886,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             var previous = owner._inInputCallback.Value; owner._inInputCallback.Value = true;
             try
             {
-                var result = await owner._inputAdmission!.ReduceAsync(input, linked.Token).ConfigureAwait(false);
+                var result = await selected.ReduceAsync(input, linked.Token).ConfigureAwait(false);
                 linked.Token.ThrowIfCancellationRequested(); return result;
             }
             finally { owner._inInputCallback.Value = previous; }
@@ -845,14 +941,17 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                     CheckQueueBudget(message, behavior == PromptInputStreamingBehavior.Steer, queue);
                 }
             };
+            var selected = _inputAdmissionSelector?.Invoke(command.Type) ?? _inputAdmission ??
+                throw new InvalidOperationException("Input admission is unavailable.");
             var processing = originating.SubmitInputAsync(new(command.Message!, PromptInputSource.Rpc, command.Images, mode),
-                new InputAdmission(this, token), limits, _stopInputToken);
+                new InputAdmission(this, selected, token), limits, _stopInputToken);
             // Started coordinator submissions finish after the run. Its actual first event is the admission witness.
             await Task.WhenAny(candidate.Entered.Task, processing).ConfigureAwait(false);
             if (candidate.Entered.Task.IsCompleted)
             {
                 lock (_gate) if (ReferenceEquals(_startingInput, candidate)) _startingInput = null;
-                _ = MonitorAsync(candidate, SubmittedRunAsync(processing));
+                lock (_gate) _postInputMovedToRun.Add(command);
+                _ = MonitorAsync(candidate, SubmittedRunAsync(processing), originating);
                 try { await WriteAsync(started).ConfigureAwait(false); }
                 finally { candidate.Ready.TrySetResult(); }
                 return;
@@ -882,7 +981,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         return result.Disposition == SubmittedInputDisposition.Started && result.Run is not null
             ? result.Run : throw new RpcDispatchException(RpcDispatchFailure.SessionRunFailed);
     }
-    private async Task MonitorAsync(RunState run, Task<AgentLoopResult> processing)
+    private async Task MonitorAsync(RunState run, Task<AgentLoopResult> processing, PersistentAgentSession originating)
     {
         try
         {
@@ -918,8 +1017,14 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         catch (Exception error) { SignalFatal(error is RpcDispatchException dispatch ? dispatch.Failure : RpcDispatchFailure.SessionRunFailed, error); }
         finally
         {
+            TaskCompletionSource<PostOriginEvidence>? postSlot = null;
+            try { postSlot = ReservePostOrigin(_postRunSettlement); }
+            catch (Exception error) { SignalFatal(RpcDispatchFailure.ResourceLimit, error); }
             lock (_gate) if (ReferenceEquals(_run, run)) _run = null;
             run.Settled.TrySetResult();
+            // Processing/idle and agent_settled writer awaits finished and run ownership is released.
+            // A reserved post-run slot remains part of actual dispatcher shutdown custody.
+            await JoinPostOrigin("run-settled", _postRunSettlement, originating, postSlot).ConfigureAwait(false);
         }
     }
     private async Task AbortAsync(CancellationToken token)
@@ -979,7 +1084,39 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     }
     private async ValueTask ObserveOperationAsync(SessionOperationEvent observation)
     {
-        if (!_session.Snapshot.AutoRecoveryEnabled) return;
+        if (observation is SessionCompactionStarted or SessionCompactionPrepared or SessionCompactionEnded)
+        {
+            var prior = _inCallback.Value; _inCallback.Value = true;
+            try
+            {
+                switch (observation)
+                {
+                    case SessionCompactionStarted started:
+                        await WriteAsync(OriginalCompactionEventProjector.Start(started.Reason, _options)).ConfigureAwait(false);
+                        break;
+                    case SessionCompactionPrepared prepared:
+                        // Validate the complete eventual frame before the original append is admitted.
+                        _ = OriginalCompactionEventProjector.End(prepared.Reason, prepared.Result, false, prepared.WillRetry, options: _options);
+                        break;
+                    case SessionCompactionEnded ended:
+                        await WriteAsync(OriginalCompactionEventProjector.End(ended.Reason, ended.Result,
+                            ended.Aborted, ended.WillRetry, ended.ErrorMessage, _options)).ConfigureAwait(false);
+                        break;
+                }
+            }
+            catch (Exception error)
+            {
+                // A prospective output-budget refusal has no transport effect and must not poison the dispatcher.
+                if (observation is not SessionCompactionPrepared)
+                    SignalFatal(error is RpcDispatchException dispatch ? dispatch.Failure : RpcDispatchFailure.SessionRunFailed, error);
+                throw;
+            }
+            finally { _inCallback.Value = prior; }
+            return;
+        }
+        if (observation is SessionAutoRetryStarted or SessionAutoRetryEnded)
+        { await ObserveRetryAsync(observation).ConfigureAwait(false); return; }
+        if (!_session.Snapshot.AutoRecoveryEnabled && !_session.AutomaticRetryConfigured) return;
         var previous = _inCallback.Value; _inCallback.Value = true;
         try
         {
@@ -1047,6 +1184,11 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         {
             RpcCommandCodec.Raw(writer, "model", model); writer.WriteString("thinkingLevel", snapshot.Context.ThinkingLevel);
             writer.WriteBoolean("isStreaming", snapshot.Agent.IsRunning); writer.WriteBoolean("isCompacting", snapshot.IsCompacting);
+            writer.WriteBoolean("autoRetryEnabled", _session.AutoRetryEnabled); writer.WriteBoolean("isRetrying", _session.IsRetrying);
+            // agent_settled is published before the monitor clears its original run owner.
+            // This is a read-only dispatcher admission fence, not a promise about future commands.
+            bool runOwnerSettled; lock (_gate) runOwnerSettled = _run is null;
+            writer.WriteBoolean("pisharpRunOwnerSettled", runOwnerSettled);
             if (snapshot.AutoRecoveryEnabled)
             {
                 writer.WriteBoolean("pisharpOperationActive", snapshot.IsProcessingOperation);
@@ -1130,20 +1272,22 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     }
     public ValueTask DisposeAsync()
     {
+        lock (_gate) if (_activePostOrigins != 0) throw new InvalidOperationException("Dispatcher disposal cannot join an active post-origin callback.");
         if (_inCallback.Value) throw new InvalidOperationException("RPC event callbacks cannot dispose their own dispatcher.");
         _ = _session.WaitForIdleAsync(); // Includes the coordinator/Agent's callback self-wait guards.
-        return new(BeginShutdown());
+        return new(BeginShutdown(publicRequest: true));
     }
     private void SignalFatal(RpcDispatchFailure failure, Exception? cause = null)
     {
         lock (_gate) _fatal ??= new(failure, cause);
         _ = BeginShutdown();
     }
-    private Task BeginShutdown()
+    private Task BeginShutdown(bool publicRequest = false)
     {
         Task pending; RunState? run; JsonlReader? input;
         lock (_gate)
         {
+            if (publicRequest && _activePostOrigins != 0) throw new InvalidOperationException("Dispatcher close cannot join an active post-origin callback.");
             if (_disposal is not null) return _disposal;
             _closed = true; _disposal = _completion.Task;
             pending = _pendingIdle?.Task ?? Task.CompletedTask; run = _run; input = _input;
@@ -1175,6 +1319,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         // Internal fatal closure may start inside a callback: wait our run first, before invoking native self-wait guards.
         if (run is not null) try { await run.Settled.Task.ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
         try { await pending.ConfigureAwait(false); await _session.WaitForIdleAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+        await JoinPostOriginShutdown(failures).ConfigureAwait(false);
         if (uiCleanup is not null) try { await uiCleanup.ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
         try { _subscription.Dispose(); } catch (Exception error) { failures.Add(error); }
         try { _operationSubscription?.Dispose(); } catch (Exception error) { failures.Add(error); }
@@ -1202,8 +1347,31 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             if (failure is null) _completion.TrySetResult(); else _completion.TrySetException(failure);
         }
     }
+    private JsonData TreePublicationFailureResponse(RpcCommandEnvelope command, string sessionId, long generation, string? leafId) =>
+        RpcCommandCodec.Build(writer =>
+        {
+            if (command.Id is not null) writer.WriteString("id", command.Id);
+            writer.WriteString("type", "response"); writer.WriteString("command", command.Type);
+            writer.WriteBoolean("success", false);
+            writer.WriteString("error", "Session tree selection committed; lifecycle publication failed.");
+            writer.WriteBoolean("committed", true);
+            writer.WriteStartObject("data"); writer.WriteString("disposition", "Selected");
+            writer.WriteString("sessionId", sessionId); writer.WriteNumber("generation", generation);
+            writer.WriteString("leafId", leafId); writer.WriteEndObject();
+        }, _options.MaximumOutputBytes);
     private void AddPending(int bytes = 0) { if (_pending++ == 0) _pendingIdle = NewGate(); _retainedCommandBytes += bytes; }
     private void CheckOpen() { lock (_gate) ThrowOpen(); }
     private void ThrowOpen() { if (_closed) throw _fatal ?? new RpcDispatchException(RpcDispatchFailure.Disposed); }
     private static TaskCompletionSource NewGate() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
+/// <summary>Actual postcommit receipt and original publication evidence; selection is never rolled back.</summary>
+public sealed class RpcSessionTreePublicationException(SessionTreeNavigationReceipt committedReceipt,
+    Task? original, Exception evidence, Exception direct)
+    : IOException("Session tree selection committed; lifecycle publication failed.", evidence)
+{
+    public SessionTreeNavigationReceipt CommittedReceipt { get; } = committedReceipt;
+    public Task? Original { get; } = original;
+    public Exception Evidence { get; } = evidence;
+    public Exception Direct { get; } = direct;
 }

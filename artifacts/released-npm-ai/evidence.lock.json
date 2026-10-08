@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "createdAt": "2026-09-30T22:40:51.659Z",
+  "node": {
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "baselineFiles": [
+    {
+      "path": "metadata.json",
+      "sha256": "1aafbfc3e2a0610b4066dd4cd94e239a64bc3b08506cd0d67f41cd18a34af789"
+    },
+    {
+      "path": "inspection.json",
+      "sha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b"
+    },
+    {
+      "path": "evidence.lock.json",
+      "sha256": "6fe01c9a77d39505c154b1b20c65d838513a8efba17ea58164aaa38e7b81456c"
+    },
+    {
+      "path": "pi-0.99.1-source.tar.gz",
+      "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b"
+    }
+  ],
+  "files": [
+    {
+      "path": "acquire.mjs",
+      "bytes": 19801,
+      "sha256": "80d8e5a325f99451141cb0072d293b23d05337a1073163140e5962207f7c4b9e"
+    },
+    {
+      "path": "pi-ai-0.99.1.tgz",
+      "bytes": 760966,
+      "sha256": "f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3"
+    },
+    {
+      "path": "acquisition.json",
+      "bytes": 793,
+      "sha256": "557c86d17b3cd831ef5ad91cb360b7a7363158cf45880088211e6ae1afdc9373"
+    },
+    {
+      "path": "inspection.json",
+      "bytes": 157841,
+      "sha256": "0c385e57ebdc3a01e0a7a50748af231a6fbefdea91b643356d6d0e239ebf6168"
+    }
+  ],
+  "mode": "default offline verification; first-new modes refuse overwrite; archives never extracted/executed"
+}

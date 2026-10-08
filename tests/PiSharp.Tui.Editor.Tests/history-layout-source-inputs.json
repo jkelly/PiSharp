@@ -1,0 +1,2388 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "Public prompt history plus vertical/page navigation and render geometry; native comparison pending shared visual map contract",
+  "cases": [
+    {
+      "id": "history-trim-empty-consecutive-and-nonconsecutive-duplicates",
+      "steps": [
+        {
+          "kind": "history",
+          "data": " \t\r\n"
+        },
+        {
+          "kind": "history",
+          "data": "﻿ alpha ﻿"
+        },
+        {
+          "kind": "history",
+          "data": "alpha"
+        },
+        {
+          "kind": "history",
+          "data": " beta "
+        },
+        {
+          "kind": "history",
+          "data": "alpha"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "history-ecmascript-trim-preserves-nel-and-raw-line-controls",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "A"
+        },
+        {
+          "kind": "history",
+          "data": " x\r\ny\tZ "
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "history-basic-older-newer-and-out-of-range",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "one"
+        },
+        {
+          "kind": "history",
+          "data": "two"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "history-first-row-up-jumps-to-start-before-recall",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "previous"
+        },
+        {
+          "kind": "set",
+          "data": "draft"
+        },
+        {
+          "kind": "render",
+          "columns": 32,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "history-prebrowse-multiline-draft-and-exact-caret-return",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "old"
+        },
+        {
+          "kind": "set",
+          "data": "draft\nrest"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        }
+      ]
+    },
+    {
+      "id": "history-multiline-recall-placement-and-row-gated-down",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "older\nlast"
+        },
+        {
+          "kind": "history",
+          "data": "newer\nx"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "history-typing-exits-browse-and-rebrowse-preserves-edit",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "one"
+        },
+        {
+          "kind": "history",
+          "data": "two"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "X"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "history-programmatic-set-and-insert-exit-browse",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "one"
+        },
+        {
+          "kind": "history",
+          "data": "two"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "set",
+          "data": "fresh"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "insert",
+          "data": "!"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "history-backspace-delete-and-noop-edit-exit-browse",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "one"
+        },
+        {
+          "kind": "history",
+          "data": "two"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[3~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "history-kill-yank-and-undo-exit-browse",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "one"
+        },
+        {
+          "kind": "history",
+          "data": "two"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "history-first-entry-one-undo-unit-and-draft-return",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "one"
+        },
+        {
+          "kind": "history",
+          "data": "two"
+        },
+        {
+          "kind": "set",
+          "data": "seed"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "history-registry-survives-recall-and-prebrowse-marker-returns",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "old"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "history-literal-marker-entry-expands-current-registry",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "[paste #1 1001 chars]"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "history-empty-paste-exits-browse-and-source-undo",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "one"
+        },
+        {
+          "kind": "history",
+          "data": "two"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "history-successful-source-submit-resets-browse-not-history",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "one"
+        },
+        {
+          "kind": "set",
+          "data": "prompt"
+        },
+        {
+          "kind": "input",
+          "data": "\r"
+        },
+        {
+          "kind": "history",
+          "data": "prompt"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        }
+      ]
+    },
+    {
+      "id": "history-frozen-hundred-entry-eviction-and-boundary",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "h000"
+        },
+        {
+          "kind": "history",
+          "data": "h001"
+        },
+        {
+          "kind": "history",
+          "data": "h002"
+        },
+        {
+          "kind": "history",
+          "data": "h003"
+        },
+        {
+          "kind": "history",
+          "data": "h004"
+        },
+        {
+          "kind": "history",
+          "data": "h005"
+        },
+        {
+          "kind": "history",
+          "data": "h006"
+        },
+        {
+          "kind": "history",
+          "data": "h007"
+        },
+        {
+          "kind": "history",
+          "data": "h008"
+        },
+        {
+          "kind": "history",
+          "data": "h009"
+        },
+        {
+          "kind": "history",
+          "data": "h010"
+        },
+        {
+          "kind": "history",
+          "data": "h011"
+        },
+        {
+          "kind": "history",
+          "data": "h012"
+        },
+        {
+          "kind": "history",
+          "data": "h013"
+        },
+        {
+          "kind": "history",
+          "data": "h014"
+        },
+        {
+          "kind": "history",
+          "data": "h015"
+        },
+        {
+          "kind": "history",
+          "data": "h016"
+        },
+        {
+          "kind": "history",
+          "data": "h017"
+        },
+        {
+          "kind": "history",
+          "data": "h018"
+        },
+        {
+          "kind": "history",
+          "data": "h019"
+        },
+        {
+          "kind": "history",
+          "data": "h020"
+        },
+        {
+          "kind": "history",
+          "data": "h021"
+        },
+        {
+          "kind": "history",
+          "data": "h022"
+        },
+        {
+          "kind": "history",
+          "data": "h023"
+        },
+        {
+          "kind": "history",
+          "data": "h024"
+        },
+        {
+          "kind": "history",
+          "data": "h025"
+        },
+        {
+          "kind": "history",
+          "data": "h026"
+        },
+        {
+          "kind": "history",
+          "data": "h027"
+        },
+        {
+          "kind": "history",
+          "data": "h028"
+        },
+        {
+          "kind": "history",
+          "data": "h029"
+        },
+        {
+          "kind": "history",
+          "data": "h030"
+        },
+        {
+          "kind": "history",
+          "data": "h031"
+        },
+        {
+          "kind": "history",
+          "data": "h032"
+        },
+        {
+          "kind": "history",
+          "data": "h033"
+        },
+        {
+          "kind": "history",
+          "data": "h034"
+        },
+        {
+          "kind": "history",
+          "data": "h035"
+        },
+        {
+          "kind": "history",
+          "data": "h036"
+        },
+        {
+          "kind": "history",
+          "data": "h037"
+        },
+        {
+          "kind": "history",
+          "data": "h038"
+        },
+        {
+          "kind": "history",
+          "data": "h039"
+        },
+        {
+          "kind": "history",
+          "data": "h040"
+        },
+        {
+          "kind": "history",
+          "data": "h041"
+        },
+        {
+          "kind": "history",
+          "data": "h042"
+        },
+        {
+          "kind": "history",
+          "data": "h043"
+        },
+        {
+          "kind": "history",
+          "data": "h044"
+        },
+        {
+          "kind": "history",
+          "data": "h045"
+        },
+        {
+          "kind": "history",
+          "data": "h046"
+        },
+        {
+          "kind": "history",
+          "data": "h047"
+        },
+        {
+          "kind": "history",
+          "data": "h048"
+        },
+        {
+          "kind": "history",
+          "data": "h049"
+        },
+        {
+          "kind": "history",
+          "data": "h050"
+        },
+        {
+          "kind": "history",
+          "data": "h051"
+        },
+        {
+          "kind": "history",
+          "data": "h052"
+        },
+        {
+          "kind": "history",
+          "data": "h053"
+        },
+        {
+          "kind": "history",
+          "data": "h054"
+        },
+        {
+          "kind": "history",
+          "data": "h055"
+        },
+        {
+          "kind": "history",
+          "data": "h056"
+        },
+        {
+          "kind": "history",
+          "data": "h057"
+        },
+        {
+          "kind": "history",
+          "data": "h058"
+        },
+        {
+          "kind": "history",
+          "data": "h059"
+        },
+        {
+          "kind": "history",
+          "data": "h060"
+        },
+        {
+          "kind": "history",
+          "data": "h061"
+        },
+        {
+          "kind": "history",
+          "data": "h062"
+        },
+        {
+          "kind": "history",
+          "data": "h063"
+        },
+        {
+          "kind": "history",
+          "data": "h064"
+        },
+        {
+          "kind": "history",
+          "data": "h065"
+        },
+        {
+          "kind": "history",
+          "data": "h066"
+        },
+        {
+          "kind": "history",
+          "data": "h067"
+        },
+        {
+          "kind": "history",
+          "data": "h068"
+        },
+        {
+          "kind": "history",
+          "data": "h069"
+        },
+        {
+          "kind": "history",
+          "data": "h070"
+        },
+        {
+          "kind": "history",
+          "data": "h071"
+        },
+        {
+          "kind": "history",
+          "data": "h072"
+        },
+        {
+          "kind": "history",
+          "data": "h073"
+        },
+        {
+          "kind": "history",
+          "data": "h074"
+        },
+        {
+          "kind": "history",
+          "data": "h075"
+        },
+        {
+          "kind": "history",
+          "data": "h076"
+        },
+        {
+          "kind": "history",
+          "data": "h077"
+        },
+        {
+          "kind": "history",
+          "data": "h078"
+        },
+        {
+          "kind": "history",
+          "data": "h079"
+        },
+        {
+          "kind": "history",
+          "data": "h080"
+        },
+        {
+          "kind": "history",
+          "data": "h081"
+        },
+        {
+          "kind": "history",
+          "data": "h082"
+        },
+        {
+          "kind": "history",
+          "data": "h083"
+        },
+        {
+          "kind": "history",
+          "data": "h084"
+        },
+        {
+          "kind": "history",
+          "data": "h085"
+        },
+        {
+          "kind": "history",
+          "data": "h086"
+        },
+        {
+          "kind": "history",
+          "data": "h087"
+        },
+        {
+          "kind": "history",
+          "data": "h088"
+        },
+        {
+          "kind": "history",
+          "data": "h089"
+        },
+        {
+          "kind": "history",
+          "data": "h090"
+        },
+        {
+          "kind": "history",
+          "data": "h091"
+        },
+        {
+          "kind": "history",
+          "data": "h092"
+        },
+        {
+          "kind": "history",
+          "data": "h093"
+        },
+        {
+          "kind": "history",
+          "data": "h094"
+        },
+        {
+          "kind": "history",
+          "data": "h095"
+        },
+        {
+          "kind": "history",
+          "data": "h096"
+        },
+        {
+          "kind": "history",
+          "data": "h097"
+        },
+        {
+          "kind": "history",
+          "data": "h098"
+        },
+        {
+          "kind": "history",
+          "data": "h099"
+        },
+        {
+          "kind": "history",
+          "data": "h100"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "vertical-utf16-sticky-long-short-long",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abcdef\nx\n123456"
+        },
+        {
+          "kind": "render",
+          "columns": 32,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        }
+      ]
+    },
+    {
+      "id": "vertical-word-wrap-and-public-width-resize",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "one two three four five six"
+        },
+        {
+          "kind": "render",
+          "columns": 9,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "render",
+          "columns": 5,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "render",
+          "columns": 14,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "vertical-cjk-emoji-offset-vs-cells-and-atomic-snap",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "AB界D\n1U0001f6422\nabcdef"
+        },
+        {
+          "kind": "render",
+          "columns": 12,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 5,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "vertical-combining-and-zwj-source-seams",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "AéZ\nU0001f469‍U0001f4bbx\nQQQQ"
+        },
+        {
+          "kind": "render",
+          "columns": 10,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 4,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "vertical-registered-marker-continuations-and-resize",
+      "steps": [
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~p\np\np\np\np\np\np\np\np\np\np\np\u001b[201~"
+        },
+        {
+          "kind": "render",
+          "columns": 9,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 5,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 24,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "vertical-page-size-uses-public-terminal-rows",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "line00\nline01\nline02\nline03\nline04\nline05\nline06\nline07\nline08\nline09\nline10\nline11\nline12\nline13\nline14\nline15\nline16\nline17"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 20
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[5~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[5~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[6~"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 40
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[5~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[6~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[6~"
+        }
+      ]
+    },
+    {
+      "id": "vertical-exact-width-end-affinity-and-empty-lines",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abcd\n\nxy\n"
+        },
+        {
+          "kind": "render",
+          "columns": 5,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "set",
+          "data": "abcd"
+        },
+        {
+          "kind": "render",
+          "columns": 5,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 1,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "history-recall-first-last-rows-change-with-wrap",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "old"
+        },
+        {
+          "kind": "history",
+          "data": "one two three four"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "render",
+          "columns": 7,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "render",
+          "columns": 24,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    }
+  ]
+}

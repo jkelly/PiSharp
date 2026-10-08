@@ -35,13 +35,27 @@ public sealed partial class ReplaceableAgentSession
             {
                 lock (gate)
                 {
-                    ValidateAttachment(expected); linked.Token.ThrowIfCancellationRequested(); publish();
+                    ValidateAttachment(expected); publish();
                 }
             }, beforeTree).ConfigureAwait(false);
             // Publication already succeeded, or the reserved old state was retained. Never replace an
             // acknowledged receipt with a late caller cancellation check or read owner.Current here.
-            return new(selection.Disposition, new(expected, selection.Revision), selection.Agent, selection.EditorText)
-            { CancellationCallbackFailed = expected.Session.Snapshot.InputCancellationCallbackFailed };
+            var receipt = new SessionTreeNavigationReceipt(selection.Disposition, new(expected, selection.Revision), selection.Agent, selection.EditorText)
+            { CancellationCallbackFailed = expected.Session.Snapshot.InputCancellationCallbackFailed,
+                Checkpoint = selection.Checkpoint, Originals = selection.Originals };
+            if (selection.Disposition == SessionTreeNavigationDisposition.Selected && request.Execution?.AfterTree is { } after)
+            {
+                var originals = new SessionBoundaryOriginals();
+                try
+                {
+                    var callback = after(receipt, linked.Token).AsTask();
+                    await originals.Join(callback, "tree-observation").ConfigureAwait(false);
+                }
+                catch (Exception error) { throw new SessionTreeCommittedObservationException(receipt with
+                    { Originals = receipt.Originals.AddRange(originals.Snapshot()) }, error); }
+                receipt = receipt with { Originals = receipt.Originals.AddRange(originals.Snapshot()) };
+            }
+            return receipt;
         }
         finally { inMutation.Value = previous; mutations.Release(); }
     }

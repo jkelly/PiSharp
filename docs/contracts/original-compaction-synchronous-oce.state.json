@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "16193f28fa04365c1938c7a98ec7e37f370c5e76",
+  "baseTree": "0280a3f1d18e3903d1dbf16e9fa563bc3f692e5c",
+  "baseStatus": "historical-synchronous-observer-OCE-state-edge",
+  "status": "source-only-synchronous-observer-failure-provenance-wrapper",
+  "newGroups": 1,
+  "totalAuthoredLifecycleGroups": 12,
+  "registeredNewGroups": 0,
+  "executedNewGroups": 0,
+  "compilers": 0,
+  "builds": 0,
+  "globalCollectorEdits": 0,
+  "acceptedParity": false,
+  "remaining": ["independent source review", "coordinator runner registration", "authorized exact-producer runtime qualification"]
+}

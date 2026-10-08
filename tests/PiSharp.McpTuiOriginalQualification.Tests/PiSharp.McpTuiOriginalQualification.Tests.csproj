@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><AssemblyName>PiSharp.CodingAgent.Tests</AssemblyName><StartupObject>PiSharp.Qualification.McpTuiQualificationEntry</StartupObject></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+    <Compile Include="../PiSharp.CodingAgent.Tests/McpDynamicRootsHttpBindingTests.cs" Link="OriginalRootsControls.cs" />
+    <Compile Include="../PiSharp.CodingAgent.Tests/McpAdmittedHttpAuthenticationTests.cs" Link="OriginalAuthenticationControls.cs" />
+    <Compile Include="../PiSharp.CodingAgent.Tests/McpOAuthDiscoveryRefreshTests.cs" Link="OriginalOAuthControls.cs" />
+    <Compile Include="../PiSharp.CodingAgent.Tests/TerminalComponentTransportFailureTests.cs" Link="OriginalProtocolControls.cs" />
+    <Compile Include="../PiSharp.CodingAgent.Tests/NativeComponentOpenLifetimeTests.cs" Link="OriginalNativeOwnerControls.cs" />
+    <Compile Include="../PiSharp.OriginalProviderQualification.Shared/QualificationEvidence.cs" Link="QualificationEvidence.cs" />
+  </ItemGroup>
+</Project>

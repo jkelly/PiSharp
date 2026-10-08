@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "normalizerVersion": "object-key-order-v1",
+  "scope": "Genuine unchanged Responses input-message projection; full payload, tool declarations, SDK wrappers, authentication and native parity excluded",
+  "fixtures": [
+    {
+      "fixtureId": "responses-replay-core",
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "requirementIds": [
+        "providers.transcripts",
+        "api.openai-responses"
+      ],
+      "scenario": "Same-model signed replay, different-model replay and foreign identity with system-section folding",
+      "clock": {
+        "mechanism": "Explicit transcript timestamps; all tool calls have results, so orphan synthesis clock is not used"
+      },
+      "seed": "none; explicit model/message/item/call IDs",
+      "environment": {
+        "platform": "win32",
+        "architecture": "x64",
+        "credentials": "not inherited",
+        "network": "disabled",
+        "workspace": "isolated home/workspace"
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/responses-replay/core.input.json",
+        "sha256": "ea51963dab7282dfaf84faf9b5b42af70e961a1494921db8b82da60232c3e76d"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/responses-replay/core.expected.json",
+        "sha256": "2d946a5739797f0bef623f4acacc7823ed505d8fb5037d57dfdd45bd749c38ad"
+      },
+      "provenance": {
+        "kind": "captured-upstream-responses-replay-oracle",
+        "inputKind": "authored-synthetic-input",
+        "source": "Unmodified pinned convertResponsesMessages with authored transcripts and target model declarations",
+        "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+        "dependencyLock": "tools/PiReferenceRunner/responses-replay-lock.json",
+        "capturedAt": "2026-09-30",
+        "captureCommand": "node tools/PiReferenceRunner/responses-replay-run.mjs --capture-new",
+        "nativeProjection": false,
+        "providerWireTraffic": false
+      }
+    }
+  ]
+}

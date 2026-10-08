@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "status": "STATIC SOURCE PIN RECONCILIATION ONLY; UNEXECUTED",
+  "base": "ac8169cb695a7aab8dafc20caba495470390c758",
+  "historicalBoundarySha256": "6ca78ab5205d5d2ee7b14fc57aa78b05824156f71221c1de921a0dc3c7544b03",
+  "changes": [
+    {
+      "sha256": "01cb6e5d169af54d5fb1f366d4712b1d0045a90c21702221fb8918c0fbeb4060",
+      "bytes": 19175,
+      "relative": "src/PiSharp.Cli/Interactive/TerminalSessionView.cs",
+      "previousSha256": "36bd9b9808735ea85f006b6ccce373d1d165d8a3e559d80407623c14f4b05e9e"
+    }
+  ],
+  "sourceMemberCount": 14,
+  "scenarioCount": 8,
+  "scenariosUnchanged": true,
+  "builds": 0,
+  "testsExecuted": 0
+}

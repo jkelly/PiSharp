@@ -1,0 +1,35 @@
+# Completions caller authorization and explicit outer retries
+
+This bounded P2-08/P2-09 unit uses unchanged Pi v0.99.1 at `d86654abb8862e201933517d6f1fce9f88dd117f`: [Completions wrapper](https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/openai-completions.ts), [provider retry helper](https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/utils/provider-retry.ts) and its locked OpenAI SDK 7.19.0. Local qualification uses fake offline keys, actual injected source fetch/native handler executions and immutable source/DLL receipts. No live provider access is required.
+
+## Request headers
+
+The configured factory still requires and validates the explicit API key. Generated bearer authentication precedes owned model headers, session-affinity headers and caller headers. A caller Authorization overrides the model/generated value case-insensitively; an explicit null removes it. Printable ASCII/tab, CR/LF/NUL rejection and configured header budgets remain enforced. Other protected framing/Cloudflare header contracts are unchanged.
+
+Every fresh SDK-compatible factory request generates `x-stainless-retry-count:0`, including default one-send calls. Caller value or null overrides/removes it. This describes the actual source SDK request's internal retry count. It never reports the native outer attempt index. The transport does not fabricate JS/Node/SDK/host runtime identity headers or rewrite computed Content-Length to align a captured header array.
+
+## Native API inventory and scope
+
+`CompletionsHttpSseOptions` gains nonpositional `CompletionsRetryOptions? Retry { get; init; }`. Existing positional construction/deconstruction and delegates remain intact. All added types live in `PiSharp.AI.Protocols.OpenAICompletions`; no shared Contracts/ChatRun/agent/session/RPC/CLI/extension surface changes.
+
+`public sealed record CompletionsRetryOptions(int MaxRetries = 0, int MaxRetryDelayMilliseconds = 60_000)` has native init properties `MaximumRequestBodyBytes` (1 MiB), `MaximumRequestHeaders` (128), `MaximumRequestOptions` (128), `MaximumRequestHeaderCharacters` (32,768), `TimeProvider` (system) and optional `Action<CompletionsRetryObservation> OnRetry`. Body limit range is 2..8 MiB; header/options counts 1..4096; aggregate header characters 1..1,048,576; retries 0..32; negative caps/undefined providers are rejected before effects. These explicit native admission bounds are not claims to accept every arbitrary JS configuration.
+
+`public sealed record CompletionsRetryObservation(int RetryIndex, int? Status, TimeSpan Delay)` is an immutable sanitized native decision after rejected request/response ownership closes and before sleep. RetryIndex starts at zero; a connection/timeout has no status. It carries no exception text, URI, headers, key, provider body or message payload. Observer failure stops preparation and is sanitized. It grants no retry/tool/durable authority and does not enter Pi messages, diagnostics or source JSON. A configured TimeProvider supplies date evaluation and actual delay scheduling; exponential jitter uses the native random source with the pinned source range.
+
+## Retry and ownership policy
+
+Null/default/zero retries preserve one send. Explicit positive retries apply solely to HTTP response preparation. The case-sensitive `x-should-retry:true/false` directive wins; otherwise connection failures, non-user timeouts, 408/409/429 and status >=500 are eligible. Current user cancellation always aborts. Payload/request construction, accepted OnResponse callbacks, body acquisition, provider callbacks, framing, streamed data, cleanup and tools are outside the retry loop. No partially emitted response is replayed.
+
+Request/payload construction and its awaited OnPayload run once per invocation. Positive retries capture the resulting bounded buffered bytes, headers, protocol version/policy and bounded opaque request-option associations. Each later send owns a fresh request/content with that materialized body; callback replacements and unknown headers/options are preserved. The snapshot is private invocation state, never an execution token or a public trace. The borrowed HttpClient is unchanged.
+
+Every rejected response closes without acquiring/reading its body. Its corresponding request closes before observer, delay and the next send. Cleanup rejection stops retries and remains joined as a separate native CleanupFailed carrier, retaining the source/semantic primary. Accepted-response canonical/source preparation, prefetch, callback and body/reader ownership retain their existing policies. Native completion still joins all admitted producer/physical work.
+
+Source delay order is retry-after-ms floating prefix, retry-after seconds floating prefix or HTTP date, then 500 ms exponential backoff capped at 8000 ms with a factor in 0.75..1. Negative/past delays become zero. The configured/default 60-second limit applies to server-requested delays, not exponential backoff; zero disables that source cap. Cancellation interrupts actual owned sleep and prevents another attempt. Infinite/overflowing positive delays beyond native timer range fail safely even when the source cap is disabled; full JS date/timeout grammar/platform qualification remains open.
+
+## Qualification boundaries
+
+Tests exercise actual auth/null/header precedence, status/directive/exhaustion, connection and non-user timeout, delay/date/prefix/cap/jitter behavior with a controlled clock, cancellation, bounded replay, once-only replacement payloads, opaque request options, disposal before retry and cleanup rejection, actual source startup and callback/post-header failures. Paired genuine source/native profiles additionally compare attempt counts, stop reasons, callbacks, full body digests, URL/method and all six named common-header facts while preserving complete raw header arrays. These injected observation points are not captured transmitted HTTP wire and do not qualify full header metadata/ABI parity.
+
+The original 328-finding base and diagnostic candidate's normal 322-finding receipts remain immutable. Independent diagnostic review also reproduced intermittent extra ordered-sequence findings at `/publicSourceExecution/lifecycle/milestones` for `abort-pending-read-cancel-gate-rejects`: base 329 in 2/6 runs, candidate 323 in 1/5. This remains open; no ordering assertion is removed, sorted or normalized. Successor strict results must retain every finding object and report real generated-header differences explicitly. All original fourteen cases, source fixtures/locks/goldens/comparators, 79 scopes and eight OPEN phase gates remain mandatory.
+
+Public API/extension ABI approval, full source reader/queue/settlement contracts, header transmission/host identity policy, standardized failure taxonomy, remaining provider/auth/model inventory, independent successor/combined reviews and lead-owned full native/physical-terminal gates remain unqualified. This unit neither waives those contracts nor grants package/phase acceptance.

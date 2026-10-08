@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "preservedCandidate": "5c1ebd5b4bd9bd6eea3cd7f9c55846428e74bd88",
+  "admissionRevision": "bounded-tier-a-tool-parity-1",
+  "reviewRequiredBeforeExecution": true,
+  "planPath": "compatibility/node/command-input-bridge.plan.json",
+  "planSha256": "abdd66ab03c89157bc8bd63aeae708daa09be0b15b8a1437d8007a301044b9ee",
+  "entrySha256": "a8d7672257d521223a444b61814081822d0463a77b5785eeffccf662fd912ef4",
+  "helperRows": [
+    {
+      "path": "tools/NodeCommandInputBridge/worker.mjs",
+      "bytes": 10223,
+      "sha256": "a8d7672257d521223a444b61814081822d0463a77b5785eeffccf662fd912ef4"
+    },
+    {
+      "path": "tools/NodeCommandInputBridge/module-loader.mjs",
+      "bytes": 28748,
+      "sha256": "82d0b61041a9216aadbf1ae0b7e6976177fda6e363bca7002bd88275629612bf"
+    },
+    {
+      "path": "tools/NodeBridge/wire.mjs",
+      "bytes": 10011,
+      "sha256": "83dd5314526f8ece061ea85da50326ed45867fe7edb76d37ac67f208775d3deb"
+    },
+    {
+      "path": "tools/NodeCommandInputBridge/admission.mjs",
+      "bytes": 5339,
+      "sha256": "f7e334ba9fd9752e35a7f6cbbcf4597edaa569b6932d89689ffe936e8b1d6ab8"
+    },
+    {
+      "path": "tools/NodeCommandInputBridge/tool-context.mjs",
+      "bytes": 666,
+      "sha256": "4e0131c01d02883b170135e1b2882b962f9e0e1f302f13a2561948e8c9371689"
+    },
+    {
+      "path": "tools/NodeCommandInputBridge/tool-progress.mjs",
+      "bytes": 3389,
+      "sha256": "424eb65472142f7e0c2f9f1e2a2abad7f0f6b494557e8c12611a084f663f520c"
+    }
+  ],
+  "sourceRows": [
+    {
+      "path": "packages/coding-agent/examples/extensions/commands.ts",
+      "bytes": 2594,
+      "sha256": "36716b53da169936c7e1360a4fde1e2fc0c3356a6505f177235f09c5538c6e4f"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/input-transform.ts",
+      "bytes": 1444,
+      "sha256": "cf0f65d610631ca75d18aae1c8f1408139702f674cb2835f8c009b943776474b"
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/types.ts",
+      "bytes": 81892,
+      "sha256": "de0ccce3b8b222d19a2ecef24902fc72aab62b6573129cbf886bc064dd6ab505"
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/loader.ts",
+      "bytes": 27197,
+      "sha256": "aa903524bb2db3ee9fb7f21e863e373e7f12a56c74fd05d27c879a4a7020deb0"
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/runner.ts",
+      "bytes": 51250,
+      "sha256": "1a0d73843fba5773d415f484c46898138723b73d27bf8c3159f491fa0b6232f3"
+    },
+    {
+      "path": "packages/coding-agent/src/core/agent-session.ts",
+      "bytes": 155372,
+      "sha256": "26e76e13456757b0419df26b1f4d9bce9faa28c2588ad66af3e4cc3e9b179e0a"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1069,
+      "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/pirate.ts",
+      "bytes": 1461,
+      "sha256": "dd6ce684bbe7630e4a749fe133ef8b8b875adbc7e31284b17fe0b8157d51e013"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/hello.ts",
+      "bytes": 640,
+      "sha256": "0aa4e9800c2526914d4c1edb00b2cfa9bd9dd6da5218289994cccd5f5bfa4934"
+    },
+    {
+      "path": "packages/ai/src/utils/validation.ts",
+      "bytes": 9902,
+      "sha256": "460786b57dead200e411b9afec916a5049c96ebcff4da082096456ac06d44fb7"
+    }
+  ],
+  "dependenciesChanged": false,
+  "referenceExpectedSha256": "d74d53610906cb41ec6c2ad8a10f57d242c2a2846631a0ec4901ef5a3225930d",
+  "originalAdmissionHandoffPreserved": true,
+  "authoredToolParityNodeTests": 10,
+  "nativeSinkControlsAuthored": true,
+  "nativeOriginalCorpusScenarioAuthored": true,
+  "nodeTestsRun": false,
+  "nativeBuildRun": false,
+  "nativeTestsRun": false,
+  "executedCorpusCredit": 0
+}

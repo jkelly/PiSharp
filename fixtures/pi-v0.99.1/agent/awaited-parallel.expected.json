@@ -1,0 +1,2320 @@
+{
+  "fixtureId": "awaited-parallel",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "captured-upstream-agent-oracle",
+  "normalizerVersion": "object-key-order-v1",
+  "observations": {
+    "requests": [
+      {
+        "model": {
+          "id": "oracle-model",
+          "name": "Synthetic oracle model",
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "baseUrl": "https://invalid.example",
+          "reasoning": false,
+          "input": [
+            "text"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 8192,
+          "maxTokens": 1024
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "",
+              "timestamp": 1700000000000,
+              "toolsAdded": [
+                {
+                  "name": "toolA",
+                  "description": "Synthetic tool toolA",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "toolB",
+                  "description": "Synthetic tool toolB",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                {
+                  "name": "toolC",
+                  "description": "Synthetic tool toolC",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": "Run the three synthetic tools",
+              "timestamp": 1700000000000
+            }
+          ]
+        }
+      }
+    ],
+    "events": [
+      {
+        "type": "agent_start"
+      },
+      {
+        "type": "turn_start"
+      },
+      {
+        "type": "message_start",
+        "message": {
+          "role": "system",
+          "content": "",
+          "timestamp": 1700000000000,
+          "toolsAdded": [
+            {
+              "name": "toolA",
+              "description": "Synthetic tool toolA",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "toolB",
+              "description": "Synthetic tool toolB",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "toolC",
+              "description": "Synthetic tool toolC",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "message_end",
+        "message": {
+          "role": "system",
+          "content": "",
+          "timestamp": 1700000000000,
+          "toolsAdded": [
+            {
+              "name": "toolA",
+              "description": "Synthetic tool toolA",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "toolB",
+              "description": "Synthetic tool toolB",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            },
+            {
+              "name": "toolC",
+              "description": "Synthetic tool toolC",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "message_start",
+        "message": {
+          "role": "user",
+          "content": "Run the three synthetic tools",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_end",
+        "message": {
+          "role": "user",
+          "content": "Run the three synthetic tools",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_start",
+        "message": {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_update",
+        "assistantMessageEvent": {
+          "type": "toolcall_start",
+          "contentIndex": 0,
+          "partial": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call-A",
+                "name": "toolA",
+                "arguments": {}
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "synthetic-oracle",
+            "model": "oracle-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "pending",
+            "timestamp": 1700000000000
+          }
+        },
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_update",
+        "assistantMessageEvent": {
+          "type": "toolcall_delta",
+          "contentIndex": 0,
+          "delta": "{\"value\":1}",
+          "partial": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call-A",
+                "name": "toolA",
+                "arguments": {}
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "synthetic-oracle",
+            "model": "oracle-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "pending",
+            "timestamp": 1700000000000
+          }
+        },
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_update",
+        "assistantMessageEvent": {
+          "type": "toolcall_end",
+          "contentIndex": 0,
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call-A",
+            "name": "toolA",
+            "arguments": {
+              "value": 1
+            }
+          },
+          "partial": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call-A",
+                "name": "toolA",
+                "arguments": {
+                  "value": 1
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "synthetic-oracle",
+            "model": "oracle-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "pending",
+            "timestamp": 1700000000000
+          }
+        },
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_update",
+        "assistantMessageEvent": {
+          "type": "toolcall_start",
+          "contentIndex": 1,
+          "partial": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call-A",
+                "name": "toolA",
+                "arguments": {
+                  "value": 1
+                }
+              },
+              {
+                "type": "toolCall",
+                "id": "call-B",
+                "name": "toolB",
+                "arguments": {}
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "synthetic-oracle",
+            "model": "oracle-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "pending",
+            "timestamp": 1700000000000
+          }
+        },
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_update",
+        "assistantMessageEvent": {
+          "type": "toolcall_delta",
+          "contentIndex": 1,
+          "delta": "{\"value\":2}",
+          "partial": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call-A",
+                "name": "toolA",
+                "arguments": {
+                  "value": 1
+                }
+              },
+              {
+                "type": "toolCall",
+                "id": "call-B",
+                "name": "toolB",
+                "arguments": {}
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "synthetic-oracle",
+            "model": "oracle-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "pending",
+            "timestamp": 1700000000000
+          }
+        },
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_update",
+        "assistantMessageEvent": {
+          "type": "toolcall_end",
+          "contentIndex": 1,
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call-B",
+            "name": "toolB",
+            "arguments": {
+              "value": 2
+            }
+          },
+          "partial": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call-A",
+                "name": "toolA",
+                "arguments": {
+                  "value": 1
+                }
+              },
+              {
+                "type": "toolCall",
+                "id": "call-B",
+                "name": "toolB",
+                "arguments": {
+                  "value": 2
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "synthetic-oracle",
+            "model": "oracle-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "pending",
+            "timestamp": 1700000000000
+          }
+        },
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {
+                "value": 2
+              }
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_update",
+        "assistantMessageEvent": {
+          "type": "toolcall_start",
+          "contentIndex": 2,
+          "partial": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call-A",
+                "name": "toolA",
+                "arguments": {
+                  "value": 1
+                }
+              },
+              {
+                "type": "toolCall",
+                "id": "call-B",
+                "name": "toolB",
+                "arguments": {
+                  "value": 2
+                }
+              },
+              {
+                "type": "toolCall",
+                "id": "call-C",
+                "name": "toolC",
+                "arguments": {}
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "synthetic-oracle",
+            "model": "oracle-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "pending",
+            "timestamp": 1700000000000
+          }
+        },
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {
+                "value": 2
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-C",
+              "name": "toolC",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_update",
+        "assistantMessageEvent": {
+          "type": "toolcall_delta",
+          "contentIndex": 2,
+          "delta": "{\"value\":3}",
+          "partial": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call-A",
+                "name": "toolA",
+                "arguments": {
+                  "value": 1
+                }
+              },
+              {
+                "type": "toolCall",
+                "id": "call-B",
+                "name": "toolB",
+                "arguments": {
+                  "value": 2
+                }
+              },
+              {
+                "type": "toolCall",
+                "id": "call-C",
+                "name": "toolC",
+                "arguments": {}
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "synthetic-oracle",
+            "model": "oracle-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "pending",
+            "timestamp": 1700000000000
+          }
+        },
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {
+                "value": 2
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-C",
+              "name": "toolC",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_update",
+        "assistantMessageEvent": {
+          "type": "toolcall_end",
+          "contentIndex": 2,
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call-C",
+            "name": "toolC",
+            "arguments": {
+              "value": 3
+            }
+          },
+          "partial": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call-A",
+                "name": "toolA",
+                "arguments": {
+                  "value": 1
+                }
+              },
+              {
+                "type": "toolCall",
+                "id": "call-B",
+                "name": "toolB",
+                "arguments": {
+                  "value": 2
+                }
+              },
+              {
+                "type": "toolCall",
+                "id": "call-C",
+                "name": "toolC",
+                "arguments": {
+                  "value": 3
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "synthetic-oracle",
+            "model": "oracle-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "pending",
+            "timestamp": 1700000000000
+          }
+        },
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {
+                "value": 2
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-C",
+              "name": "toolC",
+              "arguments": {
+                "value": 3
+              }
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_end",
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {
+                "value": 2
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-C",
+              "name": "toolC",
+              "arguments": {
+                "value": 3
+              }
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "toolUse",
+          "timestamp": 1700000000000,
+          "thinkingLevel": "off"
+        }
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call-A",
+        "toolName": "toolA",
+        "args": {
+          "value": 1
+        }
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call-B",
+        "toolName": "toolB",
+        "args": {
+          "value": 2
+        }
+      },
+      {
+        "type": "tool_execution_start",
+        "toolCallId": "call-C",
+        "toolName": "toolC",
+        "args": {
+          "value": 3
+        }
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call-C",
+        "toolName": "toolC",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "result:call-C"
+            }
+          ],
+          "details": {
+            "value": 3
+          },
+          "terminate": true
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call-A",
+        "toolName": "toolA",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "result:call-A"
+            }
+          ],
+          "details": {
+            "value": 1
+          },
+          "terminate": true
+        },
+        "isError": false
+      },
+      {
+        "type": "tool_execution_end",
+        "toolCallId": "call-B",
+        "toolName": "toolB",
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "result:call-B"
+            }
+          ],
+          "details": {
+            "value": 2
+          },
+          "terminate": true
+        },
+        "isError": false
+      },
+      {
+        "type": "message_start",
+        "message": {
+          "role": "toolResult",
+          "toolCallId": "call-A",
+          "toolName": "toolA",
+          "content": [
+            {
+              "type": "text",
+              "text": "result:call-A"
+            }
+          ],
+          "details": {
+            "value": 1
+          },
+          "isError": false,
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_end",
+        "message": {
+          "role": "toolResult",
+          "toolCallId": "call-A",
+          "toolName": "toolA",
+          "content": [
+            {
+              "type": "text",
+              "text": "result:call-A"
+            }
+          ],
+          "details": {
+            "value": 1
+          },
+          "isError": false,
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_start",
+        "message": {
+          "role": "toolResult",
+          "toolCallId": "call-B",
+          "toolName": "toolB",
+          "content": [
+            {
+              "type": "text",
+              "text": "result:call-B"
+            }
+          ],
+          "details": {
+            "value": 2
+          },
+          "isError": false,
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_end",
+        "message": {
+          "role": "toolResult",
+          "toolCallId": "call-B",
+          "toolName": "toolB",
+          "content": [
+            {
+              "type": "text",
+              "text": "result:call-B"
+            }
+          ],
+          "details": {
+            "value": 2
+          },
+          "isError": false,
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_start",
+        "message": {
+          "role": "toolResult",
+          "toolCallId": "call-C",
+          "toolName": "toolC",
+          "content": [
+            {
+              "type": "text",
+              "text": "result:call-C"
+            }
+          ],
+          "details": {
+            "value": 3
+          },
+          "isError": false,
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "message_end",
+        "message": {
+          "role": "toolResult",
+          "toolCallId": "call-C",
+          "toolName": "toolC",
+          "content": [
+            {
+              "type": "text",
+              "text": "result:call-C"
+            }
+          ],
+          "details": {
+            "value": 3
+          },
+          "isError": false,
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "turn_end",
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {
+                "value": 2
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-C",
+              "name": "toolC",
+              "arguments": {
+                "value": 3
+              }
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "toolUse",
+          "timestamp": 1700000000000,
+          "thinkingLevel": "off"
+        },
+        "toolResults": [
+          {
+            "role": "toolResult",
+            "toolCallId": "call-A",
+            "toolName": "toolA",
+            "content": [
+              {
+                "type": "text",
+                "text": "result:call-A"
+              }
+            ],
+            "details": {
+              "value": 1
+            },
+            "isError": false,
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "toolResult",
+            "toolCallId": "call-B",
+            "toolName": "toolB",
+            "content": [
+              {
+                "type": "text",
+                "text": "result:call-B"
+              }
+            ],
+            "details": {
+              "value": 2
+            },
+            "isError": false,
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "toolResult",
+            "toolCallId": "call-C",
+            "toolName": "toolC",
+            "content": [
+              {
+                "type": "text",
+                "text": "result:call-C"
+              }
+            ],
+            "details": {
+              "value": 3
+            },
+            "isError": false,
+            "timestamp": 1700000000000
+          }
+        ]
+      },
+      {
+        "type": "agent_end",
+        "messages": [
+          {
+            "role": "system",
+            "content": "",
+            "timestamp": 1700000000000,
+            "toolsAdded": [
+              {
+                "name": "toolA",
+                "description": "Synthetic tool toolA",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "value"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "name": "toolB",
+                "description": "Synthetic tool toolB",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "value"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "name": "toolC",
+                "description": "Synthetic tool toolC",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "value"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": "Run the three synthetic tools",
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call-A",
+                "name": "toolA",
+                "arguments": {
+                  "value": 1
+                }
+              },
+              {
+                "type": "toolCall",
+                "id": "call-B",
+                "name": "toolB",
+                "arguments": {
+                  "value": 2
+                }
+              },
+              {
+                "type": "toolCall",
+                "id": "call-C",
+                "name": "toolC",
+                "arguments": {
+                  "value": 3
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "synthetic-oracle",
+            "model": "oracle-model",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1700000000000,
+            "thinkingLevel": "off"
+          },
+          {
+            "role": "toolResult",
+            "toolCallId": "call-A",
+            "toolName": "toolA",
+            "content": [
+              {
+                "type": "text",
+                "text": "result:call-A"
+              }
+            ],
+            "details": {
+              "value": 1
+            },
+            "isError": false,
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "toolResult",
+            "toolCallId": "call-B",
+            "toolName": "toolB",
+            "content": [
+              {
+                "type": "text",
+                "text": "result:call-B"
+              }
+            ],
+            "details": {
+              "value": 2
+            },
+            "isError": false,
+            "timestamp": 1700000000000
+          },
+          {
+            "role": "toolResult",
+            "toolCallId": "call-C",
+            "toolName": "toolC",
+            "content": [
+              {
+                "type": "text",
+                "text": "result:call-C"
+              }
+            ],
+            "details": {
+              "value": 3
+            },
+            "isError": false,
+            "timestamp": 1700000000000
+          }
+        ]
+      }
+    ],
+    "providerEmissionSnapshots": [
+      {
+        "type": "start",
+        "partial": {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_start",
+        "contentIndex": 0,
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_delta",
+        "contentIndex": 0,
+        "delta": "{\"value\":1}",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_end",
+        "contentIndex": 0,
+        "toolCall": {
+          "type": "toolCall",
+          "id": "call-A",
+          "name": "toolA",
+          "arguments": {
+            "value": 1
+          }
+        },
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_start",
+        "contentIndex": 1,
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_delta",
+        "contentIndex": 1,
+        "delta": "{\"value\":2}",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_end",
+        "contentIndex": 1,
+        "toolCall": {
+          "type": "toolCall",
+          "id": "call-B",
+          "name": "toolB",
+          "arguments": {
+            "value": 2
+          }
+        },
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {
+                "value": 2
+              }
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_start",
+        "contentIndex": 2,
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {
+                "value": 2
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-C",
+              "name": "toolC",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_delta",
+        "contentIndex": 2,
+        "delta": "{\"value\":3}",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {
+                "value": 2
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-C",
+              "name": "toolC",
+              "arguments": {}
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_end",
+        "contentIndex": 2,
+        "toolCall": {
+          "type": "toolCall",
+          "id": "call-C",
+          "name": "toolC",
+          "arguments": {
+            "value": 3
+          }
+        },
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {
+                "value": 2
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-C",
+              "name": "toolC",
+              "arguments": {
+                "value": 3
+              }
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "done",
+        "reason": "toolUse",
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "call-A",
+              "name": "toolA",
+              "arguments": {
+                "value": 1
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-B",
+              "name": "toolB",
+              "arguments": {
+                "value": 2
+              }
+            },
+            {
+              "type": "toolCall",
+              "id": "call-C",
+              "name": "toolC",
+              "arguments": {
+                "value": 3
+              }
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "toolUse",
+          "timestamp": 1700000000000
+        }
+      }
+    ],
+    "toolTrace": [
+      {
+        "kind": "preflight",
+        "id": "call-A",
+        "args": {
+          "value": 1
+        }
+      },
+      {
+        "kind": "preflight",
+        "id": "call-B",
+        "args": {
+          "value": 2
+        }
+      },
+      {
+        "kind": "preflight",
+        "id": "call-C",
+        "args": {
+          "value": 3
+        }
+      },
+      {
+        "kind": "execute_start",
+        "id": "call-A",
+        "args": {
+          "value": 1
+        }
+      },
+      {
+        "kind": "execute_start",
+        "id": "call-B",
+        "args": {
+          "value": 2
+        }
+      },
+      {
+        "kind": "execute_start",
+        "id": "call-C",
+        "args": {
+          "value": 3
+        }
+      },
+      {
+        "kind": "execute_finish",
+        "id": "call-C"
+      },
+      {
+        "kind": "after",
+        "id": "call-C"
+      },
+      {
+        "kind": "execute_finish",
+        "id": "call-A"
+      },
+      {
+        "kind": "after",
+        "id": "call-A"
+      },
+      {
+        "kind": "execute_finish",
+        "id": "call-B"
+      },
+      {
+        "kind": "after",
+        "id": "call-B"
+      }
+    ],
+    "controls": [
+      {
+        "kind": "assistant_barrier_enter"
+      },
+      {
+        "kind": "barrier_probe",
+        "preflightCount": 0,
+        "executionCount": 0
+      },
+      {
+        "kind": "assistant_barrier_release"
+      },
+      {
+        "kind": "release_tool",
+        "id": "call-C"
+      },
+      {
+        "kind": "release_tool",
+        "id": "call-A"
+      },
+      {
+        "kind": "release_tool",
+        "id": "call-B"
+      }
+    ],
+    "finalResult": [
+      {
+        "role": "system",
+        "content": "",
+        "timestamp": 1700000000000,
+        "toolsAdded": [
+          {
+            "name": "toolA",
+            "description": "Synthetic tool toolA",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "toolB",
+            "description": "Synthetic tool toolB",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "toolC",
+            "description": "Synthetic tool toolC",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": "Run the three synthetic tools",
+        "timestamp": 1700000000000
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "toolCall",
+            "id": "call-A",
+            "name": "toolA",
+            "arguments": {
+              "value": 1
+            }
+          },
+          {
+            "type": "toolCall",
+            "id": "call-B",
+            "name": "toolB",
+            "arguments": {
+              "value": 2
+            }
+          },
+          {
+            "type": "toolCall",
+            "id": "call-C",
+            "name": "toolC",
+            "arguments": {
+              "value": 3
+            }
+          }
+        ],
+        "api": "openai-responses",
+        "provider": "synthetic-oracle",
+        "model": "oracle-model",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 0,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "toolUse",
+        "timestamp": 1700000000000,
+        "thinkingLevel": "off"
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call-A",
+        "toolName": "toolA",
+        "content": [
+          {
+            "type": "text",
+            "text": "result:call-A"
+          }
+        ],
+        "details": {
+          "value": 1
+        },
+        "isError": false,
+        "timestamp": 1700000000000
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call-B",
+        "toolName": "toolB",
+        "content": [
+          {
+            "type": "text",
+            "text": "result:call-B"
+          }
+        ],
+        "details": {
+          "value": 2
+        },
+        "isError": false,
+        "timestamp": 1700000000000
+      },
+      {
+        "role": "toolResult",
+        "toolCallId": "call-C",
+        "toolName": "toolC",
+        "content": [
+          {
+            "type": "text",
+            "text": "result:call-C"
+          }
+        ],
+        "details": {
+          "value": 3
+        },
+        "isError": false,
+        "timestamp": 1700000000000
+      }
+    ],
+    "effects": [],
+    "checks": {
+      "barrierBlockedTools": true,
+      "preflightOrder": [
+        "call-A",
+        "call-B",
+        "call-C"
+      ],
+      "completionOrder": [
+        "call-C",
+        "call-A",
+        "call-B"
+      ],
+      "resultOrder": [
+        "call-A",
+        "call-B",
+        "call-C"
+      ],
+      "maxConcurrentTools": 3,
+      "providerRequestCount": 1,
+      "terminalAgentEndCount": 1
+    }
+  }
+}

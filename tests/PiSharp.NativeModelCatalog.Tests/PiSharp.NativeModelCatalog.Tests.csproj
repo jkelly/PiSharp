@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><EnablePromptTemplateYaml>false</EnablePromptTemplateYaml></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" /></ItemGroup>
+</Project>

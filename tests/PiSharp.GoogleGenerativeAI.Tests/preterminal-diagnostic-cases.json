@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORED_UNEXECUTED",
+  "base": "9f1e1833f74a4abda99838eb6fc698041a40c876",
+  "finding": "R49-GOOGLE-PRETERMINAL-CLEANUP-02",
+  "expectedValues": "Handwritten actual consumer resource-limit and physical cleanup schedules. No runtime or Source/SDK capture.",
+  "vectors": [
+    {
+      "id": "exact-review-two-tool-block-limit",
+      "chunks": [
+        { "candidates": [{ "content": { "parts": [
+          { "functionCall": { "id": "one", "name": "inspect", "args": {} } },
+          { "functionCall": { "id": "two", "name": "inspect", "args": {} } }
+        ] }, "finishReason": "STOP" }] }
+      ],
+      "limits": { "blocks": 1, "characters": 1048576 },
+      "firstCallId": "one",
+      "firstArguments": {},
+      "expectedContentCount": 1,
+      "code": "ResourceLimit",
+      "usage": 0
+    },
+    {
+      "id": "tool-prefix-then-text-character-limit",
+      "chunks": [
+        { "candidates": [{ "content": { "parts": [{ "functionCall": { "id": "one", "name": "inspect", "args": {} } }] } }] },
+        { "candidates": [{ "content": { "parts": [{ "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }] }, "finishReason": "STOP" }] }
+      ],
+      "limits": { "blocks": 8, "characters": 64 },
+      "firstCallId": "one",
+      "firstArguments": {},
+      "expectedContentCount": 2,
+      "code": "ResourceLimit",
+      "usage": 0
+    }
+  ],
+  "families": [
+    { "id": "google.native-diagnostics-preterminal-real-consumer-limit", "schedules": 20, "consumers": ["real Google HTTP transport", "ordinary and abort-settlement ChatClient", "real Agent and executor"], "criteria": ["exact two-tool block-limit reproduction", "tool prefix then text character-limit", "actual Agent default character-limit", "held original request/response/body release", "primary ResourceLimit preserved through clean/failing cleanup", "separate CleanupFailed even before terminal", "local abort precedence", "retained admitted first tool partial and no execution authority", "complete native channels and Pi wire omission"] },
+    { "id": "google.native-diagnostics-preterminal-source-cleanup-context", "schedules": 18, "consumers": ["actual ChatRun", "controlled owned reader"], "criteria": ["resource/protocol/source MoveNext failure", "clean/distinct-exception/same-instance disposal", "one original disposal joined", "local abort precedence", "primary and cleanup classified by execution scope rather than exception identity or text", "native terminal/result/failure agreement"] }
+  ],
+  "nativeBuilds": 0,
+  "nativeExecutions": 0,
+  "csharpParserExecutions": 0,
+  "sourceCaptures": 0,
+  "packageAcceptance": false,
+  "allEightPhaseGates": "OPEN"
+}

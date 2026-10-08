@@ -16,3 +16,42 @@ fixtures/pi-v0.99.1/session-compaction/** -text
 
 fixtures/pi-v0.99.1/session-recovery/** -text
 compatibility/semantic-full-structural-openai.plan.json -text
+
+# Public export integrity uses exact physical bytes for these existing CRLF files.
+# Preserve source and license bytes across Windows and Unix checkouts.
+/.gitattributes -text
+/.gitignore -text
+/compatibility/semantic-full-structural-openai.plan.json -text
+/docs/contracts/session-setup-and-tree-options.md -text
+/docs/mcp-default-oauth-application-installation-r1312sdk.md -text
+/docs/mcp-default-oauth-host-r1293sdk.md -text
+/docs/tui-r809/ExtensionRegistrySnapshot.post.cs.txt -text
+/docs/tui-r809/ExtensionRegistrySnapshot.pre.cs.txt -text
+/docs/tui-r809/SHARED_CALLBACK_FRAME_OWNER.patch -text
+/LICENSE -text
+/src/PiSharp.Cli/Commands/OfflineSessionProfile.cs -text
+/src/PiSharp.Cli/Commands/OfflineSessionProfile.EffectiveSettingsReload.cs -text
+/src/PiSharp.Cli/Commands/OfflineSessionProfile.LifecycleHandoffs.cs -text
+/src/PiSharp.Cli/Commands/OfflineSessionProfile.OriginalSystemPrompt.cs -text
+/src/PiSharp.Cli/Commands/OfflineSessionProfile.OriginalSystemPromptHooks.cs -text
+/src/PiSharp.Cli/Commands/OfflineSessionProfile.RuntimeView.cs -text
+/src/PiSharp.Cli/Extensions/NativeExtensionRegistrationFacadeHost.cs -text
+/src/PiSharp.Cli/Mcp/Authentication/McpDefaultOAuthApplicationAdmission.cs -text
+/src/PiSharp.Cli/Mcp/Authentication/McpDefaultOAuthApplicationInstallation.cs -text
+/src/PiSharp.Cli/Reloading/NativeHostReloadCoordinator.cs -text
+/src/PiSharp.Extensions.Runtime/Facade/Context/ExtensionCommandFacade.cs -text
+/src/PiSharp.Extensions.Runtime/Facade/Registration/ExtensionRegistrationCommands.cs -text
+/src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs -text
+/src/PiSharp.Tui/Components/Text/UPSTREAM-LICENSE -text
+/tests/PiSharp.CodingAgent.Tests/OriginalSystemPromptConstructionTests.cs -text
+/tests/PiSharp.CodingAgent.Tests/OriginalSystemPromptReloadPublicationTests.cs -text
+/tests/PiSharp.DefaultOAuthHostQualification.Tests/DefaultOAuthHostQualificationEntry.cs -text
+/tests/PiSharp.DefaultOAuthHostQualification.Tests/PiSharp.DefaultOAuthHostQualification.Tests.csproj -text
+/tests/PiSharp.Terminal.SelectList.Integration.Tests/UPSTREAM-LICENSE -text
+/tests/PiSharp.Tui.IndicConjunct.Tests/fixtures/ICU-LICENSE.txt -text
+/tests/PiSharp.Tui.Keybindings.Tests/UPSTREAM-LICENSE -text
+/tests/PiSharp.Tui.SelectList.Tests/UPSTREAM-LICENSE -text
+/third-party/YamlDotNet.LICENSE.txt -text
+# Export integrity sidecars are also physical-byte authorities.
+/PUBLIC-DERIVATIVE-INTEGRITY.json -text
+/PUBLIC-SNAPSHOT-MANIFEST.json -text

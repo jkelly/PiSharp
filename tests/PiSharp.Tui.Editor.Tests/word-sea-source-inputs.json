@@ -1,0 +1,8094 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "Additive full public Editor dictionary/ambiguity/normalization/mixed-script movement, word kills, ring, undo and complete callbacks. Original32/443 and prior27/891 word corpora retained without rewriting.",
+  "runtimeEvidence": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\artifacts\\word-sea-runtime-observations.json",
+    "sha256": "31f56e82e9b47c3fb601ca00cfd012b5f4a08158f7511a7814fb5dec11030c5c"
+  },
+  "cases": [
+    {
+      "id": "sea-full-public-editor-0",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ກໍ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-1",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ກໍກໍ່"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-2",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ສໍ້ຫຼໍ້"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-3",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ສໍ້ຫຼໍ້ສອກ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-4",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ນໍ້າສົມ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-5",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ນໍ້າສົມນໍ້າສົ້ມ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-6",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ເຢໂຊຮາຢາ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-7",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ເຢໂຊຮາຢາເຢຍຣະມັນ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-8",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ໄຮຫີນ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-9",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ໄຮຫີນກໍ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-10",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ັນໍ້າສົມນໍ້າສົ້ມ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-11",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ນໍ້າສົມນໍ້າສົ້ມ.ນໍ້າສົມນໍ້າສົ້ມ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-12",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abcນໍ້າສົມນໍ້າສົ້ມ123"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-13",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ນໍ້າສົມນໍ້າສົ້ມ中文ภาษาไทย"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-14",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ກ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-15",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ກຂ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-16",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ກຂຄ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-17",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ກຂຄງ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-18",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ກຂຄງຈ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-19",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ກຂຄງຈຊ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-20",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ក"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-21",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "កកក"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-22",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ឋបនភណ្ឌ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-23",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ឋបនភណ្ឌឋបនាការ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-24",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ពំនូនដី"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-25",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ពំនូនដីពំនូល"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-26",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "សម្លុយ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-27",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "សម្លុយសម្លុយសំពត់"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-28",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ឳឡឹក"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-29",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ឳឡឹកក"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-30",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ាពំនូនដីពំនូល"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-31",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ពំនូនដីពំនូល.ពំនូនដីពំនូល"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-32",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abcពំនូនដីពំនូល123"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-33",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ពំនូនដីពំនូល中文ภาษาไทย"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-34",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "កខ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-35",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "កខគ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-36",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "កខគឃ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-37",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "កខគឃង"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-38",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "កខគឃងច"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-39",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကကတိုး"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-40",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကကတိုးကကတစ်"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-41",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ယုန်"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-42",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ယုန်ယုန်တုတ်"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-43",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကင်းဖလောင်ကောင်"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-44",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကင်းဖလောင်ကောင်ကင်းဘူ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-45",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ပေါင်းဘက်"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-46",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ပေါင်းဘက်ပေါင်းယှက်"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-47",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "င်္သကာတင်း"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-48",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "င်္သကာတင်းကကတိုး"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-49",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ိကင်းဖလောင်ကောင်ကင်းဘူ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-50",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကင်းဖလောင်ကောင်ကင်းဘူ.ကင်းဖလောင်ကောင်ကင်းဘူ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-51",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abcကင်းဖလောင်ကောင်ကင်းဘူ123"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-52",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကင်းဖလောင်ကောင်ကင်းဘူ中文ภาษาไทย"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-53",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "က"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-54",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကခ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-55",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကခဂ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-56",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကခဂဃ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-57",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကခဂဃင"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "sea-full-public-editor-58",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ကခဂဃငစ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bf"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bb"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bd"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u0017"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    }
+  ]
+}

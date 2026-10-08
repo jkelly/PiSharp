@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <EnablePromptTemplateYaml Condition="'$(EnablePromptTemplateYaml)' == ''">true</EnablePromptTemplateYaml>
+    <!-- The disabled CLI graph has its own coordinator-generated lock; normal locks stay intact. -->
+    <NuGetLockFilePath Condition="'$(EnablePromptTemplateYaml)' == 'false'">$(MSBuildProjectDirectory)/packages.prompt-yaml-disabled.lock.json</NuGetLockFilePath>
+    <DefineConstants Condition="'$(EnablePromptTemplateYaml)' == 'true'">$(DefineConstants);PISHARP_PROMPT_YAML</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PiSharp.CodingAgent.Tests" />
@@ -8,10 +12,17 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
+    <ProjectReference Include="../PiSharp.PromptTemplates.Yaml/PiSharp.PromptTemplates.Yaml.csproj" Condition="'$(EnablePromptTemplateYaml)' == 'true'" />
     <ProjectReference Include="../PiSharp.Tools/PiSharp.Tools.csproj" />
     <ProjectReference Include="../PiSharp.Rpc/PiSharp.Rpc.csproj" />
     <ProjectReference Include="../PiSharp.Tui/PiSharp.Tui.csproj" />
     <ProjectReference Include="../PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
     <ProjectReference Include="../PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Models/*.json" LogicalName="PiSharp.Cli.Models.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(EnablePromptTemplateYaml)' == 'true'">
+    <None Include="../../third-party/YamlDotNet.LICENSE.txt" Link="licenses/YamlDotNet.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
 </Project>

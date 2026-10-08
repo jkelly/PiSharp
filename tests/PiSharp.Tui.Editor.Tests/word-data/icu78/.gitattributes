@@ -1,0 +1,5 @@
+*.txt -text
+*.dict -text
+*.cpp -text
+icu78-LICENSE -text
+.gitattributes -text

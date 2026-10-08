@@ -1,0 +1,591 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "finish-decisions-core",
+  "kind": "authored-finish-decisions-input",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "events.agent"
+  ],
+  "scenario": "Seven unchanged runAgentLoop finishTurn cases: explicit end; one continue request selected by current context, tool, steering or follow-up; error/aborted assistant hard exits despite continue.",
+  "clock": {
+    "unixMilliseconds": 1700000000000,
+    "mechanism": "Disclosed harness Date.now override restored in finally; explicit authored message timestamps and IDs; no timestamp normalization."
+  },
+  "seed": "none; explicit authored IDs and awaited first-finishTurn gate per case",
+  "normalizerVersion": "object-key-order-v1",
+  "model": {
+    "id": "oracle-model",
+    "name": "Synthetic finish-decision oracle model",
+    "api": "openai-responses",
+    "provider": "synthetic-oracle",
+    "baseUrl": "https://invalid.example",
+    "reasoning": false,
+    "input": [
+      "text"
+    ],
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+    },
+    "contextWindow": 8192,
+    "maxTokens": 1024
+  },
+  "tool": {
+    "name": "lookup",
+    "description": "Synthetic lookup tool returning an authored non-terminating result",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "toolResult": {
+    "content": [
+      {
+        "type": "text",
+        "text": "lookup:7"
+      }
+    ],
+    "details": {
+      "value": 7
+    },
+    "terminate": false
+  },
+  "callbackReturns": "Each finishDecisions string end/continue returns {action:<string>}; undefined returns JavaScript undefined. Queues receive authored messages only at the awaited first finishTurn gate and drain with splice(0).",
+  "scenarios": [
+    {
+      "scenarioId": "end-after-tool-before-queues",
+      "prompts": [
+        {
+          "role": "system",
+          "content": "Synthetic finish-turn scheduling reference.",
+          "timestamp": 1700000000100
+        },
+        {
+          "role": "user",
+          "content": "Use lookup, then stop on the explicit finish decision.",
+          "timestamp": 1700000000101
+        }
+      ],
+      "providerTurns": [
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "finish-end-call",
+              "name": "lookup",
+              "arguments": {
+                "value": 7
+              }
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "toolUse",
+          "timestamp": 1700000000102
+        }
+      ],
+      "finishDecisions": [
+        "end"
+      ],
+      "steeringMessages": [
+        {
+          "role": "user",
+          "content": "Pending steering must remain pending.",
+          "timestamp": 1700000000103
+        }
+      ],
+      "followUpMessages": [
+        {
+          "role": "user",
+          "content": "Pending follow-up must remain pending.",
+          "timestamp": 1700000000104
+        }
+      ],
+      "abortOnProviderTerminal": false
+    },
+    {
+      "scenarioId": "continue-context-only-once",
+      "prompts": [
+        {
+          "role": "system",
+          "content": "Synthetic finish-turn scheduling reference.",
+          "timestamp": 1700000000200
+        },
+        {
+          "role": "user",
+          "content": "Continue one time using only the current context.",
+          "timestamp": 1700000000201
+        }
+      ],
+      "providerTurns": [
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "First text response."
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000202
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "One context-only continuation."
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000203
+        }
+      ],
+      "finishDecisions": [
+        "continue",
+        "undefined"
+      ],
+      "steeringMessages": [],
+      "followUpMessages": [],
+      "abortOnProviderTerminal": false
+    },
+    {
+      "scenarioId": "continue-satisfied-by-tool",
+      "prompts": [
+        {
+          "role": "system",
+          "content": "Synthetic finish-turn scheduling reference.",
+          "timestamp": 1700000000300
+        },
+        {
+          "role": "user",
+          "content": "Use lookup and continue exactly one request.",
+          "timestamp": 1700000000301
+        }
+      ],
+      "providerTurns": [
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "toolCall",
+              "id": "finish-continue-call",
+              "name": "lookup",
+              "arguments": {
+                "value": 7
+              }
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "toolUse",
+          "timestamp": 1700000000302
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "One natural tool continuation."
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000303
+        }
+      ],
+      "finishDecisions": [
+        "continue",
+        "undefined"
+      ],
+      "steeringMessages": [],
+      "followUpMessages": [],
+      "abortOnProviderTerminal": false
+    },
+    {
+      "scenarioId": "continue-satisfied-by-steering",
+      "prompts": [
+        {
+          "role": "system",
+          "content": "Synthetic finish-turn scheduling reference.",
+          "timestamp": 1700000000400
+        },
+        {
+          "role": "user",
+          "content": "Let steering satisfy the continuation.",
+          "timestamp": 1700000000401
+        }
+      ],
+      "providerTurns": [
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "First response before steering."
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000402
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "One response to steering."
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000404
+        }
+      ],
+      "finishDecisions": [
+        "continue",
+        "undefined"
+      ],
+      "steeringMessages": [
+        {
+          "role": "user",
+          "content": "Steering request queued at finish gate.",
+          "timestamp": 1700000000403
+        }
+      ],
+      "followUpMessages": [],
+      "abortOnProviderTerminal": false
+    },
+    {
+      "scenarioId": "continue-satisfied-by-follow-up",
+      "prompts": [
+        {
+          "role": "system",
+          "content": "Synthetic finish-turn scheduling reference.",
+          "timestamp": 1700000000500
+        },
+        {
+          "role": "user",
+          "content": "Let follow-up satisfy the continuation.",
+          "timestamp": 1700000000501
+        }
+      ],
+      "providerTurns": [
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "First response before follow-up."
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000502
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "One response to follow-up."
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000504
+        }
+      ],
+      "finishDecisions": [
+        "continue",
+        "undefined"
+      ],
+      "steeringMessages": [],
+      "followUpMessages": [
+        {
+          "role": "user",
+          "content": "Follow-up request queued at finish gate.",
+          "timestamp": 1700000000503
+        }
+      ],
+      "abortOnProviderTerminal": false
+    },
+    {
+      "scenarioId": "error-hard-exit-ignores-continue",
+      "prompts": [
+        {
+          "role": "system",
+          "content": "Synthetic finish-turn scheduling reference.",
+          "timestamp": 1700000000600
+        },
+        {
+          "role": "user",
+          "content": "Observe a synthetic provider error.",
+          "timestamp": 1700000000601
+        }
+      ],
+      "providerTurns": [
+        {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "error",
+          "timestamp": 1700000000602,
+          "errorMessage": "Synthetic provider error"
+        }
+      ],
+      "finishDecisions": [
+        "continue"
+      ],
+      "steeringMessages": [
+        {
+          "role": "user",
+          "content": "Steering remains after provider error.",
+          "timestamp": 1700000000603
+        }
+      ],
+      "followUpMessages": [
+        {
+          "role": "user",
+          "content": "Follow-up remains after provider error.",
+          "timestamp": 1700000000604
+        }
+      ],
+      "abortOnProviderTerminal": false
+    },
+    {
+      "scenarioId": "aborted-hard-exit-ignores-continue",
+      "prompts": [
+        {
+          "role": "system",
+          "content": "Synthetic finish-turn scheduling reference.",
+          "timestamp": 1700000000700
+        },
+        {
+          "role": "user",
+          "content": "Observe an authored aborted provider response.",
+          "timestamp": 1700000000701
+        }
+      ],
+      "providerTurns": [
+        {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "aborted",
+          "timestamp": 1700000000702,
+          "errorMessage": "Synthetic provider abort"
+        }
+      ],
+      "finishDecisions": [
+        "continue"
+      ],
+      "steeringMessages": [
+        {
+          "role": "user",
+          "content": "Steering remains after provider abort.",
+          "timestamp": 1700000000703
+        }
+      ],
+      "followUpMessages": [
+        {
+          "role": "user",
+          "content": "Follow-up remains after provider abort.",
+          "timestamp": 1700000000704
+        }
+      ],
+      "abortOnProviderTerminal": true
+    }
+  ],
+  "provenance": {
+    "kind": "authored-synthetic-input",
+    "origin": "Authored fake streamFn emissions/tool result/finishTurn returns/queue messages at public callbacks; the aborted case aborts the supplied controller and emits an authored aborted terminal response. No real provider/network abort is claimed."
+  }
+}

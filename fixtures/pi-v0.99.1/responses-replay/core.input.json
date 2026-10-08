@@ -1,0 +1,43 @@
+{
+  "schemaVersion":1,
+  "fixtureId":"responses-replay-core",
+  "sourceSha":"d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds":["providers.transcripts","api.openai-responses"],
+  "kind":"authored-responses-transcript-input",
+  "normalizerVersion":"object-key-order-v1",
+  "scenario":"Same-model signed replay, different-model replay and foreign identity with system-section folding",
+  "clock":{"mechanism":"Explicit transcript timestamps; all tool calls have results, so orphan synthesis clock is not used"},
+  "seed":"none; explicit model/message/item/call IDs",
+  "baseModel":{"id":"model-a","name":"Synthetic replay model","api":"openai-responses","provider":"fixture-openai","baseUrl":"https://fixture.invalid/v1","reasoning":true,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"contextWindow":4096,"maxTokens":1024},
+  "contexts":{
+    "signed-pair":{"messages":[
+      {"role":"system","content":"Base guidance","timestamp":0},
+      {"role":"user","content":[{"type":"text","text":"Read π"}],"timestamp":10},
+      {"role":"assistant","api":"openai-responses","provider":"fixture-openai","model":"model-a","responseId":"resp_source","content":[
+        {"type":"thinking","thinking":"","thinkingSignature":"{\"type\":\"reasoning\",\"id\":\"rs_same\",\"summary\":[],\"encrypted_content\":\"opaque/π==\",\"future\":null}"},
+        {"type":"text","text":"Signed answer π\r\nline","textSignature":"{\"v\":1,\"id\":\"msg_same\",\"phase\":\"commentary\"}"},
+        {"type":"toolCall","id":"call_same|fc_same","name":"read","namespace":"fs","thoughtSignature":"opaque-tool==","arguments":{"path":"C:\\temp\\π","keep":null,"order":["b","a"]}}
+      ],"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"toolUse","timestamp":20},
+      {"role":"toolResult","toolCallId":"call_same|fc_same","toolName":"read","content":[{"type":"text","text":"Result π\r\nline"}],"isError":false,"timestamp":30}
+    ]},
+    "foreign-system-fold":{"messages":[
+      {"role":"system","content":"Base guidance","sections":{"rule":"Old rule","drop":"Remove this"},"timestamp":0},
+      {"role":"user","content":[{"type":"text","text":"Read foreign π"}],"timestamp":10},
+      {"role":"assistant","api":"anthropic-messages","provider":"fixture-foreign","model":"foreign-model","content":[
+        {"type":"thinking","thinking":"","thinkingSignature":"opaque-foreign-redacted==","redacted":true},
+        {"type":"thinking","thinking":"Visible foreign reasoning π","thinkingSignature":"opaque-foreign-visible=="},
+        {"type":"text","text":"Foreign answer π","textSignature":"{\"v\":1,\"id\":\"msg_foreign\",\"phase\":\"final_answer\"}"},
+        {"type":"toolCall","id":"call odd__|foreign:item!/","name":"read","namespace":"foreign.fs","thoughtSignature":"opaque-foreign-tool==","arguments":{"path":"C:\\temp\\π","keep":null,"order":["b","a"]}}
+      ],"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"toolUse","timestamp":20},
+      {"role":"system","content":"Later guidance","sections":{"rule":"New rule","drop":null},"timestamp":25},
+      {"role":"toolResult","toolCallId":"call odd__|foreign:item!/","toolName":"read","content":[{"type":"text","text":"Foreign result π"}],"isError":false,"timestamp":30},
+      {"role":"user","content":[{"type":"text","text":"Continue"}],"timestamp":40}
+    ]}
+  },
+  "cases":[
+    {"caseId":"same-model-signed","contextRef":"signed-pair","targetModel":{"id":"model-a"},"allowedToolCallProviders":["fixture-openai"],"options":{"supportsMidConvoSystemMessages":true}},
+    {"caseId":"different-model-signed","contextRef":"signed-pair","targetModel":{"id":"model-b"},"allowedToolCallProviders":["fixture-openai"],"options":{"supportsMidConvoSystemMessages":true}},
+    {"caseId":"foreign-provider-system-fold","contextRef":"foreign-system-fold","targetModel":{"id":"model-a"},"allowedToolCallProviders":["fixture-openai"],"options":{"supportsMidConvoSystemMessages":false}}
+  ],
+  "provenance":{"kind":"authored-synthetic-input","modelMetadata":"Synthetic declarations, not a production model catalog","expectedValues":"Captured only from unchanged convertResponsesMessages","scope":"Responses input-message array projection only; no full payload, tool declaration schema conversion, SDK/auth/provider/native parity"}
+}

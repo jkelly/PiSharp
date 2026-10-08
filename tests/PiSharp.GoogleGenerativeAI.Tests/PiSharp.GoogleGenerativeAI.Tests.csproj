@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.AI/PiSharp.AI.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Agent/PiSharp.Agent.csproj" />
+    <None Update="authored-cases.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="strict-schema-cases.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="native-diagnostic-cases.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="preterminal-diagnostic-cases.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="google-retry-cases.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="google-simple-cases.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="pinned-google-catalog.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

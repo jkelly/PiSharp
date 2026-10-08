@@ -1,0 +1,3 @@
+*.txt -text
+.gitattributes -text
+*.dict -text

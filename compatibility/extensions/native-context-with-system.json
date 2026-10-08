@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORED_UNBUILT_UNEXECUTED_INDEPENDENT_REVIEW_PENDING",
+  "base": "ad66f900c8eaa217da9b04a7e556189054be1222",
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "hook": "context_with_system",
+  "sourceRunner": "packages/coding-agent/src/core/extensions/runner.ts:emitContext",
+  "sourceTypes": "packages/coding-agent/src/core/extensions/types.ts:ContextWithSystemEvent, ContextEventResult",
+  "inventory": "compatibility/extensions/native-surface.json",
+  "nativePath": "RegisterContextWithSystemHandler -> ExtensionAgentBinding.Hooks -> AgentHooks.TransformRequestMessages -> actual ChatRequest.Messages",
+  "canonicalHistory": "Unchanged; request context is a separate immutable list",
+  "authoredTestGroups": 8,
+  "nativeBuilds": 0,
+  "testsExecuted": 0,
+  "sourceExecuted": false,
+  "sourceDifferentialQualified": false,
+  "cliAdmissionChanged": true,
+  "providerTransportChanged": false,
+  "terminalUiChanged": false,
+  "phaseGatesClosed": [],
+  "remaining": [
+    "Independent review and bounded compilation/native execution",
+    "Full mutable-JavaScript parity and exact diagnostic timing",
+    "Full source differential qualification"
+  ],
+  "guide": "docs/contracts/native-context-with-system.md",
+  "inheritedHarnessCorrection": {
+    "original": "3968295ff4041f7510c788f3b270ca5e83d5e087",
+    "successor": "325f2ef"
+  },
+  "successorBase": "c660cc2aaffaa1b98f74697ab6cb0e8d8973f52d",
+  "hooks": [
+    "context",
+    "context_with_system"
+  ],
+  "authoredCliGroups": 1,
+  "reviewCorrection": "b39df2a815f82486d6591d29eb619afb08017c43"
+}

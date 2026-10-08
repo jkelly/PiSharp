@@ -1,0 +1,56 @@
+{
+  "events": [
+    {
+      "type": "error",
+      "reason": "error",
+      "error": {
+        "role": "assistant",
+        "content": [],
+        "api": "openai-responses",
+        "provider": "authored-synthetic",
+        "model": "fixture-model",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 0,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "error",
+        "timestamp": 1700000000000,
+        "errorMessage": "Synthetic missing authentication before start"
+      }
+    }
+  ],
+  "result": {
+    "role": "assistant",
+    "content": [],
+    "api": "openai-responses",
+    "provider": "authored-synthetic",
+    "model": "fixture-model",
+    "usage": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 0,
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+      }
+    },
+    "stopReason": "error",
+    "timestamp": 1700000000000,
+    "errorMessage": "Synthetic missing authentication before start"
+  }
+}

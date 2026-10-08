@@ -49,7 +49,13 @@ public sealed class HttpSseTransport
             cancellationToken.ThrowIfCancellationRequested();
             return new(response, _options);
         }
-        catch { response.Dispose(); throw; }
+        catch (Exception preparationError)
+        {
+            try { response.Dispose(); }
+            catch (Exception cleanupError)
+            { throw new AggregateException("HTTP SSE preparation and response cleanup failed.", preparationError, cleanupError); }
+            throw;
+        }
     }
 
     // Source providers may need to acquire input before an awaited response hook.
@@ -66,7 +72,13 @@ public sealed class HttpSseTransport
             if (!response.IsSuccessStatusCode) throw new HttpSseRejectedException(response.StatusCode);
             return new(response, _options);
         }
-        catch { response.Dispose(); throw; }
+        catch (Exception preparationError)
+        {
+            try { response.Dispose(); }
+            catch (Exception cleanupError)
+            { throw new AggregateException("HTTP SSE preparation and response cleanup failed.", preparationError, cleanupError); }
+            throw;
+        }
     }
 
     internal sealed class OwnedResponse(HttpResponseMessage response, SseDecoderOptions options) : IAsyncDisposable

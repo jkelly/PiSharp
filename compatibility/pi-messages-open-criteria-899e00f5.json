@@ -1,0 +1,468 @@
+{
+  "schemaVersion": 1,
+  "decision": "NO_PRODUCTION_CORRECTION_JUSTIFIED_KEEP_OPEN",
+  "candidate": "899e00f54723e0ab396db92282594301e66bcd4d",
+  "candidateTree": "41490855eca9afa62f6f0604e23c45ae7ef45f0d",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceVersion": "0.99.1",
+  "retainedCoordinatorPiMessages": {
+    "id": "pi-messages",
+    "runnerStatus": "FAILED",
+    "exit": 1,
+    "launched": true,
+    "pid": 42736,
+    "processJoined": true,
+    "outputJoined": true,
+    "cleanupOwner": "ORIGINAL_OPERATIONS_SETTLED",
+    "cleanupDeadlineExpired": false,
+    "cleanupErrors": [],
+    "error": null,
+    "report": {
+      "sha256": "44e75004a69688afccc1aba2ebdd9eaad89c6c17cadca9f002603aa7b08ff544",
+      "bytes": 306153658,
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\PiSharp-provider-pin-refresh-validation\\artifacts\\companions-899e00f5-All\\pi-messages.json"
+    },
+    "scalarReportFields": {
+      "status": "AUTHORED NATIVE CONSUMER; NO SOURCE DIFFERENTIAL ACCEPTANCE",
+      "casesSha256": "1b8a6fbb80726e6f1a6cb1848d2df9b7da41c9015d91592d9f077f2aa8c04891",
+      "criterionDependenciesSha256": "5a2ede772b7b4e906671c92a12a26654d3e1f69588bcf0b519bcb96c43aabb81",
+      "genuineSourceCasesCaptured": 0,
+      "all79ScopesRetained": true,
+      "allEightPhaseGates": "OPEN",
+      "qualificationStatus": "NONPASSING_SOURCE_QUALIFICATION_OPEN",
+      "failures": 0,
+      "openQualificationOutcomes": 2,
+      "unexecutedOutcomes": 0
+    },
+    "reportCollections": [
+      {
+        "name": "sourceQualificationBlockers",
+        "actualEntries": 6,
+        "statusCounts": []
+      },
+      {
+        "name": "outcomeIndex",
+        "actualEntries": 515,
+        "statusCounts": [
+          {
+            "status": "AUTHORED_CHECKS_COMPLETED",
+            "count": 513
+          },
+          {
+            "status": "OPEN_CRITERION",
+            "count": 1
+          },
+          {
+            "status": "OPEN_DOMAIN_GAP",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "results",
+        "actualEntries": 516,
+        "statusCounts": [
+          {
+            "status": "ALL AUTHORED BYTE BOUNDARIES CHECKED",
+            "count": 1
+          },
+          {
+            "status": "AUTHORED_CHECKS_COMPLETED",
+            "count": 513
+          },
+          {
+            "status": "OPEN_CRITERION",
+            "count": 1
+          },
+          {
+            "status": "OPEN_DOMAIN_GAP",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "name": "authoredDebugUriControls",
+        "actualEntries": 3,
+        "statusCounts": [
+          {
+            "status": "PASS_AUTHORED_NATIVE_ONLY",
+            "count": 3
+          }
+        ]
+      },
+      {
+        "name": "authoredIdentityReplacementControls",
+        "actualEntries": 7,
+        "statusCounts": [
+          {
+            "status": "PASS_AUTHORED_NATIVE_ONLY",
+            "count": 7
+          }
+        ]
+      },
+      {
+        "name": "authoredLegacyIdentityControls",
+        "actualEntries": 3,
+        "statusCounts": [
+          {
+            "status": "AUTHORED_CHECKS_COMPLETED",
+            "count": 3
+          }
+        ]
+      }
+    ],
+    "openOutcomes": [
+      {
+        "id": "PM-TOOL-IDENTITY-REPLACEMENT",
+        "readSchedule": "one-byte",
+        "category": "OPEN_DOMAIN_GAP",
+        "behavior": "COMPLETED",
+        "qualification": "OPEN",
+        "nonpassing": true,
+        "domainGap": true
+      },
+      {
+        "id": "PM-NATIVE-TOOL-CONTINUATION",
+        "readSchedule": "one-byte",
+        "category": "OPEN_CRITERION",
+        "behavior": "NO_FAILED_ASSERTIONS",
+        "qualification": "OPEN",
+        "nonpassing": true,
+        "domainGap": false
+      }
+    ]
+  },
+  "openCriterionExtract": [
+    {
+      "id": "PM-TOOL-IDENTITY-REPLACEMENT",
+      "category": "OPEN_DOMAIN_GAP",
+      "failure": null,
+      "behavior": "COMPLETED",
+      "qualification": "OPEN",
+      "openGroups": [
+        {
+          "group": "domain-gap",
+          "status": "OPEN",
+          "started": 0,
+          "completed": 0,
+          "failed": 0,
+          "inFlight": 0,
+          "openReasons": [
+            "Historical rejection/reducer restriction criteria are retained, superseded by authorized identity replacement, and remain OPEN; authored successor checks grant no genuine Source qualification."
+          ],
+          "failures": []
+        }
+      ],
+      "namedCriteria": [
+        {
+          "id": "PM-TOOL-IDENTITY-REPLACEMENT/1",
+          "name": "Retain as explicit Source/native contract conflict until lead releases a solution",
+          "priorGroup": "domain-gap",
+          "requiredGroups": [
+            "domain-gap",
+            "frames",
+            "effects"
+          ],
+          "scope": "CASE",
+          "requiredVariants": 1,
+          "observedVariants": 1,
+          "status": "OPEN",
+          "variantDependencies": [
+            {
+              "variant": 0,
+              "dependencies": [
+                {
+                  "group": "domain-gap",
+                  "status": "OPEN"
+                },
+                {
+                  "group": "frames",
+                  "status": "COMPLETED"
+                },
+                {
+                  "group": "effects",
+                  "status": "COMPLETED"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "PM-TOOL-IDENTITY-REPLACEMENT/2",
+          "name": "Do not modify shared reducer or treat rejection as parity",
+          "priorGroup": "domain-gap",
+          "requiredGroups": [
+            "domain-gap",
+            "frames",
+            "effects"
+          ],
+          "scope": "CASE",
+          "requiredVariants": 1,
+          "observedVariants": 1,
+          "status": "OPEN",
+          "variantDependencies": [
+            {
+              "variant": 0,
+              "dependencies": [
+                {
+                  "group": "domain-gap",
+                  "status": "OPEN"
+                },
+                {
+                  "group": "frames",
+                  "status": "COMPLETED"
+                },
+                {
+                  "group": "effects",
+                  "status": "COMPLETED"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "actualCounters": {
+        "Sends": 1,
+        "ProviderCallbacks": 5,
+        "Effects": 0,
+        "TerminalPublications": 1,
+        "TerminalDeliveries": 1,
+        "Unjoined": false
+      },
+      "excerptBytes": 199958
+    },
+    {
+      "id": "PM-NATIVE-TOOL-CONTINUATION",
+      "category": "OPEN_CRITERION",
+      "failure": null,
+      "behavior": "NO_FAILED_ASSERTIONS",
+      "qualification": "OPEN",
+      "openGroups": [
+        {
+          "group": "integration-open",
+          "status": "OPEN",
+          "started": 0,
+          "completed": 0,
+          "failed": 0,
+          "inFlight": 0,
+          "openReasons": [
+            "Agent/ToolInvoker shared paths are unreleased; this provider driver cannot qualify orchestration."
+          ],
+          "failures": []
+        }
+      ],
+      "namedCriteria": [
+        {
+          "id": "PM-NATIVE-TOOL-CONTINUATION/1",
+          "name": "Use actual native finalized tool args7; fake inspect effect once after awaited assistant barrier",
+          "priorGroup": "continuation",
+          "requiredGroups": [
+            "continuation",
+            "effects",
+            "frames",
+            "ownership",
+            "operation-join"
+          ],
+          "scope": "CASE",
+          "requiredVariants": 1,
+          "observedVariants": 1,
+          "status": "COMPLETED",
+          "variantDependencies": [
+            {
+              "variant": 0,
+              "dependencies": [
+                {
+                  "group": "continuation",
+                  "status": "COMPLETED"
+                },
+                {
+                  "group": "effects",
+                  "status": "COMPLETED"
+                },
+                {
+                  "group": "frames",
+                  "status": "COMPLETED"
+                },
+                {
+                  "group": "ownership",
+                  "status": "COMPLETED"
+                },
+                {
+                  "group": "operation-join",
+                  "status": "COMPLETED"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "PM-NATIVE-TOOL-CONTINUATION/2",
+          "name": "Append actual assistant/toolResult; compare second physical request; never seed Source assistant output",
+          "priorGroup": "continuation",
+          "requiredGroups": [
+            "continuation",
+            "payload",
+            "request",
+            "frames",
+            "input-unchanged",
+            "operation-join"
+          ],
+          "scope": "CASE",
+          "requiredVariants": 1,
+          "observedVariants": 1,
+          "status": "COMPLETED",
+          "variantDependencies": [
+            {
+              "variant": 0,
+              "dependencies": [
+                {
+                  "group": "continuation",
+                  "status": "COMPLETED"
+                },
+                {
+                  "group": "payload",
+                  "status": "COMPLETED"
+                },
+                {
+                  "group": "request",
+                  "status": "COMPLETED"
+                },
+                {
+                  "group": "frames",
+                  "status": "COMPLETED"
+                },
+                {
+                  "group": "input-unchanged",
+                  "status": "COMPLETED"
+                },
+                {
+                  "group": "operation-join",
+                  "status": "COMPLETED"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "PM-NATIVE-TOOL-CONTINUATION/3",
+          "name": "Existing Agent/ToolInvoker source unchanged; ownership approval required for integration assertions",
+          "priorGroup": "integration-open",
+          "requiredGroups": [
+            "integration-open"
+          ],
+          "scope": "CASE",
+          "requiredVariants": 1,
+          "observedVariants": 1,
+          "status": "OPEN",
+          "variantDependencies": [
+            {
+              "variant": 0,
+              "dependencies": [
+                {
+                  "group": "integration-open",
+                  "status": "OPEN"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "actualCounters": {
+        "Sends": 2,
+        "ProviderCallbacks": 10,
+        "Effects": 1,
+        "TerminalPublications": 2,
+        "TerminalDeliveries": 2,
+        "Unjoined": false
+      },
+      "excerptBytes": 397602
+    }
+  ],
+  "inspectedPins": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\NATIVE_FULL_COMPANION_HANDOFF_899e00f5.json",
+      "bytes": 228322,
+      "sha256": "0f2df12990e729d98849fc895ab644fdf1658376364adcb0b17f9bb5b102a847"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-3\\PiSharp-provider-pin-refresh-validation\\artifacts\\companions-899e00f5-All\\pi-messages.json",
+      "bytes": 306153658,
+      "sha256": "44e75004a69688afccc1aba2ebdd9eaad89c6c17cadca9f002603aa7b08ff544"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-9\\PI_MESSAGES_OPEN_CRITERIA_899E00F5_EXTRACT.json",
+      "bytes": 6520,
+      "sha256": "d0f019cc59d49def2ead25afe244b221966a2ee62542bb6c263acd4ee3900b8c"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-9\\PiSharp-pi-messages-open-criteria-analysis\\tests\\PiSharp.PiMessages.Tests\\Program.cs",
+      "bytes": 35774,
+      "sha256": "ec588617e43eca8359677137c175dbfe74107f6158d36d8ee8b1a815939c41ff"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-9\\PiSharp-pi-messages-open-criteria-analysis\\tests\\PiSharp.PiMessages.Tests\\HeldOwnershipHarnessR2.cs",
+      "bytes": 17353,
+      "sha256": "5b7e90624001d830cff4fad49136ac83b37081ff58a5cb49e86b493bd4cefc63"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-9\\PiSharp-pi-messages-open-criteria-analysis\\tests\\PiSharp.PiMessages.Tests\\LegacyIdentitySuccessor.cs",
+      "bytes": 9983,
+      "sha256": "785933c82379ee44e83ff5360712e37730228f2b95ca76d2773a5e149048f06e"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-9\\PiSharp-pi-messages-open-criteria-analysis\\tests\\PiSharp.PiMessages.Tests\\IdentitySuccessorContinuation.cs",
+      "bytes": 9746,
+      "sha256": "ebe8574dcb9e3500171b0d46ad1d358d4f8b94830916e6c56106edef4b4eda69"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-9\\PiSharp-pi-messages-open-criteria-analysis\\tests\\PiSharp.PiMessages.Tests\\IdentitySuccessorAdmission.cs",
+      "bytes": 8091,
+      "sha256": "a2017726bb5c0106fe4fdca0fbd9c96db958461c71260ed2b996572b426c3c01"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-9\\PiSharp-pi-messages-open-criteria-analysis\\tests\\PiSharp.PiMessages.Tests\\identity-successor-admission-r1.json",
+      "bytes": 10163,
+      "sha256": "19fc6e46c6a2fd1b2144038dd39412144a2a7c9a0b94cb311fb413486886082d"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-9\\PiSharp-pi-messages-open-criteria-analysis\\tests\\PiSharp.PiMessages.Tests\\authored-cases-r2.json",
+      "bytes": 868723,
+      "sha256": "1b8a6fbb80726e6f1a6cb1848d2df9b7da41c9015d91592d9f077f2aa8c04891"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-03\\task-9\\PiSharp-pi-messages-open-criteria-analysis\\tests\\PiSharp.PiMessages.Tests\\criterion-dependencies-r3.json",
+      "bytes": 22877,
+      "sha256": "5a2ede772b7b4e906671c92a12a26654d3e1f69588bcf0b519bcb96c43aabb81"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\pi-messages.ts",
+      "bytes": 13601,
+      "sha256": "8808e3f3d4e19fc0e3c292ce0f4bc45dbdf7d1daa6b023eb4f392c5c6040cfe0"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1\\upstream\\packages\\agent\\src\\agent-loop.ts",
+      "bytes": 29088,
+      "sha256": "e773e822a2587caf314e6bb66ea6370fce3468b7eecd26d6a67afe673f81eabc"
+    }
+  ],
+  "authored": {
+    "productionChanges": 0,
+    "newTests": 0,
+    "documents": 2
+  },
+  "executedHere": {
+    "nativeBuilds": 0,
+    "nativeTests": 0,
+    "sourceOracleCaptures": 0,
+    "liveCalls": 0,
+    "staticChecks": [
+      "JSON parse",
+      "SHA256 source/report inventory",
+      "report hash matches retained handoff",
+      "source/control and criterion inspection",
+      "Git diff whitespace check"
+    ]
+  },
+  "acceptance": "OPEN",
+  "nextStep": "Coordinator admission and matching selected-profile execution receipts, followed by explicit reviewer acceptance or an allocated original-case integration control; genuine Source capture remains missing."
+}

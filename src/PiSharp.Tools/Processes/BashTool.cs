@@ -242,8 +242,8 @@ public sealed class BashTool : IPreparedToolAdapter
         bytes < 1024 * 1024 ? (bytes / 1024d).ToString("F1", CultureInfo.InvariantCulture) + "KB" :
         (bytes / (1024d * 1024)).ToString("F1", CultureInfo.InvariantCulture) + "MB";
     private static string Append(string text, string status) => text.Length == 0 ? status : text + "\n\n" + status;
-    private static ToolResult Failure(ProcessOutputSnapshot? output, ToolFailureKind kind, string status) =>
-        new([new TextContent(Append(output is null ? "" : Format(output, ""), status))],
+    private static ToolResult Failure(ProcessOutputSnapshot? output, ToolFailureKind kind, string status, string empty = "") =>
+        new([new TextContent(Append(output is null ? "" : Format(output, empty), status))],
             output is null ? JsonData.Null : Details(output), IsError: true, Failure: new(kind, status));
     private static ToolResult Final(ProcessRunResult result, double? timeout, bool canceled)
     {
@@ -257,7 +257,7 @@ public sealed class BashTool : IPreparedToolAdapter
         if (!result.CapturedOutputComplete || result.Status == ProcessRunStatus.Failed || !result.Diagnostics.IsEmpty)
             return Failure(result.Output, ToolFailureKind.ExecutionError, "Command execution failed.");
         if (result.ExitCode is not { } code)
-            return Failure(result.Output, ToolFailureKind.ExecutionError, "Command terminated without an exit code");
+            return Failure(result.Output, ToolFailureKind.ExecutionError, "Command terminated without an exit code", "(no output)");
         var text = Format(result.Output, "(no output)");
         if (code != 0) text = Append(text, "Command exited with code " + code.ToString(CultureInfo.InvariantCulture));
         var structured = new Dictionary<string, object?> { ["output"] = result.StructuredOutput.Content,

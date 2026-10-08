@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "rpc-jsonl-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "rpc.framing"
+  ],
+  "clock": "No clock replacement or sleeps; Node stream data/end events only",
+  "seed": "Explicit case IDs and byte split positions; no RNG replacement",
+  "normalizerVersion": "object-key-order-v1; callback-strings-wire-bytes-and-array-order-retained",
+  "input": {
+    "path": "fixtures/pi-v0.99.1/rpc-jsonl/core.input.json",
+    "sha256": "8a5388aa9bb953beed7410044370a500e87dfd20644904d1ef6a93cddbeb5bb7",
+    "kind": "authored-rpc-jsonl-chunks-and-serialization-values"
+  },
+  "expected": {
+    "path": "fixtures/pi-v0.99.1/rpc-jsonl/core.expected.json",
+    "sha256": "3d283bdcb705937e25685a04355d300fa61683b5312670396233066d2789f6e0",
+    "kind": "captured-whole-rpc-jsonl-oracle"
+  },
+  "lock": {
+    "path": "fixtures/pi-v0.99.1/rpc-jsonl/oracle.lock.json",
+    "sha256": "88d1ce829bbf5a171631c34e4ff67ab9d68b677fa62970852f9d2b791cec84b6"
+  },
+  "rawCaptures": [
+    {
+      "path": "fixtures/pi-v0.99.1/rpc-jsonl/capture-1.raw.json",
+      "bytes": 72704,
+      "sha256": "bd112a6089b798ba1cfd181d4660ea493e209f320a53f0313cb50add54609a1c"
+    },
+    {
+      "path": "fixtures/pi-v0.99.1/rpc-jsonl/capture-2.raw.json",
+      "bytes": 72704,
+      "sha256": "bd112a6089b798ba1cfd181d4660ea493e209f320a53f0313cb50add54609a1c"
+    }
+  ],
+  "provenance": {
+    "source": "packages/coding-agent/src/modes/rpc/jsonl.ts",
+    "sourceSha256": "95723d349fcebad1f1da7ce103d02ba7d5e2c876b7d178d41d8b56beedbd93e0",
+    "exports": [
+      "attachJsonlLineReader",
+      "serializeJsonLine"
+    ],
+    "mechanism": "Whole unchanged public exports with actual authored Node Readable buffer/string events; no copied splitting or JSON parsing",
+    "repeatRuns": 2,
+    "byteIdentical": true,
+    "dependenciesInstalled": false,
+    "sourceModified": false,
+    "privateFunctionExtraction": false,
+    "networkOrProviderCalls": false,
+    "captureCommand": "node tools/PiReferenceRunner/capture-rpc-jsonl.mjs --capture-new --upstream APPROVED_CLEAN_SOURCE"
+  },
+  "scope": "Source-only public line callbacks, cleanup and serializer bytes; no native JSON admission/dispatcher/process IO/backpressure/full RPC qualification"
+}

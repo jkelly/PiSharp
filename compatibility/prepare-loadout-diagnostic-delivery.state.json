@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "scope": "CURRENT Pi v0.99.1 pure bounded prepare-loadout diagnostic bridge and contracts only",
+  "baseline": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "canonicalBase": "2405f51e2fd2fe3889b871c2c13e8e0dfae8d7db",
+  "canonicalTree": "31074f90390ac126017e0d398a4c08c577add13d",
+  "syntheticVerifiedBase": "5a769fd15bb64c28d388bca593a7a7cdf21583cc",
+  "verifiedSourceFiles": 1909,
+  "status": "DISJOINT_BRIDGE_AND_TESTS_AUTHORED_RESERVED_INTEGRATION_PENDING",
+  "newGroupsAuthored": 7,
+  "groupsRegistered": 0,
+  "groupsExecuted": 0,
+  "buildsExecuted": 0,
+  "compilerExecutions": 0,
+  "APIExecutions": 0,
+  "sourceOracleCaptures": 0,
+  "sharedFilesModified": 0,
+  "contract": "docs/contracts/prepare-loadout-diagnostic-delivery.md",
+  "regressionAllocation": {
+    "status": "PROPOSED_COORDINATOR_ALLOCATION_AFTER_RESERVED_HARNESS_REGISTRATION",
+    "product": "PiSharp.Extensions.ContractTests",
+    "filter": "prepare-loadout-diagnostic.",
+    "expectedUniqueGroups": 7,
+    "expectedFailures": 0,
+    "requiresDirectOriginalTaskAwait": true,
+    "methodReportIds": [
+      "extension-registration.BindingFailure",
+      "extension-registration.HeldReporter",
+      "extension-registration.ReporterFailure",
+      "extension-registration.GenerationRefusal",
+      "extension-registration.AdmissionAndBatches",
+      "extension-registration.ForeignAndSelfWait",
+      "extension-registration.BoundsAndOccurrences"
+    ],
+    "existingLoadoutMethods": [
+      "ToolActivationTests.LoadoutOrder",
+      "ToolActivationTests.LoadoutPersistence",
+      "ToolActivationTests.LoadoutFailures",
+      "ToolActivationTests.LoadoutFinalProjection"
+    ],
+    "fullAffectedSuite": "PiSharp.Extensions.ContractTests",
+    "acceptedBaselineGroups": 182,
+    "expectedFullGroupsIfNoOtherChanges": 189,
+    "focusedInFullNotAdditionalCredit": true,
+    "buildProductsReceipts": "Not allocated/executed here; coordinator supplies exact composed source/product/allocation hashes"
+  },
+  "remaining": [
+    "Reserved activation owner connects captured sink and generation lifetime, including initial binding bootstrap and original reporter close joins",
+    "SessionRuntimeRegistry coordinator integrates subsequent prepare diagnostics at actual admitted async boundaries",
+    "Reserved test integrator adds Cases and direct-await prefix before allocation",
+    "Coordinator source review, native build and seven focused plus affected existing regression qualification",
+    "Native sanitizer omits source extensionPath/error/stack wire fields; original causes remain trusted receipts",
+    "Original synchronous/source timing and complete reload/unload/SDK parity remain separate"
+  ],
+  "implementationStatusAppendProposal": "R208 current-tree successor provides bounded generation-bound synchronous capture and explicit joined async prepare_loadout diagnostic delivery, retaining prepare/report failure identities and admission refusals. Seven contract groups authored, none registered/executed here. CLI/session/test registration reserved to owners; original-source timing/path/stack and end-to-end acceptance remain open. No phase gate closes."
+}

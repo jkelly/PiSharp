@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "capture": "genuine Source Editor.setText/handleInput/submitValue and original input-transform factory/callback",
+  "repeats": 2,
+  "observations": [
+    {
+      "raw": "?quick ",
+      "submitted": "?quick",
+      "eventSource": "rpc",
+      "direct": {
+        "action": "handled"
+      },
+      "directNotices": [
+        {
+          "message": "Usage: ?quick <question>",
+          "kind": "warning"
+        }
+      ],
+      "afterEditor": {
+        "action": "continue"
+      },
+      "editorNotices": []
+    },
+    {
+      "raw": "?quick ",
+      "submitted": "?quick",
+      "eventSource": "interactive",
+      "direct": {
+        "action": "handled"
+      },
+      "directNotices": [
+        {
+          "message": "Usage: ?quick <question>",
+          "kind": "warning"
+        }
+      ],
+      "afterEditor": {
+        "action": "continue"
+      },
+      "editorNotices": []
+    },
+    {
+      "raw": "?quick ﻿ ",
+      "submitted": "?quick",
+      "eventSource": "rpc",
+      "direct": {
+        "action": "handled"
+      },
+      "directNotices": [
+        {
+          "message": "Usage: ?quick <question>",
+          "kind": "warning"
+        }
+      ],
+      "afterEditor": {
+        "action": "continue"
+      },
+      "editorNotices": []
+    },
+    {
+      "raw": "?quick ﻿ ",
+      "submitted": "?quick",
+      "eventSource": "interactive",
+      "direct": {
+        "action": "handled"
+      },
+      "directNotices": [
+        {
+          "message": "Usage: ?quick <question>",
+          "kind": "warning"
+        }
+      ],
+      "afterEditor": {
+        "action": "continue"
+      },
+      "editorNotices": []
+    },
+    {
+      "raw": "PiNg",
+      "submitted": "PiNg",
+      "eventSource": "rpc",
+      "direct": {
+        "action": "handled"
+      },
+      "directNotices": [
+        {
+          "message": "pong",
+          "kind": "info"
+        }
+      ],
+      "afterEditor": {
+        "action": "handled"
+      },
+      "editorNotices": [
+        {
+          "message": "pong",
+          "kind": "info"
+        }
+      ]
+    },
+    {
+      "raw": "PiNg",
+      "submitted": "PiNg",
+      "eventSource": "interactive",
+      "direct": {
+        "action": "handled"
+      },
+      "directNotices": [
+        {
+          "message": "pong",
+          "kind": "info"
+        }
+      ],
+      "afterEditor": {
+        "action": "handled"
+      },
+      "editorNotices": [
+        {
+          "message": "pong",
+          "kind": "info"
+        }
+      ]
+    },
+    {
+      "raw": " ﻿PiNg﻿ ",
+      "submitted": "PiNg",
+      "eventSource": "rpc",
+      "direct": {
+        "action": "continue"
+      },
+      "directNotices": [],
+      "afterEditor": {
+        "action": "handled"
+      },
+      "editorNotices": [
+        {
+          "message": "pong",
+          "kind": "info"
+        }
+      ]
+    },
+    {
+      "raw": " ﻿PiNg﻿ ",
+      "submitted": "PiNg",
+      "eventSource": "interactive",
+      "direct": {
+        "action": "continue"
+      },
+      "directNotices": [],
+      "afterEditor": {
+        "action": "handled"
+      },
+      "editorNotices": [
+        {
+          "message": "pong",
+          "kind": "info"
+        }
+      ]
+    },
+    {
+      "raw": "?quick explain nonce",
+      "submitted": "?quick explain nonce",
+      "eventSource": "rpc",
+      "direct": {
+        "action": "transform",
+        "text": "Respond briefly in 1-2 sentences: explain nonce"
+      },
+      "directNotices": [],
+      "afterEditor": {
+        "action": "transform",
+        "text": "Respond briefly in 1-2 sentences: explain nonce"
+      },
+      "editorNotices": []
+    },
+    {
+      "raw": "?quick explain nonce",
+      "submitted": "?quick explain nonce",
+      "eventSource": "interactive",
+      "direct": {
+        "action": "transform",
+        "text": "Respond briefly in 1-2 sentences: explain nonce"
+      },
+      "directNotices": [],
+      "afterEditor": {
+        "action": "transform",
+        "text": "Respond briefly in 1-2 sentences: explain nonce"
+      },
+      "editorNotices": []
+    },
+    {
+      "raw": "?quick",
+      "submitted": "?quick",
+      "eventSource": "rpc",
+      "direct": {
+        "action": "continue"
+      },
+      "directNotices": [],
+      "afterEditor": {
+        "action": "continue"
+      },
+      "editorNotices": []
+    },
+    {
+      "raw": "?quick",
+      "submitted": "?quick",
+      "eventSource": "interactive",
+      "direct": {
+        "action": "continue"
+      },
+      "directNotices": [],
+      "afterEditor": {
+        "action": "continue"
+      },
+      "editorNotices": []
+    },
+    {
+      "raw": " PiNg ",
+      "submitted": "PiNg",
+      "eventSource": "rpc",
+      "direct": {
+        "action": "continue"
+      },
+      "directNotices": [],
+      "afterEditor": {
+        "action": "handled"
+      },
+      "editorNotices": [
+        {
+          "message": "pong",
+          "kind": "info"
+        }
+      ]
+    },
+    {
+      "raw": " PiNg ",
+      "submitted": "PiNg",
+      "eventSource": "interactive",
+      "direct": {
+        "action": "continue"
+      },
+      "directNotices": [],
+      "afterEditor": {
+        "action": "handled"
+      },
+      "editorNotices": [
+        {
+          "message": "pong",
+          "kind": "info"
+        }
+      ]
+    }
+  ],
+  "sourcePins": [
+    {
+      "relative": "upstream/packages/tui/src/components/editor.ts",
+      "url": "file:///P:/PiSharp/root/Documents/Codex/2026-10-02/task/Pi-recovery-ordering-oracle-v0.99.1/upstream/packages/tui/src/components/editor.ts",
+      "bytes": 84348,
+      "sha256": "30a47fd49042579be7b85262677df62d4ff37a8f9a3a0e6c41ce3cf1d402b9c3"
+    },
+    {
+      "relative": "upstream/packages/coding-agent/examples/extensions/input-transform.ts",
+      "url": "file:///P:/PiSharp/root/Documents/Codex/2026-10-02/task/Pi-recovery-ordering-oracle-v0.99.1/upstream/packages/coding-agent/examples/extensions/input-transform.ts",
+      "bytes": 1444,
+      "sha256": "cf0f65d610631ca75d18aae1c8f1408139702f674cb2835f8c009b943776474b"
+    }
+  ],
+  "sourceEdits": false,
+  "fixtureUi": "Public constructor/render scheduling and callback notification inputs only; genuine Editor.setText/handleInput/submitValue and original extension factory/callback executed unchanged.",
+  "wholeFrontendQualified": false,
+  "wholeSourceOrderingQualified": false
+}

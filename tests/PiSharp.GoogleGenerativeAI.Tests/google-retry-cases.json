@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORED_UNCOMPILED_UNEXECUTED",
+  "originalScope": "P2-08 / GOOGLE-08 initial Google request retry behavior",
+  "sourceBaseline": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceReferences": [
+    "packages/ai/src/api/google-generative-ai.ts:100",
+    "packages/ai/src/api/google-shared.ts:494",
+    "packages/ai/src/utils/provider-retry.ts",
+    "packages/ai/test/google-shared-retry.test.ts"
+  ],
+  "expectedValues": "Handwritten pinned Source policy expectations exercised by real native transport and consumers with fake HTTP/manual timers. No SDK or provider captures.",
+  "statusVectors": [
+    { "id": "unset-default-equivalent-zero", "statuses": [429], "maxRetries": 0, "expectedRetries": 0, "success": false },
+    { "id": "rate-limit", "statuses": [429,200], "maxRetries": 1, "expectedRetries": 1, "success": true },
+    { "id": "timeout", "statuses": [408,200], "maxRetries": 1, "expectedRetries": 1, "success": true },
+    { "id": "conflict", "statuses": [409,200], "maxRetries": 1, "expectedRetries": 1, "success": true },
+    { "id": "internal", "statuses": [500,200], "maxRetries": 1, "expectedRetries": 1, "success": true },
+    { "id": "unavailable", "statuses": [503,200], "maxRetries": 1, "expectedRetries": 1, "success": true },
+    { "id": "other-five-hundred", "statuses": [599,200], "maxRetries": 1, "expectedRetries": 1, "success": true },
+    { "id": "bad-request", "statuses": [400], "maxRetries": 2, "expectedRetries": 0, "success": false },
+    { "id": "directive-force", "statuses": [401,200], "directive": "true", "maxRetries": 1, "expectedRetries": 1, "success": true },
+    { "id": "directive-suppress", "statuses": [500], "directive": "false", "maxRetries": 2, "expectedRetries": 0, "success": false },
+    { "id": "directive-false-case-sensitive", "statuses": [429,200], "directive": "FALSE", "maxRetries": 1, "expectedRetries": 1, "success": true },
+    { "id": "directive-true-case-sensitive", "statuses": [400], "directive": "True", "maxRetries": 2, "expectedRetries": 0, "success": false },
+    { "id": "exhaustion", "statuses": [429,429,429], "maxRetries": 2, "expectedRetries": 2, "success": false },
+    { "id": "multiple-distinct-failures", "statuses": [429,503,200], "maxRetries": 2, "expectedRetries": 2, "success": true },
+    { "id": "exponential-eight-second-cap", "statuses": [500,500,500,500,500,500,200], "maxRetries": 6, "expectedRetries": 6, "success": true }
+  ],
+  "delayVectors": [
+    { "id": "milliseconds-first-prefix", "milliseconds": "\uFEFF \t1.5tail", "secondsOrDate": "60", "expectedDelay": 1.5 },
+    { "id": "fallback-seconds-prefix", "milliseconds": "invalid", "secondsOrDate": "0.002tail", "expectedDelay": 2 },
+    { "id": "negative", "milliseconds": "-12", "expectedDelay": 0 },
+    { "id": "negative-infinite", "milliseconds": "-Infinity", "expectedDelay": 0 },
+    { "id": "future-date", "secondsOrDate": "Sat, 03 Oct 2026 00:00:01 GMT", "expectedDelay": 1000 },
+    { "id": "past-date", "secondsOrDate": "Fri, 02 Oct 2026 23:59:59 GMT", "expectedDelay": 0 },
+    { "id": "invalid-date", "secondsOrDate": "invalid-date", "expectedDelay": 0 },
+    { "id": "default-cap-exact", "milliseconds": "60000", "expectedDelay": 60000 },
+    { "id": "default-cap-over", "milliseconds": "60001", "failure": "ProviderError" },
+    { "id": "disabled-server-cap", "milliseconds": "60001", "cap": 0, "expectedDelay": 60001 },
+    { "id": "native-infinite-timer-bound", "milliseconds": "Infinity", "cap": 0, "failure": "UnsupportedFeature" },
+    { "id": "native-overflow-timer-bound", "milliseconds": "2147483648", "cap": 0, "failure": "UnsupportedFeature" },
+    { "id": "unusable-ms-exponential", "milliseconds": "invalid", "expectedDelay": 437.5 }
+  ],
+  "families": [
+    { "id": "google.retry-status-fresh-request-single-payload", "schedules": 30, "criteria": ["direct and ChatClient", "statuses and exact x-should-retry", "zero default and exhaustion", "exponential jitter and cap", "one payload replacement", "fresh request/content", "identical prepared body and headers", "cleanup before timer/next attempt", "no early start"] },
+    { "id": "google.retry-server-delay-and-native-limits", "schedules": 19, "criteria": ["ms/seconds/date precedence", "parseFloat prefixes", "negative/invalid dates", "60000 default and zero cap", "native finite timer/jitter/header/count admission", "closed diagnostic channels"] },
+    { "id": "google.retry-cancellation-and-rejected-cleanup", "schedules": 10, "criteria": ["held clean/failing rejected cleanup", "provider primary plus secondary cleanup", "abort precedence", "held original send/acquisition/error read", "abortable owned timer", "retry-hook cancellation", "preaborted no effects"] },
+    { "id": "google.retry-no-callback-or-stream-replay", "schedules": 9, "criteria": ["no retry for payload/send/native response/acquisition/provider hook/retry callback faults", "no retry after stream acquisition/start", "late read/JSON/provider finish faults", "private text exclusion"] },
+    { "id": "google.retry-actual-agent-ownership-authority", "schedules": 4, "criteria": ["actual high-level Agent/executor", "zero authority during rejected cleanup and backoff", "valid tool once after successful retry", "provider failure/cleanup/cancellation zero execution", "borrowed HTTP client and actual settlement diagnostics"] }
+  ],
+  "nativeBuilds": 0,
+  "nativeExecutions": 0,
+  "sourceExecutions": 0,
+  "sdkCaptures": 0,
+  "packageAcceptance": false,
+  "allEightPhaseGates": "OPEN"
+}

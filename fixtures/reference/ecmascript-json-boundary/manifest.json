@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 2,
+  "fixtureId": "ecmascript-json-boundary",
+  "kind": "genuine-node-builtin-json-parse-stringify-observations",
+  "input": {
+    "path": "fixtures/reference/ecmascript-json-boundary/input.json.gz",
+    "encodedBytes": 1237354,
+    "encodedSha256": "ae3bd38e3c5992e3ae3dfd11c9aca3420720acb3ed67402c95cb87fda1c37e64",
+    "decodedBytes": 7609961,
+    "decodedSha256": "a3fcdfbcba4da5f9412027ced81e54ebbbc906a3488cd60a9de60429b6acea52"
+  },
+  "expected": {
+    "path": "fixtures/reference/ecmascript-json-boundary/expected.json.gz",
+    "encodedBytes": 1405918,
+    "encodedSha256": "4980e8158215b0f27b47abe7070e72566ade1774ea809f003bc21d24d7230deb",
+    "decodedBytes": 11206543,
+    "decodedSha256": "a98384918bb7e1abf8ded0c1e2d1448ac186292d32f013a85fd15c5adee27027"
+  },
+  "inputSha256": "a3fcdfbcba4da5f9412027ced81e54ebbbc906a3488cd60a9de60429b6acea52",
+  "expectedSha256": "a98384918bb7e1abf8ded0c1e2d1448ac186292d32f013a85fd15c5adee27027",
+  "lockSha256": "38fd98a0785f4407a8db02397da0d97fc6627ccc675898b985e02b901a927f2c",
+  "encoding": {
+    "kind": "single deterministic gzip member",
+    "level": 9,
+    "headerHex": "1f8b080000000000020a",
+    "crc32AndIsizeVerified": true,
+    "consumedDeflateBytesVerified": true,
+    "encodedMaximumBytes": 8388608,
+    "inputDecodedMaximumBytes": 10485760,
+    "expectedDecodedMaximumBytes": 16777216
+  },
+  "caseCount": 17984,
+  "familyCounts": {
+    "binary-power-neighbors": 12588,
+    "decimal-power-neighbors": 5064,
+    "midpoint-nearest-even": 210,
+    "overflow-midpoint": 6,
+    "explicit-binary-extrema": 10,
+    "explicit-decimal-lexemes": 42,
+    "unicode-control-strings": 32,
+    "unicode-strings-and-keys": 16,
+    "property-order-and-nesting": 16
+  },
+  "maximumCaseUtf16Units": 1080,
+  "expectedSchema": "cases[{caseId,json,serialized}], exact observed strings; numericSemantics are observed binary64 sidecars",
+  "provenance": {
+    "inputAlgorithm": "Positive binary64 bit-pattern rationals; exact decimal expansions; independent BigInt nearest/even decimal powers; signed adjacent values and selected midpoint neighborhoods",
+    "outputs": "Original genuine two-fresh Node24.19.0 observations preserved byte-for-byte; guarded fresh defaults verify decoded exact strings",
+    "losslessPackaging": true,
+    "originalDecodedSourceBytesRetained": true,
+    "gzipControls": {
+      "validRoundTrip": true,
+      "rejectedControls": 8,
+      "trailingAndConcatenatedMembersRejected": true,
+      "crcAndIsizeChecked": true,
+      "declaredAndForgedBombsRejectedWithinOutputCap": true
+    },
+    "upstreamImports": false,
+    "upstreamQualificationClaimed": false,
+    "nativeProjectionOrParityClaimed": false,
+    "comparator": "Exact decoded golden bytes and serialized-string equality, without numeric/deep-equality normalization"
+  }
+}

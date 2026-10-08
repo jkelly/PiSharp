@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 3,
+  "status": "AUTHORED REPORTING CONTROLS; NOT RUN; C# EXECUTION REQUIRES FRESH ALLOCATION",
+  "dependencySha256": "5a2ede772b7b4e906671c92a12a26654d3e1f69588bcf0b519bcb96c43aabb81",
+  "controls": [
+    {
+      "id": "REPLACEMENT-REQUEST-FAIL",
+      "criterion": "PM-PAYLOAD-REPLACE/1",
+      "groupStates": {
+        "hook-gate": "COMPLETED",
+        "payload": "COMPLETED",
+        "request": "FAILED"
+      },
+      "expectedStatus": "FAILED",
+      "reason": "The exact request comparison is a required constituent."
+    },
+    {
+      "id": "REPLACEMENT-REQUEST-UNEXECUTED",
+      "criterion": "PM-PAYLOAD-REPLACE/1",
+      "groupStates": {
+        "hook-gate": "COMPLETED",
+        "payload": "COMPLETED"
+      },
+      "expectedStatus": "INCOMPLETE",
+      "reason": "A held-hook pass cannot earn a physical replacement-body pass."
+    },
+    {
+      "id": "PAYLOAD-MODEL-FAIL",
+      "criterion": "PM-PAYLOAD-HELD-UNDEFINED/2",
+      "groupStates": {
+        "hook-gate": "COMPLETED",
+        "payload": "FAILED",
+        "request": "COMPLETED",
+        "frames": "COMPLETED"
+      },
+      "expectedStatus": "FAILED",
+      "reason": "Frame completion cannot erase payload/descriptor failure."
+    },
+    {
+      "id": "FRAGMENT-REQUEST-FAIL",
+      "criterion": "PM-FRAME-CRLF-FRAGMENT/1",
+      "groupStates": {
+        "payload": "COMPLETED",
+        "request": "FAILED",
+        "response": "COMPLETED",
+        "provider": "COMPLETED",
+        "frames": "COMPLETED",
+        "fragmentation": "COMPLETED",
+        "ownership": "COMPLETED",
+        "operation-join": "COMPLETED"
+      },
+      "expectedStatus": "FAILED",
+      "reason": "Read counts alone cannot earn complete whole-body/events/final comparison."
+    },
+    {
+      "id": "FRAGMENT-LATER-VARIANTS-PENDING",
+      "criterion": "PM-FRAME-CRLF-FRAGMENT/1",
+      "expectedVariants": 3,
+      "observedVariants": 1,
+      "groupStates": {
+        "payload": "COMPLETED",
+        "request": "COMPLETED",
+        "response": "COMPLETED",
+        "provider": "COMPLETED",
+        "frames": "COMPLETED",
+        "fragmentation": "COMPLETED",
+        "ownership": "COMPLETED",
+        "operation-join": "COMPLETED"
+      },
+      "expectedStatus": "INCOMPLETE",
+      "reason": "One locally complete variant cannot complete the all-variants criterion."
+    },
+    {
+      "id": "ALL-DEPENDENCIES-UNEXECUTED",
+      "criterion": "PM-PAYLOAD-REPLACE/1",
+      "groupStates": {},
+      "expectedStatus": "UNEXECUTED",
+      "reason": "Missing API or an unreached case has no constituent evidence."
+    },
+    {
+      "id": "INTEGRATION-REMAINS-OPEN",
+      "criterion": "PM-NATIVE-TOOL-CONTINUATION/3",
+      "groupStates": {
+        "integration-open": "OPEN"
+      },
+      "expectedStatus": "OPEN",
+      "reason": "No new accounting rule turns unreleased integration into a pass."
+    },
+    {
+      "id": "OWNED-JOIN-PENDING",
+      "criterion": "PM-CLEANUP-HELD/1",
+      "groupStates": {
+        "cleanup-gate": "COMPLETED",
+        "ownership": "COMPLETED",
+        "frames": "COMPLETED",
+        "effects": "COMPLETED"
+      },
+      "expectedStatus": "INCOMPLETE",
+      "reason": "Owned operation settlement is a required constituent."
+    },
+    {
+      "id": "REPEATED-GROUP-FAILURE-STICKY",
+      "criterion": "PM-CANCEL-HELD/1",
+      "groupAttempts": [
+        {
+          "group": "hook-gate",
+          "outcome": "COMPLETED"
+        },
+        {
+          "group": "hook-gate",
+          "outcome": "FAILED"
+        },
+        {
+          "group": "hook-gate",
+          "outcome": "COMPLETED"
+        }
+      ],
+      "otherGroupStates": {
+        "provider": "COMPLETED",
+        "frames": "COMPLETED",
+        "effects": "COMPLETED"
+      },
+      "expectedStatus": "FAILED",
+      "reason": "A later successful attempt cannot erase an earlier group failure."
+    }
+  ]
+}

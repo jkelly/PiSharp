@@ -1,0 +1,119 @@
+{
+  "createdUtc": "2026-10-03T09:44:37.267Z",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "node": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "bytes": 92825416,
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "manifest": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\source-manifest.json",
+    "bytes": 969151,
+    "sha256": "772c23326a8a341cc40235a95366639ea28cca1823089969cee1c5deb58b4048"
+  },
+  "inputs": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-kitty-alternate-contract-plan-r29\\functional-supplement-identity-inputs.json",
+    "bytes": 886,
+    "sha256": "1c1473599833063dcc3c6fc52a956e14dea3b10e08d9ea460f3ace1fec6ad419"
+  },
+  "driver": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-kitty-alternate-contract-plan-r29\\capture-functional-supplement-identity-source.mjs",
+    "bytes": 3059,
+    "sha256": "7a5eed1603e53b8d724d4ec5170d67a97c9d3af7690d8718e6f681c151934031"
+  },
+  "loadedFiles": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+    }
+  ],
+  "effects": [],
+  "cases": [
+    {
+      "id": "source-keypad-left-base-backspace",
+      "raw": "\u001b[57417::127;1u",
+      "sourceParsedKey": "backspace",
+      "sourcePrintable": null,
+      "sourceMatches": {
+        "q": false,
+        "left": true,
+        "backspace": true,
+        "enter": false,
+        "a": false,
+        "shift+a": false,
+        "shift+left": false
+      },
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "source-keypad-left-base-q",
+      "raw": "\u001b[57417::113;1u",
+      "sourceParsedKey": "q",
+      "sourcePrintable": null,
+      "sourceMatches": {
+        "q": true,
+        "left": true,
+        "backspace": false,
+        "enter": false,
+        "a": false,
+        "shift+a": false,
+        "shift+left": false
+      },
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "source-keypad-left-shifted-A",
+      "raw": "\u001b[57417:65;2u",
+      "sourceParsedKey": "shift+left",
+      "sourcePrintable": "A",
+      "sourceMatches": {
+        "q": false,
+        "left": false,
+        "backspace": false,
+        "enter": false,
+        "a": false,
+        "shift+a": false,
+        "shift+left": true
+      },
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "native-57350-mapping-discriminator",
+      "raw": "\u001b[57350::113;1u",
+      "sourceParsedKey": "q",
+      "sourcePrintable": "",
+      "sourceMatches": {
+        "q": true,
+        "left": false,
+        "backspace": false,
+        "enter": false,
+        "a": false,
+        "shift+a": false,
+        "shift+left": false
+      },
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "source-keypad-enter-base-a",
+      "raw": "\u001b[57414::97;1u",
+      "sourceParsedKey": "a",
+      "sourcePrintable": "",
+      "sourceMatches": {
+        "q": false,
+        "left": false,
+        "backspace": false,
+        "enter": true,
+        "a": true,
+        "shift+a": false,
+        "shift+left": false
+      },
+      "sourceRelease": false,
+      "sourceRepeat": false
+    }
+  ]
+}

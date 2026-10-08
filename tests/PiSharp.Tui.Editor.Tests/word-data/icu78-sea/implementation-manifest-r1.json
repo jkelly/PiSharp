@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\artifacts\\sea-baseline-report.json",
+    "bytes": 23810813,
+    "sha256": "e2afa99c61e149c7919c6d528f16eadd9f4c5f1b2d20212ce2033d1889e44967"
+  },
+  "originalEngine": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78\\WordDictionary.engine.cs.txt",
+    "bytes": 23477,
+    "sha256": "22fbb7cbad2406eee008f7b79a150e94e498c70b70e2a0725ac3a2041dee38b2"
+  },
+  "originalGeneratedData": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78\\PinnedWordDictionaryData.generated.cs.txt",
+    "bytes": 2606403,
+    "sha256": "44f8b072544eddd034c3eba6151338e18ec9e87195dc41e0912015d96bdeea3a"
+  },
+  "newEngine": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78-sea\\WordDictionary.sea-engine.cs.txt",
+    "bytes": 28110,
+    "sha256": "097ed3346fcd55f534e48356eed12d37a6dbd62bf8d32f710480817515ed5e59"
+  },
+  "compactStorageData": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78-sea\\PinnedWordDictionaryData.compact-storage.generated.cs.txt",
+    "bytes": 2606409,
+    "sha256": "597a3164475d0284be0dfa75d3cfdafd3f646905fbfeda5b1461f52d0795db16"
+  },
+  "seaData": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78-sea\\PinnedWordSeaData.generated.cs.txt",
+    "bytes": 947366,
+    "sha256": "2d22ff871f654b242649057ae521b9faa02429da11ae7b0e3059d2770afda06c"
+  },
+  "controller": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\src\\PiSharp.Tui\\Input\\TerminalTextEditorPasteController.cs",
+    "bytes": 3713621,
+    "sha256": "6ca33de7c96580f2a99bf619a7454f991ae7384cc65cc516f12280c7c4a6e8b4"
+  },
+  "changes": "Operation-local normalization/candidate buffers; exact official SEA engines/data; getter literals for private compressed strings; all raw data and expected observations preserved"
+}

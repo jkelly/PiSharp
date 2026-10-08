@@ -1,0 +1,238 @@
+{
+  "createdUtc": "2026-10-03T07:29:30.271Z",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "node": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "bytes": 92825416,
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "manifest": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\source-manifest.json",
+    "bytes": 969151,
+    "sha256": "772c23326a8a341cc40235a95366639ea28cca1823089969cee1c5deb58b4048"
+  },
+  "inputs": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-mok-interrupt-remediation\\mok-interrupt-source-inputs.json",
+    "bytes": 2142,
+    "sha256": "40ce7b7af43861b635c933ca2f5e95d66559b444161d2c58c0d8de3fdf1dc739"
+  },
+  "driver": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-mok-interrupt-remediation\\capture-mok-interrupt-source.mjs",
+    "bytes": 2980,
+    "sha256": "863a5b57a145e41d3dfaa8279430441012d212538d7783f0a68bd02f812152ca"
+  },
+  "loadedFiles": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+    }
+  ],
+  "effects": [],
+  "cases": [
+    {
+      "id": "mok-mask-4",
+      "family": "MOK",
+      "mask": 4,
+      "raw": "\u001b[27;5;99~",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false,
+      "shouldInterrupt": true
+    },
+    {
+      "id": "mok-mask-68",
+      "family": "MOK",
+      "mask": 68,
+      "raw": "\u001b[27;69;99~",
+      "matchesCtrlC": false,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false,
+      "shouldInterrupt": false
+    },
+    {
+      "id": "mok-mask-132",
+      "family": "MOK",
+      "mask": 132,
+      "raw": "\u001b[27;133;99~",
+      "matchesCtrlC": false,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false,
+      "shouldInterrupt": false
+    },
+    {
+      "id": "mok-mask-196",
+      "family": "MOK",
+      "mask": 196,
+      "raw": "\u001b[27;197;99~",
+      "matchesCtrlC": false,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false,
+      "shouldInterrupt": false
+    },
+    {
+      "id": "plain-c0-ctrl-c",
+      "family": "C0",
+      "mask": 4,
+      "raw": "\u0003",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false,
+      "shouldInterrupt": true
+    },
+    {
+      "id": "kitty-mask-4-press",
+      "family": "Kitty",
+      "mask": 4,
+      "raw": "\u001b[99;5:1u",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false,
+      "shouldInterrupt": true
+    },
+    {
+      "id": "kitty-mask-68-press",
+      "family": "Kitty",
+      "mask": 68,
+      "raw": "\u001b[99;69:1u",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false,
+      "shouldInterrupt": true
+    },
+    {
+      "id": "kitty-mask-132-press",
+      "family": "Kitty",
+      "mask": 132,
+      "raw": "\u001b[99;133:1u",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false,
+      "shouldInterrupt": true
+    },
+    {
+      "id": "kitty-mask-196-press",
+      "family": "Kitty",
+      "mask": 196,
+      "raw": "\u001b[99;197:1u",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false,
+      "shouldInterrupt": true
+    },
+    {
+      "id": "kitty-mask-68-action-2",
+      "family": "Kitty",
+      "mask": 68,
+      "raw": "\u001b[99;69:2u",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true,
+      "shouldInterrupt": true
+    },
+    {
+      "id": "kitty-mask-132-action-2",
+      "family": "Kitty",
+      "mask": 132,
+      "raw": "\u001b[99;133:2u",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true,
+      "shouldInterrupt": true
+    },
+    {
+      "id": "kitty-mask-196-action-2",
+      "family": "Kitty",
+      "mask": 196,
+      "raw": "\u001b[99;197:2u",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true,
+      "shouldInterrupt": true
+    },
+    {
+      "id": "kitty-mask-68-action-3",
+      "family": "Kitty",
+      "mask": 68,
+      "raw": "\u001b[99;69:3u",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false,
+      "shouldInterrupt": false
+    },
+    {
+      "id": "kitty-mask-132-action-3",
+      "family": "Kitty",
+      "mask": 132,
+      "raw": "\u001b[99;133:3u",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false,
+      "shouldInterrupt": false
+    },
+    {
+      "id": "kitty-mask-196-action-3",
+      "family": "Kitty",
+      "mask": 196,
+      "raw": "\u001b[99;197:3u",
+      "matchesCtrlC": true,
+      "sourceParsed": "ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false,
+      "shouldInterrupt": false
+    },
+    {
+      "id": "mok-ctrl-shift-mask-5",
+      "family": "MOK",
+      "mask": 5,
+      "raw": "\u001b[27;6;99~",
+      "matchesCtrlC": false,
+      "sourceParsed": "shift+ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false,
+      "shouldInterrupt": false
+    },
+    {
+      "id": "mok-ctrl-shift-mask-69",
+      "family": "MOK",
+      "mask": 69,
+      "raw": "\u001b[27;70;99~",
+      "matchesCtrlC": false,
+      "sourceParsed": "shift+ctrl+c",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false,
+      "shouldInterrupt": false
+    }
+  ]
+}

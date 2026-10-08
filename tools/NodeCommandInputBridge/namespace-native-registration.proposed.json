@@ -1,0 +1,83 @@
+{
+  "runnerGateMessageReplaceExact": "The full native gate requires all original 28 companions plus the focused selector ownership partition.",
+  "schemaVersion": 1,
+  "newOutputRoot": "tools/NodeCommandInputBridge/NativeAdmissionTests/bin/Release/net10.0",
+  "appendTarget": {
+    "currentExecution": "UNEXECUTED",
+    "projectSha256": "5c1b86b2e92bd5a0256045ee065d5a9ed81a3688b9db9f35112c81235a1bae2c",
+    "originalExpectationChanges": 0,
+    "id": "node-loadout-metadata",
+    "scope": "Authored metadata adapter only; no Node worker or original extension prepareLoadout qualification",
+    "lockFile": {
+      "bytes": 915,
+      "path": "tools/NodeCommandInputBridge/NativeAdmissionTests/packages.lock.json",
+      "sha256": "05c9708303905fc59ce80b480f08074ec3de6a3d7fdfb0629e469ba321dbd9ce",
+      "status": "PINNED_EXISTING"
+    },
+    "entryAssembly": "tools/NodeCommandInputBridge/NativeAdmissionTests/bin/Release/net10.0/NativeAdmissionTests.dll",
+    "outputFixturePins": [],
+    "reportName": "node-loadout-metadata.json",
+    "fixturePins": [],
+    "project": "tools/NodeCommandInputBridge/NativeAdmissionTests/NativeAdmissionTests.csproj",
+    "arguments": [
+      {
+        "value": "--metadata-only",
+        "kind": "literal"
+      },
+      {
+        "value": "--report",
+        "kind": "literal"
+      },
+      {
+        "kind": "report"
+      }
+    ],
+    "timeoutSeconds": 60
+  },
+  "runnerGateMessageWithExact": "The full native gate requires all original 29 companions plus the no-worker Node loadout metadata consumer.",
+  "prepareRootGateReplaceExact": "        if ($roots.Count -ne 50) { throw 'All original 49 output roots plus the isolated focused ownership consumer root are required.' }",
+  "runnerInsert": "        if ($target.id -eq 'node-loadout-metadata' -and\n            ($target.project -cne 'tools/NodeCommandInputBridge/NativeAdmissionTests/NativeAdmissionTests.csproj' -or\n             $target.entryAssembly -cne 'tools/NodeCommandInputBridge/NativeAdmissionTests/bin/Release/net10.0/NativeAdmissionTests.dll' -or\n             $target.reportName -cne 'node-loadout-metadata.json' -or $target.timeoutSeconds -ne 60 -or\n             ($target.arguments.kind -join ',') -cne 'literal,literal,report' -or\n             $target.arguments[0].value -cne '--metadata-only' -or $target.arguments[1].value -cne '--report' -or\n             $target.fixturePins.Count -ne 0 -or $target.outputFixturePins.Count -ne 0 -or\n             $target.lockFile.path -cne 'tools/NodeCommandInputBridge/NativeAdmissionTests/packages.lock.json' -or\n             $target.lockFile.status -cne 'PINNED_EXISTING')) {\n            throw 'Node loadout metadata admission must remain the exact no-worker adapter consumer.'\n        }",
+  "nativeTests": 0,
+  "lockOrigin": "Authored project-only dependency closure from existing compatibility-node lock and project references; no restore or package downloads performed",
+  "basis": "5bddf1a6b9b10409bdb1a638451174b3a972bd08",
+  "runnerInsertBeforeExact": "        if ($target.id -eq 'pi-messages' -and",
+  "runnerReplaceExact": "        'terminal-select-list', 'terminal-select-dialog', 'anthropic-simple', 'authentication', 'terminal-ownership-focused')",
+  "registrationRequiredCount": {
+    "new": 30,
+    "old": 29
+  },
+  "solutionLines": [
+    "  <Folder Name=\"/tests/companions/NodeLoadoutMetadata/\">",
+    "    <Project Path=\"tools/NodeCommandInputBridge/NativeAdmissionTests/NativeAdmissionTests.csproj\" />",
+    "  </Folder>"
+  ],
+  "prepareRootGateWithExact": "        if ($roots.Count -ne 51) { throw 'All original 50 output roots plus the no-worker Node loadout metadata consumer root are required.' }",
+  "basisPins": [
+    {
+      "bytes": 7481,
+      "path": "PiSharp.slnx",
+      "sha256": "372c4ca6f0e528c3aedd5dd4ff77a67c07f3ce38675993fe28fbfa0a0b363e50"
+    },
+    {
+      "bytes": 66082,
+      "path": "tools/native-companion-targets.json",
+      "sha256": "43c66316348ecfa74837f1c49bfc3280097142272b7c23bfeb27cc95e14654a3"
+    },
+    {
+      "bytes": 82983,
+      "path": "tools/native-companion-registration.ps1",
+      "sha256": "d60ed46ac1e0b69a699cf0e4e469ae01d722a3d2dedeee2b2fc03fe00729f13d"
+    },
+    {
+      "bytes": 25971,
+      "path": "tools/prepare-native-products.ps1",
+      "sha256": "c9f99ba5cc28c4d42351962f0d36e86ed044cd835dc5e13fe49ba081d30d0066"
+    }
+  ],
+  "nativeBuilds": 0,
+  "provenance": "Integrating coordinator preserves all29 previous target records and all50 existing product roots; regenerates final candidate/tree/review/source manifest/allocation/build receipt/prepared admission/launch joins. No prior receipt is extended to this source. Proposed target is --metadata-only and never starts Node.",
+  "status": "PROPOSED_ONLY_COORDINATOR_OWNED_REGISTRATION",
+  "nodeTests": 0,
+  "solutionInsertBefore": "</Solution>",
+  "runnerWithExact": "        'terminal-select-list', 'terminal-select-dialog', 'anthropic-simple', 'authentication', 'terminal-ownership-focused', 'node-loadout-metadata')"
+}

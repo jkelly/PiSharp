@@ -4,7 +4,7 @@ using PiSharp.Contracts;
 namespace PiSharp.AI.Providers;
 
 /// <summary>Immutable native routing by the complete, ordinal model/API/provider identity.</summary>
-public sealed class ModelTransportRegistry : IChatTransport
+public sealed class ModelTransportRegistry : IChatTransport, IThinkingLevelTransport
 {
     private readonly ImmutableDictionary<ModelDescriptor, IChatTransport> _transports;
     public ImmutableArray<ModelDescriptor> Models { get; }
@@ -45,6 +45,9 @@ public sealed class ModelTransportRegistry : IChatTransport
         return _transports.TryGetValue(model, out var transport) ? transport :
             throw new ArgumentException("Unknown model/API/provider identity.", nameof(model));
     }
+
+    public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor model) =>
+        ThinkingLevels.GetSupported(Resolve(model), model);
 
     public IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default)
     {

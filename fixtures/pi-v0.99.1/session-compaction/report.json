@@ -1,0 +1,429 @@
+{
+  "schemaVersion": 1,
+  "status": "captured",
+  "output": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-session-compaction-work\\artifacts\\compaction-reference\\genuine-source-r2",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "executionCandidate": "86e618d1237634425329e499c0f9c5de72cea3f9",
+  "caseCount": 8,
+  "repeatRuns": 2,
+  "equalDeclaredContracts": true,
+  "rawByteIdentityRequired": false,
+  "sourceAndDependencyBytesUnchanged": true,
+  "loadedModulesMatchExplicitQualification": true,
+  "originalQualificationUnchanged": true,
+  "actualLoadedModuleCount": 832,
+  "actualLoadedCatalogFileCount": 43,
+  "catalogReceiptAndBytesUnchanged": true,
+  "actualCatalogLoads": [
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/.manifest.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/.manifest.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\.manifest.json",
+      "bytes": 3779,
+      "sha256": "58698cae7d0a3b270f360072c6106435ca1870a178254bd80d5dbfb4716734e6"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/amazon-bedrock.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/amazon-bedrock.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\amazon-bedrock.json",
+      "bytes": 90990,
+      "sha256": "c6e1a0105ac45dbf41eba6311562d55ccbed48a5d1ce4c8d9b8e86ff9a572863"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/ant-ling.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/ant-ling.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\ant-ling.json",
+      "bytes": 1692,
+      "sha256": "628feab3ef6c7d80ce96f75999804e1d9f05fec3851e5302e30fff3b69db90f6"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/anthropic.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/anthropic.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\anthropic.json",
+      "bytes": 10901,
+      "sha256": "3ff00b68990382e42626ebd1b65dcc28ae3cad9e6faa8920331ba92f067f1b3a"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/azure-openai-responses.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/azure-openai-responses.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\azure-openai-responses.json",
+      "bytes": 20456,
+      "sha256": "af60bfc0f822233177c69b63cb9d7aa9e6c99829da729f5e4805023f6e3d96e1"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/baseten.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/baseten.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\baseten.json",
+      "bytes": 17098,
+      "sha256": "883cdb952fd9eb8d8e3605c460744af36802d325f9a38f75998365e2871a5bcc"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/cerebras.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/cerebras.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\cerebras.json",
+      "bytes": 1109,
+      "sha256": "c07ed7880030c5c85a89520ec4e0fceaf2b2988356345cb1287538337971badd"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/cloudflare-ai-gateway.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/cloudflare-ai-gateway.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\cloudflare-ai-gateway.json",
+      "bytes": 36059,
+      "sha256": "52decade622d1d25f1af90385b1aec7331dad00d56e010a5e4d15118efae67ce"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/cloudflare-workers-ai.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/cloudflare-workers-ai.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\cloudflare-workers-ai.json",
+      "bytes": 12659,
+      "sha256": "b9f76cc83756a05920a8a7046c515919a1de918331b860a211f309bb716c4bb0"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/deepseek.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/deepseek.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\deepseek.json",
+      "bytes": 1387,
+      "sha256": "10a296fb3e898f7715c80890c8af0af4f5fd58f22dbcd6612fdc5d762157ccdc"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/fireworks.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/fireworks.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\fireworks.json",
+      "bytes": 16231,
+      "sha256": "d6144ba451bd7a0617669527bec1898f97a633f7d7ea5035d8e03234550340c0"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/github-copilot.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/github-copilot.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\github-copilot.json",
+      "bytes": 26521,
+      "sha256": "b5a5defdbb6a351d3764ec542dd2b194c1162a4f6ee977494dcc43e7d6873597"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/google-vertex.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/google-vertex.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\google-vertex.json",
+      "bytes": 7825,
+      "sha256": "40090c680538bc867f2624d986a449f361be4dfa6ba96d7a27402050f036e009"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/google.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/google.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\google.json",
+      "bytes": 13373,
+      "sha256": "c0f5a633e5e5a5044432db3e537f4bc674d4de18df09325c6349547fcc13cabe"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/groq.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/groq.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\groq.json",
+      "bytes": 3354,
+      "sha256": "910952ad9dad07856983459d63fce0148dba1203edd7b10d801a77c5824f3405"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/huggingface.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/huggingface.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\huggingface.json",
+      "bytes": 36433,
+      "sha256": "1b8604bd31a5e05fe43a40ec1ec6dfc1a51a28b0b020151ef057fab43f57c923"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/kimi-coding.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/kimi-coding.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\kimi-coding.json",
+      "bytes": 2282,
+      "sha256": "582250b920454d98940da3e7e99d30b807edbea28f2eb8ac15f658d2ef41e8fc"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/meta.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/meta.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\meta.json",
+      "bytes": 2819,
+      "sha256": "0c7e9a370a7005c5a89dc94f0f93bc67b8935c3f802de324f11af6ff56fff429"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/minimax-cn.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/minimax-cn.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\minimax-cn.json",
+      "bytes": 1127,
+      "sha256": "f962c20ee6a6a342820f778e9dc363a18a524bf11998f6e2c57f2989915d62e5"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/minimax.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/minimax.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\minimax.json",
+      "bytes": 1112,
+      "sha256": "17a432f80d0ea6dd26eade80a4314250d3a855678601728a5f70dd8fa0d21dd2"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/mistral.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/mistral.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\mistral.json",
+      "bytes": 12596,
+      "sha256": "10f33bff9adf1248f7e6848e5890c265399f1f94e5b42cfdc28c109d547af98d"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/moonshotai-cn.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/moonshotai-cn.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\moonshotai-cn.json",
+      "bytes": 2882,
+      "sha256": "79c9585dc84ee525ebaebbc78b3c55f3d369ec884d4f943488f1e0b14e3587f5"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/moonshotai.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/moonshotai.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\moonshotai.json",
+      "bytes": 2870,
+      "sha256": "1da2c4e34f22aef17a07c974d85bdee8e1b68b6dc712e3769c935b3f1e7dadca"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/nvidia.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/nvidia.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\nvidia.json",
+      "bytes": 12038,
+      "sha256": "3b4e7b799bf3eaacd1af0491eef77fe33147ea7f72a3a9fa54d77af0e7eacf4c"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/openai-codex.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/openai-codex.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\openai-codex.json",
+      "bytes": 6476,
+      "sha256": "3cc35a7e122e5c77ee8ec30a9a3bd8bd59629997e85ba2cb3f9e0ed62e9a09c0"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/openai.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/openai.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\openai.json",
+      "bytes": 28816,
+      "sha256": "ca5ec1028efc512502591bf2562a2a6dc330f26a5f4c4a08c8a149a43c5bd7da"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/opencode-go.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/opencode-go.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\opencode-go.json",
+      "bytes": 17032,
+      "sha256": "d05b3eb87b81c6e5a94801484e668e660fe60c68f06a972b716d581c3bbd7c25"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/opencode.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/opencode.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\opencode.json",
+      "bytes": 44976,
+      "sha256": "4adb1cfc19a5294a2d9ea5179089b86364ddbfa31485043a3fc278fa8f7e2e73"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/openrouter.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/openrouter.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\openrouter.json",
+      "bytes": 267751,
+      "sha256": "b49405ced089750d475945738a91ac669fa00e04d574da7720935bcfe16ba272"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/qwen-token-plan-cn.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/qwen-token-plan-cn.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\qwen-token-plan-cn.json",
+      "bytes": 12210,
+      "sha256": "2469a4091c474ec3db0a49a9962d8d2726c074ad9065b96bc4e0c87861c4c6c5"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/qwen-token-plan-individual.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/qwen-token-plan-individual.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\qwen-token-plan-individual.json",
+      "bytes": 5782,
+      "sha256": "0fb7cf64faf39d1a3b0a884210a86c87084b805eda15644f5f39293287b959dd"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/qwen-token-plan.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/qwen-token-plan.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\qwen-token-plan.json",
+      "bytes": 12230,
+      "sha256": "eff10620cb577142de4ec02698d5961a71fda2fe4f6ae7ea9432bad9d6844176"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/radius.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/radius.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\radius.json",
+      "bytes": 19164,
+      "sha256": "8e868af981cc64a39da11b135a96252e3eeccb14b92e80d8fbba899ff96f2616"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/together.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/together.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\together.json",
+      "bytes": 12930,
+      "sha256": "94ec3839972061405885d64f5fdbde48eb1f29a159be5e607e9770befd54e28e"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/typesafe.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/typesafe.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\typesafe.json",
+      "bytes": 291,
+      "sha256": "a4429a2f696d5cc5273969af61a7310bda07d6bdcd27bf9ac9c76c534cc43716"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/vercel-ai-gateway.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/vercel-ai-gateway.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\vercel-ai-gateway.json",
+      "bytes": 118194,
+      "sha256": "e64081d4ced20a7e754dab586d5f733eb92f00feab30c76fdcb7ce29ce5111be"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/xai.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/xai.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\xai.json",
+      "bytes": 2609,
+      "sha256": "879c49b78b663a52a220ac4ee013e726b10c4f50aaa03bc58ee53a4b54c76928"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/xiaomi-token-plan-ams.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/xiaomi-token-plan-ams.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\xiaomi-token-plan-ams.json",
+      "bytes": 2156,
+      "sha256": "ca65178f4525d9705bc8d085ed136cecbe149c4080e857ea6a64ae643d2ac00a"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/xiaomi-token-plan-cn.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/xiaomi-token-plan-cn.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\xiaomi-token-plan-cn.json",
+      "bytes": 2148,
+      "sha256": "b065326926681c2262084e59c1c19ebdaf146c07107b5242c76b456becf74db0"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/xiaomi-token-plan-sgp.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/xiaomi-token-plan-sgp.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\xiaomi-token-plan-sgp.json",
+      "bytes": 2156,
+      "sha256": "92c3d6d707f81fd9cd2b6d1fb57dc431d90ba51e10fe49d97bc8806035c23492"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/xiaomi.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/xiaomi.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\xiaomi.json",
+      "bytes": 3144,
+      "sha256": "b81d01a374f7b558728c78d81f4168efa9c8996e6e2b5618409a8094b083c759"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/zai-coding-cn.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/zai-coding-cn.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\zai-coding-cn.json",
+      "bytes": 2672,
+      "sha256": "ee5ee705fb6e413a6088db5e3616c27fce802a8ece6c355f1db35490d787f610"
+    },
+    {
+      "logicalCanonicalPath": "upstream/packages/ai/src/providers/data/zai.json",
+      "actualUrl": "file:///P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/zai.json",
+      "actualPath": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\zai.json",
+      "bytes": 4221,
+      "sha256": "58e6642fdfb736f0b9a4a277c760c536a3cea66a030abbfb2615f7b2851d5c6f"
+    }
+  ],
+  "children": [
+    {
+      "repeat": 1,
+      "scratch": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-session-compaction-work\\artifacts\\compaction-reference\\genuine-source-r2\\scratch\\capture-sU64Zh",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 1123831,
+      "stderrBytes": 0,
+      "boundedTimeoutMilliseconds": 20000,
+      "maxBufferBytes": 8388608
+    },
+    {
+      "repeat": 2,
+      "scratch": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-session-compaction-work\\artifacts\\compaction-reference\\genuine-source-r2\\scratch\\capture-uQvQIP",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 1123831,
+      "stderrBytes": 0,
+      "boundedTimeoutMilliseconds": 20000,
+      "maxBufferBytes": 8388608
+    }
+  ],
+  "retainedScratchFiles": [
+    {
+      "path": "capture-sU64Zh/workspace/actual-summary-requests-split-usage/sessions/2026-10-02T23-22-57-775Z_01a0feed-936f-7540-9a8c-e551923d915e.jsonl",
+      "bytes": 5380,
+      "sha256": "c946ef8fa40d0ab17a99c7aa67e103ce413e7ad5610bad6af6a9c301ba2953c9"
+    },
+    {
+      "path": "capture-sU64Zh/workspace/branch-summary-details-from-hook/sessions/2026-10-02T23-22-57-759Z_01a0feed-935f-7540-9a8c-e54f0cee0ce7.jsonl",
+      "bytes": 3060,
+      "sha256": "4b1dffb99c683a75d4bbb70f70b06110b2d7937ac5d786881ee5b89432d055b5"
+    },
+    {
+      "path": "capture-sU64Zh/workspace/huge-turn-tool-cut-pairing/sessions/2026-10-02T23-22-57-685Z_01a0feed-9315-7540-9a8c-e5476f404310.jsonl",
+      "bytes": 6620,
+      "sha256": "183986bbebc83784925bb88ff8c7c302307f283e67a45c7777fadbe04a33c562"
+    },
+    {
+      "path": "capture-sU64Zh/workspace/nonroot-raw-branch-common-ancestor/sessions/2026-10-02T23-22-57-743Z_01a0feed-934f-7540-9a8c-e54d8ca4ce9a.jsonl",
+      "bytes": 3047,
+      "sha256": "25f28b512526b4465d3bf4f5b7b1409706a061c9906624b9a90380269f1fc2ff"
+    },
+    {
+      "path": "capture-sU64Zh/workspace/repeated-compaction-edits-images/sessions/2026-10-02T23-22-57-699Z_01a0feed-9323-7540-9a8c-e548c5f54fe7.jsonl",
+      "bytes": 4985,
+      "sha256": "7bf4a3512acb4ad269a49dfcd906a008503a930c90fa746ae7dccf3275e16165"
+    },
+    {
+      "path": "capture-sU64Zh/workspace/retain-none-recovery-omission/sessions/2026-10-02T23-22-57-727Z_01a0feed-933f-7540-9a8c-e54a57929def.jsonl",
+      "bytes": 3821,
+      "sha256": "9e0b5007dd599f0db60b07feb02483c9f4a6d5b6aa4d1ce21b72e119295a3a39"
+    },
+    {
+      "path": "capture-sU64Zh/workspace/summary-failures-abort-boundary/sessions/2026-10-02T23-22-57-790Z_01a0feed-937e-7540-9a8c-e55295da11ef.jsonl",
+      "bytes": 2589,
+      "sha256": "575b886d83f316859d9395f16496260b225a9988d3a93fcfffd24f0869c517d1"
+    },
+    {
+      "path": "capture-sU64Zh/workspace/token-estimation-thresholds/sessions/2026-10-02T23-22-57-669Z_01a0feed-9305-7540-9a8c-e545dfe1dda8.jsonl",
+      "bytes": 3046,
+      "sha256": "8a2da7259f40050c4c9502e7386d056d031d9420850fd263bdd406269c56fde2"
+    },
+    {
+      "path": "capture-uQvQIP/workspace/actual-summary-requests-split-usage/sessions/2026-10-02T23-22-58-474Z_01a0feed-9629-7586-927a-588561161871.jsonl",
+      "bytes": 5380,
+      "sha256": "fd5444f32c3798ddd4225109fb8352d84f96e8c112a65af0137a6c598a310979"
+    },
+    {
+      "path": "capture-uQvQIP/workspace/branch-summary-details-from-hook/sessions/2026-10-02T23-22-58-457Z_01a0feed-9619-7586-927a-58835d8fac2e.jsonl",
+      "bytes": 3060,
+      "sha256": "c4f6f866e3709ae3f192794761c05a31afdb61191f412754d4866f8f8e710728"
+    },
+    {
+      "path": "capture-uQvQIP/workspace/huge-turn-tool-cut-pairing/sessions/2026-10-02T23-22-58-383Z_01a0feed-95cf-7586-927a-587b9ba024fe.jsonl",
+      "bytes": 6620,
+      "sha256": "49d5abffd1dcc877ae3dec7448a6932e03cfdd0be17940ed882807d6607a3861"
+    },
+    {
+      "path": "capture-uQvQIP/workspace/nonroot-raw-branch-common-ancestor/sessions/2026-10-02T23-22-58-440Z_01a0feed-9608-7586-927a-58812e68fd65.jsonl",
+      "bytes": 3047,
+      "sha256": "3d879614fd0fce428d1c5ecc6589ed5ea7e80131c11b8ffbdc10c79b4586a5ed"
+    },
+    {
+      "path": "capture-uQvQIP/workspace/repeated-compaction-edits-images/sessions/2026-10-02T23-22-58-396Z_01a0feed-95dc-7586-927a-587d2629f545.jsonl",
+      "bytes": 4985,
+      "sha256": "60d3eab29c36904e6caf664d51c0eb03d47cae33cc0df86a9e7f897d79b2b6c4"
+    },
+    {
+      "path": "capture-uQvQIP/workspace/retain-none-recovery-omission/sessions/2026-10-02T23-22-58-424Z_01a0feed-95f7-7586-927a-587fd53a827b.jsonl",
+      "bytes": 3821,
+      "sha256": "c6906096770171fb41a4dad9c7c33f66634b85bedf8ee48780ab6d6a6602bae9"
+    },
+    {
+      "path": "capture-uQvQIP/workspace/summary-failures-abort-boundary/sessions/2026-10-02T23-22-58-489Z_01a0feed-9639-7586-927a-5887f89a57d1.jsonl",
+      "bytes": 2589,
+      "sha256": "42743eeb3125b5cc6918fa9133ee6cffcd2cc9f38d8068750c675c4167ca890c"
+    },
+    {
+      "path": "capture-uQvQIP/workspace/token-estimation-thresholds/sessions/2026-10-02T23-22-58-369Z_01a0feed-95c1-7586-927a-58783da343e5.jsonl",
+      "bytes": 3046,
+      "sha256": "18dfcf9f3496f4a0b9b7056868888b666d69544a97b2e8cd0f209fa86338fa11"
+    }
+  ],
+  "captureSha256": "75886743d87b0e93e19ecbacccc803fb5bf4b9c5e9586106444334b815832fa5",
+  "contractSha256": "6f83cbeefd5a6d796c444c477786a79b66eacfd4999dc8a4f0f9f86331bf0671",
+  "scope": "Eight whole-source P4-06 schedules authored, not yet captured. P4-03/04, Phase2 summarization transport, P4-07 recovery, original79 scopes/eight phase gates remain open."
+}

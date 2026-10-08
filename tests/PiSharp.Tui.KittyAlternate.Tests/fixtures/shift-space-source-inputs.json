@@ -1,0 +1,298 @@
+{
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "purpose": "Exact Shift+Space binding precedence, lock/action variants and pending-jump printable/null distinction. Public pinned Source only; no native execution.",
+  "cases": [
+    {
+      "id": "shift-space-shifted-65-modifier-2-action-1",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;2u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-65-modifier-2-action-2",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;2:2u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-65-modifier-2-action-3",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;2:3u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-65-modifier-66-action-1",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;66u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-65-modifier-66-action-2",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;66:2u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-65-modifier-66-action-3",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;66:3u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-65-modifier-130-action-1",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;130u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-65-modifier-130-action-2",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;130:2u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-65-modifier-130-action-3",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;130:3u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-65-modifier-194-action-1",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;194u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-65-modifier-194-action-2",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;194:2u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-65-modifier-194-action-3",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;194:3u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-2-action-1",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;2u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-2-action-2",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;2:2u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-2-action-3",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;2:3u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-66-action-1",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;66u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-66-action-2",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;66:2u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-66-action-3",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;66:3u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-130-action-1",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;130u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-130-action-2",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;130:2u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-130-action-3",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;130:3u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-194-action-1",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;194u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-194-action-2",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;194:2u"
+        }
+      ]
+    },
+    {
+      "id": "shift-space-shifted-13-modifier-194-action-3",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;194:3u"
+        }
+      ]
+    },
+    {
+      "id": "pending-jump-shift-space-printable-A",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~bA b\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[97;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[93;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[32:65;2u"
+        },
+        {
+          "kind": "input",
+          "raw": "Z"
+        }
+      ]
+    },
+    {
+      "id": "pending-jump-shift-space-nonprintable-cancels-and-inserts",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~bA b\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[97;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[93;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[32:13;2u"
+        },
+        {
+          "kind": "input",
+          "raw": "Z"
+        }
+      ]
+    }
+  ]
+}

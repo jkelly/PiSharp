@@ -25,18 +25,21 @@ public sealed class PersistentSessionLifecycle
     private readonly SessionBranchPublisher publisher;
     private readonly Func<string, SessionRuntimeRegistry>? registryForWorkingDirectory;
     private readonly Func<string, CancellationToken, ValueTask<SessionRuntimeLease>>? runtimeForWorkingDirectory;
+    private readonly Func<string, long, CancellationToken, ValueTask<SessionRuntimeLease>>? runtimeForAttachment;
     public SessionCatalog? Catalog { get; }
-    public bool RebindsWorkingDirectory => registryForWorkingDirectory is not null || runtimeForWorkingDirectory is not null;
+    public bool RebindsWorkingDirectory => registryForWorkingDirectory is not null || runtimeForWorkingDirectory is not null || runtimeForAttachment is not null;
     public PersistentAgentSessionOptions Options => options;
     public SessionLifecycleReadOnly ReadOnly { get; }
     public PersistentSessionLifecycle(SessionRuntimeRegistry registry, Func<long> clock, Func<string> nextEntryId,
         PersistentAgentSessionOptions? options = null, Func<string>? nextSessionId = null,
         ISessionBranchFileSystem? fileSystem = null, SessionCatalog? catalog = null,
         Func<string, SessionRuntimeRegistry>? registryForWorkingDirectory = null, SessionStorageBackend? backend = null,
-        Func<string, CancellationToken, ValueTask<SessionRuntimeLease>>? runtimeForWorkingDirectory = null)
+        Func<string, CancellationToken, ValueTask<SessionRuntimeLease>>? runtimeForWorkingDirectory = null,
+        Func<string, long, CancellationToken, ValueTask<SessionRuntimeLease>>? runtimeForAttachment = null)
     {
         ArgumentNullException.ThrowIfNull(registry); ArgumentNullException.ThrowIfNull(clock); ArgumentNullException.ThrowIfNull(nextEntryId);
-        this.registry = registry; this.clock = clock; this.nextEntryId = nextEntryId; this.options = options ?? new();
+        this.registry = registry; this.clock = clock; this.nextEntryId = nextEntryId;
+        this.options = (options ?? new()) with { LifetimeToolSelection = registry.LifetimeToolSelection ?? options?.LifetimeToolSelection };
         if (backend is not null)
         {
             if (fileSystem is not null && !ReferenceEquals(fileSystem, backend) ||
@@ -54,9 +57,11 @@ public sealed class PersistentSessionLifecycle
         publisher = new(new(bounds, graph), fileSystem);
         Catalog = catalog;
         this.registryForWorkingDirectory = registryForWorkingDirectory;
-        if (registryForWorkingDirectory is not null && runtimeForWorkingDirectory is not null)
+        if ((registryForWorkingDirectory is null ? 0 : 1) + (runtimeForWorkingDirectory is null ? 0 : 1) +
+            (runtimeForAttachment is null ? 0 : 1) > 1)
             throw new ArgumentException("Specify either borrowed registry bindings or an owned runtime factory.");
         this.runtimeForWorkingDirectory = runtimeForWorkingDirectory;
+        this.runtimeForAttachment = runtimeForAttachment;
         ReadOnly = new(new(new SessionCopyOptions(bounds, bounds.MaximumInputBytes), graph), backend, catalog);
     }
     /// <summary>Creates an initial session through the same registry factory, storage, identity and bounds
@@ -91,24 +96,36 @@ public sealed class PersistentSessionLifecycle
         }
     }
     public ReplaceableAgentSession Attach(PersistentAgentSession initial) => ReplaceableAgentSession.WithLifecycle(initial, this);
+    public Task<ReplaceableAgentSession> AttachAsync(PersistentAgentSession initial) =>
+        ReplaceableAgentSession.WithLifecycleAndRuntimeBindingAsync(initial, this);
     public Task<SessionCatalogPage> ListAsync(SessionCatalogQuery query, CancellationToken cancellationToken = default) =>
         ReadOnly.ListAsync(query, cancellationToken);
     /// <summary>Opens an existing session with the same explicit model/tool registry, identity generators
     /// and persistence bounds used by new/fork/clone. The caller owns the returned coordinator.</summary>
     public Task<PersistentAgentSession> OpenAsync(AgentSessionSwitchRequest request, ModelDescriptor fallbackModel,
         CancellationToken cancellationToken = default)
+        => OpenForAttachmentAsync(request, fallbackModel, 1, cancellationToken);
+
+    internal Task<PersistentAgentSession> OpenForAttachmentAsync(AgentSessionSwitchRequest request,
+        ModelDescriptor fallbackModel, long generation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request); ArgumentNullException.ThrowIfNull(fallbackModel);
         if (!System.IO.Path.IsPathFullyQualified(request.Path) || string.IsNullOrWhiteSpace(request.Path) ||
             request.UseLatestLeaf && request.SelectedLeafId is not null)
             throw new ArgumentException("Session open requires an absolute path and valid branch selection.", nameof(request));
-        return PersistentAgentSession.OpenWithRuntimeFactoryAsync(request.Path, AcquireRuntimeAsync, clock, nextEntryId,
+        if (generation < 1) throw new ArgumentOutOfRangeException(nameof(generation));
+        return PersistentAgentSession.OpenWithRuntimeFactoryAsync(request.Path,
+            (cwd, token) => AcquireRuntimeAsync(cwd, generation, token), clock, nextEntryId,
             options with { UseLatestLeaf = request.UseLatestLeaf, SelectedLeafId = request.SelectedLeafId }, fallbackModel, cancellationToken);
     }
     private ValueTask<SessionRuntimeLease> AcquireRuntimeAsync(string cwd, CancellationToken token)
+        => AcquireRuntimeAsync(cwd, 1, token);
+
+    private ValueTask<SessionRuntimeLease> AcquireRuntimeAsync(string cwd, long generation, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        return runtimeForWorkingDirectory is not null ? runtimeForWorkingDirectory(cwd, token) :
+        return runtimeForAttachment is not null ? runtimeForAttachment(cwd, generation, token) :
+            runtimeForWorkingDirectory is not null ? runtimeForWorkingDirectory(cwd, token) :
             ValueTask.FromResult(new SessionRuntimeLease(registryForWorkingDirectory is null ? registry :
                 registryForWorkingDirectory(cwd) ?? throw new InvalidOperationException("The host did not supply bindings for the session working directory.")));
     }
@@ -143,7 +160,9 @@ public sealed class PersistentSessionLifecycle
         {
             file = await publisher.PrepareAsync(plan, path, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
-            session = await PersistentAgentSession.OpenWithRuntimeFactoryAsync(path, AcquireRuntimeAsync, clock, nextEntryId,
+            var generation = checked(previous.Generation + 1);
+            session = await PersistentAgentSession.OpenWithRuntimeFactoryAsync(path,
+                (cwd, cancellation) => AcquireRuntimeAsync(cwd, generation, cancellation), clock, nextEntryId,
                 options with { UseLatestLeaf = true, SelectedLeafId = null }, state.Agent.Model, token).ConfigureAwait(false);
             var prepared = new PreparedCreation(session, file, plan.SelectedText); session = null; file = null;
             return prepared;

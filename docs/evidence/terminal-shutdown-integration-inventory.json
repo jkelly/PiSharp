@@ -1,0 +1,148 @@
+{
+  "base": "9dd7341571519a2fa851a4158e53fb1d93b58ae5",
+  "paths": [
+    {
+      "terminal": "07576d85c44debfb5144c8fddd5bdc0fc607c79e",
+      "path": "docs/evidence/terminal-graceful-shutdown.md",
+      "integrated": "07576d85c44debfb5144c8fddd5bdc0fc607c79e"
+    },
+    {
+      "terminal": "e4408d80128cd4d19f6c941a3923593454387203",
+      "path": "docs/evidence/terminal-interrupt.md",
+      "integrated": "e4408d80128cd4d19f6c941a3923593454387203"
+    },
+    {
+      "terminal": "e766f883c4ac4fbbdd6aec3994ace21d1e35fdf9",
+      "path": "docs/evidence/terminal-queue-restoration.md",
+      "integrated": "e766f883c4ac4fbbdd6aec3994ace21d1e35fdf9"
+    },
+    {
+      "terminal": "f952743aaf6169608ea41e2c02b3133a054f6539",
+      "path": "src/PiSharp.Cli/Commands/RpcSessionCommand.cs",
+      "integrated": "f952743aaf6169608ea41e2c02b3133a054f6539"
+    },
+    {
+      "terminal": "9dc12ff00b43e4f91bca525fce026bcbde1930b3",
+      "path": "src/PiSharp.Cli/Commands/TerminalSessionCommand.cs",
+      "integrated": "9dc12ff00b43e4f91bca525fce026bcbde1930b3"
+    },
+    {
+      "terminal": "5aa3fd3b4041524aa9ba6d89d877b4baa72a0f7a",
+      "path": "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs",
+      "integrated": "5aa3fd3b4041524aa9ba6d89d877b4baa72a0f7a"
+    },
+    {
+      "terminal": "fa36f993a077afedc2b4ef853d7e42bfc04cd811",
+      "path": "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+      "integrated": "fa36f993a077afedc2b4ef853d7e42bfc04cd811"
+    },
+    {
+      "terminal": "dece0267d2397f500198dc42210097ef0ee4325e",
+      "path": "src/PiSharp.Cli/Interactive/TerminalInterruptGesture.cs",
+      "integrated": "dece0267d2397f500198dc42210097ef0ee4325e"
+    },
+    {
+      "terminal": "4e87b5101ff5882084876a1bf097bcc59a3cb515",
+      "path": "src/PiSharp.Cli/Interactive/TerminalQueueRestoration.cs",
+      "integrated": "4e87b5101ff5882084876a1bf097bcc59a3cb515"
+    },
+    {
+      "terminal": "f60a145c4d4fac1ce47005daa29d7ec9d3fd5402",
+      "path": "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+      "integrated": "f60a145c4d4fac1ce47005daa29d7ec9d3fd5402"
+    },
+    {
+      "terminal": "a56947121fc483b6d0804283e1a25457d1d1685c",
+      "path": "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs",
+      "integrated": "a56947121fc483b6d0804283e1a25457d1d1685c"
+    },
+    {
+      "terminal": "3a373373c2e943a11079789d24acf43271d515e4",
+      "path": "src/PiSharp.Tui/Rendering/VtRenderer.cs",
+      "integrated": "3a373373c2e943a11079789d24acf43271d515e4"
+    },
+    {
+      "terminal": "dc3f7d40bc07054fc3b7a16676ae448a075a19b4",
+      "path": "tests/PiSharp.Rpc.Tests/Program.cs",
+      "integrated": "37d1390988f3ff1e89d1bfe2b22d36c178d83829"
+    },
+    {
+      "terminal": "c375a6ff5bf7c34d15daa12df94abf8e5bd1255f",
+      "path": "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+      "integrated": "c375a6ff5bf7c34d15daa12df94abf8e5bd1255f"
+    },
+    {
+      "terminal": "424eb02adcf83bf161eeb0f38c8191bdaf3931a8",
+      "path": "tests/PiSharp.Rpc.Tests/RpcTerminalInterruptTests.cs",
+      "integrated": "424eb02adcf83bf161eeb0f38c8191bdaf3931a8"
+    },
+    {
+      "terminal": "2c8f65aae53095255d5a034c7d71e3c07597baaa",
+      "path": "tests/PiSharp.Terminal.SelectList.Integration.Tests/Program.cs",
+      "integrated": "2c8f65aae53095255d5a034c7d71e3c07597baaa"
+    },
+    {
+      "terminal": "b64c82741b848699c8ecb26cac562426371f83da",
+      "path": "tests/PiSharp.Terminal.SelectList.Integration.Tests/SelectorFixture.cs",
+      "integrated": "b64c82741b848699c8ecb26cac562426371f83da"
+    },
+    {
+      "terminal": "b7b2d7c1aef27bd8b29e17eddd16db958063b7f1",
+      "path": "tests/PiSharp.Terminal.SelectList.Integration.Tests/StartupControlledTerminal.cs",
+      "integrated": "b7b2d7c1aef27bd8b29e17eddd16db958063b7f1"
+    },
+    {
+      "terminal": "41e007a2243822f25d42042432f30c765c70b50b",
+      "path": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalGracefulShutdownCases.cs",
+      "integrated": "41e007a2243822f25d42042432f30c765c70b50b"
+    },
+    {
+      "terminal": "91192b4d36256343c17564951dd49463a733be6f",
+      "path": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalInterruptCases.cs",
+      "integrated": "91192b4d36256343c17564951dd49463a733be6f"
+    },
+    {
+      "terminal": "36ab8aa34157e6369c18a0dfe736e9e5e2f37dea",
+      "path": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalNativeInterruptCases.cs",
+      "integrated": "36ab8aa34157e6369c18a0dfe736e9e5e2f37dea"
+    },
+    {
+      "terminal": "455cae4ef514c462503705a6fbec66dd3e1c10f7",
+      "path": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalQueueRestorationCases.cs",
+      "integrated": "455cae4ef514c462503705a6fbec66dd3e1c10f7"
+    },
+    {
+      "terminal": "e5e3470d4e769c239b17e6482d3af204a98ac050",
+      "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-graceful-shutdown-migration.json",
+      "integrated": "e5e3470d4e769c239b17e6482d3af204a98ac050"
+    },
+    {
+      "terminal": "1ca76a7aaca3a91577a3539a63260ef29544daf9",
+      "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-interrupt-migration.json",
+      "integrated": "1ca76a7aaca3a91577a3539a63260ef29544daf9"
+    },
+    {
+      "terminal": "d7ef40cc5a5e9488a5cda2a71d2685f2a3692837",
+      "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.before-graceful-shutdown.json",
+      "integrated": "d7ef40cc5a5e9488a5cda2a71d2685f2a3692837"
+    },
+    {
+      "terminal": "e96b26aa148afc96dd5c0eb9c0f80d0ad7ca6132",
+      "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.before-interrupt.json",
+      "integrated": "e96b26aa148afc96dd5c0eb9c0f80d0ad7ca6132"
+    },
+    {
+      "terminal": "02f5f5967faea92b276fb48eefd7e9f856ee934c",
+      "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.json",
+      "integrated": "02f5f5967faea92b276fb48eefd7e9f856ee934c"
+    }
+  ],
+  "testsExecuted": 0,
+  "terminal": "9985d2e8f22d73ae80026efbbba1fa84aef76f27",
+  "status": "STATIC_ONLY",
+  "hostCorrectionPreserved": true,
+  "heldIoPins": 14,
+  "atomicTestCorrectionPreserved": true,
+  "nativeBuilds": 0,
+  "sourceMerge": "70ce909cd892b3a363cd2a800e5572b9e8c153a1"
+}

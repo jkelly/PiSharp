@@ -10,7 +10,7 @@ using PiSharp.Tui.Rendering;
 namespace PiSharp.Cli.Interactive;
 
 /// <summary>Owned terminal presentation over a borrowed console. It owns no session/editor state.</summary>
-internal sealed class TerminalSessionView : IInteractiveSessionPresentation, ITerminalPendingQueuePresentation, IAsyncDisposable
+internal sealed class TerminalSessionView : IInteractiveSessionPresentation, IInteractiveAssistantStreamingPresentation, ITerminalPendingQueuePresentation, IAsyncDisposable
 {
     private const int RetainedCharacters = 32_768, MaximumDraftCharacters = 65_536;
     private readonly IConsoleTerminal terminal;
@@ -29,6 +29,8 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, ITe
     private long geometryRevision;
     private TerminalDraftSnapshot draft = new("", 0);
     private TerminalSelectList? selectList;
+    private TerminalCustomComponentPresentation? customComponent;
+    private readonly List<TerminalToolComponentPresentation> toolComponents = [];
     private string selectTitle = "";
     private TerminalPendingQueueSnapshot pendingQueue = TerminalPendingQueueSnapshot.Empty(1);
     private bool selectListFocused;
@@ -38,6 +40,7 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, ITe
     private int sourceScroll;
     private int retained, pending;
     private bool clipped, entered;
+    private bool assistantStreamOpen;
     private Task? closing;
 
     internal TerminalSessionView(IConsoleTerminal terminal, ITerminalViewportSource viewport,
@@ -76,6 +79,16 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, ITe
     {
         ArgumentNullException.ThrowIfNull(displayText);
         if (displayText.Length > 8 * 1024 * 1024 + 1) throw new InvalidOperationException("Terminal presentation exceeds its input bound.");
+        if (assistantStreamOpen) { Append("\n"); assistantStreamOpen = false; }
+        Append(displayText); await Draw(token).ConfigureAwait(false);
+    }, token);
+
+    public ValueTask PresentAssistantDeltaAsync(string displayText, CancellationToken token) => Run(async () =>
+    {
+        ArgumentNullException.ThrowIfNull(displayText);
+        if (displayText.Length > 8 * 1024 * 1024) throw new InvalidOperationException("Terminal presentation exceeds its input bound.");
+        if (displayText.Length == 0) return;
+        if (!assistantStreamOpen) { Append("[assistant] "); assistantStreamOpen = true; }
         Append(displayText); await Draw(token).ConfigureAwait(false);
     }, token);
 
@@ -118,7 +131,64 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, ITe
     internal ValueTask SetSelectListAsync(TerminalSelectList? value, CancellationToken token, bool focused = true,
         string? title = null) => Run(async () =>
     {
+        if (value is not null && customComponent is not null)
+            throw new InvalidOperationException("Custom component owns terminal presentation.");
         selectList = value; selectTitle = title ?? ""; selectListFocused = focused;
+        renderer.Invalidate(); if (entered) await Draw(token).ConfigureAwait(false);
+    }, token);
+
+    // The owning broker has already acquired actual editor focus and registry callback admission.
+    // Reference identity prevents a stale generation from replacing/clearing a later component.
+    internal ValueTask OpenCustomComponentAsync(TerminalCustomComponentPresentation owner, CancellationToken token) => Run(async () =>
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        if (customComponent is not null || selectList is not null)
+            throw new InvalidOperationException("Terminal component presentation is already owned.");
+        customComponent = owner;
+        renderer.Invalidate();
+        if (entered) await Draw(token).ConfigureAwait(false);
+    }, token);
+
+    internal ValueTask RefreshCustomComponentAsync(TerminalCustomComponentPresentation owner, CancellationToken token) => Run(async () =>
+    {
+        if (!ReferenceEquals(customComponent, owner)) throw new InvalidOperationException("Stale custom component presentation.");
+        if (entered) await Draw(token).ConfigureAwait(false);
+    }, token);
+
+    internal ValueTask CloseCustomComponentAsync(TerminalCustomComponentPresentation owner, CancellationToken token) => Run(async () =>
+    {
+        if (!ReferenceEquals(customComponent, owner)) throw new InvalidOperationException("Stale custom component presentation.");
+        customComponent = null; renderer.Invalidate();
+        if (entered) await Draw(token).ConfigureAwait(false);
+    }, token);
+
+    internal Task SetCustomEditorFocusAsync(bool editorOwnsFocus, CancellationToken token) =>
+        focusOwner?.SetEditorFocusAsync(editorOwnsFocus, token) ??
+        throw new InvalidOperationException("Custom terminal components require the actual attached editor focus owner.");
+
+    internal async Task<bool> CaptureCustomEditorFocusAsync(CancellationToken token)
+    {
+        bool captured = false;
+        await Run(() => { captured = draft.EditorOwnsFocus; return Task.CompletedTask; }, token).ConfigureAwait(false);
+        return captured;
+    }
+
+    internal ValueTask OpenToolComponentAsync(TerminalToolComponentPresentation owner, CancellationToken token) => Run(async () =>
+    {
+        if (toolComponents.Count >= 16 || toolComponents.Contains(owner)) throw new InvalidOperationException("Tool presentation capacity/identity differs.");
+        toolComponents.Add(owner); renderer.Invalidate();
+        if (entered) await Draw(token).ConfigureAwait(false);
+    }, token);
+    internal ValueTask RefreshToolComponentAsync(TerminalToolComponentPresentation owner, CancellationToken token) => Run(async () =>
+    {
+        if (!toolComponents.Contains(owner)) throw new InvalidOperationException("Stale tool presentation.");
+        owner.Cached = null; renderer.Invalidate();
+        if (entered) await Draw(token).ConfigureAwait(false);
+    }, token);
+    internal ValueTask CloseToolComponentAsync(TerminalToolComponentPresentation owner, CancellationToken token) => Run(async () =>
+    {
+        // Attachment may have failed before insertion. Cleanup clears only this exact reference.
+        if (!toolComponents.Remove(owner)) return;
         renderer.Invalidate(); if (entered) await Draw(token).ConfigureAwait(false);
     }, token);
 
@@ -159,10 +229,21 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, ITe
     private async Task Draw(CancellationToken token)
     {
         if (!entered) throw new InvalidOperationException("Terminal preview has not started.");
-        if (!draftReceived) return;
+        if (!draftReceived && customComponent is null && toolComponents.Count == 0) return;
         var (actual, editorGeometry) = ReadGeometryState();
         if (actual != geometry) { geometry = actual; renderer.Invalidate(); }
         var columns = actual.Columns; var rows = actual.Rows;
+        if (customComponent is { } component)
+        {
+            var original = component.RenderAsync(columns, token);
+            TerminalCustomComponentRows customRows;
+            try { customRows = await original.ConfigureAwait(false); }
+            catch (Exception error) { throw new AggregateException("Original custom render failed.", original.Exception ?? error); }
+            if (customRows.Rows.IsDefault || customRows.CellWidths.IsDefault)
+                throw new InvalidOperationException("Original custom render returned unavailable rows/widths.");
+            var customFrame = TerminalCustomComponentFrameFactory.Create(customRows.Rows, customRows.CellWidths, rows, columns);
+            await renderer.RenderAsync(customFrame, token).ConfigureAwait(false); return;
+        }
         if (selectList is not null)
         {
             var selected = TerminalExtensionSelectorFrameFactory.Create(selectTitle, selectList, rows, columns, selectListFocused);
@@ -183,14 +264,15 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, ITe
                 presentationEditorLifetime = map.EditorIdentity.EditorLifetimeId;
                 presentationScrollResetRevision = map.ScrollResetRevision; sourceScroll = 0;
             }
-            var transcript = Wrap((clipped ? new[] { "[earlier view clipped]", "\n" } : []).Concat(display), columns).ToImmutableArray();
+            var transcript = Transcript(columns).ToImmutableArray();
             var presented = TerminalEditorFrameFactory.Create(map, sourceScroll, transcript, draft.EditorOwnsFocus);
             presented = TerminalPendingQueueFrameFactory.Create(presented, pendingQueue.Steering, pendingQueue.FollowUp);
             // Source rendering mutates its scalar scroll before transport completion. A held
             // physical write must not change the next captured controller/layout identity.
             sourceScroll = presented.FirstVisibleSourceRow;
             observeSourceFrame?.Invoke(map, presented);
-            await renderer.RenderAsync(presented.Frame, token).ConfigureAwait(false); return;
+            var withTools = await ComposeTools(presented.Frame, presented.EditorRowOrigin, token).ConfigureAwait(false);
+            await renderer.RenderAsync(withTools, token).ConfigureAwait(false); return;
         }
         // Existing literal/no-geometry adapter callers retain their established projection.
         // Actual session terminal always supplies the controller's captured Source layout.
@@ -198,7 +280,7 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, ITe
         var input = projected.Rows;
         var inputRows = input.Length;
         var historyRows = rows - inputRows;
-        var history = Wrap((clipped ? new[] { "[earlier view clipped]", "\n" } : []).Concat(display), columns);
+        var history = Transcript(columns);
         var visible = new List<string>(rows);
         if (historyRows > 0)
         {
@@ -208,7 +290,38 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, ITe
         visible.AddRange(input);
         var cursor = new TerminalCursor(historyRows + projected.CursorRow, projected.CursorColumn, draft.EditorOwnsFocus);
         var frame = layout.CreateFrame(string.Join('\n', visible), rows, columns, cursor);
-        await renderer.RenderAsync(frame, token).ConfigureAwait(false);
+        var combined = await ComposeTools(frame, historyRows, token).ConfigureAwait(false);
+        await renderer.RenderAsync(combined, token).ConfigureAwait(false);
+    }
+
+    private async Task<TerminalFrame> ComposeTools(TerminalFrame existing, int editorOrigin, CancellationToken token)
+    {
+        if (toolComponents.Count == 0) return existing;
+        var text = new List<string>(); var widths = new List<int>(); long characters = 0;
+        foreach (var tool in toolComponents)
+        {
+            if (!tool.IsCurrent) continue;
+            var projection = tool.Cached;
+            if (projection is null || tool.CachedColumns != existing.Columns)
+            {
+                var original = tool.Source.RenderAsync(existing.Columns, token);
+                try { projection = await original.ConfigureAwait(false); }
+                catch (Exception error) { throw new AggregateException("Original tool render failed.", original.Exception ?? error); }
+                if (projection.Rows.IsDefault || projection.CellWidths.IsDefault || projection.Rows.Length != projection.CellWidths.Length)
+                    throw new InvalidOperationException("Original tool rows/widths differ.");
+                tool.Cached = projection; tool.CachedColumns = existing.Columns;
+            }
+            token.ThrowIfCancellationRequested();
+            if (!tool.IsCurrent) continue;
+            foreach (var row in projection.Rows)
+            {
+                characters += row.Length;
+                if (characters > 65536 || text.Count >= 256) throw new TerminalRenderException(TerminalRenderFailure.ResourceLimit);
+                text.Add(row);
+            }
+            widths.AddRange(projection.CellWidths);
+        }
+        return TerminalCustomComponentFrameFactory.CombineToolRows(existing, editorOrigin, text, widths);
     }
 
     private async Task DrawUnavailable(int rows, int columns, CancellationToken token)
@@ -217,6 +330,18 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, ITe
         // scroll stay intact and a later actual resize retries the same captured layout.
         var frame = layout.CreateFrame("Editor needs a wider window", rows, columns, new TerminalCursor(0, 0, false));
         await renderer.RenderAsync(frame, token).ConfigureAwait(false);
+    }
+
+    private List<string> Transcript(int columns)
+    {
+        var history = Wrap((clipped ? new[] { "[earlier view clipped]", "\n" } : []).Concat(display), columns);
+        // Presentation only: never prefix the canonical editor text or move its caret.
+        var keys = Keybindings?.GetKeys("tui.input.submit") ?? ["enter"];
+        var submit = keys.Length == 0 ? "submit unbound" :
+            string.Join(" / ", keys.Select(key => key == "enter" ? "Enter" : key)) + " sends";
+        var hint = string.Concat(Project("Message: " + submit + " | /abort stops | /quit exits"));
+        history.Add(hint[..Math.Min(hint.Length, columns)]);
+        return history;
     }
 
     private void Append(string text)
@@ -308,7 +433,7 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, ITe
         if (entered)
             try { await terminal.WriteAsync("\u001b[?2004l\u001b[?1049l".AsMemory(), CancellationToken.None).ConfigureAwait(false); }
             catch (Exception error) { failure ??= error; }
-        display.Clear(); retained = 0; draft = new("", 0); draftReceived = false; selectList = null; selectTitle = "";
+        display.Clear(); toolComponents.Clear(); retained = 0; draft = new("", 0); draftReceived = false; selectList = null; selectTitle = "";
         pendingQueue = TerminalPendingQueueSnapshot.Empty(1);
         presentationEditorLifetime = Guid.Empty; presentationScrollResetRevision = -1; sourceScroll = 0; serial.Dispose();
         if (failure is null) completion.TrySetResult(); else completion.TrySetException(failure);

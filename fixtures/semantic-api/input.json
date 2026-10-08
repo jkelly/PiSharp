@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "kind": "authored-semantic-capability-probes",
+  "provenance": "Small authored TypeScript inputs; expected observations must come from the real unchanged TypeScript7 async API and native helper. No authored expected semantic output.",
+  "config": {
+    "compilerOptions": {"target": "ES2024", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "noEmit": true, "skipLibCheck": false, "types": [], "lib": ["ES2024"]},
+    "files": ["probe.ts"]
+  },
+  "files": [
+    {
+      "path": "probe.ts",
+      "text": "export interface Base { readonly id: string; optional?: number; }\nexport interface Derived extends Base { value: boolean; }\nexport type Alias = Derived;\nexport type Combined = Derived & { tag: \"x\" };\nexport function overload(value: string): string;\nexport function overload(value: number): number;\nexport function overload(value: string | number): string | number { return value; }\nexport interface Box<T extends Base = Derived> { value: T; }\nexport type NumberBox = Box<Derived>;\nimport type { Missing } from \"./deliberately-absent.js\";\nexport type Broken = Missing;\n"
+    }
+  ],
+  "queries": [
+    {"family": "inheritance", "export": "Derived", "declared": true, "bases": true},
+    {"family": "alias", "export": "Alias", "declared": true},
+    {"family": "intersection", "export": "Combined", "declared": true},
+    {"family": "overloads", "export": "overload", "declared": false},
+    {"family": "generic", "export": "Box", "declared": true},
+    {"family": "generic-substitution", "export": "NumberBox", "declared": true},
+    {"family": "unresolved-import", "export": "Broken", "declared": true}
+  ],
+  "requiredBlockers": ["deliberately-absent.js must remain unresolved; no ambient stub or any replacement is permitted"],
+  "sourceProfile": "synthetic-smoke-only; full public inventory/TypeChecker declaration closure remains mandatory"
+}

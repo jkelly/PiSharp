@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "openai-completions-sdk-framing-and-lifecycle",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "api.openai-completions",
+    "stream.indexed-events",
+    "stream.terminal-settlement"
+  ],
+  "input": {
+    "path": "fixtures/reference/openai-completions-sdk-lifecycle/input.json",
+    "sha256": "2e35c47906fd8c52c0d156dc2af4621f746fdcdb33fb319fecc78abaa438bd2e",
+    "kind": "authored-public-completions-sdk-wire-and-owned-response-lifecycle"
+  },
+  "expected": {
+    "path": "fixtures/reference/openai-completions-sdk-lifecycle/expected.json",
+    "sha256": "829ec6d61f05e0064b6ca38799e264b6b4a6f7a2029d4f499e81d84b5475b81b",
+    "kind": "captured-unchanged-public-completions-wrapper-sdk-lifecycle"
+  },
+  "lock": {
+    "path": "tools/ReferenceOracle/openai-completions-sdk-lifecycle.lock.json",
+    "sha256": "5790f389521796f80a2c0d0b8fb8be8ccf6efc13bd0a197527abd6d7cecb5211"
+  },
+  "nativeComparison": "not performed",
+  "independentAcceptance": "pending"
+}

@@ -17,7 +17,7 @@ public static class SessionSummaryCommand
         "[--leaf <id>|--root] [--keep-recent <tokens>] [--reserve <tokens>] [--focus <text>] " +
         "[--first-kept <id>|--retain-none] [--automatic --context-window <tokens>]; branch-summary requires --target <id|root>";
     public static async Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null)
     {
         var acknowledged = false; var writeMayStart = false; var outputStarted = false;
         try
@@ -47,19 +47,21 @@ public static class SessionSummaryCommand
             if (target is { Length: 0 } || leaf is { Length: 0 } || values.GetValueOrDefault("--first-kept") is { Length: 0 }) throw Invalid();
             var turns = await SessionCommands.ScriptAsync(scriptPath, cancellationToken).ConfigureAwait(false);
             string? report = null;
-            await using (var profile = await OfflineSessionProfile.CreateAsync(workspace, sessionPath, scriptPath,
-                turns, [], [], cancellationToken, offlineApi: api).ConfigureAwait(false))
+            var profile = await OfflineSessionProfile.CreateAsync(workspace, sessionPath, scriptPath,
+                turns, [], [], cancellationToken, offlineApi: api, mcpAdmission: mcpAdmission).ConfigureAwait(false);
+            PersistentAgentSession? session = null; Exception? operationFailure = null;
+            try
             {
                 var options = new PersistentAgentSessionOptions(UseLatestLeaf: latest, SelectedLeafId: leaf,
                     AgentOptions: new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024)),
                     SessionLogStoreOptions: new(ReaderOptions: new(MaximumInputBytes: 8_388_608, MaximumLines: 10_000, MaximumRecords: 10_000)));
                 long Clock() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); string NextId() => "cli-summary-" + Guid.NewGuid().ToString("N");
-                var lifecycle = new PersistentSessionLifecycle(profile.Registry, Clock, NextId, options);
-                await using var session = await lifecycle.OpenAsync(new(sessionPath, latest, leaf), profile.SelectedModel, cancellationToken).ConfigureAwait(false);
+                var lifecycle = profile.CreateLifecycle(Clock, NextId, options);
+                session = await lifecycle.OpenAsync(new(sessionPath, latest, leaf), profile.SelectedModel, cancellationToken).ConfigureAwait(false);
                 if (!string.Equals(SessionCommands.Absolute(session.WorkingDirectory), profile.Workspace,
                     OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                     throw new SessionCommandException(SessionCommandFailure.WorkspaceMismatch);
-                profile.AttachOwner(session, options, Clock, NextId, lifecycle: lifecycle); var attachment = profile.Sessions!.Current;
+                await profile.AttachOwnerAsync(session, options, Clock, NextId, lifecycle: lifecycle).ConfigureAwait(false); var attachment = profile.Sessions!.Current;
                 string Report(string? entryId, bool committed) => JsonSerializer.Serialize(new
                 { schemaVersion = 1, status = committed ? "committed" : "skipped", checkpointAcknowledged = committed,
                     sessionFile = sessionPath, sessionId = attachment.Session.Snapshot.Log.Header.Id,
@@ -78,8 +80,9 @@ public static class SessionSummaryCommand
                         profile.SummaryGenerator, cancellationToken, Preflight).ConfigureAwait(false);
                 acknowledged = receipt?.Append.CheckpointAcknowledged == true;
                 report ??= Report(null, false);
-                await profile.Sessions.DisposeAsync().ConfigureAwait(false);
             }
+            catch (Exception error) { operationFailure = error; }
+            finally { await profile.SettleOwnedCommandAsync(session, operationFailure).ConfigureAwait(false); }
             outputStarted = true; await stdout.WriteLineAsync(report).ConfigureAwait(false); await stdout.FlushAsync().ConfigureAwait(false); return 0;
         }
         catch (Exception error)

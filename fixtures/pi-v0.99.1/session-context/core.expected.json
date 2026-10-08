@@ -1,0 +1,2619 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "session-context-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "captured-unchanged-session-context-oracle",
+  "observations": {
+    "cases": [
+      {
+        "caseId": "selected-left",
+        "leafId": "left-leaf",
+        "projection": {
+          "entries": [
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "root-system",
+                "parentId": null,
+                "timestamp": "2023-11-14T22:13:20.000Z",
+                "message": {
+                  "role": "system",
+                  "content": "System π.",
+                  "toolsAdded": [
+                    {
+                      "name": "read",
+                      "description": "Read an authored logical file.",
+                      "parameters": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  ],
+                  "timestamp": 1700000000000,
+                  "opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              },
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "System π.",
+                  "toolsAdded": [
+                    {
+                      "name": "read",
+                      "description": "Read an authored logical file.",
+                      "parameters": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  ],
+                  "timestamp": 1700000000000,
+                  "opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "model_change",
+                "id": "root-model",
+                "parentId": "root-system",
+                "timestamp": "2023-11-14T22:13:21.000Z",
+                "provider": "openai",
+                "modelId": "declared-base"
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "thinking_level_change",
+                "id": "root-thinking",
+                "parentId": "root-model",
+                "timestamp": "2023-11-14T22:13:22.000Z",
+                "thinkingLevel": "low"
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "root-user",
+                "parentId": "root-thinking",
+                "timestamp": "2023-11-14T22:13:23.000Z",
+                "message": {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Root line\r\nπ"
+                    }
+                  ],
+                  "timestamp": 1700000003000,
+                  "opaque": {
+                    "nullValue": null
+                  }
+                }
+              },
+              "messages": [
+                {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Root line\r\nπ"
+                    }
+                  ],
+                  "timestamp": 1700000003000,
+                  "opaque": {
+                    "nullValue": null
+                  }
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "left-system",
+                "parentId": "root-user",
+                "timestamp": "2023-11-14T22:13:24.000Z",
+                "message": {
+                  "role": "system",
+                  "content": "",
+                  "toolsRemoved": [
+                    {
+                      "name": "read"
+                    }
+                  ],
+                  "toolsAdded": [
+                    {
+                      "name": "write",
+                      "description": "Write authored text.",
+                      "parameters": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "content"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  ],
+                  "timestamp": 1700000004000
+                }
+              },
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "",
+                  "toolsRemoved": [
+                    {
+                      "name": "read"
+                    }
+                  ],
+                  "toolsAdded": [
+                    {
+                      "name": "write",
+                      "description": "Write authored text.",
+                      "parameters": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "content"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  ],
+                  "timestamp": 1700000004000
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "left-user",
+                "parentId": "left-system",
+                "timestamp": "2023-11-14T22:13:25.000Z",
+                "message": {
+                  "role": "user",
+                  "content": "Left question.",
+                  "timestamp": 1700000005000,
+                  "opaque": {
+                    "keep": [
+                      "left",
+                      null
+                    ]
+                  }
+                }
+              },
+              "messages": [
+                {
+                  "role": "user",
+                  "content": "Left question.",
+                  "timestamp": 1700000005000,
+                  "opaque": {
+                    "keep": [
+                      "left",
+                      null
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "left-assistant",
+                "parentId": "left-user",
+                "timestamp": "2023-11-14T22:13:26.000Z",
+                "message": {
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "type": "thinking",
+                      "thinking": "Authored thought.",
+                      "thinkingSignature": "{\"opaque\":[\"signature\",null]}"
+                    },
+                    {
+                      "type": "toolCall",
+                      "id": "call_left|fc_left",
+                      "name": "write",
+                      "arguments": {
+                        "path": "logical.txt",
+                        "content": "owned π"
+                      },
+                      "namespace": "opaque-namespace",
+                      "toolCallSignature": {
+                        "keep": null
+                      },
+                      "thoughtSignature": "opaque-thought-signature"
+                    }
+                  ],
+                  "api": "openai-responses",
+                  "provider": "openai",
+                  "model": "assistant-left",
+                  "usage": {
+                    "input": 4,
+                    "output": 2,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "reasoning": 0,
+                    "totalTokens": 6,
+                    "cost": {
+                      "input": 0,
+                      "output": 0,
+                      "cacheRead": 0,
+                      "cacheWrite": 0,
+                      "total": 0
+                    }
+                  },
+                  "stopReason": "toolUse",
+                  "timestamp": 1700000006000,
+                  "responseId": "response-left"
+                }
+              },
+              "messages": [
+                {
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "type": "thinking",
+                      "thinking": "Authored thought.",
+                      "thinkingSignature": "{\"opaque\":[\"signature\",null]}"
+                    },
+                    {
+                      "type": "toolCall",
+                      "id": "call_left|fc_left",
+                      "name": "write",
+                      "arguments": {
+                        "path": "logical.txt",
+                        "content": "owned π"
+                      },
+                      "namespace": "opaque-namespace",
+                      "toolCallSignature": {
+                        "keep": null
+                      },
+                      "thoughtSignature": "opaque-thought-signature"
+                    }
+                  ],
+                  "api": "openai-responses",
+                  "provider": "openai",
+                  "model": "assistant-left",
+                  "usage": {
+                    "input": 4,
+                    "output": 2,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "reasoning": 0,
+                    "totalTokens": 6,
+                    "cost": {
+                      "input": 0,
+                      "output": 0,
+                      "cacheRead": 0,
+                      "cacheWrite": 0,
+                      "total": 0
+                    }
+                  },
+                  "stopReason": "toolUse",
+                  "timestamp": 1700000006000,
+                  "responseId": "response-left"
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "left-result",
+                "parentId": "left-assistant",
+                "timestamp": "2023-11-14T22:13:27.000Z",
+                "message": {
+                  "role": "toolResult",
+                  "toolCallId": "call_left|fc_left",
+                  "toolName": "write",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Recorded tool result\r\n"
+                    }
+                  ],
+                  "isError": false,
+                  "timestamp": 1700000007000,
+                  "opaque": {
+                    "result": null
+                  }
+                }
+              },
+              "messages": [
+                {
+                  "role": "toolResult",
+                  "toolCallId": "call_left|fc_left",
+                  "toolName": "write",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Recorded tool result\r\n"
+                    }
+                  ],
+                  "isError": false,
+                  "timestamp": 1700000007000,
+                  "opaque": {
+                    "result": null
+                  }
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "custom_message",
+                "id": "left-custom-message",
+                "parentId": "left-result",
+                "timestamp": "2023-11-14T22:13:28.000Z",
+                "customType": "authored.note",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hidden display, visible context."
+                  },
+                  {
+                    "type": "image",
+                    "data": "AA==",
+                    "mimeType": "image/png"
+                  }
+                ],
+                "display": false,
+                "details": null
+              },
+              "messages": [
+                {
+                  "role": "custom",
+                  "customType": "authored.note",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Hidden display, visible context."
+                    },
+                    {
+                      "type": "image",
+                      "data": "AA==",
+                      "mimeType": "image/png"
+                    }
+                  ],
+                  "display": false,
+                  "details": null,
+                  "timestamp": 1700000008000
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "custom",
+                "id": "left-custom-state",
+                "parentId": "left-custom-message",
+                "timestamp": "2023-11-14T22:13:29.000Z",
+                "customType": "authored.state",
+                "data": {
+                  "instruction": "inert metadata",
+                  "keep": null
+                }
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "usage",
+                "id": "left-usage",
+                "parentId": "left-custom-state",
+                "timestamp": "2023-11-14T22:13:30.000Z",
+                "kind": "cache_warm",
+                "provider": "openai",
+                "model": "usage-only-model",
+                "usage": {
+                  "input": 4,
+                  "output": 2,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 6,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "note": "Authored accounting; no model-context contribution."
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "label",
+                "id": "left-label",
+                "parentId": "left-usage",
+                "timestamp": "2023-11-14T22:13:31.000Z",
+                "targetId": "left-user",
+                "label": "Left bookmark"
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "session_info",
+                "id": "left-info",
+                "parentId": "left-label",
+                "timestamp": "2023-11-14T22:13:32.000Z",
+                "name": "Authored display name"
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "future_record",
+                "id": "left-leaf",
+                "parentId": "left-info",
+                "timestamp": "2023-11-14T22:13:33.000Z",
+                "data": {
+                  "command": "must remain inert",
+                  "ordered": [
+                    null,
+                    "x"
+                  ]
+                },
+                "opaque": null
+              },
+              "messages": []
+            }
+          ],
+          "messages": [
+            {
+              "role": "system",
+              "content": "System π.",
+              "toolsAdded": [
+                {
+                  "name": "read",
+                  "description": "Read an authored logical file.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "timestamp": 1700000000000,
+              "opaque": {
+                "keep": null,
+                "ordered": [
+                  "b",
+                  "a"
+                ]
+              }
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Root line\r\nπ"
+                }
+              ],
+              "timestamp": 1700000003000,
+              "opaque": {
+                "nullValue": null
+              }
+            },
+            {
+              "role": "system",
+              "content": "",
+              "toolsRemoved": [
+                {
+                  "name": "read"
+                }
+              ],
+              "toolsAdded": [
+                {
+                  "name": "write",
+                  "description": "Write authored text.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "content": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "content"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "timestamp": 1700000004000
+            },
+            {
+              "role": "user",
+              "content": "Left question.",
+              "timestamp": 1700000005000,
+              "opaque": {
+                "keep": [
+                  "left",
+                  null
+                ]
+              }
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "thinking",
+                  "thinking": "Authored thought.",
+                  "thinkingSignature": "{\"opaque\":[\"signature\",null]}"
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_left|fc_left",
+                  "name": "write",
+                  "arguments": {
+                    "path": "logical.txt",
+                    "content": "owned π"
+                  },
+                  "namespace": "opaque-namespace",
+                  "toolCallSignature": {
+                    "keep": null
+                  },
+                  "thoughtSignature": "opaque-thought-signature"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "assistant-left",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1700000006000,
+              "responseId": "response-left"
+            },
+            {
+              "role": "toolResult",
+              "toolCallId": "call_left|fc_left",
+              "toolName": "write",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Recorded tool result\r\n"
+                }
+              ],
+              "isError": false,
+              "timestamp": 1700000007000,
+              "opaque": {
+                "result": null
+              }
+            },
+            {
+              "role": "custom",
+              "customType": "authored.note",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hidden display, visible context."
+                },
+                {
+                  "type": "image",
+                  "data": "AA==",
+                  "mimeType": "image/png"
+                }
+              ],
+              "display": false,
+              "details": null,
+              "timestamp": 1700000008000
+            }
+          ],
+          "thinkingLevel": "low",
+          "model": {
+            "provider": "openai",
+            "modelId": "assistant-left"
+          }
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "System π.",
+              "toolsAdded": [
+                {
+                  "name": "read",
+                  "description": "Read an authored logical file.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "timestamp": 1700000000000,
+              "opaque": {
+                "keep": null,
+                "ordered": [
+                  "b",
+                  "a"
+                ]
+              }
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Root line\r\nπ"
+                }
+              ],
+              "timestamp": 1700000003000,
+              "opaque": {
+                "nullValue": null
+              }
+            },
+            {
+              "role": "system",
+              "content": "",
+              "toolsRemoved": [
+                {
+                  "name": "read"
+                }
+              ],
+              "toolsAdded": [
+                {
+                  "name": "write",
+                  "description": "Write authored text.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "content": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "content"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "timestamp": 1700000004000
+            },
+            {
+              "role": "user",
+              "content": "Left question.",
+              "timestamp": 1700000005000,
+              "opaque": {
+                "keep": [
+                  "left",
+                  null
+                ]
+              }
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "thinking",
+                  "thinking": "Authored thought.",
+                  "thinkingSignature": "{\"opaque\":[\"signature\",null]}"
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_left|fc_left",
+                  "name": "write",
+                  "arguments": {
+                    "path": "logical.txt",
+                    "content": "owned π"
+                  },
+                  "namespace": "opaque-namespace",
+                  "toolCallSignature": {
+                    "keep": null
+                  },
+                  "thoughtSignature": "opaque-thought-signature"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "assistant-left",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1700000006000,
+              "responseId": "response-left"
+            },
+            {
+              "role": "toolResult",
+              "toolCallId": "call_left|fc_left",
+              "toolName": "write",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Recorded tool result\r\n"
+                }
+              ],
+              "isError": false,
+              "timestamp": 1700000007000,
+              "opaque": {
+                "result": null
+              }
+            },
+            {
+              "role": "custom",
+              "customType": "authored.note",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hidden display, visible context."
+                },
+                {
+                  "type": "image",
+                  "data": "AA==",
+                  "mimeType": "image/png"
+                }
+              ],
+              "display": false,
+              "details": null,
+              "timestamp": 1700000008000
+            }
+          ],
+          "thinkingLevel": "low",
+          "model": {
+            "provider": "openai",
+            "modelId": "assistant-left"
+          }
+        },
+        "llmMessages": [
+          {
+            "role": "system",
+            "content": "System π.",
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read an authored logical file.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000000,
+            "opaque": {
+              "keep": null,
+              "ordered": [
+                "b",
+                "a"
+              ]
+            }
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Root line\r\nπ"
+              }
+            ],
+            "timestamp": 1700000003000,
+            "opaque": {
+              "nullValue": null
+            }
+          },
+          {
+            "role": "system",
+            "content": "",
+            "toolsRemoved": [
+              {
+                "name": "read"
+              }
+            ],
+            "toolsAdded": [
+              {
+                "name": "write",
+                "description": "Write authored text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000004000
+          },
+          {
+            "role": "user",
+            "content": "Left question.",
+            "timestamp": 1700000005000,
+            "opaque": {
+              "keep": [
+                "left",
+                null
+              ]
+            }
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "Authored thought.",
+                "thinkingSignature": "{\"opaque\":[\"signature\",null]}"
+              },
+              {
+                "type": "toolCall",
+                "id": "call_left|fc_left",
+                "name": "write",
+                "arguments": {
+                  "path": "logical.txt",
+                  "content": "owned π"
+                },
+                "namespace": "opaque-namespace",
+                "toolCallSignature": {
+                  "keep": null
+                },
+                "thoughtSignature": "opaque-thought-signature"
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "assistant-left",
+            "usage": {
+              "input": 4,
+              "output": 2,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "reasoning": 0,
+              "totalTokens": 6,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1700000006000,
+            "responseId": "response-left"
+          },
+          {
+            "role": "toolResult",
+            "toolCallId": "call_left|fc_left",
+            "toolName": "write",
+            "content": [
+              {
+                "type": "text",
+                "text": "Recorded tool result\r\n"
+              }
+            ],
+            "isError": false,
+            "timestamp": 1700000007000,
+            "opaque": {
+              "result": null
+            }
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hidden display, visible context."
+              },
+              {
+                "type": "image",
+                "data": "AA==",
+                "mimeType": "image/png"
+              }
+            ],
+            "timestamp": 1700000008000
+          }
+        ],
+        "ownUndefinedPaths": {
+          "projection": [],
+          "context": [],
+          "llmMessages": []
+        }
+      },
+      {
+        "caseId": "selected-right",
+        "leafId": "right-leaf",
+        "projection": {
+          "entries": [
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "root-system",
+                "parentId": null,
+                "timestamp": "2023-11-14T22:13:20.000Z",
+                "message": {
+                  "role": "system",
+                  "content": "System π.",
+                  "toolsAdded": [
+                    {
+                      "name": "read",
+                      "description": "Read an authored logical file.",
+                      "parameters": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  ],
+                  "timestamp": 1700000000000,
+                  "opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              },
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "System π.",
+                  "toolsAdded": [
+                    {
+                      "name": "read",
+                      "description": "Read an authored logical file.",
+                      "parameters": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  ],
+                  "timestamp": 1700000000000,
+                  "opaque": {
+                    "keep": null,
+                    "ordered": [
+                      "b",
+                      "a"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "model_change",
+                "id": "root-model",
+                "parentId": "root-system",
+                "timestamp": "2023-11-14T22:13:21.000Z",
+                "provider": "openai",
+                "modelId": "declared-base"
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "thinking_level_change",
+                "id": "root-thinking",
+                "parentId": "root-model",
+                "timestamp": "2023-11-14T22:13:22.000Z",
+                "thinkingLevel": "low"
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "root-user",
+                "parentId": "root-thinking",
+                "timestamp": "2023-11-14T22:13:23.000Z",
+                "message": {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Root line\r\nπ"
+                    }
+                  ],
+                  "timestamp": 1700000003000,
+                  "opaque": {
+                    "nullValue": null
+                  }
+                }
+              },
+              "messages": [
+                {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Root line\r\nπ"
+                    }
+                  ],
+                  "timestamp": 1700000003000,
+                  "opaque": {
+                    "nullValue": null
+                  }
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "model_change",
+                "id": "right-model",
+                "parentId": "root-user",
+                "timestamp": "2023-11-14T22:13:34.000Z",
+                "provider": "foreign-provider",
+                "modelId": "declared-right"
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "thinking_level_change",
+                "id": "right-thinking",
+                "parentId": "right-model",
+                "timestamp": "2023-11-14T22:13:35.000Z",
+                "thinkingLevel": "high"
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "right-user",
+                "parentId": "right-thinking",
+                "timestamp": "2023-11-14T22:13:36.000Z",
+                "message": {
+                  "role": "user",
+                  "content": "Right question.",
+                  "timestamp": 1700000016000
+                }
+              },
+              "messages": [
+                {
+                  "role": "user",
+                  "content": "Right question.",
+                  "timestamp": 1700000016000
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "right-assistant",
+                "parentId": "right-user",
+                "timestamp": "2023-11-14T22:13:37.000Z",
+                "message": {
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Right answer.",
+                      "textSignature": "opaque-text-signature"
+                    }
+                  ],
+                  "api": "foreign-api",
+                  "provider": "foreign-provider",
+                  "model": "assistant-right",
+                  "usage": {
+                    "input": 4,
+                    "output": 2,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "reasoning": 0,
+                    "totalTokens": 6,
+                    "cost": {
+                      "input": 0,
+                      "output": 0,
+                      "cacheRead": 0,
+                      "cacheWrite": 0,
+                      "total": 0
+                    }
+                  },
+                  "stopReason": "stop",
+                  "timestamp": 1700000017000,
+                  "opaque": {
+                    "retained": null
+                  }
+                }
+              },
+              "messages": [
+                {
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Right answer.",
+                      "textSignature": "opaque-text-signature"
+                    }
+                  ],
+                  "api": "foreign-api",
+                  "provider": "foreign-provider",
+                  "model": "assistant-right",
+                  "usage": {
+                    "input": 4,
+                    "output": 2,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "reasoning": 0,
+                    "totalTokens": 6,
+                    "cost": {
+                      "input": 0,
+                      "output": 0,
+                      "cacheRead": 0,
+                      "cacheWrite": 0,
+                      "total": 0
+                    }
+                  },
+                  "stopReason": "stop",
+                  "timestamp": 1700000017000,
+                  "opaque": {
+                    "retained": null
+                  }
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "custom_message",
+                "id": "right-custom-message",
+                "parentId": "right-assistant",
+                "timestamp": "2023-11-14T22:13:38.000Z",
+                "customType": "authored.right",
+                "content": "Custom string.",
+                "display": true
+              },
+              "messages": [
+                {
+                  "role": "custom",
+                  "customType": "authored.right",
+                  "content": "Custom string.",
+                  "display": true,
+                  "timestamp": 1700000018000
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "right-leaf",
+                "parentId": "right-custom-message",
+                "timestamp": "2023-11-14T22:13:39.000Z",
+                "message": {
+                  "role": "futureRuntime",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Unknown role stays inert."
+                    }
+                  ],
+                  "timestamp": 1700000019000,
+                  "opaque": {
+                    "keep": null
+                  }
+                }
+              },
+              "messages": [
+                {
+                  "role": "futureRuntime",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Unknown role stays inert."
+                    }
+                  ],
+                  "timestamp": 1700000019000,
+                  "opaque": {
+                    "keep": null
+                  }
+                }
+              ]
+            }
+          ],
+          "messages": [
+            {
+              "role": "system",
+              "content": "System π.",
+              "toolsAdded": [
+                {
+                  "name": "read",
+                  "description": "Read an authored logical file.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "timestamp": 1700000000000,
+              "opaque": {
+                "keep": null,
+                "ordered": [
+                  "b",
+                  "a"
+                ]
+              }
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Root line\r\nπ"
+                }
+              ],
+              "timestamp": 1700000003000,
+              "opaque": {
+                "nullValue": null
+              }
+            },
+            {
+              "role": "user",
+              "content": "Right question.",
+              "timestamp": 1700000016000
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Right answer.",
+                  "textSignature": "opaque-text-signature"
+                }
+              ],
+              "api": "foreign-api",
+              "provider": "foreign-provider",
+              "model": "assistant-right",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000017000,
+              "opaque": {
+                "retained": null
+              }
+            },
+            {
+              "role": "custom",
+              "customType": "authored.right",
+              "content": "Custom string.",
+              "display": true,
+              "timestamp": 1700000018000
+            },
+            {
+              "role": "futureRuntime",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Unknown role stays inert."
+                }
+              ],
+              "timestamp": 1700000019000,
+              "opaque": {
+                "keep": null
+              }
+            }
+          ],
+          "thinkingLevel": "high",
+          "model": {
+            "provider": "foreign-provider",
+            "modelId": "assistant-right"
+          }
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "System π.",
+              "toolsAdded": [
+                {
+                  "name": "read",
+                  "description": "Read an authored logical file.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "timestamp": 1700000000000,
+              "opaque": {
+                "keep": null,
+                "ordered": [
+                  "b",
+                  "a"
+                ]
+              }
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Root line\r\nπ"
+                }
+              ],
+              "timestamp": 1700000003000,
+              "opaque": {
+                "nullValue": null
+              }
+            },
+            {
+              "role": "user",
+              "content": "Right question.",
+              "timestamp": 1700000016000
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Right answer.",
+                  "textSignature": "opaque-text-signature"
+                }
+              ],
+              "api": "foreign-api",
+              "provider": "foreign-provider",
+              "model": "assistant-right",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000017000,
+              "opaque": {
+                "retained": null
+              }
+            },
+            {
+              "role": "custom",
+              "customType": "authored.right",
+              "content": "Custom string.",
+              "display": true,
+              "timestamp": 1700000018000
+            },
+            {
+              "role": "futureRuntime",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Unknown role stays inert."
+                }
+              ],
+              "timestamp": 1700000019000,
+              "opaque": {
+                "keep": null
+              }
+            }
+          ],
+          "thinkingLevel": "high",
+          "model": {
+            "provider": "foreign-provider",
+            "modelId": "assistant-right"
+          }
+        },
+        "llmMessages": [
+          {
+            "role": "system",
+            "content": "System π.",
+            "toolsAdded": [
+              {
+                "name": "read",
+                "description": "Read an authored logical file.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000000000,
+            "opaque": {
+              "keep": null,
+              "ordered": [
+                "b",
+                "a"
+              ]
+            }
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Root line\r\nπ"
+              }
+            ],
+            "timestamp": 1700000003000,
+            "opaque": {
+              "nullValue": null
+            }
+          },
+          {
+            "role": "user",
+            "content": "Right question.",
+            "timestamp": 1700000016000
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Right answer.",
+                "textSignature": "opaque-text-signature"
+              }
+            ],
+            "api": "foreign-api",
+            "provider": "foreign-provider",
+            "model": "assistant-right",
+            "usage": {
+              "input": 4,
+              "output": 2,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "reasoning": 0,
+              "totalTokens": 6,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "stop",
+            "timestamp": 1700000017000,
+            "opaque": {
+              "retained": null
+            }
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Custom string."
+              }
+            ],
+            "timestamp": 1700000018000
+          }
+        ],
+        "ownUndefinedPaths": {
+          "projection": [
+            "/entries/8/messages/0/details",
+            "/messages/4/details"
+          ],
+          "context": [
+            "/messages/4/details"
+          ],
+          "llmMessages": []
+        }
+      },
+      {
+        "caseId": "explicit-null-leaf",
+        "leafId": null,
+        "projection": {
+          "entries": [],
+          "messages": [],
+          "thinkingLevel": "off",
+          "model": null
+        },
+        "context": {
+          "messages": [],
+          "thinkingLevel": "off",
+          "model": null
+        },
+        "llmMessages": [],
+        "ownUndefinedPaths": {
+          "projection": [],
+          "context": [],
+          "llmMessages": []
+        }
+      },
+      {
+        "caseId": "compacted-left-with-edits",
+        "leafId": "left-advanced-leaf",
+        "projection": {
+          "entries": [
+            {
+              "sourceEntry": {
+                "type": "compaction",
+                "id": "left-compaction",
+                "parentId": "left-edit-before",
+                "timestamp": "2023-11-14T22:13:41.000Z",
+                "summary": "Authored compacted history π.",
+                "firstKeptEntryId": "left-user",
+                "tokensBefore": 128,
+                "details": {
+                  "keep": null
+                },
+                "systemMessage": {
+                  "role": "system",
+                  "content": "Checkpoint system.",
+                  "toolsAdded": [
+                    {
+                      "name": "write",
+                      "description": "Write authored text.",
+                      "parameters": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "content"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  ],
+                  "timestamp": 1700000021000,
+                  "opaque": {
+                    "checkpoint": null
+                  }
+                }
+              },
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Checkpoint system.",
+                  "toolsAdded": [
+                    {
+                      "name": "write",
+                      "description": "Write authored text.",
+                      "parameters": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "content"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  ],
+                  "timestamp": 1700000021000,
+                  "opaque": {
+                    "checkpoint": null
+                  }
+                },
+                {
+                  "role": "compactionSummary",
+                  "summary": "Authored compacted history π.",
+                  "tokensBefore": 128,
+                  "timestamp": 1700000021000
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "left-user",
+                "parentId": "left-system",
+                "timestamp": "2023-11-14T22:13:25.000Z",
+                "message": {
+                  "role": "user",
+                  "content": "Left question.",
+                  "timestamp": 1700000005000,
+                  "opaque": {
+                    "keep": [
+                      "left",
+                      null
+                    ]
+                  }
+                }
+              },
+              "messages": [
+                {
+                  "role": "user",
+                  "content": "Last replacement after compaction π.",
+                  "timestamp": 1700000005000,
+                  "opaque": {
+                    "keep": [
+                      "left",
+                      null
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "left-assistant",
+                "parentId": "left-user",
+                "timestamp": "2023-11-14T22:13:26.000Z",
+                "message": {
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "type": "thinking",
+                      "thinking": "Authored thought.",
+                      "thinkingSignature": "{\"opaque\":[\"signature\",null]}"
+                    },
+                    {
+                      "type": "toolCall",
+                      "id": "call_left|fc_left",
+                      "name": "write",
+                      "arguments": {
+                        "path": "logical.txt",
+                        "content": "owned π"
+                      },
+                      "namespace": "opaque-namespace",
+                      "toolCallSignature": {
+                        "keep": null
+                      },
+                      "thoughtSignature": "opaque-thought-signature"
+                    }
+                  ],
+                  "api": "openai-responses",
+                  "provider": "openai",
+                  "model": "assistant-left",
+                  "usage": {
+                    "input": 4,
+                    "output": 2,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "reasoning": 0,
+                    "totalTokens": 6,
+                    "cost": {
+                      "input": 0,
+                      "output": 0,
+                      "cacheRead": 0,
+                      "cacheWrite": 0,
+                      "total": 0
+                    }
+                  },
+                  "stopReason": "toolUse",
+                  "timestamp": 1700000006000,
+                  "responseId": "response-left"
+                }
+              },
+              "messages": [
+                {
+                  "role": "assistant",
+                  "content": [
+                    {
+                      "type": "thinking",
+                      "thinking": "Authored thought.",
+                      "thinkingSignature": "{\"opaque\":[\"signature\",null]}"
+                    },
+                    {
+                      "type": "toolCall",
+                      "id": "call_left|fc_left",
+                      "name": "write",
+                      "arguments": {
+                        "path": "logical.txt",
+                        "content": "owned π"
+                      },
+                      "namespace": "opaque-namespace",
+                      "toolCallSignature": {
+                        "keep": null
+                      },
+                      "thoughtSignature": "opaque-thought-signature"
+                    }
+                  ],
+                  "api": "openai-responses",
+                  "provider": "openai",
+                  "model": "assistant-left",
+                  "usage": {
+                    "input": 4,
+                    "output": 2,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "reasoning": 0,
+                    "totalTokens": 6,
+                    "cost": {
+                      "input": 0,
+                      "output": 0,
+                      "cacheRead": 0,
+                      "cacheWrite": 0,
+                      "total": 0
+                    }
+                  },
+                  "stopReason": "toolUse",
+                  "timestamp": 1700000006000,
+                  "responseId": "response-left"
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "left-result",
+                "parentId": "left-assistant",
+                "timestamp": "2023-11-14T22:13:27.000Z",
+                "message": {
+                  "role": "toolResult",
+                  "toolCallId": "call_left|fc_left",
+                  "toolName": "write",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Recorded tool result\r\n"
+                    }
+                  ],
+                  "isError": false,
+                  "timestamp": 1700000007000,
+                  "opaque": {
+                    "result": null
+                  }
+                }
+              },
+              "messages": [
+                {
+                  "role": "toolResult",
+                  "toolCallId": "call_left|fc_left",
+                  "toolName": "write",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Edited tool result string."
+                    }
+                  ],
+                  "isError": false,
+                  "timestamp": 1700000007000,
+                  "opaque": {
+                    "result": null
+                  }
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "custom_message",
+                "id": "left-custom-message",
+                "parentId": "left-result",
+                "timestamp": "2023-11-14T22:13:28.000Z",
+                "customType": "authored.note",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Hidden display, visible context."
+                  },
+                  {
+                    "type": "image",
+                    "data": "AA==",
+                    "mimeType": "image/png"
+                  }
+                ],
+                "display": false,
+                "details": null
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "custom",
+                "id": "left-custom-state",
+                "parentId": "left-custom-message",
+                "timestamp": "2023-11-14T22:13:29.000Z",
+                "customType": "authored.state",
+                "data": {
+                  "instruction": "inert metadata",
+                  "keep": null
+                }
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "usage",
+                "id": "left-usage",
+                "parentId": "left-custom-state",
+                "timestamp": "2023-11-14T22:13:30.000Z",
+                "kind": "cache_warm",
+                "provider": "openai",
+                "model": "usage-only-model",
+                "usage": {
+                  "input": 4,
+                  "output": 2,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "reasoning": 0,
+                  "totalTokens": 6,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "note": "Authored accounting; no model-context contribution."
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "label",
+                "id": "left-label",
+                "parentId": "left-usage",
+                "timestamp": "2023-11-14T22:13:31.000Z",
+                "targetId": "left-user",
+                "label": "Left bookmark"
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "session_info",
+                "id": "left-info",
+                "parentId": "left-label",
+                "timestamp": "2023-11-14T22:13:32.000Z",
+                "name": "Authored display name"
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "future_record",
+                "id": "left-leaf",
+                "parentId": "left-info",
+                "timestamp": "2023-11-14T22:13:33.000Z",
+                "data": {
+                  "command": "must remain inert",
+                  "ordered": [
+                    null,
+                    "x"
+                  ]
+                },
+                "opaque": null
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "context_edit",
+                "id": "left-edit-before",
+                "parentId": "left-leaf",
+                "timestamp": "2023-11-14T22:13:40.000Z",
+                "targetId": "left-user",
+                "replacement": {
+                  "content": "First replacement before compaction."
+                }
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "branch_summary",
+                "id": "left-branch-summary",
+                "parentId": "left-compaction",
+                "timestamp": "2023-11-14T22:13:42.000Z",
+                "fromId": "right-leaf",
+                "summary": "Authored summary of the sibling branch.",
+                "details": {
+                  "notSent": null
+                }
+              },
+              "messages": [
+                {
+                  "role": "branchSummary",
+                  "summary": "Authored summary of the sibling branch.",
+                  "fromId": "right-leaf",
+                  "timestamp": 1700000022000
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "left-bash",
+                "parentId": "left-branch-summary",
+                "timestamp": "2023-11-14T22:13:43.000Z",
+                "message": {
+                  "role": "bashExecution",
+                  "command": "authored-command",
+                  "output": "Recorded stdout\r\n",
+                  "exitCode": 1,
+                  "cancelled": false,
+                  "truncated": true,
+                  "fullOutputPath": "logical-output.txt",
+                  "timestamp": 1700000023000,
+                  "excludeFromContext": false
+                }
+              },
+              "messages": [
+                {
+                  "role": "bashExecution",
+                  "command": "authored-command",
+                  "output": "Recorded stdout\r\n",
+                  "exitCode": 1,
+                  "cancelled": false,
+                  "truncated": true,
+                  "fullOutputPath": "logical-output.txt",
+                  "timestamp": 1700000023000,
+                  "excludeFromContext": false
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "message",
+                "id": "left-bash-hidden",
+                "parentId": "left-bash",
+                "timestamp": "2023-11-14T22:13:44.000Z",
+                "message": {
+                  "role": "bashExecution",
+                  "command": "authored-hidden-command",
+                  "output": "Hidden recorded output",
+                  "exitCode": 0,
+                  "cancelled": false,
+                  "truncated": false,
+                  "timestamp": 1700000024000,
+                  "excludeFromContext": true
+                }
+              },
+              "messages": [
+                {
+                  "role": "bashExecution",
+                  "command": "authored-hidden-command",
+                  "output": "Hidden recorded output",
+                  "exitCode": 0,
+                  "cancelled": false,
+                  "truncated": false,
+                  "timestamp": 1700000024000,
+                  "excludeFromContext": true
+                }
+              ]
+            },
+            {
+              "sourceEntry": {
+                "type": "context_edit",
+                "id": "left-edit-after",
+                "parentId": "left-bash-hidden",
+                "timestamp": "2023-11-14T22:13:45.000Z",
+                "targetId": "left-user",
+                "replacement": {
+                  "content": "Last replacement after compaction π."
+                }
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "context_edit",
+                "id": "left-edit-tool",
+                "parentId": "left-edit-after",
+                "timestamp": "2023-11-14T22:13:46.000Z",
+                "targetId": "left-result",
+                "replacement": {
+                  "content": "Edited tool result string."
+                }
+              },
+              "messages": []
+            },
+            {
+              "sourceEntry": {
+                "type": "context_edit",
+                "id": "left-advanced-leaf",
+                "parentId": "left-edit-tool",
+                "timestamp": "2023-11-14T22:13:47.000Z",
+                "targetId": "left-custom-message",
+                "replacement": null
+              },
+              "messages": []
+            }
+          ],
+          "messages": [
+            {
+              "role": "system",
+              "content": "Checkpoint system.",
+              "toolsAdded": [
+                {
+                  "name": "write",
+                  "description": "Write authored text.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "content": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "content"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "timestamp": 1700000021000,
+              "opaque": {
+                "checkpoint": null
+              }
+            },
+            {
+              "role": "compactionSummary",
+              "summary": "Authored compacted history π.",
+              "tokensBefore": 128,
+              "timestamp": 1700000021000
+            },
+            {
+              "role": "user",
+              "content": "Last replacement after compaction π.",
+              "timestamp": 1700000005000,
+              "opaque": {
+                "keep": [
+                  "left",
+                  null
+                ]
+              }
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "thinking",
+                  "thinking": "Authored thought.",
+                  "thinkingSignature": "{\"opaque\":[\"signature\",null]}"
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_left|fc_left",
+                  "name": "write",
+                  "arguments": {
+                    "path": "logical.txt",
+                    "content": "owned π"
+                  },
+                  "namespace": "opaque-namespace",
+                  "toolCallSignature": {
+                    "keep": null
+                  },
+                  "thoughtSignature": "opaque-thought-signature"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "assistant-left",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1700000006000,
+              "responseId": "response-left"
+            },
+            {
+              "role": "toolResult",
+              "toolCallId": "call_left|fc_left",
+              "toolName": "write",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Edited tool result string."
+                }
+              ],
+              "isError": false,
+              "timestamp": 1700000007000,
+              "opaque": {
+                "result": null
+              }
+            },
+            {
+              "role": "branchSummary",
+              "summary": "Authored summary of the sibling branch.",
+              "fromId": "right-leaf",
+              "timestamp": 1700000022000
+            },
+            {
+              "role": "bashExecution",
+              "command": "authored-command",
+              "output": "Recorded stdout\r\n",
+              "exitCode": 1,
+              "cancelled": false,
+              "truncated": true,
+              "fullOutputPath": "logical-output.txt",
+              "timestamp": 1700000023000,
+              "excludeFromContext": false
+            },
+            {
+              "role": "bashExecution",
+              "command": "authored-hidden-command",
+              "output": "Hidden recorded output",
+              "exitCode": 0,
+              "cancelled": false,
+              "truncated": false,
+              "timestamp": 1700000024000,
+              "excludeFromContext": true
+            }
+          ],
+          "thinkingLevel": "low",
+          "model": {
+            "provider": "openai",
+            "modelId": "assistant-left"
+          }
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "Checkpoint system.",
+              "toolsAdded": [
+                {
+                  "name": "write",
+                  "description": "Write authored text.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      },
+                      "content": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "content"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              ],
+              "timestamp": 1700000021000,
+              "opaque": {
+                "checkpoint": null
+              }
+            },
+            {
+              "role": "compactionSummary",
+              "summary": "Authored compacted history π.",
+              "tokensBefore": 128,
+              "timestamp": 1700000021000
+            },
+            {
+              "role": "user",
+              "content": "Last replacement after compaction π.",
+              "timestamp": 1700000005000,
+              "opaque": {
+                "keep": [
+                  "left",
+                  null
+                ]
+              }
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "thinking",
+                  "thinking": "Authored thought.",
+                  "thinkingSignature": "{\"opaque\":[\"signature\",null]}"
+                },
+                {
+                  "type": "toolCall",
+                  "id": "call_left|fc_left",
+                  "name": "write",
+                  "arguments": {
+                    "path": "logical.txt",
+                    "content": "owned π"
+                  },
+                  "namespace": "opaque-namespace",
+                  "toolCallSignature": {
+                    "keep": null
+                  },
+                  "thoughtSignature": "opaque-thought-signature"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "assistant-left",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1700000006000,
+              "responseId": "response-left"
+            },
+            {
+              "role": "toolResult",
+              "toolCallId": "call_left|fc_left",
+              "toolName": "write",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Edited tool result string."
+                }
+              ],
+              "isError": false,
+              "timestamp": 1700000007000,
+              "opaque": {
+                "result": null
+              }
+            },
+            {
+              "role": "branchSummary",
+              "summary": "Authored summary of the sibling branch.",
+              "fromId": "right-leaf",
+              "timestamp": 1700000022000
+            },
+            {
+              "role": "bashExecution",
+              "command": "authored-command",
+              "output": "Recorded stdout\r\n",
+              "exitCode": 1,
+              "cancelled": false,
+              "truncated": true,
+              "fullOutputPath": "logical-output.txt",
+              "timestamp": 1700000023000,
+              "excludeFromContext": false
+            },
+            {
+              "role": "bashExecution",
+              "command": "authored-hidden-command",
+              "output": "Hidden recorded output",
+              "exitCode": 0,
+              "cancelled": false,
+              "truncated": false,
+              "timestamp": 1700000024000,
+              "excludeFromContext": true
+            }
+          ],
+          "thinkingLevel": "low",
+          "model": {
+            "provider": "openai",
+            "modelId": "assistant-left"
+          }
+        },
+        "llmMessages": [
+          {
+            "role": "system",
+            "content": "Checkpoint system.",
+            "toolsAdded": [
+              {
+                "name": "write",
+                "description": "Write authored text.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "timestamp": 1700000021000,
+            "opaque": {
+              "checkpoint": null
+            }
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "The conversation history before this point was compacted into the following summary:\n\n<summary>\nAuthored compacted history π.\n</summary>"
+              }
+            ],
+            "timestamp": 1700000021000
+          },
+          {
+            "role": "user",
+            "content": "Last replacement after compaction π.",
+            "timestamp": 1700000005000,
+            "opaque": {
+              "keep": [
+                "left",
+                null
+              ]
+            }
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "Authored thought.",
+                "thinkingSignature": "{\"opaque\":[\"signature\",null]}"
+              },
+              {
+                "type": "toolCall",
+                "id": "call_left|fc_left",
+                "name": "write",
+                "arguments": {
+                  "path": "logical.txt",
+                  "content": "owned π"
+                },
+                "namespace": "opaque-namespace",
+                "toolCallSignature": {
+                  "keep": null
+                },
+                "thoughtSignature": "opaque-thought-signature"
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "assistant-left",
+            "usage": {
+              "input": 4,
+              "output": 2,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "reasoning": 0,
+              "totalTokens": 6,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1700000006000,
+            "responseId": "response-left"
+          },
+          {
+            "role": "toolResult",
+            "toolCallId": "call_left|fc_left",
+            "toolName": "write",
+            "content": [
+              {
+                "type": "text",
+                "text": "Edited tool result string."
+              }
+            ],
+            "isError": false,
+            "timestamp": 1700000007000,
+            "opaque": {
+              "result": null
+            }
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "The following is a summary of a branch that this conversation came back from:\n\n<summary>\nAuthored summary of the sibling branch.</summary>"
+              }
+            ],
+            "timestamp": 1700000022000
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Ran `authored-command`\n```\nRecorded stdout\r\n\n```\n\nCommand exited with code 1\n\n[Output truncated. Full output: logical-output.txt]"
+              }
+            ],
+            "timestamp": 1700000023000
+          }
+        ],
+        "ownUndefinedPaths": {
+          "projection": [],
+          "context": [],
+          "llmMessages": []
+        }
+      }
+    ],
+    "checks": {
+      "caseCount": 4,
+      "authoredInputEntries": 28,
+      "wholeSessionModuleLoaded": true,
+      "publicExports": [
+        "buildSessionProjection",
+        "buildSessionContext",
+        "convertToLlm"
+      ],
+      "sourceEntriesUnchanged": true,
+      "noClockOrRngOverride": true,
+      "noSessionConstructorOrFilesystemOperation": true,
+      "networkAndProcessesBlocked": true
+    }
+  }
+}

@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "file-mutation-queue-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "captured-whole-file-mutation-queue-oracle",
+  "observations": {
+    "cases": [
+      {
+        "caseId": "existing-fifo",
+        "probes": [
+          {
+            "probeId": "existing-fifo",
+            "checkpoints": [
+              {
+                "at": "unrelated-completed-while-first-work-blocked",
+                "secondStarted": false
+              },
+              {
+                "at": "first-cleanup-blocked",
+                "secondStarted": false
+              }
+            ],
+            "trace": [
+              "first:start",
+              "unrelated:start",
+              "unrelated:complete",
+              "first:work-complete",
+              "first:cleanup-complete",
+              "second:start",
+              "second:throw",
+              "subsequent:start",
+              "subsequent:complete"
+            ],
+            "outcomes": {
+              "first": {
+                "status": "fulfilled",
+                "value": "existing-first"
+              },
+              "second": {
+                "status": "rejected",
+                "error": {
+                  "name": "AuthoredCallbackError",
+                  "message": "authored callback failure"
+                }
+              },
+              "unrelated": {
+                "status": "fulfilled",
+                "value": "existing-unrelated"
+              },
+              "subsequent": {
+                "status": "fulfilled",
+                "value": "existing-subsequent"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "filesystem-aliases",
+        "filesystemObservations": {
+          "junctionResolvesToOwnedTarget": true,
+          "existingJunctionFileRealpathsEqual": true,
+          "hardlinkStatIdentityEqual": true,
+          "hardlinkRealpathsEqual": false,
+          "fileUtf8Sha256": "994945400da1ebda13984290b0de949b18ae3bc12d30c2bd7195a550222e02d6"
+        },
+        "probes": [
+          {
+            "probeId": "junction-existing",
+            "checkpoints": [
+              {
+                "at": "unrelated-completed-while-first-work-blocked",
+                "secondStarted": false
+              },
+              {
+                "at": "first-cleanup-blocked",
+                "secondStarted": false
+              }
+            ],
+            "trace": [
+              "first:start",
+              "unrelated:start",
+              "unrelated:complete",
+              "first:work-complete",
+              "first:cleanup-complete",
+              "second:start",
+              "second:complete",
+              "subsequent:start",
+              "subsequent:complete"
+            ],
+            "outcomes": {
+              "first": {
+                "status": "fulfilled",
+                "value": "alias-first"
+              },
+              "second": {
+                "status": "fulfilled",
+                "value": "alias-second"
+              },
+              "unrelated": {
+                "status": "fulfilled",
+                "value": "alias-unrelated"
+              },
+              "subsequent": {
+                "status": "fulfilled",
+                "value": "alias-subsequent"
+              }
+            }
+          },
+          {
+            "probeId": "hardlink-existing",
+            "checkpoints": [
+              {
+                "at": "unrelated-completed-while-first-work-blocked",
+                "secondStarted": true
+              },
+              {
+                "at": "first-cleanup-blocked",
+                "secondStarted": true
+              }
+            ],
+            "trace": [
+              "first:start",
+              "second:start",
+              "second:complete",
+              "unrelated:start",
+              "unrelated:complete",
+              "first:work-complete",
+              "first:cleanup-complete",
+              "subsequent:start",
+              "subsequent:complete"
+            ],
+            "outcomes": {
+              "first": {
+                "status": "fulfilled",
+                "value": "alias-first"
+              },
+              "second": {
+                "status": "fulfilled",
+                "value": "alias-second"
+              },
+              "unrelated": {
+                "status": "fulfilled",
+                "value": "alias-unrelated"
+              },
+              "subsequent": {
+                "status": "fulfilled",
+                "value": "alias-subsequent"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "missing-fallback",
+        "probes": [
+          {
+            "probeId": "missing-normalized",
+            "checkpoints": [
+              {
+                "at": "unrelated-completed-while-first-work-blocked",
+                "secondStarted": false
+              },
+              {
+                "at": "first-cleanup-blocked",
+                "secondStarted": false
+              }
+            ],
+            "trace": [
+              "first:start",
+              "unrelated:start",
+              "unrelated:complete",
+              "first:work-complete",
+              "first:cleanup-complete",
+              "second:start",
+              "second:complete",
+              "subsequent:start",
+              "subsequent:complete"
+            ],
+            "outcomes": {
+              "first": {
+                "status": "fulfilled",
+                "value": "missing-first"
+              },
+              "second": {
+                "status": "fulfilled",
+                "value": "missing-second"
+              },
+              "unrelated": {
+                "status": "fulfilled",
+                "value": "missing-unrelated"
+              },
+              "subsequent": {
+                "status": "fulfilled",
+                "value": "missing-subsequent"
+              }
+            }
+          },
+          {
+            "probeId": "missing-junction-alias",
+            "checkpoints": [
+              {
+                "at": "unrelated-completed-while-first-work-blocked",
+                "secondStarted": true
+              },
+              {
+                "at": "first-cleanup-blocked",
+                "secondStarted": true
+              }
+            ],
+            "trace": [
+              "first:start",
+              "second:start",
+              "second:complete",
+              "unrelated:start",
+              "unrelated:complete",
+              "first:work-complete",
+              "first:cleanup-complete",
+              "subsequent:start",
+              "subsequent:complete"
+            ],
+            "outcomes": {
+              "first": {
+                "status": "fulfilled",
+                "value": "missing-first"
+              },
+              "second": {
+                "status": "fulfilled",
+                "value": "missing-second"
+              },
+              "unrelated": {
+                "status": "fulfilled",
+                "value": "missing-unrelated"
+              },
+              "subsequent": {
+                "status": "fulfilled",
+                "value": "missing-subsequent"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "resolver-rejection",
+        "callbackInvoked": false,
+        "outcomes": {
+          "rejected": {
+            "status": "rejected",
+            "error": {
+              "name": "TypeError",
+              "message": "The argument 'path' must be a string, Uint8Array, or URL without null bytes. Received 'P:\\\\PiSharp\\\\root\\\\Documents\\\\Codex\\\\2026-09-30\\\\task-2\\\\pisharp-oracle-invalid\\\\bad\\x00path'",
+              "code": "ERR_INVALID_ARG_VALUE"
+            }
+          },
+          "afterFailure": {
+            "status": "fulfilled",
+            "value": "registered-after-resolver-rejection"
+          }
+        }
+      }
+    ],
+    "filesystemScope": "Only this child owned layout; callback/return labels are authored actual function inputs",
+    "clock": "No clock replacement, sleeps or race-based deadlines",
+    "checks": {
+      "caseCount": 4,
+      "probeCount": 5,
+      "wholeUnchangedModule": true,
+      "externalPackagesLoaded": 0,
+      "networkAndChildProcessesBlocked": true
+    }
+  }
+}

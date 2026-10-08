@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "whole-agent-progress-metadata-v1",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "approvedOracle": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-reference-oracle-v0.99.1",
+  "runtime": {
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+    "reuseExisting": true,
+    "absoluteExecutable": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe"
+  },
+  "source": {
+    "repository": "https://github.com/earendil-works/pi",
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "lockPath": "package-lock.json",
+    "lockSha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d",
+    "tree": "200bd10bb146773516f862a02b8aaebeed163e00",
+    "canonicalFingerprint": {
+      "files": 2093,
+      "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+    },
+    "acquiredFingerprint": {
+      "files": 2093,
+      "sha256": "676a5df7a526ab0fb6a78f734b57093bb7571913fc17251d02cb0c84527dcf21"
+    },
+    "declaredConversionPaths": [
+      "pi-test.bat",
+      "pi-test.ps1"
+    ],
+    "pins": [
+      {
+        "path": "package-lock.json",
+        "bytes": 186139,
+        "sha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d"
+      },
+      {
+        "path": "packages/agent/src/agent.ts",
+        "bytes": 19748,
+        "sha256": "7024a3145a6ebc951a0f030164adb1dfb12d33d6e0dbbac15ef0efda49c87457"
+      },
+      {
+        "path": "packages/agent/src/agent-loop.ts",
+        "bytes": 29088,
+        "sha256": "e773e822a2587caf314e6bb66ea6370fce3468b7eecd26d6a67afe673f81eabc"
+      },
+      {
+        "path": "packages/agent/src/types.ts",
+        "bytes": 20955,
+        "sha256": "347efd535342c1d5fbd6b731168c57fcbb201a6652707f8e22e1b66fe3b69c2d"
+      },
+      {
+        "path": "packages/agent/src/stream-fn.ts",
+        "bytes": 683,
+        "sha256": "1f9dee101a5ce1052558458d9ce47e53e05187224e879217899059a80d90bc45"
+      },
+      {
+        "path": "packages/ai/src/utils/event-stream.ts",
+        "bytes": 2878,
+        "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386"
+      },
+      {
+        "path": "packages/coding-agent/src/experimental/source-resolver.ts",
+        "bytes": 3592,
+        "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6"
+      },
+      {
+        "path": "LICENSE",
+        "bytes": 1069,
+        "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48"
+      }
+    ]
+  },
+  "originalSetupPlan": {
+    "path": "compatibility/reference-oracle-install-plan.json",
+    "bytes": 5406,
+    "sha256": "9aa6a90f561bb88143eab55530f87c1789974170212886e064342d24f8344c30"
+  },
+  "setupReceipt": {
+    "path": ".pisharp-oracle-setup.json",
+    "bytes": 670,
+    "sha256": "19f38d04439ee9f6b9c417410cddc70b399ae2b576db04f196fb40c7f1cca600"
+  },
+  "projectionManifest": {
+    "path": "compatibility/reference-oracle-dependencies/package.json",
+    "bytes": 219,
+    "sha256": "c019f991c0869ec882382a3e80bca09f45e1f5f5e0a72190bb5becc91d287564"
+  },
+  "projectionLock": {
+    "path": "compatibility/reference-oracle-dependencies/package-lock.json",
+    "bytes": 892,
+    "sha256": "b8892d4ccf60204444b261cc25aae7b62145d39d883d3f15bf0b2c5ccb2ebdbb"
+  },
+  "oracleProjection": [
+    {
+      "path": "package.json",
+      "bytes": 219,
+      "sha256": "c019f991c0869ec882382a3e80bca09f45e1f5f5e0a72190bb5becc91d287564"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 892,
+      "sha256": "b8892d4ccf60204444b261cc25aae7b62145d39d883d3f15bf0b2c5ccb2ebdbb"
+    },
+    {
+      "path": "node_modules/.package-lock.json",
+      "bytes": 709,
+      "sha256": "9a97845ea5203b249938b4fa953f06550a2d8989ea54c844704b231a408cc751"
+    }
+  ],
+  "gitConfig": {
+    "path": "config/gitconfig",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "packageManagerEvidence": {
+    "version": "11.6.2",
+    "tarball": "https://registry.npmjs.org/npm/-/npm-11.6.2.tgz",
+    "integrity": "sha512-7iKzNfy8lWYs3zq4oFPa8EXZz5xt9gQNKJZau3B1ErLBb6bF7sBJ00x09485DOvRT2l5Gerbl3VlZNT57MxJVA==",
+    "archive": {
+      "path": "archives/npm-11.6.2.tgz",
+      "bytes": 2663834,
+      "sha256": "585f95094ee5cb2788ee11d90f2a518a7c9ef6e083fa141d0b63ca3383675a20"
+    },
+    "invokedDuringCapture": false
+  },
+  "packages": [
+    {
+      "name": "partial-json",
+      "version": "0.1.7",
+      "resolved": "https://registry.npmjs.org/partial-json/-/partial-json-0.1.7.tgz",
+      "integrity": "sha512-Njv/59hHaokb/hRUjce3Hdv12wd60MtM9Z5Olmn+nehe0QDAsRtRbJPvJ0Z91TusF0SuZRIvnM+S4l6EIP8leA==",
+      "license": "MIT",
+      "archive": {
+        "path": "cache/_cacache/content-v2/sha512/36/3b/ffe7d8476a891bfe14548dc7b71ddbf5db077ad0cb4cf59e4e9669fe9de85ed100c0b11b516c93ef27467dd53bac1744ae65122f9ccf92e25e8420ff2578",
+        "bytes": 6304,
+        "sha256": "30eafeed6fdc25fb2ca24f34c37796d9f98f0bf5e156452b98a2c356762f6322"
+      },
+      "files": {
+        "files": 9,
+        "sha256": "b1c730b893ef274e6d457f23eebc9c39162cd6aaf777247942b9ad0cc1f1cb8e"
+      },
+      "manifestSha256": "42b3ae6c99ec959249f8eb4d3da7fdb44ec1f96ec627fa7f9ca5487a4e80963f",
+      "dependencyDeclarations": {},
+      "optionalDependencies": {},
+      "peerDependencies": {},
+      "lifecycleScripts": {},
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 1075,
+          "sha256": "cd519ad3d7e012427f978dfb2e3b92ee403d189d7b859ba6bf68fd7e12ca456f",
+          "utf8Text": "MIT License\n\nCopyright (c) 2023 Promplate Dev Team\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+        }
+      ]
+    },
+    {
+      "name": "typebox",
+      "version": "1.3.27",
+      "resolved": "https://registry.npmjs.org/typebox/-/typebox-1.3.27.tgz",
+      "integrity": "sha512-zu+jc1pcy4UiNThxikUr36f0Rybk9PEeCg/NE6adeWr/SKsdNO4EzZHYRDlv2YCVAfj3Odq3dESSo/jNyoBXzA==",
+      "license": "MIT",
+      "archive": {
+        "path": "cache/_cacache/content-v2/sha512/ce/ef/a3735a5ccb85223538718a452bdfa7f44726e4f4f11e0a0fcd13a69d796aff48ab1d34ee04cd91d844396fd9809501f8f739dab7744492a3f8cdca8057cc",
+        "bytes": 264178,
+        "sha256": "5a288bcd3d68f44567de84b185e04d205ef7d5b53602846bc3db30fdd219dda3"
+      },
+      "files": {
+        "files": 1385,
+        "sha256": "9762e85e6a6e12cc6593cee73c1ffcc85857ba4c7f6d2ab52feeb4b28954ed25"
+      },
+      "manifestSha256": "c59ddfd977ce941f1e8ee8b0a0b14396c332fa27cc5fa6fa165227ffd5a3992f",
+      "dependencyDeclarations": {},
+      "optionalDependencies": {},
+      "peerDependencies": {},
+      "lifecycleScripts": {},
+      "licenses": [
+        {
+          "path": "license",
+          "bytes": 1094,
+          "sha256": "e8a7cc256941a26ba8234f04390165243a4d42f74fd6491934140605bf7eae2d",
+          "utf8Text": "TypeBox\n\nThe MIT License (MIT)\n\nCopyright (c) 2017-2026 Haydn Paterson\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in\nall copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN\nTHE SOFTWARE."
+        }
+      ]
+    }
+  ],
+  "archiveInspector": {
+    "path": "tools/PiReferenceRunner/setup-responses-sdk-oracle.mjs",
+    "bytes": 34806,
+    "sha256": "1da4ce53bf9b7ccc462bad540294353fd7ab42ba35ca171d3921916409d2b513"
+  },
+  "offlineObserver": {
+    "path": "tools/PiReferenceRunner/full-preload.mjs",
+    "bytes": 1145,
+    "sha256": "e1f62a2048bc484a162085430a5afb6f88547d78049b6f29b2a0e4f65fcd79e2"
+  },
+  "offlineGuard": {
+    "path": "tools/PiReferenceRunner/offline-guard.mjs",
+    "bytes": 784,
+    "sha256": "ae3741bdce496451bd04afcf8628df6ddc5bc5cfad8af6ee5e52cbc7b065a094"
+  },
+  "rawComparator": {
+    "path": "tools/CompatibilityReport/raw-json.mjs",
+    "bytes": 3665,
+    "sha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9"
+  },
+  "input": {
+    "path": "tools/PiReferenceRunner/agent-progress-inputs.json",
+    "bytes": 11592,
+    "sha256": "d1894b264cd5aa070f5774574e6199f253c6fa2f756de34f725ac8913a55551e"
+  },
+  "harnessFiles": [
+    "tools/PiReferenceRunner/capture-agent-progress.mjs",
+    "tools/PiReferenceRunner/run-agent-progress.mjs",
+    "tools/PiReferenceRunner/agent-progress-inputs.json",
+    "compatibility/agent-progress-reference.plan.json",
+    "tools/PiReferenceRunner/full-preload.mjs",
+    "tools/PiReferenceRunner/offline-guard.mjs",
+    "tools/PiReferenceRunner/setup-responses-sdk-oracle.mjs",
+    "tools/CompatibilityReport/raw-json.mjs"
+  ],
+  "outputs": {
+    "expected": "fixtures/pi-v0.99.1/agent-progress/core.expected.json",
+    "lock": "fixtures/pi-v0.99.1/agent-progress/oracle.lock.json",
+    "manifest": "fixtures/pi-v0.99.1/agent-progress/manifest.json",
+    "actual": "artifacts/agent-progress-reference/core.actual.json",
+    "report": "artifacts/agent-progress-reference/report.json",
+    "scratch": "artifacts/agent-progress-reference/scratch"
+  },
+  "scope": {
+    "qualifiedBoundary": "Only observations captured after root executes the unchanged whole public Agent lifecycle against authored fake streams/tools/hooks/gates on the exact approved minimal oracle",
+    "eventRetention": "All Agent events and fake-provider frames, listener entry/exit trace, tool trace, complete hook context/returns, barrier probes and final public state; no event exclusion",
+    "jsonUnsupportedValues": "JSON.stringify observations plus explicit own-undefined/function/Set inventories; original Set serializes as {} and values are separately recorded",
+    "nativeDifferencesOpen": [
+      "Native awaited/serialized progress versus source void callback and overlapping listeners",
+      "Native late-callback rejection versus source ignored late callbacks"
+    ],
+    "excludes": [
+      "Production providers, SDK/auth/wire mapping",
+      "Native parity or whole phase closure",
+      "Production file tools, durable sessions and RPC",
+      "Other failure/reentrancy/listener rejection paths",
+      "Cross-platform queue/scheduler equivalence"
+    ],
+    "numericScope": "Authored finite representable JS numbers only; retain actual serialized numeric lexemes and null/missing identity; no arbitrary-precision JS claim"
+  },
+  "licenseStatus": {
+    "profile": "Source MIT plus exact minimal partial-json/typebox packaged MIT notices retained here",
+    "fullP102Closure": false,
+    "noNewPackageAcquisition": true
+  },
+  "captureOwnership": "Root alone runs --capture-new after review. Exclusive first-new artifacts; default verifies frozen hashes before execution."
+}

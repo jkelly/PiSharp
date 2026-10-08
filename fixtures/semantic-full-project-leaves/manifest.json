@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "kind": "genuine-unchanged-upstream-config-leaf-declaration-semantic-diagnostics-reference",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "receiptSha256": "0c3bb31d39dd7ed9c63dcefb11b7c3677b05352505a6fa63d418c567f691f1ae",
+  "baselineSnapshotSha256": "6f0adfe24b99cab96637255ce58d145f397495e7da27ebb276fc8ff89d5aa772",
+  "harness": [
+    {
+      "path": "compatibility/semantic-full-project-leaves.plan.json",
+      "bytes": 9330,
+      "sha256": "d0f277e2f7d9d040f9334b1dc63ecdc0306657a1d6fbe18271e22519ba298f6e"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-leaves.md",
+      "bytes": 9461,
+      "sha256": "472487500bf140a9730f97936111822afd8a5e80ea3214e92d6ab445f3df23da"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "bytes": 9494,
+      "sha256": "fcb29ed9bfe942ed64ccfa72757215a4076391ddc59268553d0b68f24af0e2a3"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-leaves-driver.mjs",
+      "bytes": 10426,
+      "sha256": "6d3ac83b1a0f0cfc5e71731d20ef172d04e7d1738c5b0127650a1fb745c086cf"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-leaves-preload.mjs",
+      "bytes": 8574,
+      "sha256": "7c8c05fd43d3f46b63cf11133b7de2603e8b077421edd6c147865d21acc1b395"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-leaves.test.mjs",
+      "bytes": 22046,
+      "sha256": "b74968fb4ee160e56437780797f707ceb19fe2380630b55902363e9bcd90d03a"
+    },
+    {
+      "path": "tools/SemanticInventory/run-full-project-leaves.mjs",
+      "bytes": 6970,
+      "sha256": "f0002288ebcdf7455f56c15b816944df61d9b376dc72bd50a379f63f2b38d546"
+    }
+  ],
+  "expected": {
+    "path": "fixtures/semantic-full-project-leaves/expected.json",
+    "bytes": 11900399,
+    "sha256": "1cc9c8d056603abbd1ae170ab7219bb5ba94f6549ace0e7cd8d4248b33bf5d2b"
+  },
+  "rawProvenance": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-semantic-full-project-leaves-first\\first.json.provenance.json",
+      "sha256": "70de9c41aacf49ce6e1b83cc45bbe2ea54cb56eac17e4b0101f94e76bf592b36"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-semantic-full-project-leaves-first\\second.json.provenance.json",
+      "sha256": "5bd1e01eb748995879f53ab9d5405b37cf928ddfba09a07bd9b08dc993be61dc"
+    }
+  ],
+  "originalConfigOpenedUnchanged": true,
+  "admittedPackageFiles": 1915,
+  "admittedDeclarationFiles": 928,
+  "newLeafPackageFiles": 416,
+  "newLeafDeclarationFiles": 129,
+  "diagnosticFiltering": false,
+  "pathNormalization": false,
+  "semanticPublicClosure": false,
+  "phaseGatesPassed": []
+}

@@ -1,0 +1,9 @@
+# Reviewed Pi identity test lock reconciliation
+
+Base main: d43e5ff0205a072278ea70417dcd5675b06b044e. Preserve and stage the existing uncommitted lock; no rewrite, reset or stash.
+
+The only dependency change is the project-only PiSharp.Agent edge required by reviewed identity-test ProjectReference commit 55cd2e86404cdfec325d4884bcec276a56d62862. The existing normalized Git blob 21fcd66ce92c083059db974cbe98646f1cfa12a1 is exactly the independently reviewed successor 886ede622dd6dc420ca1e0ac0d1dc8fd2c204402 lock. It adds no external packages.
+
+Existing raw working bytes: 465, SHA256 078224f55c5b68e9b22dc60e60d779929731edf47ec275deef8560b448d07c87 (CRLF). Canonical committed/reviewed bytes: 443, SHA256 2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9 (LF). Staging normalizes the Git blob under existing attributes; it does not rewrite the current working file. These raw hashes must never be treated as identical. Future admission must hash an exact fresh checkout and use its actual bytes.
+
+Lock and ambient restore metadata share 2026-10-04T00:49:07Z; metadata names user NuGet paths. No retained actual command or writer was identified. Unknown writer attribution is preserved; no user attribution or claim that formal validation produced this change. External task-3 PIMESSAGES_DIRTY_LOCK_CAPTURE retains the original raw file and exact diff, with PIMESSAGES_DIRTY_LOCK_INVESTIGATION.json retaining read-only findings. No credential/config contents were read, no restore or SDK execution occurred for this reconciliation, and all prior candidate-specific receipts remain unchanged.

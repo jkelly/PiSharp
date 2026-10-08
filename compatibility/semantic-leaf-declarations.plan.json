@@ -1,0 +1,683 @@
+{
+  "schemaVersion": 1,
+  "kind": "seven-exact-existing-leaf-archives-inert-semantic-declaration-stage-C",
+  "status": "authored; root-exclusive copy/admission and genuine whole-config follow-up pending",
+  "oracle": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-leaves-v0.99.1",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "origin": {
+    "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-typebox-v0.99.1",
+    "receipt": ".pisharp-typebox-declarations-admitted.json",
+    "receiptSha256": "dbd3e3d68465198231ee13f786b0e6b64e171cbb10d7c8b6f7e0eb98c3ec951b",
+    "payloadFiles": 4122,
+    "sourceFiles": 2093,
+    "compilerFiles": 529,
+    "previousNodePackageFiles": 114,
+    "previousNodeDeclarations": 108,
+    "previousTypeboxPackageFiles": 1385,
+    "previousTypeboxDeclarations": 691,
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+    "verifier": "tools/SemanticInventory/full-project-typebox-common.mjs",
+    "metadataPins": [
+      {
+        "path": ".pisharp-typebox-declarations-owner.json",
+        "bytes": 1182,
+        "sha256": "280deb240e170852fff15a17d198554220284aa9a5d2c7571f6a26bd0274e971"
+      },
+      {
+        "path": ".pisharp-typebox-declarations-prepared.json",
+        "bytes": 527385,
+        "sha256": "5c9533866ad082864a7842170a7321990998178b28547c22b9e94b94bc653145"
+      },
+      {
+        "path": ".pisharp-typebox-declarations-admission-started.json",
+        "bytes": 265,
+        "sha256": "949a052c6021c3f0909e4bb99b8e4d3ab060e6b73103045b41afbfff78d2f819"
+      },
+      {
+        "path": ".pisharp-typebox-declarations-admitted.json",
+        "bytes": 1079330,
+        "sha256": "dbd3e3d68465198231ee13f786b0e6b64e171cbb10d7c8b6f7e0eb98c3ec951b"
+      }
+    ]
+  },
+  "runtime": {
+    "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "dependencies": [
+    {
+      "path": "compatibility/semantic-full-project-typebox.plan.json",
+      "bytes": 7592,
+      "sha256": "09d0e904f54371e1d8a90938840c2a9916816078f53fa3c497df4af340ba033b"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "bytes": 18430,
+      "sha256": "df5b99d591731d56607d4d8eb505bfbdb25581d50a2652c2dbd90cc05dc00eba"
+    },
+    {
+      "path": "tools/SurfaceInventory/inspect-ast-archives.mjs",
+      "bytes": 28614,
+      "sha256": "ac6c53f6dd692b2c69bd8ecfcd1003370f6d389a776a4a269f6d14be370db763"
+    },
+    {
+      "path": "tools/CompatibilityReport/raw-json.mjs",
+      "bytes": 3665,
+      "sha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9"
+    }
+  ],
+  "archiveSource": {
+    "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-extension-reducers-oracle-v0.99.1-license-corrected",
+    "restoredReceipt": {
+      "path": ".pisharp-extension-reducers-restored.json",
+      "bytes": 30672,
+      "sha256": "421905aec95408aa7aabf5d0a71b35d64172c77f20a1a40554b8cae7e6b1850d"
+    }
+  },
+  "packages": [
+    {
+      "name": "chalk",
+      "version": "6.0.0",
+      "archive": {
+        "path": "archives/chalk-6.0.0.tgz",
+        "bytes": 16388,
+        "sha256": "85d0ce26b8a6098d3826d9ec17cf16c7a9326dfce3f2545ecc1133581c981399"
+      },
+      "inspection": {
+        "path": "archives/chalk-6.0.0.inspection.json",
+        "bytes": 2187,
+        "sha256": "e5e0e0c18f03b30cc2ca7d475404be8e9ef88b42babcc6c3f0f84e93ebe051e4"
+      },
+      "manifest": {
+        "path": "package.json",
+        "bytes": 1743,
+        "sha256": "5a853fc6dc0c529bc126f97645989e9d60d06a2e9b20f66a6b48b0e8ef9da3ef"
+      },
+      "declarationFiles": 4,
+      "historicalTree": {
+        "files": 12,
+        "sha256": "ddbf61ceb3de9e2de347ebd30bab70aeae044ff0f524fde35697dbaf2e47d9cf"
+      },
+      "regularBytes": 56029,
+      "notices": [
+        {
+          "path": "license",
+          "bytes": 1117,
+          "sha256": "5c932d88256b4ab958f64a856fa48e8bd1f55bc1d96b8149c65689e0c61789d3"
+        }
+      ],
+      "resolution": {
+        "exports": {
+          "types": "./source/index.d.ts",
+          "default": "./source/index.js"
+        },
+        "imports": {
+          "#ansi-styles": "./source/vendor/ansi-styles/index.js",
+          "#supports-color": {
+            "node": "./source/vendor/supports-color/index.js",
+            "default": "./source/vendor/supports-color/browser.js"
+          }
+        }
+      },
+      "binDeclarations": {},
+      "installLifecycle": {},
+      "lockPath": "node_modules/chalk",
+      "lockEntry": {
+        "version": "6.0.0",
+        "resolved": "https://registry.npmjs.org/chalk/-/chalk-6.0.0.tgz",
+        "integrity": "sha512-2uNTXIuTTxk7ciZgAU1BQcgnchcG0xXnrs6jzkQfj9SsRa9M2s5zE8WT96hS6KmG4MzWHSrvH43DF1m4XRkrFg==",
+        "license": "MIT",
+        "engines": {
+          "node": ">=22"
+        },
+        "funding": {
+          "url": "https://github.com/chalk/chalk?sponsor=1"
+        }
+      },
+      "target": "upstream/node_modules/chalk",
+      "installedPath": "node_modules/chalk",
+      "archiveRoot": "package",
+      "regularFiles": 12,
+      "allowedShebangPaths": []
+    },
+    {
+      "name": "yaml",
+      "version": "2.9.0",
+      "archive": {
+        "path": "archives/yaml-2.9.0.tgz",
+        "bytes": 112086,
+        "sha256": "008fa204cb1ba700e0272ba045abbf09a6ffe63456e8146ba97cac6c2ad1ef91"
+      },
+      "inspection": {
+        "path": "archives/yaml-2.9.0.inspection.json",
+        "bytes": 3064,
+        "sha256": "73b2a2ad5c4e6731567009a399e02b2e22c7331ca6de025259badb688d73fc1d"
+      },
+      "manifest": {
+        "path": "package.json",
+        "bytes": 3254,
+        "sha256": "20b8b197cbd10dad245d45e463dfe58e4c8c25a47e24bc4256ad9ab58bf35683"
+      },
+      "declarationFiles": 78,
+      "historicalTree": {
+        "files": 233,
+        "sha256": "fbcc249c0d37bfd51da3f22188d420e169898e4011125cea892c5595755beb4e"
+      },
+      "regularBytes": 685953,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "bytes": 738,
+          "sha256": "5bba27375d93e9119f76c1015f7672cf9ad5f70952296e0842fb2243d6376869"
+        }
+      ],
+      "resolution": {
+        "main": "./dist/index.js",
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "node": "./dist/index.js",
+            "default": "./browser/index.js"
+          },
+          "./package.json": "./package.json",
+          "./util": {
+            "types": "./dist/util.d.ts",
+            "node": "./dist/util.js",
+            "default": "./browser/dist/util.js"
+          }
+        },
+        "bin": "./bin.mjs",
+        "browser": {
+          "./dist/index.js": "./browser/index.js",
+          "./dist/util.js": "./browser/dist/util.js",
+          "./util.js": "./browser/dist/util.js"
+        }
+      },
+      "binDeclarations": {
+        "yaml": "bin.mjs"
+      },
+      "installLifecycle": {},
+      "lockPath": "node_modules/yaml",
+      "lockEntry": {
+        "version": "2.9.0",
+        "resolved": "https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz",
+        "integrity": "sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==",
+        "license": "ISC",
+        "bin": {
+          "yaml": "bin.mjs"
+        },
+        "engines": {
+          "node": ">= 14.6"
+        },
+        "funding": {
+          "url": "https://github.com/sponsors/eemeli"
+        }
+      },
+      "target": "upstream/node_modules/yaml",
+      "installedPath": "node_modules/yaml",
+      "archiveRoot": "package",
+      "regularFiles": 233,
+      "allowedShebangPaths": [
+        "bin.mjs"
+      ],
+      "inertLauncherPins": [
+        {
+          "path": "bin.mjs",
+          "bytes": 310,
+          "sha256": "faebbf70669988b5be13130907adf7b788145960448eab08e92e66189e72f448"
+        }
+      ]
+    },
+    {
+      "name": "ignore",
+      "version": "7.0.8",
+      "archive": {
+        "path": "archives/ignore-7.0.8.tgz",
+        "bytes": 37488,
+        "sha256": "456c4882dee0d43f9c75de2a3e77f1f5ac8b6be55bbb9e0c56bd00bd531d3c3c"
+      },
+      "inspection": {
+        "path": "archives/ignore-7.0.8.inspection.json",
+        "bytes": 4069,
+        "sha256": "6c9e80ee7f6a642e8c8acd2fc1089d518c80d5f2b09300a90e51d8f8a833d1d6"
+      },
+      "manifest": {
+        "path": "package.json",
+        "bytes": 3279,
+        "sha256": "809e28f354aca6ac273e9d455ee2ebd8f2c0e8676d0b62417a5b11ddda4ba8cd"
+      },
+      "declarationFiles": 1,
+      "historicalTree": {
+        "files": 6,
+        "sha256": "c416c2f09a5247e17934f15e32c10e8c339ad21253bf782e2bd6b5b211a4cc72"
+      },
+      "regularBytes": 113079,
+      "notices": [
+        {
+          "path": "LICENSE-MIT",
+          "bytes": 1095,
+          "sha256": "9c94db23dc4b1e9aaee5d195668b916afc71efed54af226b66cf0ccc4389c1c0"
+        }
+      ],
+      "resolution": {
+        "types": "index.d.ts"
+      },
+      "binDeclarations": {},
+      "installLifecycle": {},
+      "lockPath": "node_modules/ignore",
+      "lockEntry": {
+        "version": "7.0.8",
+        "resolved": "https://registry.npmjs.org/ignore/-/ignore-7.0.8.tgz",
+        "integrity": "sha512-YYNsSlXBjMk92SKnkwvB5LOVSa6OznlFUGcsvrFgNJbJCd0M1XKeFVRc8ZByeCqz32FivYNHJVooLmdqrmvp/Q==",
+        "license": "MIT",
+        "engines": {
+          "node": ">= 4"
+        }
+      },
+      "target": "upstream/node_modules/ignore",
+      "installedPath": "node_modules/ignore",
+      "archiveRoot": "package",
+      "regularFiles": 6,
+      "allowedShebangPaths": []
+    },
+    {
+      "name": "diff",
+      "version": "8.0.4",
+      "archive": {
+        "path": "archives/diff-8.0.4.tgz",
+        "bytes": 126146,
+        "sha256": "ef51327ad58243cf533326219f5ebaa5029280bd0fafcc11f7c23156639593d6"
+      },
+      "inspection": {
+        "path": "archives/diff-8.0.4.inspection.json",
+        "bytes": 3632,
+        "sha256": "045c5994d940b5e651cf8fea08c5bd0094d4775b734a6e5c01efa89f355e92fa"
+      },
+      "manifest": {
+        "path": "package.json",
+        "bytes": 3777,
+        "sha256": "372a1ad33bcaded0234d5d327d1164c18968ee3f2e9f362ddd22e4489e91e369"
+      },
+      "declarationFiles": 42,
+      "historicalTree": {
+        "files": 136,
+        "sha256": "03e243b82824379aa5616accd6f7fb2fe0d49b11c58f7121832bf169efb212ef"
+      },
+      "regularBytes": 519469,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1546,
+          "sha256": "eda81a415869e67809f6a9f3fd6056062cb83a462118e07eec5e92b2e0c40ce9"
+        }
+      ],
+      "resolution": {
+        "main": "./libcjs/index.js",
+        "module": "./libesm/index.js",
+        "types": "libcjs/index.d.ts",
+        "exports": {
+          ".": {
+            "import": {
+              "types": "./libesm/index.d.ts",
+              "default": "./libesm/index.js"
+            },
+            "require": {
+              "types": "./libcjs/index.d.ts",
+              "default": "./libcjs/index.js"
+            }
+          },
+          "./package.json": "./package.json",
+          "./lib/*.js": {
+            "import": {
+              "types": "./libesm/*.d.ts",
+              "default": "./libesm/*.js"
+            },
+            "require": {
+              "types": "./libcjs/*.d.ts",
+              "default": "./libcjs/*.js"
+            }
+          },
+          "./lib/": {
+            "import": {
+              "types": "./libesm/",
+              "default": "./libesm/"
+            },
+            "require": {
+              "types": "./libcjs/",
+              "default": "./libcjs/"
+            }
+          }
+        },
+        "browser": "./dist/diff.js"
+      },
+      "binDeclarations": {},
+      "installLifecycle": {},
+      "lockPath": "node_modules/diff",
+      "lockEntry": {
+        "version": "8.0.4",
+        "resolved": "https://registry.npmjs.org/diff/-/diff-8.0.4.tgz",
+        "integrity": "sha512-DPi0FmjiSU5EvQV0++GFDOJ9ASQUVFh5kD+OzOnYdi7n3Wpm9hWWGfB/O2blfHcMVTL5WkQXSnRiK9makhrcnw==",
+        "license": "BSD-3-Clause",
+        "engines": {
+          "node": ">=0.3.1"
+        }
+      },
+      "target": "upstream/node_modules/diff",
+      "installedPath": "node_modules/diff",
+      "archiveRoot": "package",
+      "regularFiles": 136,
+      "allowedShebangPaths": []
+    },
+    {
+      "name": "marked",
+      "version": "18.0.11",
+      "archive": {
+        "path": "archives/marked-18.0.11.tgz",
+        "bytes": 119809,
+        "sha256": "cef55476c7551e73e1a89118fa69fee9f7eef9960e9c774ad266e22ee966b994"
+      },
+      "inspection": {
+        "path": "archives/marked-18.0.11.inspection.json",
+        "bytes": 5437,
+        "sha256": "1ae93d2477e97141e48e8c618d6140c6a7888341d91d8356dd9b22b1f83dbdf1"
+      },
+      "manifest": {
+        "path": "package.json",
+        "bytes": 3404,
+        "sha256": "5a43adf708c24038a44ecd5f642bc55e3226f9e8e7997fca20272f32037970e3"
+      },
+      "declarationFiles": 1,
+      "historicalTree": {
+        "files": 12,
+        "sha256": "21023e880a5b04891f41a80e05561deb733a33876afe405f3dd44030dc7f3c94"
+      },
+      "regularBytes": 479846,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "bytes": 2942,
+          "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c"
+        }
+      ],
+      "resolution": {
+        "main": "./lib/marked.esm.js",
+        "module": "./lib/marked.esm.js",
+        "types": "./lib/marked.d.ts",
+        "exports": {
+          ".": {
+            "types": "./lib/marked.d.ts",
+            "default": "./lib/marked.esm.js"
+          },
+          "./bin/marked": "./bin/marked.js",
+          "./package.json": "./package.json"
+        },
+        "bin": {
+          "marked": "bin/marked.js"
+        },
+        "browser": "./lib/marked.umd.js"
+      },
+      "binDeclarations": {
+        "marked": "bin/marked.js"
+      },
+      "installLifecycle": {},
+      "lockPath": "node_modules/marked",
+      "lockEntry": {
+        "version": "18.0.11",
+        "resolved": "https://registry.npmjs.org/marked/-/marked-18.0.11.tgz",
+        "integrity": "sha512-HnslJfsZkRPBDJRHvVtAaWlZHEpSu7u8LgQuJCELjRKuWR+hpq4A7sLq3p8HaI9ypVoXDXxV34CsQJEe1+J5Aw==",
+        "license": "MIT",
+        "bin": {
+          "marked": "bin/marked.js"
+        },
+        "engines": {
+          "node": ">= 20"
+        }
+      },
+      "target": "upstream/node_modules/marked",
+      "installedPath": "node_modules/marked",
+      "archiveRoot": "package",
+      "regularFiles": 12,
+      "allowedShebangPaths": [
+        "bin/main.js",
+        "bin/marked.js"
+      ],
+      "inertLauncherPins": [
+        {
+          "path": "bin/main.js",
+          "bytes": 6709,
+          "sha256": "48cb7df763b02b107594cd14b0da9930f66cd80fb09ff9044fcc4516bba39d9d"
+        },
+        {
+          "path": "bin/marked.js",
+          "bytes": 264,
+          "sha256": "dc015672ddc613210a6fae6ab123b9295a670a4e7044a8170b41ccf4d8f5af06"
+        }
+      ]
+    },
+    {
+      "name": "get-east-asian-width",
+      "version": "1.6.0",
+      "archive": {
+        "path": "archives/get-east-asian-width-1.6.0.tgz",
+        "bytes": 5310,
+        "sha256": "4451f58e2f5a4ef27ae8b4ba25b64be97d3a8413dc8614a4321a10d418eee6d7"
+      },
+      "inspection": {
+        "path": "archives/get-east-asian-width-1.6.0.inspection.json",
+        "bytes": 2234,
+        "sha256": "f543f684a0f9f2a511633a5f9f0a6d3192f35b3ab234703ac40aab07b3a839ed"
+      },
+      "manifest": {
+        "path": "package.json",
+        "bytes": 1281,
+        "sha256": "d263e50dd1a43aee9acda4d7f066e66b0d0bde1f2852ea6e7153750a5e3a3e52"
+      },
+      "declarationFiles": 1,
+      "historicalTree": {
+        "files": 8,
+        "sha256": "9800c6c7cda83befc60bc600853ebfaddd18812ea86ea441629dbbad3b10da1c"
+      },
+      "regularBytes": 14592,
+      "notices": [
+        {
+          "path": "license",
+          "bytes": 1117,
+          "sha256": "5c932d88256b4ab958f64a856fa48e8bd1f55bc1d96b8149c65689e0c61789d3"
+        }
+      ],
+      "resolution": {
+        "exports": {
+          "types": "./index.d.ts",
+          "default": "./index.js"
+        }
+      },
+      "binDeclarations": {},
+      "installLifecycle": {},
+      "lockPath": "node_modules/get-east-asian-width",
+      "lockEntry": {
+        "version": "1.6.0",
+        "resolved": "https://registry.npmjs.org/get-east-asian-width/-/get-east-asian-width-1.6.0.tgz",
+        "integrity": "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA==",
+        "license": "MIT",
+        "engines": {
+          "node": ">=18"
+        },
+        "funding": {
+          "url": "https://github.com/sponsors/sindresorhus"
+        }
+      },
+      "target": "upstream/node_modules/get-east-asian-width",
+      "installedPath": "node_modules/get-east-asian-width",
+      "archiveRoot": "package",
+      "regularFiles": 8,
+      "allowedShebangPaths": []
+    },
+    {
+      "name": "partial-json",
+      "version": "0.1.7",
+      "archive": {
+        "path": "archives/partial-json-0.1.7.tgz",
+        "bytes": 6304,
+        "sha256": "30eafeed6fdc25fb2ca24f34c37796d9f98f0bf5e156452b98a2c356762f6322"
+      },
+      "inspection": {
+        "path": "archives/partial-json-0.1.7.inspection.json",
+        "bytes": 2177,
+        "sha256": "b1f1791a0084d5e204223aca1471b9825033943eb93079393233bb7a5a450123"
+      },
+      "manifest": {
+        "path": "package.json",
+        "bytes": 977,
+        "sha256": "42b3ae6c99ec959249f8eb4d3da7fdb44ec1f96ec627fa7f9ca5487a4e80963f"
+      },
+      "declarationFiles": 2,
+      "historicalTree": {
+        "files": 9,
+        "sha256": "b1c730b893ef274e6d457f23eebc9c39162cd6aaf777247942b9ad0cc1f1cb8e"
+      },
+      "regularBytes": 21852,
+      "notices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1075,
+          "sha256": "cd519ad3d7e012427f978dfb2e3b92ee403d189d7b859ba6bf68fd7e12ca456f"
+        }
+      ],
+      "resolution": {
+        "main": "dist/index.js",
+        "module": "dist/index.js",
+        "types": "dist/index.d.ts",
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+          },
+          "./options": {
+            "types": "./dist/options.d.ts",
+            "default": "./dist/options.js"
+          }
+        }
+      },
+      "binDeclarations": {},
+      "installLifecycle": {},
+      "lockPath": "node_modules/partial-json",
+      "lockEntry": {
+        "version": "0.1.7",
+        "resolved": "https://registry.npmjs.org/partial-json/-/partial-json-0.1.7.tgz",
+        "integrity": "sha512-Njv/59hHaokb/hRUjce3Hdv12wd60MtM9Z5Olmn+nehe0QDAsRtRbJPvJ0Z91TusF0SuZRIvnM+S4l6EIP8leA==",
+        "license": "MIT"
+      },
+      "target": "upstream/node_modules/partial-json",
+      "installedPath": "node_modules/partial-json",
+      "archiveRoot": "package",
+      "regularFiles": 9,
+      "allowedShebangPaths": []
+    }
+  ],
+  "baseline": {
+    "pins": [
+      {
+        "path": "fixtures/semantic-full-project-typebox/expected.json",
+        "bytes": 11827290,
+        "sha256": "6f0adfe24b99cab96637255ce58d145f397495e7da27ebb276fc8ff89d5aa772"
+      },
+      {
+        "path": "fixtures/semantic-full-project-typebox/manifest.json",
+        "bytes": 2702,
+        "sha256": "94370593efa9d43b84254da52963649c157825a8593a0928b393ae1697a78007"
+      }
+    ],
+    "snapshotSha256": "6f0adfe24b99cab96637255ce58d145f397495e7da27ebb276fc8ff89d5aa772",
+    "diagnosticCounts": {
+      "getConfigFileParsingDiagnostics": 0,
+      "getGlobalDiagnostics": 0,
+      "getProgramDiagnostics": 0,
+      "getSyntacticDiagnostics": 0,
+      "getBindDiagnostics": 0,
+      "getSemanticDiagnostics": 2318,
+      "getSuggestionDiagnostics": 832,
+      "getDeclarationDiagnostics": 0
+    },
+    "unresolvedRecords": 746,
+    "programSourceFiles": 2335,
+    "rootFiles": 1661,
+    "leafUnresolvedRecords": 35,
+    "leafSpecifierCounts": {
+      "chalk": 19,
+      "yaml": 3,
+      "ignore": 3,
+      "diff": 5,
+      "marked": 3,
+      "get-east-asian-width": 1,
+      "partial-json": 1
+    },
+    "currentNearestLockInstances": 33,
+    "mandatoryNearestLockInstances": 34,
+    "originalMandatorySpecifierGroups": 43,
+    "mandatoryScopeExclusions": false
+  },
+  "limits": {
+    "compressedBytes": 4194304,
+    "totalCompressedBytes": 8388608,
+    "expandedBytes": 33554432,
+    "memberBytes": 8388608,
+    "members": 12000,
+    "depth": 32,
+    "pathUtf8Bytes": 1024,
+    "componentUtf8Bytes": 255,
+    "paxBytes": 65536,
+    "jsonBytes": 2097152,
+    "noticeBytes": 2097152,
+    "regularTotalBytes": 33554432,
+    "compressionRatio": 256,
+    "originFileBytes": 33554432,
+    "originTotalBytes": 536870912
+  },
+  "policy": {
+    "copyAllArchiveMembers": true,
+    "fullManifestBytesPinned": true,
+    "expectedNewPackages": 7,
+    "expectedNewFiles": 416,
+    "expectedNewDeclarations": 129,
+    "wholePayloadFiles": 4538,
+    "historicalCheckedInstallLifecycleScope": [
+      "preinstall",
+      "install",
+      "postinstall",
+      "prepare"
+    ],
+    "expectedCheckedInstallLifecycleKeys": [],
+    "allOtherDeclaredScriptsRetainedInert": true,
+    "expectedRuntimeDependencyDeclarations": {},
+    "binAdmission": "Only original YAML bin.mjs and Marked bin/marked.js plus its packaged bin/main.js helper exact byte-pinned shebangs retained as inert regular data; unchanged bin declarations; no links/launch",
+    "packageCodeImported": false,
+    "network": false,
+    "npm": false,
+    "binLinks": false,
+    "nativeExecuted": false,
+    "sourceTransforms": false
+  },
+  "followUp": {
+    "vfsPayloadFiles": 4538,
+    "canonicalSourceRows": 2093,
+    "originalCompilerFiles": 529,
+    "allAdmittedPackageFiles": 1915,
+    "allAdmittedDeclarationFiles": 928,
+    "diagnosticMethods": [
+      "getConfigFileParsingDiagnostics",
+      "getGlobalDiagnostics",
+      "getProgramDiagnostics",
+      "getSyntacticDiagnostics",
+      "getBindDiagnostics",
+      "getSemanticDiagnostics",
+      "getSuggestionDiagnostics",
+      "getDeclarationDiagnostics"
+    ],
+    "profile": "new separate unchanged whole root config through qualified actual TypeScript async native API; after actual successor admission receipt",
+    "golden": "root-exclusive new genuine fixtures/semantic-full-project-leaves; no authored expected output",
+    "remainingClosure": "all 34 baseline instances / 43 original specifier groups and all diagnostic families retained; no forecast reduction or exclusions"
+  },
+  "semanticPublicClosure": false,
+  "phaseGatesPassed": []
+}

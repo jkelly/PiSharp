@@ -1,0 +1,2961 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "driver": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-source-profile-work\\tests\\PiSharp.Tui.Editor.Tests\\capture-history-layout-source.mjs",
+    "sha256": "80617d96122aba7f66d3b6e498ef9eb545802f535dd7972e7a5ea24b73849899"
+  },
+  "sourceManifest": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\source-manifest.json",
+    "sha256": "772c23326a8a341cc40235a95366639ea28cca1823089969cee1c5deb58b4048"
+  },
+  "inputs": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-source-profile-work\\tests\\PiSharp.Tui.Editor.Tests\\supplementary-history-layout-inputs.json",
+    "sha256": "4dc9512af7a8a49d96a6513020e9910426af3032157890fd5a75f2cfb84efe0d"
+  },
+  "node": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "version": "v24.19.0",
+    "versions": {
+      "node": "24.19.0",
+      "acorn": "8.17.0",
+      "ada": "3.4.4",
+      "amaro": "1.1.10",
+      "ares": "1.34.6",
+      "brotli": "1.2.0",
+      "cldr": "48.0",
+      "icu": "78.3",
+      "llhttp": "9.4.3",
+      "merve": "1.2.2",
+      "modules": "137",
+      "napi": "10",
+      "nbytes": "0.1.4",
+      "ncrypto": "0.0.1",
+      "nghttp2": "1.69.0",
+      "nghttp3": "",
+      "ngtcp2": "",
+      "openssl": "3.5.7",
+      "simdjson": "4.6.4",
+      "simdutf": "6.4.0",
+      "sqlite": "3.53.3",
+      "tz": "2026b",
+      "undici": "7.29.0",
+      "unicode": "17.0",
+      "uv": "1.52.1",
+      "uvwasi": "0.0.23",
+      "v8": "13.6.233.17-node.51",
+      "zlib": "1.3.2.1-motley-3246f1b",
+      "zstd": "1.5.7"
+    },
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "loadedFiles": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\editor.ts",
+      "bytes": 84348,
+      "sha256": "30a47fd49042579be7b85262677df62d4ff37a8f9a3a0e6c41ce3cf1d402b9c3"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keybindings.ts",
+      "bytes": 10125,
+      "sha256": "eea5e3fe258ad50337595bb5320955a6d97bac0c8f6c0a838f988d75079bcf38"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\kill-ring.ts",
+      "bytes": 1295,
+      "sha256": "d829ae816560b12d2800a38db9f7278f76d9ef43d0e53e004a86add9b56c559a"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\tui.ts",
+      "bytes": 49604,
+      "sha256": "92dcb7f5f9a3a9575421d8de366be5cc78890be8df38d86c4ed3c0d77c7f88a4"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\terminal-colors.ts",
+      "bytes": 3082,
+      "sha256": "72d1ef298837bfe520bd8a060cb93ea27547dcbff04a167ace0f55b5183e550d"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\terminal-image.ts",
+      "bytes": 23218,
+      "sha256": "b901b8df0ad84e04ac0ee612c419b45d960430f63d2bdaa974c8dd9d89f3e6e5"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\utils.ts",
+      "bytes": 38919,
+      "sha256": "5ecbc6c9b4850e78bf19de1fe8859b99b9c4c5f8a6384728d255a8e7e8a610ee"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\index.js",
+      "bytes": 730,
+      "sha256": "d7b1ba05914c0fc311c20e5618bf8d0893c9c74078a07975e2df981445e64887"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\lookup.js",
+      "bytes": 2671,
+      "sha256": "c80ecc22b120b27ef5ea9facb7000b8fd4ec037a84d9231d215f1c44bc9c21d0"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\lookup-data.js",
+      "bytes": 4734,
+      "sha256": "f6b40f86c9a2a6808ec808fa8ddcb8da261254cc6121d37ffaeb2bf35dad1d5b"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\utilities.js",
+      "bytes": 650,
+      "sha256": "4b08a7e9e3ffacbcf198a6abceb2338d52ac671899e52ccc2851c898bfccac42"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\undo-stack.ts",
+      "bytes": 643,
+      "sha256": "1373c1e0a1e2c58ac90c93d32a9e5c1226d7f53314c77dd3d0f8ec349d2b3627"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\word-navigation.ts",
+      "bytes": 3987,
+      "sha256": "b73e915a524926ac8881731e89026b0bc7b5b0bd465de67257af81a420465c7f"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\select-list.ts",
+      "bytes": 9385,
+      "sha256": "0fc369801e745eff15567d72829bf67887f5efec8bc6816aaf1ee65338618373"
+    }
+  ],
+  "builtinImports": [
+    "node:child_process",
+    "node:os",
+    "node:path",
+    "node:perf_hooks",
+    "node:url"
+  ],
+  "prohibitedEffects": [],
+  "sourceModified": false,
+  "injectedBoundary": "Documented constructor TUI terminal.rows/render scheduler and theme, public Focusable.focused property and callbacks; no private method/state replacement",
+  "observationBoundary": "Public addToHistory/setText/insertTextAtCursor/handleInput/render operations, complete text/expanded text/cursor, accumulated callbacks/render requests and exact returned render rows. No native implementation/comparison or phase acceptance is asserted. All four existing corpora remain unchanged.",
+  "cases": [
+    {
+      "id": "genuine-supplementary-smile-cjk-sticky-resize",
+      "input": {
+        "steps": [
+          {
+            "kind": "set",
+            "data": "AB界D\n1🙂2\nabcdef"
+          },
+          {
+            "kind": "render",
+            "columns": 12,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u0001"
+          },
+          {
+            "kind": "input",
+            "data": "\u0006"
+          },
+          {
+            "kind": "input",
+            "data": "\u0006"
+          },
+          {
+            "kind": "input",
+            "data": "\u0006"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "render",
+            "columns": 5,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          }
+        ]
+      },
+      "observation": {
+        "steps": [
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 2,
+              "col": 6
+            },
+            "cursorUtf16Offset": 16,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 2,
+              "col": 6
+            },
+            "cursorUtf16Offset": 16,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 12,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────",
+              "AB界D       ",
+              "1🙂2        ",
+              "abcdef\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────────"
+            ]
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 2,
+              "col": 0
+            },
+            "cursorUtf16Offset": 10,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 12,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────",
+              "AB界D       ",
+              "1🙂2        ",
+              "abcdef\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────────"
+            ]
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 2,
+              "col": 1
+            },
+            "cursorUtf16Offset": 11,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 12,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────",
+              "AB界D       ",
+              "1🙂2        ",
+              "abcdef\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────────"
+            ]
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 2,
+              "col": 2
+            },
+            "cursorUtf16Offset": 12,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 12,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────",
+              "AB界D       ",
+              "1🙂2        ",
+              "abcdef\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────────"
+            ]
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 2,
+              "col": 3
+            },
+            "cursorUtf16Offset": 13,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 12,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────",
+              "AB界D       ",
+              "1🙂2        ",
+              "abcdef\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────────"
+            ]
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 1,
+              "col": 3
+            },
+            "cursorUtf16Offset": 8,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 12,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────",
+              "AB界D       ",
+              "1🙂2        ",
+              "abcdef\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────────"
+            ]
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 0,
+              "col": 3
+            },
+            "cursorUtf16Offset": 3,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 12,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────",
+              "AB界D       ",
+              "1🙂2        ",
+              "abcdef\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────────"
+            ]
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 1,
+              "col": 3
+            },
+            "cursorUtf16Offset": 8,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 12,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────",
+              "AB界D       ",
+              "1🙂2        ",
+              "abcdef\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────────"
+            ]
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 2,
+              "col": 3
+            },
+            "cursorUtf16Offset": 13,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 12,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────",
+              "AB界D       ",
+              "1🙂2        ",
+              "abcdef\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────────"
+            ]
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 2,
+              "col": 3
+            },
+            "cursorUtf16Offset": 13,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 5,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────",
+              "AB界 ",
+              "D    ",
+              "1🙂2 ",
+              "abc\u001b_pi:c\u0007\u001b[7md\u001b[0m ",
+              "ef   ",
+              "─────"
+            ]
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 1,
+              "col": 3
+            },
+            "cursorUtf16Offset": 8,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 5,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────",
+              "AB界 ",
+              "D    ",
+              "1🙂2 ",
+              "abc\u001b_pi:c\u0007\u001b[7md\u001b[0m ",
+              "ef   ",
+              "─────"
+            ]
+          },
+          {
+            "text": "AB界D\n1🙂2\nabcdef",
+            "expandedText": "AB界D\n1🙂2\nabcdef",
+            "cursor": {
+              "line": 2,
+              "col": 3
+            },
+            "cursorUtf16Offset": 13,
+            "changes": [
+              "AB界D\n1🙂2\nabcdef"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 5,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────",
+              "AB界 ",
+              "D    ",
+              "1🙂2 ",
+              "abc\u001b_pi:c\u0007\u001b[7md\u001b[0m ",
+              "ef   ",
+              "─────"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "genuine-woman-technologist-combining-sticky-resize",
+      "input": {
+        "steps": [
+          {
+            "kind": "set",
+            "data": "AéZ\n👩‍💻x\nQQQQ"
+          },
+          {
+            "kind": "render",
+            "columns": 10,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u0001"
+          },
+          {
+            "kind": "input",
+            "data": "\u0006"
+          },
+          {
+            "kind": "input",
+            "data": "\u0006"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "render",
+            "columns": 4,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "render",
+            "columns": 16,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          }
+        ]
+      },
+      "observation": {
+        "steps": [
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 2,
+              "col": 4
+            },
+            "cursorUtf16Offset": 16,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 2,
+              "col": 4
+            },
+            "cursorUtf16Offset": 16,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 10,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────────",
+              "AéZ       ",
+              "👩‍💻x       ",
+              "QQQQ\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "──────────"
+            ]
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 2,
+              "col": 0
+            },
+            "cursorUtf16Offset": 12,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 10,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────────",
+              "AéZ       ",
+              "👩‍💻x       ",
+              "QQQQ\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "──────────"
+            ]
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 2,
+              "col": 1
+            },
+            "cursorUtf16Offset": 13,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 10,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────────",
+              "AéZ       ",
+              "👩‍💻x       ",
+              "QQQQ\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "──────────"
+            ]
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 2,
+              "col": 2
+            },
+            "cursorUtf16Offset": 14,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 10,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────────",
+              "AéZ       ",
+              "👩‍💻x       ",
+              "QQQQ\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "──────────"
+            ]
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 1,
+              "col": 0
+            },
+            "cursorUtf16Offset": 5,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 10,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────────",
+              "AéZ       ",
+              "👩‍💻x       ",
+              "QQQQ\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "──────────"
+            ]
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 0,
+              "col": 1
+            },
+            "cursorUtf16Offset": 1,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 10,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────────",
+              "AéZ       ",
+              "👩‍💻x       ",
+              "QQQQ\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "──────────"
+            ]
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 1,
+              "col": 0
+            },
+            "cursorUtf16Offset": 5,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 10,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────────",
+              "AéZ       ",
+              "👩‍💻x       ",
+              "QQQQ\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "──────────"
+            ]
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 1,
+              "col": 0
+            },
+            "cursorUtf16Offset": 5,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 4,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────",
+              "AéZ ",
+              "\u001b_pi:c\u0007\u001b[7m👩‍💻\u001b[0mx ",
+              "QQQ ",
+              "Q   ",
+              "────"
+            ]
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 2,
+              "col": 2
+            },
+            "cursorUtf16Offset": 14,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 4,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────",
+              "AéZ ",
+              "\u001b_pi:c\u0007\u001b[7m👩‍💻\u001b[0mx ",
+              "QQQ ",
+              "Q   ",
+              "────"
+            ]
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 1,
+              "col": 0
+            },
+            "cursorUtf16Offset": 5,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 4,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────",
+              "AéZ ",
+              "\u001b_pi:c\u0007\u001b[7m👩‍💻\u001b[0mx ",
+              "QQQ ",
+              "Q   ",
+              "────"
+            ]
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 1,
+              "col": 0
+            },
+            "cursorUtf16Offset": 5,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 16,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────────",
+              "AéZ             ",
+              "\u001b_pi:c\u0007\u001b[7m👩‍💻\u001b[0mx             ",
+              "QQQQ            ",
+              "────────────────"
+            ]
+          },
+          {
+            "text": "AéZ\n👩‍💻x\nQQQQ",
+            "expandedText": "AéZ\n👩‍💻x\nQQQQ",
+            "cursor": {
+              "line": 2,
+              "col": 2
+            },
+            "cursorUtf16Offset": 14,
+            "changes": [
+              "AéZ\n👩‍💻x\nQQQQ"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 16,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────────",
+              "AéZ             ",
+              "\u001b_pi:c\u0007\u001b[7m👩‍💻\u001b[0mx             ",
+              "QQQQ            ",
+              "────────────────"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "genuine-family-flag-modifier-soft-wrap",
+      "input": {
+        "steps": [
+          {
+            "kind": "set",
+            "data": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+          },
+          {
+            "kind": "render",
+            "columns": 6,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "render",
+            "columns": 9,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "render",
+            "columns": 32,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          }
+        ]
+      },
+      "observation": {
+        "steps": [
+          {
+            "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "expandedText": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "cursor": {
+              "line": 0,
+              "col": 25
+            },
+            "cursorUtf16Offset": 25,
+            "changes": [
+              "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "expandedText": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "cursor": {
+              "line": 0,
+              "col": 25
+            },
+            "cursorUtf16Offset": 25,
+            "changes": [
+              "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 6,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────",
+              "a 👩‍👩‍👧‍👦  ",
+              "🇺🇸    ",
+              "👍🏽 z\u001b_pi:c\u0007\u001b[7m \u001b[0m ",
+              "──────"
+            ]
+          },
+          {
+            "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "expandedText": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "cursor": {
+              "line": 0,
+              "col": 18
+            },
+            "cursorUtf16Offset": 18,
+            "changes": [
+              "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 6,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────",
+              "a 👩‍👩‍👧‍👦  ",
+              "🇺🇸    ",
+              "👍🏽 z\u001b_pi:c\u0007\u001b[7m \u001b[0m ",
+              "──────"
+            ]
+          },
+          {
+            "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "expandedText": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "cursor": {
+              "line": 0,
+              "col": 2
+            },
+            "cursorUtf16Offset": 2,
+            "changes": [
+              "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 6,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────",
+              "a 👩‍👩‍👧‍👦  ",
+              "🇺🇸    ",
+              "👍🏽 z\u001b_pi:c\u0007\u001b[7m \u001b[0m ",
+              "──────"
+            ]
+          },
+          {
+            "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "expandedText": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "cursor": {
+              "line": 0,
+              "col": 18
+            },
+            "cursorUtf16Offset": 18,
+            "changes": [
+              "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 6,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────",
+              "a 👩‍👩‍👧‍👦  ",
+              "🇺🇸    ",
+              "👍🏽 z\u001b_pi:c\u0007\u001b[7m \u001b[0m ",
+              "──────"
+            ]
+          },
+          {
+            "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "expandedText": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "cursor": {
+              "line": 0,
+              "col": 18
+            },
+            "cursorUtf16Offset": 18,
+            "changes": [
+              "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 9,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────────",
+              "a 👩‍👩‍👧‍👦 🇺🇸\u001b_pi:c\u0007\u001b[7m \u001b[0m ",
+              "👍🏽 z     ",
+              "─────────"
+            ]
+          },
+          {
+            "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "expandedText": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "cursor": {
+              "line": 0,
+              "col": 25
+            },
+            "cursorUtf16Offset": 25,
+            "changes": [
+              "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 9,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────────",
+              "a 👩‍👩‍👧‍👦 🇺🇸\u001b_pi:c\u0007\u001b[7m \u001b[0m ",
+              "👍🏽 z     ",
+              "─────────"
+            ]
+          },
+          {
+            "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "expandedText": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "cursor": {
+              "line": 0,
+              "col": 2
+            },
+            "cursorUtf16Offset": 2,
+            "changes": [
+              "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 9,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────────",
+              "a 👩‍👩‍👧‍👦 🇺🇸\u001b_pi:c\u0007\u001b[7m \u001b[0m ",
+              "👍🏽 z     ",
+              "─────────"
+            ]
+          },
+          {
+            "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "expandedText": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "cursor": {
+              "line": 0,
+              "col": 2
+            },
+            "cursorUtf16Offset": 2,
+            "changes": [
+              "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 32,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────────────────────────",
+              "a \u001b_pi:c\u0007\u001b[7m👩‍👩‍👧‍👦\u001b[0m 🇺🇸 👍🏽 z                    ",
+              "────────────────────────────────"
+            ]
+          },
+          {
+            "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "expandedText": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 32,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────────────────────────",
+              "a \u001b_pi:c\u0007\u001b[7m👩‍👩‍👧‍👦\u001b[0m 🇺🇸 👍🏽 z                    ",
+              "────────────────────────────────"
+            ]
+          },
+          {
+            "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "expandedText": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+            "cursor": {
+              "line": 0,
+              "col": 25
+            },
+            "cursorUtf16Offset": 25,
+            "changes": [
+              "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 32,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────────────────────────",
+              "a \u001b_pi:c\u0007\u001b[7m👩‍👩‍👧‍👦\u001b[0m 🇺🇸 👍🏽 z                    ",
+              "────────────────────────────────"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "genuine-supplementary-source-half-open-end-affinity",
+      "input": {
+        "steps": [
+          {
+            "kind": "set",
+            "data": "a🙂bc\n👩‍💻\n"
+          },
+          {
+            "kind": "render",
+            "columns": 5,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "render",
+            "columns": 3,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "render",
+            "columns": 12,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          }
+        ]
+      },
+      "observation": {
+        "steps": [
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 2,
+              "col": 0
+            },
+            "cursorUtf16Offset": 12,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 2,
+              "col": 0
+            },
+            "cursorUtf16Offset": 12,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 5,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────",
+              "a🙂b ",
+              "c    ",
+              "👩‍💻   ",
+              "\u001b_pi:c\u0007\u001b[7m \u001b[0m    ",
+              "─────"
+            ]
+          },
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 1,
+              "col": 0
+            },
+            "cursorUtf16Offset": 6,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 5,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────",
+              "a🙂b ",
+              "c    ",
+              "👩‍💻   ",
+              "\u001b_pi:c\u0007\u001b[7m \u001b[0m    ",
+              "─────"
+            ]
+          },
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 0,
+              "col": 4
+            },
+            "cursorUtf16Offset": 4,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 5,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────",
+              "a🙂b ",
+              "c    ",
+              "👩‍💻   ",
+              "\u001b_pi:c\u0007\u001b[7m \u001b[0m    ",
+              "─────"
+            ]
+          },
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 1,
+              "col": 0
+            },
+            "cursorUtf16Offset": 6,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 5,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────",
+              "a🙂b ",
+              "c    ",
+              "👩‍💻   ",
+              "\u001b_pi:c\u0007\u001b[7m \u001b[0m    ",
+              "─────"
+            ]
+          },
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 2,
+              "col": 0
+            },
+            "cursorUtf16Offset": 12,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 5,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────",
+              "a🙂b ",
+              "c    ",
+              "👩‍💻   ",
+              "\u001b_pi:c\u0007\u001b[7m \u001b[0m    ",
+              "─────"
+            ]
+          },
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 2,
+              "col": 0
+            },
+            "cursorUtf16Offset": 12,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 3,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "───",
+              "a  ",
+              "🙂 ",
+              "bc ",
+              "👩‍💻 ",
+              "\u001b_pi:c\u0007\u001b[7m \u001b[0m  ",
+              "───"
+            ]
+          },
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 1,
+              "col": 0
+            },
+            "cursorUtf16Offset": 6,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 3,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "───",
+              "a  ",
+              "🙂 ",
+              "bc ",
+              "👩‍💻 ",
+              "\u001b_pi:c\u0007\u001b[7m \u001b[0m  ",
+              "───"
+            ]
+          },
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 0,
+              "col": 3
+            },
+            "cursorUtf16Offset": 3,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 3,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "───",
+              "a  ",
+              "🙂 ",
+              "bc ",
+              "👩‍💻 ",
+              "\u001b_pi:c\u0007\u001b[7m \u001b[0m  ",
+              "───"
+            ]
+          },
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 1,
+              "col": 0
+            },
+            "cursorUtf16Offset": 6,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 3,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "───",
+              "a  ",
+              "🙂 ",
+              "bc ",
+              "👩‍💻 ",
+              "\u001b_pi:c\u0007\u001b[7m \u001b[0m  ",
+              "───"
+            ]
+          },
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 1,
+              "col": 0
+            },
+            "cursorUtf16Offset": 6,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 12,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────",
+              "a🙂bc       ",
+              "\u001b_pi:c\u0007\u001b[7m👩‍💻\u001b[0m          ",
+              "            ",
+              "────────────"
+            ]
+          },
+          {
+            "text": "a🙂bc\n👩‍💻\n",
+            "expandedText": "a🙂bc\n👩‍💻\n",
+            "cursor": {
+              "line": 2,
+              "col": 0
+            },
+            "cursorUtf16Offset": 12,
+            "changes": [
+              "a🙂bc\n👩‍💻\n"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 12,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────",
+              "a🙂bc       ",
+              "\u001b_pi:c\u0007\u001b[7m👩‍💻\u001b[0m          ",
+              "            ",
+              "────────────"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "genuine-supplementary-history-first-last-wrap-and-draft",
+      "input": {
+        "steps": [
+          {
+            "kind": "history",
+            "data": "prior 👩‍💻"
+          },
+          {
+            "kind": "history",
+            "data": "one 🙂 two 🇺🇸 end"
+          },
+          {
+            "kind": "set",
+            "data": "👍🏽 draft"
+          },
+          {
+            "kind": "render",
+            "columns": 6,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u0001"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "render",
+            "columns": 18,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          }
+        ]
+      },
+      "observation": {
+        "steps": [
+          {
+            "text": "",
+            "expandedText": "",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "",
+            "expandedText": "",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "👍🏽 draft",
+            "expandedText": "👍🏽 draft",
+            "cursor": {
+              "line": 0,
+              "col": 10
+            },
+            "cursorUtf16Offset": 10,
+            "changes": [
+              "👍🏽 draft"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "👍🏽 draft",
+            "expandedText": "👍🏽 draft",
+            "cursor": {
+              "line": 0,
+              "col": 10
+            },
+            "cursorUtf16Offset": 10,
+            "changes": [
+              "👍🏽 draft"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 6,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────",
+              "👍🏽    ",
+              "draft\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+              "──────"
+            ]
+          },
+          {
+            "text": "👍🏽 draft",
+            "expandedText": "👍🏽 draft",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "👍🏽 draft"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 6,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────",
+              "👍🏽    ",
+              "draft\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+              "──────"
+            ]
+          },
+          {
+            "text": "one 🙂 two 🇺🇸 end",
+            "expandedText": "one 🙂 two 🇺🇸 end",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "👍🏽 draft",
+              "one 🙂 two 🇺🇸 end"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 6,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────",
+              "👍🏽    ",
+              "draft\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+              "──────"
+            ]
+          },
+          {
+            "text": "prior 👩‍💻",
+            "expandedText": "prior 👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "👍🏽 draft",
+              "one 🙂 two 🇺🇸 end",
+              "prior 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 6,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────",
+              "👍🏽    ",
+              "draft\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+              "──────"
+            ]
+          },
+          {
+            "text": "prior 👩‍💻",
+            "expandedText": "prior 👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 5
+            },
+            "cursorUtf16Offset": 5,
+            "changes": [
+              "👍🏽 draft",
+              "one 🙂 two 🇺🇸 end",
+              "prior 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 6,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────",
+              "👍🏽    ",
+              "draft\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+              "──────"
+            ]
+          },
+          {
+            "text": "one 🙂 two 🇺🇸 end",
+            "expandedText": "one 🙂 two 🇺🇸 end",
+            "cursor": {
+              "line": 0,
+              "col": 19
+            },
+            "cursorUtf16Offset": 19,
+            "changes": [
+              "👍🏽 draft",
+              "one 🙂 two 🇺🇸 end",
+              "prior 👩‍💻",
+              "one 🙂 two 🇺🇸 end"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 6,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────",
+              "👍🏽    ",
+              "draft\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+              "──────"
+            ]
+          },
+          {
+            "text": "👍🏽 draft",
+            "expandedText": "👍🏽 draft",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "👍🏽 draft",
+              "one 🙂 two 🇺🇸 end",
+              "prior 👩‍💻",
+              "one 🙂 two 🇺🇸 end",
+              "👍🏽 draft"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 6,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────",
+              "👍🏽    ",
+              "draft\u001b_pi:c\u0007\u001b[7m \u001b[0m",
+              "──────"
+            ]
+          },
+          {
+            "text": "👍🏽 draft",
+            "expandedText": "👍🏽 draft",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "👍🏽 draft",
+              "one 🙂 two 🇺🇸 end",
+              "prior 👩‍💻",
+              "one 🙂 two 🇺🇸 end",
+              "👍🏽 draft"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 18,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────────────────",
+              "\u001b_pi:c\u0007\u001b[7m👍🏽\u001b[0m draft          ",
+              "──────────────────"
+            ]
+          },
+          {
+            "text": "👍🏽 draft",
+            "expandedText": "👍🏽 draft",
+            "cursor": {
+              "line": 0,
+              "col": 10
+            },
+            "cursorUtf16Offset": 10,
+            "changes": [
+              "👍🏽 draft",
+              "one 🙂 two 🇺🇸 end",
+              "prior 👩‍💻",
+              "one 🙂 two 🇺🇸 end",
+              "👍🏽 draft"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 18,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────────────────",
+              "\u001b_pi:c\u0007\u001b[7m👍🏽\u001b[0m draft          ",
+              "──────────────────"
+            ]
+          },
+          {
+            "text": "👍🏽 draft",
+            "expandedText": "👍🏽 draft",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "👍🏽 draft",
+              "one 🙂 two 🇺🇸 end",
+              "prior 👩‍💻",
+              "one 🙂 two 🇺🇸 end",
+              "👍🏽 draft"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 18,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "──────────────────",
+              "\u001b_pi:c\u0007\u001b[7m👍🏽\u001b[0m draft          ",
+              "──────────────────"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "genuine-supplementary-page-and-terminal-height",
+      "input": {
+        "steps": [
+          {
+            "kind": "set",
+            "data": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+          },
+          {
+            "kind": "render",
+            "columns": 8,
+            "terminalRows": 20
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[5~"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[6~"
+          },
+          {
+            "kind": "render",
+            "columns": 14,
+            "terminalRows": 40
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[5~"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[6~"
+          },
+          {
+            "kind": "render",
+            "columns": 8,
+            "terminalRows": 5
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          }
+        ]
+      },
+      "observation": {
+        "steps": [
+          {
+            "text": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "expandedText": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "cursor": {
+              "line": 14,
+              "col": 11
+            },
+            "cursorUtf16Offset": 169,
+            "changes": [
+              "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "expandedText": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "cursor": {
+              "line": 14,
+              "col": 11
+            },
+            "cursorUtf16Offset": 169,
+            "changes": [
+              "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 8,
+            "terminalRows": 20,
+            "lastRenderedRows": [
+              "─── ↑...",
+              "12 🙂   ",
+              "👩‍💻      ",
+              "13 🙂   ",
+              "👩‍💻      ",
+              "14 🙂   ",
+              "👩‍💻\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────"
+            ]
+          },
+          {
+            "text": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "expandedText": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "cursor": {
+              "line": 11,
+              "col": 11
+            },
+            "cursorUtf16Offset": 133,
+            "changes": [
+              "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 8,
+            "terminalRows": 20,
+            "lastRenderedRows": [
+              "─── ↑...",
+              "12 🙂   ",
+              "👩‍💻      ",
+              "13 🙂   ",
+              "👩‍💻      ",
+              "14 🙂   ",
+              "👩‍💻\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────"
+            ]
+          },
+          {
+            "text": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "expandedText": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "cursor": {
+              "line": 14,
+              "col": 11
+            },
+            "cursorUtf16Offset": 169,
+            "changes": [
+              "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 8,
+            "terminalRows": 20,
+            "lastRenderedRows": [
+              "─── ↑...",
+              "12 🙂   ",
+              "👩‍💻      ",
+              "13 🙂   ",
+              "👩‍💻      ",
+              "14 🙂   ",
+              "👩‍💻\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────"
+            ]
+          },
+          {
+            "text": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "expandedText": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "cursor": {
+              "line": 14,
+              "col": 11
+            },
+            "cursorUtf16Offset": 169,
+            "changes": [
+              "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 14,
+            "terminalRows": 40,
+            "lastRenderedRows": [
+              "── ↑ 3 more ──",
+              "3 🙂 👩‍💻       ",
+              "4 🙂 👩‍💻       ",
+              "5 🙂 👩‍💻       ",
+              "6 🙂 👩‍💻       ",
+              "7 🙂 👩‍💻       ",
+              "8 🙂 👩‍💻       ",
+              "9 🙂 👩‍💻       ",
+              "10 🙂 👩‍💻      ",
+              "11 🙂 👩‍💻      ",
+              "12 🙂 👩‍💻      ",
+              "13 🙂 👩‍💻      ",
+              "14 🙂 👩‍💻\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "──────────────"
+            ]
+          },
+          {
+            "text": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "expandedText": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "cursor": {
+              "line": 2,
+              "col": 10
+            },
+            "cursorUtf16Offset": 32,
+            "changes": [
+              "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 14,
+            "terminalRows": 40,
+            "lastRenderedRows": [
+              "── ↑ 3 more ──",
+              "3 🙂 👩‍💻       ",
+              "4 🙂 👩‍💻       ",
+              "5 🙂 👩‍💻       ",
+              "6 🙂 👩‍💻       ",
+              "7 🙂 👩‍💻       ",
+              "8 🙂 👩‍💻       ",
+              "9 🙂 👩‍💻       ",
+              "10 🙂 👩‍💻      ",
+              "11 🙂 👩‍💻      ",
+              "12 🙂 👩‍💻      ",
+              "13 🙂 👩‍💻      ",
+              "14 🙂 👩‍💻\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "──────────────"
+            ]
+          },
+          {
+            "text": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "expandedText": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "cursor": {
+              "line": 14,
+              "col": 11
+            },
+            "cursorUtf16Offset": 169,
+            "changes": [
+              "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 14,
+            "terminalRows": 40,
+            "lastRenderedRows": [
+              "── ↑ 3 more ──",
+              "3 🙂 👩‍💻       ",
+              "4 🙂 👩‍💻       ",
+              "5 🙂 👩‍💻       ",
+              "6 🙂 👩‍💻       ",
+              "7 🙂 👩‍💻       ",
+              "8 🙂 👩‍💻       ",
+              "9 🙂 👩‍💻       ",
+              "10 🙂 👩‍💻      ",
+              "11 🙂 👩‍💻      ",
+              "12 🙂 👩‍💻      ",
+              "13 🙂 👩‍💻      ",
+              "14 🙂 👩‍💻\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "──────────────"
+            ]
+          },
+          {
+            "text": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "expandedText": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "cursor": {
+              "line": 14,
+              "col": 11
+            },
+            "cursorUtf16Offset": 169,
+            "changes": [
+              "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 8,
+            "terminalRows": 5,
+            "lastRenderedRows": [
+              "─── ↑...",
+              "👩‍💻      ",
+              "13 🙂   ",
+              "👩‍💻      ",
+              "14 🙂   ",
+              "👩‍💻\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────"
+            ]
+          },
+          {
+            "text": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "expandedText": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "cursor": {
+              "line": 14,
+              "col": 5
+            },
+            "cursorUtf16Offset": 163,
+            "changes": [
+              "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 8,
+            "terminalRows": 5,
+            "lastRenderedRows": [
+              "─── ↑...",
+              "👩‍💻      ",
+              "13 🙂   ",
+              "👩‍💻      ",
+              "14 🙂   ",
+              "👩‍💻\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────"
+            ]
+          },
+          {
+            "text": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "expandedText": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+            "cursor": {
+              "line": 14,
+              "col": 11
+            },
+            "cursorUtf16Offset": 169,
+            "changes": [
+              "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 8,
+            "terminalRows": 5,
+            "lastRenderedRows": [
+              "─── ↑...",
+              "👩‍💻      ",
+              "13 🙂   ",
+              "👩‍💻      ",
+              "14 🙂   ",
+              "👩‍💻\u001b_pi:c\u0007\u001b[7m \u001b[0m     ",
+              "────────"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "genuine-supplementary-paste-marker-following-emoji",
+      "input": {
+        "steps": [
+          {
+            "kind": "set",
+            "data": "🙂"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[200~👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\u001b[201~"
+          },
+          {
+            "kind": "render",
+            "columns": 9,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "render",
+            "columns": 5,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "render",
+            "columns": 24,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          }
+        ]
+      },
+      "observation": {
+        "steps": [
+          {
+            "text": "🙂",
+            "expandedText": "🙂",
+            "cursor": {
+              "line": 0,
+              "col": 2
+            },
+            "cursorUtf16Offset": 2,
+            "changes": [
+              "🙂"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 22
+            },
+            "cursorUtf16Offset": 22,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 22
+            },
+            "cursorUtf16Offset": 22,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 9,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────────",
+              "🙂       ",
+              "[paste   ",
+              "#1 +12   ",
+              "lines]\u001b_pi:c\u0007\u001b[7m \u001b[0m  ",
+              "─────────"
+            ]
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 2
+            },
+            "cursorUtf16Offset": 2,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 9,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────────",
+              "🙂       ",
+              "[paste   ",
+              "#1 +12   ",
+              "lines]\u001b_pi:c\u0007\u001b[7m \u001b[0m  ",
+              "─────────"
+            ]
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 9,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────────",
+              "🙂       ",
+              "[paste   ",
+              "#1 +12   ",
+              "lines]\u001b_pi:c\u0007\u001b[7m \u001b[0m  ",
+              "─────────"
+            ]
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 2
+            },
+            "cursorUtf16Offset": 2,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 9,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────────",
+              "🙂       ",
+              "[paste   ",
+              "#1 +12   ",
+              "lines]\u001b_pi:c\u0007\u001b[7m \u001b[0m  ",
+              "─────────"
+            ]
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 2
+            },
+            "cursorUtf16Offset": 2,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 9,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────────",
+              "🙂       ",
+              "[paste   ",
+              "#1 +12   ",
+              "lines]\u001b_pi:c\u0007\u001b[7m \u001b[0m  ",
+              "─────────"
+            ]
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 2
+            },
+            "cursorUtf16Offset": 2,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 5,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────",
+              "🙂   ",
+              "\u001b_pi:c\u0007\u001b[7m[\u001b[0mpas ",
+              "te   ",
+              "#1   ",
+              "+12  ",
+              "line ",
+              "s]   ",
+              "─────"
+            ]
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 5,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────",
+              "🙂   ",
+              "\u001b_pi:c\u0007\u001b[7m[\u001b[0mpas ",
+              "te   ",
+              "#1   ",
+              "+12  ",
+              "line ",
+              "s]   ",
+              "─────"
+            ]
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 2
+            },
+            "cursorUtf16Offset": 2,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 5,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "─────",
+              "🙂   ",
+              "\u001b_pi:c\u0007\u001b[7m[\u001b[0mpas ",
+              "te   ",
+              "#1   ",
+              "+12  ",
+              "line ",
+              "s]   ",
+              "─────"
+            ]
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 2
+            },
+            "cursorUtf16Offset": 2,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 24,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────────────────",
+              "🙂\u001b_pi:c\u0007\u001b[7m[paste #1 +12 lines]\u001b[0m  ",
+              "────────────────────────"
+            ]
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 24,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────────────────",
+              "🙂\u001b_pi:c\u0007\u001b[7m[paste #1 +12 lines]\u001b[0m  ",
+              "────────────────────────"
+            ]
+          },
+          {
+            "text": "🙂[paste #1 +12 lines]",
+            "expandedText": "🙂👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻",
+            "cursor": {
+              "line": 0,
+              "col": 22
+            },
+            "cursorUtf16Offset": 22,
+            "changes": [
+              "🙂",
+              "🙂[paste #1 +12 lines]"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 3,
+            "lastRenderColumns": 24,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────────────────",
+              "🙂\u001b_pi:c\u0007\u001b[7m[paste #1 +12 lines]\u001b[0m  ",
+              "────────────────────────"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "genuine-supplementary-history-raw-undo",
+      "input": {
+        "steps": [
+          {
+            "kind": "history",
+            "data": "🙂 👩‍💻 🇺🇸"
+          },
+          {
+            "kind": "set",
+            "data": "seed 👍🏽"
+          },
+          {
+            "kind": "input",
+            "data": "\u0001"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "X"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "input",
+            "data": "\u001f"
+          },
+          {
+            "kind": "render",
+            "columns": 8,
+            "terminalRows": 24
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[A"
+          },
+          {
+            "kind": "input",
+            "data": "\u001b[B"
+          },
+          {
+            "kind": "render",
+            "columns": 32,
+            "terminalRows": 24
+          }
+        ]
+      },
+      "observation": {
+        "steps": [
+          {
+            "text": "",
+            "expandedText": "",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "seed 👍🏽",
+            "expandedText": "seed 👍🏽",
+            "cursor": {
+              "line": 0,
+              "col": 9
+            },
+            "cursorUtf16Offset": 9,
+            "changes": [
+              "seed 👍🏽"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "seed 👍🏽",
+            "expandedText": "seed 👍🏽",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "seed 👍🏽"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "🙂 👩‍💻 🇺🇸",
+            "expandedText": "🙂 👩‍💻 🇺🇸",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "seed 👍🏽",
+              "🙂 👩‍💻 🇺🇸"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "🙂 👩‍💻 🇺🇸",
+            "expandedText": "🙂 👩‍💻 🇺🇸",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "seed 👍🏽",
+              "🙂 👩‍💻 🇺🇸"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "X🙂 👩‍💻 🇺🇸",
+            "expandedText": "X🙂 👩‍💻 🇺🇸",
+            "cursor": {
+              "line": 0,
+              "col": 1
+            },
+            "cursorUtf16Offset": 1,
+            "changes": [
+              "seed 👍🏽",
+              "🙂 👩‍💻 🇺🇸",
+              "X🙂 👩‍💻 🇺🇸"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "X🙂 👩‍💻 🇺🇸",
+            "expandedText": "X🙂 👩‍💻 🇺🇸",
+            "cursor": {
+              "line": 0,
+              "col": 14
+            },
+            "cursorUtf16Offset": 14,
+            "changes": [
+              "seed 👍🏽",
+              "🙂 👩‍💻 🇺🇸",
+              "X🙂 👩‍💻 🇺🇸"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "🙂 👩‍💻 🇺🇸",
+            "expandedText": "🙂 👩‍💻 🇺🇸",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "seed 👍🏽",
+              "🙂 👩‍💻 🇺🇸",
+              "X🙂 👩‍💻 🇺🇸",
+              "🙂 👩‍💻 🇺🇸"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 0,
+            "lastRenderColumns": null,
+            "terminalRows": 24,
+            "lastRenderedRows": null
+          },
+          {
+            "text": "🙂 👩‍💻 🇺🇸",
+            "expandedText": "🙂 👩‍💻 🇺🇸",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "seed 👍🏽",
+              "🙂 👩‍💻 🇺🇸",
+              "X🙂 👩‍💻 🇺🇸",
+              "🙂 👩‍💻 🇺🇸"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 8,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────",
+              "\u001b_pi:c\u0007\u001b[7m🙂\u001b[0m 👩‍💻   ",
+              "🇺🇸      ",
+              "────────"
+            ]
+          },
+          {
+            "text": "🙂 👩‍💻 🇺🇸",
+            "expandedText": "🙂 👩‍💻 🇺🇸",
+            "cursor": {
+              "line": 0,
+              "col": 0
+            },
+            "cursorUtf16Offset": 0,
+            "changes": [
+              "seed 👍🏽",
+              "🙂 👩‍💻 🇺🇸",
+              "X🙂 👩‍💻 🇺🇸",
+              "🙂 👩‍💻 🇺🇸",
+              "🙂 👩‍💻 🇺🇸"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 8,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────",
+              "\u001b_pi:c\u0007\u001b[7m🙂\u001b[0m 👩‍💻   ",
+              "🇺🇸      ",
+              "────────"
+            ]
+          },
+          {
+            "text": "🙂 👩‍💻 🇺🇸",
+            "expandedText": "🙂 👩‍💻 🇺🇸",
+            "cursor": {
+              "line": 0,
+              "col": 9
+            },
+            "cursorUtf16Offset": 9,
+            "changes": [
+              "seed 👍🏽",
+              "🙂 👩‍💻 🇺🇸",
+              "X🙂 👩‍💻 🇺🇸",
+              "🙂 👩‍💻 🇺🇸",
+              "🙂 👩‍💻 🇺🇸"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 1,
+            "lastRenderColumns": 8,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────",
+              "\u001b_pi:c\u0007\u001b[7m🙂\u001b[0m 👩‍💻   ",
+              "🇺🇸      ",
+              "────────"
+            ]
+          },
+          {
+            "text": "🙂 👩‍💻 🇺🇸",
+            "expandedText": "🙂 👩‍💻 🇺🇸",
+            "cursor": {
+              "line": 0,
+              "col": 9
+            },
+            "cursorUtf16Offset": 9,
+            "changes": [
+              "seed 👍🏽",
+              "🙂 👩‍💻 🇺🇸",
+              "X🙂 👩‍💻 🇺🇸",
+              "🙂 👩‍💻 🇺🇸",
+              "🙂 👩‍💻 🇺🇸"
+            ],
+            "submits": [],
+            "renderRequests": 0,
+            "renderCalls": 2,
+            "lastRenderColumns": 32,
+            "terminalRows": 24,
+            "lastRenderedRows": [
+              "────────────────────────────────",
+              "🙂 👩‍💻 \u001b_pi:c\u0007\u001b[7m🇺🇸\u001b[0m                        ",
+              "────────────────────────────────"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

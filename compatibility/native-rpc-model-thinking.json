@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "base": "bf9ed062f0bbcccb5e598a7b08269ceecc339d21",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "status": "AUTHORED_OPERATIONAL_NATIVE_THINKING_RPC_INTEGRATION_PREREQUISITE_CORRECTION_AND_REVIEW_PENDING",
+  "commands": [
+    "set_model",
+    "cycle_model",
+    "get_available_models",
+    "set_thinking_level",
+    "cycle_thinking_level",
+    "get_available_thinking_levels"
+  ],
+  "authoredGroups": 8,
+  "buildsExecuted": 0,
+  "testsExecuted": 0,
+  "providerCalls": 0,
+  "configuredInventoryOnly": true,
+  "inventoryOrderRetained": true,
+  "fullMetadataRetained": true,
+  "durableConfigurationApi": "PersistentAgentSession.ConfigureAsync",
+  "nonOffThinkingSupported": true,
+  "prerequisite": "d1810105bfce81a890034c55a73e0894ae8766ad composed as ad67a7007e0de06e02d0dfa69d3b31ce748c24d3; independent correction/review pending; not qualified",
+  "queryLevels": "PersistentAgentSession.GetSupportedThinkingLevels for actual current/selected binding; legacy and bounded unsupported transports remain off-only",
+  "sourceParityAccepted": false,
+  "mainMerged": false,
+  "publicPush": false,
+  "ownership": [
+    "src/PiSharp.Rpc/Protocol/RpcCommandCodec.cs",
+    "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs",
+    "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.ModelThinking.cs",
+    "tests/PiSharp.Rpc.Tests/RpcModelThinkingTests.cs",
+    "tests/PiSharp.Rpc.Tests/Program.cs",
+    "tests/PiSharp.Rpc.Tests/RpcNativeThinkingIntegrationTests.cs"
+  ],
+  "remaining": [
+    "corrected native-thinking prerequisite admission",
+    "independent source review",
+    "approved offline compile and eight RPC groups plus appropriate regressions",
+    "source/provider parity remains unaccepted"
+  ],
+  "integrationBase": "c7481d3b9466c8d6330e895bcb0c10d71e294008",
+  "nonOffThinkingScope": "authored only; conditional on admitted actual native binding; no execution or acceptance",
+  "newNativeIntegrationGroups": 3
+}

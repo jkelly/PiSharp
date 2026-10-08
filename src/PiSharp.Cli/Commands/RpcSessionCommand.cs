@@ -9,34 +9,64 @@ using PiSharp.Rpc;
 using PiSharp.Rpc.Protocol;
 using PiSharp.Sessions.Storage;
 using PiSharp.Cli.Extensions;
+using PiSharp.Cli.Interactive;
+using PiSharp.Extensions;
 using PiSharp.Rpc.Ui;
 using PiSharp.Sessions.Lifecycle;
+using PiSharp.Cli.Prompts;
+using PiSharp.CodingAgent.Resources;
+using PiSharp.CodingAgent.Configuration;
+using PiSharp.Cli.Settings;
+using PiSharp.Cli.Skills;
+using PiSharp.CodingAgent.Resources.Skills;
 
 namespace PiSharp.Cli.Commands;
 
-/// <summary>Explicit-path offline durable RPC host. Stdout contains only the dispatcher's shared JSONL records.</summary>
+/// <summary>Explicit-path durable RPC host with scripted or explicit live provider admission. Stdout contains only the dispatcher's shared JSONL records.</summary>
 public static class RpcSessionCommand
 {
     public const string Usage = "session rpc --session <existing absolute JSONL> --workspace <existing absolute directory> " +
-        "--offline-script <absolute JSON> [--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
-        "[--bash-executable <absolute file> --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]] " + NativeExtensionConfiguration.Flags + " " + SessionCatalogCommand.Flags + " " + CreationFlags;
+        "(--offline-script <absolute JSON> | --live [--provider openai|openrouter|anthropic] [--model <pinned model id>] [--max-output-tokens 1..8192]) [--thinking off|minimal|low|medium|high|xhigh|max] [--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
+        "[--bash-executable <absolute file> --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]] " + NativeExtensionConfiguration.Flags + " " + SessionCatalogCommand.Flags + " " + CreationFlags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags;
     public const string CreationFlags = "[--session-mode open|new-memory|new-lazy]";
     private static readonly JsonlTransportOptions Framing = new(MaximumFrameBytes: 1_048_576, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
-    private sealed record Arguments(string Session, string Workspace, string Script, bool Latest, string? Leaf,
+    private sealed record Arguments(string Session, string Workspace, string? Script, bool Latest, string? Leaf,
         ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi, OfflineBashAuthorization? Bash,
-        NativeExtensionConfiguration? Extension, bool SupportsImages, ImmutableArray<SessionCatalogStore> Stores, string SessionMode);
+        NativeExtensionConfiguration? Extension, bool SupportsImages, ImmutableArray<SessionCatalogStore> Stores, string SessionMode, SettingsModelSelection? Live,
+        PromptTemplateCliConfiguration Prompts, StartupSettingsRequest? Settings, string? Thinking, ToolSelectionCliOptions Tools, SkillCliConfiguration Skills);
 
     public static Task<int> RunAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
-        CancellationToken cancellationToken = default) => RunCoreAsync(args, stdin, stdout, stderr, null, cancellationToken);
+        CancellationToken cancellationToken = default, PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
+        Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null, PiSharp.Cli.Reloading.NativeHostReloadAdmission? reloadAdmission = null) =>
+        RunCoreAsync(args, stdin, stdout, stderr, null, cancellationToken, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission);
+
+    /// <summary>Same host lifecycle with injected reads for explicitly selected settings files.</summary>
+    public static Task<int> RunWithSettingsAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
+        IStartupSettingsFileSystem settingsFileSystem, CancellationToken cancellationToken = default,
+        PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
+        Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null, PiSharp.Cli.Reloading.NativeHostReloadAdmission? reloadAdmission = null)
+    {
+        ArgumentNullException.ThrowIfNull(settingsFileSystem);
+        return RunCoreAsync(args, stdin, stdout, stderr, null, cancellationToken, settingsFileSystem: settingsFileSystem, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission);
+    }
 
     internal static Task<int> RunWithPresentationAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
         IRpcExtensionUiPresentationObserver presentation, CancellationToken cancellationToken, Func<bool>? userShutdown = null,
-        Func<RpcSessionShutdownSettlement, ValueTask<RpcTerminalStoppedAcknowledgment>>? stopTerminalAndJoin = null) =>
-        RunCoreAsync(args, stdin, stdout, stderr, presentation, cancellationToken, userShutdown, stopTerminalAndJoin);
+        Func<RpcSessionShutdownSettlement, ValueTask<RpcTerminalStoppedAcknowledgment>>? stopTerminalAndJoin = null,
+        LiveSessionRuntime? liveRuntime = null, PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
+        Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null, PiSharp.Cli.Reloading.NativeHostReloadAdmission? reloadAdmission = null,
+        TerminalExtensionInputAdmission? terminalInputAdmission = null,
+        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null) =>
+        RunCoreAsync(args, stdin, stdout, stderr, presentation, cancellationToken, userShutdown, stopTerminalAndJoin, liveRuntime, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission, terminalInputAdmission: terminalInputAdmission, decorateTerminalUi: decorateTerminalUi);
 
     private static async Task<int> RunCoreAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
         IRpcExtensionUiPresentationObserver? presentation, CancellationToken cancellationToken, Func<bool>? userShutdown = null,
-        Func<RpcSessionShutdownSettlement, ValueTask<RpcTerminalStoppedAcknowledgment>>? stopTerminalAndJoin = null)
+        Func<RpcSessionShutdownSettlement, ValueTask<RpcTerminalStoppedAcknowledgment>>? stopTerminalAndJoin = null,
+        LiveSessionRuntime? liveRuntime = null, IStartupSettingsFileSystem? settingsFileSystem = null,
+        PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
+        Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null, PiSharp.Cli.Reloading.NativeHostReloadAdmission? reloadAdmission = null,
+        TerminalExtensionInputAdmission? terminalInputAdmission = null,
+        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null)
     {
         ArgumentNullException.ThrowIfNull(stdin); ArgumentNullException.ThrowIfNull(stdout); ArgumentNullException.ThrowIfNull(stderr);
         OfflineSessionProfile? profile = null; PersistentAgentSession? session = null;
@@ -44,20 +74,27 @@ public static class RpcSessionCommand
         InputObservation? observedInput = null; OutputObservation? observedOutput = null; OfflineGate? gate = null;
         SessionStorageBackend? backend = null; Exception? operationFailure = null;
         var cleanupFailures = new List<Exception>();
+        using var lifecycleStop = new CancellationTokenSource();
+        using var lifecycleRun = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifecycleStop.Token);
         try
         {
             var parsed = Parse(args);
             cancellationToken.ThrowIfCancellationRequested();
             if (!stdin.CanRead || !stdout.CanWrite) throw Invalid();
             if (!Directory.Exists(parsed.Workspace)) throw new SessionCommandException(SessionCommandFailure.WorkspaceMissing);
+            var settings = await SettingsStartupConfiguration.LoadAsync(parsed.Settings, stderr, settingsFileSystem, cancellationToken).ConfigureAwait(false);
+            var liveSelection = parsed.Live?.Resolve(settings);
             backend = parsed.SessionMode == "open" ? null : new SessionStorageBackend(Path.GetDirectoryName(parsed.Session)!,
                 parsed.SessionMode == "new-memory" ? SessionStorageMode.InMemory : SessionStorageMode.LazyLocal,
                 new(MaximumFileBytes: 8_388_608));
-            var turns = await SessionCommands.ScriptAsync(parsed.Script, cancellationToken).ConfigureAwait(false);
+            var turns = parsed.Script is null ? ImmutableArray<JsonData>.Empty :
+                await SessionCommands.ScriptAsync(parsed.Script, cancellationToken).ConfigureAwait(false);
             gate = OfflineGate.From(turns);
             ui = parsed.Extension is null ? null : new(presentationObserver: presentation);
+            IExtensionUiProvider? activationUi = ui is null ? null : decorateTerminalUi?.Invoke(ui) ?? ui;
+            if (activationUi is not null && terminalInputAdmission is not null) activationUi = terminalInputAdmission.Decorate(activationUi);
             profile = await OfflineSessionProfile.CreateAsync(parsed.Workspace, parsed.Session, parsed.Script,
-                turns, parsed.Reads, parsed.Writes, cancellationToken, gate.BeforeSendAsync, parsed.OfflineApi, parsed.Bash, parsed.Extension, ui,
+                turns, parsed.Reads, parsed.Writes, cancellationToken, gate.BeforeSendAsync, parsed.OfflineApi, parsed.Bash, parsed.Extension, activationUi,
                 async (diagnostic, token) =>
                 {
                     token.ThrowIfCancellationRequested();
@@ -65,7 +102,12 @@ public static class RpcSessionCommand
                         eventName = diagnostic.EventName, ownerId = diagnostic.OwnerId, ownerGeneration = diagnostic.OwnerGeneration,
                         registrationId = diagnostic.RegistrationId, failure = diagnostic.Failure.ToString() }) + "\n").AsMemory(), token).ConfigureAwait(false);
                     await stderr.FlushAsync(token).ConfigureAwait(false);
-                }, modelSupportsImages: parsed.SupportsImages).ConfigureAwait(false);
+                }, modelSupportsImages: parsed.SupportsImages, liveSelection: liveSelection, liveRuntime: liveRuntime,
+                toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings), mcpAdmission: mcpAdmission).ConfigureAwait(false);
+            profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
+            profile.ConfigureEffectiveSettings(settings);
+            profile.BindSettingsThinkingReads();
+            await profile.LoadSkillsAsync(parsed.Skills, stderr, cancellationToken).ConfigureAwait(false);
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);
             var options = new PersistentAgentSessionOptions(UseLatestLeaf: parsed.Latest, SelectedLeafId: parsed.Leaf,
@@ -74,7 +116,7 @@ public static class RpcSessionCommand
             string NextId() => "rpc-" + Guid.NewGuid().ToString("N");
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);
-            var lifecycle = new PersistentSessionLifecycle(profile.Registry, Clock, NextId, options, catalog: catalog, backend: backend);
+            var lifecycle = profile.CreateLifecycle(Clock, NextId, options, catalog: catalog, backend: backend);
             session = parsed.SessionMode == "open"
                 ? await lifecycle.OpenAsync(new(parsed.Session, parsed.Latest, parsed.Leaf), profile.SelectedModel, cancellationToken).ConfigureAwait(false)
                 : await lifecycle.CreateAsync(parsed.Session, new PiSharp.Sessions.Serialization.SessionEntryCodec().Parse(JsonSerializer.Serialize(new
@@ -84,7 +126,16 @@ public static class RpcSessionCommand
             if (!string.Equals(SessionCommands.Absolute(session.WorkingDirectory), profile.Workspace,
                 OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                 throw new SessionCommandException(SessionCommandFailure.WorkspaceMismatch);
-            profile.AttachOwner(session, options, Clock, NextId, parsed.Stores.IsEmpty ? null : parsed.Stores, lifecycle);
+            var thinking = SettingsModelSelection.Thinking(settings, session.Snapshot.Agent.Model, parsed.Thinking,
+                parsed.SessionMode == "open", session.GetSupportedThinkingLevels());
+            if (thinking is not null && thinking != session.Snapshot.Context.ThinkingLevel)
+                await session.ConfigureAsync(new(ThinkingLevel: thinking), cancellationToken).ConfigureAwait(false);
+            await profile.LoadPromptTemplatesAsync(parsed.Prompts, stderr, cancellationToken).ConfigureAwait(false);
+            if (parsed.SessionMode == "open") await profile.ApplySkillsAsync(session, cancellationToken).ConfigureAwait(false);
+            if (settings is not null) { session.SteeringMode = settings.SteeringMode; session.FollowUpMode = settings.FollowUpMode; }
+            await profile.AttachOwnerAsync(session, options, Clock, NextId, parsed.Stores.IsEmpty ? null : parsed.Stores, lifecycle).ConfigureAwait(false);
+            if (reloadAdmission is not null) profile.ConfigureReload(reloadAdmission);
+            await profile.ApplyInitialToolSelectionAsync(session, cancellationToken).ConfigureAwait(false);
             observedInput = new InputObservation(stdin, gate);
             var outputFraming = parsed.Bash is null ? Framing : Framing with { MaximumFrameBytes = 8 * 1024 * 1024 };
             observedOutput = new OutputObservation(stdout, gate, outputFraming.MaximumFrameBytes);
@@ -97,8 +148,13 @@ public static class RpcSessionCommand
                 sessionOwnership: RpcSessionOwnership.Borrowed, inputAdmission: profile.InputAdmission, extensionUi: ui,
                 extensionCommandCatalog: profile, sessionOwner: profile.Sessions,
                 sessionStartup: token => profile.StartLifecycleAsync(parsed.SessionMode == "open" ? "resume" : "new", token),
-                summaryGenerator: profile.SummaryGenerator, recoveryDesiredMaxOutput: profile.OriginalDesiredMaxOutput);
-            await dispatcher.RunAsync(reader, cancellationToken).ConfigureAwait(false);
+                summaryGenerator: profile.SummaryGenerator, recoveryDesiredMaxOutput: profile.OriginalDesiredMaxOutput,
+                inputAdmissionSelector: profile.PromptInputSelector, exportHtmlWriter: profile.ExportHtmlWriter,
+                selectedTreePublisher: profile.PublishSelectedTreeAsync,
+                postInputSettlement: profile.DrainLifecycleHandoffsAsync,
+                postRunSettlement: profile.DrainLifecycleHandoffsAsync);
+            profile.ConfigureLifecycleModeStop(lifecycleStop.CancelAsync);
+            await dispatcher.RunAsync(reader, lifecycleRun.Token).ConfigureAwait(false);
         }
         catch (Exception error) { operationFailure = error; }
         // A run/subscriber failure may poison session authority even when resource
@@ -123,8 +179,18 @@ public static class RpcSessionCommand
         }
         else if (writer is not null) await Cleanup(() => writer.DisposeAsync()).ConfigureAwait(false);
         if (reader is not null) await Cleanup(() => reader.DisposeAsync()).ConfigureAwait(false);
+        ExtensionSessionSnapshot? shutdownSnapshot = null;
+        // Rejected initial acquisition can already have retired the startup view.
+        // Only an attached session supplies a shutdown notification target; all
+        // acquired resources are still disposed below, including unattached ones.
+        var shutdownProfile = profile?.Sessions is not null ? profile : null;
+        // Dispatcher work has joined; capture the acknowledged final attachment before phase one
+        // cancels its lifetime. Retention grants read authority only, never a new action scope.
+        try { shutdownSnapshot = shutdownProfile?.CaptureShutdownSessionSnapshot(); }
+        catch (Exception error) { cleanupFailures.Add(error); }
         if (profile?.Sessions is { } owner) await Cleanup(() => new(owner.StopAdmissionAndJoinAsync())).ConfigureAwait(false);
         else if (session is not null) await Cleanup(() => new(session.StopAdmissionAndJoinAsync())).ConfigureAwait(false);
+        if (terminalInputAdmission is not null) await Cleanup(() => terminalInputAdmission.StopAdmissionAndJoinAsync()).ConfigureAwait(false);
         if (ui is not null) await Cleanup(() => ui.DisposeAsync()).ConfigureAwait(false);
         if (observedInput is not null) await Cleanup(() => observedInput.DisposeAsync()).ConfigureAwait(false);
         if (observedOutput is not null) await Cleanup(() => observedOutput.DisposeAsync()).ConfigureAwait(false);
@@ -146,6 +212,8 @@ public static class RpcSessionCommand
         // Phase two: every owned resource close is attempted and joined, including an unattached session.
         // Retired UI scopes cannot repaint or admit input while lifecycle disposal is running.
         var runtimeFailures = new List<Exception>();
+        if (shutdownProfile is not null)
+            await RuntimeCleanup(async () => { _ = await shutdownProfile.DispatchSessionShutdownAsync(shutdownSnapshot).ConfigureAwait(false); }).ConfigureAwait(false);
         if (profile is not null) await RuntimeCleanup(() => profile.DisposeAsync()).ConfigureAwait(false);
         if (session is not null) await RuntimeCleanup(() => session.DisposeAsync()).ConfigureAwait(false);
         cleanupFailures.AddRange(runtimeFailures);
@@ -178,11 +246,14 @@ public static class RpcSessionCommand
             return await Fail("Canceled", "RPC host canceled after settling owned work; inspect durable state.", 1).ConfigureAwait(false);
         if (operationFailure is SessionRuntimeRegistryException registryError && registryError.Failure == SessionRuntimeRegistryFailure.UnknownModel)
         {
+            if (profile?.IsLive == true) return await Fail("LiveSessionModelMismatch", "The selected live model does not match this session history; use a matching model or a new session.", 2).ConfigureAwait(false);
             var error = new SessionCommandException(SessionCommandFailure.OfflineProviderMismatch);
             return await Fail(error.Failure.ToString(), error.Message, 2).ConfigureAwait(false);
         }
         if (operationFailure is SessionCommandException commandError)
             return await Fail(commandError.Failure.ToString(), commandError.Message, commandError.Failure == SessionCommandFailure.CommandFailed ? 1 : 2).ConfigureAwait(false);
+        if (operationFailure is LiveSessionException liveError)
+            return await Fail(liveError.Code, liveError.Message, 2).ConfigureAwait(false);
         if (operationFailure is NativeExtensionException extensionError)
             return await Fail(extensionError.Failure.ToString(), extensionError.Message, extensionError.Failure == NativeExtensionFailure.CleanupFailed ? 1 : 2).ConfigureAwait(false);
         return await Fail("RpcHostFailed", "RPC host failed after owned cleanup; inspect durable state before retrying.", 1).ConfigureAwait(false);
@@ -206,19 +277,27 @@ public static class RpcSessionCommand
     {
         if (args is null || args.Length is < 8 or > 264 || args[0] != "session" || args[1] != "rpc") throw Invalid();
         var options = new Dictionary<string, string>(StringComparer.Ordinal);
-        var reads = ImmutableArray.CreateBuilder<string>(); var writes = ImmutableArray.CreateBuilder<string>(); var root = false;
+        var tools = new ToolSelectionCliOptions();
+        var skills = ImmutableArray.CreateBuilder<SkillPathSelection>();
+        var reads = ImmutableArray.CreateBuilder<string>(); var writes = ImmutableArray.CreateBuilder<string>(); var root = false; var live = false;
         var bashCommands = ImmutableArray.CreateBuilder<string>();
         var extensionTools = ImmutableArray.CreateBuilder<string>();
         var deniedExtensionTools = ImmutableArray.CreateBuilder<string>();
         var extensionCommands = ImmutableArray.CreateBuilder<string>();
         var stores = ImmutableArray.CreateBuilder<SessionCatalogStore>();
+        var prompts = ImmutableArray.CreateBuilder<PromptTemplatePathSelection>();
         for (var index = 2; index < args.Length; index++)
         {
+            if (SkillCliConfiguration.TryConsume(args, ref index, skills)) continue;
+            if (PromptTemplateCliConfiguration.TryConsume(args, ref index, prompts)) continue;
+            if (ToolSelectionCliConfiguration.TryConsume(args, ref index, ref tools)) continue;
             var key = args[index];
+            if (key == "--live") { if (live) throw Invalid(); live = true; continue; }
             if (key == "--root") { if (root) throw Invalid(); root = true; continue; }
-            if (key is not ("--session" or "--workspace" or "--offline-script" or "--offline-api" or "--offline-images" or "--leaf" or "--allow-read" or "--allow-write" or
+            if (key is not ("--session" or "--workspace" or "--offline-script" or "--offline-api" or "--offline-images" or "--provider" or "--model" or "--max-output-tokens" or "--leaf" or "--allow-read" or "--allow-write" or
                 "--bash-executable" or "--bash-spill-root" or "--allow-bash-command" or "--bash-timeout" or "--session-store" or "--session-mode" or
-                "--extension-package" or "--extension-manifest" or "--extension-approval" or "--extension-snapshot-root" or "--enable-extension-tool" or "--deny-extension-tool" or "--enable-extension-command") ||
+                "--extension-package" or "--extension-manifest" or "--extension-approval" or "--extension-snapshot-root" or "--enable-extension-tool" or "--deny-extension-tool" or "--enable-extension-command" or
+                "--user-settings" or "--project-settings" or "--steering-mode" or "--follow-up-mode" or "--thinking") ||
                 ++index >= args.Length) throw Invalid();
             var value = args[index];
             if (key == "--allow-read") reads.Add(SessionCommands.Absolute(value));
@@ -231,7 +310,16 @@ public static class RpcSessionCommand
             else if (!options.TryAdd(key, value)) throw Invalid();
         }
         if (!options.TryGetValue("--session", out var session) || !options.TryGetValue("--workspace", out var workspace) ||
-            !options.TryGetValue("--offline-script", out var script) || reads.Count > 128 || writes.Count > 128) throw Invalid();
+            reads.Count > 128 || writes.Count > 128) throw Invalid();
+        options.TryGetValue("--offline-script", out var script);
+        options.TryGetValue("--provider", out var provider); options.TryGetValue("--model", out var liveModel);
+        options.TryGetValue("--max-output-tokens", out var maximumTokens);
+        if (live ? script is not null || options.ContainsKey("--offline-api") || options.ContainsKey("--offline-images") :
+            script is null || provider is not null || liveModel is not null || maximumTokens is not null) throw Invalid();
+        options.TryGetValue("--thinking", out var thinking);
+        if (thinking is not null && !PiSharp.AI.ThinkingLevels.Ordered.Contains(thinking, StringComparer.Ordinal)) throw Invalid();
+        // Capture preferences without settings IO. Resolve through the pinned catalog after the one settings read.
+        var liveSelection = live ? new SettingsModelSelection(provider, liveModel, maximumTokens) : null;
         options.TryGetValue("--leaf", out var leaf);
         options.TryGetValue("--session-mode", out var sessionMode); sessionMode ??= "open";
         if (sessionMode is not ("open" or "new-memory" or "new-lazy") || sessionMode != "open" && (root || leaf is not null)) throw Invalid();
@@ -252,8 +340,9 @@ public static class RpcSessionCommand
         var sessionPath = SessionCommands.Absolute(session);
         if (sessionMode != "open" && stores.Any(store => !string.Equals(Path.GetFullPath(store.Directory), Path.GetDirectoryName(sessionPath),
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))) throw Invalid();
-        return new(SessionCommands.Absolute(session), SessionCommands.Absolute(workspace), SessionCommands.Absolute(script),
-            !root && leaf is null, leaf, reads.ToImmutable(), writes.ToImmutable(), model.Api, bash, extension, imageInput == "true", stores.ToImmutable(), sessionMode);
+        return new(SessionCommands.Absolute(session), SessionCommands.Absolute(workspace), script is null ? null : SessionCommands.Absolute(script),
+            !root && leaf is null, leaf, reads.ToImmutable(), writes.ToImmutable(), model.Api, bash, extension, imageInput == "true", stores.ToImmutable(), sessionMode, liveSelection,
+            new(prompts.ToImmutable()), SettingsStartupConfiguration.FromOptions(options), thinking, tools, new(skills.ToImmutable()));
     }
     private static SessionCommandException Invalid() => new(SessionCommandFailure.InvalidArguments);
     private static bool Unicode(string value)

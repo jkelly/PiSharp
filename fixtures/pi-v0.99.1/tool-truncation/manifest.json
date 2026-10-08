@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "normalizerVersion": "object-key-order-v1",
+  "scope": "Integrity registration for 124 authored string inputs and 248 unchanged upstream head/tail observations. Capture fields are unnormalized; native tool and phase acceptance remain open.",
+  "fixtures": [
+    {
+      "fixtureId": "tool-truncation-core",
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "requirementIds": [
+        "tools.truncation"
+      ],
+      "scenario": "Pure truncateHead/truncateTail string output and all eleven metadata fields across UTF-8 and LF boundaries, zero/default/integer budgets, oversized lines, CRLF/BOM/NUL text and invalid UTF-16.",
+      "clock": {
+        "mechanism": "No clock calls in the selected pure source exports; no clock override."
+      },
+      "seed": "none; explicit ordered authored case IDs, strings and budgets",
+      "environment": {
+        "platform": "win32",
+        "architecture": "x64",
+        "credentials": "Not consulted by the import-free source or capture adapter; no claim that child processes received a scrubbed environment.",
+        "network": "No network imports or calls in the import-free source or capture adapter; no network-disable guard claim.",
+        "workspace": "Read-only pinned public source import and exclusive creation of new local evidence files."
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/tool-truncation/core.input.json",
+        "sha256": "c573c8413bfa1c78a872d17672d5f0a861ce2637b05055e6fa11c5f87f2f5c04"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/tool-truncation/core.expected.json",
+        "sha256": "8c088a8230dcf627221c2b3d3f22b2c7dc4aee2f3bd9e8b434f3c13b2124496d",
+        "bytes": 498500
+      },
+      "rawCaptures": [
+        {
+          "path": "fixtures/pi-v0.99.1/tool-truncation/core.capture-1.json",
+          "sha256": "8c088a8230dcf627221c2b3d3f22b2c7dc4aee2f3bd9e8b434f3c13b2124496d",
+          "bytes": 498500
+        },
+        {
+          "path": "fixtures/pi-v0.99.1/tool-truncation/core.capture-2.json",
+          "sha256": "8c088a8230dcf627221c2b3d3f22b2c7dc4aee2f3bd9e8b434f3c13b2124496d",
+          "bytes": 498500
+        }
+      ],
+      "provenance": {
+        "kind": "captured-upstream-tool-truncation-oracle",
+        "inputKind": "authored-tool-truncation-input",
+        "inputOrigin": "PiSharp-authored synthetic boundary corpus",
+        "source": "Unchanged pinned truncateHead and truncateTail exports imported directly by file URL with Node type stripping; one import-free source module and built-in Buffer only.",
+        "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+        "record": {
+          "path": "fixtures/pi-v0.99.1/tool-truncation/core.provenance.json",
+          "sha256": "9ae1f097849764c7b1908f75d9a854be08ee8cf29bbc66d7dc669fa3a3944417"
+        },
+        "runner": {
+          "path": "tools/PiReferenceRunner/capture-tool-truncation.mjs",
+          "sha256": "0f9899a8c01813e8cf13265d11f45bd6693da0e5fc52fd9d901ab910b54a4e6a"
+        },
+        "runtime": {
+          "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+          "version": "v24.19.0",
+          "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+          "platform": "win32",
+          "architecture": "x64",
+          "flags": [
+            "--experimental-strip-types",
+            "--disable-warning=ExperimentalWarning"
+          ]
+        },
+        "sourceModules": [
+          {
+            "path": "packages/coding-agent/src/core/tools/truncate.ts",
+            "sha256": "8e4507c3ed7ca7548cf7c2d7f77d07f2ae63a38b756789cbb44e9062db6c8762"
+          }
+        ],
+        "capturedMethods": [
+          "truncateHead",
+          "truncateTail"
+        ],
+        "capturedAt": "2026-09-30",
+        "captureCommand": "& 'P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe' --experimental-strip-types --disable-warning=ExperimentalWarning tools/PiReferenceRunner/capture-tool-truncation.mjs ../Pi-upstream-v0.99.1 fixtures/pi-v0.99.1/tool-truncation/core.input.json fixtures/pi-v0.99.1/tool-truncation",
+        "capturedCaseCount": 124,
+        "observedResultCount": 248,
+        "independentCaptureProcesses": 2,
+        "capturesByteIdentical": true,
+        "normalization": [],
+        "providerWireTraffic": false,
+        "nativeDifferential": false,
+        "toolEffectsImplemented": false,
+        "phaseAcceptanceClaimed": false
+      }
+    }
+  ]
+}

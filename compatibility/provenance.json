@@ -1,0 +1,569 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "items": [
+    {
+      "id": "pinned-pi-source",
+      "kind": "external-source-reference",
+      "origin": "https://github.com/earendil-works/pi",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2025 Mario Zechner",
+      "sourceToPort": [
+        "Public packages/ai/src/types.ts informs native PiWireJson message/event contracts",
+        "Public packages/ai/src/utils/assistant-message-frame.ts informs native AssistantStreamReducer",
+        "Development reference runner imports public event-stream.ts unmodified from external checkout",
+        "Public packages/agent/src/agent-loop.ts and types.ts inform native ToolBatchScheduler and tool/event contracts",
+        "Development reference runner imports public openai-responses-shared.ts processResponsesStream unmodified with authored parsed DTOs and synthetic rates"
+      ],
+      "notice": "THIRD-PARTY-NOTICES.md"
+    },
+    {
+      "id": "native-streaming-json-preview",
+      "kind": "public-source-adaptation",
+      "origin": "https://github.com/promplate/partial-json-parser-js",
+      "version": "0.1.7",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2023 Promplate Dev Team",
+      "sourceToPort": [
+        "Pinned public Pi json-parse.ts informs strict, repaired, partial and repaired-partial display parsing attempts",
+        "Public partial-json 0.1.7 dist/index.js and options.js inform the bounded native partial reader"
+      ],
+      "sourceHashes": {
+        "dist/index.js": "23f750aa1170c830b7ef180135852317886cc58ce7d2597e5eeee044539072c7",
+        "dist/options.js": "779b2aded6d4e2ec6171ea9d5d5d97551e8c3258b6e78a01d2e9fc6235865b36"
+      },
+      "nativePath": "src/PiSharp.AI/ToolArguments/StreamingJsonPreview.cs",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "scope": "Standalone display-only prototype; no accepted reducer or executable final-argument integration"
+    },
+    {
+      "id": "fixtures-authored",
+      "kind": "authored-synthetic-fixtures",
+      "license": "PiSharp repository MIT license",
+      "paths": [
+        "fixtures/pi-v0.99.1/providers",
+        "fixtures/pi-v0.99.1/reference-inputs"
+      ],
+      "containsPrivateData": false,
+      "origin": "New synthetic inputs authored for this implementation"
+    },
+    {
+      "id": "reference-oracle",
+      "kind": "captured-behavior",
+      "paths": [
+        "fixtures/pi-v0.99.1/reference-oracle"
+      ],
+      "origin": "Unmodified pinned event-stream.ts with authored synthetic inputs",
+      "scope": "Queue/settlement only; no provider or frame reducer calls"
+    },
+    {
+      "id": "full-agent-reference-oracle",
+      "kind": "captured-behavior",
+      "paths": [
+        "fixtures/pi-v0.99.1/agent"
+      ],
+      "origin": "Unmodified pinned agent-loop.ts runAgentLoop with authored synthetic input and fake stream/tools",
+      "scope": "One awaited full-loop scheduling/transcript scenario; no production provider wire or native differential",
+      "dependencyProvenance": "tools/PiReferenceRunner/full-lock.json",
+      "runtimeDependencies": "Task-local upstream-locked typebox 1.3.27 and partial-json 0.1.7; development-only, not bundled with native product"
+    },
+    {
+      "id": "indexed-frame-reference-oracle",
+      "kind": "captured-behavior",
+      "paths": [
+        "fixtures/pi-v0.99.1/frame"
+      ],
+      "origin": "Unmodified pinned AssistantMessageFrameEncoder and reduceAssistantMessageFrames with authored synthetic inputs",
+      "scope": "One interleaved indexed frame scenario; completed native comparison remains bounded, wider prefix parity open",
+      "dependencyProvenance": "tools/PiReferenceRunner/frame-lock.json",
+      "containsPrivateData": false,
+      "runtimeDependencies": "Existing task-local development-only upstream-locked dependencies; not bundled with native product"
+    },
+    {
+      "id": "json-preview-reference-oracle",
+      "kind": "captured-behavior",
+      "paths": [
+        "fixtures/pi-v0.99.1/json-preview"
+      ],
+      "origin": "Unmodified pinned parseStreamingJson and upstream-locked partial-json with authored strings",
+      "scope": "39 observed preview cases including explicit precision probes; native profile32matches7exclusions and no general numeric parity",
+      "dependencyProvenance": "tools/PiReferenceRunner/json-preview-lock.json",
+      "containsPrivateData": false,
+      "runtimeDependencies": "Existing task-local development-only upstream-locked dependencies; not bundled with native product"
+    },
+    {
+      "id": "responses-parsed-event-reference-oracle",
+      "kind": "captured-behavior",
+      "paths": [
+        "fixtures/pi-v0.99.1/responses-wire"
+      ],
+      "origin": "Unmodified pinned processResponsesStream with authored parsed DTOs and synthetic model rates",
+      "scope": "Three helper traces; no HTTP/SSE/wrapper/authentication/production-catalog/native-provider parity",
+      "dependencyProvenance": "tools/PiReferenceRunner/responses-lock.json",
+      "containsPrivateData": false,
+      "runtimeDependencies": "Existing task-local development-only upstream-locked dependencies; not bundled with native product"
+    },
+    {
+      "id": "native-responses-text-tool",
+      "kind": "public-source-adaptation",
+      "origin": "https://github.com/earendil-works/pi",
+      "version": "0.99.1",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2025 Mario Zechner",
+      "sourceToPort": [
+        "Public packages/ai/src/api/openai-responses-shared.ts processResponsesStream informs native parsed text/refusal and function-call reduction, identity, signature and usage mapping"
+      ],
+      "sourceHashes": {
+        "packages/ai/src/api/openai-responses-shared.ts": "85db12efcd109d505c98846e34c45cb4a3260edcee88ef28c8afd1db20eac26a"
+      },
+      "nativePath": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTextToolTransport.cs",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "containsPrivateData": false,
+      "scope": "Parsed text/function subset; native authored envelopes and strict validation; no HTTP/SDK/auth/catalog/request projection or complete provider parity"
+    },
+    {
+      "id": "responses-replay-reference-oracle",
+      "kind": "captured-behavior",
+      "paths": [
+        "fixtures/pi-v0.99.1/responses-replay"
+      ],
+      "origin": "Unmodified pinned public convertResponsesMessages with authored transcript/model/options/provider sets",
+      "scope": "Three serialized input-array request projections and separate own-undefined ledger; no full payload/auth/SDK/provider/native comparison",
+      "dependencyProvenance": "tools/PiReferenceRunner/responses-replay-lock.json",
+      "containsPrivateData": false,
+      "runtimeDependencies": "Existing task-local development-only Node24.19.0, typebox1.3.27 and partial-json0.1.7; no new installation or product Node dependency"
+    },
+    {
+      "id": "loop-continuation-reference-oracle",
+      "kind": "captured-behavior",
+      "paths": [
+        "fixtures/pi-v0.99.1/loop-continuation"
+      ],
+      "origin": "Unchanged pinned runAgentLoop under authored fakeclock/provider/tool/lowlevelcallbacks",
+      "scope": "Two continuation/steering-before-followup cases;no native/highlevelAgent/paidprovider qualification",
+      "dependencyProvenance": "tools/PiReferenceRunner/loop-continuation-lock.json",
+      "containsPrivateData": false
+    },
+    {
+      "id": "released-public-source-baseline",
+      "kind": "inert-public-release-evidence",
+      "paths": [
+        "artifacts/released-baseline"
+      ],
+      "origin": "Official Pi0.99.1 GitHub release archive/checksums/metadata and exact public npm version documents",
+      "commit": "70c7b18de6a6b95b9e2d927775483117390de5d1",
+      "scope": "Canonical source/releasedcatalog identity only;nativeassetsnotexecuted;transitivelicensingopen",
+      "containsPrivateData": false
+    },
+    {
+      "id": "released-pi-ai-package",
+      "kind": "inert-public-release-evidence",
+      "paths": [
+        "artifacts/released-npm-ai"
+      ],
+      "origin": "Official registry.npmjs.org exact@earendil-works/pi-ai0.99.1tarball",
+      "commit": "a467501263a3a1622f79fe3540b36471a110f286",
+      "scope": "42providerJSONs match release-source;manifesttimestampdiffers;namedlicenseabsent;declarationsarenotlicenseclosure",
+      "containsPrivateData": false,
+      "installed": false,
+      "executed": false
+    },
+    {
+      "id": "native-responses-transcript-projection",
+      "kind": "public-source-adaptation",
+      "origin": "https://github.com/earendil-works/pi",
+      "version": "0.99.1",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2025 Mario Zechner",
+      "sourceToPort": [
+        "convertResponsesMessages, transformMessages, transcript/system resolution, system rendering, UTF16 shortHash and JSON.stringify argument profile inform the bounded native pure projector"
+      ],
+      "nativePath": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTranscriptProjector.cs",
+      "sourceEvidence": "tools/PiReferenceRunner/responses-replay-lock.json",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "scope": "Three serialized array cases; explicit safe-integer/Unicode/orphan/content hardening restrictions; no whole payload/provider parity",
+      "containsPrivateData": false
+    },
+    {
+      "id": "native-frozen-catalog",
+      "kind": "public-source-adaptation",
+      "origin": "https://github.com/earendil-works/pi",
+      "version": "0.99.1",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2025 Mario Zechner",
+      "nativePath": "src/PiSharp.AI/Catalogs/FrozenModelCatalog.cs",
+      "scope": "Bounded pure API-family/model catalog admission informed by pinned AI declarations; unchanged acquired JSON bytes retained; no runtime provider capability claim",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "containsPrivateData": false
+    },
+    {
+      "id": "native-agent-loop",
+      "kind": "public-source-adaptation",
+      "origin": "https://github.com/earendil-works/pi",
+      "version": "0.99.1",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2025 Mario Zechner",
+      "nativePath": "src/PiSharp.Agent/AgentLoopRunner.cs",
+      "scope": "Public source-informed bounded append-only turn/queue continuation; two fixed-clock captured projections; no high-level Agent parity",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "containsPrivateData": false
+    },
+    {
+      "id": "native-responses-key-request",
+      "kind": "public-source-adaptation",
+      "origin": "https://github.com/earendil-works/pi",
+      "version": "0.99.1",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2025 Mario Zechner",
+      "nativePath": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesKeyAuthRequestFactory.cs",
+      "scope": "Public builder-informed authored bounded non-reasoning payload/key profile; actual SDK wrapper qualification pending",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "containsPrivateData": false
+    },
+    {
+      "id": "native-tool-output-head-tail",
+      "kind": "public-source-adaptation",
+      "origin": "https://github.com/earendil-works/pi",
+      "version": "0.99.1",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2025 Mario Zechner",
+      "sourcePath": "packages/coding-agent/src/core/tools/truncate.ts",
+      "sourceSha256": "8e4507c3ed7ca7548cf7c2d7f77d07f2ae63a38b756789cbb44e9062db6c8762",
+      "nativePath": "src/PiSharp.Agent/Tools/ToolOutputTruncator.cs",
+      "sourceEvidence": "fixtures/pi-v0.99.1/tool-truncation/core.provenance.json",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "scope": "Pure head/tail string limits;124authored inputs/248genuineobserved results; no effectfultools/heapcap",
+      "containsPrivateData": false
+    },
+    {
+      "id": "development-openai-sdk-restore",
+      "kind": "development-only-external-dependency",
+      "origin": "https://registry.npmjs.org/openai/7.19.0",
+      "version": "7.19.0",
+      "license": "Apache-2.0 with retained package vendored notices",
+      "receipt": "compatibility/responses-sdk-oracle-setup.json",
+      "scope": "Unbundled task-local reference-only SDK;no product dependency/paid provider calls/scripts/native builds/global changes",
+      "fullLicenseReviewComplete": false,
+      "containsPrivateData": false
+    },
+    {
+      "id": "genuine-wrapper-sdk-observations",
+      "kind": "development-public-source-execution",
+      "origin": "https://github.com/earendil-works/pi",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "source": "packages/ai/src/api/openai-responses.ts",
+      "runtimeDependency": "openai7.19.0",
+      "evidence": "fixtures/pi-v0.99.1/responses-sdk/oracle.lock.json",
+      "scope": "Three authored fake-fetch text profiles, real unchanged wrapper/SDK; fixedDate.now disclosed; no native/provider/live parity",
+      "containsPrivateData": false
+    },
+    {
+      "id": "native-v3-session-codec",
+      "kind": "public-source-informed-native-implementation",
+      "source": "packages/coding-agent/src/core/session-manager.ts and docs/session-format.md",
+      "nativePath": "src/PiSharp.Sessions/Serialization/SessionEntryCodec.cs",
+      "scope": "Pure current-v3 codec; native integer/duplicate/Unicode/bounds policy, no upstream reader/migration parity",
+      "origin": "https://github.com/earendil-works/pi",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "containsPrivateData": false
+    },
+    {
+      "id": "native-file-mutation-queue",
+      "kind": "public-source-adaptation",
+      "source": "packages/coding-agent/src/core/tools/file-mutation-queue.ts",
+      "sourceSha256": "33cb06ac9bcdf32c8b84d9d12e33be44c503a7670f668e003a3262cd34294d11",
+      "nativePath": "src/PiSharp.Agent/Tools/FileMutationQueue.cs",
+      "scope": "Trusted injected identity resolver/FIFO/awaited cleanup; cancellation and logical caps native hardening",
+      "origin": "https://github.com/earendil-works/pi",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "containsPrivateData": false
+    },
+    {
+      "id": "native-read-write-tools",
+      "nativePath": "src/PiSharp.Tools/Files/ReadWriteTools.cs",
+      "scope": "Public-source-adapted bounded UTF8 file effects with mandatory host policy; broader content/identity/race/tool parity unfinished",
+      "kind": "public-source-informed-native-implementation",
+      "origin": "https://github.com/earendil-works/pi",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "containsPrivateData": false
+    },
+    {
+      "id": "native-session-append-and-context",
+      "nativePath": "src/PiSharp.Sessions",
+      "scope": "Public-source-informed wire/tree semantics; publish-after-local-durable-checkpoint is an explicit native decision; full interoperability unfinished",
+      "kind": "public-source-informed-native-implementation",
+      "origin": "https://github.com/earendil-works/pi",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "containsPrivateData": false
+    },
+    {
+      "id": "whole-session-context-reference",
+      "kind": "captured-public-behavior",
+      "origin": "https://github.com/earendil-works/pi",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "paths": [
+        "fixtures/pi-v0.99.1/session-context"
+      ],
+      "scope": "Whole unchanged public session projections and separate LLM conversion; source-only4cases, no filesystem/generation/native acceptance claim",
+      "setupReceipt": "compatibility/session-context-oracle-setup.json",
+      "containsPrivateData": false
+    },
+    {
+      "id": "native-stored-context-and-legacy-migration",
+      "kind": "public-source-adaptation",
+      "origin": "https://github.com/earendil-works/pi",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "source": "packages/coding-agent/src/core/session-manager.ts and messages.ts",
+      "nativePaths": [
+        "src/PiSharp.Sessions/Context",
+        "src/PiSharp.Sessions/Serialization/SessionEntryMigration.cs"
+      ],
+      "scope": "Stored influences developer4case comparison; pure legacy migration build pending; no generation/import/export gate",
+      "containsPrivateData": false
+    },
+    {
+      "id": "native-edit-tool",
+      "kind": "public-source-adaptation",
+      "origin": "https://github.com/earendil-works/pi",
+      "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "source": [
+        "packages/coding-agent/src/core/tools/edit.ts",
+        "packages/coding-agent/src/core/tools/edit-diff.ts",
+        "packages/coding-agent/src/utils/text.ts"
+      ],
+      "nativePaths": [
+        "src/PiSharp.Tools/Files/EditMatcher.cs",
+        "src/PiSharp.Tools/Files/EditPlan.cs",
+        "src/PiSharp.Tools/Files/EditTool.cs"
+      ],
+      "scope": "Authored native effects; independently authored bounded Myers formatter, exactjsdiff qualification pending",
+      "containsPrivateData": false
+    },
+    {
+      "id": "edit-reference-dependency-restore",
+      "kind": "development-only-exact-dependency-restore",
+      "source": "canonical public Pi root package-lock.json",
+      "packages": 13,
+      "installedArchiveFiles": 1997,
+      "receipt": "compatibility/edit-oracle-setup.json",
+      "receiptSha256": "2c1a92e8cc89f344aa397a12cd2708e2909792ad81ec402a3570b7863e110bea",
+      "scripts": false,
+      "nativeBuilds": false,
+      "productDependency": false,
+      "containsPrivateData": false
+    },
+    {
+      "id": "native-anthropic-request-projection",
+      "kind": "public-source-adaptation",
+      "origin": "https://github.com/earendil-works/pi",
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "nativePath": "src/PiSharp.AI/Protocols/AnthropicMessages/AnthropicMessagesRequestProjector.cs",
+      "sourceToPort": [
+        "Pinned whole anthropic-messages.ts, transform-messages.ts, transcript.ts, text.ts and constrained-sampling.ts inform authored native request conversion"
+      ],
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "scope": "Developer-tested source-informed explicit profile; no genuine SDK numeric/auth/provider qualification"
+    },
+    {
+      "id": "whole-public-rpc-jsonl-reference",
+      "kind": "development-only-unchanged-source-observation",
+      "origin": "https://github.com/earendil-works/pi",
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "fixturePath": "fixtures/pi-v0.99.1/rpc-jsonl",
+      "captureCommit": "4aaac9fb1e0a0b1698ac501a76f1e9fe19dbda67",
+      "scope": "Whole canonical jsonl.ts plus Node builtin; developer default replay passed, independent qualification pending"
+    },
+    {
+      "id": "whole-public-edit-reference",
+      "kind": "development-only-unchanged-source-observation",
+      "origin": "https://github.com/earendil-works/pi",
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "license": "MIT",
+      "fixturePath": "fixtures/pi-v0.99.1/edit",
+      "captureCommit": "d2e297606c2fd5f9edae9e055f948a9fe4ae11c1",
+      "scope": "Unchanged whole public exports and default owned filesystem effects; developer default replay passed, independent native comparison pending"
+    },
+    {
+      "id": "native-libuv-access-profile",
+      "kind": "public-source-adaptation",
+      "origin": "https://github.com/libuv/libuv",
+      "version": "1.52.1",
+      "license": "MIT",
+      "copyright": [
+        "Copyright (c) 2015-present libuv project contributors.",
+        "Copyright Joyent, Inc. and other Node contributors. All rights reserved."
+      ],
+      "sourcePaths": [
+        "src/win/fs.c",
+        "src/win/error.c",
+        "src/unix/fs.c"
+      ],
+      "nativePath": "src/PiSharp.Tools/Files/LocalFileAccessProbe.cs",
+      "sourceToPort": [
+        "Selected fs__access metadata/ReadOnly behavior and finite platform error categories translated to C#"
+      ],
+      "notice": "THIRD-PARTY-NOTICES.md",
+      "scope": "Actual Windows developer controls only; full error-table, Linux/macOS and hostile filesystem identity qualification remain open; no bundled libuv/Node binary"
+    },
+    {
+      "id": "anthropic-sdk-reviewed-development-oracle",
+      "kind": "development-only-external-dependency-restore",
+      "origin": "Exact official npm registry URLs and unchanged canonical upstream package-lock.json",
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "setupCommit": "8c7cdd3482d9ba5ead0ce1bbcf8246d4a9d20583",
+      "receipt": "compatibility/anthropic-oracle-setup.json",
+      "receiptSha256": "e11d383b6a5ecb736c89523c065d96e540b2392108b1c23ffa315113bc28c1c9",
+      "runtime": "Node24.19.0; task-local npm11.6.2",
+      "packages": [
+        {
+          "name": "@anthropic-ai/sdk",
+          "version": "0.124.0",
+          "files": {
+            "files": 1735,
+            "sha256": "36567957c4382a811f1cc2cb64b0f99715569ccf974aa4ae3c11bf2e4b9f3ed3"
+          },
+          "archiveSha256": "a9d9894658fc4e4ca44e982eb603b59945d01c24a5510965c067e1c94fdaaeb2",
+          "manifestSha256": "e9692cceae09a61d4168fca1fd47c1dd66b3798891b4cbe74cd21c331c20708a",
+          "licenseEvidence": "packaged-root-license-text",
+          "packagedRootLicenseVerified": true
+        },
+        {
+          "name": "@babel/runtime",
+          "version": "7.29.2",
+          "files": {
+            "files": 249,
+            "sha256": "b5a0ead572dacff9184ad5be4f720abaaa4137741fd8d3861b5151f086fc484a"
+          },
+          "archiveSha256": "91d6dda69e8514cca05e8bda7f6fe19b80f9a405fbd88c21e4eccc54f10f87e5",
+          "manifestSha256": "a34bfb8ab99545a10b211e8918e4a58cc66740366644298cb8efa3b766537ee0",
+          "licenseEvidence": "packaged-root-license-text",
+          "packagedRootLicenseVerified": true
+        },
+        {
+          "name": "@stablelib/base64",
+          "version": "1.0.1",
+          "files": {
+            "files": 15,
+            "sha256": "2320b911e9b77d2ade070cd674de1188ff7165f933de49847ddfd204bb4b1f98"
+          },
+          "archiveSha256": "0130711d2e0d3f87436c7825db1f35bd6134fba2eda64b0df43d781f9b6a596a",
+          "manifestSha256": "7821116cc9ab0fb2542c1407ac5e34ff78bcc70b2d1295b753a9ea16134b3df7",
+          "licenseEvidence": "packaged-root-license-text",
+          "packagedRootLicenseVerified": true
+        },
+        {
+          "name": "fast-sha256",
+          "version": "1.3.0",
+          "files": {
+            "files": 6,
+            "sha256": "66727f88b0cb099464e8e9ecd9e737cb1ba16d57fd0eb16af7c601d776e4686a"
+          },
+          "archiveSha256": "4f897ea2594dc9cfb1250e7d4d0f65b4f105952a802fff2d06990bf1dc2c84f6",
+          "manifestSha256": "d312f1993364bfb4f217f820ff7f9e0a6b1d87930bfc2605138ab660e8d29806",
+          "licenseEvidence": "packaged-root-license-text",
+          "packagedRootLicenseVerified": true
+        },
+        {
+          "name": "json-schema-to-ts",
+          "version": "3.1.1",
+          "files": {
+            "files": 267,
+            "sha256": "5bb4712de7619bc9b8b7078f50f3e69a8c48774da81666d5c7e3820e89e15b51"
+          },
+          "archiveSha256": "f6f34e4e453aca8753e9f644ad4fa297ae7011030bfff9e909bf34e31c4cc364",
+          "manifestSha256": "9439fa620a0f7a930950239ec4445d902c7d29590cddf0985a83bea531b2e81e",
+          "licenseEvidence": "packaged-root-license-text",
+          "packagedRootLicenseVerified": true
+        },
+        {
+          "name": "partial-json",
+          "version": "0.1.7",
+          "files": {
+            "files": 9,
+            "sha256": "b1c730b893ef274e6d457f23eebc9c39162cd6aaf777247942b9ad0cc1f1cb8e"
+          },
+          "archiveSha256": "30eafeed6fdc25fb2ca24f34c37796d9f98f0bf5e156452b98a2c356762f6322",
+          "manifestSha256": "42b3ae6c99ec959249f8eb4d3da7fdb44ec1f96ec627fa7f9ca5487a4e80963f",
+          "licenseEvidence": "packaged-root-license-text",
+          "packagedRootLicenseVerified": true
+        },
+        {
+          "name": "standardwebhooks",
+          "version": "1.1.1",
+          "files": {
+            "files": 8,
+            "sha256": "03977b2aa436611587ee6acf684c1d68b1fc348d7f301f7c06ed293c50be9f9b"
+          },
+          "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+          "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+          "licenseEvidence": "declared-MIT-only",
+          "packagedRootLicenseVerified": false
+        },
+        {
+          "name": "ts-algebra",
+          "version": "2.0.0",
+          "files": {
+            "files": 104,
+            "sha256": "de3fa195eec4e650f9798665843d8243cb341df9a256d99752ac9357cdfe005a"
+          },
+          "archiveSha256": "f4c3968fd81eb7952e94860eb233558c820397d999149b6e2c689abaa34bc65c",
+          "manifestSha256": "6c6f692e1a3ad9943c77b5fa4eb04b0f63cb708353c67dcc5d86b35b2f7e5c30",
+          "licenseEvidence": "packaged-root-license-text",
+          "packagedRootLicenseVerified": true
+        }
+      ],
+      "installedFiles": 2393,
+      "lifecycleScriptsExecuted": false,
+      "optionalPeers": [],
+      "binLinks": false,
+      "nativeBuilds": false,
+      "globalSystemChanges": false,
+      "credentials": false,
+      "providerCalls": false,
+      "sourceTransformOrModuleReplacement": false,
+      "wholeWrapperQualified": false,
+      "redistributionLicenseClosure": false,
+      "licenseReviewStatus": "P1-02 HOLD",
+      "scope": "Actual scoped development restore only; no product SDK dependency, live provider or independent capture qualification. Original partial attempt and accepted older oracles preserved."
+    }
+  ],
+  "unresolved": [
+    {
+      "id": "transitive-notices",
+      "owner": "release",
+      "detail": "No dependencies bundled; audit npm/NuGet/native/assets before packaging."
+    },
+    {
+      "id": "runtime-provenance",
+      "owner": "release",
+      "detail": "Preinstalled Node runtime is development-only; distributor archive acquisition provenance unverified."
+    },
+    {
+      "id": "name-trademark",
+      "owner": "lead",
+      "detail": "PiSharp naming review remains separate from MIT copyright license."
+    }
+  ]
+}

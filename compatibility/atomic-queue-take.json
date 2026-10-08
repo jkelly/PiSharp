@@ -1,0 +1,23 @@
+{
+  "status": "AUTHORED_UNBUILT_UNEXECUTED_REVIEW_PENDING",
+  "base": "9d0047031ff68ee27dd66cb48d17af4d53191a7e",
+  "contract": "bool TryClearPendingInputQueues(AgentPendingInputQueueSnapshot expected, [NotNullWhen(true)] out AgentPendingInputQueueSnapshot? removed, CancellationToken cancellationToken = default)",
+  "owners": [
+    "PiSharp.Agent.Agent",
+    "PiSharp.CodingAgent.PersistentAgentSession"
+  ],
+  "queueApi": "AgentPendingInputQueue.TryClearAndSnapshot",
+  "identity": "Queue-owned opaque revision plus exact message references/order and both modes; rejects ABA and foreign/reconstructed snapshots",
+  "failure": "false, removed null, no mutation",
+  "cancellation": "Observed before commit: throw with no mutation; success remains committed after later cancellation",
+  "testsAuthored": 7,
+  "testsExecuted": 0,
+  "nativeBuilds": 0,
+  "guide": "docs/contracts/atomic-pending-queue-take.md",
+  "phaseGatesClosed": [],
+  "testCorrection": {
+    "status": "AUTHORED_UNEXECUTED",
+    "finding": "Windows live-store byte checks require a reader sharing existing ReadWrite access",
+    "change": "Explicit FileShare.ReadWrite observer; existing active gate and direct original joins unchanged"
+  }
+}

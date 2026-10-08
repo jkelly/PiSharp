@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "session-branches-replayed",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "caseCount": 8,
+  "kind": "captured-unchanged-session-manager-branches",
+  "input": {
+    "path": "fixtures/pi-v0.99.1/session-branches-replayed/core.input.json",
+    "bytes": 53897,
+    "sha256": "e3b207d3ffc1f30ee7a6512eae0470688d4475f58accd059a2f19ab4b2517239"
+  },
+  "capture": {
+    "path": "fixtures/pi-v0.99.1/session-branches-replayed/capture.json",
+    "bytes": 19050274,
+    "sha256": "9b2ac41db76ed54c1958d9faeeca5d26cf1c2245614e856b38483bf503bd83b0"
+  },
+  "lock": {
+    "path": "fixtures/pi-v0.99.1/session-branches-replayed/oracle.lock.json",
+    "bytes": 143308,
+    "sha256": "5aa52de48f2b6d04a797ec3d04448d26089d81e32d12f46021ac65620c42a16b"
+  },
+  "provenance": {
+    "wholeSessionManager": true,
+    "separatePublicLlmConversion": true,
+    "repeatRuns": 2,
+    "equalDeclaredContracts": true,
+    "generatedIdsAndClocksRaw": true
+  },
+  "scope": "Eight valid admitted branch/history forests and actual global metadata append schedules; no malformed cycle execution, provider execution, P4-03 closure or full phase/package closure claim."
+}

@@ -30,6 +30,8 @@ public sealed record AgentLoopCallbacks(
 {
     public Func<ImmutableArray<TranscriptEntry>, CancellationToken, ValueTask<ImmutableArray<TranscriptEntry>>>? TransformRequestMessages { get; init; }
     public Func<AgentRequestBoundary, CancellationToken, ValueTask<AgentLoopRequestPreparation?>>? PrepareRequestBoundary { get; init; }
+    /// <summary>Context-only custom inputs after tool results; consuming these never requests another turn.</summary>
+    public Func<CancellationToken, ValueTask<ImmutableArray<TranscriptEntry>>>? GetContextOnlyMessages { get; init; }
 }
 
 public sealed record AgentLoopStarted : AgentEvent;
@@ -207,6 +209,24 @@ public sealed class AgentLoopRunner
                     if (!failed && decision is not (AgentLoopFinishAction.Default or AgentLoopFinishAction.End or AgentLoopFinishAction.Continue))
                         throw new InvalidOperationException("Finish-turn decision is unsupported.");
                     await sink.EmitAsync(new AgentLoopTurnEnded(lastTurn), deliveryToken).ConfigureAwait(false);
+                    if (callbacks.GetContextOnlyMessages is { } contextOnly)
+                    {
+                        // Capture the borrowed ValueTask once and directly join it before history/events.
+                        var original = contextOnly(deliveryToken).AsTask();
+                        ImmutableArray<TranscriptEntry> contextMessages;
+                        try { contextMessages = await original.ConfigureAwait(false); }
+                        catch (Exception error) when (original.IsFaulted)
+                        { throw new AggregateException("Context-only boundary original fault.", original.Exception!, error); }
+                        ValidateInputs(contextMessages);
+                        if (contextMessages.Any(message => message.Role != "custom"))
+                            throw new ArgumentException("Context-only delivery admits only custom messages.");
+                        if ((long)transcript.Length + contextMessages.Length > _options.MaximumTranscriptMessages) throw new LoopLimit();
+                        foreach (var message in contextMessages)
+                        {
+                            await EmitInputAsync(message).ConfigureAwait(false);
+                            transcript = transcript.Add(message);
+                        }
+                    }
                     if (failed)
                         return await EndAsync(AgentLoopStopReason.ChatFailure).ConfigureAwait(false);
                     if (decision == AgentLoopFinishAction.End)

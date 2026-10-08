@@ -15,7 +15,8 @@ internal static class Program
     private static string Finish(string reason = "stop") => "{\"id\":\"later\",\"choices\":[{\"finish_reason\":\"" + reason + "\",\"delta\":{}}]}";
     private const string Usage = "{\"choices\":[],\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":3,\"prompt_tokens_details\":{\"cached_tokens\":2},\"total_tokens\":11}}";
     private static string Frames(params string[] json) => string.Join("", json.Select(x => "data: " + x + "\n\n")) + "data: [DONE]\n\n";
-    private static void Require(bool condition) { if (!condition) throw new InvalidOperationException("Authored assertion failed."); }
+    private static void Require(bool condition, [CallerLineNumber] int line = 0, string? subcase = null)
+    { if (!condition) throw new MistralFixtureAssertionException(nameof(Program), line, subcase); }
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
     {
         public int Calls { get; private set; }
@@ -69,7 +70,21 @@ internal static class Program
     {
         if (args.Length != 0 && (args.Length != 2 || args[0] != "--report")) throw new ArgumentException("Expected optional --report and fresh path.");
         var results = new List<object>(); var failed = 0;
-        async Task Check(string id, Func<Task> action) { try { await action(); results.Add(new { id, status = "passed" }); } catch { failed++; results.Add(new { id, status = "failed", diagnostic = "Authored assertion failed; details withheld" }); } }
+        async Task Check(string id, Func<Task> action)
+        {
+            try { await action(); results.Add(new { id, status = "passed" }); }
+            catch (Exception error)
+            {
+                failed++;
+                results.Add(new { id, status = "failed", diagnostic = MistralFixtureAssertionException.Diagnostic(error),
+                    fixture = (error as MistralFixtureAssertionException)?.Fixture, line = (error as MistralFixtureAssertionException)?.Line,
+                    subcase = (error as MistralFixtureAssertionException)?.Subcase });
+            }
+        }
+        foreach (var (name, run) in MistralToolStreamingTests.Cases()) await Check(name, run);
+        foreach (var (name, run) in MistralFactorySimpleTests.Cases()) await Check(name, run);
+        foreach (var (name, run) in MistralReplayTests.Cases()) await Check(name, run);
+        foreach (var (name, run) in MistralVisionTests.Cases()) await Check(name, run);
         await Check("bound-identity-before-any-callback-or-send", async () =>
         {
             var callbacks = 0; using var h = new Handler((_, _) => throw new InvalidOperationException()); using var client = new HttpClient(h);
@@ -90,6 +105,10 @@ internal static class Program
             var events = await Collect(new MistralTextHttpSseTransport(client, Model, options)); var terminal = Terminal(events);
             Require(body.Released && terminal is StreamDone && events[^2] is TextEnded { Content: "Hello" } && h.Calls == 1);
             Require(terminal.Message.Usage.Input == 6 && terminal.Message.Usage.CacheRead == 2 && terminal.Message.Usage.Output == 3 && terminal.Message.Usage.TotalTokens == 11);
+            var cost = terminal.Message.Usage.Cost; var binaryCost = cost.SourceBinary64Cost!.Value;
+            Require(cost.Input == binaryCost.GetProperty("input").GetDecimal() && cost.Output == binaryCost.GetProperty("output").GetDecimal() &&
+                cost.CacheRead == binaryCost.GetProperty("cacheRead").GetDecimal() && cost.Total == binaryCost.GetProperty("total").GetDecimal());
+            Require(PiWireJson.ReadMessage(PiWireJson.WriteMessage(terminal.Message).Value).Usage.TotalTokens == 11);
             Require(terminal.Message.ExtraProperties!.TryGet("responseId", out var id) && id!.Value.GetString() == "first");
             Require(hooks.SequenceEqual(["payload", "send", "response", "chunk", "chunk", "chunk"]));
         });
@@ -130,15 +149,17 @@ internal static class Program
         });
         await Check("request-unsupported-modes-before-send", async () =>
         {
-            foreach (var entry in new[] { new TranscriptEntry("assistant", JsonData.Parse("{\"content\":\"replay\"}")), new TranscriptEntry("user", JsonData.Parse("{\"content\":[{\"type\":\"image\",\"data\":\"fake\"}]}")) })
+            foreach (var entry in new[] { new TranscriptEntry("assistant", JsonData.Parse("{\"content\":\"replay\"}")), new TranscriptEntry("user", JsonData.Parse("{\"content\":[{\"type\":\"audio\",\"data\":\"fake\"}]}")) })
             {
                 using var h = new Handler((_, _) => throw new InvalidOperationException()); using var client = new HttpClient(h);
-                var events = await Collect(new MistralTextHttpSseTransport(client, Model, Options), new(Model, [entry])); Require(Terminal(events).NativeDiagnostic?.Code == NativeChatFailureCode.UnsupportedFeature && h.Calls == 0);
+                var events = await Collect(new MistralTextHttpSseTransport(client, Model, Options), new(Model, [entry]));
+                Require(Terminal(events).NativeDiagnostic?.Code == NativeChatFailureCode.UnsupportedFeature && h.Calls == 0,
+                    subcase: entry.Role == "assistant" ? "assistant-scalar" : "user-audio");
             }
         });
         await Check("response-unsupported-modes-and-resource-limits", async () =>
         {
-            var body = new Body(Frames("{\"choices\":[{\"delta\":{\"content\":[{\"type\":\"thinking\",\"thinking\":[]}]}}]}")); using var h = new Handler((_, _) => Task.FromResult(Response(body))); using var client = new HttpClient(h);
+            var body = new Body(Frames("{\"choices\":[{\"delta\":{\"content\":[{\"type\":\"unsupported\",\"thinking\":[]}]}}]}")); using var h = new Handler((_, _) => Task.FromResult(Response(body))); using var client = new HttpClient(h);
             var events = await Collect(new MistralTextHttpSseTransport(client, Model, Options)); Require(body.Released && Terminal(events).NativeDiagnostic?.Code == NativeChatFailureCode.UnsupportedFeature);
             var limitedBody = new Body(Frames(Text, Finish())); using var limitedHandler = new Handler((_, _) => Task.FromResult(Response(limitedBody))); using var limitedClient = new HttpClient(limitedHandler);
             events = await Collect(new MistralTextHttpSseTransport(limitedClient, Model, Options with { MaximumFrameCharacters = 10 })); Require(limitedBody.Released && Terminal(events).NativeDiagnostic?.Code == NativeChatFailureCode.ResourceLimit);
@@ -200,45 +221,50 @@ internal static class Program
         await Check("replacement-depth-headers-and-cumulative-content-bounds", async () =>
         {
             foreach (var options in new[] {
-                Options with { OnPayload = (_, _, _) => ValueTask.FromResult<JsonData?>(JsonData.Parse("{\"model\":\"authored-text-model\",\"stream\":true,\"messages\":[],\"tools\":[]}")) },
+                Options with { OnPayload = (_, _, _) => ValueTask.FromResult<JsonData?>(JsonData.Parse("{\"model\":\"authored-text-model\",\"stream\":true,\"messages\":[],\"tools\":[{\"type\":\"unsupported\"}]}")) },
                 Options with { MaximumJsonDepth = 1 },
                 Options with { MaximumContentCharacters = 4 } })
             {
                 using var h = new Handler((_, _) => throw new InvalidOperationException()); using var client = new HttpClient(h);
                 var events = await Collect(new MistralTextHttpSseTransport(client, Model, options));
-                Require(h.Calls == 0 && Terminal(events) is StreamError);
-                Require(Terminal(events).NativeDiagnostic?.Code == (options.OnPayload is null ? NativeChatFailureCode.ResourceLimit : NativeChatFailureCode.UnsupportedFeature));
+                var subcase = options.OnPayload is not null ? "replacement-tool-kind" : options.MaximumJsonDepth == 1 ? "request-depth" : "request-content";
+                Require(h.Calls == 0 && Terminal(events) is StreamError, subcase: subcase);
+                Require(Terminal(events).NativeDiagnostic?.Code == (options.OnPayload is null ? NativeChatFailureCode.ResourceLimit : NativeChatFailureCode.UnsupportedFeature), subcase: subcase);
             }
-            var body = new Body(Frames(Text, Text, Finish())); using var handler = new Handler((_, _) => Task.FromResult(Response(body))); using var http = new HttpClient(handler);
+            // Admit the full immutable request, then exceed the separate output accumulation.
+            var boundedText = "{\"choices\":[{\"delta\":{\"content\":\"" + new string('x', 40) + "\"}}]}";
+            var body = new Body(Frames(boundedText, boundedText, Finish())); using var handler = new Handler((_, _) => Task.FromResult(Response(body))); using var http = new HttpClient(handler);
             var shortRequest = new ChatRequest(Model, [new("user", JsonData.Parse("{\"content\":\"x\"}"))]);
-            var output = await Collect(new MistralTextHttpSseTransport(http, Model, Options with { MaximumContentCharacters = 8 }), shortRequest);
-            Require(body.Released && Terminal(output).NativeDiagnostic?.Code == NativeChatFailureCode.ResourceLimit && output[^2] is TextEnded { Content: "Hello" });
+            var output = await Collect(new MistralTextHttpSseTransport(http, Model, Options with { MaximumContentCharacters = 64 }), shortRequest);
+            Require(handler.Calls == 1 && output.OfType<StreamStarted>().Any() && body.Released &&
+                Terminal(output).NativeDiagnostic?.Code == NativeChatFailureCode.ResourceLimit && output[^2] is TextEnded ended && ended.Content == new string('x', 40), subcase: "output-accumulation");
             var headerBody = new Body(Frames(Text, Finish())); using var headerHandler = new Handler((_, _) => {
                 var response = Response(headerBody); response.Headers.TryAddWithoutValidation("X-Authored", new string('x', 70)); return Task.FromResult(response);
             }); using var headerHttp = new HttpClient(headerHandler);
             var headerOutput = await Collect(new MistralTextHttpSseTransport(headerHttp, Model, Options with { MaximumHeaderCharacters = 64 }));
-            Require(headerBody.Released && Terminal(headerOutput).NativeDiagnostic?.Code == NativeChatFailureCode.ResourceLimit && !headerOutput.OfType<StreamStarted>().Any());
+            Require(headerBody.Released && Terminal(headerOutput).NativeDiagnostic?.Code == NativeChatFailureCode.ResourceLimit && !headerOutput.OfType<StreamStarted>().Any(), subcase: "response-header");
         });
         await Check("atomic-chunk-failure-before-first-published-text", async () =>
         {
             foreach (var unsupported in new[] { true, false }) foreach (var throughClient in new[] { true, false })
             {
-                var parts = unsupported ? "[{\"type\":\"text\",\"text\":\"Hi\"},{\"type\":\"thinking\",\"thinking\":[]}]" : "[\"Hello\",\"world\"]";
+                var parts = unsupported ? "[{\"type\":\"text\",\"text\":\"Hi\"},{\"type\":\"unsupported\",\"thinking\":[]}]" : JsonSerializer.Serialize(new[] { new string('x', 40), new string('y', 40) });
                 var body = new Body(Frames("{\"choices\":[{\"delta\":{\"content\":" + parts + "}}]}"));
                 using var h = new Handler((_, _) => Task.FromResult(Response(body))); using var client = new HttpClient(h);
-                var transport = new MistralTextHttpSseTransport(client, Model, Options with { MaximumContentCharacters = 8 });
+                var transport = new MistralTextHttpSseTransport(client, Model, Options with { MaximumContentCharacters = 64 });
                 var request = new ChatRequest(Model, [new("user", JsonData.Parse("{\"content\":\"x\"}"))]);
                 var expected = unsupported ? NativeChatFailureCode.UnsupportedFeature : NativeChatFailureCode.ResourceLimit;
-                if (throughClient) { var result = await new ChatClient(transport).CompleteAsync(request); Require(result.NativeDiagnostic?.Code == expected && result.Message.Content.Length == 0); }
-                else { var events = await Collect(transport, request); Require(Terminal(events).NativeDiagnostic?.Code == expected && !events.OfType<TextStarted>().Any() && !events.OfType<TextDelta>().Any() && !events.OfType<TextEnded>().Any()); }
-                Require(body.Released);
+                var subcase = (unsupported ? "unsupported" : "resource") + (throughClient ? "-client" : "-stream");
+                if (throughClient) { var result = await new ChatClient(transport).CompleteAsync(request); Require(result.NativeDiagnostic?.Code == expected && result.Message.Content.Length == 0, subcase: subcase); }
+                else { var events = await Collect(transport, request); Require(Terminal(events).NativeDiagnostic?.Code == expected && !events.OfType<TextStarted>().Any() && !events.OfType<TextDelta>().Any() && !events.OfType<TextEnded>().Any(), subcase: subcase); }
+                Require(h.Calls == 1 && body.Released, subcase: subcase);
             }
         });
         await Check("atomic-chunk-failure-retains-only-earlier-published-text", async () =>
         {
             foreach (var throughClient in new[] { true, false })
             {
-                var bad = "{\"choices\":[{\"delta\":{\"content\":[\"unpublished\",{\"type\":\"thinking\",\"thinking\":[]}]}}]}";
+                var bad = "{\"choices\":[{\"delta\":{\"content\":[\"unpublished\",{\"type\":\"unsupported\",\"thinking\":[]}]}}]}";
                 var body = new Body(Frames(Text, bad)); using var h = new Handler((_, _) => Task.FromResult(Response(body))); using var client = new HttpClient(h);
                 var transport = new MistralTextHttpSseTransport(client, Model, Options);
                 if (throughClient) { var result = await new ChatClient(transport).CompleteAsync(Request); Require(result.NativeDiagnostic?.Code == NativeChatFailureCode.UnsupportedFeature && result.Message.Content is [TextContent { Text: "Hello" }]); }
@@ -296,12 +322,12 @@ internal static class Program
             {
                 var body = new HeldDispose(); using var h = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(body) })); using var client = new HttpClient(h);
                 var transport = new MistralTextHttpSseTransport(client, Model, Options); var observed = new List<StreamEvent>();
-                async Task Consume() { await foreach (var frame in transport.StreamAsync(Request)) { Require(frame is not StreamTerminalEvent || body.Settled); observed.Add(frame); } }
+                async Task Consume() { await foreach (var frame in transport.StreamAsync(Request)) { Require(frame is not StreamTerminalEvent || body.Settled, subcase: "disposal-stream-terminal"); observed.Add(frame); } }
                 Task pending = throughClient ? new ChatClient(transport).CompleteAsync(Request) : Consume();
-                try { await body.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5)); Require(!pending.IsCompleted && !body.Settled && !observed.OfType<TextEnded>().Any()); }
+                try { await body.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5)); Require(!pending.IsCompleted && !body.Settled && !observed.OfType<TextEnded>().Any(), subcase: throughClient ? "disposal-client-held" : "disposal-stream-held"); }
                 finally { body.Release.TrySetResult(); await pending; }
-                Require(body.Settled && body.AsyncDisposals == 1);
-                if (!throughClient) Require(Terminal(observed) is StreamDone && observed[^2] is TextEnded && Terminal(observed).Message.Usage.TotalTokens == 11);
+                Require(body.Settled && body.AsyncDisposals == 1, subcase: throughClient ? "disposal-client-settled" : "disposal-stream-settled");
+                if (!throughClient) Require(Terminal(observed) is StreamDone && observed[^2] is TextEnded && Terminal(observed).Message.Usage.TotalTokens == 11, subcase: "disposal-stream-usage");
             }
         });
         await Check("held-payload-and-provider-callbacks-join-on-cancellation", async () =>
@@ -328,7 +354,10 @@ internal static class Program
             var body = new SplitUtf8("\uFEFF" + Frames(chunk, Finish(), Usage));
             using var h = new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(body) })); using var client = new HttpClient(h);
             var events = await Collect(new MistralTextHttpSseTransport(client, Model, Options));
-            Require(body.Released && body.Reads > 20 && string.Concat(events.OfType<TextDelta>().Select(x => x.Delta)) == unicode && events[^2] is TextEnded ended && ended.Content == unicode && Terminal(events) is StreamDone && Terminal(events).Message.Usage.TotalTokens == 11);
+            Require(body.Released && body.Reads > 20, subcase: "split-read-release");
+            Require(string.Concat(events.OfType<TextDelta>().Select(x => x.Delta)) == unicode, subcase: "split-decoded-text");
+            Require(events[^2] is TextEnded ended && ended.Content == unicode, subcase: "split-text-end");
+            Require(Terminal(events) is StreamDone && Terminal(events).Message.Usage.TotalTokens == 11, subcase: "split-trailing-usage");
         });
         var report = JsonSerializer.Serialize(new { scope = "Authored fake HTTP only; no source differential/catalog/durable qualification", tests = results.Count, passed = results.Count - failed, failed, results }); Console.WriteLine(report);
         if (args.Length == 2) { await using var file = new FileStream(args[1], FileMode.CreateNew, FileAccess.Write); await using var writer = new StreamWriter(file); await writer.WriteLineAsync(report); }

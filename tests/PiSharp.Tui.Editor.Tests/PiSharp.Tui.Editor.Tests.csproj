@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Update="word-data/WordBreakTest-17.0.0.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="word-data/dictionary-runtime-observations.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="word-data/sea-runtime-observations.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="word-data/icu78-sea/icu78-laodict.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="word-data/icu78-sea/icu78-khmerdict.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="word-data/icu78-sea/icu78-burmesedict.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="word-data/icu78/icu78-cjdict.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="word-data/icu78/icu78-thaidict.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="word-data/icu78/NormalizationTest-17.0.0.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="TerminalCharacterJumpProductionTests.cs" />
+    <Compile Remove="TerminalWordControlsProductionTests.cs" />
+    <Compile Remove="TerminalWordSeaAcknowledgedProductionTests.cs" />
+    <ProjectReference Include="../../src/PiSharp.Tui/PiSharp.Tui.csproj" />
+  </ItemGroup>
+</Project>

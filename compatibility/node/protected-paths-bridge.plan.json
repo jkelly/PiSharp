@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "profile": "real-protected-paths-hook-0",
+  "status": "First and diagnostic root gates each 1 passed/9 failed; verifier response-cap cause confirmed; targeted classification correction unexecuted",
+  "author": { "model": "gpt-6.1-sol", "reasoningEffort": "xhigh" },
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "runtime": {
+    "version": "v24.19.0", "platform": "win32", "architecture": "x64",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "helpers": [
+    { "path": "tools/NodeBridge/worker.mjs", "bytes": 8699, "sha256": "ef20cf354f3729da4488d3dd6fe860d8320233d12e62e7099f9ce8eb541708eb" },
+    { "path": "tools/NodeBridge/wire.mjs", "bytes": 10011, "sha256": "83dd5314526f8ece061ea85da50326ed45867fe7edb76d37ac67f208775d3deb" },
+    { "path": "tools/NodeBridge/module-loader.mjs", "bytes": 14871, "sha256": "b1ee6bf6afa1c3395d440af22d7dc60470442bbd8554510c57afad01e6dca3a5" }
+  ],
+  "reference": {
+    "plan": { "path": "compatibility/node/real-extension-reference.plan.json", "bytes": 12863, "sha256": "e55b7af94907598157809fc6da08ad1d60899c23b849d3623c28174d5d7fc622" },
+    "manifest": { "path": "fixtures/reference/node-real-extensions/manifest.json", "bytes": 208732, "sha256": "b74a7ece33b0596850266a1e1686b3c9cd1d5c978e3dcae1f07174adc3757ff9" },
+    "input": { "path": "fixtures/reference/node-real-extensions/input.json", "bytes": 5606, "sha256": "478ab4379f55eb7c7114f205b040f3409aea5e991a3e4ee56111851b432e3ec7" },
+    "expected": { "path": "fixtures/reference/node-real-extensions/expected.json", "bytes": 254791, "sha256": "d13bca9d8ca51152c6b95b9bd2db8ab5bbcb76f361e647dcf1e97365e155b843" },
+    "qualification": "Root-qualified canonical a667 source reference; exact pinned manifest remains authoritative",
+    "wholeCases": 8,
+    "selectedWholeCases": ["protected-ui-and-path-spellings", "protected-original-headless"],
+    "selectedHookRequests": 8,
+    "otherSixWholeCases": "OPEN; hello tool, input hooks, commands/dialogs and reference authored rollback are not bridge-qualified by this slice",
+    "comparison": "All eight actual registry/leased-hook calls compare complete returned observation ledgers, input observations and notification arguments against the unchanged reference; this is not an eight-case complete Agent replay"
+  },
+  "source": {
+    "tag": "v0.99.1", "files": 2093,
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+    "acquiredFingerprint": "676a5df7a526ab0fb6a78f734b57093bb7571913fc17251d02cb0c84527dcf21",
+    "module": { "path": "packages/coding-agent/examples/extensions/protected-paths.ts", "bytes": 808, "sha256": "9ca66b1f3b1b9a61cc5ddc660f92cca2ea66c4264a1bdb6b00e0da5844399fe2" },
+    "loader": { "path": "packages/coding-agent/src/core/extensions/loader.ts", "bytes": 27197, "sha256": "aa903524bb2db3ee9fb7f21e863e373e7f12a56c74fd05d27c879a4a7020deb0" },
+    "publicExports": ["loadExtensions", "loadExtensionFromFactory", "createExtensionRuntime", "clearExtensionCache"],
+    "restoredReceipt": { "bytes": 30672, "sha256": "421905aec95408aa7aabf5d0a71b35d64172c77f20a1a40554b8cae7e6b1850d" },
+    "preAndPost": "Exact whole acquired source, nine repository metadata files, all fifteen installed package inventories, Jiti publisher files/archive/receipt and all qualified reference control/harness pins; historical receipts are read only",
+    "readAccounting": "Complete raw post-bootstrap runtime rows; verifier reads classified by their explicit AsyncLocalStorage owner. Complete qualified before/after base+Jiti inventory result objects retained. Verifier code-file table is explicitly a manifest-bound count/bytes/exact sorted-row SHA summary, not raw rows or source execution evidence"
+  },
+  "jiti": {
+    "name": "jiti", "version": "2.7.0", "publisherFiles": 16,
+    "archiveBytes": 427320,
+    "archiveSha256": "8dd0d365fb49c0e7cc42d6a00df6fb2da9056fc24492094346fc34ecdbcf28ca",
+    "integrity": "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==",
+    "receiptSha256": "d39408642f317614a9b8f8ee65e3f1d56aa93fce76018798fe984e795103c8ce",
+    "officialLoaderUnchanged": true, "installOrScripts": false, "cacheWrites": false
+  },
+  "installedDependencies": {
+    "authority": "Exact canonical package-lock.json plus every installed-file fingerprint in the qualified reference manifest and restored receipt; this list adds no packages",
+    "versions": {
+      "chalk": "6.0.0", "cross-spawn": "7.0.6", "diff": "8.0.4", "get-east-asian-width": "1.6.0",
+      "highlight.js": "10.7.3", "ignore": "7.0.8", "isexe": "2.0.0", "marked": "18.0.11",
+      "partial-json": "0.1.7", "path-key": "3.1.1", "shebang-command": "2.0.0", "shebang-regex": "3.0.0",
+      "typebox": "1.3.27", "which": "2.0.2", "yaml": "2.9.0"
+    }
+  },
+  "licenses": {
+    "pi": { "path": "upstream/LICENSE", "bytes": 1069, "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48", "notice": "MIT; Copyright (c) 2025 Mario Zechner" },
+    "jiti": { "path": "node_modules/jiti/LICENSE", "bytes": 1078, "sha256": "46231df5a7733c3f52f11b71f3df61813007745b62b09031acfb45fb42d75082", "notice": "MIT; Copyright (c) Pooya Parsa" },
+    "typebox": { "path": "node_modules/typebox/license", "bytes": 1094, "sha256": "e8a7cc256941a26ba8234f04390165243a4d42f74fd6491934140605bf7eae2d", "notice": "MIT; Copyright (c) 2017-2026 Haydn Paterson" },
+    "shippingRuntimeAndNoticeBundle": "OPEN mandatory; complete upstream/dependency notices and bundled Jiti compiler notices require a shipping audit, not just these three MIT pins"
+  },
+  "facades": {
+    "qualifiedVirtualModuleReplacementCount": 1,
+    "original": "packages/coding-agent/src/core/extensions/virtual-modules.ts",
+    "replacement": "tools/NodeExtensionReference/controlled-virtual-modules.mjs",
+    "exactQualifiedAliases": { "@earendil-works/pi-ai": ["Type"], "@earendil-works/pi-coding-agent": ["defineTool"] },
+    "implementedHostBoundary": ["one tool_call handler", "ctx.hasUI", "ctx.ui.notify via actual native leased UI context"],
+    "unsupportedRegistrationAudit": ["other handlers", "tools", "commands", "flags", "shortcuts", "messageRenderers", "entryRenderers", "markdownTransformer", "providers", "nativeProviders", "virtualModels", "MCP", "eventBus operations"],
+    "fullNamespacesAndOtherHostOperations": "OPEN mandatory; this is a closed pinned-hook profile, not the upstream engine or general extension support matrix"
+  },
+  "ownership": {
+    "jsFunctions": "Retained only inside the Node worker; opaque callback identity carries native owner/generation",
+    "nativeAuthority": "ExtensionRegistry atomic activation, actual leased callback context, native UI capability and final ToolInvoker schema/prepared-action/policy",
+    "notifyTiming": "Source notify stays synchronous; admitted native publications are joined at the callback boundary. Universal original UI/Runner scheduling parity remains OPEN",
+    "cancellation": "No replay; native lease remains held through an actual source operation settlement fence",
+    "allWritableOutputs": "Fresh caller-owned run root outside read-only repository/oracle/Jiti/reference/runtime inputs; child environment is cleared and only fixed physical home/temp/agent/cache identities are supplied",
+    "supervision": "Existing actual process, pipe ownership, shared joined shutdown, 500ms grace, bounded stderr and post-protocol stdout drain; no child-spawn capability in this profile",
+    "runtimeGuard": "Trusted fixed source only. JavaScript API denials and module admission are not an OS sandbox"
+  },
+  "bounds": {
+    "frameBytes": 1048576, "jsonDepth": 32, "jsonValues": 65536,
+    "pendingCalls": 32, "activeProtocolCallbacks": 16, "pendingWrites": 32, "encodedConnectionBytes": 8388608,
+    "decoderReadBufferBytes": 4096, "decoderPartialFrameBytes": 1048576,
+    "nativeActiveContexts": 8, "nativeOwnerBrokerHandles": 1, "invocationBytes": 262144,
+    "retainedRecordBytes": 524288, "nativeLastRecordSlots": 4, "sourceOperationSlots": 16,
+    "sourceFailureRecordBytes": 523264, "sourceRetainedFailureBytes": 8388608,
+    "sourceObservationPathCharacters": 262144, "sourceObservationNodes": 65536,
+    "sourceNotificationsPerCall": 16, "notificationCharacters": 65536,
+    "loadedModuleAndRuntimeSourceReadAndVerifierReadRowsEach": 10000, "resolutions": 10000,
+    "finalizationDiagnosticObserverBytes": 131072, "finalizationErrorTextPrefixCharactersEach": 8192,
+    "accounting": "Independent frame/decoder, encoded connection, current invocation, retained records and loaded-source limits; no claim that encoded-byte accounting measures all managed/V8 heap memory"
+  },
+  "tests": {
+    "class": "ProtectedPathsBridgeTests", "api": "Cases(dotnetHost, nodePath, repoRoot, oracleRoot, jitiRoot, referenceRoot, runParent)",
+    "authoredGroups": 10, "authorExecutedGroups": 0,
+    "nativeToolInvokerScenario": "Separate actual native write adapter plus prepared extension hook: source block prevents native file effect/policy invocation; source continuation remains subject to native schema and final action policy",
+    "authoredFaultControls": "Held native activation; actual public loadExtensionFromFactory held async rejection; actual public loadExtensionFromFactory unsupported command registration; held/cancelled native notification; real authored native output followed by callback fault",
+    "notClaimed": ["eight complete Agent scenarios", "complete original Loader/Runner parity", "all eleven corpus extensions", "full native renderer/UI parity", "real extension crash/restart replay", "phase-seven feasibility or completion"]
+  },
+  "finalizationDiagnostics": "Actual stage, completed verification flags, runtime/verifier read and load counts and attempted report UTF8 size/hash; actual bounded error facts. Native retains a failed report and still throws cleanup failure; existing perrecord/frame limits are unchanged",
+  "validationCorrectionHistory": [
+    { "evidence": "First root process gate: 1 passed/9 failed; original generic finalize RemoteError, original receipts preserved", "entrySha256": "a70aa118503a107b6c37062699100110733df6320bd5eac0e6b9a23fb28b308e", "loaderSha256": "e413aec79860b519f12c0001925e365e63e6a8ae5b12d7056d772a4553473352", "planSha256": "f0b9243b3a2f7931ad56c9ad18da305b01624f3d3f2d0a9bf46be37fa3174ec7" },
+    { "evidence": "Diagnostic root gate: 1 passed/9 failed; all immutable checks true, loaded726/read727 to3739, attempted711737 bytes over524288 cap", "entrySha256": "ef20cf354f3729da4488d3dd6fe860d8320233d12e62e7099f9ce8eb541708eb", "loaderSha256": "4839cc44f9a873b3f4bff9c32157080e9b889262fbcbf2a0e8d28eba152b5d2a", "planSha256": "eaffcf0ff6715e763af28d660766f48d8025fd47602c7a94571411939cfdc5b7" }
+  ],
+  "phaseCredit": "None; all applicable phase-seven corpus, worker/facade, packaging and compatibility gates remain open until actual independently qualified evidence"
+}

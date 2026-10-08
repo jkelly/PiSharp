@@ -1,0 +1,15 @@
+{
+  "status": "SOURCE_ONLY_ADDITIVE_FACADE_HOST_INTEGRATION_AND_QUALIFICATION_PENDING",
+  "baseline": "Pi 0.99.1 d86654abb8862e201933517d6f1fce9f88dd117f",
+  "baseCandidate": "a9df14f95d530157de021da81bc9fd17f69e2fd0",
+  "casesAuthored": 9,
+  "casesRegistered": 0,
+  "casesExecuted": 0,
+  "nativeExecutions": 0,
+  "compilerVerified": false,
+  "sharedHostOrRegistryEdits": false,
+  "realHostAdapterInstalled": false,
+  "oauthImplemented": false,
+  "dynamicRootsImplemented": false,
+  "fullMcpParity": false
+}

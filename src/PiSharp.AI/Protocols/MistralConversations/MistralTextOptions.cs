@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Collections.Immutable;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.MistralConversations;
@@ -14,6 +15,18 @@ public sealed record MistralTextOptions(Uri BaseUrl, bool SupportsText, MistralT
     public int MaximumFrameCharacters { get; init; } = 1_048_576;
     public int MaximumTotalCharacters { get; init; } = 8_388_608;
     public int MaximumContentCharacters { get; init; } = 1_048_576;
+    public int MaximumContentBlocks { get; init; } = 1024;
+    public JsonData? ToolChoice { get; init; }
+    public string? PromptMode { get; init; }
+    public string? ReasoningEffort { get; init; }
+    public ImmutableDictionary<string, string?>? ModelHeaders { get; init; }
+    public ImmutableDictionary<string, string?>? Headers { get; init; }
+    public bool Reasoning { get; init; }
+    public bool SupportsImages { get; init; }
+    public bool SupportsMidConversationSystemMessages { get; init; }
+    public ImmutableDictionary<string, string?>? ThinkingLevelMap { get; init; }
+    public string? SessionId { get; init; }
+    public bool CachePrompt { get; init; } = true;
     public int MaximumErrorBytes { get; init; } = 1_048_576;
     public int MaximumJsonDepth { get; init; } = 32;
     public int MaximumHeaders { get; init; } = 128;
@@ -25,12 +38,25 @@ public sealed record MistralTextOptions(Uri BaseUrl, bool SupportsText, MistralT
     public override string ToString() => nameof(MistralTextOptions);
     internal void Validate()
     {
+        if (PromptMode is not (null or "reasoning") || ReasoningEffort is not (null or "none" or "low" or "medium" or "high" or "max") ||
+            OnPayload?.GetInvocationList().Length > 1 || OnResponse?.GetInvocationList().Length > 1 || OnProviderStreamEvent?.GetInvocationList().Length > 1)
+            throw new MistralTextException(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral direct option or callback binding.");
+        foreach (var headers in new[] { ModelHeaders, Headers })
+            if (headers is not null && (headers.Count > MaximumHeaders || headers.Any(pair =>
+                string.IsNullOrEmpty(pair.Key) || pair.Key.Length > MaximumHeaderCharacters ||
+                pair.Key.Any(character => !char.IsAsciiLetterOrDigit(character) && !"!#$%&'*+-.^_`|~".Contains(character)) ||
+                pair.Value is { } value && (value.Length > MaximumHeaderCharacters || value.Contains('\r') || value.Contains('\n'))) ||
+                headers.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count() != headers.Count))
+                throw new MistralTextException(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral header configuration.");
+        if (ThinkingLevelMap is { } map && (!Reasoning || map.Any(pair => pair.Key is not ("off" or "minimal" or "low" or "medium" or "high" or "xhigh" or "max") ||
+            pair.Value is { Length: 0 or > 128 })) || SessionId?.Length > 4096 || SessionId?.Contains('\r') == true || SessionId?.Contains('\n') == true)
+            throw new MistralTextException(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral reasoning/cache configuration.");
         if (BaseUrl is null || !BaseUrl.IsAbsoluteUri || BaseUrl.Scheme is not ("http" or "https") || BaseUrl.UserInfo.Length != 0 || BaseUrl.Query.Length != 0 || BaseUrl.Fragment.Length != 0 ||
             BaseUrl.AbsoluteUri.Length > 8192 || !SupportsText || Costs is null || new[] { Costs.Input, Costs.Output, Costs.CacheRead, Costs.CacheWrite }.Any(x => !double.IsFinite(x) || x < 0) ||
             string.IsNullOrWhiteSpace(UserAgent) || UserAgent.Length > MaximumHeaderCharacters || UserAgent.Contains('\r') || UserAgent.Contains('\n') ||
             Temperature is { } t && !double.IsFinite(t) || MaxTokens is { } m && !double.IsFinite(m) ||
             TimeoutMilliseconds is < 1 or > 3_600_000 || MaximumPayloadBytes is < 1 or > 8_388_608 || MaximumFrameCharacters is < 1 or > 8_388_608 ||
-            MaximumTotalCharacters is < 1 or > 67_108_864 || MaximumContentCharacters is < 1 or > 8_388_608 || MaximumErrorBytes is < 1 or > 8_388_608 ||
+            MaximumTotalCharacters is < 1 or > 67_108_864 || MaximumContentCharacters is < 1 or > 8_388_608 || MaximumContentBlocks is < 1 or > 10000 || MaximumErrorBytes is < 1 or > 8_388_608 ||
             MaximumJsonDepth is < 1 or > 64 || MaximumHeaders is < 4 or > 4096 || MaximumHeaderCharacters is < 1 or > 65536 || MaximumTotalHeaderCharacters is < 4 or > 1_048_576)
             throw new MistralTextException(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral text configuration.");
     }

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "baseline": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "baseAuthorCommit": "754251be28928b24eaae5895b744c423450c91a3",
+  "baseTreeEqualsMain754251": "738429cf70aa4609938e398d3ef00b5836bf157c",
+  "status": "PURE_POLICY_AND_CLI_CAPTURE_IMPLEMENTED_CORE_ENFORCEMENT_PENDING",
+  "api": ["AllowedToolSelection.Create", "AllowedToolSelection.IsAllowed", "AllowedToolSelection.FilterCatalog", "AllowedToolSelection.SelectInitial", "InitialToolSelection.LifetimePolicy"],
+  "testsAuthoredNewGroups": 6,
+  "testsExecutedByWorker": 0,
+  "buildsExecutedByWorker": 0,
+  "coreIntegrationRequired": ["atomic initial admission before recorded declaration resolution", "policy retained across registry/session replacements and refresh", "policy applied before callable/namespace/loadout construction", "disallowed activation no durable mutation"],
+  "remainingCli": ["--no-tools/-nt", "--no-builtin-tools/-nbt", "--exclude-tools/-xt"],
+  "contract": "docs/contracts/lifetime-tool-selection-policy.md"
+}

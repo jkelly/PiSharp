@@ -1,0 +1,9 @@
+# MCP host owning retirement binding
+
+McpPreparedServer registers its exact captured attachment with ReplaceableAgentSession.RegisterOwnedResource. Public close immediately fences new server admissions and returns the owning lease's stable original close task. Actual close body is admitted only under the owner mutation semaphore and exact persistent replacement reservation. It joins runtime/channel and captured host originals, then withdraws only the last actually committed catalog subset through the opaque retirement transaction. Active names come freshly from that reservation; no normal owner semaphore reacquisition or general unavailable-session read is used.
+
+Replacement calls the body only after target preflight/veto/drains, before old capability retirement. Final shutdown also calls the body before attachment cancellation. Faulted shutdown permits cleanup-only transactions and cannot acknowledge an unsafe catalog update. Failures remain original or reference-preserving aggregates and repeated owner disposal joins their original failures.
+
+The fixture exercises actual owning shutdown with held channel cleanup and observes that attachment cancellation and withdrawal acknowledgement occur only after release. The unrelated adapter control remains an actual prepared invocation. Held refresh already admitted under the owner finishes before queued normal close, and its acknowledged revision is then withdrawn. The eight owning API groups are registered once with direct original awaits. All groups remain UNCOMPILED and UNEXECUTED.
+
+This slice supplies owning close/replacement binding for explicitly constructed servers. Ordinary CLI config activation, admitted server acquisition factory, genuine codemode/tool-search identity, captured catalogs for before-open persisted declarations, and fresh runtime qualification remain open. No complete MCP parity claim, network activity, credentials, transport acquisition or grants occur here.

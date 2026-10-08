@@ -1,0 +1,3552 @@
+{
+  "schemaVersion": 1,
+  "kind": "PATH_SCOPED_SEMANTIC_DEPENDENCY_TRANSPLANT",
+  "base": "2be4f6d77a2e68795d76ef4f3d3b7a14c8392cc1",
+  "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+  "sourceTree": "302202bbb9246ee1e6930a88fb1fc333ce51612e",
+  "upstream": {
+    "tag": "v0.99.1",
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "originalWorkPackages": 79,
+    "phaseGates": 8
+  },
+  "integrationMethod": "Exact source byte copy only for absent dependency paths; existing dependencies verified and reused; main files preserved",
+  "importedFileCount": 92,
+  "importedBytes": 82795469.0,
+  "files": [
+    {
+      "path": "artifacts/released-baseline/acquire.mjs",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "f6ccac5b077b25ab76d012545eb771197a4540e4",
+      "sourceMode": "100644",
+      "sourceBlob": "13f868bd0f95c01b2210016f52ce62470c90ad90",
+      "sourcePhysicalGitBlob": "13f868bd0f95c01b2210016f52ce62470c90ad90",
+      "sourceBytes": 22861,
+      "sourceSha256": "fa8b32ff4dc22d9be52c3796c353f89983b9ae2aa3720a75eaaf303112f7b517",
+      "candidateBytes": 22861,
+      "candidateSha256": "fa8b32ff4dc22d9be52c3796c353f89983b9ae2aa3720a75eaaf303112f7b517"
+    },
+    {
+      "path": "artifacts/released-baseline/evidence.lock.json",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "f6ccac5b077b25ab76d012545eb771197a4540e4",
+      "sourceMode": "100644",
+      "sourceBlob": "b7a3a3f092e43d65260ac36172149fe216d8dbe4",
+      "sourcePhysicalGitBlob": "b7a3a3f092e43d65260ac36172149fe216d8dbe4",
+      "sourceBytes": 1263,
+      "sourceSha256": "6fe01c9a77d39505c154b1b20c65d838513a8efba17ea58164aaa38e7b81456c",
+      "candidateBytes": 1263,
+      "candidateSha256": "6fe01c9a77d39505c154b1b20c65d838513a8efba17ea58164aaa38e7b81456c"
+    },
+    {
+      "path": "artifacts/released-baseline/inspection.json",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "f6ccac5b077b25ab76d012545eb771197a4540e4",
+      "sourceMode": "100644",
+      "sourceBlob": "e835aa73019c920c094e08c4a17cd62e7287ab80",
+      "sourcePhysicalGitBlob": "e835aa73019c920c094e08c4a17cd62e7287ab80",
+      "sourceBytes": 41808,
+      "sourceSha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b",
+      "candidateBytes": 41808,
+      "candidateSha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b"
+    },
+    {
+      "path": "artifacts/released-baseline/metadata.json",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "f6ccac5b077b25ab76d012545eb771197a4540e4",
+      "sourceMode": "100644",
+      "sourceBlob": "ba1b5eced3eadedf75e85fef990ece74f1e812cb",
+      "sourcePhysicalGitBlob": "ba1b5eced3eadedf75e85fef990ece74f1e812cb",
+      "sourceBytes": 72880,
+      "sourceSha256": "1aafbfc3e2a0610b4066dd4cd94e239a64bc3b08506cd0d67f41cd18a34af789",
+      "candidateBytes": 72880,
+      "candidateSha256": "1aafbfc3e2a0610b4066dd4cd94e239a64bc3b08506cd0d67f41cd18a34af789"
+    },
+    {
+      "path": "artifacts/released-baseline/pi-0.99.1-source.tar.gz",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "f6ccac5b077b25ab76d012545eb771197a4540e4",
+      "sourceMode": "100644",
+      "sourceBlob": "540149e6a3c47bfd756a18b00201a8ed4179d56f",
+      "sourcePhysicalGitBlob": "540149e6a3c47bfd756a18b00201a8ed4179d56f",
+      "sourceBytes": 8646242,
+      "sourceSha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b",
+      "candidateBytes": 8646242,
+      "candidateSha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b"
+    },
+    {
+      "path": "artifacts/released-baseline/SHA256SUMS",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "f6ccac5b077b25ab76d012545eb771197a4540e4",
+      "sourceMode": "100644",
+      "sourceBlob": "2901a4eb192a8b7ac53f25b2a6388069257a35f9",
+      "sourcePhysicalGitBlob": "2901a4eb192a8b7ac53f25b2a6388069257a35f9",
+      "sourceBytes": 823,
+      "sourceSha256": "1490fbb52c4cbf6f175b1b66147702b5e6584504277fc0c424745c32770bdbba",
+      "candidateBytes": 823,
+      "candidateSha256": "1490fbb52c4cbf6f175b1b66147702b5e6584504277fc0c424745c32770bdbba"
+    },
+    {
+      "path": "artifacts/released-npm-ai/evidence.lock.json",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "a467501263a3a1622f79fe3540b36471a110f286",
+      "sourceMode": "100644",
+      "sourceBlob": "fa0590a2dd8d10489f699d93947ff70806f7f55c",
+      "sourcePhysicalGitBlob": "fa0590a2dd8d10489f699d93947ff70806f7f55c",
+      "sourceBytes": 1532,
+      "sourceSha256": "35fe3e5e8713163c4277fa72747de1ad38a2f842ea7543d00f567f3865ee0d94",
+      "candidateBytes": 1532,
+      "candidateSha256": "35fe3e5e8713163c4277fa72747de1ad38a2f842ea7543d00f567f3865ee0d94"
+    },
+    {
+      "path": "artifacts/released-npm-ai/inspection.json",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "a467501263a3a1622f79fe3540b36471a110f286",
+      "sourceMode": "100644",
+      "sourceBlob": "c6c1d91cebdc738459c641e755460b4a16b6e0f2",
+      "sourcePhysicalGitBlob": "c6c1d91cebdc738459c641e755460b4a16b6e0f2",
+      "sourceBytes": 157841,
+      "sourceSha256": "0c385e57ebdc3a01e0a7a50748af231a6fbefdea91b643356d6d0e239ebf6168",
+      "candidateBytes": 157841,
+      "candidateSha256": "0c385e57ebdc3a01e0a7a50748af231a6fbefdea91b643356d6d0e239ebf6168"
+    },
+    {
+      "path": "artifacts/released-npm-ai/pi-ai-0.99.1.tgz",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "a467501263a3a1622f79fe3540b36471a110f286",
+      "sourceMode": "100644",
+      "sourceBlob": "cac842a3121d0b109c323fc3a4fc77bb3325b592",
+      "sourcePhysicalGitBlob": "cac842a3121d0b109c323fc3a4fc77bb3325b592",
+      "sourceBytes": 760966,
+      "sourceSha256": "f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3",
+      "candidateBytes": 760966,
+      "candidateSha256": "f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3"
+    },
+    {
+      "path": "compatibility/ast-archive-admission.json",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "5866d37ecb44d802ac6f4dbd13a667864dca55eb",
+      "sourceMode": "100644",
+      "sourceBlob": "3796377fdcecf0193964327b3f841406fef82e80",
+      "sourcePhysicalGitBlob": "3796377fdcecf0193964327b3f841406fef82e80",
+      "sourceBytes": 570660,
+      "sourceSha256": "b019f67110323622948e54771e015f7fbe2e8a4d1ec99ed1be450064f914c3e2",
+      "candidateBytes": 570660,
+      "candidateSha256": "b019f67110323622948e54771e015f7fbe2e8a4d1ec99ed1be450064f914c3e2"
+    },
+    {
+      "path": "compatibility/public-entrypoints.plan.json",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ef9b847e7db780aeb8510d390638686583fda946",
+      "sourceMode": "100644",
+      "sourceBlob": "90b487cbf78ffeb7fd13becbb1d4daeaa786cc43",
+      "sourcePhysicalGitBlob": "90b487cbf78ffeb7fd13becbb1d4daeaa786cc43",
+      "sourceBytes": 3057,
+      "sourceSha256": "9524ccdeaaaaec2409f17c823a8baf0f9da0acd27c5492fdaf986e63fd815857",
+      "candidateBytes": 3057,
+      "candidateSha256": "9524ccdeaaaaec2409f17c823a8baf0f9da0acd27c5492fdaf986e63fd815857"
+    },
+    {
+      "path": "compatibility/semantic-api.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ba91c9c601318a82aa112d3942fd15a1121f65d7",
+      "sourceMode": "100644",
+      "sourceBlob": "8306687b6df0eeedc9eccf82853ca625722c3acf",
+      "sourcePhysicalGitBlob": "8306687b6df0eeedc9eccf82853ca625722c3acf",
+      "sourceBytes": 4131,
+      "sourceSha256": "731aa2cee6eda951b7d6f3d9fb0a4cdad3472389787e65d50c8e46b09827bcfd",
+      "candidateBytes": 4131,
+      "candidateSha256": "731aa2cee6eda951b7d6f3d9fb0a4cdad3472389787e65d50c8e46b09827bcfd"
+    },
+    {
+      "path": "compatibility/semantic-full-project-catalog.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "a14fc1771fb04bdf63435ca1c272e35e9034e144",
+      "sourceMode": "100644",
+      "sourceBlob": "4c79e62d8b61f4a28fd6325ae6a5fe6dcbd6da3a",
+      "sourcePhysicalGitBlob": "4c79e62d8b61f4a28fd6325ae6a5fe6dcbd6da3a",
+      "sourceBytes": 11376,
+      "sourceSha256": "398d02d6f33e63a1bd933ce0ee6875baa7aa0f4db58d60ba03d613b089bac202",
+      "candidateBytes": 11376,
+      "candidateSha256": "398d02d6f33e63a1bd933ce0ee6875baa7aa0f4db58d60ba03d613b089bac202"
+    },
+    {
+      "path": "compatibility/semantic-full-project-leaves.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "79ec85a27665ce00e80f5acffb3d4544e2be1e13",
+      "sourceMode": "100644",
+      "sourceBlob": "26ee368ee6b0ac73dfbd91f48cf2e9326af42d9c",
+      "sourcePhysicalGitBlob": "26ee368ee6b0ac73dfbd91f48cf2e9326af42d9c",
+      "sourceBytes": 9330,
+      "sourceSha256": "d0f277e2f7d9d040f9334b1dc63ecdc0306657a1d6fbe18271e22519ba298f6e",
+      "candidateBytes": 9330,
+      "candidateSha256": "d0f277e2f7d9d040f9334b1dc63ecdc0306657a1d6fbe18271e22519ba298f6e"
+    },
+    {
+      "path": "compatibility/semantic-full-project-node.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3e7c98f45ea4bc1136095d61647443cab0b6a630",
+      "sourceMode": "100644",
+      "sourceBlob": "c813d5578c1c933c6a658cf5561dc90254314e95",
+      "sourcePhysicalGitBlob": "c813d5578c1c933c6a658cf5561dc90254314e95",
+      "sourceBytes": 7129,
+      "sourceSha256": "299155962bebb8d415233401fb43ace87feef9c787999717e85afcb360debe02",
+      "candidateBytes": 7129,
+      "candidateSha256": "299155962bebb8d415233401fb43ace87feef9c787999717e85afcb360debe02"
+    },
+    {
+      "path": "compatibility/semantic-full-project-openai.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3974063ac3b8be1914530bc4ea718132b64c95d0",
+      "sourceMode": "100644",
+      "sourceBlob": "3fa843950d2fe68452654e1fe001c91448ef532b",
+      "sourcePhysicalGitBlob": "3fa843950d2fe68452654e1fe001c91448ef532b",
+      "sourceBytes": 16203,
+      "sourceSha256": "3401b676e50b7546a4b3179e76282a4f8e1309a107e8d6efad173924cf9db3eb",
+      "candidateBytes": 16203,
+      "candidateSha256": "3401b676e50b7546a4b3179e76282a4f8e1309a107e8d6efad173924cf9db3eb"
+    },
+    {
+      "path": "compatibility/semantic-full-project-typebox.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "b18be004329fdab8d9a0b46054a1af837681bd76",
+      "sourceMode": "100644",
+      "sourceBlob": "f171a97ab041192094465c560fa1e2c194fa22ec",
+      "sourcePhysicalGitBlob": "f171a97ab041192094465c560fa1e2c194fa22ec",
+      "sourceBytes": 7592,
+      "sourceSha256": "09d0e904f54371e1d8a90938840c2a9916816078f53fa3c497df4af340ba033b",
+      "candidateBytes": 7592,
+      "candidateSha256": "09d0e904f54371e1d8a90938840c2a9916816078f53fa3c497df4af340ba033b"
+    },
+    {
+      "path": "compatibility/semantic-full-project.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "1775aef38d39f45a565fdf640dc986d0dacecbf0",
+      "sourceMode": "100644",
+      "sourceBlob": "8016c8aa72b5cdf6f53a79cfdc3a69c7a7cdf495",
+      "sourcePhysicalGitBlob": "8016c8aa72b5cdf6f53a79cfdc3a69c7a7cdf495",
+      "sourceBytes": 3749,
+      "sourceSha256": "bdca069976c1fd221e503e9d2892f49498823b0695e561c61eeecc0d15129ead",
+      "candidateBytes": 3749,
+      "candidateSha256": "bdca069976c1fd221e503e9d2892f49498823b0695e561c61eeecc0d15129ead"
+    },
+    {
+      "path": "compatibility/semantic-full-structural-openai.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceMode": "100644",
+      "sourceBlob": "0292fc81d5e91ba4b04832748450a287c8f8abd5",
+      "sourcePhysicalGitBlob": "0292fc81d5e91ba4b04832748450a287c8f8abd5",
+      "sourceBytes": 23976,
+      "sourceSha256": "ed7d486f01f1f5248c39ea1a7dc717bb10ae7f330622452b3ce8e0a0b50db736",
+      "candidateBytes": 23976,
+      "candidateSha256": "ed7d486f01f1f5248c39ea1a7dc717bb10ae7f330622452b3ce8e0a0b50db736"
+    },
+    {
+      "path": "compatibility/semantic-leaf-declarations.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "61a37354d4cf4fdafa0abf3bc5269f611406ad51",
+      "sourceMode": "100644",
+      "sourceBlob": "2e27164429aef7579332c78918148fc7b2ca84c4",
+      "sourcePhysicalGitBlob": "2e27164429aef7579332c78918148fc7b2ca84c4",
+      "sourceBytes": 22622,
+      "sourceSha256": "a65030e0db4193de43057559eae00debda22de4332359cb9541422ba0a21cfb5",
+      "candidateBytes": 22622,
+      "candidateSha256": "a65030e0db4193de43057559eae00debda22de4332359cb9541422ba0a21cfb5"
+    },
+    {
+      "path": "compatibility/semantic-node-declarations.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "2ccfff28d89eeab9c24483be65de7c58e80d33aa",
+      "sourceMode": "100644",
+      "sourceBlob": "a8dfbf0149f5eb8254d49acea5808b08be34f7c0",
+      "sourcePhysicalGitBlob": "a8dfbf0149f5eb8254d49acea5808b08be34f7c0",
+      "sourceBytes": 6377,
+      "sourceSha256": "62a9dc8b188893836423f329ba9df5f5386f92a6455ba3f4f4d3cb59925d369b",
+      "candidateBytes": 6377,
+      "candidateSha256": "62a9dc8b188893836423f329ba9df5f5386f92a6455ba3f4f4d3cb59925d369b"
+    },
+    {
+      "path": "compatibility/semantic-public-triage-openai.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "8e30364972032cadfb7600c195c67f2bca3cc99a",
+      "sourceMode": "100644",
+      "sourceBlob": "308a7875d507592e1f676d44a99ca54ee352fd6d",
+      "sourcePhysicalGitBlob": "308a7875d507592e1f676d44a99ca54ee352fd6d",
+      "sourceBytes": 649027,
+      "sourceSha256": "8feaf1cdd0e6bb8285f87cf4be7517e5e741abf9b3101b6ef6030e28913082d7",
+      "candidateBytes": 649027,
+      "candidateSha256": "8feaf1cdd0e6bb8285f87cf4be7517e5e741abf9b3101b6ef6030e28913082d7"
+    },
+    {
+      "path": "compatibility/semantic-public-triage.census.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "4d0b42275ebeeea8998b40348e75357d21db24df",
+      "sourceMode": "100644",
+      "sourceBlob": "911e9fec89b6ed7a2c2a4bcc80d93657ca50d128",
+      "sourcePhysicalGitBlob": "911e9fec89b6ed7a2c2a4bcc80d93657ca50d128",
+      "sourceBytes": 3574484,
+      "sourceSha256": "803967f474c4dc51100ad348899a88c3ccfd4b51468e89a542a0dc7388266ff0",
+      "candidateBytes": 3574484,
+      "candidateSha256": "803967f474c4dc51100ad348899a88c3ccfd4b51468e89a542a0dc7388266ff0"
+    },
+    {
+      "path": "compatibility/semantic-released-catalog.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "e55fe2d60d027c672973b1dc46f07dc6dbf7ebf6",
+      "sourceMode": "100644",
+      "sourceBlob": "e910c706e9d745898eff2a621be38f007d5795a5",
+      "sourcePhysicalGitBlob": "e910c706e9d745898eff2a621be38f007d5795a5",
+      "sourceBytes": 17168,
+      "sourceSha256": "9a14334508d418ed0bdc46f38fa31f368390a017f31c4ea49250965d58b6d3a0",
+      "candidateBytes": 17168,
+      "candidateSha256": "9a14334508d418ed0bdc46f38fa31f368390a017f31c4ea49250965d58b6d3a0"
+    },
+    {
+      "path": "compatibility/semantic-typebox-declarations.plan.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "139c78515eaa3a73437ca1d5bdc8e69f66dcdfef",
+      "sourceMode": "100644",
+      "sourceBlob": "d78fb3757532b143a79560550d888bd2be8fec7c",
+      "sourcePhysicalGitBlob": "d78fb3757532b143a79560550d888bd2be8fec7c",
+      "sourceBytes": 8740,
+      "sourceSha256": "7acc123c9618fb2ea3780a8fad43db522e5074e60523e706c804f8f5b57dfb9c",
+      "candidateBytes": 8740,
+      "candidateSha256": "7acc123c9618fb2ea3780a8fad43db522e5074e60523e706c804f8f5b57dfb9c"
+    },
+    {
+      "path": "docs/compatibility/minimal-native-api-panic.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ef220611bd65a66c40b747dd4239407199cf4605",
+      "sourceMode": "100644",
+      "sourceBlob": "c6432755a168f24e698287a3fa472dc463136282",
+      "sourcePhysicalGitBlob": "c6432755a168f24e698287a3fa472dc463136282",
+      "sourceBytes": 4024,
+      "sourceSha256": "396cc9d8675b2d32a7e77c3467bcd5c3dded16d02705fbb2e02a04b730ce933f",
+      "candidateBytes": 4024,
+      "candidateSha256": "396cc9d8675b2d32a7e77c3467bcd5c3dded16d02705fbb2e02a04b730ce933f"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-catalog.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "a14fc1771fb04bdf63435ca1c272e35e9034e144",
+      "sourceMode": "100644",
+      "sourceBlob": "495e0336b12a8c7b9bc2e36ee3cf0d587149d671",
+      "sourcePhysicalGitBlob": "495e0336b12a8c7b9bc2e36ee3cf0d587149d671",
+      "sourceBytes": 14170,
+      "sourceSha256": "560046af8b802cb2ee2442c1e9fc2ef2511f07a1096e52f1f24f758c2a199372",
+      "candidateBytes": 14170,
+      "candidateSha256": "560046af8b802cb2ee2442c1e9fc2ef2511f07a1096e52f1f24f758c2a199372"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-leaves.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "79ec85a27665ce00e80f5acffb3d4544e2be1e13",
+      "sourceMode": "100644",
+      "sourceBlob": "f6d533bd8547a92e39dfa1076b00ef785f36377a",
+      "sourcePhysicalGitBlob": "f6d533bd8547a92e39dfa1076b00ef785f36377a",
+      "sourceBytes": 9461,
+      "sourceSha256": "472487500bf140a9730f97936111822afd8a5e80ea3214e92d6ab445f3df23da",
+      "candidateBytes": 9461,
+      "candidateSha256": "472487500bf140a9730f97936111822afd8a5e80ea3214e92d6ab445f3df23da"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-node.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3e7c98f45ea4bc1136095d61647443cab0b6a630",
+      "sourceMode": "100644",
+      "sourceBlob": "42eafd8918c76c684cd6906739d4bf2b1fad07bf",
+      "sourcePhysicalGitBlob": "42eafd8918c76c684cd6906739d4bf2b1fad07bf",
+      "sourceBytes": 11239,
+      "sourceSha256": "fe7022880d3f5d0ce6ce094ab2a8bca419fe753b07a742182bc59a6274f4c67a",
+      "candidateBytes": 11239,
+      "candidateSha256": "fe7022880d3f5d0ce6ce094ab2a8bca419fe753b07a742182bc59a6274f4c67a"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-openai.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3974063ac3b8be1914530bc4ea718132b64c95d0",
+      "sourceMode": "100644",
+      "sourceBlob": "1477d4a63dbaf366523666f7ed7550aa99b9ce64",
+      "sourcePhysicalGitBlob": "1477d4a63dbaf366523666f7ed7550aa99b9ce64",
+      "sourceBytes": 12913,
+      "sourceSha256": "bf1cf3d4fe08dcf1cc6e969daec366f97de459068faf9c0146c5bf0b193a4d5a",
+      "candidateBytes": 12913,
+      "candidateSha256": "bf1cf3d4fe08dcf1cc6e969daec366f97de459068faf9c0146c5bf0b193a4d5a"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-typebox.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "b18be004329fdab8d9a0b46054a1af837681bd76",
+      "sourceMode": "100644",
+      "sourceBlob": "0cad09bfb1cc64c5267d139fbdb9939a25896291",
+      "sourcePhysicalGitBlob": "0cad09bfb1cc64c5267d139fbdb9939a25896291",
+      "sourceBytes": 10613,
+      "sourceSha256": "d7a3d6df752622be0901bc5a380d80df3bb6a7e02e482eafcd990c70e187bfdf",
+      "candidateBytes": 10613,
+      "candidateSha256": "d7a3d6df752622be0901bc5a380d80df3bb6a7e02e482eafcd990c70e187bfdf"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "b33c529f42120ea8ae31451581cd88759373deb5",
+      "sourceMode": "100644",
+      "sourceBlob": "378deba81cf776549d00b19b69cf35bf29d85fa9",
+      "sourcePhysicalGitBlob": "378deba81cf776549d00b19b69cf35bf29d85fa9",
+      "sourceBytes": 7630,
+      "sourceSha256": "7b84b4af4eb077be611d23471a43c946b3d3aaf332aaddd5bebb7ad586a0ff15",
+      "candidateBytes": 7630,
+      "candidateSha256": "7b84b4af4eb077be611d23471a43c946b3d3aaf332aaddd5bebb7ad586a0ff15"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-structural-openai.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceMode": "100644",
+      "sourceBlob": "b662bd01fb9c9bf85a8bec6a5b976f2d5f859d2f",
+      "sourcePhysicalGitBlob": "b662bd01fb9c9bf85a8bec6a5b976f2d5f859d2f",
+      "sourceBytes": 35070,
+      "sourceSha256": "d62cac08bf8a20e52cf7dc810f9f39b4a16fef77f1c4992a0109601d7bd78aca",
+      "candidateBytes": 35070,
+      "candidateSha256": "d62cac08bf8a20e52cf7dc810f9f39b4a16fef77f1c4992a0109601d7bd78aca"
+    },
+    {
+      "path": "docs/compatibility/semantic-leaf-declarations-setup.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "61a37354d4cf4fdafa0abf3bc5269f611406ad51",
+      "sourceMode": "100644",
+      "sourceBlob": "b54476521c4434e188c70e32a725828426486a3a",
+      "sourcePhysicalGitBlob": "b54476521c4434e188c70e32a725828426486a3a",
+      "sourceBytes": 9208,
+      "sourceSha256": "a7b85879e64649a880f7a4ac1ca5ad571f259431609cc51e32738eae6bb9d210",
+      "candidateBytes": 9208,
+      "candidateSha256": "a7b85879e64649a880f7a4ac1ca5ad571f259431609cc51e32738eae6bb9d210"
+    },
+    {
+      "path": "docs/compatibility/semantic-node-declarations-setup.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "2ccfff28d89eeab9c24483be65de7c58e80d33aa",
+      "sourceMode": "100644",
+      "sourceBlob": "26c929dbc8fbe9f36cdc29b9c67f264908eb3301",
+      "sourcePhysicalGitBlob": "26c929dbc8fbe9f36cdc29b9c67f264908eb3301",
+      "sourceBytes": 7763,
+      "sourceSha256": "62a702291477d43588cb686e621371c98cc5d4219273f52414245c8ba218a688",
+      "candidateBytes": 7763,
+      "candidateSha256": "62a702291477d43588cb686e621371c98cc5d4219273f52414245c8ba218a688"
+    },
+    {
+      "path": "docs/compatibility/semantic-public-residual-triage.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "4d0b42275ebeeea8998b40348e75357d21db24df",
+      "sourceMode": "100644",
+      "sourceBlob": "7631e2364fcc8203879db2cdf2a6581838c60555",
+      "sourcePhysicalGitBlob": "7631e2364fcc8203879db2cdf2a6581838c60555",
+      "sourceBytes": 24935,
+      "sourceSha256": "aa82f295c75597ac4ff06fa2f3af0a06c86b6ca57786b9c3a5ffe13066a2bf05",
+      "candidateBytes": 24935,
+      "candidateSha256": "aa82f295c75597ac4ff06fa2f3af0a06c86b6ca57786b9c3a5ffe13066a2bf05"
+    },
+    {
+      "path": "docs/compatibility/semantic-released-catalog-setup.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "e55fe2d60d027c672973b1dc46f07dc6dbf7ebf6",
+      "sourceMode": "100644",
+      "sourceBlob": "96d076d213881124f15573878c8fa4e6a46429c2",
+      "sourcePhysicalGitBlob": "96d076d213881124f15573878c8fa4e6a46429c2",
+      "sourceBytes": 9346,
+      "sourceSha256": "0f7dcd321da4506c974a9e5d993da00456ec9c538f662b9c4c3fc5c898c0f7a6",
+      "candidateBytes": 9346,
+      "candidateSha256": "0f7dcd321da4506c974a9e5d993da00456ec9c538f662b9c4c3fc5c898c0f7a6"
+    },
+    {
+      "path": "docs/compatibility/semantic-typebox-declarations-setup.md",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "139c78515eaa3a73437ca1d5bdc8e69f66dcdfef",
+      "sourceMode": "100644",
+      "sourceBlob": "8d01bb613b71a41af81a1e46ba2371919b13091c",
+      "sourcePhysicalGitBlob": "8d01bb613b71a41af81a1e46ba2371919b13091c",
+      "sourceBytes": 10301,
+      "sourceSha256": "97537872259fc25b3011c2558bed71b67fa4b5fce586c4426a2457a3d97d8b1c",
+      "candidateBytes": 10301,
+      "candidateSha256": "97537872259fc25b3011c2558bed71b67fa4b5fce586c4426a2457a3d97d8b1c"
+    },
+    {
+      "path": "fixtures/semantic-api/input.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ba91c9c601318a82aa112d3942fd15a1121f65d7",
+      "sourceMode": "100644",
+      "sourceBlob": "c4df4054dbeb756f00373e6d7c4b48fcea4e94d9",
+      "sourcePhysicalGitBlob": "c4df4054dbeb756f00373e6d7c4b48fcea4e94d9",
+      "sourceBytes": 1913,
+      "sourceSha256": "10162c9dadc082c947526712786c3d75d898afcbee5bd3616e9f15b7a425a569",
+      "candidateBytes": 1913,
+      "candidateSha256": "10162c9dadc082c947526712786c3d75d898afcbee5bd3616e9f15b7a425a569"
+    },
+    {
+      "path": "fixtures/semantic-full-project-catalog/expected.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "29a80590c24ca3b6620654d3222699ac21577a01",
+      "sourceMode": "100644",
+      "sourceBlob": "0bacbbb396a6876642b4b8b51d05135b3ede6406",
+      "sourcePhysicalGitBlob": "0bacbbb396a6876642b4b8b51d05135b3ede6406",
+      "sourceBytes": 13305865,
+      "sourceSha256": "5999081da5235765a1a0dc7090ca770ba32a11e939a824973fb1d3317b7a77df",
+      "candidateBytes": 13305865,
+      "candidateSha256": "5999081da5235765a1a0dc7090ca770ba32a11e939a824973fb1d3317b7a77df"
+    },
+    {
+      "path": "fixtures/semantic-full-project-catalog/manifest.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "29a80590c24ca3b6620654d3222699ac21577a01",
+      "sourceMode": "100644",
+      "sourceBlob": "4293ea049c264d2ad235be5dbc8364e0007d1a81",
+      "sourcePhysicalGitBlob": "4293ea049c264d2ad235be5dbc8364e0007d1a81",
+      "sourceBytes": 2720,
+      "sourceSha256": "2aa4925eca091516b7ea6f15eaa744c310a66c000404a52ed70f7581be0e960a",
+      "candidateBytes": 2720,
+      "candidateSha256": "2aa4925eca091516b7ea6f15eaa744c310a66c000404a52ed70f7581be0e960a"
+    },
+    {
+      "path": "fixtures/semantic-full-project-leaves/expected.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "8475ab9ff17141979ff9c48fb31550af0329a765",
+      "sourceMode": "100644",
+      "sourceBlob": "11ba7c8afd88fca7745dd69bd1843ae07c3c8c8d",
+      "sourcePhysicalGitBlob": "11ba7c8afd88fca7745dd69bd1843ae07c3c8c8d",
+      "sourceBytes": 11900399,
+      "sourceSha256": "9688c7ab648cab659fc12b93cf39d817f9fd398145ed23185c1439790d7a5d28",
+      "candidateBytes": 11900399,
+      "candidateSha256": "9688c7ab648cab659fc12b93cf39d817f9fd398145ed23185c1439790d7a5d28"
+    },
+    {
+      "path": "fixtures/semantic-full-project-leaves/manifest.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "8475ab9ff17141979ff9c48fb31550af0329a765",
+      "sourceMode": "100644",
+      "sourceBlob": "b5b3221819af88d26b23bc4be44fc623eb44a509",
+      "sourcePhysicalGitBlob": "b5b3221819af88d26b23bc4be44fc623eb44a509",
+      "sourceBytes": 2680,
+      "sourceSha256": "b5c26efdc8c6e15210879712aaf438c488db870cffcba79f3844bf1a57bef606",
+      "candidateBytes": 2680,
+      "candidateSha256": "b5c26efdc8c6e15210879712aaf438c488db870cffcba79f3844bf1a57bef606"
+    },
+    {
+      "path": "fixtures/semantic-full-project-node/expected.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "eabb1d9cf3bfd47df2a80c87852b9f1358bf7c12",
+      "sourceMode": "100644",
+      "sourceBlob": "74b21a03787b14cd2ee48bafd4db789a23330b05",
+      "sourcePhysicalGitBlob": "74b21a03787b14cd2ee48bafd4db789a23330b05",
+      "sourceBytes": 11259657,
+      "sourceSha256": "48ad3042aed5c1365a470bb885b3500c114044987ceb7c619fadf7eab215ef92",
+      "candidateBytes": 11259657,
+      "candidateSha256": "48ad3042aed5c1365a470bb885b3500c114044987ceb7c619fadf7eab215ef92"
+    },
+    {
+      "path": "fixtures/semantic-full-project-node/manifest.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "eabb1d9cf3bfd47df2a80c87852b9f1358bf7c12",
+      "sourceMode": "100644",
+      "sourceBlob": "28c67717490e0b06d089f8b50f337fcfa8d55b51",
+      "sourcePhysicalGitBlob": "28c67717490e0b06d089f8b50f337fcfa8d55b51",
+      "sourceBytes": 2596,
+      "sourceSha256": "7412bd7b2e0086f44911a41292db3d68623988b42a68de4f1d11d36ee2999491",
+      "candidateBytes": 2596,
+      "candidateSha256": "7412bd7b2e0086f44911a41292db3d68623988b42a68de4f1d11d36ee2999491"
+    },
+    {
+      "path": "fixtures/semantic-full-project-openai/expected.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ed89b4d8fe6426c4e693d9ea0ec91b274afc8ee4",
+      "sourceMode": "100644",
+      "sourceBlob": "5334fd11e624144b927269cf7abc2fb540a32a2d",
+      "sourcePhysicalGitBlob": "5334fd11e624144b927269cf7abc2fb540a32a2d",
+      "sourceBytes": 15195616,
+      "sourceSha256": "b317776cc214fa757abf19769de3fec25323e4489226d705559441100876c107",
+      "candidateBytes": 15195616,
+      "candidateSha256": "b317776cc214fa757abf19769de3fec25323e4489226d705559441100876c107"
+    },
+    {
+      "path": "fixtures/semantic-full-project-openai/manifest.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ed89b4d8fe6426c4e693d9ea0ec91b274afc8ee4",
+      "sourceMode": "100644",
+      "sourceBlob": "e02854f1373288f2361d64fd0e042628f7e46d29",
+      "sourcePhysicalGitBlob": "e02854f1373288f2361d64fd0e042628f7e46d29",
+      "sourceBytes": 2793,
+      "sourceSha256": "497c0a65c2f418239bd91d78baa73a3c1647bf120c6d852d19f98d603224865a",
+      "candidateBytes": 2793,
+      "candidateSha256": "497c0a65c2f418239bd91d78baa73a3c1647bf120c6d852d19f98d603224865a"
+    },
+    {
+      "path": "fixtures/semantic-full-project-typebox/expected.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ad0d8e96738eca014ea83fc653e41bdb57669616",
+      "sourceMode": "100644",
+      "sourceBlob": "068e0c6e916d9b1597e5e7a85d2128285a32b225",
+      "sourcePhysicalGitBlob": "068e0c6e916d9b1597e5e7a85d2128285a32b225",
+      "sourceBytes": 11827290,
+      "sourceSha256": "6f0adfe24b99cab96637255ce58d145f397495e7da27ebb276fc8ff89d5aa772",
+      "candidateBytes": 11827290,
+      "candidateSha256": "6f0adfe24b99cab96637255ce58d145f397495e7da27ebb276fc8ff89d5aa772"
+    },
+    {
+      "path": "fixtures/semantic-full-project-typebox/manifest.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ad0d8e96738eca014ea83fc653e41bdb57669616",
+      "sourceMode": "100644",
+      "sourceBlob": "b62bf61305b58342e5231a41e822dfe7b563c490",
+      "sourcePhysicalGitBlob": "b62bf61305b58342e5231a41e822dfe7b563c490",
+      "sourceBytes": 2702,
+      "sourceSha256": "94370593efa9d43b84254da52963649c157825a8593a0928b393ae1697a78007",
+      "candidateBytes": 2702,
+      "candidateSha256": "94370593efa9d43b84254da52963649c157825a8593a0928b393ae1697a78007"
+    },
+    {
+      "path": "fixtures/semantic-full-project/expected.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "4954e04ebcb1839fdee73f305436524f7da7d505",
+      "sourceMode": "100644",
+      "sourceBlob": "6a43563e21ce3eacdac4d1465421b47ef988dcfa",
+      "sourcePhysicalGitBlob": "6a43563e21ce3eacdac4d1465421b47ef988dcfa",
+      "sourceBytes": 13991317,
+      "sourceSha256": "ad2f8b8926dbb9a3485023a460fd139f982c488d6f413e5f0bc32851b6ea3008",
+      "candidateBytes": 13991317,
+      "candidateSha256": "ad2f8b8926dbb9a3485023a460fd139f982c488d6f413e5f0bc32851b6ea3008"
+    },
+    {
+      "path": "fixtures/semantic-full-project/manifest.json",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "4954e04ebcb1839fdee73f305436524f7da7d505",
+      "sourceMode": "100644",
+      "sourceBlob": "4b213c4e4a76e0f56f14b3a2a0129f0ce9189381",
+      "sourcePhysicalGitBlob": "4b213c4e4a76e0f56f14b3a2a0129f0ce9189381",
+      "sourceBytes": 2324,
+      "sourceSha256": "fb17f711b431843a55d12f1d62dc5ef9bbf4611309389f0d8fa2c28d598c75f3",
+      "candidateBytes": 2324,
+      "candidateSha256": "fb17f711b431843a55d12f1d62dc5ef9bbf4611309389f0d8fa2c28d598c75f3"
+    },
+    {
+      "path": "LICENSE",
+      "action": "oracle-or-test-member-name-collision-main-preserved",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "5675b6036c15363938e6a77443bcc3fd25c37360",
+      "sourceMode": "100644",
+      "sourceBlob": "71cb26574625d3081755b4e50953319294e7cbcb",
+      "sourcePhysicalGitBlob": "e29b5e5308b0417552b5ac3badc905ea5129f8b6",
+      "sourceBytes": 1098,
+      "sourceSha256": "6e49c00b43e3e546effb9ebbc3bd349d1ee94474b746b9e5bc4d3fd8100b8f82",
+      "candidateBytes": 1098,
+      "candidateSha256": "6e49c00b43e3e546effb9ebbc3bd349d1ee94474b746b9e5bc4d3fd8100b8f82"
+    },
+    {
+      "path": "README.md",
+      "action": "oracle-or-test-member-name-collision-main-preserved",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "05db6ef362de7edc3558f84572d9b1fb6a0c03e4",
+      "sourceMode": "100644",
+      "sourceBlob": "0cff72bd38478671a7a22ceb4b01c9e9e048ffd6",
+      "sourcePhysicalGitBlob": "0cff72bd38478671a7a22ceb4b01c9e9e048ffd6",
+      "sourceBytes": 2794,
+      "sourceSha256": "4dd99e40cf693c48c674e78d099aa4043c18511d6328480514d65addabf17477",
+      "candidateBytes": 3622,
+      "candidateSha256": "1b053b228b07ff43b8ba7d37d19e4ea3a1d6214731dfa4a1f2ef6f3240f292df"
+    },
+    {
+      "path": "tools/CompatibilityReport/raw-json.mjs",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "8869ed3d359ea4c7caef9abdc47e4fc7e3fcdcd5",
+      "sourceMode": "100644",
+      "sourceBlob": "289d0f26f87770aeb9ad3c6ec06c0bab41615504",
+      "sourcePhysicalGitBlob": "289d0f26f87770aeb9ad3c6ec06c0bab41615504",
+      "sourceBytes": 3665,
+      "sourceSha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9",
+      "candidateBytes": 3665,
+      "candidateSha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "a14fc1771fb04bdf63435ca1c272e35e9034e144",
+      "sourceMode": "100644",
+      "sourceBlob": "aa4b4d189d193474cfbfb512c6b9b1983ec34bd9",
+      "sourcePhysicalGitBlob": "aa4b4d189d193474cfbfb512c6b9b1983ec34bd9",
+      "sourceBytes": 15169,
+      "sourceSha256": "1c8fb8f5c386e4b7ff9f91a419afea3cb9086952d095b1bbad3380d234daa44c",
+      "candidateBytes": 15169,
+      "candidateSha256": "1c8fb8f5c386e4b7ff9f91a419afea3cb9086952d095b1bbad3380d234daa44c"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog-driver.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "a14fc1771fb04bdf63435ca1c272e35e9034e144",
+      "sourceMode": "100644",
+      "sourceBlob": "3e34625e7fe11614582cdbb1b1bca99a97d902b7",
+      "sourcePhysicalGitBlob": "3e34625e7fe11614582cdbb1b1bca99a97d902b7",
+      "sourceBytes": 12416,
+      "sourceSha256": "36fb36dae3e43b6bb46629c8fa4a1c827a84b17fc768ad5280f7c70c63f60395",
+      "candidateBytes": 12416,
+      "candidateSha256": "36fb36dae3e43b6bb46629c8fa4a1c827a84b17fc768ad5280f7c70c63f60395"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog-preload.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "a14fc1771fb04bdf63435ca1c272e35e9034e144",
+      "sourceMode": "100644",
+      "sourceBlob": "c9d1425c76f93ea2f75b1bc25e571f3d7b5dcac2",
+      "sourcePhysicalGitBlob": "c9d1425c76f93ea2f75b1bc25e571f3d7b5dcac2",
+      "sourceBytes": 8586,
+      "sourceSha256": "eb92f092ebd850e1acac0cf1a4e1aecfc894ec5a6155a4df63a4e41e00ddb39c",
+      "candidateBytes": 8586,
+      "candidateSha256": "eb92f092ebd850e1acac0cf1a4e1aecfc894ec5a6155a4df63a4e41e00ddb39c"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-catalog.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "a14fc1771fb04bdf63435ca1c272e35e9034e144",
+      "sourceMode": "100644",
+      "sourceBlob": "cbdab71851af1a1541a81da9291c3f7fbc336987",
+      "sourcePhysicalGitBlob": "cbdab71851af1a1541a81da9291c3f7fbc336987",
+      "sourceBytes": 11463,
+      "sourceSha256": "509d1e750703d4df5f67d420db6e62e9cb0b5d91c5dac1bef2a0de606e89ba06",
+      "candidateBytes": 11463,
+      "candidateSha256": "509d1e750703d4df5f67d420db6e62e9cb0b5d91c5dac1bef2a0de606e89ba06"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-common.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "b33c529f42120ea8ae31451581cd88759373deb5",
+      "sourceMode": "100644",
+      "sourceBlob": "2f7232f2ef34d3df28a61ae6e164398ad03c01d0",
+      "sourcePhysicalGitBlob": "2f7232f2ef34d3df28a61ae6e164398ad03c01d0",
+      "sourceBytes": 12228,
+      "sourceSha256": "8a3a43f2ecd4005e3a9e3b9bf702b5aea710cff6f95fa9467e3e6077a7243854",
+      "candidateBytes": 12228,
+      "candidateSha256": "8a3a43f2ecd4005e3a9e3b9bf702b5aea710cff6f95fa9467e3e6077a7243854"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-driver.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "1775aef38d39f45a565fdf640dc986d0dacecbf0",
+      "sourceMode": "100644",
+      "sourceBlob": "4cdcc5856308b346f947c7b6f511ef459e3995b5",
+      "sourcePhysicalGitBlob": "4cdcc5856308b346f947c7b6f511ef459e3995b5",
+      "sourceBytes": 8942,
+      "sourceSha256": "962d902f8d4d6bca28bc5549b321ef563b4a1cd6adc9f32fec760c3c5c9743ae",
+      "candidateBytes": 8942,
+      "candidateSha256": "962d902f8d4d6bca28bc5549b321ef563b4a1cd6adc9f32fec760c3c5c9743ae"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "79ec85a27665ce00e80f5acffb3d4544e2be1e13",
+      "sourceMode": "100644",
+      "sourceBlob": "d512df1af9e6cd14e1e5b9649c12d31f09894826",
+      "sourcePhysicalGitBlob": "d512df1af9e6cd14e1e5b9649c12d31f09894826",
+      "sourceBytes": 9494,
+      "sourceSha256": "fcb29ed9bfe942ed64ccfa72757215a4076391ddc59268553d0b68f24af0e2a3",
+      "candidateBytes": 9494,
+      "candidateSha256": "fcb29ed9bfe942ed64ccfa72757215a4076391ddc59268553d0b68f24af0e2a3"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-leaves-driver.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "79ec85a27665ce00e80f5acffb3d4544e2be1e13",
+      "sourceMode": "100644",
+      "sourceBlob": "1afd4e006c00839667b9244089809d7e8b8d9aca",
+      "sourcePhysicalGitBlob": "1afd4e006c00839667b9244089809d7e8b8d9aca",
+      "sourceBytes": 10426,
+      "sourceSha256": "6d3ac83b1a0f0cfc5e71731d20ef172d04e7d1738c5b0127650a1fb745c086cf",
+      "candidateBytes": 10426,
+      "candidateSha256": "6d3ac83b1a0f0cfc5e71731d20ef172d04e7d1738c5b0127650a1fb745c086cf"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-leaves-preload.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "79ec85a27665ce00e80f5acffb3d4544e2be1e13",
+      "sourceMode": "100644",
+      "sourceBlob": "c110b97d949272818b2085b682155cbdcd3f7d52",
+      "sourcePhysicalGitBlob": "c110b97d949272818b2085b682155cbdcd3f7d52",
+      "sourceBytes": 8574,
+      "sourceSha256": "7c8c05fd43d3f46b63cf11133b7de2603e8b077421edd6c147865d21acc1b395",
+      "candidateBytes": 8574,
+      "candidateSha256": "7c8c05fd43d3f46b63cf11133b7de2603e8b077421edd6c147865d21acc1b395"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-leaves.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "79ec85a27665ce00e80f5acffb3d4544e2be1e13",
+      "sourceMode": "100644",
+      "sourceBlob": "66833a10128905bfb5ee1d680b9b0ee61a783f35",
+      "sourcePhysicalGitBlob": "66833a10128905bfb5ee1d680b9b0ee61a783f35",
+      "sourceBytes": 22046,
+      "sourceSha256": "b74968fb4ee160e56437780797f707ceb19fe2380630b55902363e9bcd90d03a",
+      "candidateBytes": 22046,
+      "candidateSha256": "b74968fb4ee160e56437780797f707ceb19fe2380630b55902363e9bcd90d03a"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-node-common.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3e7c98f45ea4bc1136095d61647443cab0b6a630",
+      "sourceMode": "100644",
+      "sourceBlob": "8088e02be679a4a5c2ebe2e5ce39ee69cde1a326",
+      "sourcePhysicalGitBlob": "8088e02be679a4a5c2ebe2e5ce39ee69cde1a326",
+      "sourceBytes": 21386,
+      "sourceSha256": "2b7b2c7948c02366028f820b4de0c67ac2e109ac54a45946945538b3459ff3ce",
+      "candidateBytes": 21386,
+      "candidateSha256": "2b7b2c7948c02366028f820b4de0c67ac2e109ac54a45946945538b3459ff3ce"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-node-driver.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3e7c98f45ea4bc1136095d61647443cab0b6a630",
+      "sourceMode": "100644",
+      "sourceBlob": "f9f54d983b64bf138187105e299f517c693df798",
+      "sourcePhysicalGitBlob": "f9f54d983b64bf138187105e299f517c693df798",
+      "sourceBytes": 9990,
+      "sourceSha256": "e8997e2c11f3bbaa24a021a5df5c465d2710ad95a2927269e69c28191ce63e03",
+      "candidateBytes": 9990,
+      "candidateSha256": "e8997e2c11f3bbaa24a021a5df5c465d2710ad95a2927269e69c28191ce63e03"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-node-preload.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3e7c98f45ea4bc1136095d61647443cab0b6a630",
+      "sourceMode": "100644",
+      "sourceBlob": "692ea277187292da267cfd021250283857919ac8",
+      "sourcePhysicalGitBlob": "692ea277187292da267cfd021250283857919ac8",
+      "sourceBytes": 8547,
+      "sourceSha256": "b11aa534a4ee7d81d80ba05e4292dba5cbf37e46a706450f98aed36e23bd2bba",
+      "candidateBytes": 8547,
+      "candidateSha256": "b11aa534a4ee7d81d80ba05e4292dba5cbf37e46a706450f98aed36e23bd2bba"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-node.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3e7c98f45ea4bc1136095d61647443cab0b6a630",
+      "sourceMode": "100644",
+      "sourceBlob": "23bcbe1276acfb5eb592ee4d95fabd2ba2bfa041",
+      "sourcePhysicalGitBlob": "23bcbe1276acfb5eb592ee4d95fabd2ba2bfa041",
+      "sourceBytes": 20416,
+      "sourceSha256": "e5a37c543e0ecfd882161fb5e3db608841eaa349ebf36b4aeb502db25fb01694",
+      "candidateBytes": 20416,
+      "candidateSha256": "e5a37c543e0ecfd882161fb5e3db608841eaa349ebf36b4aeb502db25fb01694"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-preload.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ee09dbaeb062baecbb5d7c9f51791b2371e08700",
+      "sourceMode": "100644",
+      "sourceBlob": "e4f5378ca4fd5138ffdc08ceca3f9aae30e9fe27",
+      "sourcePhysicalGitBlob": "e4f5378ca4fd5138ffdc08ceca3f9aae30e9fe27",
+      "sourceBytes": 8292,
+      "sourceSha256": "e5981dc861066f5801d8e7922a82f2105cbdf03670af393ca2f9e2b413886822",
+      "candidateBytes": 8292,
+      "candidateSha256": "e5981dc861066f5801d8e7922a82f2105cbdf03670af393ca2f9e2b413886822"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "b18be004329fdab8d9a0b46054a1af837681bd76",
+      "sourceMode": "100644",
+      "sourceBlob": "9a4267c0ea16baee4af58b93f02faa4b269a37b0",
+      "sourcePhysicalGitBlob": "9a4267c0ea16baee4af58b93f02faa4b269a37b0",
+      "sourceBytes": 18430,
+      "sourceSha256": "df5b99d591731d56607d4d8eb505bfbdb25581d50a2652c2dbd90cc05dc00eba",
+      "candidateBytes": 18430,
+      "candidateSha256": "df5b99d591731d56607d4d8eb505bfbdb25581d50a2652c2dbd90cc05dc00eba"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-typebox-driver.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "b18be004329fdab8d9a0b46054a1af837681bd76",
+      "sourceMode": "100644",
+      "sourceBlob": "322c0092697792a2eb5f46ea9b4d415b956396dd",
+      "sourcePhysicalGitBlob": "322c0092697792a2eb5f46ea9b4d415b956396dd",
+      "sourceBytes": 10438,
+      "sourceSha256": "b4140990542bf0a74f87419af0fe283b771bd206d68b12e8dfecc4b5f3fb6c05",
+      "candidateBytes": 10438,
+      "candidateSha256": "b4140990542bf0a74f87419af0fe283b771bd206d68b12e8dfecc4b5f3fb6c05"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-typebox-preload.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "b18be004329fdab8d9a0b46054a1af837681bd76",
+      "sourceMode": "100644",
+      "sourceBlob": "90838225b54ac9a2c07db417a6f575cd54bc953f",
+      "sourcePhysicalGitBlob": "90838225b54ac9a2c07db417a6f575cd54bc953f",
+      "sourceBytes": 8586,
+      "sourceSha256": "62bee8ca085b7d9c0602bd7641bd301e9985851b59d0acbba4638be970dbab29",
+      "candidateBytes": 8586,
+      "candidateSha256": "62bee8ca085b7d9c0602bd7641bd301e9985851b59d0acbba4638be970dbab29"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-typebox.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "b18be004329fdab8d9a0b46054a1af837681bd76",
+      "sourceMode": "100644",
+      "sourceBlob": "132bf278d7513937c1488fd1bb592cfa6a347f11",
+      "sourcePhysicalGitBlob": "132bf278d7513937c1488fd1bb592cfa6a347f11",
+      "sourceBytes": 20222,
+      "sourceSha256": "866ac40a7ef5312b93e05c1dab733ab2ea81fabfdcc1f941b321bb698274594a",
+      "candidateBytes": 20222,
+      "candidateSha256": "866ac40a7ef5312b93e05c1dab733ab2ea81fabfdcc1f941b321bb698274594a"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "b33c529f42120ea8ae31451581cd88759373deb5",
+      "sourceMode": "100644",
+      "sourceBlob": "6ee079be4e2ebc1611439f18573b3853099ecc3d",
+      "sourcePhysicalGitBlob": "6ee079be4e2ebc1611439f18573b3853099ecc3d",
+      "sourceBytes": 11878,
+      "sourceSha256": "df5aee6566b8c54dcde3cb75afcf2df426d2a8f33f52c56de066d176769b50c0",
+      "candidateBytes": 11878,
+      "candidateSha256": "df5aee6566b8c54dcde3cb75afcf2df426d2a8f33f52c56de066d176769b50c0"
+    },
+    {
+      "path": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "2ccfff28d89eeab9c24483be65de7c58e80d33aa",
+      "sourceMode": "100644",
+      "sourceBlob": "104bf9b429ed0efd512d57a78c0dfe2fa4c853f9",
+      "sourcePhysicalGitBlob": "104bf9b429ed0efd512d57a78c0dfe2fa4c853f9",
+      "sourceBytes": 6790,
+      "sourceSha256": "baee47b869aab6d2409c0a3906b1e0ea5bf5fe236ca24837fae71aa81d633ffd",
+      "candidateBytes": 6790,
+      "candidateSha256": "baee47b869aab6d2409c0a3906b1e0ea5bf5fe236ca24837fae71aa81d633ffd"
+    },
+    {
+      "path": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "a14fc1771fb04bdf63435ca1c272e35e9034e144",
+      "sourceMode": "100644",
+      "sourceBlob": "61b8617ccc427467bd1b78615641adae13b16213",
+      "sourcePhysicalGitBlob": "61b8617ccc427467bd1b78615641adae13b16213",
+      "sourceBytes": 7166,
+      "sourceSha256": "3e4486556f452675e70eab476f6271326de32422e4869a9e3acad48d7d622893",
+      "candidateBytes": 7166,
+      "candidateSha256": "3e4486556f452675e70eab476f6271326de32422e4869a9e3acad48d7d622893"
+    },
+    {
+      "path": "tools/SemanticInventory/run-full-project-leaves.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "79ec85a27665ce00e80f5acffb3d4544e2be1e13",
+      "sourceMode": "100644",
+      "sourceBlob": "4efa3b8666721fcbfa1a2c7495580eccbcacae42",
+      "sourcePhysicalGitBlob": "4efa3b8666721fcbfa1a2c7495580eccbcacae42",
+      "sourceBytes": 6970,
+      "sourceSha256": "f0002288ebcdf7455f56c15b816944df61d9b376dc72bd50a379f63f2b38d546",
+      "candidateBytes": 6970,
+      "candidateSha256": "f0002288ebcdf7455f56c15b816944df61d9b376dc72bd50a379f63f2b38d546"
+    },
+    {
+      "path": "tools/SemanticInventory/run-full-project-node.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3e7c98f45ea4bc1136095d61647443cab0b6a630",
+      "sourceMode": "100644",
+      "sourceBlob": "125667a77f70da68a7fa386540976efada3cb082",
+      "sourcePhysicalGitBlob": "125667a77f70da68a7fa386540976efada3cb082",
+      "sourceBytes": 6691,
+      "sourceSha256": "fc01b4e16a95bfb75c696d8407c94184338dfa5b0919dbaae32a32516404453a",
+      "candidateBytes": 6691,
+      "candidateSha256": "fc01b4e16a95bfb75c696d8407c94184338dfa5b0919dbaae32a32516404453a"
+    },
+    {
+      "path": "tools/SemanticInventory/run-full-project-typebox.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "b18be004329fdab8d9a0b46054a1af837681bd76",
+      "sourceMode": "100644",
+      "sourceBlob": "b8990cb99560d1cedc4b92b45fc15bd22dd69dd0",
+      "sourcePhysicalGitBlob": "b8990cb99560d1cedc4b92b45fc15bd22dd69dd0",
+      "sourceBytes": 7003,
+      "sourceSha256": "28be2769e8bfe4fd7118dc86e4d2558da0859dc9962ba83be6bfa19cbbb88c0d",
+      "candidateBytes": 7003,
+      "candidateSha256": "28be2769e8bfe4fd7118dc86e4d2558da0859dc9962ba83be6bfa19cbbb88c0d"
+    },
+    {
+      "path": "tools/SemanticInventory/run-full-project.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "1775aef38d39f45a565fdf640dc986d0dacecbf0",
+      "sourceMode": "100644",
+      "sourceBlob": "813908b13bbdc0828d1849db91352e4ff1d98b05",
+      "sourcePhysicalGitBlob": "813908b13bbdc0828d1849db91352e4ff1d98b05",
+      "sourceBytes": 6130,
+      "sourceSha256": "4327d32097fd60a3eeec44f77ad1a146ea80b7b0ec8a58ee8e1618d5678e4489",
+      "candidateBytes": 6130,
+      "candidateSha256": "4327d32097fd60a3eeec44f77ad1a146ea80b7b0ec8a58ee8e1618d5678e4489"
+    },
+    {
+      "path": "tools/SemanticInventory/semantic-leaf-declarations.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "61a37354d4cf4fdafa0abf3bc5269f611406ad51",
+      "sourceMode": "100644",
+      "sourceBlob": "896728df00f816d63bca32634f916a8c58183284",
+      "sourcePhysicalGitBlob": "896728df00f816d63bca32634f916a8c58183284",
+      "sourceBytes": 14132,
+      "sourceSha256": "5fd47f76a32ad0f0a9a5733970b8afc02e756f2bde84856ef60cfd7548043dc5",
+      "candidateBytes": 14132,
+      "candidateSha256": "5fd47f76a32ad0f0a9a5733970b8afc02e756f2bde84856ef60cfd7548043dc5"
+    },
+    {
+      "path": "tools/SemanticInventory/semantic-node-declarations.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "2ccfff28d89eeab9c24483be65de7c58e80d33aa",
+      "sourceMode": "100644",
+      "sourceBlob": "dafaa2c82c4afc27001da9900bdb38fbf8568933",
+      "sourcePhysicalGitBlob": "dafaa2c82c4afc27001da9900bdb38fbf8568933",
+      "sourceBytes": 10796,
+      "sourceSha256": "05ae6df8c9fbb2e3d4b151a5b3f8e1d4f3655f5693f714fc688054ef1bb1621c",
+      "candidateBytes": 10796,
+      "candidateSha256": "05ae6df8c9fbb2e3d4b151a5b3f8e1d4f3655f5693f714fc688054ef1bb1621c"
+    },
+    {
+      "path": "tools/SemanticInventory/semantic-released-catalog.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "e55fe2d60d027c672973b1dc46f07dc6dbf7ebf6",
+      "sourceMode": "100644",
+      "sourceBlob": "2e06b0ed72d6fc5d80072a1a075d142c4f5fb0a9",
+      "sourcePhysicalGitBlob": "2e06b0ed72d6fc5d80072a1a075d142c4f5fb0a9",
+      "sourceBytes": 7861,
+      "sourceSha256": "fcc5b2a1124c4cee33ea4d457cd9e298348e1c441825800c1471c63302a1e59b",
+      "candidateBytes": 7861,
+      "candidateSha256": "fcc5b2a1124c4cee33ea4d457cd9e298348e1c441825800c1471c63302a1e59b"
+    },
+    {
+      "path": "tools/SemanticInventory/semantic-typebox-declarations.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "139c78515eaa3a73437ca1d5bdc8e69f66dcdfef",
+      "sourceMode": "100644",
+      "sourceBlob": "62276465de4dba6f5f680a8dce1d8a82eabd08f2",
+      "sourcePhysicalGitBlob": "62276465de4dba6f5f680a8dce1d8a82eabd08f2",
+      "sourceBytes": 11866,
+      "sourceSha256": "1544307c999f3e7075b19ffccd4b1b1f4ce031208640eb6748a4c753976af8ce",
+      "candidateBytes": 11866,
+      "candidateSha256": "1544307c999f3e7075b19ffccd4b1b1f4ce031208640eb6748a4c753976af8ce"
+    },
+    {
+      "path": "tools/SemanticInventory/setup-semantic-leaf-declarations.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "61a37354d4cf4fdafa0abf3bc5269f611406ad51",
+      "sourceMode": "100644",
+      "sourceBlob": "26ee0d9975e80cfe25aa85b591f25fb96e0665c2",
+      "sourcePhysicalGitBlob": "26ee0d9975e80cfe25aa85b591f25fb96e0665c2",
+      "sourceBytes": 26963,
+      "sourceSha256": "9077915adedc272481933093276c641fef13cf55add49b3b3bf6fac3b2e4b47e",
+      "candidateBytes": 26963,
+      "candidateSha256": "9077915adedc272481933093276c641fef13cf55add49b3b3bf6fac3b2e4b47e"
+    },
+    {
+      "path": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "2ccfff28d89eeab9c24483be65de7c58e80d33aa",
+      "sourceMode": "100644",
+      "sourceBlob": "ce3f7f5d3941740e03bbd4988a26d71a2501e6e7",
+      "sourcePhysicalGitBlob": "ce3f7f5d3941740e03bbd4988a26d71a2501e6e7",
+      "sourceBytes": 22278,
+      "sourceSha256": "13af52a5c4e5ced26ca779195f4c10fa739868c89112b4877aa9c1e3c1e3d034",
+      "candidateBytes": 22278,
+      "candidateSha256": "13af52a5c4e5ced26ca779195f4c10fa739868c89112b4877aa9c1e3c1e3d034"
+    },
+    {
+      "path": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "e55fe2d60d027c672973b1dc46f07dc6dbf7ebf6",
+      "sourceMode": "100644",
+      "sourceBlob": "dc39c7407997864e26ccee6b053b4ec6412fd911",
+      "sourcePhysicalGitBlob": "dc39c7407997864e26ccee6b053b4ec6412fd911",
+      "sourceBytes": 28626,
+      "sourceSha256": "5c38f84d281796838e392e1148850eb8130ffff7e0c47ccef31929f5752ae81c",
+      "candidateBytes": 28626,
+      "candidateSha256": "5c38f84d281796838e392e1148850eb8130ffff7e0c47ccef31929f5752ae81c"
+    },
+    {
+      "path": "tools/SemanticInventory/setup-semantic-typebox-declarations.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "139c78515eaa3a73437ca1d5bdc8e69f66dcdfef",
+      "sourceMode": "100644",
+      "sourceBlob": "eed4cc8cfb8024a6bab30cd2ba5d4b43540392af",
+      "sourcePhysicalGitBlob": "eed4cc8cfb8024a6bab30cd2ba5d4b43540392af",
+      "sourceBytes": 22309,
+      "sourceSha256": "bc3a9efd861336ba894c14b52fc74d34034a2de32a1727160c9746d0085cef08",
+      "candidateBytes": 22309,
+      "candidateSha256": "bc3a9efd861336ba894c14b52fc74d34034a2de32a1727160c9746d0085cef08"
+    },
+    {
+      "path": "tools/SemanticInventory/setup-typescript-semantic-oracle.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ba91c9c601318a82aa112d3942fd15a1121f65d7",
+      "sourceMode": "100644",
+      "sourceBlob": "159935769e3f6ebe71cd818487665132e91507c0",
+      "sourcePhysicalGitBlob": "159935769e3f6ebe71cd818487665132e91507c0",
+      "sourceBytes": 15782,
+      "sourceSha256": "26b352b36670f0a686d7a1978e9cb1e79682c8c9db72ad8632d1c8e5974d616d",
+      "candidateBytes": 15782,
+      "candidateSha256": "26b352b36670f0a686d7a1978e9cb1e79682c8c9db72ad8632d1c8e5974d616d"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai-common.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3974063ac3b8be1914530bc4ea718132b64c95d0",
+      "sourceMode": "100644",
+      "sourceBlob": "2023f1c2089a2f2812bb2aa8a38f60d697d72fa2",
+      "sourcePhysicalGitBlob": "2023f1c2089a2f2812bb2aa8a38f60d697d72fa2",
+      "sourceBytes": 11415,
+      "sourceSha256": "94b555a1686a1f2076f9a9473ad2b3e505263c401ae6197c6a52fe98134dbcdd",
+      "candidateBytes": 11415,
+      "candidateSha256": "94b555a1686a1f2076f9a9473ad2b3e505263c401ae6197c6a52fe98134dbcdd"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai-driver.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3974063ac3b8be1914530bc4ea718132b64c95d0",
+      "sourceMode": "100644",
+      "sourceBlob": "731baa40c86ef2f29d6b72321d4e1b9fd1af360a",
+      "sourcePhysicalGitBlob": "731baa40c86ef2f29d6b72321d4e1b9fd1af360a",
+      "sourceBytes": 14024,
+      "sourceSha256": "97a455b3163cf23384458e7639e922f3cc05d197a2a6c49a69497d952ba3fe3a",
+      "candidateBytes": 14024,
+      "candidateSha256": "97a455b3163cf23384458e7639e922f3cc05d197a2a6c49a69497d952ba3fe3a"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai-preload.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3974063ac3b8be1914530bc4ea718132b64c95d0",
+      "sourceMode": "100644",
+      "sourceBlob": "a7b7a3d1f1ba10b9dcf3f720281360e9c34388b0",
+      "sourcePhysicalGitBlob": "a7b7a3d1f1ba10b9dcf3f720281360e9c34388b0",
+      "sourceBytes": 8573,
+      "sourceSha256": "4df776003700fbc4140fb0a2618c0e712db5b8ce923174beb07aef1f1c761bf9",
+      "candidateBytes": 8573,
+      "candidateSha256": "4df776003700fbc4140fb0a2618c0e712db5b8ce923174beb07aef1f1c761bf9"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3974063ac3b8be1914530bc4ea718132b64c95d0",
+      "sourceMode": "100644",
+      "sourceBlob": "67fdfc35953bcd6ef0a31b4caf6236a3db302069",
+      "sourcePhysicalGitBlob": "67fdfc35953bcd6ef0a31b4caf6236a3db302069",
+      "sourceBytes": 14847,
+      "sourceSha256": "c90d6e480f8d2aeb15898f9bf8f3391929792d47a5ab0576fdce14d0f088a7f1",
+      "candidateBytes": 14847,
+      "candidateSha256": "c90d6e480f8d2aeb15898f9bf8f3391929792d47a5ab0576fdce14d0f088a7f1"
+    },
+    {
+      "path": "tools/SemanticReference/full-structural-openai-common.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceMode": "100644",
+      "sourceBlob": "227b1c541a6631e36093e407f728221e3cbfa3b8",
+      "sourcePhysicalGitBlob": "227b1c541a6631e36093e407f728221e3cbfa3b8",
+      "sourceBytes": 26610,
+      "sourceSha256": "e8327d9ca6fc690073d7f489c675a6bc0feafbbcf984f5fcb145e81d73952fa7",
+      "candidateBytes": 26610,
+      "candidateSha256": "e8327d9ca6fc690073d7f489c675a6bc0feafbbcf984f5fcb145e81d73952fa7"
+    },
+    {
+      "path": "tools/SemanticReference/full-structural-openai-driver.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceMode": "100644",
+      "sourceBlob": "817ef9dd5275bf30ac2372b8567dbb7ff964891e",
+      "sourcePhysicalGitBlob": "817ef9dd5275bf30ac2372b8567dbb7ff964891e",
+      "sourceBytes": 47656,
+      "sourceSha256": "9cf266e4d30815c48208f8cec0102a2fc5d05501ad12eef69317d669cce32285",
+      "candidateBytes": 47656,
+      "candidateSha256": "9cf266e4d30815c48208f8cec0102a2fc5d05501ad12eef69317d669cce32285"
+    },
+    {
+      "path": "tools/SemanticReference/full-structural-openai-preload.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "62c540184f78887bba7217231d9f37b3f7a6bf59",
+      "sourceMode": "100644",
+      "sourceBlob": "f48f8ef24c7f8d9060b8b93909c1095072aec2b8",
+      "sourcePhysicalGitBlob": "f48f8ef24c7f8d9060b8b93909c1095072aec2b8",
+      "sourceBytes": 16650,
+      "sourceSha256": "78545e49383feb966970f62062728e3d54fc923f5513d38f2be197a0b6208750",
+      "candidateBytes": 16650,
+      "candidateSha256": "78545e49383feb966970f62062728e3d54fc923f5513d38f2be197a0b6208750"
+    },
+    {
+      "path": "tools/SemanticReference/full-structural-openai.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceMode": "100644",
+      "sourceBlob": "b3b32419b2b439942bc36d001b6e93ca7814acee",
+      "sourcePhysicalGitBlob": "b3b32419b2b439942bc36d001b6e93ca7814acee",
+      "sourceBytes": 80886,
+      "sourceSha256": "a320bba845eeaa6130e2c11fe8a4fbfa55587e8b5c49be471881cba023f0a0cf",
+      "candidateBytes": 80886,
+      "candidateSha256": "a320bba845eeaa6130e2c11fe8a4fbfa55587e8b5c49be471881cba023f0a0cf"
+    },
+    {
+      "path": "tools/SemanticReference/minimal-native-panic-consumer.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ef220611bd65a66c40b747dd4239407199cf4605",
+      "sourceMode": "100644",
+      "sourceBlob": "147706a192d5751d9a345e1cb560589e8ac85860",
+      "sourcePhysicalGitBlob": "147706a192d5751d9a345e1cb560589e8ac85860",
+      "sourceBytes": 8381,
+      "sourceSha256": "f7395e18b5e82e482132f4b21cbfd741f281f7ee63d539961e264f07a43bd5ed",
+      "candidateBytes": 8381,
+      "candidateSha256": "f7395e18b5e82e482132f4b21cbfd741f281f7ee63d539961e264f07a43bd5ed"
+    },
+    {
+      "path": "tools/SemanticReference/run-full-project-openai.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "3974063ac3b8be1914530bc4ea718132b64c95d0",
+      "sourceMode": "100644",
+      "sourceBlob": "a21ce5b15c992d78bcb064c84d0861067f8f0532",
+      "sourcePhysicalGitBlob": "a21ce5b15c992d78bcb064c84d0861067f8f0532",
+      "sourceBytes": 7302,
+      "sourceSha256": "50ef6d69df24363dd7c5d18fba2d32f07fbf5a91ab388a5686f0c5c4a26a04b7",
+      "candidateBytes": 7302,
+      "candidateSha256": "50ef6d69df24363dd7c5d18fba2d32f07fbf5a91ab388a5686f0c5c4a26a04b7"
+    },
+    {
+      "path": "tools/SemanticReference/run-full-structural-openai.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "62c540184f78887bba7217231d9f37b3f7a6bf59",
+      "sourceMode": "100644",
+      "sourceBlob": "5915b8ef249c07023e6c978206eee4766cd71f03",
+      "sourcePhysicalGitBlob": "5915b8ef249c07023e6c978206eee4766cd71f03",
+      "sourceBytes": 14313,
+      "sourceSha256": "d16719ec3a7f43d785e090e63796775fd65562ae6df10dc96c8fb086be5d0d74",
+      "candidateBytes": 14313,
+      "candidateSha256": "d16719ec3a7f43d785e090e63796775fd65562ae6df10dc96c8fb086be5d0d74"
+    },
+    {
+      "path": "tools/SemanticReference/run-minimal-native-panic.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ef220611bd65a66c40b747dd4239407199cf4605",
+      "sourceMode": "100644",
+      "sourceBlob": "fd3d229ee06382064b1cd22c1bc5b8c3a5a0539b",
+      "sourcePhysicalGitBlob": "fd3d229ee06382064b1cd22c1bc5b8c3a5a0539b",
+      "sourceBytes": 3881,
+      "sourceSha256": "a069b5352af35e1d36a1ff514a959ebca3c670ac28a5c3749e8c94181f6b3ade",
+      "candidateBytes": 3881,
+      "candidateSha256": "a069b5352af35e1d36a1ff514a959ebca3c670ac28a5c3749e8c94181f6b3ade"
+    },
+    {
+      "path": "tools/SemanticReference/semantic-public-triage-openai.test.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "8e30364972032cadfb7600c195c67f2bca3cc99a",
+      "sourceMode": "100644",
+      "sourceBlob": "616bb0fe0584f7f32185dc739f442dc989bcc4be",
+      "sourcePhysicalGitBlob": "616bb0fe0584f7f32185dc739f442dc989bcc4be",
+      "sourceBytes": 11198,
+      "sourceSha256": "7e976e5b7e9bf260139a2e30ca60a05a2b7945278be3212d23ef315717198642",
+      "candidateBytes": 11198,
+      "candidateSha256": "7e976e5b7e9bf260139a2e30ca60a05a2b7945278be3212d23ef315717198642"
+    },
+    {
+      "path": "tools/SemanticReference/semantic-public-triage.ps1",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "4d0b42275ebeeea8998b40348e75357d21db24df",
+      "sourceMode": "100644",
+      "sourceBlob": "04e97fdc879b649b05b37b3593f2bc740311d054",
+      "sourcePhysicalGitBlob": "04e97fdc879b649b05b37b3593f2bc740311d054",
+      "sourceBytes": 10427,
+      "sourceSha256": "06cd54922a80f27702892a25c0a15cdf158e1845ce9ae97ffbc667c452c765f6",
+      "candidateBytes": 10427,
+      "candidateSha256": "06cd54922a80f27702892a25c0a15cdf158e1845ce9ae97ffbc667c452c765f6"
+    },
+    {
+      "path": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "8e30364972032cadfb7600c195c67f2bca3cc99a",
+      "sourceMode": "100644",
+      "sourceBlob": "68e826fe5485cc2e520bee775fd6d4452f67e041",
+      "sourcePhysicalGitBlob": "68e826fe5485cc2e520bee775fd6d4452f67e041",
+      "sourceBytes": 25898,
+      "sourceSha256": "bac3f7b1c37627bda0705b3711e7ab9c0854bd06bfe5f4c49403ddaed27478fd",
+      "candidateBytes": 25898,
+      "candidateSha256": "bac3f7b1c37627bda0705b3711e7ab9c0854bd06bfe5f4c49403ddaed27478fd"
+    },
+    {
+      "path": "tools/SemanticReference/test-minimal-native-panic-consumer.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ef220611bd65a66c40b747dd4239407199cf4605",
+      "sourceMode": "100644",
+      "sourceBlob": "01bf9705c27102e356469ac3d1db8760c0839343",
+      "sourcePhysicalGitBlob": "01bf9705c27102e356469ac3d1db8760c0839343",
+      "sourceBytes": 4226,
+      "sourceSha256": "4e358aa5e0611bd6b19c1a1a85fca0d3d709eb9c1d1d588ce7e9796c274587a0",
+      "candidateBytes": 4226,
+      "candidateSha256": "4e358aa5e0611bd6b19c1a1a85fca0d3d709eb9c1d1d588ce7e9796c274587a0"
+    },
+    {
+      "path": "tools/SemanticReference/verify-retained-minimal-native-panic.mjs",
+      "action": "import-exact-source-bytes",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "ef220611bd65a66c40b747dd4239407199cf4605",
+      "sourceMode": "100644",
+      "sourceBlob": "41f675764da52380a14d3e3e7d6570a839b179de",
+      "sourcePhysicalGitBlob": "41f675764da52380a14d3e3e7d6570a839b179de",
+      "sourceBytes": 3841,
+      "sourceSha256": "dda3a8b6155fa8d693b7a5e43126c0b8cfe95820c6155d04f3457ce824f00cc6",
+      "candidateBytes": 3841,
+      "candidateSha256": "dda3a8b6155fa8d693b7a5e43126c0b8cfe95820c6155d04f3457ce824f00cc6"
+    },
+    {
+      "path": "tools/SurfaceInventory/inspect-ast-archives.mjs",
+      "action": "reuse-unchanged-main-dependency",
+      "sourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "sourceLastTouch": "5866d37ecb44d802ac6f4dbd13a667864dca55eb",
+      "sourceMode": "100644",
+      "sourceBlob": "33f3227721810e028f34dc197fc81d6499c82338",
+      "sourcePhysicalGitBlob": "33f3227721810e028f34dc197fc81d6499c82338",
+      "sourceBytes": 28614,
+      "sourceSha256": "ac6c53f6dd692b2c69bd8ecfcd1003370f6d389a776a4a269f6d14be370db763",
+      "candidateBytes": 28614,
+      "candidateSha256": "ac6c53f6dd692b2c69bd8ecfcd1003370f6d389a776a4a269f6d14be370db763"
+    }
+  ],
+  "discoveryEdges": [
+    {
+      "from": "<root>",
+      "to": "docs/compatibility/minimal-native-api-panic.md",
+      "reason": "Reviewed minimal diagnostic documentation"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/full-project-openai-common.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/full-project-openai-driver.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/full-project-openai-preload.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/full-project-openai.test.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/full-structural-openai-common.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/full-structural-openai-driver.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/full-structural-openai-preload.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/full-structural-openai.test.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/minimal-native-panic-consumer.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/run-full-project-openai.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/run-full-structural-openai.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/run-minimal-native-panic.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/semantic-public-triage-openai.test.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/test-minimal-native-panic-consumer.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "<root>",
+      "to": "tools/SemanticReference/verify-retained-minimal-native-panic.mjs",
+      "reason": "OpenAI setup/whole/structural/minimal diagnostic source and authored controls"
+    },
+    {
+      "from": "tools/SemanticReference/full-project-openai-common.mjs",
+      "to": "compatibility/semantic-full-project-openai.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-project-openai-common.mjs",
+      "to": "tools/SemanticReference/full-project-openai-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-project-openai-common.mjs",
+      "to": "tools/SemanticReference/full-project-openai-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-project-openai-common.mjs",
+      "to": "tools/SemanticReference/full-project-openai-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-project-openai-common.mjs",
+      "to": "tools/SemanticReference/run-full-project-openai.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-project-openai-common.mjs",
+      "to": "tools/SemanticReference/full-project-openai.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-project-openai-common.mjs",
+      "to": "docs/compatibility/semantic-full-project-openai.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-project-openai-common.mjs",
+      "to": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-structural-openai-common.mjs",
+      "to": "compatibility/semantic-full-structural-openai.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-structural-openai-common.mjs",
+      "to": "tools/SemanticReference/full-structural-openai-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-structural-openai-common.mjs",
+      "to": "tools/SemanticReference/full-structural-openai-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-structural-openai-common.mjs",
+      "to": "tools/SemanticReference/full-structural-openai-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-structural-openai-common.mjs",
+      "to": "tools/SemanticReference/run-full-structural-openai.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-structural-openai-common.mjs",
+      "to": "tools/SemanticReference/full-structural-openai.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-structural-openai-common.mjs",
+      "to": "docs/compatibility/semantic-full-structural-openai.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/full-structural-openai-common.mjs",
+      "to": "tools/SemanticReference/full-project-openai-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/run-full-project-openai.mjs",
+      "to": "tools/SemanticReference/full-project-openai-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/run-full-project-openai.mjs",
+      "to": "tools/SemanticReference/full-project-openai-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/run-full-project-openai.mjs",
+      "to": "fixtures/semantic-full-project-openai/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/run-full-project-openai.mjs",
+      "to": "fixtures/semantic-full-project-openai/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/run-full-project-openai.mjs",
+      "to": "fixtures/semantic-full-project-openai/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/run-full-structural-openai.mjs",
+      "to": "tools/SemanticReference/full-structural-openai-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/run-full-structural-openai.mjs",
+      "to": "tools/SemanticReference/full-structural-openai-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/semantic-public-triage-openai.test.mjs",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/semantic-public-triage-openai.test.mjs",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/semantic-public-triage-openai.test.mjs",
+      "to": "README.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/semantic-public-triage-openai.test.mjs",
+      "to": "LICENSE",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "to": "compatibility/semantic-public-triage-openai.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "to": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "to": "tools/SemanticReference/semantic-public-triage-openai.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "to": "LICENSE",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "compatibility/public-entrypoints.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "fixtures/semantic-full-project-catalog/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "fixtures/semantic-full-project-catalog/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "compatibility/semantic-released-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "compatibility/semantic-released-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticInventory/semantic-released-catalog.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "docs/compatibility/semantic-released-catalog-setup.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "artifacts/released-baseline/inspection.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "artifacts/released-baseline/metadata.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "artifacts/released-npm-ai/evidence.lock.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "artifacts/released-npm-ai/inspection.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "artifacts/released-npm-ai/pi-ai-0.99.1.tgz",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "compatibility/semantic-public-triage-openai.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "compatibility/semantic-public-triage-openai.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticReference/semantic-public-triage-openai.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "compatibility/semantic-full-project-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticInventory/full-project-catalog-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticInventory/full-project-catalog-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "tools/SemanticInventory/full-project-catalog.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-openai.plan.json",
+      "to": "docs/compatibility/semantic-full-project-catalog.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "compatibility/semantic-full-project-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "tools/SemanticInventory/full-project-catalog-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "tools/SemanticInventory/full-project-catalog-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "tools/SemanticInventory/full-project-catalog.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "docs/compatibility/semantic-full-project-catalog.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "compatibility/semantic-full-project-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "artifacts/released-baseline/inspection.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "artifacts/released-npm-ai/inspection.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "artifacts/released-npm-ai/evidence.lock.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "artifacts/released-npm-ai/pi-ai-0.99.1.tgz",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "compatibility/public-entrypoints.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "fixtures/semantic-full-project-catalog/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "fixtures/semantic-full-project-catalog/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "compatibility/semantic-released-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "compatibility/semantic-released-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticInventory/semantic-released-catalog.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "docs/compatibility/semantic-released-catalog-setup.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "artifacts/released-baseline/inspection.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "artifacts/released-baseline/metadata.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "artifacts/released-npm-ai/evidence.lock.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "artifacts/released-npm-ai/inspection.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "artifacts/released-npm-ai/pi-ai-0.99.1.tgz",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "compatibility/semantic-public-triage-openai.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "compatibility/semantic-public-triage-openai.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticReference/setup-semantic-public-triage-openai.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticReference/semantic-public-triage-openai.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "compatibility/semantic-full-project-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticInventory/full-project-catalog-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticInventory/full-project-catalog-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticInventory/full-project-catalog.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "docs/compatibility/semantic-full-project-catalog.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "compatibility/semantic-full-project-openai.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticReference/full-project-openai-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticReference/full-project-openai-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticReference/full-project-openai-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticReference/run-full-project-openai.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "tools/SemanticReference/full-project-openai.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "docs/compatibility/semantic-full-project-openai.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "fixtures/semantic-full-project-openai/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "fixtures/semantic-full-project-openai/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-structural-openai.plan.json",
+      "to": "fixtures/semantic-full-project-openai/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-openai/manifest.json",
+      "to": "compatibility/semantic-full-project-openai.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-openai/manifest.json",
+      "to": "docs/compatibility/semantic-full-project-openai.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-openai/manifest.json",
+      "to": "tools/SemanticReference/full-project-openai-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-openai/manifest.json",
+      "to": "tools/SemanticReference/full-project-openai-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-openai/manifest.json",
+      "to": "tools/SemanticReference/full-project-openai-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-openai/manifest.json",
+      "to": "tools/SemanticReference/full-project-openai.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-openai/manifest.json",
+      "to": "tools/SemanticReference/run-full-project-openai.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-openai/manifest.json",
+      "to": "fixtures/semantic-full-project-openai/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "LICENSE",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "LICENSE",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "README.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "compatibility/semantic-released-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "fixtures/semantic-full-project-catalog/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "fixtures/semantic-full-project-catalog/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "compatibility/semantic-public-triage.census.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "tools/SemanticReference/semantic-public-triage.ps1",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage-openai.plan.json",
+      "to": "docs/compatibility/semantic-public-residual-triage.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "to": "compatibility/semantic-released-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "to": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "to": "tools/SemanticInventory/semantic-released-catalog.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "to": "docs/compatibility/semantic-released-catalog-setup.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "to": "artifacts/released-baseline/evidence.lock.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "to": "artifacts/released-baseline/inspection.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "to": "artifacts/released-baseline/SHA256SUMS",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "to": "artifacts/released-baseline/pi-0.99.1-source.tar.gz",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-catalog/manifest.json",
+      "to": "compatibility/semantic-full-project-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-catalog/manifest.json",
+      "to": "docs/compatibility/semantic-full-project-catalog.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-catalog/manifest.json",
+      "to": "tools/SemanticInventory/full-project-catalog-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-catalog/manifest.json",
+      "to": "tools/SemanticInventory/full-project-catalog-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-catalog/manifest.json",
+      "to": "tools/SemanticInventory/full-project-catalog-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-catalog/manifest.json",
+      "to": "tools/SemanticInventory/full-project-catalog.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-catalog/manifest.json",
+      "to": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-catalog/manifest.json",
+      "to": "fixtures/semantic-full-project-catalog/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "to": "compatibility/semantic-full-project-typebox.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "to": "tools/SemanticInventory/full-project-typebox-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "to": "tools/SemanticInventory/full-project-typebox-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "to": "tools/SemanticInventory/run-full-project-typebox.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "to": "tools/SemanticInventory/full-project-typebox.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "to": "docs/compatibility/semantic-full-project-typebox.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "to": "compatibility/semantic-full-project-typebox.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "compatibility/semantic-full-project-leaves.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "artifacts/released-baseline/evidence.lock.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "artifacts/released-baseline/acquire.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "artifacts/released-baseline/inspection.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "artifacts/released-baseline/metadata.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "artifacts/released-baseline/SHA256SUMS",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "artifacts/released-baseline/pi-0.99.1-source.tar.gz",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "LICENSE",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "fixtures/semantic-full-project-leaves/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-released-catalog.plan.json",
+      "to": "fixtures/semantic-full-project-leaves/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/semantic-released-catalog.test.mjs",
+      "to": "artifacts/released-baseline/pi-0.99.1-source.tar.gz",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "compatibility/public-entrypoints.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "fixtures/semantic-full-project-leaves/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "fixtures/semantic-full-project-leaves/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "compatibility/semantic-released-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "compatibility/semantic-released-catalog.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-released-catalog.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "tools/SemanticInventory/semantic-released-catalog.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "docs/compatibility/semantic-released-catalog-setup.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "artifacts/released-baseline/inspection.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "artifacts/released-baseline/metadata.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "artifacts/released-npm-ai/evidence.lock.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "artifacts/released-npm-ai/inspection.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-catalog.plan.json",
+      "to": "artifacts/released-npm-ai/pi-ai-0.99.1.tgz",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "to": "tools/SemanticInventory/full-project-catalog-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "to": "tools/SemanticInventory/full-project-catalog-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "to": "fixtures/semantic-full-project-catalog/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "to": "fixtures/semantic-full-project-catalog/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-catalog.mjs",
+      "to": "fixtures/semantic-full-project-catalog/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-public-triage.census.json",
+      "to": "fixtures/semantic-full-project-catalog/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/semantic-public-triage.ps1",
+      "to": "fixtures/semantic-full-project-catalog/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticReference/semantic-public-triage.ps1",
+      "to": "compatibility/semantic-public-triage.census.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-typebox.plan.json",
+      "to": "compatibility/semantic-typebox-declarations.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-typebox.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-typebox-declarations.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-typebox.plan.json",
+      "to": "compatibility/semantic-typebox-declarations.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-typebox.plan.json",
+      "to": "docs/compatibility/semantic-typebox-declarations-setup.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-typebox.plan.json",
+      "to": "tools/SemanticInventory/semantic-typebox-declarations.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-typebox.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-typebox-declarations.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-typebox.plan.json",
+      "to": "tools/SemanticInventory/full-project-node-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-typebox.plan.json",
+      "to": "compatibility/public-entrypoints.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-typebox.plan.json",
+      "to": "fixtures/semantic-full-project-node/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-typebox.plan.json",
+      "to": "fixtures/semantic-full-project-node/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-typebox.mjs",
+      "to": "tools/SemanticInventory/full-project-typebox-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-typebox.mjs",
+      "to": "tools/SemanticInventory/full-project-typebox-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-typebox.mjs",
+      "to": "fixtures/semantic-full-project-typebox/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-typebox.mjs",
+      "to": "fixtures/semantic-full-project-typebox/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-typebox.mjs",
+      "to": "fixtures/semantic-full-project-typebox/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-typebox.test.mjs",
+      "to": "tools/SemanticInventory/full-project-typebox-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "to": "compatibility/semantic-full-project-leaves.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "to": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "to": "tools/SemanticInventory/full-project-leaves-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "to": "tools/SemanticInventory/full-project-leaves-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "to": "tools/SemanticInventory/run-full-project-leaves.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "to": "tools/SemanticInventory/full-project-leaves.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "to": "docs/compatibility/semantic-full-project-leaves.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "to": "compatibility/semantic-full-project-leaves.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-leaves.plan.json",
+      "to": "compatibility/semantic-leaf-declarations.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-leaves.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-leaf-declarations.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-leaves.plan.json",
+      "to": "compatibility/semantic-leaf-declarations.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-leaves.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-leaf-declarations.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-leaves.plan.json",
+      "to": "tools/SemanticInventory/semantic-leaf-declarations.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-leaves.plan.json",
+      "to": "docs/compatibility/semantic-leaf-declarations-setup.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-leaves.plan.json",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-leaves.plan.json",
+      "to": "compatibility/public-entrypoints.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-leaves.plan.json",
+      "to": "fixtures/semantic-full-project-typebox/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-leaves.plan.json",
+      "to": "fixtures/semantic-full-project-typebox/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-leaves.plan.json",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-leaves/manifest.json",
+      "to": "compatibility/semantic-full-project-leaves.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-leaves/manifest.json",
+      "to": "docs/compatibility/semantic-full-project-leaves.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-leaves/manifest.json",
+      "to": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-leaves/manifest.json",
+      "to": "tools/SemanticInventory/full-project-leaves-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-leaves/manifest.json",
+      "to": "tools/SemanticInventory/full-project-leaves-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-leaves/manifest.json",
+      "to": "tools/SemanticInventory/full-project-leaves.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-leaves/manifest.json",
+      "to": "tools/SemanticInventory/run-full-project-leaves.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-leaves/manifest.json",
+      "to": "fixtures/semantic-full-project-leaves/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "tools/SemanticInventory/full-project-node-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "compatibility/semantic-full-project-node.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "compatibility/semantic-node-declarations.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "docs/compatibility/semantic-node-declarations-setup.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "tools/SemanticInventory/full-project-node-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "tools/SemanticInventory/semantic-node-declarations.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "tools/SurfaceInventory/inspect-ast-archives.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "fixtures/semantic-full-project-node/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-typebox-declarations.plan.json",
+      "to": "fixtures/semantic-full-project-node/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-typebox-declarations.mjs",
+      "to": "compatibility/semantic-typebox-declarations.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-typebox-declarations.mjs",
+      "to": "tools/SemanticInventory/setup-semantic-typebox-declarations.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-typebox-declarations.mjs",
+      "to": "tools/SemanticInventory/semantic-typebox-declarations.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-typebox-declarations.mjs",
+      "to": "docs/compatibility/semantic-typebox-declarations-setup.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-typebox-declarations.mjs",
+      "to": "tools/SurfaceInventory/inspect-ast-archives.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-typebox-declarations.mjs",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-node-common.mjs",
+      "to": "compatibility/semantic-full-project-node.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-node-common.mjs",
+      "to": "tools/SemanticInventory/full-project-node-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-node-common.mjs",
+      "to": "tools/SemanticInventory/full-project-node-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-node-common.mjs",
+      "to": "tools/SemanticInventory/full-project-node-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-node-common.mjs",
+      "to": "tools/SemanticInventory/run-full-project-node.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-node-common.mjs",
+      "to": "tools/SemanticInventory/full-project-node.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-node-common.mjs",
+      "to": "docs/compatibility/semantic-full-project-node.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-node-common.mjs",
+      "to": "compatibility/semantic-full-project-node.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-node/manifest.json",
+      "to": "compatibility/semantic-full-project-node.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-node/manifest.json",
+      "to": "docs/compatibility/semantic-full-project-node.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-node/manifest.json",
+      "to": "tools/SemanticInventory/full-project-node-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-node/manifest.json",
+      "to": "tools/SemanticInventory/full-project-node-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-node/manifest.json",
+      "to": "tools/SemanticInventory/full-project-node-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-node/manifest.json",
+      "to": "tools/SemanticInventory/full-project-node.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-node/manifest.json",
+      "to": "tools/SemanticInventory/run-full-project-node.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-node/manifest.json",
+      "to": "fixtures/semantic-full-project-node/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-typebox/manifest.json",
+      "to": "compatibility/semantic-full-project-typebox.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-typebox/manifest.json",
+      "to": "docs/compatibility/semantic-full-project-typebox.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-typebox/manifest.json",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-typebox/manifest.json",
+      "to": "tools/SemanticInventory/full-project-typebox-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-typebox/manifest.json",
+      "to": "tools/SemanticInventory/full-project-typebox-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-typebox/manifest.json",
+      "to": "tools/SemanticInventory/full-project-typebox.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-typebox/manifest.json",
+      "to": "tools/SemanticInventory/run-full-project-typebox.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project-typebox/manifest.json",
+      "to": "fixtures/semantic-full-project-typebox/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-leaves.mjs",
+      "to": "tools/SemanticInventory/full-project-leaves-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-leaves.mjs",
+      "to": "tools/SemanticInventory/full-project-leaves-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-leaves.mjs",
+      "to": "fixtures/semantic-full-project-leaves/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-leaves.mjs",
+      "to": "fixtures/semantic-full-project-leaves/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-leaves.mjs",
+      "to": "fixtures/semantic-full-project-leaves/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-leaves.test.mjs",
+      "to": "tools/SemanticInventory/full-project-leaves-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-leaf-declarations.plan.json",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-leaf-declarations.plan.json",
+      "to": "compatibility/semantic-full-project-typebox.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-leaf-declarations.plan.json",
+      "to": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-leaf-declarations.plan.json",
+      "to": "tools/SurfaceInventory/inspect-ast-archives.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-leaf-declarations.plan.json",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-leaf-declarations.plan.json",
+      "to": "LICENSE",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-leaf-declarations.plan.json",
+      "to": "LICENSE",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-leaf-declarations.plan.json",
+      "to": "LICENSE",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-leaf-declarations.plan.json",
+      "to": "LICENSE",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-leaf-declarations.plan.json",
+      "to": "fixtures/semantic-full-project-typebox/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-leaf-declarations.plan.json",
+      "to": "fixtures/semantic-full-project-typebox/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-leaf-declarations.mjs",
+      "to": "compatibility/semantic-leaf-declarations.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-leaf-declarations.mjs",
+      "to": "tools/SemanticInventory/setup-semantic-leaf-declarations.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-leaf-declarations.mjs",
+      "to": "tools/SemanticInventory/semantic-leaf-declarations.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-leaf-declarations.mjs",
+      "to": "docs/compatibility/semantic-leaf-declarations-setup.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-leaf-declarations.mjs",
+      "to": "tools/SurfaceInventory/inspect-ast-archives.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-leaf-declarations.mjs",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-node.plan.json",
+      "to": "compatibility/semantic-node-declarations.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-node.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-node.plan.json",
+      "to": "compatibility/semantic-node-declarations.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-node.plan.json",
+      "to": "docs/compatibility/semantic-node-declarations-setup.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-node.plan.json",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-node.plan.json",
+      "to": "tools/SemanticInventory/semantic-node-declarations.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-node.plan.json",
+      "to": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-node.plan.json",
+      "to": "compatibility/public-entrypoints.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-node.plan.json",
+      "to": "fixtures/semantic-full-project/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project-node.plan.json",
+      "to": "fixtures/semantic-full-project/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-node-declarations.plan.json",
+      "to": "tools/SemanticInventory/setup-typescript-semantic-oracle.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-node-declarations.plan.json",
+      "to": "compatibility/semantic-api.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-node-declarations.plan.json",
+      "to": "tools/SurfaceInventory/inspect-ast-archives.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-node-declarations.plan.json",
+      "to": "compatibility/ast-archive-admission.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-node-declarations.plan.json",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-node-declarations.plan.json",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "to": "compatibility/semantic-node-declarations.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "to": "compatibility/semantic-node-declarations.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "to": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "to": "tools/SemanticInventory/semantic-node-declarations.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "to": "docs/compatibility/semantic-node-declarations-setup.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "to": "tools/SemanticInventory/setup-typescript-semantic-oracle.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "to": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-node.mjs",
+      "to": "tools/SemanticInventory/full-project-node-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-node.mjs",
+      "to": "tools/SemanticInventory/full-project-node-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-node.mjs",
+      "to": "fixtures/semantic-full-project-node/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-node.mjs",
+      "to": "fixtures/semantic-full-project-node/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project-node.mjs",
+      "to": "fixtures/semantic-full-project-node/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-node.test.mjs",
+      "to": "tools/SemanticInventory/full-project-node-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project/manifest.json",
+      "to": "compatibility/semantic-full-project.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project/manifest.json",
+      "to": "docs/compatibility/semantic-full-project.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project/manifest.json",
+      "to": "tools/SemanticInventory/full-project-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project/manifest.json",
+      "to": "tools/SemanticInventory/full-project-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project/manifest.json",
+      "to": "tools/SemanticInventory/full-project-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project/manifest.json",
+      "to": "tools/SemanticInventory/full-project.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project/manifest.json",
+      "to": "tools/SemanticInventory/run-full-project.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "fixtures/semantic-full-project/manifest.json",
+      "to": "fixtures/semantic-full-project/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-typescript-semantic-oracle.mjs",
+      "to": "compatibility/semantic-api.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-typescript-semantic-oracle.mjs",
+      "to": "LICENSE",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-typescript-semantic-oracle.mjs",
+      "to": "compatibility/semantic-api.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/setup-typescript-semantic-oracle.mjs",
+      "to": "compatibility/semantic-api.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-api.plan.json",
+      "to": "compatibility/ast-archive-admission.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-api.plan.json",
+      "to": "tools/SurfaceInventory/inspect-ast-archives.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-api.plan.json",
+      "to": "tools/CompatibilityReport/raw-json.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-api.plan.json",
+      "to": "fixtures/semantic-api/input.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "compatibility/semantic-full-project.plan.json",
+      "to": "compatibility/public-entrypoints.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-common.mjs",
+      "to": "compatibility/semantic-full-project.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-common.mjs",
+      "to": "tools/SemanticInventory/full-project-common.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-common.mjs",
+      "to": "tools/SemanticInventory/full-project-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-common.mjs",
+      "to": "tools/SemanticInventory/full-project-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-common.mjs",
+      "to": "tools/SemanticInventory/run-full-project.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-common.mjs",
+      "to": "tools/SemanticInventory/full-project.test.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-common.mjs",
+      "to": "docs/compatibility/semantic-full-project.md",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project-common.mjs",
+      "to": "compatibility/semantic-full-project.plan.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/full-project.test.mjs",
+      "to": "tools/SemanticInventory/full-project-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project.mjs",
+      "to": "tools/SemanticInventory/full-project-preload.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project.mjs",
+      "to": "tools/SemanticInventory/full-project-driver.mjs",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project.mjs",
+      "to": "fixtures/semantic-full-project/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project.mjs",
+      "to": "fixtures/semantic-full-project/manifest.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    },
+    {
+      "from": "tools/SemanticInventory/run-full-project.mjs",
+      "to": "fixtures/semantic-full-project/expected.json",
+      "reason": "literal repository path / profile membership / byte pin"
+    }
+  ],
+  "reviewedCommitMapping": [
+    {
+      "reviewedCommit": "8e30364972032cadfb7600c195c67f2bca3cc99a",
+      "subject": "Define exclusive offline pinned OpenAI declaration successor setup",
+      "sourceTree": "1c6b971274fe2c1cbf9e187661ffa86dbc0ef527",
+      "pathsNeededInFinalTransplant": [
+        "compatibility/semantic-public-triage-openai.plan.json",
+        "tools/SemanticReference/semantic-public-triage-openai.test.mjs",
+        "tools/SemanticReference/setup-semantic-public-triage-openai.mjs"
+      ],
+      "attributesNeededAsPreciseRuleOnly": false,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    },
+    {
+      "reviewedCommit": "3974063ac3b8be1914530bc4ea718132b64c95d0",
+      "subject": "Bind unchanged compiler profile to admitted locked OpenAI SDK data",
+      "sourceTree": "8d4c01218d4169e7a9ef2d53e8aa929afac8f9d2",
+      "pathsNeededInFinalTransplant": [
+        "compatibility/semantic-full-project-openai.plan.json",
+        "docs/compatibility/semantic-full-project-openai.md",
+        "tools/SemanticReference/full-project-openai-common.mjs",
+        "tools/SemanticReference/full-project-openai-driver.mjs",
+        "tools/SemanticReference/full-project-openai-preload.mjs",
+        "tools/SemanticReference/full-project-openai.test.mjs",
+        "tools/SemanticReference/run-full-project-openai.mjs"
+      ],
+      "attributesNeededAsPreciseRuleOnly": false,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    },
+    {
+      "reviewedCommit": "ed89b4d8fe6426c4e693d9ea0ec91b274afc8ee4",
+      "subject": "Freeze two genuine unchanged-config SDK compiler observations",
+      "sourceTree": "a162158993ca96077ae92e453b3fd6893b9b8d40",
+      "pathsNeededInFinalTransplant": [
+        "fixtures/semantic-full-project-openai/expected.json",
+        "fixtures/semantic-full-project-openai/manifest.json"
+      ],
+      "attributesNeededAsPreciseRuleOnly": false,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    },
+    {
+      "reviewedCommit": "cb20502fc3c881ed01752b2de8e1b6f869817896",
+      "subject": "Add guarded whole-config structural reference profile",
+      "sourceTree": "6c3a892505c8b1a63f321282a79136f0fc021bd5",
+      "pathsNeededInFinalTransplant": [
+        "compatibility/semantic-full-structural-openai.plan.json",
+        "docs/compatibility/semantic-full-structural-openai.md",
+        "tools/SemanticReference/full-structural-openai-common.mjs",
+        "tools/SemanticReference/full-structural-openai-driver.mjs",
+        "tools/SemanticReference/full-structural-openai-preload.mjs",
+        "tools/SemanticReference/full-structural-openai.test.mjs",
+        "tools/SemanticReference/run-full-structural-openai.mjs"
+      ],
+      "attributesNeededAsPreciseRuleOnly": false,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    },
+    {
+      "reviewedCommit": "fda70f9362414082d08b256085e2873651d2a2dd",
+      "subject": "Bind structural census to complete frozen source observations",
+      "sourceTree": "f25409fb67bd0f0f3e93512d748c410c460b3f0b",
+      "pathsNeededInFinalTransplant": [
+        "compatibility/semantic-full-structural-openai.plan.json",
+        "docs/compatibility/semantic-full-structural-openai.md",
+        "tools/SemanticReference/full-structural-openai-common.mjs",
+        "tools/SemanticReference/full-structural-openai.test.mjs"
+      ],
+      "attributesNeededAsPreciseRuleOnly": false,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    },
+    {
+      "reviewedCommit": "a79156d858cedd11e64eed774b631d6641c4391a",
+      "subject": "Retain exact secondary owned-child failure receipts",
+      "sourceTree": "cca517cc822765a833aec172baa16f527d415cfe",
+      "pathsNeededInFinalTransplant": [
+        "docs/compatibility/semantic-full-structural-openai.md",
+        "tools/SemanticReference/full-structural-openai-preload.mjs",
+        "tools/SemanticReference/full-structural-openai.test.mjs"
+      ],
+      "attributesNeededAsPreciseRuleOnly": false,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    },
+    {
+      "reviewedCommit": "62c540184f78887bba7217231d9f37b3f7a6bf59",
+      "subject": "Stream bounded structural provenance and retain native close receipts",
+      "sourceTree": "b1e1bdfd9af7f8ec17a3368af141311b5ddec596",
+      "pathsNeededInFinalTransplant": [
+        "compatibility/semantic-full-structural-openai.plan.json",
+        "docs/compatibility/semantic-full-structural-openai.md",
+        "tools/SemanticReference/full-structural-openai-common.mjs",
+        "tools/SemanticReference/full-structural-openai-driver.mjs",
+        "tools/SemanticReference/full-structural-openai-preload.mjs",
+        "tools/SemanticReference/full-structural-openai.test.mjs",
+        "tools/SemanticReference/run-full-structural-openai.mjs"
+      ],
+      "attributesNeededAsPreciseRuleOnly": false,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    },
+    {
+      "reviewedCommit": "43d45ffdbb0c8f738e6256b3ca1cc817dfa7bdc4",
+      "subject": "Retain absent native tuple metadata as explicit mandatory unresolved evidence",
+      "sourceTree": "d3505d2e5e5e857b4745cbe767293e59ea5c3be3",
+      "pathsNeededInFinalTransplant": [
+        "docs/compatibility/semantic-full-structural-openai.md",
+        "tools/SemanticReference/full-structural-openai-driver.mjs",
+        "tools/SemanticReference/full-structural-openai.test.mjs"
+      ],
+      "attributesNeededAsPreciseRuleOnly": false,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    },
+    {
+      "reviewedCommit": "2be67987da83e9962432d0004a97bd290d051314",
+      "subject": "Add bounded same-pinned API panic diagnostic mode",
+      "sourceTree": "ed9382afd385b4a96ca9b8d9670e10c21ec959cd",
+      "pathsNeededInFinalTransplant": [
+        "docs/compatibility/minimal-native-api-panic.md",
+        "tools/SemanticReference/full-structural-openai-driver.mjs",
+        "tools/SemanticReference/run-minimal-native-panic.mjs"
+      ],
+      "attributesNeededAsPreciseRuleOnly": false,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    },
+    {
+      "reviewedCommit": "c4679e90a1b9cdfd2bc92375631bda3de44af9ec",
+      "subject": "Preserve exact byte-pinned structural plan across checkout",
+      "sourceTree": "4f327730a8deab9b261486e727a23aa091d24039",
+      "pathsNeededInFinalTransplant": [
+        "compatibility/semantic-full-structural-openai.plan.json"
+      ],
+      "attributesNeededAsPreciseRuleOnly": true,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    },
+    {
+      "reviewedCommit": "ef220611bd65a66c40b747dd4239407199cf4605",
+      "subject": "Require clean joined evidence for minimal native panic diagnostics",
+      "sourceTree": "d7e40c76799e8ca9966bf57b4e5183eea2afedf0",
+      "pathsNeededInFinalTransplant": [
+        "docs/compatibility/minimal-native-api-panic.md",
+        "tools/SemanticReference/minimal-native-panic-consumer.mjs",
+        "tools/SemanticReference/run-minimal-native-panic.mjs",
+        "tools/SemanticReference/test-minimal-native-panic-consumer.mjs",
+        "tools/SemanticReference/verify-retained-minimal-native-panic.mjs"
+      ],
+      "attributesNeededAsPreciseRuleOnly": false,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    },
+    {
+      "reviewedCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+      "subject": "Retain partial semantic evidence after exact symbol type panic without passing capture",
+      "sourceTree": "302202bbb9246ee1e6930a88fb1fc333ce51612e",
+      "pathsNeededInFinalTransplant": [
+        "compatibility/semantic-full-structural-openai.plan.json",
+        "docs/compatibility/semantic-full-structural-openai.md",
+        "tools/SemanticReference/full-structural-openai-common.mjs",
+        "tools/SemanticReference/full-structural-openai-driver.mjs",
+        "tools/SemanticReference/full-structural-openai.test.mjs"
+      ],
+      "attributesNeededAsPreciseRuleOnly": false,
+      "integration": "Final dependency-closed paths taken from 8e8cb414; no commit merge or old tree replacement"
+    }
+  ],
+  "attributes": {
+    "appendedRule": "compatibility/semantic-full-structural-openai.plan.json -text",
+    "originalPrefixBytes": 536,
+    "originalPrefixSha256": "caa48a0e6ecffadff256967143891cdfbe49f9435cfa55d22348acecaa617a0c",
+    "candidateBytes": 598,
+    "candidateSha256": "b29fa17edcd5b98d747b81d471244429142a55719b8f46a808798a048369eb28",
+    "allOriginalBytesPreserved": true
+  },
+  "mainPreservation": {
+    "baseTrackedFiles": 1633,
+    "unchangedFiles": 1632,
+    "onlyExistingPathModified": ".gitattributes",
+    "beforeInventorySha256": "4e62237aa9e1ac02f19696104f0da27e20e861b501b4e84d04b727d4908533b2",
+    "preservedInventorySha256": "655600f3bd0fe21ec347b109d927cda8bbd8982406f29b3a1c7e7f681a03e922"
+  },
+  "tests": {
+    "candidateSpecificTestsRun": 0,
+    "importedControlsUnchanged": true,
+    "prior181ControlRunAppliesOnlyToSourceCommit": "8e8cb4146aadf659d9c9f13f43881fc97d37a699",
+    "independentReviewRequiredBeforeAllocatedRerun": true
+  },
+  "status": {
+    "P1": "HOLD",
+    "semanticPublicClosure": false,
+    "fullP1Qualified": false,
+    "postPanicNativeUsabilityQualified": false,
+    "phaseGatesPassed": [],
+    "referenceExecution": 0,
+    "nativeCompilerExecution": 0,
+    "downloads": 0
+  }
+}

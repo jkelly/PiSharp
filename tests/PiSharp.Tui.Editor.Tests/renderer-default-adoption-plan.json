@@ -1,0 +1,274 @@
+{
+  "schemaVersion": 1,
+  "selectedOriginalPackages": [
+    "P5-08 default editor/focus/Unicode/IME",
+    "P5-09 untrusted terminal control handling dependency"
+  ],
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "workerBase": "e9c7c255f0a1b8cb271a87bf6a48139f4c87b2bb",
+  "leadBase": "20fe9986e496647668f3989a2cc7d4ade635ea7b",
+  "status": "Concrete proposed production contract; shared paths unreleased; safe transport and fallback decisions pending",
+  "minimumProductionWork": [
+    {
+      "order": 1,
+      "paths": [
+        "src/PiSharp.Tui/Input/TerminalEditorVisualMap.cs",
+        "src/PiSharp.Tui/Input/TerminalTextEditorPasteController.cs"
+      ],
+      "change": "Reuse the existing source builder and projector for the single actual default. Coordinate one authoritative source scroll-reset stamp in immutable captured layout input, or prove an equivalent explicit caller signal. Add one sealed pure presentation factory that consumes the construction-validated map plus source scroll/focus/current viewport/prefix rows; it returns the exact source component oracle and a safe typed TerminalFrame with frame-local origins. It derives caret/style ranges from map cursor and existing source Segments; it never parses raw component ANSI to decide trust.",
+      "publicContractProposal": "Create(map, firstVisibleSourceRow, focused, currentScreenRows, controlFreeTranscriptRows) -> exactSourceComponent, sealedTerminalFrame, nextSourceScroll; tentative names only, no API implemented"
+    },
+    {
+      "order": 2,
+      "paths": [
+        "src/PiSharp.Tui/Rendering/TerminalFrame.cs",
+        "src/PiSharp.Tui/Rendering/VtRenderer.cs"
+      ],
+      "change": "Keep TerminalFrame.Rows control-free, including literal Unicode and zero-width text. Add factory-only typed inverse-style spans and an explicit cursor-anchor eligibility bit. Encode fixed trusted SGR at source scalar seams; strip no trusted style via TerminalTextLayout.Normalize. Safe text/control handling must follow the explicit lead decision below. Reuse existing serial admission, bounds, diffing, actual-write cache commit and joined disposal. Existing unstyled frame APIs remain the separately tested unstyled contract."
+    },
+    {
+      "order": 3,
+      "paths": [
+        "src/PiSharp.Cli/Interactive/TerminalSessionView.cs"
+      ],
+      "change": "Capture source policy for the same actual dimensions used by Draw. Draw uses source component plus source focus-preserving component crop and current transcript origin, retains one scalar scroll plus authoritative reset stamp, commits pure presentation scroll before the awaited write, and releases presentation data at teardown. Use trusted caret metadata, never user pi:c text or a second wrapping algorithm. Define supported actual dimensions before removing preview clamps; no silent default parity outside the domain."
+    },
+    {
+      "order": 4,
+      "paths": [
+        "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+        "src/PiSharp.Cli/Commands/TerminalSessionCommand.cs"
+      ],
+      "change": "Default startup receives the authoritative per-run empty captured layout before its first editor paint. The current20fe view Start paints ASCII before input controller creation, and RunAcknowledged initially renders only after an event. Coordinate a minimal initial captured-render callback/start ordering change; preserve receipt/read/timer/channel ownership and no second controller. Current per-key fresh-map dispatch otherwise already supports the view-selected source policy."
+    },
+    {
+      "order": 5,
+      "paths": [
+        "Lead-owned focused view/caller tests and shared test registration"
+      ],
+      "change": "Run the supplied unchanged40/745 component oracles through the actual default boundary, plus63 transport witnesses and lifecycle matrix. Independent immutable review then lead-reserved full native/physical qualification; no package closure from the focused results."
+    }
+  ],
+  "exactParityBoundaries": {
+    "logical": "Text/expanded text/UTF16 scalar cursor/paste/history/undo/callback/receipt structures remain source-exact. No sanitization rewrites editor storage.",
+    "component": "Actual default shared source component rows, borders, source scrolling and fake-caret ANSI/APC are byte-exact to unchanged Editor.render expectations; raw rows are an oracle, not a transport-trust boundary.",
+    "transport": "For benign text, preserve visible glyph/cell/style/caret semantics using source terminal normalizations. Native VT command framing/diff strategy may differ and raw source/native writes are both retained. Unsafe user-control output cannot be source-wire-identical while preventing terminal effects; every such conflict requires the explicit decision and retained differences below."
+  },
+  "safeTransportDecision": {
+    "state": "PENDING explicit lead profile decision; recommended single safe default, no unsafe toggle or new optional profile",
+    "minimumRequirements": [
+      "User-origin bytes never gain terminal control authority, including byte-identical SGR and forged cursor markers",
+      "Use only validated map cursor/focus/style metadata; do not infer caret by searching component strings",
+      "HT/LF are handled as declared normalized text/row boundaries; C0/C1/ESC and recognized CSI/OSC/APC/DCS/string payloads require an explicit data-display rule",
+      "An invisible drop must preserve proved source cell-prefix positions; visible escaping requires the SAME shared map for navigation/wrapping/caret. Neither may silently change source geometry",
+      "Untrusted packet/caret seams are non-additive: a caret inside a CSI/OSC can break the source packet, expose payload glyphs, and change emitted width. A blanket row-string strip is not enough. Retain these exact witnesses and reject unsupported unsafe conversion atomically until its rule is defined",
+      "Record deliberate control/forged-marker source-wire deviations as explicit profile exceptions pending qualification; do not normalize expected source objects or close original P5-08/09 from safe plain Unicode alone"
+    ],
+    "concreteConflicts": [
+      {
+        "id": "user-osc52",
+        "conflict": "Source passes clipboard-write OSC52 from SetText and InsertText; safe transport must suppress that authority."
+      },
+      {
+        "id": "user-cup",
+        "conflict": "Source passes ESC[999;999H from draft data; safe transport must prevent cursor movement."
+      },
+      {
+        "id": "user-forged-caret",
+        "conflict": "Input a+pi:c+bc makes source extract the first user marker and position hardware at row2/column2 rather than the genuine end-of-abc column4; the genuine marker remains in the terminal output. Typed provenance fixes it by deliberately differing from unsafe source behavior."
+      },
+      {
+        "id": "user-erase-caret-inside",
+        "conflict": "A scalar seam inside a user ANSI packet changes source visible payload/style parsing; safe output needs a declared shared width/mapping rule, not post-render replacement."
+      },
+      {
+        "id": "history-raw-nel-cr",
+        "conflict": "Raw recalled NEL/CR reach source wire but can change physical rows despite source zero-cell accounting. Default safe transport cannot emit them merely to match raw source bytes."
+      }
+    ],
+    "encoderRules": {
+      "authority": "Factory-only style/cursor metadata derived from a construction-validated map. A syntactic VT allowlist does not make byte-identical user SGR/APC trusted.",
+      "data": "The selected user-control rule must produce Unicode text with no raw C0/C1/ESC. Preserve surrogate validity and source zero-width/spacing semantics; emit user text only as data, never append an ANSI-bearing source row.",
+      "commandGrammar": "Only fixed encoder-owned SGR0/7, bounded CUP, ED2J, EL2K and cursor visibility/mode commands; any protocol normalization such as OSC8 close is a fixed encoder action rather than a URL/data command. All dynamic numeric operands are validated against current frame dimensions.",
+      "tests": "Parse the joined writes with a strict host-command grammar and compare expected trusted command counts/style spans/caret anchors. Assert no OSC52, title change, URL-open OSC8, DCS, arbitrary APC, unbounded CUP or C1 command. Keep parser state across write boundaries. Test byte-identical user SGR7 and pi:c in addition to existing adversarial witnesses.",
+      "rowBudget": "Bound text, style-span count, row count, cells and encoded command overhead before transport admission; no prefix of an invalid frame is written. Keep immutable frames and existing actual-write completion/cache discipline."
+    }
+  },
+  "additionalRequiredDecisions": [
+    {
+      "id": "overwide",
+      "evidence": "columns1 and2 with CJK source Editor.render throws recursive RangeError; native source builder rejects ResourceLimit. Choose a bounded supported terminal fallback; no recursion/crash emulation."
+    },
+    {
+      "id": "dimensions-and-resources",
+      "evidence": "Current preview clamps geometry256cols/64rows; source map/projector acceptsheight1024 and can emit309 rows, exceeding default TerminalFrame row256/text65536 limits. Choose a declared domain and coherent map/frame/write budgets, preserving outside-domain failures."
+    },
+    {
+      "id": "focus-hardware",
+      "evidence": "Source false hardware-cursor option hides the cursor but positions its focused marker for IME; focus loss retains inverse fake caret while no marker/anchor exists. Native current always-visible cursor is a different behavior to reconcile explicitly."
+    },
+    {
+      "id": "reset-and-startup-api",
+      "evidence": "Captured layout has no scroll-reset/focus/startup signal. Current initial view draw precedes the authoritative controller. Approve the minimum new metadata/initial capture contract before implementation."
+    }
+  ],
+  "gapDisposition": {
+    "originalCases": 18,
+    "originalCheckpoints": 178,
+    "semantic": 45,
+    "renderOnly": 133,
+    "perCase": [
+      {
+        "id": "history-ecmascript-trim-preserves-nel-and-raw-line-controls",
+        "semantic": 0,
+        "render": 3,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "history-first-row-up-jumps-to-start-before-recall",
+        "semantic": 0,
+        "render": 5,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "vertical-utf16-sticky-long-short-long",
+        "semantic": 0,
+        "render": 12,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "vertical-word-wrap-and-public-width-resize",
+        "semantic": 9,
+        "render": 2,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "vertical-cjk-emoji-offset-vs-cells-and-atomic-snap",
+        "semantic": 0,
+        "render": 12,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "vertical-combining-and-zwj-source-seams",
+        "semantic": 8,
+        "render": 4,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "vertical-registered-marker-continuations-and-resize",
+        "semantic": 0,
+        "render": 13,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "vertical-page-size-uses-public-terminal-rows",
+        "semantic": 0,
+        "render": 8,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "vertical-exact-width-end-affinity-and-empty-lines",
+        "semantic": 2,
+        "render": 12,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "history-recall-first-last-rows-change-with-wrap",
+        "semantic": 3,
+        "render": 6,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "genuine-supplementary-smile-cjk-sticky-resize",
+        "semantic": 0,
+        "render": 12,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "genuine-woman-technologist-combining-sticky-resize",
+        "semantic": 6,
+        "render": 6,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "genuine-family-flag-modifier-soft-wrap",
+        "semantic": 7,
+        "render": 3,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "genuine-supplementary-source-half-open-end-affinity",
+        "semantic": 1,
+        "render": 10,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "genuine-supplementary-history-first-last-wrap-and-draft",
+        "semantic": 6,
+        "render": 4,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "genuine-supplementary-page-and-terminal-height",
+        "semantic": 2,
+        "render": 7,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "genuine-supplementary-paste-marker-following-emoji",
+        "semantic": 1,
+        "render": 10,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      },
+      {
+        "id": "genuine-supplementary-history-raw-undo",
+        "semantic": 0,
+        "render": 4,
+        "componentOracle": "Existing source map/component matches; actual default adoption still required"
+      }
+    ],
+    "allOriginal178RemainOpen": true,
+    "newEscapedCases": 8,
+    "newEscapedCheckpoints": 80
+  },
+  "evidence": {
+    "conflicts": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-renderer-adoption-contract-work\\artifacts\\renderer-contract-conflict-evidence.json",
+      "bytes": 96187,
+      "sha256": "25cda6d2c9b669c5f53d886f92b28ec83740c131334550e568b084021af8fd4d"
+    },
+    "originalClassification": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-default-source-layout-work\\artifacts\\default-layout-classification.json",
+      "bytes": 1714343,
+      "sha256": "38ff2f7dac64276138ee3f2a3453b24f365f8a1c92fbddf1ee7fcd9587500e24"
+    },
+    "integrationContract": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-renderer-adoption-contract-work\\artifacts\\default-view-integration-vectors\\integration-test-contract.json",
+      "bytes": 7855,
+      "sha256": "c8e3d95ca245cafcef4910190beb8aeeebdda3a759b123e13937639af7b188b0"
+    },
+    "leadSnapshot": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\TERMINAL_SOURCE_VIEW_ADOPTION_LEAD_HANDOFF.json",
+      "bytes": 7537,
+      "sha256": "f483dfa413459524ba17a8065d5e4e4ec497eb638cbdb9369d5c3bfcead40434"
+    },
+    "nativeProbe": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-renderer-adoption-contract-work\\artifacts\\renderer-contract-development-native.json",
+      "bytes": 695261,
+      "sha256": "e2d86ecd0300cc596d0f39c9341e9f59ac8171f257b86e7e1ed3e1db8633342d"
+    },
+    "sourceCaptureCommits": [
+      "5087137568c8be8fd52b220e379b5278d21d1656",
+      "ee41149da9afe4f6bab9d4b5012a9351f0c84647"
+    ]
+  },
+  "sourceCapturedBeforeNativeProbe": true,
+  "productionChanges": 0,
+  "sharedPathsEdited": false,
+  "newOptionalProfiles": 0,
+  "newWorkers": 0,
+  "originalPackages": 79,
+  "originalPhaseGates": 8,
+  "completePackageAcceptanceClaimed": false,
+  "fullOrPhysicalGate": false
+}

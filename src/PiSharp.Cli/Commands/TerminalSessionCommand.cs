@@ -19,9 +19,10 @@ public static class TerminalSessionCommand
     internal static async Task<(StartupArguments? Arguments, int Result)> ValidateStartupAsync(string[] args, TextWriter error)
     {
         ArgumentNullException.ThrowIfNull(args); ArgumentNullException.ThrowIfNull(error);
-        if (args is not ["session", "terminal", ..] || args.Count(value => value == "--terminal-preview") != 1)
+        if (args is not ["session", "terminal", ..] || (args.Count(value => value == "--terminal-preview") is not (0 or 1) ||
+            args.Count(value => value == "--terminal-preview") == 0 && args.Count(value => value == "--live") != 1))
         {
-            await Failure("InvalidArguments", "Terminal preview requires session terminal --terminal-preview.", error, startupRejection: true).ConfigureAwait(false);
+            await Failure("InvalidArguments", "Terminal requires session terminal with --terminal-preview or explicit --live.", error, startupRejection: true).ConfigureAwait(false);
             return (null, 2);
         }
         var rpcArgs = args.Where(value => value != "--terminal-preview").ToArray(); rpcArgs[1] = "rpc";
@@ -31,22 +32,31 @@ public static class TerminalSessionCommand
             await Failure(exception.Failure.ToString(), exception.Message, error, startupRejection: true).ConfigureAwait(false);
             return (null, exception.Failure == SessionCommandFailure.CommandFailed ? 1 : 2);
         }
+        catch (LiveSessionException exception)
+        {
+            await Failure(exception.Code, exception.Message, error, startupRejection: true).ConfigureAwait(false);
+            return (null, 2);
+        }
         catch (NativeExtensionException exception)
         {
             await Failure(exception.Failure.ToString(), exception.Message, error, startupRejection: true).ConfigureAwait(false);
             return (null, exception.Failure == NativeExtensionFailure.CleanupFailed ? 1 : 2);
         }
     }
-    public const string Usage = "session terminal --terminal-preview --session <existing absolute JSONL> --workspace <existing absolute directory> --offline-script <absolute JSON> [existing rpc options]; Windows terminal editor displays Unicode with inert controls";
+    public const string LiveUsage = "session terminal --live --provider openai|openrouter|anthropic --model <pinned model id> --session <absolute JSONL> --workspace <existing absolute directory> [--session-mode open|new-lazy|new-memory] [--max-output-tokens 1..8192] [existing exact tool grants]";
+    public const string Usage = "session terminal --terminal-preview --session <existing absolute JSONL> --workspace <existing absolute directory> --offline-script <absolute JSON> [existing rpc options]; Windows terminal editor displays Unicode with inert controls; " + LiveUsage;
     public static Task<int> RunAsync(string[] args, IConsoleTerminal terminal, ITerminalViewportSource viewport,
         TextWriter error, CancellationToken token = default) =>
         RunOwnedAsync(args, terminal, viewport, error, null, null, token, null, kittyProtocolActive: false);
 
+    internal static Task<int> RunWithLiveRuntimeAsync(string[] args, IConsoleTerminal terminal,
+        ITerminalViewportSource viewport, TextWriter error, LiveSessionRuntime runtime, CancellationToken token = default) =>
+        RunOwnedAsync(args, terminal, viewport, error, null, null, token, null, kittyProtocolActive: false, liveRuntime: runtime);
     internal static Task<int> RunWithTerminalRestoreAsync(string[] args, IConsoleTerminal terminal,
         ITerminalViewportSource viewport, TextWriter error, Func<ValueTask> restoreTerminalAndJoin,
-        CancellationToken token = default, TerminalKeybindingConfiguration? keybindingConfiguration = null) =>
+        CancellationToken token = default, TerminalKeybindingConfiguration? keybindingConfiguration = null, LiveSessionRuntime? liveRuntime = null) =>
         RunOwnedAsync(args, terminal, viewport, error, null, null, token, keybindingConfiguration, kittyProtocolActive: false,
-            restoreTerminalAndJoin: restoreTerminalAndJoin);
+            restoreTerminalAndJoin: restoreTerminalAndJoin, liveRuntime: liveRuntime);
 
     public static Task<int> RunConfiguredAsync(string[] args, IConsoleTerminal terminal, ITerminalViewportSource viewport,
         TextWriter error, TerminalKeybindingConfiguration keybindingConfiguration, CancellationToken token = default)
@@ -59,29 +69,36 @@ public static class TerminalSessionCommand
         TextWriter error, Func<JsonData, CancellationToken, ValueTask> observer, CancellationToken token = default,
         IRpcExtensionUiPresentationObserver? presentationObserver = null, Action<TerminalInputEvent>? observeInputCompletion = null,
         Action<TerminalSessionFailureObservation>? observeFailure = null,
-        Action<RpcSessionShutdownSettlement>? shutdownObserver = null)
+        Action<RpcSessionShutdownSettlement>? shutdownObserver = null, LiveSessionRuntime? liveRuntime = null)
     {
         ArgumentNullException.ThrowIfNull(observer);
         return RunOwnedAsync(args, terminal, viewport, error, observer, presentationObserver, token, null, kittyProtocolActive: false,
-            observeInputCompletion: observeInputCompletion, observeFailure: observeFailure, shutdownObserver: shutdownObserver);
+            observeInputCompletion: observeInputCompletion, observeFailure: observeFailure, shutdownObserver: shutdownObserver, liveRuntime: liveRuntime);
     }
 
     internal static Task<int> RunObservedConfiguredAsync(string[] args, IConsoleTerminal terminal, ITerminalViewportSource viewport,
         TextWriter error, Func<JsonData, CancellationToken, ValueTask> observer, TerminalKeybindingConfiguration keybindingConfiguration,
         CancellationToken token = default, bool kittyProtocolActive = false, TimeProvider? shutdownTimeProvider = null,
-        Func<ValueTask>? restoreTerminalAndJoin = null, Action<RpcSessionShutdownSettlement>? shutdownObserver = null)
+        Func<ValueTask>? restoreTerminalAndJoin = null, Action<RpcSessionShutdownSettlement>? shutdownObserver = null, LiveSessionRuntime? liveRuntime = null)
     {
         ArgumentNullException.ThrowIfNull(observer); ArgumentNullException.ThrowIfNull(keybindingConfiguration);
         return RunOwnedAsync(args, terminal, viewport, error, observer, null, token, keybindingConfiguration, kittyProtocolActive,
-            shutdownTimeProvider, restoreTerminalAndJoin, shutdownObserver);
+            shutdownTimeProvider, restoreTerminalAndJoin, shutdownObserver, liveRuntime: liveRuntime);
     }
+
+    internal static Task<int> RunWithTerminalInputAdmissionAsync(string[] args, IConsoleTerminal terminal,
+        ITerminalViewportSource viewport, TextWriter error, TerminalExtensionInputAdmission terminalInputAdmission,
+        CancellationToken token = default) =>
+        RunOwnedAsync(args, terminal, viewport, error, null, null, token, null, kittyProtocolActive: false,
+            terminalInputAdmission: terminalInputAdmission);
 
     private static async Task<int> RunOwnedAsync(string[] args, IConsoleTerminal terminal, ITerminalViewportSource viewport,
         TextWriter error, Func<JsonData, CancellationToken, ValueTask>? observer,
         IRpcExtensionUiPresentationObserver? presentationObserver, CancellationToken token,
         TerminalKeybindingConfiguration? keybindingConfiguration, bool kittyProtocolActive, TimeProvider? shutdownTimeProvider = null,
         Func<ValueTask>? restoreTerminalAndJoin = null, Action<RpcSessionShutdownSettlement>? shutdownObserver = null,
-        Action<TerminalInputEvent>? observeInputCompletion = null, Action<TerminalSessionFailureObservation>? observeFailure = null)
+        Action<TerminalInputEvent>? observeInputCompletion = null, Action<TerminalSessionFailureObservation>? observeFailure = null,
+        LiveSessionRuntime? liveRuntime = null, TerminalExtensionInputAdmission? terminalInputAdmission = null)
     {
         ArgumentNullException.ThrowIfNull(args); ArgumentNullException.ThrowIfNull(terminal);
         ArgumentNullException.ThrowIfNull(viewport); ArgumentNullException.ThrowIfNull(error);
@@ -109,6 +126,7 @@ public static class TerminalSessionCommand
         var selectRouter = new TerminalSelectListInputRouter(frontend, selectList, focusOwner); frontend.BindSelectList(selectRouter);
         var beginInput = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var connection = new BoundedRpcConnection(ObserveRecord); frontend.Bind(connection.SendAsync);
+        terminalInputAdmission ??= new TerminalExtensionInputAdmission(1, frontend.CaptureSessionGeneration, hostCancellation.Token);
         Task<int>? host = null; Task<TerminalInputExit>? reading = null; Task? resizing = null;
         Exception? failure = null; var result = 1;
         var userShutdown = 0;
@@ -168,7 +186,7 @@ public static class TerminalSessionCommand
         {
             try { return await new TerminalChatInput(terminal, clock: null, focusOwner: focusOwner, keybindings: keybindings,
                 kittyProtocolActive: kittyProtocolActive, selectListRouter: selectRouter, queueRestoration: frontend,
-                doubleEscapeAction: ownerConfiguration.DoubleEscapeAction).RunAcknowledgedAsync(frontend.LineAsync,
+                doubleEscapeAction: ownerConfiguration.DoubleEscapeAction, terminalInputAdmission: terminalInputAdmission, captureTerminalSessionGeneration: terminalInputAdmission is null ? null : frontend.CaptureSessionGeneration).RunAcknowledgedAsync(frontend.LineAsync,
                 async canceledToken => { await frontend.LineAsync("/cancel", canceledToken).ConfigureAwait(false); },
                 view.SetDraftAsync, receipts, (editor, accepted) =>
                 {
@@ -206,7 +224,9 @@ public static class TerminalSessionCommand
                     try { shutdownObserver?.Invoke(settlement); } catch (Exception errorValue) { RecordFailure(errorValue); }
                     var cleanupFailures = await StopTerminalAndJoin().ConfigureAwait(false);
                     return settlement.AcknowledgeTerminalStopped(cleanupFailures);
-                }).ConfigureAwait(false); }
+                }, liveRuntime: liveRuntime, terminalInputAdmission: terminalInputAdmission,
+                decorateTerminalUi: inner => new TerminalCustomComponentUiProvider(inner, view, terminalInputAdmission!,
+                    frontend.CaptureSessionGeneration)).ConfigureAwait(false); }
             finally { receipts.Complete(); } // Actual host and its awaited output callbacks have settled.
         }
 
@@ -251,9 +271,17 @@ public static class TerminalSessionCommand
             var orderlyQuit = false;
             receipts.Complete();
             Cancel(inputCancellation); Cancel(resizeCancellation); connection.CompleteInput();
+            Task? terminalInputCloseOriginal = null;
+            if (terminalInputAdmission is not null)
+                try { terminalInputCloseOriginal = terminalInputAdmission.StopAdmissionAndJoinAsync().AsTask(); }
+                catch (Exception errorValue) { RecordFailure(errorValue); }
             if (reading is not null)
                 try { orderlyQuit = await reading.ConfigureAwait(false) == TerminalInputExit.Quit; }
                 catch (Exception errorValue) { RecordFailure(errorValue); Cancel(hostCancellation); }
+            if (terminalInputCloseOriginal is not null)
+                try { await terminalInputCloseOriginal.ConfigureAwait(false); }
+                catch when (terminalInputCloseOriginal.IsFaulted) { RecordFailure(terminalInputCloseOriginal.Exception!); }
+                catch (Exception errorValue) { RecordFailure(errorValue); }
             if (resizing is not null)
                 try { _ = await JoinResizeStopAsync(resizing, resizeCancellation.Token).ConfigureAwait(false); }
                 catch (Exception errorValue) { RecordFailure(errorValue); }

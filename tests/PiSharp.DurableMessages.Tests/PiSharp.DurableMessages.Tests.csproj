@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><AssemblyName>PiSharp.CodingAgent.Tests</AssemblyName></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" />
+    <Compile Include="../PiSharp.CodingAgent.Tests/ContextDurableSessionMessageTests.cs" Link="ContextDurableSessionMessageTests.cs" />
+    <Compile Include="../PiSharp.CodingAgent.Tests/NativeInitializerLoaderTests.cs" Link="NativeInitializerLoaderTests.cs" />
+  </ItemGroup>
+</Project>

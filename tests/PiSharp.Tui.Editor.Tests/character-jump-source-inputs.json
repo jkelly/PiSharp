@@ -1,0 +1,861 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "Original default character jumps, public source full observations, no renders or private state injection. Existing source profile and escaped HOLD corpora remain untouched.",
+  "cases": [
+    {
+      "id": "jump-forward-repeated-current-character-excluded",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "a x a x a"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "a"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "a"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        }
+      ]
+    },
+    {
+      "id": "jump-backward-repeated-and-zero-index-source-quirk",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "a x a x a"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "a"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "a"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "a"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        }
+      ]
+    },
+    {
+      "id": "jump-forward-across-empty-logical-lines",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "one x\n\nmid x\nlast x"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[5~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        }
+      ]
+    },
+    {
+      "id": "jump-backward-across-empty-logical-lines",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "one x\n\nmid x\nlast x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "z"
+        }
+      ]
+    },
+    {
+      "id": "jump-no-match-consumes-search-and-resets-typing-action",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abc"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "q"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "z"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "jump-same-and-opposite-hotkeys-cancel-not-replace",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abc x"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "jump-pending-control-falls-through-left-newline-and-undo",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abc x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\u0002"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\n"
+        },
+        {
+          "kind": "input",
+          "data": "z"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        }
+      ]
+    },
+    {
+      "id": "jump-pending-kill-yank-and-two-phase-yank-pop",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "one\ntwo"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "set",
+          "data": "three"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        }
+      ]
+    },
+    {
+      "id": "jump-compound-printable-search-payload",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abcbc abc"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "bc"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "abc"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "bc"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        }
+      ]
+    },
+    {
+      "id": "jump-genuine-supplementary-and-combining-target",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "a🙂 é 👩‍💻 end"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "🙂"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "́"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "👩‍💻"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "🙂"
+        }
+      ]
+    },
+    {
+      "id": "jump-registered-marker-text-interior-and-source-edit",
+      "steps": [
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "1"
+        },
+        {
+          "kind": "input",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "p"
+        }
+      ]
+    },
+    {
+      "id": "jump-literal-marker-and-substring",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "[paste #1] [paste #2]"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "2"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "paste"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "#"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        }
+      ]
+    },
+    {
+      "id": "jump-programmatic-set-preserves-pending-mode",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "old"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "set",
+          "data": "xabcx"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "set",
+          "data": "xabcx"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        }
+      ]
+    },
+    {
+      "id": "jump-programmatic-insert-preserves-pending-mode",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "a x x"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "insert",
+          "data": "Q"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "jump-pending-history-add-and-navigation-control",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "old x"
+        },
+        {
+          "kind": "history",
+          "data": "new x"
+        },
+        {
+          "kind": "set",
+          "data": "draft x"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "history",
+          "data": "later x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "jump-kitty-hotkeys-and-ordinary-shifted-printable-target",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "aX bX"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[93;5u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[88;2u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[93;7u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[97;1u"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        }
+      ]
+    },
+    {
+      "id": "jump-kitty-supplementary-target-and-repeat-hotkey",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "a🙂b🙂"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[93;5:2u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[128578;1u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[93;5:2u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[128578;1:2u"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        }
+      ]
+    },
+    {
+      "id": "jump-kitty-target-release-cancels-before-next-text",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abc x"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[120;1:3u"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        }
+      ]
+    },
+    {
+      "id": "jump-kitty-hotkey-release-cancels-before-next-text",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abc x"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[93;5:3u"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        }
+      ]
+    },
+    {
+      "id": "jump-protocol-focus-and-alt-key-cancel-fallthrough",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abc x"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[I"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\u001bx"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        }
+      ]
+    },
+    {
+      "id": "jump-bracketed-paste-cancels-and-keeps-normal-paste",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abc x"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~xy\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "jump-enter-host-reset-and-next-prompt-does-not-search",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abc x"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001d"
+        },
+        {
+          "kind": "input",
+          "data": "\r"
+        },
+        {
+          "kind": "input",
+          "data": "x"
+        },
+        {
+          "kind": "input",
+          "data": "!"
+        }
+      ]
+    }
+  ]
+}

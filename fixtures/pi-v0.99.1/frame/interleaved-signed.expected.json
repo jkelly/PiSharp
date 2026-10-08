@@ -1,0 +1,1495 @@
+{
+  "fixtureId": "interleaved-signed",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "captured-upstream-frame-oracle",
+  "normalizerVersion": "object-key-order-v1",
+  "observations": {
+    "emissionSnapshots": [
+      {
+        "type": "start",
+        "partial": {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "thinking_start",
+        "contentIndex": 0,
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "",
+              "thinkingSignature": "stale-thinking=="
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "text_start",
+        "contentIndex": 1,
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "",
+              "textSignature": "stale-text=="
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "thinking_delta",
+        "contentIndex": 0,
+        "delta": "Draft reasoning π",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "",
+              "textSignature": "stale-text=="
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_start",
+        "contentIndex": 2,
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "",
+              "textSignature": "stale-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {},
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "text_delta",
+        "contentIndex": 1,
+        "delta": "Draft text π",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "Draft text π",
+              "textSignature": "stale-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {},
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_delta",
+        "contentIndex": 2,
+        "delta": "{\"path\":\"C:\\",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "Draft text π",
+              "textSignature": "stale-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:"
+              },
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "thinking_delta",
+        "contentIndex": 0,
+        "delta": "\r\nnext",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π\r\nnext",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "Draft text π",
+              "textSignature": "stale-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:"
+              },
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_delta",
+        "contentIndex": 2,
+        "delta": "\\temp\\\\π\",\"options\":{\"preserve\":null,\"order\":[\"b\",\"a\"]}}",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π\r\nnext",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "Draft text π",
+              "textSignature": "stale-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "text_end",
+        "contentIndex": 1,
+        "content": "Authoritative π\r\nC:\\temp\\π",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π\r\nnext",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "Authoritative π\r\nC:\\temp\\π",
+              "textSignature": "opaque-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "thinking_end",
+        "contentIndex": 0,
+        "content": "Authoritative reasoning π",
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Authoritative reasoning π",
+              "thinkingSignature": "opaque-thinking==",
+              "redacted": false
+            },
+            {
+              "type": "text",
+              "text": "Authoritative π\r\nC:\\temp\\π",
+              "textSignature": "opaque-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "toolcall_end",
+        "contentIndex": 2,
+        "toolCall": {
+          "type": "toolCall",
+          "id": "call-frame-1",
+          "name": "read",
+          "arguments": {
+            "path": "C:\\temp\\π",
+            "options": {
+              "preserve": null,
+              "order": [
+                "b",
+                "a"
+              ]
+            }
+          },
+          "thoughtSignature": "opaque-tool==",
+          "namespace": "fs"
+        },
+        "partial": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Authoritative reasoning π",
+              "thinkingSignature": "opaque-thinking==",
+              "redacted": false
+            },
+            {
+              "type": "text",
+              "text": "Authoritative π\r\nC:\\temp\\π",
+              "textSignature": "opaque-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "thoughtSignature": "opaque-tool==",
+              "namespace": "fs"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "done",
+        "reason": "toolUse",
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Authoritative reasoning π",
+              "thinkingSignature": "opaque-thinking==",
+              "redacted": false
+            },
+            {
+              "type": "text",
+              "text": "Authoritative π\r\nC:\\temp\\π",
+              "textSignature": "opaque-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "thoughtSignature": "opaque-tool==",
+              "namespace": "fs"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "toolUse",
+          "timestamp": 1700000000000
+        }
+      }
+    ],
+    "frames": [
+      {
+        "type": "start",
+        "partial": {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "thinking_start",
+        "contentIndex": 0,
+        "content": {
+          "type": "thinking",
+          "thinking": "",
+          "thinkingSignature": "stale-thinking=="
+        }
+      },
+      {
+        "type": "text_start",
+        "contentIndex": 1,
+        "content": {
+          "type": "text",
+          "text": "",
+          "textSignature": "stale-text=="
+        }
+      },
+      {
+        "type": "thinking_delta",
+        "contentIndex": 0,
+        "delta": "Draft reasoning π"
+      },
+      {
+        "type": "toolcall_start",
+        "contentIndex": 2,
+        "toolCall": {
+          "type": "toolCall",
+          "id": "call-frame-1",
+          "name": "read",
+          "arguments": {},
+          "thoughtSignature": "stale-tool==",
+          "namespace": "stale"
+        }
+      },
+      {
+        "type": "text_delta",
+        "contentIndex": 1,
+        "delta": "Draft text π"
+      },
+      {
+        "type": "toolcall_delta",
+        "contentIndex": 2,
+        "delta": "{\"path\":\"C:\\"
+      },
+      {
+        "type": "thinking_delta",
+        "contentIndex": 0,
+        "delta": "\r\nnext"
+      },
+      {
+        "type": "toolcall_delta",
+        "contentIndex": 2,
+        "delta": "\\temp\\\\π\",\"options\":{\"preserve\":null,\"order\":[\"b\",\"a\"]}}"
+      },
+      {
+        "type": "text_end",
+        "contentIndex": 1,
+        "content": "Authoritative π\r\nC:\\temp\\π",
+        "textSignature": "opaque-text=="
+      },
+      {
+        "type": "thinking_end",
+        "contentIndex": 0,
+        "content": "Authoritative reasoning π",
+        "thinkingSignature": "opaque-thinking==",
+        "redacted": false
+      },
+      {
+        "type": "toolcall_end",
+        "contentIndex": 2,
+        "id": "call-frame-1",
+        "name": "read",
+        "arguments": {
+          "path": "C:\\temp\\π",
+          "options": {
+            "preserve": null,
+            "order": [
+              "b",
+              "a"
+            ]
+          }
+        },
+        "thoughtSignature": "opaque-tool==",
+        "namespace": "fs"
+      }
+    ],
+    "prefixReductions": [
+      {
+        "afterEmissionIndex": 0,
+        "frameCount": 1,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 1,
+        "frameCount": 2,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "",
+              "thinkingSignature": "stale-thinking=="
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 2,
+        "frameCount": 3,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "",
+              "textSignature": "stale-text=="
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 3,
+        "frameCount": 4,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "",
+              "textSignature": "stale-text=="
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 4,
+        "frameCount": 5,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "",
+              "textSignature": "stale-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {},
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 5,
+        "frameCount": 6,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "Draft text π",
+              "textSignature": "stale-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {},
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 6,
+        "frameCount": 7,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "Draft text π",
+              "textSignature": "stale-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:"
+              },
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 7,
+        "frameCount": 8,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π\r\nnext",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "Draft text π",
+              "textSignature": "stale-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:"
+              },
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 8,
+        "frameCount": 9,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π\r\nnext",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "Draft text π",
+              "textSignature": "stale-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 9,
+        "frameCount": 10,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Draft reasoning π\r\nnext",
+              "thinkingSignature": "stale-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "Authoritative π\r\nC:\\temp\\π",
+              "textSignature": "opaque-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 10,
+        "frameCount": 11,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Authoritative reasoning π",
+              "thinkingSignature": "opaque-thinking==",
+              "redacted": false
+            },
+            {
+              "type": "text",
+              "text": "Authoritative π\r\nC:\\temp\\π",
+              "textSignature": "opaque-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "thoughtSignature": "stale-tool==",
+              "namespace": "stale"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 11,
+        "frameCount": 12,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Authoritative reasoning π",
+              "thinkingSignature": "opaque-thinking==",
+              "redacted": false
+            },
+            {
+              "type": "text",
+              "text": "Authoritative π\r\nC:\\temp\\π",
+              "textSignature": "opaque-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "thoughtSignature": "opaque-tool==",
+              "namespace": "fs"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "afterEmissionIndex": 12,
+        "frameCount": 12,
+        "reducedMessage": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "Authoritative reasoning π",
+              "thinkingSignature": "opaque-thinking==",
+              "redacted": false
+            },
+            {
+              "type": "text",
+              "text": "Authoritative π\r\nC:\\temp\\π",
+              "textSignature": "opaque-text=="
+            },
+            {
+              "type": "toolCall",
+              "id": "call-frame-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "thoughtSignature": "opaque-tool==",
+              "namespace": "fs"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "synthetic-oracle",
+          "model": "oracle-model",
+          "responseId": "response-frame-1",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      }
+    ],
+    "reducedMessage": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "Authoritative reasoning π",
+          "thinkingSignature": "opaque-thinking==",
+          "redacted": false
+        },
+        {
+          "type": "text",
+          "text": "Authoritative π\r\nC:\\temp\\π",
+          "textSignature": "opaque-text=="
+        },
+        {
+          "type": "toolCall",
+          "id": "call-frame-1",
+          "name": "read",
+          "arguments": {
+            "path": "C:\\temp\\π",
+            "options": {
+              "preserve": null,
+              "order": [
+                "b",
+                "a"
+              ]
+            }
+          },
+          "thoughtSignature": "opaque-tool==",
+          "namespace": "fs"
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "synthetic-oracle",
+      "model": "oracle-model",
+      "responseId": "response-frame-1",
+      "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 0,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "pending",
+      "timestamp": 1700000000000
+    },
+    "terminalResult": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "Authoritative reasoning π",
+          "thinkingSignature": "opaque-thinking==",
+          "redacted": false
+        },
+        {
+          "type": "text",
+          "text": "Authoritative π\r\nC:\\temp\\π",
+          "textSignature": "opaque-text=="
+        },
+        {
+          "type": "toolCall",
+          "id": "call-frame-1",
+          "name": "read",
+          "arguments": {
+            "path": "C:\\temp\\π",
+            "options": {
+              "preserve": null,
+              "order": [
+                "b",
+                "a"
+              ]
+            }
+          },
+          "thoughtSignature": "opaque-tool==",
+          "namespace": "fs"
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "synthetic-oracle",
+      "model": "oracle-model",
+      "responseId": "response-frame-1",
+      "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 0,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1700000000000
+    },
+    "effects": [],
+    "checks": {
+      "indexedContentCount": 3,
+      "signaturesPreserved": true,
+      "authoritativeEndsPreserved": true,
+      "finalArgumentsPreserved": true,
+      "terminalExcludedFromFrames": true,
+      "emissionSnapshotsImmutable": true
+    }
+  }
+}

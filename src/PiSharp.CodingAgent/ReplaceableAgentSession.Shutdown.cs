@@ -13,7 +13,7 @@ public sealed partial class ReplaceableAgentSession
         RejectTransitionReentrancy();
         PersistentAgentSession[] attached;
         lock (gate) attached = sessions.ToArray();
-        foreach (var session in attached) _ = session.WaitForIdleAsync();
+        foreach (var session in attached) session.RejectOwnedResourceSelfWait();
         TaskCompletionSource? completion = null; Task settled;
         lock (gate)
         {
@@ -31,17 +31,36 @@ public sealed partial class ReplaceableAgentSession
         var failures = new List<Exception>();
         try
         {
+            await InitiateOwnedResourceStopsAsync().ConfigureAwait(false);
+            CancellationTokenSource? notificationLifetime;
+            lock (gate) notificationLifetime = committedNotificationLifetime;
             try { InvokeShutdownCancellation(() => closing.Cancel()); } catch (Exception error) { failures.Add(error); }
             try { InvokeShutdownCancellation(Abort); } catch (Exception error) { failures.Add(error); }
-            Task[] discovery; CancellationTokenSource[] attachedLifetimes;
-            lock (gate) { discovery = discoveryOperations.Keys.ToArray(); attachedLifetimes = lifetimes.ToArray(); }
+            if (notificationLifetime is not null)
+                try { InvokeShutdownCancellation(() => notificationLifetime.Cancel()); } catch (Exception error) { failures.Add(error); }
+            Task[] discovery;
+            lock (gate) discovery = discoveryOperations.Keys.ToArray();
             foreach (var read in discovery) try { await read.ConfigureAwait(false); } catch (Exception) { /* Caller owns read failure; read task includes cleanup. */ }
-            foreach (var lifetime in attachedLifetimes)
-                try { InvokeShutdownCancellation(() => lifetime.Cancel()); } catch (Exception error) { failures.Add(error); }
             await mutations.WaitAsync().ConfigureAwait(false);
             Task[] retired; PersistentAgentSession[] owned; CancellationTokenSource[] finalLifetimes;
             try
             {
+                AgentSessionAttachment retiring; lock (gate) retiring = current;
+                PersistentAgentSession.ReplacementReservation? resourceReservation = null;
+                try
+                {
+                    bool needsReservation; lock (gate) needsReservation = ownedResources.Any(resource =>
+                        ReferenceEquals(resource.Attachment, retiring) && !resource.BodyStarted);
+                    if (needsReservation)
+                    {
+                        await retiring.Session.WaitForIdleAsync().ConfigureAwait(false);
+                        resourceReservation = retiring.Session.ReserveReplacement();
+                    }
+                }
+                catch (Exception error) { failures.Add(error); }
+                try { await RetireOwnedResourcesAsync(retiring, resourceReservation, joinAll: true).ConfigureAwait(false); }
+                catch (Exception error) { failures.Add(error); }
+                finally { resourceReservation?.Dispose(); }
                 lock (gate) { retired = retirements.ToArray(); owned = sessions.ToArray(); finalLifetimes = lifetimes.ToArray(); }
             }
             finally { mutations.Release(); }

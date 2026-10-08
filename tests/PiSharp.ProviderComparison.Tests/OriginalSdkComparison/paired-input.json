@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "originalCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "cases": [
+    "pi-messages.direct-settled-tool-alias",
+    "pi-messages.simple-settled-tool-alias"
+  ],
+  "model": {
+    "type": "chat",
+    "id": "inert-model",
+    "provider": "inert-provider",
+    "api": "pi-messages",
+    "name": "Inert",
+    "baseUrl": "https://pi-messages.invalid/base/",
+    "reasoning": true,
+    "input": [
+      "text"
+    ],
+    "contextWindow": 65536,
+    "maxTokens": 8192,
+    "cost": {
+      "cacheWrite": 0,
+      "output": 0,
+      "input": 0,
+      "cacheRead": 0
+    }
+  },
+  "context": {
+    "messages": [
+      {
+        "content": "alias",
+        "timestamp": 123,
+        "role": "user"
+      }
+    ]
+  },
+  "events": [
+    {
+      "type": "start"
+    },
+    {
+      "toolName": "inspect",
+      "contentIndex": 0,
+      "id": "provisional-call",
+      "type": "toolcall_start"
+    },
+    {
+      "contentIndex": 0,
+      "delta": "{\"value\":1}",
+      "type": "toolcall_delta"
+    },
+    {
+      "contentIndex": 0,
+      "type": "toolcall_end",
+      "toolCall": {
+        "name": "other",
+        "id": "final-call",
+        "arguments": {
+          "value": 7
+        },
+        "type": "toolCall"
+      }
+    },
+    {
+      "reason": "toolUse",
+      "type": "done",
+      "usage": {
+        "cacheWrite": 0,
+        "cost": {
+          "cacheWrite": 0,
+          "total": 0,
+          "output": 0,
+          "input": 0,
+          "cacheRead": 0
+        },
+        "output": 0,
+        "input": 0,
+        "cacheRead": 0,
+        "totalTokens": 0
+      }
+    }
+  ]
+}

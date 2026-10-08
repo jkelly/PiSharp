@@ -1,0 +1,106 @@
+{
+  "createdUtc": "2026-10-03T09:23:58.994Z",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "node": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "bytes": 92825416,
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "manifest": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\source-manifest.json",
+    "bytes": 969151,
+    "sha256": "772c23326a8a341cc40235a95366639ea28cca1823089969cee1c5deb58b4048"
+  },
+  "inputs": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-kitty-alternate-key-preparation-r28\\alternate-key-identity-inputs.json",
+    "bytes": 808,
+    "sha256": "252aa6c1de5346c95c1316f946b1bdcaff50fc2213e7833a5c82233d6ba77ae9"
+  },
+  "driver": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-kitty-alternate-key-preparation-r28\\capture-alternate-key-identity-source.mjs",
+    "bytes": 2955,
+    "sha256": "c1d48f9a307159913ec989d6e20208d5d219c999fa2901b5c7fdb983639dc2fe"
+  },
+  "loadedFiles": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+    }
+  ],
+  "effects": [],
+  "cases": [
+    {
+      "id": "shifted-a",
+      "raw": "\u001b[97:65;2u",
+      "sourceParsedKey": "shift+a",
+      "sourcePrintable": "A",
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "shifted-b",
+      "raw": "\u001b[98:66;2u",
+      "sourceParsedKey": "shift+b",
+      "sourcePrintable": "B",
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "cyrillic-control-a",
+      "raw": "\u001b[1092::97;5u",
+      "sourceParsedKey": "ctrl+a",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "cyrillic-control-w",
+      "raw": "\u001b[1094::119;5u",
+      "sourceParsedKey": "ctrl+w",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "latin-control-w-base-a",
+      "raw": "\u001b[119::97;5u",
+      "sourceParsedKey": "ctrl+w",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "latin-plain-c-base-x",
+      "raw": "\u001b[99::120;1u",
+      "sourceParsedKey": "c",
+      "sourcePrintable": "c",
+      "sourceRelease": false,
+      "sourceRepeat": false
+    },
+    {
+      "id": "alternate-repeat",
+      "raw": "\u001b[1092::97;5:2u",
+      "sourceParsedKey": "ctrl+a",
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": true
+    },
+    {
+      "id": "alternate-release",
+      "raw": "\u001b[1092::97;5:3u",
+      "sourceParsedKey": "ctrl+a",
+      "sourcePrintable": null,
+      "sourceRelease": true,
+      "sourceRepeat": false
+    },
+    {
+      "id": "source-unsupported-associated-text",
+      "raw": "\u001b[97;1;97u",
+      "sourceParsedKey": null,
+      "sourcePrintable": null,
+      "sourceRelease": false,
+      "sourceRepeat": false
+    }
+  ]
+}

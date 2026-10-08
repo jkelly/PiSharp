@@ -2,12 +2,14 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using PiSharp.AI.Authentication;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.OpenAIResponses;
 
 public sealed record ResponsesKeyAuthRequestOptions(
-    bool SupportsMaxOutputTokens = false, int? MaxOutputTokens = null,
+    bool SupportsMaxOutputTokens = true, int? MaxOutputTokens = null,
     JsonData? PayloadOverrides = null,
     int MaximumOutputTokens = 1_000_000, int MaximumKeyCharacters = 4096,
     int MaximumEndpointCharacters = 4096, int MaximumModelCharacters = 1024,
@@ -15,7 +17,22 @@ public sealed record ResponsesKeyAuthRequestOptions(
     string? SessionId = null, double? Temperature = null,
     int MaximumSessionIdCharacters = 4096, double MaximumTemperatureMagnitude = 2,
     string? ReasoningEffort = null, string? ReasoningSummary = null, JsonData? ThinkingLevelMap = null,
-    JsonData? ToolChoice = null, string? ServiceTier = null);
+    JsonData? ToolChoice = null, string? ServiceTier = null,
+    string? CacheRetention = null, bool SupportsLongCacheRetention = true,
+    bool SupportsExplicitPromptCacheMode = false, ProviderEnvironmentSnapshot? Environment = null)
+{
+    public JsonData? ModelHeaders { get; init; }
+    public JsonData? Headers { get; init; }
+    public JsonData? ModelSamplingParams { get; init; }
+    public JsonData? SamplingParams { get; init; }
+    public string SessionAffinityFormat { get; init; } = "openai";
+    public int MaximumHeaders { get; init; } = 128;
+    public int MaximumHeaderCharacters { get; init; } = 4096;
+    public int MaximumTotalHeaderCharacters { get; init; } = 65_536;
+    [System.Text.Json.Serialization.JsonIgnore] public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask<JsonData?>>? OnPayload { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore] public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask>? OnResponse { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore] public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask>? OnProviderStreamEvent { get; init; }
+}
 
 public enum ResponsesKeyAuthRequestFailure
 {
@@ -50,9 +67,11 @@ public sealed class ResponsesKeyAuthRequestFactory
     private readonly string _suffix;
     private readonly string _reasoningSuffix;
     private readonly string _toolChoiceSuffix;
+    private readonly string _cacheRetention;
     internal sealed record ServiceTierBinding(string? RequestedTier);
     internal static readonly HttpRequestOptionsKey<ServiceTierBinding> RequestedServiceTierKey = new("PiSharp.Responses.RequestedServiceTier");
     internal string? RequestedServiceTier => _options.ServiceTier;
+    internal ResponsesKeyAuthRequestOptions Policy => _options;
     private const string Prefix = "{\"model\":";
     private const string InputField = ",\"input\":";
 
@@ -60,6 +79,9 @@ public sealed class ResponsesKeyAuthRequestFactory
         ResponsesTranscriptProjectionOptions projectionOptions, ResponsesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
+        if (_options.OnPayload?.GetInvocationList().Length > 1 || _options.OnResponse?.GetInvocationList().Length > 1 ||
+            _options.OnProviderStreamEvent?.GetInvocationList().Length > 1)
+            throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
         if (endpoint is null || expectedModel is null || projectionOptions is null ||
             _options.MaximumOutputTokens < 16 || _options.MaximumKeyCharacters <= 0 ||
             _options.MaximumEndpointCharacters <= 0 || _options.MaximumModelCharacters <= 0 ||
@@ -76,8 +98,8 @@ public sealed class ResponsesKeyAuthRequestFactory
             expectedModel.Id.Length > _options.MaximumModelCharacters ||
             expectedModel.Provider.Length > _options.MaximumModelCharacters)
             throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
-        if (!ResponsesServiceTier.Supported(_options.ServiceTier) || _options.PayloadOverrides is not null ||
-            (_options.MaxOutputTokens is not null && !_options.SupportsMaxOutputTokens))
+        if (_options.CacheRetention is not (null or "none" or "short" or "long") ||
+            !ResponsesServiceTier.Supported(_options.ServiceTier) || _options.PayloadOverrides is not null)
             throw Failure(ResponsesKeyAuthRequestFailure.UnsupportedOptions);
         if (_options.Temperature is { } temperature && !double.IsFinite(temperature))
             throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
@@ -85,20 +107,40 @@ public sealed class ResponsesKeyAuthRequestFactory
                 Math.Max(requested, 16) > _options.MaximumOutputTokens) ||
             (_options.Temperature is { } boundedTemperature && Math.Abs(boundedTemperature) > _options.MaximumTemperatureMagnitude))
             throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
+        if (_options.SessionAffinityFormat is not ("openai" or "openrouter" or "none") ||
+            _options.MaximumHeaders <= 0 || _options.MaximumHeaderCharacters <= 0 || _options.MaximumTotalHeaderCharacters <= 0)
+            throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
         _toolChoiceSuffix = ToolChoiceField();
         _reasoningSuffix = ReasoningFields(projectionOptions.Reasoning, expectedModel.Provider);
-        var session = ClampSessionId(_options.SessionId);
+        _cacheRetention = _options.CacheRetention ?? (_options.Environment?.GetValue("PI_CACHE_RETENTION") == "long" ? "long" : "short");
+        var session = _cacheRetention == "none" ? null : ClampSessionId(_options.SessionId);
         try { _projector = new(projectionOptions); }
         catch (ArgumentException) { throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration); }
         _endpoint = endpoint;
         _model = expectedModel;
         _modelJson = JsonSerializer.Serialize(expectedModel.Id);
         _suffix = ",\"stream\":true" +
-            (session is not null ? ",\"prompt_cache_key\":" + JsonSerializer.Serialize(session) : "") + ",\"store\":false" +
-            (_options.MaxOutputTokens is { } count && count != 0
+            (session is not null ? ",\"prompt_cache_key\":" + JsonSerializer.Serialize(session) : "") + CacheFields() + ",\"store\":false" +
+            (_options.SupportsMaxOutputTokens && _options.MaxOutputTokens is { } count && count != 0
                 ? ",\"max_output_tokens\":" + Math.Max(count, 16).ToString(CultureInfo.InvariantCulture) : "") +
             (_options.Temperature is { } value ? ",\"temperature\":" + (value == 0 ? "0" : JsonSerializer.Serialize(value)) : "") +
             (_options.ServiceTier is { } tier ? ",\"service_tier\":" + JsonSerializer.Serialize(tier) : "");
+    }
+
+    // Pi d86654abb8862e201933517d6f1fce9f88dd117f, openai-responses.ts:
+    // getPromptCacheRetention/getPromptCacheOptions. These explicit profile controls
+    // require no ambient environment lookup or endpoint/provider-name inference.
+    private string CacheFields()
+    {
+        if (_options.SupportsExplicitPromptCacheMode)
+        {
+            if (_cacheRetention == "none") return ",\"prompt_cache_options\":{\"mode\":\"explicit\"}";
+            if (_cacheRetention == "long" && _options.SupportsLongCacheRetention)
+                return ",\"prompt_cache_options\":{\"ttl\":\"30m\"}";
+            return "";
+        }
+        return _cacheRetention == "long" && _options.SupportsLongCacheRetention
+            ? ",\"prompt_cache_retention\":\"24h\"" : "";
     }
 
     public HttpRequestMessage Create(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
@@ -127,6 +169,21 @@ public sealed class ResponsesKeyAuthRequestFactory
         if (bytes > _options.MaximumPayloadBytes) throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
         cancellationToken.ThrowIfCancellationRequested();
         var payload = Encoding.UTF8.GetBytes(Prefix + _modelJson + InputField + input + _suffix + toolField + _toolChoiceSuffix + _reasoningSuffix + "}");
+        if (_options.ModelSamplingParams is not null || _options.SamplingParams is not null)
+        {
+            var root = JsonNode.Parse(payload)!.AsObject();
+            foreach (var sampling in new[] { _options.ModelSamplingParams, _options.SamplingParams })
+            {
+                if (sampling is null || sampling.Value.ValueKind == JsonValueKind.Null) continue;
+                if (sampling.Value.ValueKind != JsonValueKind.Object) throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
+                AdmitHookPayload(sampling, cancellationToken);
+                foreach (var property in sampling.Value.EnumerateObject()) root[property.Name] = JsonNode.Parse(property.Value.GetRawText());
+            }
+            var merged = JsonData.Parse(root.ToJsonString());
+            AdmitHookPayload(merged, cancellationToken);
+            payload = Encoding.UTF8.GetBytes(merged.ToString());
+        }
+        var headers = RequestHeaders(cancellationToken);
         HttpRequestMessage? result = null;
         HttpContent? content = null;
         try
@@ -136,6 +193,11 @@ public sealed class ResponsesKeyAuthRequestFactory
             content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
             result = new HttpRequestMessage(HttpMethod.Post, _endpoint) { Content = content };
             content = null; // Request now owns content.
+            foreach (var header in headers)
+                if (header.Value is not null && !header.Key.Equals("authorization", StringComparison.OrdinalIgnoreCase) &&
+                    !result.Headers.TryAddWithoutValidation(header.Key, header.Value))
+                    throw Failure(ResponsesKeyAuthRequestFailure.UnsupportedOptions);
+            // Preserve this explicit-key profile's existing authorization authority.
             result.Headers.Authorization = new AuthenticationHeaderValue("Bearer", explicitApiKey);
             result.Options.Set(RequestedServiceTierKey, new ServiceTierBinding(_options.ServiceTier));
             cancellationToken.ThrowIfCancellationRequested();
@@ -147,6 +209,55 @@ public sealed class ResponsesKeyAuthRequestFactory
             content?.Dispose();
             throw;
         }
+    }
+
+    // Pi createClient: model headers, session affinity, then request headers.
+    private Dictionary<string, string?> RequestHeaders(CancellationToken token)
+    {
+        var headers = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        long supplied = 0;
+        void Merge(JsonData? source)
+        {
+            if (source is null || source.Value.ValueKind == JsonValueKind.Null) return;
+            supplied += source.ToString().Length;
+            if (supplied > _options.MaximumTotalHeaderCharacters) throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
+            if (source.Value.ValueKind != JsonValueKind.Object) throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
+            foreach (var property in source.Value.EnumerateObject())
+            {
+                token.ThrowIfCancellationRequested();
+                if (property.Value.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
+                    throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
+                headers[property.Name] = property.Value.GetString();
+            }
+        }
+        Merge(_options.ModelHeaders);
+        if (_options.SessionId is { Length: > 0 } session)
+        {
+            _ = ClampSessionId(session); // Headers use original session; body cache key is clamped separately.
+            if (_options.SessionAffinityFormat == "openrouter") headers["x-session-id"] = session;
+            else
+            {
+                if (_options.SessionAffinityFormat == "openai") headers["session_id"] = session;
+                headers["x-client-request-id"] = session;
+            }
+        }
+        Merge(_options.Headers);
+        long total = 0;
+        if (headers.Count > _options.MaximumHeaders) throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
+        foreach (var header in headers)
+        {
+            token.ThrowIfCancellationRequested();
+            if (header.Key.Length == 0 || header.Key.Any(character => !(char.IsAsciiLetterOrDigit(character) || "!#$%&'*+-.^_`|~".Contains(character))) ||
+                header.Value?.Any(character => character != '\t' && (character < ' ' || character > '~')) == true)
+                throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
+            if (header.Key.Equals("host", StringComparison.OrdinalIgnoreCase) || header.Key.Equals("content-length", StringComparison.OrdinalIgnoreCase) ||
+                header.Key.Equals("transfer-encoding", StringComparison.OrdinalIgnoreCase) || header.Key.Equals("connection", StringComparison.OrdinalIgnoreCase))
+                throw Failure(ResponsesKeyAuthRequestFailure.UnsupportedOptions);
+            total += header.Key.Length + (long)(header.Value?.Length ?? 0);
+            if (header.Key.Length > _options.MaximumHeaderCharacters || header.Value?.Length > _options.MaximumHeaderCharacters ||
+                total > _options.MaximumTotalHeaderCharacters) throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
+        }
+        return headers;
     }
 
     private string ToolChoiceField()
@@ -230,6 +341,16 @@ public sealed class ResponsesKeyAuthRequestFactory
         return fields;
     }
 
+    internal void AdmitHookPayload(JsonData payload, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (payload.Value.ValueKind != JsonValueKind.Object) throw Failure(ResponsesKeyAuthRequestFailure.InvalidRequest);
+        if (Encoding.UTF8.GetByteCount(payload.ToString()) > _options.MaximumPayloadBytes) throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
+        CheckDepth(payload.Value, 0, cancellationToken);
+        if (payload.Value.TryGetProperty("max_output_tokens", out var maximum) && maximum.ValueKind == JsonValueKind.Number &&
+            (!maximum.TryGetDouble(out var tokens) || !double.IsFinite(tokens) || tokens > _options.MaximumOutputTokens))
+            throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
+    }
     private static bool ValidText(string value)
     {
         for (var i = 0; i < value.Length; i++)

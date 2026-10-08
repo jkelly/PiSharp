@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "text-authoritative-end",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "authored-synthetic-contract",
+  "scenario": "Exact Unicode/CRLF/path text, unknown root data and authoritative text end",
+  "requirementIds": [
+    "stream.indexed-events",
+    "stream.terminal-settlement"
+  ],
+  "clock": {
+    "unixMilliseconds": 1700000000000
+  },
+  "seed": "none",
+  "normalizerVersion": "object-key-order-v1",
+  "provenance": {
+    "kind": "authored-synthetic-contract",
+    "origin": "Newly authored PiSharp fixture; frame shape sourced from pinned public types; expected reduction not captured from upstream",
+    "upstreamOutput": false
+  },
+  "frames": [
+    {
+      "type": "start",
+      "partial": {
+        "role": "assistant",
+        "content": [],
+        "api": "openai-responses",
+        "provider": "authored-synthetic",
+        "model": "fixture-model",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 0,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "pending",
+        "timestamp": 1700000000000,
+        "futureMetadata": {
+          "explicitNull": null,
+          "ordered": [
+            "b",
+            "a"
+          ]
+        }
+      }
+    },
+    {
+      "type": "text_start",
+      "contentIndex": 0,
+      "content": {
+        "type": "text",
+        "text": ""
+      }
+    },
+    {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "draft "
+    },
+    {
+      "type": "text_delta",
+      "contentIndex": 0,
+      "delta": "π"
+    },
+    {
+      "type": "text_end",
+      "contentIndex": 0,
+      "content": "Authoritative π\r\nC:\\temp\\π",
+      "textSignature": "opaque-text=="
+    }
+  ],
+  "terminal": {
+    "type": "done",
+    "reason": "stop",
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Authoritative π\r\nC:\\temp\\π",
+          "textSignature": "opaque-text=="
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "authored-synthetic",
+      "model": "fixture-model",
+      "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 0,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "stop",
+      "timestamp": 1700000000000,
+      "futureMetadata": {
+        "explicitNull": null,
+        "ordered": [
+          "b",
+          "a"
+        ]
+      },
+      "responseId": "authored-response-1"
+    }
+  },
+  "expected": {
+    "events": [
+      {
+        "type": "start",
+        "partial": {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "authored-synthetic",
+          "model": "fixture-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000,
+          "futureMetadata": {
+            "explicitNull": null,
+            "ordered": [
+              "b",
+              "a"
+            ]
+          }
+        }
+      },
+      {
+        "type": "text_start",
+        "contentIndex": 0,
+        "content": {
+          "type": "text",
+          "text": ""
+        }
+      },
+      {
+        "type": "text_delta",
+        "contentIndex": 0,
+        "delta": "draft "
+      },
+      {
+        "type": "text_delta",
+        "contentIndex": 0,
+        "delta": "π"
+      },
+      {
+        "type": "text_end",
+        "contentIndex": 0,
+        "content": "Authoritative π\r\nC:\\temp\\π",
+        "textSignature": "opaque-text=="
+      },
+      {
+        "type": "done",
+        "reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Authoritative π\r\nC:\\temp\\π",
+              "textSignature": "opaque-text=="
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "authored-synthetic",
+          "model": "fixture-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000000,
+          "futureMetadata": {
+            "explicitNull": null,
+            "ordered": [
+              "b",
+              "a"
+            ]
+          },
+          "responseId": "authored-response-1"
+        }
+      }
+    ],
+    "result": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "text",
+          "text": "Authoritative π\r\nC:\\temp\\π",
+          "textSignature": "opaque-text=="
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "authored-synthetic",
+      "model": "fixture-model",
+      "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 0,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "stop",
+      "timestamp": 1700000000000,
+      "futureMetadata": {
+        "explicitNull": null,
+        "ordered": [
+          "b",
+          "a"
+        ]
+      },
+      "responseId": "authored-response-1"
+    }
+  }
+}

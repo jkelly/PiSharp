@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "slice": "explicit-cli-tools-and-settings-defaultTools",
+  "baseline": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "baseCandidate": "01fd0178e8d7e0f40ee5d037d30c894331c926b4",
+  "status": "implemented-awaiting-native-qualification",
+  "testsAuthored": 8,
+  "testsExecutedByWorker": 0,
+  "compilerExecutedByWorker": false,
+  "staticChecks": ["source API inspection", "git diff --check"],
+  "limitations": ["resume overrides require already-admissible recorded loadouts; unavailable/mismatched recorded declarations still reject before override without mutation", "upstream initial-selection admission-path parity remains separate work", "absent-selection native defaults retained", "initial selection only; no lifetime CLI allowlist", "only admitted declarable extensions available", "hidden/script-only startup-selection fixture coverage remains unqualified", "find/grep not installed in CLI profile", "no exclude-tools/no-tools flags", "no ambient settings discovery"],
+  "contract": "docs/contracts/startup-tool-selection.md"
+}

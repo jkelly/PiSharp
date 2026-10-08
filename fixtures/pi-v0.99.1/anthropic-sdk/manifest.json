@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "anthropic-sdk-direct-stream-three-requests",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "api.anthropic-messages",
+    "stream.indexed-events",
+    "stream.terminal-settlement"
+  ],
+  "input": {
+    "path": "tools/PiReferenceRunner/anthropic-sdk-inputs.json",
+    "bytes": 8570,
+    "sha256": "80ab9885440ccca2e01ed421b89a17899f3ecd25f92a558b809ca247921486e4"
+  },
+  "expected": {
+    "path": "fixtures/pi-v0.99.1/anthropic-sdk/core.expected.json",
+    "sha256": "eedd5bb2658f13fc8b722a17912e704c33a5bf5001f54689f5aadb49be511bb9",
+    "kind": "captured-unchanged-anthropic-wrapper-sdk-oracle"
+  },
+  "lock": {
+    "path": "fixtures/pi-v0.99.1/anthropic-sdk/oracle.lock.json",
+    "sha256": "282af62b697e0b2dfcbcf45cbff0dc1ae2443c714de0104d4ab3962b51c7a5c0"
+  },
+  "clock": {
+    "unixMilliseconds": 1700000000000,
+    "mechanism": "Capture child explicitly replaces Date.now for output timestamps; source/SDK unchanged; actual OS/runtime/headers and crypto are not replaced."
+  },
+  "seed": "No RNG replacement; authored IDs/key and SSE values only.",
+  "normalizerVersion": "raw-json-v1-lossless-numeric-lexemes-object-key-order-only",
+  "licenseStatus": {
+    "licenseReviewStatus": "P1-02 HOLD",
+    "redistributionLicenseClosure": false,
+    "developmentOnlyLicenseAdmission": {
+      "name": "standardwebhooks",
+      "version": "1.1.1",
+      "archiveFile": "standardwebhooks-1.1.1.tgz",
+      "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+      "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+      "scope": "task-local-development-only",
+      "declaredLicense": "MIT",
+      "licenseEvidence": "declared-MIT-only",
+      "licenses": [],
+      "packagedRootLicenseVerified": false,
+      "redistributionLicenseClosure": false,
+      "licenseReviewStatus": "P1-02 HOLD"
+    }
+  },
+  "provenance": {
+    "source": "Whole unchanged packages/ai/src/api/anthropic-messages.ts public stream",
+    "sdk": "Actual upstream-locked @anthropic-ai/sdk0.124.0 beta.messages.create/asResponse request boundary",
+    "sseDecoder": "Unchanged Pi iterateAnthropicEvents; no SDK decoder claim",
+    "input": "Authored transcripts/options/number-lexeme-to-Number seam and in-memory SSE",
+    "callbacks": "Supported fake fetch/onPayload returning undefined/onResponse/onProviderStreamEvent",
+    "emissionObservation": "Returned stream instance push tap snapshots before mutation; source/SDK implementations unchanged",
+    "credentials": "Inert authored marker; explicit credential-free child env",
+    "repeatRuns": 2,
+    "byteIdentical": true
+  },
+  "scope": "Three source-observed request/text-stream profiles; no native differential/provider/auth/SDK-stream-decoder/phase or redistribution-license closure"
+}

@@ -1,0 +1,345 @@
+{
+  "sourceGuards": {
+    "completeSourceRecordsAndNumericFieldsRetained": true,
+    "canonicalSourceFiles": 2093,
+    "originalQualifiedLoadedModules": 715,
+    "additiveCanonicalCandidates": 117,
+    "timeoutMilliseconds": 20000,
+    "exactDependencyPackages": 8,
+    "noProviderOrToolAcquisition": true,
+    "maximumChildOutputBytes": 8388608,
+    "separatelyQualifiedActualCatalogFiles": 43,
+    "clocksAndRngUnmodified": true,
+    "actualLoadedModules": 832
+  },
+  "disclosure": {
+    "sourceOnly": "Whole-source pure compact aborted-response behavior is retained. Native active-manager transport rejects aborted successful checkpoints and must join cancellation separately.",
+    "sourceOnlyFields": "Raw headers/env options/model metadata/own-undefined/special numbers/Set and AbortSignal conversions retained. Native builder compares shared request fields explicitly; no claims for absent provider transport or global phase closure.",
+    "authoredResponses": "Explicit finite authored streamFn response schedules; whole source modules unchanged, no provider requests, no Date/RNG shim.",
+    "historicalScopeLiteral": "comparisonPolicy.scope retains its pre-capture authoring wording verbatim; actual captured status/counts and qualification are recorded separately here.",
+    "executionCandidate": "86e618d1237634425329e499c0f9c5de72cea3f9 is the actual revised capture producer and is never relabeled as a later consumer candidate.",
+    "sourceRouting": "Compact requests explicitly receive the actual manager session ID, as the active manager does. Branch requests retain actual fresh source UUIDv7 values; native branches compare fresh-identity relations and retain both actual routes separately. Earlier genuine-source-r1 default-route compact requests remain immutable failed evidence, not relabeled manager routing.",
+    "authoredInputCorrection": "The repeated image schedule uses declared UserMessage image content. Earlier genuine-source-r1 assistant image content was outside the pinned AssistantMessage union and remains immutable failed evidence; native admission separately proves rejection without effects.",
+    "historicalFailedEvidence": "genuine-source-r1 raw captures remain unchanged in artifacts/compaction-reference/genuine-source-r1 and fixture-before-r2; complete r4 source/binary/failure evidence is independently preserved at preserved-compaction-compaction-development-r4/checkpoint.json SHA256741cc0010f851f8bc833af8e72d19dd7d7bfc0baf3dffb56b92f88eea2442cca. They are not admitted as corrected typed-input parity evidence.",
+    "requestComparisons": "All shared prompt/model/budget/cache/reasoning fields remain exact. Compact routing equals the actual manager identity; branch source/native UUIDv7 values remain raw and are compared by explicit freshness/distinctness relations. Native consumer logs retain both actual routes."
+  },
+  "fixtureId": "session-compaction",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "repeatRuns": 2,
+  "observedCounts": [
+    {
+      "repeat": 1,
+      "cases": [
+        {
+          "caseId": "token-estimation-thresholds",
+          "checkpoints": 1,
+          "operationReturns": 9,
+          "pureCalls": 4,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 23,
+          "specialNumberPaths": 0,
+          "collectionConversions": 0
+        },
+        {
+          "caseId": "huge-turn-tool-cut-pairing",
+          "checkpoints": 1,
+          "operationReturns": 10,
+          "pureCalls": 5,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 30,
+          "specialNumberPaths": 0,
+          "collectionConversions": 9
+        },
+        {
+          "caseId": "repeated-compaction-edits-images",
+          "checkpoints": 4,
+          "operationReturns": 14,
+          "pureCalls": 4,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 93,
+          "specialNumberPaths": 0,
+          "collectionConversions": 9
+        },
+        {
+          "caseId": "retain-none-recovery-omission",
+          "checkpoints": 2,
+          "operationReturns": 10,
+          "pureCalls": 2,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 37,
+          "specialNumberPaths": 0,
+          "collectionConversions": 3
+        },
+        {
+          "caseId": "nonroot-raw-branch-common-ancestor",
+          "checkpoints": 2,
+          "operationReturns": 11,
+          "pureCalls": 4,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 44,
+          "specialNumberPaths": 0,
+          "collectionConversions": 6
+        },
+        {
+          "caseId": "branch-summary-details-from-hook",
+          "checkpoints": 2,
+          "operationReturns": 10,
+          "pureCalls": 3,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 41,
+          "specialNumberPaths": 0,
+          "collectionConversions": 6
+        },
+        {
+          "caseId": "actual-summary-requests-split-usage",
+          "checkpoints": 3,
+          "operationReturns": 10,
+          "pureCalls": 2,
+          "streamCalls": 2,
+          "serializations": 1,
+          "reopenViews": 1,
+          "ownUndefinedPaths": 68,
+          "specialNumberPaths": 0,
+          "collectionConversions": 6
+        },
+        {
+          "caseId": "summary-failures-abort-boundary",
+          "checkpoints": 2,
+          "operationReturns": 7,
+          "pureCalls": 10,
+          "streamCalls": 10,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 84,
+          "specialNumberPaths": 0,
+          "collectionConversions": 17
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "cases": [
+        {
+          "caseId": "token-estimation-thresholds",
+          "checkpoints": 1,
+          "operationReturns": 9,
+          "pureCalls": 4,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 23,
+          "specialNumberPaths": 0,
+          "collectionConversions": 0
+        },
+        {
+          "caseId": "huge-turn-tool-cut-pairing",
+          "checkpoints": 1,
+          "operationReturns": 10,
+          "pureCalls": 5,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 30,
+          "specialNumberPaths": 0,
+          "collectionConversions": 9
+        },
+        {
+          "caseId": "repeated-compaction-edits-images",
+          "checkpoints": 4,
+          "operationReturns": 14,
+          "pureCalls": 4,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 93,
+          "specialNumberPaths": 0,
+          "collectionConversions": 9
+        },
+        {
+          "caseId": "retain-none-recovery-omission",
+          "checkpoints": 2,
+          "operationReturns": 10,
+          "pureCalls": 2,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 37,
+          "specialNumberPaths": 0,
+          "collectionConversions": 3
+        },
+        {
+          "caseId": "nonroot-raw-branch-common-ancestor",
+          "checkpoints": 2,
+          "operationReturns": 11,
+          "pureCalls": 4,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 44,
+          "specialNumberPaths": 0,
+          "collectionConversions": 6
+        },
+        {
+          "caseId": "branch-summary-details-from-hook",
+          "checkpoints": 2,
+          "operationReturns": 10,
+          "pureCalls": 3,
+          "streamCalls": 0,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 41,
+          "specialNumberPaths": 0,
+          "collectionConversions": 6
+        },
+        {
+          "caseId": "actual-summary-requests-split-usage",
+          "checkpoints": 3,
+          "operationReturns": 10,
+          "pureCalls": 2,
+          "streamCalls": 2,
+          "serializations": 1,
+          "reopenViews": 1,
+          "ownUndefinedPaths": 68,
+          "specialNumberPaths": 0,
+          "collectionConversions": 6
+        },
+        {
+          "caseId": "summary-failures-abort-boundary",
+          "checkpoints": 2,
+          "operationReturns": 7,
+          "pureCalls": 10,
+          "streamCalls": 10,
+          "serializations": 1,
+          "reopenViews": 0,
+          "ownUndefinedPaths": 84,
+          "specialNumberPaths": 0,
+          "collectionConversions": 17
+        }
+      ]
+    }
+  ],
+  "caseIds": [
+    "token-estimation-thresholds",
+    "huge-turn-tool-cut-pairing",
+    "repeated-compaction-edits-images",
+    "retain-none-recovery-omission",
+    "nonroot-raw-branch-common-ancestor",
+    "branch-summary-details-from-hook",
+    "actual-summary-requests-split-usage",
+    "summary-failures-abort-boundary"
+  ],
+  "schemaVersion": 1,
+  "kind": "two-genuine-unchanged-whole-source-session-compaction-captures",
+  "captures": [
+    {
+      "path": "capture.json",
+      "repeat": 1,
+      "bytes": 2140188,
+      "sha256": "38cdcd9f2872511d67d38926b48db042c0e036b2ca345c597922c6ee8bcbe48f"
+    },
+    {
+      "path": "repeat-2.json",
+      "repeat": 2,
+      "bytes": 2140188,
+      "sha256": "9ebf20aacfbb57c560b2f2eab02eed305a4bcf73e8ea8f79325420d58f9ecf2a"
+    }
+  ],
+  "caseCount": 8,
+  "files": [
+    {
+      "path": "capture.json",
+      "bytes": 2140188,
+      "sha256": "38cdcd9f2872511d67d38926b48db042c0e036b2ca345c597922c6ee8bcbe48f"
+    },
+    {
+      "path": "contract.json",
+      "bytes": 102016,
+      "sha256": "6f83cbeefd5a6d796c444c477786a79b66eacfd4999dc8a4f0f9f86331bf0671"
+    },
+    {
+      "path": "environment-pins.json",
+      "bytes": 55110,
+      "sha256": "32e22bffe4c8e42d61047576dc4093d076f3537afbcc452a2d83bc12567ffd80"
+    },
+    {
+      "path": "oracle.lock.json",
+      "bytes": 248938,
+      "sha256": "38a55ca1984cafff06bd3bb57f9db535c7d29a81747dc579e14166a0429f81ad"
+    },
+    {
+      "path": "owner.json",
+      "bytes": 529,
+      "sha256": "d6190f6110266d0b42172f6cc59fc32a6e5bcd649e06e46befb662c633318ff2"
+    },
+    {
+      "path": "parent.receipt.json",
+      "bytes": 533,
+      "sha256": "b17e32d3d82d971a40ffd75266863097cec24996242000a7c9f2a2157ae3a8eb"
+    },
+    {
+      "path": "repeat-1.receipt.json",
+      "bytes": 362,
+      "sha256": "ceed9378a83d83ea2635971cb3fd8e7918673e52970670098cfa75813564f139"
+    },
+    {
+      "path": "repeat-1.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "repeat-1.stdout.json",
+      "bytes": 1123831,
+      "sha256": "8e8c2681c4baf7dc23258fd6b63f8f522fb532109c8c83f3e895067539604ef3"
+    },
+    {
+      "path": "repeat-2.json",
+      "bytes": 2140188,
+      "sha256": "9ebf20aacfbb57c560b2f2eab02eed305a4bcf73e8ea8f79325420d58f9ecf2a"
+    },
+    {
+      "path": "repeat-2.receipt.json",
+      "bytes": 362,
+      "sha256": "a293f971c43c000db0b31160ef7ec987bbeb0956105d1cccbf6741540a404792"
+    },
+    {
+      "path": "repeat-2.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "repeat-2.stdout.json",
+      "bytes": 1123831,
+      "sha256": "3f11e2f1a05d83bb6bee67b839916ee0c0b390fd7697e1e445f59b96aab04a42"
+    },
+    {
+      "path": "report.json",
+      "bytes": 31396,
+      "sha256": "f71b6eb4b35fc365535a08171ca5b19836c50aaa318413a8600a507e4de77add"
+    },
+    {
+      "path": "supplemental-qualification.json",
+      "bytes": 84037,
+      "sha256": "bff69dd910162453566eb6f271a3f916f37664b77b28d6271bd8066b12000358"
+    }
+  ],
+  "captureExecutionCandidate": "86e618d1237634425329e499c0f9c5de72cea3f9",
+  "declaredComparisons": [
+    "every complete manager header/physical forest/selected branch/tree/projection/context/LLM view",
+    "native estimates/threshold/cut and compaction/branch plans",
+    "canonical serialized conversation and file formatting",
+    "shared summary request fields plus complete successful result usage/details/checkpoint",
+    "source-only terminal/error/abort results retained with explicit active-manager safety boundary"
+  ]
+}

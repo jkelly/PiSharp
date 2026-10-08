@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "status": "captured",
+  "output": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-context-edit-integration-work\\artifacts\\session-context-edits-reference\\manager-first",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "caseCount": 6,
+  "repeatRuns": 2,
+  "equalDeclaredContracts": true,
+  "rawByteIdentityRequired": false,
+  "sourceAndDependencyBytesUnchanged": true,
+  "loadedModulesMatchFrozenQualification": true,
+  "children": [
+    {
+      "repeat": 1,
+      "scratch": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-context-edit-integration-work\\artifacts\\session-context-edits-reference\\manager-first\\scratch\\capture-aW6DQt",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 1474860,
+      "stderrBytes": 0,
+      "boundedTimeoutMilliseconds": 20000,
+      "maxBufferBytes": 8388608
+    },
+    {
+      "repeat": 2,
+      "scratch": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-context-edit-integration-work\\artifacts\\session-context-edits-reference\\manager-first\\scratch\\capture-93buDt",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 1474860,
+      "stderrBytes": 0,
+      "boundedTimeoutMilliseconds": 20000,
+      "maxBufferBytes": 8388608
+    }
+  ],
+  "retainedScratchFiles": [
+    {
+      "path": "capture-93buDt/workspace/manager-admission-no-effects/sessions/2026-10-02T21-45-48-805Z_01a0fe94-a205-75a7-98e6-880d36bcdc2e.jsonl",
+      "bytes": 1893,
+      "sha256": "ebb44a58ab31f6d403bba436091aa424fba2e79b0ed413c97b28a4858135ccbc"
+    },
+    {
+      "path": "capture-93buDt/workspace/manager-branch-before-after-sibling/sessions/2026-10-02T21-45-48-754Z_01a0fe94-a1d2-75a7-98e6-880911158302.jsonl",
+      "bytes": 1553,
+      "sha256": "d991e0d773bad2a12ff499229ede05a583f75f342e310bca231276df9a5368b3"
+    },
+    {
+      "path": "capture-93buDt/workspace/manager-compaction-before-after/sessions/2026-10-02T21-45-48-769Z_01a0fe94-a1e1-75a7-98e6-880a69ae80fb.jsonl",
+      "bytes": 3173,
+      "sha256": "031d20fd56967f4284bf9fee913f20a9f37d57d5b14b1346f015877ee0ac2fdf"
+    },
+    {
+      "path": "capture-93buDt/workspace/manager-exact-shape-all-roles/sessions/2026-10-02T21-45-48-699Z_01a0fe94-a19b-75a7-98e6-8806511f30f0.jsonl",
+      "bytes": 3979,
+      "sha256": "4430e44dd2eb27e9d422371a5009c7de26876a475b1b617aead055379431352e"
+    },
+    {
+      "path": "capture-93buDt/workspace/manager-repeated-latest-omission/sessions/2026-10-02T21-45-48-670Z_01a0fe94-a17d-75a7-98e6-8804aa9d5626.jsonl",
+      "bytes": 1888,
+      "sha256": "fa316e327847f71921e6d5c727b9054c7173d6acfb36cf353c2ae8dc0fec935d"
+    },
+    {
+      "path": "capture-aW6DQt/workspace/manager-admission-no-effects/sessions/2026-10-02T21-45-48-199Z_01a0fe94-9fa7-7030-876c-ffb48b10a260.jsonl",
+      "bytes": 1893,
+      "sha256": "16744a649905861c3312098094a446642777f2f900bd49861fc93280444c70a3"
+    },
+    {
+      "path": "capture-aW6DQt/workspace/manager-branch-before-after-sibling/sessions/2026-10-02T21-45-48-148Z_01a0fe94-9f74-7030-876c-ffb06dc89718.jsonl",
+      "bytes": 1553,
+      "sha256": "83a92dc8e8f8a32819e5f38690041bba5bf94ebc5d3f1a1aadcba32690a54636"
+    },
+    {
+      "path": "capture-aW6DQt/workspace/manager-compaction-before-after/sessions/2026-10-02T21-45-48-163Z_01a0fe94-9f83-7030-876c-ffb28a909704.jsonl",
+      "bytes": 3173,
+      "sha256": "da3b4b8d6c069554510c4f3dc50ab9e69d762b70f3b1df5b1a78bd38834faee3"
+    },
+    {
+      "path": "capture-aW6DQt/workspace/manager-exact-shape-all-roles/sessions/2026-10-02T21-45-48-091Z_01a0fe94-9f3b-7030-876c-ffaef100af91.jsonl",
+      "bytes": 3979,
+      "sha256": "93f7a42cba08a064ee3ff6701c24c17b8952a4245cf6a5d708b578f3094cbf26"
+    },
+    {
+      "path": "capture-aW6DQt/workspace/manager-repeated-latest-omission/sessions/2026-10-02T21-45-48-063Z_01a0fe94-9f1f-7030-876c-ffaca481f418.jsonl",
+      "bytes": 1888,
+      "sha256": "1f8e841be6d5309c7e7694613009915be9047b68aaa0c615a52745a48478f5be"
+    }
+  ],
+  "captureSha256": "5e937a05694f064e0f1c32c573381c540d2d356216d11e52d7dcf504f94d51eb",
+  "contractSha256": "d6a7a6916a61b1dbcbb6b65f23342b31f29412bb7b53bbd65fd13137ca98cce4",
+  "scope": "Six whole SessionManager context-edit schedules, including actual appendContextEdit and branch/compaction/open. No full original package, phase, provider, recovery or native parity closure claim."
+}

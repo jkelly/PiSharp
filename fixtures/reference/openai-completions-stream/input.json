@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "openai-completions-stream-three-cases",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "authored-transcripts-options-and-in-memory-chat-completion-chunks",
+  "requirementIds": ["api.openai-completions", "stream.indexed-events", "stream.terminal-settlement"],
+  "clock": {
+    "unixMilliseconds": 1700000000000,
+    "mechanism": "Capture child temporarily replaces Date.now; no source/SDK edit or RNG replacement."
+  },
+  "model": {
+    "id": "pisharp-authored-completions-model",
+    "name": "Authored offline Completions model",
+    "api": "openai-completions",
+    "provider": "openai",
+    "baseUrl": "https://pisharp-completions-oracle.invalid/v1",
+    "reasoning": false,
+    "input": ["text"],
+    "contextWindow": 4096,
+    "maxTokens": 128,
+    "cost": {"input": 2, "output": 6, "cacheRead": 0.5, "cacheWrite": 1},
+    "headers": {"X-Model": "authored-model-header", "X-Override": "model-value", "X-Remove": "model-value"}
+  },
+  "commonOptions": {
+    "apiKey": "pisharp-authored-inert-noncredential",
+    "maxRetries": 0,
+    "maxTokens": 64,
+    "temperature": 0,
+    "env": {},
+    "headers": {"User-Agent": "PiSharp Completions offline oracle", "X-Override": "options-value", "X-Remove": null, "X-Client-Request-Id": "authored-completions-request"}
+  },
+  "response": {
+    "status": 200,
+    "headers": {"content-type": "text/event-stream; charset=utf-8", "x-request-id": "req_authored_completions", "x-fixture": "owned-in-memory-sse"},
+    "chunkBytes": 7,
+    "lineEnding": "\r\n",
+    "prefixComment": ": authored comment\r\n\r\n",
+    "suffix": "data: [DONE]\r\n\r\n"
+  },
+  "cases": [
+    {
+      "caseId": "text-and-final-usage",
+      "context": {"messages": [
+        {"role": "system", "content": "Keep exact text, controls and Unicode.", "timestamp": 1700000000000},
+        {"role": "user", "content": "Reply with pi \u03c0 and a supplementary character \ud83d\ude00.", "timestamp": 1700000000000}
+      ]},
+      "options": {},
+      "expectedStopReason": "stop",
+      "wireChunks": [
+        {"id": "chat_text_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [{"index": 0, "delta": {"role": "assistant", "content": "Hello "}, "finish_reason": null}], "opaque": {"keep": null, "order": [2, 1]}},
+        {"id": "chat_text_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "authored-returned-model", "choices": [{"index": 0, "delta": {"content": "\u03c0 \ud83d\ude00\u0000\r\n"}, "finish_reason": null}]},
+        {"id": "chat_text_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "authored-returned-model", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+        {"id": "chat_text_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "authored-returned-model", "choices": [], "usage": {"prompt_tokens": 11, "completion_tokens": 3, "total_tokens": 14}}
+      ]
+    },
+    {
+      "caseId": "interleaved-two-tools-and-text",
+      "context": {"messages": [
+        {"role": "system", "content": "Declare inert tools; never execute them in this oracle.", "timestamp": 1700000000000, "toolsAdded": [
+          {"name": "alpha", "description": "Inert authored alpha declaration.", "parameters": {"type": "object", "properties": {"value": {"type": "string"}}, "required": ["value"], "additionalProperties": false}},
+          {"name": "beta", "description": "Inert authored beta declaration.", "parameters": {"type": "object", "properties": {"count": {"type": "integer"}, "keep": {"type": "null"}}, "required": ["count", "keep"], "additionalProperties": false}}
+        ]},
+        {"role": "user", "content": "Return two tool calls and text.", "timestamp": 1700000000000}
+      ]},
+      "options": {"toolChoice": "auto"},
+      "expectedStopReason": "toolUse",
+      "wireChunks": [
+        {"id": "chat_tools_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [{"index": 0, "delta": {"tool_calls": [{"index": 4, "id": "call_alpha", "type": "function", "function": {"name": "alpha", "arguments": "{\"value\":\""}}]}, "finish_reason": null}]},
+        {"id": "chat_tools_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [{"index": 0, "delta": {"content": "Working \u03c0", "tool_calls": [{"index": 9, "type": "function", "function": {"name": "beta", "arguments": "{\"count\":"}}]}, "finish_reason": null}]},
+        {"id": "chat_tools_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [{"index": 0, "delta": {"tool_calls": [{"index": 9, "id": "call_beta", "function": {"arguments": "2,\"keep\":null}"}}, {"index": 4, "function": {"arguments": "\\u03"}}]}, "finish_reason": null}]},
+        {"id": "chat_tools_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [{"index": 0, "delta": {"tool_calls": [{"index": 4, "function": {"arguments": "c0\\n\"}"}}]}, "finish_reason": null}]},
+        {"id": "chat_tools_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}]},
+        {"id": "chat_tools_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [], "usage": {"prompt_tokens": 17, "completion_tokens": 5, "total_tokens": 22}}
+      ]
+    },
+    {
+      "caseId": "thinking-signature-and-cache-usage",
+      "modelOverrides": {"reasoning": true},
+      "context": {"messages": [
+        {"role": "system", "content": "Return authored reasoning metadata and a bounded answer.", "timestamp": 1700000000000},
+        {"role": "user", "content": "Explain briefly.", "timestamp": 1700000000000}
+      ]},
+      "options": {"reasoningEffort": "high", "cacheRetention": "long", "sessionId": "authored-completions-session"},
+      "expectedStopReason": "length",
+      "wireChunks": [
+        {"id": "chat_thinking_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [{"index": 0, "delta": {"reasoning_content": "First \u03c0", "reasoning": "ignored competing field", "reasoning_text": "ignored third field", "reasoning_details": [{"type": "reasoning.summary", "summary": "Sum ", "id": null, "index": 6, "opaque": {"keep": null}}]}, "finish_reason": null}]},
+        {"id": "chat_thinking_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [{"index": 0, "delta": {"reasoning_text": " then second", "reasoning_details": [{"type": "reasoning.summary", "summary": "mary", "id": "summary_owned", "format": "authored-format", "index": 6}, {"type": "reasoning.encrypted", "data": "opaque+/=\u0000", "id": "encrypted_owned", "format": "authored-format", "index": 7, "nativeLooking": {"type": "ClrNeverLoaded", "value": null}}]}, "finish_reason": null}]},
+        {"id": "chat_thinking_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [{"index": 0, "delta": {"content": "Answer"}, "finish_reason": null}]},
+        {"id": "chat_thinking_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [{"index": 0, "delta": {}, "finish_reason": "length"}]},
+        {"id": "chat_thinking_owned", "object": "chat.completion.chunk", "created": 1700000000, "model": "pisharp-authored-completions-model", "choices": [], "usage": {"prompt_tokens": 20, "completion_tokens": 9, "total_tokens": 100, "cached_tokens": 8, "prompt_cache_hit_tokens": 4, "prompt_tokens_details": {"cached_tokens": 3, "cache_write_tokens": 2}, "completion_tokens_details": {"reasoning_tokens": 4}, "opaque": null}}
+      ]
+    }
+  ]
+}

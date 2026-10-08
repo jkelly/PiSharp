@@ -2,6 +2,7 @@ using System.Threading.Channels;
 using System.Collections.Immutable;
 using PiSharp.Tui;
 using PiSharp.Tui.Input;
+using PiSharp.Extensions;
 
 namespace PiSharp.Cli.Interactive;
 
@@ -26,13 +27,15 @@ internal sealed class TerminalChatInput
     private readonly TerminalSelectListInputRouter? selectListRouter;
     private readonly InteractiveSessionFrontend? queueRestoration;
     private readonly TerminalDoubleEscapeAction doubleEscapeAction;
+    private readonly TerminalExtensionInputAdmission? terminalInputAdmission;
+    private readonly Func<long>? captureTerminalSessionGeneration;
     internal TerminalChatInput(IConsoleTerminal terminal, TimeProvider? clock = null) : this(terminal, clock, null) { }
     internal TerminalChatInput(IConsoleTerminal terminal, TimeProvider? clock, TerminalEditorFocusOwner? focusOwner)
             : this(terminal, clock, focusOwner, null) { }
     internal TerminalChatInput(IConsoleTerminal terminal, TimeProvider? clock, TerminalEditorFocusOwner? focusOwner,
         TerminalKeybindings? keybindings, bool kittyProtocolActive = false, TerminalSelectListInputRouter? selectListRouter = null,
-        InteractiveSessionFrontend? queueRestoration = null, TerminalDoubleEscapeAction doubleEscapeAction = TerminalDoubleEscapeAction.Tree)
-    { this.terminal = terminal; this.clock = clock; this.focusOwner = focusOwner; this.keybindings = keybindings?.CreateSnapshot(); this.kittyProtocolActive = kittyProtocolActive; this.selectListRouter = selectListRouter; this.queueRestoration = queueRestoration; this.doubleEscapeAction = doubleEscapeAction; }
+        InteractiveSessionFrontend? queueRestoration = null, TerminalDoubleEscapeAction doubleEscapeAction = TerminalDoubleEscapeAction.Tree, TerminalExtensionInputAdmission? terminalInputAdmission = null, Func<long>? captureTerminalSessionGeneration = null)
+    { this.terminal = terminal; this.clock = clock; this.focusOwner = focusOwner; this.keybindings = keybindings?.CreateSnapshot(); this.kittyProtocolActive = kittyProtocolActive; this.selectListRouter = selectListRouter; this.queueRestoration = queueRestoration; this.doubleEscapeAction = doubleEscapeAction; if ((terminalInputAdmission is null) != (captureTerminalSessionGeneration is null)) throw new ArgumentException("Terminal input admission and generation capture must be supplied together."); this.terminalInputAdmission = terminalInputAdmission; this.captureTerminalSessionGeneration = captureTerminalSessionGeneration; }
     /// <summary>The caller completes receipts only after the actual RPC host/output callbacks settle.</summary>
     internal async Task<TerminalInputExit> RunAcknowledgedAsync(
         Func<TerminalSubmittedLine, CancellationToken, Task<bool>> submitLine,
@@ -531,14 +534,18 @@ internal sealed class TerminalChatInput
         var readToken = readStop.Token;
         var provider = clock ?? TimeProvider.System; var decoder = new TerminalInputDecoder(timeProvider: provider, kittyProtocolActive: kittyProtocolActive);
         var clearGesture = new TerminalInterruptGesture(provider);
-        var buffer = new char[4096]; Task<int>? physical = null;
+        var buffer = new char[4096]; Task<int>? physical = null; long physicalSessionGeneration = 0;
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(35), provider);
         Task<bool>? tick = null; Exception? failure = null, inputOverflow = null;
         try
         {
             while (true)
             {
-                physical ??= terminal.ReadAsync(buffer.AsMemory(), readToken).AsTask();
+                if (physical is null)
+                {
+                    physicalSessionGeneration = captureTerminalSessionGeneration?.Invoke() ?? 0;
+                    physical = terminal.ReadAsync(buffer.AsMemory(), readToken).AsTask();
+                }
                 tick ??= timer.WaitForNextTickAsync(readToken).AsTask();
                 if (await Task.WhenAny(physical, tick).ConfigureAwait(false) == tick)
                 {
@@ -548,7 +555,20 @@ internal sealed class TerminalChatInput
                 var count = await physical.ConfigureAwait(false); physical = null;
                 if (count < 0 || count > buffer.Length) throw new IOException("Terminal read returned an invalid character count.");
                 if (count == 0) { Publish(decoder.Complete()); observeEof?.Invoke(); break; }
-                Publish(decoder.Feed(buffer.AsSpan(0, count)));
+                if (terminalInputAdmission is null) Publish(decoder.Feed(buffer.AsSpan(0, count)));
+                else
+                {
+                    if (physicalSessionGeneration != captureTerminalSessionGeneration!()) continue;
+                    var dispatchOriginal = terminalInputAdmission.DispatchAsync(new string(buffer, 0, count), physicalSessionGeneration, readToken);
+                    ExtensionTerminalInputOutcome outcome;
+                    try { outcome = await dispatchOriginal.ConfigureAwait(false); }
+                    catch when (dispatchOriginal.IsFaulted)
+                    { System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(dispatchOriginal.Exception!).Throw(); throw; }
+                    readToken.ThrowIfCancellationRequested();
+                    if (physicalSessionGeneration != captureTerminalSessionGeneration!()) continue;
+                    if (outcome.Disposition == ExtensionTerminalInputDisposition.Forward)
+                        Publish(decoder.Feed(outcome.Data.AsSpan()));
+                }
             }
         }
         catch (Exception error)

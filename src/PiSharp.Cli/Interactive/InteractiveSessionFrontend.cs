@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using PiSharp.Contracts;
 using PiSharp.Rpc.Ui;
+using PiSharp.CodingAgent.Resources;
 
 namespace PiSharp.Cli.Interactive;
 
@@ -11,6 +12,11 @@ namespace PiSharp.Cli.Interactive;
 internal interface IInteractiveSessionPresentation
 {
     ValueTask PresentAsync(string displayText, CancellationToken token);
+}
+
+internal interface IInteractiveAssistantStreamingPresentation
+{
+    ValueTask PresentAssistantDeltaAsync(string displayText, CancellationToken token);
 }
 
 internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExtensionUiPresentationObserver
@@ -47,6 +53,7 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
     private readonly TaskCompletionSource ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource commandsReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly HashSet<string> extensionCommands = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> promptCommands = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> completionRequests = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (long Generation, string? Cwd)> catalogRequests = new(StringComparer.Ordinal);
     private readonly Dictionary<int, string> sessionChoices = [];
@@ -56,6 +63,8 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
     private VisibleDialog? dialog;
     private bool dialogResponsePending;
     private bool startupInputEnded;
+    private readonly Dictionary<int, StringBuilder> assistantPresentedBlocks = new();
+    private int assistantPresentedCharacters;
     private long sequence, uiCharacters;
     internal Task Ready => ready.Task;
     internal void Bind(Func<JsonData, CancellationToken, Task> sender) => send = sender;
@@ -113,6 +122,7 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
     internal async ValueTask ObserveAsync(JsonData record, CancellationToken token)
     {
         var body = record.Value; var type = body.GetProperty("type").GetString(); string? display = null; var started = false;
+        var assistantDelta = false;
         TerminalPendingQueueSnapshot? pendingQueue = null;
         lock (state)
         {
@@ -161,9 +171,17 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
                         if (commands.ValueKind != JsonValueKind.Array || commands.GetArrayLength() > 1024)
                             throw new InvalidOperationException("Interactive command catalog exceeds its profile.");
                         extensionCommands.Clear();
+                        promptCommands.Clear();
                         foreach (var command in commands.EnumerateArray())
                         {
                             var name = command.GetProperty("name").GetString()!;
+                            if (command.TryGetProperty("source", out var source) && source.GetString() == "prompt")
+                            {
+                                if (name.Length is < 1 or > 4096) throw new InvalidOperationException("Interactive prompt name is invalid.");
+                                ChatEditor.Validate(name);
+                                promptCommands.TryAdd(name, command.GetProperty("description").GetString() ?? "");
+                                continue;
+                            }
                             if (name.Length is < 1 or > 128 || name.Any(value => !(char.IsAsciiLetterOrDigit(value) || value is '.' or '_' or '-')))
                                 throw new InvalidOperationException("Interactive extension command name is invalid.");
                             extensionCommands.Add(name);
@@ -243,22 +261,47 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
                 case "extension_ui_request":
                     if (!nativePresentation || !IsDialog(body)) display = ApplyUi(record);
                     break;
-                case "agent_start": terminalStreaming = true; display = "[running]"; break;
+                case "agent_start": terminalStreaming = true; ResetAssistantPresentation(); display = "[running]"; break;
                 case "pisharp_recovery_started": display = "[recovering] " + body.GetProperty("reason").GetString(); break;
                 case "pisharp_recovery_ended": display = "[recovery] " + body.GetProperty("status").GetString() +
                     (body.GetProperty("willRetry").GetBoolean() ? "; continuing" : ""); break;
                 case "pisharp_operation_settled": display = "[operation result] " + body.GetProperty("status").GetString(); break;
                 case "message_start":
-                    if (body.GetProperty("message").GetProperty("role").GetString() == "assistant") display = "[assistant started]";
+                    if (body.GetProperty("message").GetProperty("role").GetString() == "assistant")
+                    { ResetAssistantPresentation(); display = "[assistant started]"; }
                     break;
                 case "message_update":
                     var update = body.GetProperty("assistantMessageEvent");
                     if (update.GetProperty("type").GetString() == "text_delta")
-                        display = "[assistant delta] " + update.GetProperty("delta").GetString();
+                    {
+                        var delta = update.GetProperty("delta").GetString()!;
+                        if (nativePresentation && presentation is IInteractiveAssistantStreamingPresentation)
+                        {
+                            if (delta.Length != 0) RememberAssistantBlock(update, delta, append: true);
+                            display = delta; assistantDelta = true;
+                        }
+                        else display = "[assistant delta] " + delta;
+                    }
+                    else if (update.GetProperty("type").GetString() == "text_end" && nativePresentation &&
+                        presentation is IInteractiveAssistantStreamingPresentation)
+                    {
+                        var index = AssistantBlockIndex(update); var content = update.GetProperty("content").GetString()!;
+                        if (!AssistantBlockMatches(index, content))
+                            display = AssistantFinalBlock(index, content);
+                        RememberAssistantBlock(update, content, append: false);
+                    }
                     break;
                 case "message_end":
                     var message = body.GetProperty("message");
-                    if (message.GetProperty("role").GetString() == "assistant") display = MessageText(message) + "\n[assistant ended] " + message.GetProperty("stopReason").GetString();
+                    if (message.GetProperty("role").GetString() == "assistant")
+                    {
+                        var final = ReconcileAssistantMessage(message);
+                        display = (final.Length == 0 ? "" : final + "\n") +
+                            "[assistant ended] " + message.GetProperty("stopReason").GetString();
+                        if (message.TryGetProperty("errorMessage", out var messageError) && messageError.ValueKind == JsonValueKind.String)
+                            display += "\n[assistant error] " + messageError.GetString();
+                        ResetAssistantPresentation();
+                    }
                     break;
                 case "tool_execution_start": display = "[tool start] " + body.GetProperty("toolName").GetString(); break;
                 case "tool_execution_update": display = "[tool update] " + ResultText(body.GetProperty("partialResult")); break;
@@ -274,7 +317,7 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
                 case "session_switched":
                     var generation = body.GetProperty("generation").GetInt64();
                     if (generation <= sessionGeneration) break;
-                    sessionGeneration = generation; terminalStreaming = false; sessionChoices.Clear(); nextSessionCursor = null; catalogWorkingDirectory = null;
+                    sessionGeneration = generation; terminalStreaming = false; ResetAssistantPresentation(); sessionChoices.Clear(); nextSessionCursor = null; catalogWorkingDirectory = null;
                     RetireNavigationOnSwitch();
                     statuses.Clear(); widgets.Clear(); draft.Clear();
                     if (nativePresentation && presentation is ITerminalPendingQueuePresentation)
@@ -293,7 +336,7 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
             try { await ((ITerminalPendingQueuePresentation)presentation).PresentPendingAsync(pendingQueue, token).ConfigureAwait(false); }
             finally { rendering.Release(); }
         }
-        if (display is not null) await RenderAsync(display, token).ConfigureAwait(false);
+        if (display is not null) await RenderAsync(display, token, assistantDelta).ConfigureAwait(false);
         if (selectListRouter is not null && type == "response" && body.GetProperty("command").GetString() == "pisharp_capture_navigation")
             await SynchronizeNavigationAsync(token).ConfigureAwait(false);
         else if (selectListRouter is not null && (started || type == "session_switched"))
@@ -487,7 +530,16 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
                 var request = line[10..]; var separator = request.IndexOf(' ');
                 var name = separator < 0 ? request : request[..separator];
                 var prefix = separator < 0 ? "" : request[(separator + 1)..];
-                if (!extensionCommands.Contains(name)) display = "[completion] command unavailable.";
+                if (name.StartsWith('/'))
+                {
+                    var matches = promptCommands.Where(pair => pair.Key.StartsWith(name[1..], StringComparison.Ordinal))
+                        .Select(pair => "/" + pair.Key + " " + pair.Value).ToArray();
+                    display = matches.Length == 0 ? "[completion] no matching templates." :
+                        "[templates]\n" + ChatEditor.Display(string.Join('\n', matches));
+                }
+                else if (!extensionCommands.Contains(name) && promptCommands.TryGetValue(name, out var description))
+                    display = "[template] " + ChatEditor.Display("/" + name + " " + description);
+                else if (!extensionCommands.Contains(name)) display = "[completion] command unavailable.";
                 else if (prefix.Length > 65_536) display = "[completion] prefix exceeds its limit.";
                 else if (completionRequests.Count >= 16) display = "[completion] outstanding query limit reached.";
                 else
@@ -538,7 +590,9 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
             else if (line.StartsWith('/'))
             {
                 var separator = line.IndexOf(' '); var name = separator < 0 ? line[1..] : line[1..separator];
-                if (extensionCommands.Contains(name)) command = new { id, type = "prompt", message = line };
+                var promptName = PromptTemplateExpander.GetInvocationName(line);
+                if (extensionCommands.Contains(name) || promptName is not null && promptCommands.ContainsKey(promptName))
+                    command = new { id, type = "prompt", message = line };
                 else display = "[command] unavailable; use /send for literal leading-slash text.";
             }
             else if (line.Length != 0) command = new { id, type = "prompt", message = line, streamingBehavior = "steer" };
@@ -572,16 +626,60 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
         await Send(new { id = "chat-history", type = "get_messages" }, token).ConfigureAwait(false);
     }
     private Task Send(object command, CancellationToken token) => send!(JsonData.Parse(JsonSerializer.Serialize(command)), token);
-    private async Task RenderAsync(string text, CancellationToken token)
+    private async Task RenderAsync(string text, CancellationToken token, bool assistantDelta = false)
     {
         if (text.Length > 8 * 1024 * 1024) throw new InvalidOperationException("Interactive view exceeds its bounded profile.");
         var safe = ChatEditor.Display(text);
         if (Encoding.UTF8.GetByteCount(safe) >= 8 * 1024 * 1024) throw new InvalidOperationException("Interactive UTF-8 view exceeds its bounded profile.");
         await rendering.WaitAsync(token).ConfigureAwait(false);
-        try { await presentation.PresentAsync(safe + "\n", token).ConfigureAwait(false); }
+        try
+        {
+            if (assistantDelta) await ((IInteractiveAssistantStreamingPresentation)presentation).PresentAssistantDeltaAsync(safe, token).ConfigureAwait(false);
+            else await presentation.PresentAsync(safe + "\n", token).ConfigureAwait(false);
+        }
         finally { rendering.Release(); }
     }
     private static string MessageText(JsonElement message) => "[" + message.GetProperty("role").GetString() + "] " + ResultText(message);
+    private void ResetAssistantPresentation()
+    { assistantPresentedBlocks.Clear(); assistantPresentedCharacters = 0; }
+    private static int AssistantBlockIndex(JsonElement update) =>
+        update.TryGetProperty("contentIndex", out var index) ? index.GetInt32() : 0;
+    private bool AssistantBlockMatches(int index, string content) =>
+        assistantPresentedBlocks.TryGetValue(index, out var shown) && shown.ToString() == content;
+    private static string AssistantFinalBlock(int index, string content) =>
+        "[assistant final block " + index.ToString(CultureInfo.InvariantCulture) + "] " + (content.Length == 0 ? "[empty]" : content);
+    private void RememberAssistantBlock(JsonElement update, string text, bool append)
+    {
+        var index = AssistantBlockIndex(update);
+        assistantPresentedBlocks.TryGetValue(index, out var shown);
+        var removed = append ? 0 : shown?.Length ?? 0;
+        if (text.Length > 8 * 1024 * 1024 - (assistantPresentedCharacters - removed))
+            throw new InvalidOperationException("Interactive assistant presentation exceeds its bounded profile.");
+        if (shown is null && assistantPresentedBlocks.Count >= 65_536)
+            throw new InvalidOperationException("Interactive assistant block presentation exceeds its bounded profile.");
+        if (shown is null) assistantPresentedBlocks.Add(index, shown = new StringBuilder());
+        if (!append) shown.Clear();
+        shown.Append(text); assistantPresentedCharacters += text.Length - removed;
+    }
+    private string ReconcileAssistantMessage(JsonElement message)
+    {
+        if (assistantPresentedBlocks.Count == 0) return MessageText(message);
+        if (!message.TryGetProperty("content", out var content)) return MessageText(message);
+        if (content.ValueKind == JsonValueKind.String)
+            return AssistantBlockMatches(0, content.GetString()!) ? "" : AssistantFinalBlock(0, content.GetString()!);
+        if (content.ValueKind != JsonValueKind.Array) return MessageText(message);
+        var final = new List<string>(); var index = 0;
+        foreach (var block in content.EnumerateArray())
+        {
+            if (block.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
+            {
+                if (!AssistantBlockMatches(index, text.GetString()!)) final.Add(AssistantFinalBlock(index, text.GetString()!));
+            }
+            else if (block.TryGetProperty("name", out var name)) final.Add(AssistantFinalBlock(index, "tool:" + name.GetString()));
+            index++;
+        }
+        return string.Join('\n', final);
+    }
     private static string ResultText(JsonElement value)
     {
         if (!value.TryGetProperty("content", out var content) || content.ValueKind == JsonValueKind.Null) return "";
@@ -593,7 +691,7 @@ internal sealed partial class InteractiveSessionFrontend : IDisposable, IRpcExte
     public void Dispose()
     {
         // The command joins its input loop and the host's actual output callbacks before closing this view.
-        lock (state) { queueRestoration?.Completion.TrySetCanceled(); queueRestoration = null; ClearDialogs(); draft.Clear(); statuses.Clear(); widgets.Clear(); completionRequests.Clear(); send = null; }
+        lock (state) { queueRestoration?.Completion.TrySetCanceled(); queueRestoration = null; ClearDialogs(); draft.Clear(); statuses.Clear(); widgets.Clear(); completionRequests.Clear(); ResetAssistantPresentation(); send = null; }
         ready.TrySetCanceled(); rendering.Dispose();
     }
 }

@@ -11,7 +11,7 @@ internal sealed class NativeSessionCompactionObservationBinding(ExtensionRegistr
     internal void Attach(ReplaceableAgentSession owner, AgentSessionAttachment attached)
     {
         owner.ValidateAttachment(attached);
-        attached.Session.ConfigureCompactionObservation(async observation =>
+        owner.ConfigureCompactionObservationForBinding(attached, async observation =>
         {
             try
             {

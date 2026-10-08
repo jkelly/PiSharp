@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "status": "BoundedRuntimeAndObservedSourceProjectionAccepted",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourcePaths": [
+    "packages/ai/src/types.ts",
+    "packages/ai/src/api/anthropic-messages.ts"
+  ],
+  "nativeExecutions": 5,
+  "authoredRegisteredGroups": 7,
+  "runtimeAccepted": true,
+  "routes": [
+    "key-factory-Prepare",
+    "authenticated-factory-Prepare",
+    "Simple-Hooks",
+    "FromPrepared"
+  ],
+  "legacyArbitraryFactoryOnPayload": "explicitly-rejected",
+  "resolvedConvenienceForwarding": false,
+  "pairedCaptureMigrated": true,
+  "mutableJavaScriptPayloadSemantics": false,
+  "wholeProviderParity": false,
+  "nativeExecutionsUnit": "Current qualification profile original operations: Contracts compile, AI compile, fixture compile, focused controls, capture; not per-slice test counts",
+  "qualificationEvidence": "docs/verification/provider-source-projection.md",
+  "runtimeAcceptanceScope": "Matching focused groups in the closed 993 run; broader callers and full semantic parity are not accepted",
+  "captureExecutionAccepted": true,
+  "semanticParityAccepted": false,
+  "currentCandidate": "993d1c372d3c09903c33212443750838f466b694",
+  "historicalA66Observation": {
+    "ownedMapperSnapshots": 49,
+    "synchronousActions": 6,
+    "capturedCases": 13,
+    "focusedGroupInvocations": 17,
+    "explicitTerminalOnlyProjections": 3,
+    "distinctReturnedTasks": 3,
+    "candidate": "a66e465ea2261c3dd786e05bb52f6e25b233caeb",
+    "boundedRuntimeAccepted": true,
+    "allSemanticDimensionsAccepted": false
+  },
+  "currentClosedObservation": {
+    "captureDistinctTasks": 59,
+    "fixtureCompilations": 1,
+    "freshProductionCompilations": 2,
+    "captureGraphTruncated": false,
+    "capturedCases": 13,
+    "operationsPassed": 5,
+    "explicitTerminalOnlyProjections": 3,
+    "ownedMapperSnapshots": 49,
+    "focusedGroupInvocations": 17,
+    "synchronousActions": 6,
+    "distinctReturnedTasks": 3,
+    "captureFaultNodes": 8
+  },
+  "sourceProjectionObservedScopeAccepted": true,
+  "allSemanticDimensionsAccepted": false,
+  "sourceCompatibilityComplete": false,
+  "independentReviewAccepted": true,
+  "sourceErrorSchemaGapClosed": true,
+  "independentReviewSha256": "3073933267e890ba50ac69e6627749933446a08679f725592dfc780216eda22e",
+  "rootAcceptanceSha256": "9ab550b7d6e175c2131bd9a45d5587c61fac349fcb5fe7447602cc166ce7ea37",
+  "migrationScope": "Separately reviewed isolated Anthropic capture using actual owned snapshots and explicit terminal projector; no other provider/public caller migration",
+  "remaining": [
+    "Complete semantic and byte parity not accepted",
+    "Native decimal costs and property ordering differ",
+    "Eleven cases omit response/provider callback installation; complete header coverage absent",
+    "Other callers, full native gate, current package and public derivative qualification remain separate"
+  ]
+}

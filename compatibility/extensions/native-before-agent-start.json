@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORED_UNBUILT_UNEXECUTED_INDEPENDENT_REVIEW_PENDING",
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "base": "b39df2a815f82486d6591d29eb619afb08017c43",
+  "hook": "before_agent_start",
+  "subset": [
+    "immutable prompt/images/current prompt",
+    "ordered returned custom messages",
+    "run-owned request-only forced prompt after context",
+    "canonical custom history and reopen",
+    "joined callback cancellation"
+  ],
+  "authoredTestGroups": 7,
+  "authoredCliGroups": 1,
+  "nativeBuilds": 0,
+  "testsExecuted": 0,
+  "sourceExecuted": false,
+  "sourceDifferentialQualified": false,
+  "remaining": [
+    "Native compile and focused/adjacent tests in approved bounded window",
+    "Independent review",
+    "Rich BuildSystemPromptOptions normalization/renderer/mutation and selectedTools parity",
+    "Dynamic ctx.getSystemPrompt and exact error timing"
+  ],
+  "guide": "docs/contracts/native-before-agent-start.md",
+  "phaseGatesClosed": [],
+  "reviewCorrections": [
+    {
+      "finding": "P2 custom-tailed history rejected by both continuation guards",
+      "status": "AUTHORED_UNBUILT_UNEXECUTED",
+      "base": "b9f1b2bdb526c042220b05d206b23a3a1f49d1ee",
+      "regressions": [
+        "custom-only durable reopen ContinueAsync",
+        "overflow failed-assistant omission then compaction and internal ContinueAsync"
+      ]
+    }
+  ]
+}

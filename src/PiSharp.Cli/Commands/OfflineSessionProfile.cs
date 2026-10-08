@@ -6,20 +6,28 @@ using System.Text;
 using System.Text.Json;
 using PiSharp.AI;
 using PiSharp.AI.Catalogs;
+using PiSharp.AI.Authentication;
 using PiSharp.AI.Protocols.AnthropicMessages;
 using PiSharp.AI.Protocols.OpenAICompletions;
 using PiSharp.AI.Protocols.OpenAIResponses;
 using PiSharp.Agent;
 using PiSharp.CodingAgent;
 using PiSharp.Contracts;
+using PiSharp.Tools;
 using PiSharp.Tools.Files;
 using PiSharp.Tools.Processes;
 using PiSharp.Cli.Extensions;
 using PiSharp.Extensions;
 using PiSharp.Extensions.Events;
+using PiSharp.Extensions.Runtime;
 using PiSharp.Rpc.Protocol;
 using PiSharp.Sessions.Lifecycle;
 using PiSharp.Sessions.Compaction;
+using PiSharp.Cli.Prompts;
+using PiSharp.Cli.Settings;
+using PiSharp.CodingAgent.Resources;
+using PiSharp.Cli.Skills;
+using PiSharp.CodingAgent.Resources.Skills;
 
 namespace PiSharp.Cli.Commands;
 
@@ -27,7 +35,7 @@ internal sealed record OfflineBashAuthorization(string Executable, string SpillR
     ImmutableHashSet<string> Commands, double? Timeout);
 
 /// <summary>Literal authored wire turns through injected HTTP; only explicit final file targets are authorized.</summary>
-internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCommandCatalog
+internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCommandCatalog
 {
     public static ModelDescriptor Model { get; } = new("pisharp-offline-session", "openai-responses", "openai");
     public static ModelDescriptor AnthropicModel { get; } = new("pisharp-offline-session", "anthropic-messages", "anthropic");
@@ -37,39 +45,73 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
     private static readonly Uri AnthropicBase = new("https://offline-session.invalid");
     private static readonly Uri AnthropicEndpoint = new("https://offline-session.invalid/v1/messages?beta=true");
     private static readonly Uri CompletionsEndpoint = new("https://offline-session.invalid/v1/chat/completions");
-    private readonly HttpClient _client;
+    private readonly HttpClient? _client;
+    private readonly LiveSessionConnection? _live;
     private readonly Handler _handler;
     private readonly FilePolicy _policy;
+    private readonly ToolInvokerOptions _profileInvokerOptions;
     private readonly NativeExtensionActivation? _extension;
     private readonly OwnedProcessCleanup? _processCleanup;
     internal ImmutableArray<OwnedProcessCleanupReceipt> ProcessCleanupReceipts => _processCleanup?.Capture() ?? [];
     internal ImmutableArray<Exception> ProcessCleanupFailures => _processCleanup?.CaptureFailures() ?? [];
     private readonly object _disposalGate = new();
     private Task? _disposal;
-    internal IPromptInputAdmission? InputAdmission => _extension?.InputAdmission;
+    private PromptTemplateCliBinding? _promptTemplates;
+    internal async Task LoadPromptTemplatesAsync(PromptTemplateCliConfiguration configuration, TextWriter diagnostics, CancellationToken token)
+    {
+        if (configuration.Selections.IsEmpty) return;
+        RequireStartupViewMutable();
+        if (_promptTemplates is not null) throw new InvalidOperationException("Prompt templates are already captured.");
+        var capture = await PromptTemplateCliBinding.LoadAsync(configuration, _extension?.RawInputHandlers, _extension,
+            _extension, PromptTemplateFrontendDecoder.Decode, token: token).ConfigureAwait(false);
+        foreach (var diagnostic in capture.Templates.Catalog.Diagnostics)
+        {
+            await diagnostics.WriteLineAsync(JsonSerializer.Serialize(new { type = "prompt_template_diagnostic",
+                severity = diagnostic.Type.ToString().ToLowerInvariant(), message = diagnostic.Message,
+                path = diagnostic.Path, collision = diagnostic.Collision }).AsMemory(), token).ConfigureAwait(false);
+        }
+        await diagnostics.FlushAsync(token).ConfigureAwait(false);
+        _promptTemplates = capture;
+    }
     internal ReplaceableAgentSession? Sessions { get; private set; }
     internal void AttachOwner(PersistentAgentSession session, PersistentAgentSessionOptions? options = null,
         Func<long>? clock = null, Func<string>? nextId = null, IEnumerable<SessionCatalogStore>? catalogStores = null,
         PersistentSessionLifecycle? lifecycle = null)
     {
+        if (mcpRuntime is not null) throw new InvalidOperationException("Admitted MCP runtime requires asynchronous attachment.");
         if (Sessions is not null) throw new InvalidOperationException("Profile already has a session owner.");
+        ConfigureRetrySession(session);
         clock ??= () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         nextId ??= () => "replacement-" + Guid.NewGuid().ToString("N");
         var configured = options ?? new();
         var catalog = new SessionCatalog(catalogStores ?? [new("session-directory", Path.GetDirectoryName(session.Path)!)]);
         Sessions = (lifecycle ?? new PersistentSessionLifecycle(Registry, clock, nextId, configured, catalog: catalog)).Attach(session);
         _policy.ActiveSessionPath = () => Sessions.Current.Session.Path;
-        _extension?.AttachOwner(Sessions);
+        AttachRuntimeView(Sessions);
     }
-    internal ValueTask StartLifecycleAsync(string reason, CancellationToken token) =>
-        _extension?.DispatchSessionStartAsync(reason, token) ?? ValueTask.CompletedTask;
-    internal ValueTask AttachSessionAsync(PersistentAgentSession session, string reason, CancellationToken token)
-    { AttachOwner(session); return StartLifecycleAsync(reason, token); }
-    public JsonData CommandCatalog => _extension?.CommandCatalog ?? JsonData.Parse("[]");
-    public ValueTask<JsonData> CompleteCommandAsync(string name, string prefix, CancellationToken token) =>
-        _extension?.CompleteCommandAsync(name, prefix, token) ?? throw new InvalidOperationException("No active extension command revision.");
-    public SessionRuntimeRegistry Registry { get; }
+    internal async ValueTask AttachSessionAsync(PersistentAgentSession session, string reason, CancellationToken token)
+    { await AttachOwnerAsync(session).ConfigureAwait(false); await StartLifecycleAsync(reason, token).ConfigureAwait(false); }
+    private readonly ImmutableArray<string>? _initialActiveTools;
+    private readonly ImmutableArray<string>? _deferredCatalogNames;
+    internal async Task ApplyInitialToolSelectionAsync(PersistentAgentSession session, CancellationToken token)
+    {
+        if (mcpRuntime is not null)
+        {
+            var registry = session.CaptureToolCatalogRegistry();
+            var selection = registry.LifetimeToolSelection ?? throw new InvalidOperationException("Admitted catalog requires an explicit lifetime selection.");
+            var selectedNames = selection.SelectInitial(registry.RegisteredTools.Select(tool => new PiSharp.CodingAgent.ToolSelection.ToolSelectionDescriptor(
+                tool.Adapter.Name, tool.Exposure, tool.DefaultActive, tool.IsExtension)).ToImmutableArray());
+            await session.SetActiveToolsAsync(selectedNames, token).ConfigureAwait(false);
+        }
+        else if (_initialActiveTools is { } names) await session.SetActiveToolsAsync(names, token).ConfigureAwait(false);
+        await DrainLoadoutDiagnosticsAsync(token).ConfigureAwait(false);
+    }
+    private readonly SessionRuntimeRegistry _startupRegistry;
+    public SessionRuntimeRegistry Registry => Sessions is null ? _startupRegistry : CaptureRuntimeView().NativeRegistry;
+    // Borrow the exact catalog write adapter/queue and policy; no hooks or transforms can redirect export content.
+    internal ToolInvoker ExportHtmlWriter { get; }
     public ModelDescriptor SelectedModel { get; }
+    internal bool IsLive => _live is not null;
     internal FrozenCatalogModel SelectedModelDefinition { get; }
     internal JsonData SelectedModelWire
     {
@@ -87,9 +129,9 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
         }
     }
     // Explicit authored offline profile limit, supplied before any context-based adjustment.
-    internal double OriginalDesiredMaxOutput => 8192;
+    internal double OriginalDesiredMaxOutput => _live?.MaximumOutputTokens ?? 8192;
     public string Workspace { get; }
-    public JsonData InitialSystem { get; }
+    public JsonData InitialSystem { get; private set; }
     public object[] Requests => _handler.Requests.ToArray();
     public object[] Actions => _policy.Actions.ToArray();
     public int UsedTurns => _handler.Requests.Count;
@@ -104,6 +146,7 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
         if (summary.Model != SelectedModel || summary.ThinkingLevel is not null || summary.CacheRetention != "none" ||
             summary.MaximumOutputTokens is <= 0 or > 1_000_000 || summary.MaximumOutputTokens != Math.Floor(summary.MaximumOutputTokens))
             throw new SessionCompactionException(SessionCompactionFailure.InvalidSettings);
+        if (_live is not null) return _live.CreateTransport((int)summary.MaximumOutputTokens, summary: true);
         if (SelectedModel.Api == "anthropic-messages")
         {
             var factory = new AnthropicMessagesKeyAuthRequestFactory(AnthropicBase, SelectedModel,
@@ -111,7 +154,7 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
                     ModelSupportsImages: SelectedModelDefinition.DeclaresImageInput, CacheRetention: AnthropicCacheRetention.None,
                     MaximumMessages: 512, MaximumEntryCharacters: 1_048_576),
                 new(MaxTokens: summary.MaximumOutputTokens, SessionId: summary.SessionId, MaximumPayloadBytes: 1_048_576));
-            return new AnthropicMessagesHttpSseTransport(_client, (request, token) => MarkSummary(factory.Create(request, InertKey, token), summary),
+            return new AnthropicMessagesHttpSseTransport(_client!, (request, token) => MarkSummary(factory.Create(request, InertKey, token), summary),
                 new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
         }
         if (SelectedModel.Api == "openai-completions")
@@ -122,33 +165,36 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
                     { ModelSupportsImages = SelectedModelDefinition.DeclaresImageInput },
                 new(MaxTokens: summary.MaximumOutputTokens, SupportsReasoningEffort: false, CacheRetention: CompletionsCacheRetention.None,
                     SessionId: summary.SessionId, MaximumPayloadBytes: 1_048_576));
-            return new CompletionsHttpSseTransport(_client, (request, token) => MarkSummary(factory.Create(request, InertKey, token), summary),
+            return new CompletionsHttpSseTransport(_client!, (request, token) => MarkSummary(factory.Create(request, InertKey, token), summary),
                 new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
         }
         var responses = new ResponsesKeyAuthRequestFactory(Endpoint, SelectedModel,
             new(Reasoning: false, MaximumMessages: 512, MaximumEntryCharacters: 1_048_576),
             new(SupportsMaxOutputTokens: true, MaxOutputTokens: (int)summary.MaximumOutputTokens, SessionId: summary.SessionId,
                 MaximumPayloadBytes: 1_048_576));
-        return new ResponsesHttpSseTransport(_client, request => MarkSummary(responses.Create(request, InertKey), summary),
+        return new ResponsesHttpSseTransport(_client!, request => MarkSummary(responses.Create(request, InertKey), summary),
             new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
     }
 
-    private OfflineSessionProfile(string workspace, ReadWriteTools tools, LsTool listing, FilePolicy policy, Handler handler, ModelDescriptor model,
-        BashTool? bash, NativeExtensionActivation? extension, FrozenCatalogModel modelDefinition, OwnedProcessCleanup? processCleanup)
+    private OfflineSessionProfile(string workspace, BuiltinToolCatalog tools, FilePolicy policy, Handler handler, ModelDescriptor model,
+        BashTool? bash, NativeExtensionActivation? extension, FrozenCatalogModel modelDefinition, OwnedProcessCleanup? processCleanup, LiveSessionConnection? live = null,
+        InitialToolSelection? toolSelection = null, bool deferCatalogValidation = false,
+        OriginalSystemPromptAdmission? originalSystemPrompt = null)
     {
-        RequireSelectedModelDefinition(model, modelDefinition);
+        if (live is null) RequireSelectedModelDefinition(model, modelDefinition);
         Workspace = workspace; _policy = policy; _handler = handler; SelectedModel = model; _extension = extension;
         _processCleanup = processCleanup;
         SelectedModelDefinition = modelDefinition;
-        _client = new HttpClient(handler);
+        _live = live; _client = live is null ? new HttpClient(handler) : null;
         IChatTransport transport;
-        if (model.Api == "anthropic-messages")
+        if (live is not null) transport = live.CreateTransport();
+        else if (model.Api == "anthropic-messages")
         {
             var factory = new AnthropicMessagesKeyAuthRequestFactory(AnthropicBase, model,
                 new(MaximumTokens: 8192, ModelReasoning: false, ModelSupportsImages: modelDefinition.DeclaresImageInput, MaximumMessages: 512,
                     MaximumEntryCharacters: bash is null ? 65_536 : 1_048_576),
                 new(MaximumPayloadBytes: 1_048_576));
-            transport = new AnthropicMessagesHttpSseTransport(_client, (request, token) => factory.Create(request, InertKey, token),
+            transport = new AnthropicMessagesHttpSseTransport(_client!, (request, token) => factory.Create(request, InertKey, token),
                 new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
         }
         else if (model.Api == "openai-completions")
@@ -159,7 +205,7 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
                     ToolDeclarations: new(MaximumMessages: 512, MaximumEntryCharacters: entryCharacters))
                     { ModelSupportsImages = modelDefinition.DeclaresImageInput },
                 new(MaxTokens: 8192, SupportsReasoningEffort: false, MaximumPayloadBytes: 1_048_576));
-            transport = new CompletionsHttpSseTransport(_client, (request, token) => factory.Create(request, InertKey, token),
+            transport = new CompletionsHttpSseTransport(_client!, (request, token) => factory.Create(request, InertKey, token),
                 new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
         }
         else
@@ -167,33 +213,87 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
             var factory = new ResponsesKeyAuthRequestFactory(Endpoint, model,
                 new(Reasoning: false, MaximumMessages: 512, MaximumEntryCharacters: bash is null ? 65_536 : 1_048_576),
                 new(MaximumPayloadBytes: 1_048_576));
-            transport = new ResponsesHttpSseTransport(_client, request => factory.Create(request, InertKey),
+            transport = new ResponsesHttpSseTransport(_client!, request => factory.Create(request, InertKey),
                 new(MaximumDataEvents: 256, MaximumTotalDataCharacters: 1_048_576));
         }
-        var registrations = tools.Adapters.Select((adapter, index) => new SessionRegisteredTool(tools.Declarations[index], adapter)).ToImmutableArray();
-        if (bash is not null) registrations = registrations.Add(new(bash.Declaration, bash));
-        // Pi's coding-tool default excludes ls; explicit durable activation selects this registered search tool.
-        registrations = registrations.Add(new(listing.Declaration, listing.Adapter) { DefaultActive = false });
+        // Preserve the explicit profile defaults; durable activation can now select edit alongside ls.
+        var defaults = bash is null ? tools.Select(["read", "write"]) : tools.Select(["read", "write", "bash"]);
+        var registrations = defaults.Select(tool => new SessionRegisteredTool(tool.Declaration, tool.Adapter)).ToImmutableArray();
+        registrations = registrations.AddRange(tools.Registered.Where(tool => !defaults.Any(active => active.Name == tool.Name))
+            .Select(tool => new SessionRegisteredTool(tool.Declaration, tool.Adapter) { DefaultActive = false }));
         var invokerOptions = bash is null
             ? new ToolInvokerOptions(MaximumArgumentCharacters: 65_536, MaximumActionCharacters: 131_072, MaximumResultCharacters: 131_072)
             : new ToolInvokerOptions(MaximumArgumentCharacters: 96_000, MaximumActionCharacters: 192_000,
                 MaximumResultCharacters: 512 * 1024, MaximumActionEntries: 1026) { MaximumStructuredContentCharacters = 8 * 1024 * 1024 };
+        _profileInvokerOptions = invokerOptions;
         if (extension is not null)
         {
             policy.ExtensionTargets = extension.Targets;
             extension.Bind(policy, invokerOptions);
             registrations = registrations.AddRange(extension.EnabledAdapters.Select((adapter, index) =>
                 new SessionRegisteredTool(extension.EnabledDeclarations[index], adapter, ToolExecutionMode.Sequential)
-                { Exposure = extension.EnabledRegistrations[index].Exposure, Namespace = extension.EnabledRegistrations[index].Namespace,
+                { IsExtension = true, Exposure = extension.EnabledRegistrations[index].Exposure, Namespace = extension.EnabledRegistrations[index].Namespace,
                     DefaultActive = extension.EnabledRegistrations[index].DefaultActive,
                     PrepareLoadout = extension.Binding.GetLoadoutPreparation(adapter.Name) }));
         }
-        Registry = new([new(model, transport, ExecutionMode: ToolExecutionMode.Sequential, Hooks: extension?.Binding.ContextHooks)], registrations, policy,
-            new SessionRuntimeRegistryOptions(ToolInvokerOptions: invokerOptions) { PreparedToolHooks = extension?.Binding.PreparedHooks, BindNestedCallsToSessionOwner = true });
+        if (toolSelection is not null)
+        {
+            if (deferCatalogValidation && !toolSelection.UseAvailableDefaults) _deferredCatalogNames = toolSelection.Names;
+            var selected = ImmutableArray.CreateBuilder<string>();
+            foreach (var name in toolSelection.Names)
+            {
+                if (name.Length is < 1 or > 64 || name.Any(char.IsControl))
+                { _client?.Dispose(); throw new SessionCommandException(SessionCommandFailure.InvalidArguments); }
+                if (deferCatalogValidation && !registrations.Any(value => value.Adapter.Name == name)) continue;
+                if (toolSelection.UseAvailableDefaults && !registrations.Any(value => value.Adapter.Name == name)) continue;
+                if (toolSelection.LifetimePolicy is not null && registrations.Any(value => value.Adapter.Name == name &&
+                    value.Exposure is not (ToolExposure.Direct or ToolExposure.ModelOnly))) continue;
+                if (name.Length is < 1 or > 64 || !registrations.Any(value => value.Adapter.Name == name &&
+                    value.Exposure is ToolExposure.Direct or ToolExposure.ModelOnly))
+                {
+                    _client?.Dispose();
+                    throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
+                }
+                if (!selected.Contains(name)) selected.Add(name);
+            }
+            if (toolSelection.IncludeDefaultExtensions && extension is not null)
+                foreach (var registration in registrations.Where(value => (toolSelection.LifetimePolicy?.IsAllowed(value.Adapter.Name) ?? true) &&
+                    extension.EnabledAdapters.Any(adapter => adapter.Name == value.Adapter.Name) &&
+                    ToolExposureSemantics.ActivatesOnRegistration(value.Exposure, value.DefaultActive)))
+                    if (!selected.Contains(registration.Adapter.Name)) selected.Add(registration.Adapter.Name);
+            _initialActiveTools = selected.ToImmutable();
+        }
+        ExportHtmlWriter = new([tools.Select(["write"])[0].Adapter], policy, options: invokerOptions);
+        var lifetimeSelection = toolSelection?.LifetimePolicy;
+        if (deferCatalogValidation && toolSelection is not null && lifetimeSelection is null)
+            lifetimeSelection = PiSharp.CodingAgent.ToolSelection.AllowedToolSelection.Create(configuredDefaults: toolSelection.Names);
+        var literalSystem = live is not null ? "You are a coding assistant. Use the registered tools only on explicitly authorized targets." :
+            bash is null ? "Explicit offline session file tools." : "Explicit offline session file and authorized Bash tools.";
+        var initialTools = _initialActiveTools ?? registrations.Where(value => ToolExposureSemantics.ActivatesOnRegistration(value.Exposure, value.DefaultActive))
+            .Select(value => value.Adapter.Name).ToImmutableArray();
+        startupOriginalPrompt = OriginalSystemPromptBuilder.Capture(originalSystemPrompt ?? new() { CustomPrompt = literalSystem },
+            workspace, initialTools, literal: originalSystemPrompt is null);
+        _startupRegistry = new([DecorateOriginalPromptBinding(new(model, transport, ExecutionMode: ToolExecutionMode.Sequential, Hooks: extension?.Binding.ContextHooks))], registrations, policy,
+            new SessionRuntimeRegistryOptions(ToolInvokerOptions: invokerOptions) { PreparedToolHooks = extension?.Binding.PreparedHooks,
+                LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
+                BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
+                DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync,
+                PreparePromptSections = PrepareDurablePromptSections });
+        // Publish installed metadata into the exact native baseline before any session/model resolution.
+        // MCP runtime clones retain this catalog holder through the actual WithToolCatalog pipeline.
+        extension?.RegistrationInstallation?.ConfigureModelCatalog(_startupRegistry, _startupRegistry.CaptureModelCatalog().Bindings, DecorateOriginalPromptBinding);
         InitialSystem = JsonData.Parse(JsonSerializer.Serialize(new { role = "system",
-            content = bash is null ? "Explicit offline session file tools." : "Explicit offline session file and authorized Bash tools.",
-            timestamp = 0, toolsAdded = registrations.Where(value => ToolExposureSemantics.ActivatesOnRegistration(value.Exposure,
-                value.DefaultActive)).Select(value => value.Declaration.Value).ToArray(), offlineApi = model.Api }));
+            content = literalSystem,
+            timestamp = 0, toolsAdded = (_initialActiveTools is { } active ? active.Select(name => registrations.Single(value => value.Adapter.Name == name)) :
+                registrations.Where(value => ToolExposureSemantics.ActivatesOnRegistration(value.Exposure,
+                value.DefaultActive))).Select(value => value.Declaration.Value).ToArray(), offlineApi = live is null ? model.Api : null }));
+        if (originalSystemPrompt is not null)
+        {
+            var built = System.Text.Json.Nodes.JsonNode.Parse(OriginalSystemPromptBuilder.Message(startupOriginalPrompt, 0, allowForce: false).ToString())!.AsObject();
+            foreach (var property in InitialSystem.Value.EnumerateObject())
+                if (property.Name is "toolsAdded" or "offlineApi") built[property.Name] = System.Text.Json.Nodes.JsonNode.Parse(property.Value.GetRawText());
+            InitialSystem = JsonData.Parse(built.ToJsonString());
+        }
     }
 
     internal static ModelDescriptor SelectModel(string? offlineApi) => offlineApi switch
@@ -266,10 +366,50 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
         Func<CancellationToken, ValueTask>? beforeSendAsync = null, string? offlineApi = null, OfflineBashAuthorization? bash = null,
         NativeExtensionConfiguration? extension = null, IExtensionUiProvider? extensionUi = null,
         Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? reportInputDiagnostic = null,
-        bool modelSupportsImages = false)
+        bool modelSupportsImages = false, LiveSessionSelection? liveSelection = null, LiveSessionRuntime? liveRuntime = null,
+        InitialToolSelection? toolSelection = null, OfflineGrepHost? grepHost = null, PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
+        AuthenticationResolution? resolvedAnthropicAuthentication = null, HttpMessageHandler? resolvedAnthropicHandler = null,
+        PiSharp.Cli.Mcp.McpRegisteredProfileAdmission? registeredMcpAdmission = null,
+        NativeExtensionInitializerInstallation? configuredInitializerInstallation = null,
+        PiSharp.Cli.Mcp.McpApplicationInitializerAdmission? applicationMcpHost = null,
+        Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null,
+        OriginalSystemPromptAdmission? originalSystemPrompt = null)
     {
-        var model = SelectModel(offlineApi);
-        var modelDefinition = AuthoredModelDefinition(model, modelSupportsImages);
+        if (configuredExecInstallation is not null && (extension is null || configuredExecInstallation.GetInvocationList().Length != 1))
+            throw new ArgumentException("One native extension and one explicit execution installation factory required.");
+        Func<PiSharp.Cli.Mcp.McpApplicationHostInstallation>? readApplicationHost = null;
+        if (applicationMcpHost is not null)
+        {
+            if (extension is null || configuredInitializerInstallation is null || mcpAdmission is not null || registeredMcpAdmission is not null)
+                throw new ArgumentException("Application MCP installation requires one native initializer and no competing MCP profile admission.");
+            configuredInitializerInstallation = applicationMcpHost.Bind(configuredInitializerInstallation, out var readInstalled);
+            readApplicationHost = readInstalled;
+        }
+        if (configuredInitializerInstallation is not null)
+        {
+            if (extension is null) throw new ArgumentException("An admitted initializer installation requires a native extension configuration.");
+            configuredInitializerInstallation.Validate();
+            token.ThrowIfCancellationRequested();
+        }
+        if (registeredMcpAdmission is not null && mcpAdmission is not null)
+            throw new ArgumentException("Choose one explicit MCP profile admission.");
+        // Explicit admitted resolution uses no environment lookup; reject invalid composition before profile effects.
+        if (resolvedAnthropicAuthentication is not null &&
+            (liveSelection is null || liveSelection.Model.Provider != "anthropic" || liveSelection.Model.Api != "anthropic-messages" ||
+             resolvedAnthropicAuthentication.Diagnostic != AuthenticationDiagnostic.Resolved || resolvedAnthropicAuthentication.Authentication is null))
+            throw new ArgumentException("Resolved Anthropic authentication requires an admitted Anthropic live selection.");
+        if (resolvedAnthropicHandler is not null && resolvedAnthropicAuthentication is null)
+            throw new ArgumentException("A resolved Anthropic handler requires explicit admitted authentication.");
+        if (resolvedAnthropicAuthentication is not null) token.ThrowIfCancellationRequested();
+        if (grepHost is not null)
+        {
+            ArgumentNullException.ThrowIfNull(grepHost.Executor);
+            ArgumentNullException.ThrowIfNull(grepHost.ContextOperations);
+            ArgumentNullException.ThrowIfNull(grepHost.SearchAdmission);
+            ArgumentNullException.ThrowIfNull(grepHost.ContextAdmission);
+        }
+        var model = liveSelection?.Model ?? SelectModel(offlineApi);
+        var modelDefinition = liveSelection?.Definition ?? AuthoredModelDefinition(model, modelSupportsImages);
         // Reject recognized wire events from the other family before durable session admission.
         foreach (var turn in turns)
             foreach (var observation in turn.Value.GetProperty("events").EnumerateArray())
@@ -300,6 +440,9 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
         var files = new LocalFileOperations();
         var canonicalWorkspace = SessionCommands.Absolute(await files.CanonicalizeAsync(workspace, token));
         if (!Directory.Exists(canonicalWorkspace)) throw new SessionCommandException(SessionCommandFailure.WorkspaceMissing);
+        if (originalSystemPrompt is not null)
+            originalSystemPrompt = OriginalSystemPromptBuilder.Capture(originalSystemPrompt, canonicalWorkspace,
+                originalSystemPrompt.SelectedTools.IsDefault ? [] : originalSystemPrompt.SelectedTools).Input;
         var reserved = new HashSet<string>(FilePolicy.Comparer)
         { SessionCommands.Absolute(await files.CanonicalizeAsync(sessionPath, token)) };
         if (scriptPath is not null) reserved.Add(SessionCommands.Absolute(await files.CanonicalizeAsync(scriptPath, token)));
@@ -337,21 +480,47 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
             processCleanup = new(new NativeProcessRunner());
             bashTool = new(processCleanup, new(executable, canonicalWorkspace, environment, canonicalSpill));
         }
-        var policy = new FilePolicy(canonicalWorkspace, reads, writes, reserved, grant);
+        var policy = new FilePolicy(canonicalWorkspace, reads, writes, reserved, grant, grepHost);
+        var grepReader = grepHost is null ? null : new AdmittedGrepContextReader(canonicalWorkspace,
+            grepHost.ContextOperations, policy.AuthorizeGrepContextAsync);
         NativeExtensionActivation? activation = null;
+        LiveSessionConnection? connection = null;
+        Task<LiveSessionConnection>? connectionOriginal = null;
         try
         {
-            if (extensionPreflight is not null) activation = await NativeExtensionActivation.LoadAsync(extensionPreflight, token, extensionUi, reportInputDiagnostic).ConfigureAwait(false);
-            return new(canonicalWorkspace, new ReadWriteTools(canonicalWorkspace, canonicalWorkspace, files,
-                new(MaximumReadBytes: 65_536, MaximumWriteBytes: 65_536, MaximumArgumentCharacters: 65_536)),
-                new LsTool(canonicalWorkspace, canonicalWorkspace, files), policy,
-                new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup);
+            if (extensionPreflight is not null) activation = await NativeExtensionActivation.LoadAsync(extensionPreflight, token, extensionUi, reportInputDiagnostic,
+                configuredInitializerInstallation: configuredInitializerInstallation, configuredExecInstallation: configuredExecInstallation).ConfigureAwait(false);
+            if (resolvedAnthropicAuthentication is null) connection = liveSelection?.Connect(liveRuntime);
+            else
+            {
+                connectionOriginal = (liveSelection ?? throw new InvalidOperationException("Validated Anthropic selection is absent."))
+                    .ConnectResolvedAnthropicAsync(resolvedAnthropicAuthentication, resolvedAnthropicHandler, token).AsTask();
+                connection = await connectionOriginal.ConfigureAwait(false);
+            }
+            var profile = new OfflineSessionProfile(canonicalWorkspace, new BuiltinToolCatalog(canonicalWorkspace, canonicalWorkspace, files,
+                readWriteOptions: new(MaximumReadBytes: 65_536, MaximumWriteBytes: 65_536, MaximumArgumentCharacters: 65_536),
+                editOptions: new(MaximumInputBytes: 65_536, MaximumOutputBytes: 65_536, MaximumArgumentCharacters: 65_536,
+                    DiffOptions: new(MaximumOutputCharacters: 4096)), bash: bashTool,
+                grep: grepHost?.Executor, grepContextReader: grepReader), policy,
+                new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup, connection, toolSelection,
+                deferCatalogValidation: mcpAdmission is not null || registeredMcpAdmission is not null || readApplicationHost is not null,
+                originalSystemPrompt: originalSystemPrompt);
+            if (readApplicationHost is not null) profile.ConfigureMcpRegistrationRuntime(readApplicationHost().CreateRegisteredAdmission());
+            else if (registeredMcpAdmission is not null) profile.ConfigureMcpRegistrationRuntime(registeredMcpAdmission);
+            else if (mcpAdmission is not null) profile.ConfigureMcpRuntime(mcpAdmission);
+            return profile;
         }
         catch (Exception original)
         {
+            var cleanupFailures = new List<Exception>();
+            if (connectionOriginal?.Exception is { } connectionFaults) cleanupFailures.Add(connectionFaults);
+            Task? connectionCleanup = null;
+            try { if (connection is not null) { connectionCleanup = connection.DisposeAsync().AsTask(); await connectionCleanup.ConfigureAwait(false); } }
+            catch (Exception cleanup) { cleanupFailures.Add((Exception?)connectionCleanup?.Exception ?? cleanup); }
             if (activation is not null)
                 try { await activation.DisposeAsync().ConfigureAwait(false); }
-                catch (Exception cleanup) { throw new AggregateException("Profile admission and owned cleanup failed.", original, cleanup); }
+                catch (Exception cleanup) { cleanupFailures.Add(cleanup); }
+            if (cleanupFailures.Count > 0) throw new AggregateException("Profile admission and owned cleanup failed.", new[] { original }.Concat(cleanupFailures));
             throw;
         }
 
@@ -374,11 +543,21 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
 
     public ValueTask DisposeAsync()
     {
+        RefuseLifecycleDrainClose();
+        _live?.RefuseResolvedCleanupSelfWait();
+        RefuseViewCleanupSelfWait();
+        // Refuse before installing a settlement or closing Sessions: a reporter must never join its own close.
+        RefuseViewReporterDisposal();
         TaskCompletionSource? settlement = null; Task pending;
-        lock (_disposalGate)
+        lock (lifecycleGate)
         {
-            if (_disposal is null) { settlement = new(TaskCreationOptions.RunContinuationsAsynchronously); _disposal = settlement.Task; }
-            pending = _disposal;
+            if (lifecycleDraining) throw new InvalidOperationException("Profile close cannot join an active lifecycle drain.");
+            lock (_disposalGate)
+            {
+                if (_disposal is null) { settlement = new(TaskCreationOptions.RunContinuationsAsynchronously); _disposal = settlement.Task; }
+                pending = _disposal;
+            }
+            lifecycleClosing = true;
         }
         if (settlement is not null) _ = CloseAsync(settlement);
         return new(pending);
@@ -386,11 +565,14 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
     private async Task CloseAsync(TaskCompletionSource settlement)
     {
         var failures = new List<Exception>();
+        try { await CloseLifecycleHandoffsAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
         if (Sessions is not null)
             try { await Sessions.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
-        try { _client.Dispose(); } catch (Exception error) { failures.Add(error); }
-        if (_extension is not null)
-            try { await _extension.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
+        Task? liveCleanup = null;
+        try { if (_live is not null) { liveCleanup = _live.DisposeAsync().AsTask(); await liveCleanup.ConfigureAwait(false); } }
+        catch (Exception error) { failures.Add((Exception?)liveCleanup?.Exception ?? error); }
+        try { _client?.Dispose(); } catch (Exception error) { failures.Add(error); }
+        try { await CloseProfileViewsAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
         if (failures.Count > 0) settlement.TrySetException(new NativeExtensionException(NativeExtensionFailure.CleanupFailed, new AggregateException(failures)));
         else settlement.TrySetResult();
     }
@@ -407,7 +589,7 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
     }
 
     private sealed class FilePolicy(string workspace, HashSet<string> reads, HashSet<string> writes,
-        HashSet<string> reserved, BashGrant? bash) : IToolActionPolicy
+        HashSet<string> reserved, BashGrant? bash, OfflineGrepHost? grepHost) : IToolActionPolicy
     {
         public static StringComparer Comparer { get; } = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
         private static StringComparison Comparison => OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
@@ -416,6 +598,22 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
         public Func<string?>? ActiveSessionPath { get; set; }
         public static bool Within(string root, string target) =>
             target.StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, Comparison);
+        private bool IsReserved(string target)
+        {
+            var activePath = ActiveSessionPath?.Invoke();
+            return reserved.Contains(target) || activePath is not null && Comparer.Equals(SessionCommands.Absolute(activePath), target);
+        }
+        public async ValueTask<bool> AuthorizeGrepContextAsync(string path, int maximumBytes, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            var allowed = grepHost is not null && Within(workspace, path) && reads.Contains(path) && !IsReserved(path);
+            if (allowed) allowed = await grepHost!.ContextAdmission(path, maximumBytes, token).ConfigureAwait(false);
+            // An awaited grant may span a session transition; recheck its reserved target before returning.
+            token.ThrowIfCancellationRequested();
+            allowed = allowed && !IsReserved(path);
+            Actions.Add(new { ToolName = "grep", Operation = "context_read", Target = path, allowed });
+            return allowed;
+        }
         public async ValueTask<ToolActionAuthorization> AuthorizeAsync(ToolInvocation invocation, PreparedToolAction action, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -434,12 +632,25 @@ internal sealed class OfflineSessionProfile : IAsyncDisposable, IRpcExtensionCom
                     action.CommandArguments, action.WorkingDirectory, action.Environment, arguments = action.Arguments.Value });
                 return new(granted);
             }
-            var activePath = ActiveSessionPath?.Invoke();
-            var isReserved = reserved.Contains(action.Target) || activePath is not null && Comparer.Equals(SessionCommands.Absolute(activePath), action.Target);
+            var isReserved = IsReserved(action.Target);
+            if (action.ToolName == "grep")
+            {
+                var admissible = grepHost is not null && action.Operation == "grep" && action.Kind == PreparedToolActionKind.Path &&
+                    action.WorkingDirectory == workspace && !action.CommandArguments.IsDefault && action.CommandArguments.IsEmpty &&
+                    action.Environment.IsEmpty && (Comparer.Equals(workspace, action.Target) || Within(workspace, action.Target)) && !isReserved;
+                var authorization = admissible
+                    ? await grepHost!.SearchAdmission.AuthorizeAsync(invocation, action, token).ConfigureAwait(false)
+                    : new ToolActionAuthorization(false);
+                token.ThrowIfCancellationRequested();
+                if (IsReserved(action.Target)) authorization = new(false, authorization.Terminate);
+                Actions.Add(new { action.ToolName, action.Operation, action.Target, allowed = authorization.Allow });
+                return authorization;
+            }
             var allow = action.Kind == PreparedToolActionKind.Path && action.WorkingDirectory == workspace &&
                 action.CommandArguments.IsEmpty && action.Environment.Count == 0 && Within(workspace, action.Target) &&
                 !isReserved && (action.ToolName == "read" && action.Operation == "read" && reads.Contains(action.Target) ||
                     action.ToolName == "ls" && action.Operation == "ls" && reads.Contains(action.Target) ||
+                    action.ToolName == "edit" && action.Operation == "edit" && reads.Contains(action.Target) && writes.Contains(action.Target) ||
                     action.ToolName == "write" && action.Operation == "write" && writes.Contains(action.Target));
             Actions.Add(new { action.ToolName, action.Operation, action.Target, allowed = allow });
             return new(allow);

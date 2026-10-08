@@ -1,7 +1,13 @@
 # Contributing to PiSharp
 
-Keep changes focused. Distinguish implemented behavior, authored tests, measured results and acceptance. Cite immutable public upstream sources and retain applicable MIT/third-party notices. Do not submit credentials, personal machine paths, private captures or unresolved third-party binary archives.
+PiSharp is in early implementation. Use the eight phase plans as the execution source and record implemented behavior separately from proposed requirements. Useful contributions include source-linked compatibility fixtures, small native slices and review of the remaining phase boundaries.
 
-Use the pinned SDK and public build/offline checks in [README](README.md). The two fake-HTTP provider test products are a scoped public subset. The complete private native/reference gate needs omitted inputs and cannot be reproduced by this snapshot alone. Source, test scope and fixture changes need their own review and checks.
+1. Open an issue describing the proposed change and its rationale before substantial work.
+2. Keep documentation pull requests focused. Distinguish planned behavior from verified observations and implemented functionality.
+3. Cite public upstream sources with immutable commit links when describing baseline behavior.
+4. Submit only material you have the right to share publicly. Exclude credentials, personal data, confidential material, and private repository content.
+5. Preserve applicable copyright and license notices for any future third-party material. Contributions are provided under this repository's MIT license.
 
-The [planning index](docs/plans/README.md) describes original requirements. Do not silently regenerate goldens, transfer counts to changed source, or promote bounded tests into platform, parity, phase or release acceptance. Contributions use the repository's MIT license.
+Run `.\tools\test-native.ps1` from the repository root with the SDK pinned in `global.json`. The framework-only native suite uses offline fixtures and no provider keys. For documentation changes, check links, spelling, and consistency with the [planning index](docs/plans/README.md). Do not claim tests passed or parity was achieved without corresponding implementation and evidence.
+
+Keep [implementation status](IMPLEMENTATION_STATUS.md) and the machine-readable task state current. Authored fixture expectations, captured upstream results, developer checks and independent acceptance are distinct evidence kinds. Never regenerate goldens automatically or silently retarget the pinned upstream commit.

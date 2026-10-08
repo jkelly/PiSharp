@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "profile": "real-hello-tool-0",
+  "status": "Statically authored integrated candidate; root execution and independent qualification pending",
+  "author": { "model": "gpt-6.1-sol", "reasoningEffort": "xhigh" },
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "runtime": { "version": "v24.19.0", "platform": "win32", "architecture": "x64", "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237" },
+  "helpers": [
+    { "path": "tools/NodeHelloBridge/worker.mjs", "bytes": 7430, "sha256": "8694db158d7ff6b0160e3f730d408027c2b3be3b9e4eae7c57db906b9a8f6571" },
+    { "path": "tools/NodeHelloBridge/module-loader.mjs", "bytes": 18992, "sha256": "bb0dc1934f5449c7226a76f0ea6ed9eafa980a4fa0345c9ed2e5a7bea4e35e5f" },
+    { "path": "tools/NodeBridge/wire.mjs", "bytes": 10011, "sha256": "83dd5314526f8ece061ea85da50326ed45867fe7edb76d37ac67f208775d3deb" }
+  ],
+  "preparationExpectedSha256": "f005d29a78a238bd30c179ffe27a3eb1a429619edab8eb549004aaa0b78112ae",
+  "preparationReference": [
+    { "path": "compatibility/node/hello-preparation-reference.plan.json", "bytes": 4664, "sha256": "74e3b17b65e024fa07d77f5615acbcaa2c18b5fff31f21700c5e46196d64e19c" },
+    { "path": "fixtures/reference/node-hello-preparation/manifest.json", "bytes": 1619033, "sha256": "d241bc12bd2caeb63d44b51bebf38efda21b4d60e18073fed2dd8157bcc53c37" },
+    { "path": "fixtures/reference/node-hello-preparation/expected.json", "bytes": 392505, "sha256": "f005d29a78a238bd30c179ffe27a3eb1a429619edab8eb549004aaa0b78112ae" }
+  ],
+  "sourcePins": [
+    { "path": "packages/coding-agent/examples/extensions/hello.ts", "bytes": 640, "sha256": "0aa4e9800c2526914d4c1edb00b2cfa9bd9dd6da5218289994cccd5f5bfa4934" },
+    { "path": "packages/ai/src/utils/validation.ts", "bytes": 9902, "sha256": "460786b57dead200e411b9afec916a5049c96ebcff4da082096456ac06d44fb7" },
+    { "path": "packages/ai/src/index.ts", "bytes": 2395, "sha256": "c909ef4f82daff2f494ce1aa29d8bd68390f6513c5aff047088cadb3fa96ecea" },
+    { "path": "packages/coding-agent/src/core/extensions/types.ts", "bytes": 81892, "sha256": "de0ccce3b8b222d19a2ecef24902fc72aab62b6573129cbf886bc064dd6ab505" },
+    { "path": "packages/coding-agent/src/core/extensions/loader.ts", "bytes": 27197, "sha256": "aa903524bb2db3ee9fb7f21e863e373e7f12a56c74fd05d27c879a4a7020deb0" },
+    { "path": "packages/coding-agent/src/core/extensions/runner.ts", "bytes": 51250, "sha256": "1a0d73843fba5773d415f484c46898138723b73d27bf8c3159f491fa0b6232f3" },
+    { "path": "LICENSE", "bytes": 1069, "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48" }
+  ],
+  "qualifiedInputs": {
+    "canonicalPlanSha256": "e55b7af94907598157809fc6da08ad1d60899c23b849d3623c28174d5d7fc622",
+    "canonicalManifestSha256": "b74a7ece33b0596850266a1e1686b3c9cd1d5c978e3dcae1f07174adc3757ff9",
+    "canonicalExpectedSha256": "d13bca9d8ca51152c6b95b9bd2db8ab5bbcb76f361e647dcf1e97365e155b843",
+    "jitiArchiveSha256": "8dd0d365fb49c0e7cc42d6a00df6fb2da9056fc24492094346fc34ecdbcf28ca",
+    "typebox": { "version": "1.3.27", "files": 1385, "fingerprint": "9762e85e6a6e12cc6593cee73c1ffcc85857ba4c7f6d2ab52feeb4b28954ed25", "archiveSha256": "5a288bcd3d68f44567de84b185e04d205ef7d5b53602846bc3db30fdd219dda3", "licenseSha256": "e8a7cc256941a26ba8234f04390165243a4d42f74fd6491934140605bf7eae2d" },
+    "inventoryAuthority": "The predecessor verifier is composed read-only. Whole source, all fifteen existing installed package inventories, Jiti archive/publisher/receipt and canonical controls are checked before and after. No predecessor worker starts, pin changes, new packages or installs.",
+    "preparationReferenceQualification": "Four complete genuine captures and seven process controls are retained by the root; independent qualification is a separate gate. This candidate gives no source acceptance credit. All eight pinned reference harness files are held as read-only metadata/source-byte inputs, not admitted executable bridge modules."
+  },
+  "sourceBoundary": {
+    "loader": "Whole unchanged public loadExtensions with official Jiti 2.7.0; original async factory registers its live schema and execute function in Node.",
+    "virtualModuleReplacementCount": 1,
+    "virtualModuleReplacement": "Exact canonical controlled-virtual-modules.mjs Type/defineTool aliases, disclosed and immutable; full public SDK namespaces remain open.",
+    "schema": "Public schema JSON, description and omitted additionalProperties are unchanged. Live original TypeBox object is retained for whole validateToolArguments. All recursive own descriptors, symbols and Settings are observed before and after; TypeBox 1.3.27 has nonenumerable string ~kind and lacks Symbol.for('TypeBox.Kind'), preserving the original utility fallback.",
+    "preparation": "Pure trusted initial preparation after strict native original JSON admission and before native initial validation. Actual whole validation.ts structuredClone/optional-null/Value.Convert/Compile/check path is called once; no Value.Clean or schema rewrite. Preparation has no context, UI, host callback handle or invented call ID. Hook replacements are not converted again.",
+    "execution": "Actual five arguments: original provider tool-call identity, final native-authorized prepared parameters, owned signal, bounded synchronous onUpdate callback and genuine ExtensionRunner.createToolContext. The real runner has no UI bridge; neighboring host/context operations are explicitly unsupported. Source Hello uses none of those operations and emits no updates.",
+    "finalAuthority": "Native initial and final schema, typed hook replacement, final prepared action policy and explicit package/hash/scope grants remain authoritative. Denied Hello remains advertised and bound but cannot acquire an executable target.",
+    "errors": "Full new raw source error name/message/stack and observations retained. Reference and bridge instrumentation paths are different provenance; stacks are never normalized or filtered for equality.",
+    "pathFidelity": "Protected-paths raw-relative hook arguments remain a separate mandatory open compatibility obligation. This path-free Hello profile does not close it."
+  },
+  "ownership": {
+    "package": "Explicit approved native wrapper, private Compatibility.Node and ExtensionHost assemblies, shared Default Abstractions/Contracts identity, exact audited Windows supervisor import grant only.",
+    "operations": "Captured native registration leases span preparation/execution and actual hello.settle fences. Admitted progress deliveries are joined even if the synchronous source callback does not await; original Hello emits zero progress.",
+    "shutdown": "Owner callbacks quiesce before source invalidation/cache clear, worker joined shutdown, physical stdout/stderr EOF/close and process exit. Held input handles and approved system import handles follow existing retained-failure loader semantics.",
+    "outputs": "Only explicit fresh task-local invocation roots and disposal receipts. Source API guards/module admission are a fixed trusted-source boundary, not an OS sandbox."
+  },
+  "limits": { "requestBytes": 262144, "responseBytes": 524288, "sourceObservationBytes": 131072, "sourceObservationNodes": 65536, "sourceObservationPathCharacters": 262144, "sourceObservationDepth": 48, "sourceOperations": 16, "retainedSourceBytes": 8388608, "nativeReceiptSlots": 32, "nativeActiveContexts": 8, "updatesPerCall": 16, "updateBytes": 262144, "moduleAndReadRowsEach": 4096, "resolutions": 10000, "sourceReadCalls": 20000, "sourceReadBytes": 67108864, "packageReceiptBytes": 2097152, "cliIoBytesEach": 2097152, "cliDeadlineSeconds": 60 },
+  "workflow": {
+    "runner": "tools/test-native-hello-package.ps1; explicit absolute Node/repository/oracle/Jiti/canonical reference/Hello preparation reference/run roots; never ordinary tools/test-native.ps1",
+    "cases": "NodeHelloPackageTests.Cases(host,cli,published,node,repository,oracle,jiti,reference,helloReference,runParent)",
+    "authoredGroups": 4,
+    "authorExecutedGroups": 0,
+    "providerGroups": "Responses, Anthropic, Completions: original hello-result and hello-unicode arguments via real HTTP requests and compiled CLI; durable acknowledgement; independent RPC numeric42 preparation/execute; independent selected-ancestor RPC branch with actual final Hello denial; genuine receipts and physical joins retained.",
+    "deniedIdentity": "Original hello-denied corpus input has no ID. Native provider call native-hello-denied is explicitly authored; original input is not changed. Responses identity retains exact call_id|item-id mapping.",
+    "authorityGroup": "Whole upstream missing/object/array-name errors; separate authored invalid-final replacement hook with no source modification or reconversion; ungranted native write denied; zero original execution receipts.",
+    "comparison": "Exact returned serializedJson plus complete observer JSON values against frozen genuine captures; public schema, hidden metadata, actual provider IDs, real five-argument/context facts and before/after inputs retained. No expected values replayed as implementation results."
+  },
+  "remainingMandatoryGates": ["all eleven unchanged corpus extensions and all forty-two scenario IDs", "full public SDK namespaces/context operations", "universal progress/UI/runner timing and source semantics", "raw relative tool_call fidelity with final native safety", "remaining upstream schemas and coercion/optional-null profiles", "worker crash/cancel/restart integration and real extension effects", "complete runtime and dependency shipping notice audit", "independent reference and integrated candidate qualification"],
+  "phaseCredit": "None until actual root gates and independent review; no whole-corpus or phase-six/seven closure claim"
+}

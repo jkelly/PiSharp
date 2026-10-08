@@ -1,0 +1,89 @@
+{
+  "schema": "original-ui-private-admission-proposal-v1",
+  "status": "UNAPPLIED_REQUIRES_EXACT_CALLER_ADMISSION_IMPLEMENTATION",
+  "canonicalWhitelistChanged": false,
+  "privatePluginAdmitted": false,
+  "nativeExecutions": 0,
+  "base": "bbaf94fe7bc24c1eef0b3199bdf01b651316d29d",
+  "native": "039b367a1c0048584be5bbce1231c59d2e859944",
+  "js": "e243c3c2c530e533c2f4d473773bff2f4fde5dd2",
+  "helperPins": "61728a7a9679f92a9e6817540d7b9b4ae57c2d9b",
+  "sourcePreimagesAndPrivatePostimage": [
+    {
+      "relative": "src/PiSharp.Compatibility.Node/NodeTierAAdmission.cs",
+      "bytes": 9220,
+      "sha256": "a9842c4d69ca78ee7f061540ae80ce9c9aebb55d107de6bebf3ede9762f73d49"
+    },
+    {
+      "relative": "src/PiSharp.Compatibility.Node/NodeCommandInputExtension.cs",
+      "bytes": 35795,
+      "sha256": "f0e34db0db0a44295f4bb1982daff8a2553368b2612aaea08ad82bdc4e884218"
+    },
+    {
+      "relative": "tools/NodeCommandInputBridge/admission.mjs",
+      "bytes": 6651,
+      "sha256": "800b04603f93f2e633a8a57a9e3e3d2ed567cf2408d764e94b4934da30ff911a"
+    },
+    {
+      "relative": "tools/NodeCommandInputBridge/module-loader.mjs",
+      "bytes": 45768,
+      "sha256": "52e8b6a901f481b5735c4d3811da7f7d80a07156ddead796e50c4ea4aa6f6948"
+    },
+    {
+      "relative": "tools/NodeCommandInputBridge/worker.mjs",
+      "bytes": 23091,
+      "sha256": "05c96faf586b8102736e89904c4450159657dde01929e4edfa5e0848ef56583a"
+    },
+    {
+      "relative": "compatibility/node/command-input-bridge.plan.json",
+      "bytes": 24208,
+      "sha256": "929293b20f50a0a21a82a23dd1baea4eb354816d9f076b8862019a9957356f70"
+    },
+    {
+      "relative": "src/PiSharp.ExtensionHost/Supervision/NodeCommandInputWorkerLaunch.cs",
+      "bytes": 7677,
+      "sha256": "77a850884e6fc61d69710994a360b421c511cc0a4b4bdbd479336f274cb59099"
+    },
+    {
+      "relative": "tests/PiSharp.NodeUi.Tests/private-original-ui-qualification-plugin.mjs",
+      "bytes": 2960,
+      "sha256": "8e27790e1b5aa480c0e44595e98026b3d130fcb8a789b3b3aed2b5d335d336c8"
+    }
+  ],
+  "originalCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "originalPins": [
+    {
+      "relative": "packages/coding-agent/examples/extensions/commands.ts",
+      "bytes": 2594,
+      "sha256": "36716b53da169936c7e1360a4fde1e2fc0c3356a6505f177235f09c5538c6e4f"
+    },
+    {
+      "relative": "packages/coding-agent/examples/extensions/timed-confirm.ts",
+      "bytes": 2238,
+      "sha256": "c35304599e6f07238ef5472efe9c3f2fef2a022f801750ed792ef9061c7de10f"
+    },
+    {
+      "relative": "packages/coding-agent/src/core/extensions/types.ts",
+      "bytes": 81892,
+      "sha256": "de0ccce3b8b222d19a2ecef24902fc72aab62b6573129cbf886bc064dd6ab505"
+    }
+  ],
+  "privateCommands": [
+    "qualification-input",
+    "qualification-editor",
+    "qualification-timeout",
+    "qualification-preabort",
+    "qualification-child",
+    "qualification-abort",
+    "qualification-parent",
+    "qualification-session"
+  ],
+  "proposal": "Add a separate host-owned affine qualification-source lease, exact private source byte/SHA pin and readonly admitted stage root. Existing canonical Pins, ValidateSelection, selectSources and load methods remain unchanged. New opted-in source-load method must authenticate actual owner/generation and host-supplied lease before reading; use genuine loader.loadExtensions then genuine Runner and existing translation, repeat immutable source verification, return exact eight command receipts and no other registrations. It is not implemented by this artifact or the two helper pin updates.",
+  "remaining": [
+    "Private source lease and explicit native/worker loader caller seam implementation/review",
+    "Actual readonly stage with genuine original dependency closure and supplied admitted launch",
+    "Managed registered eight-command controls and real UI timeout/session lifetime backend",
+    "Separate upstream timed-confirm opt-in admission if selected; no rpc-demo partial-field dropping",
+    "Root-reviewed finite compiler/runtime qualifier and complete originals reporter"
+  ]
+}

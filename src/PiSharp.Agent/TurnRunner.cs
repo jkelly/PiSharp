@@ -1,5 +1,6 @@
 using PiSharp.AI;
 using PiSharp.Contracts;
+using System.Text.Json;
 
 namespace PiSharp.Agent;
 
@@ -13,13 +14,17 @@ public sealed class TurnRunner
 {
     private readonly ChatClient client;
     private readonly ToolBatchScheduler scheduler;
+    private readonly string? thinkingLevel;
 
-    public TurnRunner(ChatClient client, ToolBatchScheduler scheduler)
+    public TurnRunner(ChatClient client, ToolBatchScheduler scheduler, string? thinkingLevel = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(scheduler);
         this.client = client;
         this.scheduler = scheduler;
+        if (thinkingLevel is not null && !ThinkingLevels.Ordered.Contains(thinkingLevel, StringComparer.Ordinal))
+            throw new ArgumentException("Invalid thinking level.", nameof(thinkingLevel));
+        this.thinkingLevel = thinkingLevel;
     }
 
     public Task<TurnResult> RunAsync(ChatRequest request, IAgentEventSink sink,
@@ -35,6 +40,8 @@ public sealed class TurnRunner
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(sink);
+        // High-level configuration owns this control, including cancellation fallback requests.
+        if (thinkingLevel is not null) request = request with { ThinkingLevel = thinkingLevel };
         ChatResult chat;
         var deliveryToken = settleAbort ? CancellationToken.None : cancellationToken;
         var assistantStarted = false;
@@ -58,13 +65,15 @@ public sealed class TurnRunner
         // Disposal/transport cleanup settles before any assistant commit barrier or tool preflight.
         // Caller cancellation during the chat phase propagates only after owned cleanup completes.
         if (!settleAbort) cancellationToken.ThrowIfCancellationRequested();
-        else
+        if (settleAbort || thinkingLevel is not null)
         {
-            // The native high-level configuration currently has the same explicit default
-            // requested thinking level as Pi Agent: off. This stamps only the finalized
-            // high-level message; provider observations remain unchanged.
+            // Stamp the same requested control sent on this turn, after transport cleanup.
+            // Raw provider progress remains untouched.
             chat = chat with { Message = chat.Message with
-            { ExtraProperties = (chat.Message.ExtraProperties ?? JsonFields.Empty).Set("thinkingLevel", JsonData.Parse("\"off\"")) } };
+            { ExtraProperties = (chat.Message.ExtraProperties ?? JsonFields.Empty).Set("thinkingLevel", JsonData.Parse(JsonSerializer.Serialize(request.ThinkingLevel ?? "off"))) } };
+        }
+        if (settleAbort)
+        {
             if (!assistantStarted)
                 await sink.EmitAsync(new AssistantMessageStarted(chat.Message), deliveryToken).ConfigureAwait(false);
         }

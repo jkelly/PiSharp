@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "nodeSourceCommit": "cdc1b38d40cb567b7ad0b39c86addf830a0af0ae",
+  "icuSourceCommit": "21d1eb0f306e1141c10931e914dfc038c06121da",
+  "node": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "bytes": 92825416,
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "compressed": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-dictionary-work\\artifacts\\reference-icu\\icudt78l.dat.bz2",
+    "bytes": 11343088,
+    "sha256": "4ff77b52d0a93fa0ce7a59c82a1efed7c0604d8c94b7f4991e31fce0bb30aaa3"
+  },
+  "decompressor": {
+    "path": "C:/Program Files/Git/usr/bin/bzip2.exe",
+    "bytes": 92176,
+    "sha256": "ac027e648f7d4bb8172d13a1bc27ac71784d193109aa48e76eff703aeb0f520d"
+  },
+  "decompressed": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-dictionary-work\\artifacts\\reference-icu\\official-node-icudt78l.dat",
+    "bytes": 33107424,
+    "sha256": "f992970b576b5d3bc437f414f5b59ab0543127886a73ec2bc09a3e3c6c11353b"
+  },
+  "embeddedPackageOffset": 44994768,
+  "entirePackageByteIdentical": true,
+  "dictionaryChecks": [
+    {
+      "name": "icudt78l/brkitr/burmesedict.dict",
+      "bytes": 254448,
+      "sha256": "99f1b2afe6672bc495a872e85dd5ed2be5ffc4d9b8377deff2dbc18a2b4538e5",
+      "matches": true
+    },
+    {
+      "name": "icudt78l/brkitr/cjdict.dict",
+      "bytes": 2007296,
+      "sha256": "3850478c713b2004cbb96ef4b9f049caf16d6faf32a883d2e63c09659d0c59c7",
+      "matches": true
+    },
+    {
+      "name": "icudt78l/brkitr/khmerdict.dict",
+      "bytes": 445552,
+      "sha256": "080582d61636c7f9039d65bc37452d100faa07f3ba7f5e21aa32aa1672441413",
+      "matches": true
+    },
+    {
+      "name": "icudt78l/brkitr/laodict.dict",
+      "bytes": 162624,
+      "sha256": "b044d4232c2fea926b88f6047c4efcd683e7cf0573cf9f60990aa7500c60ef0c",
+      "matches": true
+    },
+    {
+      "name": "icudt78l/brkitr/thaidict.dict",
+      "bytes": 126144,
+      "sha256": "ea47ae521cea65077bf047a75d1e9d28c495ec2f8cf4d2734fcb65a888229be9",
+      "matches": true
+    },
+    {
+      "name": "icudt78l/brkitr/word.brk",
+      "bytes": 23120,
+      "sha256": "659f2a18f7ecec07b498d392bb3e7ca03c8466fffa19a83d1db215007a826898",
+      "matches": true
+    }
+  ],
+  "productionDependencyChanges": false
+}

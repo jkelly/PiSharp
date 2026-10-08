@@ -1,0 +1,45 @@
+{
+  "status": "SOURCE_ONLY_BOUNDED_CURRENT_V0_99_1_DISCOVERY_SUCCESSOR",
+  "baseline": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "source": "packages/coding-agent/src/core/skills.ts",
+  "sourceSha256": "055dbfde974fd1951267dd6f9204b5d713ff0004e0991eb870fce9158c6e359a",
+  "dependencySemantics": "Pinned ignore 7.0.8; primary source inspected, native bounded matcher authored independently; no package installed and no genuine ignore oracle execution claimed.",
+  "supersedes": "skills-resource-profile.json open automatic skills discovery/ignore and reload descriptor prerequisites only. Host integration and resource generation publication remain open.",
+  "apis": [
+    "SkillDiscoveryRequest supplies UserAgentDirectory/ProjectWorkingDirectory grants, ExplicitPaths and IncludeDefaults",
+    "SkillDiscovery.BuildSelections derives only granted user/skills and project/.pi/skills; defaults user then project then explicit paths",
+    "SkillDiscovery.LoadAsync returns SkillResourceSet; SkillCliBinding.LoadDiscoveredAsync is an unwired borrowed host adapter",
+    "SkillPathSelection.Scope and ReportMissingPath are additive init properties; existing explicit callers retain temporary scope and missing diagnostics",
+    "SkillResourceSet.ReloadDescriptors contains Key/Fingerprint/Skill; host maps kind skill to ResourceReloadEntry without an Extensions dependency"
+  ],
+  "behavior": [
+    "Missing conventional roots silent; untrusted roots denied before filesystem calls; no environment/home lookup or authority upgrade",
+    "IncludeDefaults false reclassifies explicit paths under supplied default roots as user/project; ordinary explicit selections remain temporary",
+    "Read same-directory .gitignore then .ignore then .fdignore before enumeration; selected explicit files bypass adjacent ignore files",
+    "Shared per-root matcher receives nested directory prefixes and applies ordered case-insensitive matching, negation and excluded-parent pruning",
+    "Preserve source prefix quirks: root /foo loses anchoring; root escaped bang becomes library negation; nested bare foo becomes child/foo",
+    "Ignored SKILL.md does not stop traversal; admitted SKILL.md stops even if metadata invalid; root-only regular md, nested SKILL.md, hidden/node_modules skips preserved",
+    "Ignore reads share MaximumFiles and MaximumTotalBytes with skill reads; failed reads consume supplied byte allowance; failed enumerations reserve aggregate allowance before borrowing and never reuse it",
+    "Fresh expansion validates fresh YAML with borrowed decoder and keeps captured identity; malformed YAML returns exact raw command plus fixed diagnostic",
+    "Reload keys hash normalized selected path; fingerprints hash captured raw bytes and metadata/provenance, including body-only changes; no extra reads",
+    "Cancellation directly awaits original borrowed reads; no spawned tasks, leases, process/model/tool grants or disposal authority"
+  ],
+  "limitsAndDifferences": [
+    "Default limits 128 read attempts/selections, 4096 directory entries, depth16, 64KiB file and 1MiB aggregate bytes; ignore files consume read attempts too",
+    "Ignore matcher max4096 rules and max4096 characters per prefixed pattern; longer/invalid bounded input produces fixed diagnostics rather than an unrestricted scan",
+    "Native physical reader rejects links and link ancestors, Windows network/device paths; upstream follows links. This is a bounded authorized-root profile, not a filesystem race sandbox",
+    "Lexical normalization/dedup, fixed diagnostic text/order, conservative failed budgets, bounded Unicode regex casing and malformed class grammar remain native profile limits requiring genuine source comparison",
+    "Directory traversal keeps filesystem entry order and a per-selection matcher; no sorting or automatic parent ignore lookup",
+    "Ignore I/O/matcher failures diagnose and continue with already admitted rules; upstream ignore read errors are silent",
+    "Descriptors identify discovery captures, not an immutable execution lease; fresh expansion still rereads selected files. Caller must fence generations and join old expansions before retirement"
+  ],
+  "tests": { "newGroups": 8, "collection": "SkillDiscoveryTests.Cases()", "prefix": "skill discovery ", "authoredOnly": true, "executedHere": 0, "existingReviewFixGroups": 2, "existingTotalSkillResourceGroups": 11, "registration": "Coordinator appends collection once and directly awaits tests; do not wrap original load/host settlement with outer WaitAsync" },
+  "coordinatorRequired": [
+    "Import review correction 5e8f93ad before successor, or complete combined bundle based on754251be",
+    "Supply explicit approved roots and typed metadata decoder; normal YAML graph uses existing admitted YamlDotNet dependency only",
+    "Wire one capture to command catalog, prompt order, system descriptors and supported completion surfaces through existing host owner",
+    "Map immutable descriptors to Oct4task8 reload planning; existing generation owner controls approval, invalidation, publication, authoritative failure and original joins",
+    "Native compile/tests, genuine baseline differential and actual startup/reload qualification remain unexecuted and open"
+  ],
+  "excluded": "Future v1.0.2, Extras, shared host/session/registry/activation/RPC switch edits, package acquisition, paid/live APIs, credentials, trust changes and publication"
+}

@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "kind": "exact-existing-TypeBox-archive-inert-semantic-declaration-stage-B",
+  "status": "authored; root-exclusive assembly/admission and actual whole-config follow-up pending",
+  "oracle": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-typebox-v0.99.1",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "origin": {
+    "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-node-v0.99.1",
+    "receipt": ".pisharp-node-declarations-admitted.json",
+    "receiptSha256": "9ea0d71520ad542fdbabafc3711238ca02ad43e0c85649367c6f740979fb2617",
+    "payloadFiles": 2737,
+    "originalSourceFiles": 2093,
+    "compilerFiles": 529,
+    "nodePackageFiles": 114,
+    "nodeDeclarations": 108,
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+    "verifier": "tools/SemanticInventory/full-project-node-common.mjs"
+  },
+  "runtime": {
+    "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "dependencies": [
+    {
+      "path": "compatibility/semantic-full-project-node.plan.json",
+      "bytes": 7129,
+      "sha256": "299155962bebb8d415233401fb43ace87feef9c787999717e85afcb360debe02"
+    },
+    {
+      "path": "compatibility/semantic-node-declarations.plan.json",
+      "bytes": 6377,
+      "sha256": "62a9dc8b188893836423f329ba9df5f5386f92a6455ba3f4f4d3cb59925d369b"
+    },
+    {
+      "path": "docs/compatibility/semantic-node-declarations-setup.md",
+      "bytes": 7763,
+      "sha256": "62a702291477d43588cb686e621371c98cc5d4219273f52414245c8ba218a688"
+    },
+    {
+      "path": "tools/CompatibilityReport/raw-json.mjs",
+      "bytes": 3665,
+      "sha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-node-common.mjs",
+      "bytes": 21386,
+      "sha256": "2b7b2c7948c02366028f820b4de0c67ac2e109ac54a45946945538b3459ff3ce"
+    },
+    {
+      "path": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "bytes": 6790,
+      "sha256": "baee47b869aab6d2409c0a3906b1e0ea5bf5fe236ca24837fae71aa81d633ffd"
+    },
+    {
+      "path": "tools/SemanticInventory/semantic-node-declarations.test.mjs",
+      "bytes": 10796,
+      "sha256": "05ae6df8c9fbb2e3d4b151a5b3f8e1d4f3655f5693f714fc688054ef1bb1621c"
+    },
+    {
+      "path": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+      "bytes": 22278,
+      "sha256": "13af52a5c4e5ced26ca779195f4c10fa739868c89112b4877aa9c1e3c1e3d034"
+    },
+    {
+      "path": "tools/SurfaceInventory/inspect-ast-archives.mjs",
+      "bytes": 28614,
+      "sha256": "ac6c53f6dd692b2c69bd8ecfcd1003370f6d389a776a4a269f6d14be370db763"
+    }
+  ],
+  "archiveSource": {
+    "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-extension-reducers-oracle-v0.99.1-license-corrected",
+    "archive": {
+      "path": "archives/typebox-1.3.27.tgz",
+      "bytes": 264178,
+      "sha256": "5a288bcd3d68f44567de84b185e04d205ef7d5b53602846bc3db30fdd219dda3"
+    },
+    "inspection": {
+      "path": "archives/typebox-1.3.27.inspection.json",
+      "bytes": 2079,
+      "sha256": "fb6153708945f03004b27bf0e907b0c9e5a07a1d990e647ab6be9b7c14011606"
+    },
+    "restoredReceipt": {
+      "path": ".pisharp-extension-reducers-restored.json",
+      "bytes": 30672,
+      "sha256": "421905aec95408aa7aabf5d0a71b35d64172c77f20a1a40554b8cae7e6b1850d"
+    },
+    "historicalTypeBoxInstalledTree": {
+      "files": 1385,
+      "sha256": "9762e85e6a6e12cc6593cee73c1ffcc85857ba4c7f6d2ab52feeb4b28954ed25"
+    },
+    "installedPath": "node_modules/typebox",
+    "targetArchive": "archives/typebox-1.3.27.tgz",
+    "targetInspection": "archives/typebox-1.3.27.inspection.json",
+    "targetReceipt": "archives/extension-reducers-restored.json",
+    "archiveQualification": "immutable official previously acquired archive and accepted installed receipt; recompute SRI/member hashes/full installed-to-archive bytes before/after; no request or install"
+  },
+  "package": {
+    "name": "typebox",
+    "lockPath": "node_modules/typebox",
+    "lockEntry": {
+      "version": "1.3.27",
+      "resolved": "https://registry.npmjs.org/typebox/-/typebox-1.3.27.tgz",
+      "integrity": "sha512-zu+jc1pcy4UiNThxikUr36f0Rybk9PEeCg/NE6adeWr/SKsdNO4EzZHYRDlv2YCVAfj3Odq3dESSo/jNyoBXzA==",
+      "license": "MIT"
+    },
+    "target": "upstream/node_modules/typebox",
+    "archiveRoot": "package",
+    "regularFiles": 1385,
+    "expandedBytes": 2610688,
+    "regularBytes": 1512886,
+    "runtimeJsFiles": 691,
+    "declarationFiles": 691,
+    "manifest": {
+      "path": "package.json",
+      "bytes": 2021,
+      "sha256": "c59ddfd977ce941f1e8ee8b0a0b14396c332fa27cc5fa6fa165227ffd5a3992f"
+    },
+    "license": {
+      "path": "license",
+      "bytes": 1094,
+      "sha256": "e8a7cc256941a26ba8234f04390165243a4d42f74fd6491934140605bf7eae2d"
+    },
+    "exportSubpaths": [
+      "./compile",
+      "./error",
+      "./format",
+      "./guard",
+      "./schema",
+      "./system",
+      "./type",
+      "./value",
+      "."
+    ]
+  },
+  "baseline": {
+    "pins": [
+      {
+        "path": "fixtures/semantic-full-project-node/expected.json",
+        "bytes": 11259657,
+        "sha256": "48ad3042aed5c1365a470bb885b3500c114044987ceb7c619fadf7eab215ef92"
+      },
+      {
+        "path": "fixtures/semantic-full-project-node/manifest.json",
+        "bytes": 2596,
+        "sha256": "7412bd7b2e0086f44911a41292db3d68623988b42a68de4f1d11d36ee2999491"
+      }
+    ],
+    "snapshotSha256": "48ad3042aed5c1365a470bb885b3500c114044987ceb7c619fadf7eab215ef92",
+    "diagnosticCounts": {
+      "getConfigFileParsingDiagnostics": 0,
+      "getGlobalDiagnostics": 0,
+      "getProgramDiagnostics": 0,
+      "getSyntacticDiagnostics": 0,
+      "getBindDiagnostics": 0,
+      "getSemanticDiagnostics": 2496,
+      "getSuggestionDiagnostics": 832,
+      "getDeclarationDiagnostics": 0
+    },
+    "unresolvedRecords": 890,
+    "programSourceFiles": 1841,
+    "rootFiles": 1661,
+    "typeboxUnresolvedRecords": 144,
+    "typeboxSpecifierCounts": {
+      "typebox": 129,
+      "typebox/value": 8,
+      "typebox/compile": 5,
+      "typebox/error": 2
+    },
+    "currentParsedSpecifierGroupsIncludingUnparsed": 42,
+    "currentNearestLockInstances": 34,
+    "originalMandatorySpecifierGroups": 43,
+    "mandatoryScopeExclusions": false
+  },
+  "limits": {
+    "compressedBytes": 4194304,
+    "expandedBytes": 33554432,
+    "memberBytes": 8388608,
+    "members": 12000,
+    "depth": 32,
+    "pathUtf8Bytes": 1024,
+    "componentUtf8Bytes": 255,
+    "paxBytes": 65536,
+    "jsonBytes": 2097152,
+    "noticeBytes": 2097152,
+    "regularTotalBytes": 33554432,
+    "compressionRatio": 256,
+    "originFileBytes": 33554432,
+    "originTotalBytes": 536870912
+  },
+  "policy": {
+    "copyAllArchiveMembers": true,
+    "permittedInertPayloadCategories": [
+      ".mjs",
+      ".d.mts",
+      "package.json",
+      "readme.md",
+      "license"
+    ],
+    "expectedInstallLifecycleKeys": [],
+    "expectedBinDeclarations": [],
+    "expectedDependencyDeclarations": {},
+    "packageCodeImported": false,
+    "newNativeExecutablePayloads": false,
+    "npm": false,
+    "network": false,
+    "binLinks": false,
+    "packageResolutionOrEmit": false
+  },
+  "followUp": {
+    "profile": "new separate unchanged root configuration and genuine async TypeScript native API, after exact new admission receipt exists",
+    "vfsPayloadFiles": 4122,
+    "canonicalSourceRows": 2093,
+    "originalCompilerFiles": 529,
+    "nodeDeclarationFiles": 108,
+    "typeboxDeclarationFiles": 691,
+    "packageRuntimeExecution": "denied; existing compiler-only module guard retained in new profile variant",
+    "diagnosticMethods": [
+      "getConfigFileParsingDiagnostics",
+      "getGlobalDiagnostics",
+      "getProgramDiagnostics",
+      "getSyntacticDiagnostics",
+      "getBindDiagnostics",
+      "getSemanticDiagnostics",
+      "getSuggestionDiagnostics",
+      "getDeclarationDiagnostics"
+    ],
+    "baseline": "all8 complete arrays2496semantic/832suggestion/890unresolved; count deltas only,no filtering/normalization",
+    "outputs": "root captures into new fresh caller-owned scratch; immutable NEW golden+manifest, no child copies",
+    "remainingClosure": "all43 originally mandatory groups/34 exact nearest lock instances, optional peers, SDK interfaces, structural member graph and missing published declarations remain mandatory; derive residuals from genuine next observation"
+  },
+  "semanticPublicClosure": false,
+  "phaseGatesPassed": []
+}

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "normalizerVersion": "object-key-order-v1",
+  "scope": "One genuine awaited upstream runAgentLoop scenario with fake provider/tools; no production provider, native agent differential or phase closure",
+  "fixtures": [
+    {
+      "fixtureId": "awaited-parallel",
+      "requirementIds": [
+        "events.agent"
+      ],
+      "scenario": "Awaited assistant message_end blocks tools; sequential preflight A/B/C, parallel starts, C/A/B completion and A/B/C committed results; all-terminate stops continuation",
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "clock": {
+        "unixMilliseconds": 1700000000000,
+        "mechanism": "Harness Date.now override; no upstream source changes"
+      },
+      "seed": "none; explicit tool call IDs and gated scheduling",
+      "environment": {
+        "platform": "win32",
+        "architecture": "x64",
+        "credentials": "not inherited",
+        "network": "disabled during capture",
+        "workspace": "fresh isolated temporary home/workspace"
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/agent/awaited-parallel.input.json",
+        "sha256": "8807a17dcfb167ffce1103a117ddcb495495e535180f5b7ee8dc236653aefc51"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/agent/awaited-parallel.expected.json",
+        "sha256": "fd21837b2427e24d2a6d565a554ac1fc91518aa152dac2dfcbcf8874062f814b"
+      },
+      "provenance": {
+        "kind": "captured-upstream-agent-oracle",
+        "inputKind": "authored-synthetic-input",
+        "source": "Unmodified pinned packages/agent/src/agent-loop.ts runAgentLoop",
+        "resolver": "Unmodified pinned packages/coding-agent/src/experimental/source-resolver.ts",
+        "dependencyLock": "tools/PiReferenceRunner/full-lock.json",
+        "captureCommand": "node tools/PiReferenceRunner/full-run.mjs --capture-new",
+        "capturedAt": "2026-09-30",
+        "rawProviderWireFrames": false
+      }
+    }
+  ]
+}

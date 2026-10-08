@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "kind": "genuine-unchanged-upstream-config-released-catalog-openai-semantic-diagnostics-reference",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "receiptSha256": "1e7f61d543738e4c7ad81df5cacdf98c8d75190633f881fd3741a127c6d8a577",
+  "baselineSnapshotSha256": "5999081da5235765a1a0dc7090ca770ba32a11e939a824973fb1d3317b7a77df",
+  "harness": [
+    {
+      "path": "compatibility/semantic-full-project-openai.plan.json",
+      "bytes": 16203,
+      "sha256": "3401b676e50b7546a4b3179e76282a4f8e1309a107e8d6efad173924cf9db3eb"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-openai.md",
+      "bytes": 12913,
+      "sha256": "bf1cf3d4fe08dcf1cc6e969daec366f97de459068faf9c0146c5bf0b193a4d5a"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai-common.mjs",
+      "bytes": 11415,
+      "sha256": "94b555a1686a1f2076f9a9473ad2b3e505263c401ae6197c6a52fe98134dbcdd"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai-driver.mjs",
+      "bytes": 14024,
+      "sha256": "97a455b3163cf23384458e7639e922f3cc05d197a2a6c49a69497d952ba3fe3a"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai-preload.mjs",
+      "bytes": 8573,
+      "sha256": "4df776003700fbc4140fb0a2618c0e712db5b8ce923174beb07aef1f1c761bf9"
+    },
+    {
+      "path": "tools/SemanticReference/full-project-openai.test.mjs",
+      "bytes": 14847,
+      "sha256": "c90d6e480f8d2aeb15898f9bf8f3391929792d47a5ab0576fdce14d0f088a7f1"
+    },
+    {
+      "path": "tools/SemanticReference/run-full-project-openai.mjs",
+      "bytes": 7302,
+      "sha256": "50ef6d69df24363dd7c5d18fba2d32f07fbf5a91ab388a5686f0c5c4a26a04b7"
+    }
+  ],
+  "expected": {
+    "path": "fixtures/semantic-full-project-openai/expected.json",
+    "bytes": 15195616,
+    "sha256": "cdc9be99055105b62ee37ee4df684add4328c29c95b693d4b12d2d76c64b2cf6"
+  },
+  "rawProvenance": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-semantic-public-openai-native-first-runs\\first.json.provenance.json",
+      "sha256": "8e226e1338b04fe0aecba62591602de188ebfccfb818ab059c770770e4642da7"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-semantic-public-openai-native-first-runs\\second.json.provenance.json",
+      "sha256": "0f9b6629efb568c6b9d19d6fe4edf3c1373d88246c53b8141dd8d765871a463b"
+    }
+  ],
+  "originalConfigOpenedUnchanged": true,
+  "admittedPackageFiles": 5463,
+  "admittedDeclarationFiles": 1712,
+  "catalogDataFiles": 43,
+  "catalogDataBytes": 902551,
+  "openaiPackageFiles": 3548,
+  "openaiDeclarationFiles": 784,
+  "publishedOwnershipBlockers": 3,
+  "diagnosticFiltering": false,
+  "pathNormalization": false,
+  "semanticPublicClosure": false,
+  "phaseGatesPassed": []
+}

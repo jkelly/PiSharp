@@ -8,8 +8,8 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.MistralConversations;
 
-/// <summary>Bound text-only Mistral fetch/SSE composition. Borrows client; no catalog, ambient auth, retries or tool authority.</summary>
-public sealed class MistralTextHttpSseTransport : IChatTransport, IModelProvider
+/// <summary>Bound Mistral text/function-tool fetch/SSE composition. Borrows client; no ambient auth, retries or tool execution authority.</summary>
+public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModelProvider, IThinkingLevelTransport
 {
     private readonly HttpClient client;
     private readonly ModelDescriptor model;
@@ -58,7 +58,16 @@ public sealed class MistralTextHttpSseTransport : IChatTransport, IModelProvider
                     if (replacement is not null) { Admit(() => { AdmitPayload(replacement.Value, camel: true); return true; }); payload = replacement; }
                 }
                 var wire = JsonNode.Parse(payload.ToString())!.AsObject();
-                foreach (var (from, to) in new[] { ("maxTokens", "max_tokens") }) if (wire.ContainsKey(from)) { var value = wire[from]; wire.Remove(from); wire[to] = value; }
+                MapRequestOptions(wire);
+                foreach (var message in wire["messages"]!.AsArray())
+                {
+                    foreach (var (from, to) in new[] { ("toolCalls", "tool_calls"), ("toolCallId", "tool_call_id") })
+                        if (message!.AsObject().ContainsKey(from)) { var value = message[from]; message.AsObject().Remove(from); message[to] = value; }
+                    if (message!["content"] is JsonArray parts)
+                        foreach (var part in parts)
+                            if (part!.AsObject().ContainsKey("imageUrl"))
+                            { var image = part["imageUrl"]; part.AsObject().Remove("imageUrl"); part["image_url"] = image; }
+                }
                 var bytes = Encoding.UTF8.GetBytes(wire.ToJsonString()); Limit(bytes.Length, options.MaximumPayloadBytes);
                 var baseUri = new Uri(options.BaseUrl.GetLeftPart(UriPartial.Path).TrimEnd('/') + "/");
                 send = new(HttpMethod.Post, new Uri(baseUri, "v1/chat/completions")) { Content = new ByteArrayContent(bytes) };
@@ -66,6 +75,11 @@ public sealed class MistralTextHttpSseTransport : IChatTransport, IModelProvider
                 if (key.Contains('\r') || key.Contains('\n') || key.Length + 7 > options.MaximumHeaderCharacters) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral credential/header limit.");
                 send.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key); send.Headers.TryAddWithoutValidation("User-Agent", options.UserAgent);
                 send.Headers.TryAddWithoutValidation("Accept", "text/event-stream"); send.Content.Headers.ContentType = new("application/json");
+                ApplyHeaders(send, options.ModelHeaders); ApplyHeaders(send, options.Headers);
+                var explicitAffinity = new[] { options.ModelHeaders, options.Headers }.Any(headers =>
+                    headers?.Keys.Any(name => name.Equals("x-affinity", StringComparison.OrdinalIgnoreCase)) == true);
+                if (options.CachePrompt && !string.IsNullOrEmpty(options.SessionId) && !explicitAffinity)
+                    send.Headers.TryAddWithoutValidation("x-affinity", options.SessionId);
                 ObserveHeaders(send.Headers.Concat(send.Content.Headers));
                 token.ThrowIfCancellationRequested();
                 timeout.CancelAfter(options.TimeoutMilliseconds);
@@ -107,7 +121,7 @@ public sealed class MistralTextHttpSseTransport : IChatTransport, IModelProvider
             if (!completed && cleanup is not null) throw Fail(NativeChatFailureCode.CleanupFailed, "Mistral iterator cleanup failed.");
         }
         // End and terminal are emitted only after the original callback/send/pull/disposal operations settle.
-        if (state.Open) yield return new TextEnded(0, state.Text);
+        foreach (var frame in state.Finish()) yield return frame;
         var reason = state.Reason; var code = NativeChatFailureCode.SourceFailed; string? text = null;
         if (caller.IsCancellationRequested) { reason = StopReason.Aborted; code = NativeChatFailureCode.Cancelled; text = "Request was aborted"; }
         else if (failure is not null) { reason = StopReason.Error; code = MistralNativeDiagnostics.FromException(failure).Code; text = failure is MistralTextException ? failure.Message : timeout.IsCancellationRequested ? "Mistral request timed out." : "Mistral operation failed."; }
@@ -120,29 +134,41 @@ public sealed class MistralTextHttpSseTransport : IChatTransport, IModelProvider
     }
     private JsonData BuildPayload(ChatRequest request)
     {
-        var messages = new JsonArray(); long total = 0;
-        for (var i = 0; i < request.Messages.Length; i++)
+        var messages = new JsonArray(); long total = 0; var ids = new MistralToolIds();
+        var replay = ResolveReplay(request, ids);
+        for (var i = 0; i < replay.Length; i++)
         {
-            var entry = request.Messages[i]; var value = entry.WireBody.Value;
+            var entry = replay[i]; var value = entry.WireBody.Value;
             Limit(Encoding.UTF8.GetByteCount(value.GetRawText()), options.MaximumPayloadBytes); CheckDepth(value, 0);
             if (value.ValueKind != JsonValueKind.Object) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral transcript value.");
-            if (entry.Role is not ("system" or "user") || entry.Role == "system" && i != 0) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral replay/system update.");
-            foreach (var property in value.EnumerateObject()) if (property.Name is not ("role" or "content" or "timestamp")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral request field.");
+            if (entry.Role is "assistant" or "toolResult")
+            {
+                var history = ProjectToolHistory(entry);
+                if (history is not null) { total += history.ToJsonString().Length; Limit(total, options.MaximumContentCharacters); messages.Add(history); }
+                continue;
+            }
+            if (entry.Role is not ("system" or "user")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral replay role.");
+            foreach (var property in value.EnumerateObject()) if (property.Name is not ("role" or "content" or "timestamp") &&
+                !(entry.Role == "system" && property.Name is "toolsAdded" or "toolsRemoved" or "sections")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral request field.");
             if (value.TryGetProperty("role", out var role) && role.GetString() != entry.Role) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Mistral transcript role mismatch.");
             var content = value.GetProperty("content"); JsonNode? node;
             if (content.ValueKind == JsonValueKind.String) node = JsonValue.Create(Sanitize(content.GetString()!));
             else if (content.ValueKind == JsonValueKind.Array)
             {
                 var parts = new JsonArray(); foreach (var part in content.EnumerateArray())
-                { var text = ReadTextPart(part); parts.Add(new JsonObject { ["type"] = "text", ["text"] = Sanitize(text) }); }
+                { Limit(parts.Count + 1, options.MaximumContentBlocks); parts.Add(ProjectInputPart(part)); }
                 node = entry.Role == "system" ? JsonValue.Create(string.Join("\n", parts.Select(x => x!["text"]!.GetValue<string>()))) : parts;
             }
             else throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral text content.");
+            if (entry.Role == "system") node = JsonValue.Create(Sanitize(SystemText(value, i != 0)));
             total += node!.ToJsonString().Length; Limit(total, options.MaximumContentCharacters);
             if (entry.Role == "system" && node is JsonValue s && s.GetValue<string>().Length == 0 || node is JsonArray a && a.Count == 0) continue;
             messages.Add(new JsonObject { ["role"] = entry.Role, ["content"] = node });
         }
         var payload = new JsonObject { ["model"] = model.Id, ["stream"] = true, ["messages"] = messages };
+        var tools = ProjectTools(request); if (tools.Count > 0) payload["tools"] = tools;
+        if (options.ToolChoice is { } choice) payload["toolChoice"] = Choice(choice.Value);
+        AddSimpleOptions(payload, request);
         if (options.Temperature is { } temperature) payload["temperature"] = temperature;
         if (options.MaxTokens is { } max) payload["maxTokens"] = max;
         var data = JsonData.Parse(payload.ToJsonString()); AdmitPayload(data.Value, true); return data;
@@ -151,15 +177,37 @@ public sealed class MistralTextHttpSseTransport : IChatTransport, IModelProvider
     {
         Limit(Encoding.UTF8.GetByteCount(value.GetRawText()), options.MaximumPayloadBytes); CheckDepth(value, 0);
         if (value.ValueKind != JsonValueKind.Object || value.GetProperty("model").GetString() != model.Id || value.GetProperty("stream").ValueKind != JsonValueKind.True) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload replacement.");
-        foreach (var p in value.EnumerateObject()) if (p.Name is not ("model" or "stream" or "messages" or "temperature") && p.Name != (camel ? "maxTokens" : "max_tokens")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload replacement field.");
+        // Original MistralChatPayload has an unknown-valued index signature. The hook's
+        // extra root fields survive the wire conversion; byte/depth and core admission
+        // still apply to the complete replacement before any HTTP effect.
+        foreach (var field in new[] { "promptMode", "reasoningEffort", "promptCacheKey" })
+            if (value.TryGetProperty(field, out var text) && text.ValueKind != JsonValueKind.String)
+                throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral reasoning/cache option.");
+        if (value.TryGetProperty("toolChoice", out var choice)) _ = Choice(choice);
+        if (value.TryGetProperty("tools", out var tools))
+            foreach (var tool in tools.EnumerateArray())
+            {
+                if (tool.GetProperty("type").GetString() != "function") throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral tool kind.");
+                var function = tool.GetProperty("function");
+                if (string.IsNullOrEmpty(function.GetProperty("name").GetString()) || function.GetProperty("parameters").ValueKind != JsonValueKind.Object)
+                    throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral function declaration.");
+            }
         foreach (var name in new[] { "temperature", camel ? "maxTokens" : "max_tokens" }) if (value.TryGetProperty(name, out var number) && (number.ValueKind != JsonValueKind.Number || !number.TryGetDouble(out var n) || !double.IsFinite(n))) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral numeric option.");
         var index = 0; long size = 0;
         foreach (var message in value.GetProperty("messages").EnumerateArray())
         {
-            foreach (var p in message.EnumerateObject()) if (p.Name is not ("role" or "content")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload message field.");
-            var role = message.GetProperty("role").GetString(); if (role is not ("system" or "user") || role == "system" && index != 0) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload role.");
-            var content = message.GetProperty("content");
-            if (content.ValueKind == JsonValueKind.Array && role == "user") foreach (var part in content.EnumerateArray()) _ = ReadTextPart(part);
+            foreach (var p in message.EnumerateObject()) if (p.Name is not ("role" or "content" or "toolCalls" or "toolCallId" or "name" or "prefix")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload message field.");
+            var role = message.GetProperty("role").GetString(); if (role is not ("system" or "user" or "assistant" or "tool")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload role.");
+            if (message.TryGetProperty("toolCalls", out var calls)) { if (role != "assistant") throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral tool-call role."); ValidateToolCalls(calls); }
+            if (role == "tool" && (string.IsNullOrEmpty(message.GetProperty("toolCallId").GetString()) || string.IsNullOrEmpty(message.GetProperty("name").GetString())))
+                throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral tool result.");
+            if (!message.TryGetProperty("content", out var content))
+            { if (role != "assistant" || !message.TryGetProperty("toolCalls", out _)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Missing Mistral content."); index++; continue; }
+            if (content.ValueKind == JsonValueKind.Array && role is "user" or "assistant" or "tool") foreach (var part in content.EnumerateArray())
+            {
+                Limit(content.GetArrayLength(), options.MaximumContentBlocks);
+                if (role == "assistant") ValidateReplayPart(part); else ValidateInputPart(part);
+            }
             else if (content.ValueKind != JsonValueKind.String) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload content.");
             size += content.GetRawText().Length; Limit(size, options.MaximumContentCharacters); index++;
         }
@@ -170,6 +218,19 @@ public sealed class MistralTextHttpSseTransport : IChatTransport, IModelProvider
         var result = new JsonObject(); long total = 0; var count = 0;
         foreach (var field in fields) { var text = string.Join(", ", field.Value); Limit(++count, options.MaximumHeaders); Limit(field.Key.Length + text.Length, options.MaximumHeaderCharacters); total += field.Key.Length + text.Length; Limit(total, options.MaximumTotalHeaderCharacters); result[field.Key.ToLowerInvariant()] = text; }
         return result;
+    }
+    private static void ApplyHeaders(HttpRequestMessage request, ImmutableDictionary<string, string?>? headers)
+    {
+        if (headers is null) return;
+        var content = request.Content ?? throw Fail(NativeChatFailureCode.UnsupportedFeature, "Missing Mistral request content.");
+        foreach (var pair in headers)
+        {
+            foreach (var name in request.Headers.Select(header => header.Key).Where(name => name.Equals(pair.Key, StringComparison.OrdinalIgnoreCase)).ToArray()) request.Headers.Remove(name);
+            foreach (var name in content.Headers.Select(header => header.Key).Where(name => name.Equals(pair.Key, StringComparison.OrdinalIgnoreCase)).ToArray()) content.Headers.Remove(name);
+            if (pair.Value is not null && !request.Headers.TryAddWithoutValidation(pair.Key, pair.Value) &&
+                !content.Headers.TryAddWithoutValidation(pair.Key, pair.Value))
+                throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral header binding.");
+        }
     }
     private async ValueTask<MistralTextException> HttpError(HttpResponseMessage response, Stream body, CancellationToken token)
     {
@@ -205,8 +266,11 @@ public sealed class MistralTextHttpSseTransport : IChatTransport, IModelProvider
     internal static T Admit<T>(Func<T> action)
     {
         try { return action(); }
-        catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException)
+        catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or FormatException)
         { throw Fail(NativeChatFailureCode.MalformedStream, "Invalid Mistral admitted data."); }
+        catch (StreamingJsonPreviewException error)
+        { throw Fail(error.Failure is StreamingJsonPreviewFailure.CharacterLimit or StreamingJsonPreviewFailure.DepthLimit
+            ? NativeChatFailureCode.ResourceLimit : NativeChatFailureCode.MalformedStream, "Invalid Mistral tool argument fragment."); }
         catch (OverflowException) { throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral numeric limit."); }
     }
     private static async ValueTask<T> AwaitSource<T>(Func<ValueTask<T>> action)

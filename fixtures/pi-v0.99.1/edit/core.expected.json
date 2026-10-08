@@ -1,0 +1,1258 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "edit-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "captured-unchanged-edit-oracle",
+  "observations": {
+    "cases": [
+      {
+        "caseId": "reverse-disjoint",
+        "path": "files/reverse.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/reverse.txt",
+            "edits": [
+              {
+                "oldText": "omega",
+                "newText": "OMEGA"
+              },
+              {
+                "oldText": "alpha",
+                "newText": "ALPHA"
+              }
+            ]
+          },
+          "suppliedAfter": {
+            "path": "files/reverse.txt",
+            "edits": [
+              {
+                "oldText": "omega",
+                "newText": "OMEGA"
+              },
+              {
+                "oldText": "alpha",
+                "newText": "ALPHA"
+              }
+            ]
+          },
+          "prepared": {
+            "path": "files/reverse.txt",
+            "edits": [
+              {
+                "oldText": "omega",
+                "newText": "OMEGA"
+              },
+              {
+                "oldText": "alpha",
+                "newText": "ALPHA"
+              }
+            ]
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": {
+          "normalization": {
+            "splitBom": {
+              "bom": "",
+              "text": "alpha\nmiddle\nomega\n"
+            },
+            "detectedLineEnding": "\n",
+            "normalized": "alpha\nmiddle\nomega\n",
+            "fuzzyView": "alpha\nmiddle\nomega\n"
+          },
+          "matching": {
+            "status": "fulfilled",
+            "value": {
+              "baseContent": "alpha\nmiddle\nomega\n",
+              "newContent": "ALPHA\nmiddle\nOMEGA\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "fuzzyFind": {
+            "status": "fulfilled",
+            "value": {
+              "found": true,
+              "index": 13,
+              "matchLength": 5,
+              "usedFuzzyMatch": false,
+              "contentForReplacement": "alpha\nmiddle\nomega\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "generated": {
+            "display": {
+              "status": "fulfilled",
+              "value": {
+                "diff": "-1 alpha\n+1 ALPHA\n 2 middle\n-3 omega\n+3 OMEGA",
+                "firstChangedLine": 1
+              },
+              "ownUndefinedPaths": []
+            },
+            "patch": {
+              "status": "fulfilled",
+              "value": "--- files/reverse.txt\n+++ files/reverse.txt\n@@ -1,3 +1,3 @@\n-alpha\n+ALPHA\n middle\n-omega\n+OMEGA\n",
+              "ownUndefinedPaths": []
+            },
+            "restoredLineEndings": "ALPHA\nmiddle\nOMEGA\n"
+          }
+        },
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "diff": "-1 alpha\n+1 ALPHA\n 2 middle\n-3 omega\n+3 OMEGA",
+            "firstChangedLine": 1
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "fulfilled",
+          "value": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Successfully replaced 2 block(s) in files/reverse.txt."
+              }
+            ],
+            "details": {
+              "diff": "-1 alpha\n+1 ALPHA\n 2 middle\n-3 omega\n+3 OMEGA",
+              "patch": "--- files/reverse.txt\n+++ files/reverse.txt\n@@ -1,3 +1,3 @@\n-alpha\n+ALPHA\n middle\n-omega\n+OMEGA\n",
+              "firstChangedLine": 1
+            }
+          },
+          "ownUndefinedPaths": []
+        },
+        "filesystem": {
+          "before": {
+            "bytes": 19,
+            "sha256": "5a3ccec900f34dee652332802262b8b528a34c541872e9385b4fe1cceccf119a",
+            "base64": "YWxwaGEKbWlkZGxlCm9tZWdhCg==",
+            "utf8": "alpha\nmiddle\nomega\n"
+          },
+          "after": {
+            "bytes": 19,
+            "sha256": "a673b54c629a6aeb58b1701841d60a7f24d04b0a3c80cc9eaf476ab439420106",
+            "base64": "QUxQSEEKbWlkZGxlCk9NRUdBCg==",
+            "utf8": "ALPHA\nmiddle\nOMEGA\n"
+          },
+          "byteIdentical": false
+        }
+      },
+      {
+        "caseId": "introduced-later-match",
+        "path": "files/introduced.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/introduced.txt",
+            "edits": [
+              {
+                "oldText": "alpha",
+                "newText": "introduced"
+              },
+              {
+                "oldText": "introduced",
+                "newText": "final"
+              }
+            ]
+          },
+          "suppliedAfter": {
+            "path": "files/introduced.txt",
+            "edits": [
+              {
+                "oldText": "alpha",
+                "newText": "introduced"
+              },
+              {
+                "oldText": "introduced",
+                "newText": "final"
+              }
+            ]
+          },
+          "prepared": {
+            "path": "files/introduced.txt",
+            "edits": [
+              {
+                "oldText": "alpha",
+                "newText": "introduced"
+              },
+              {
+                "oldText": "introduced",
+                "newText": "final"
+              }
+            ]
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": {
+          "normalization": {
+            "splitBom": {
+              "bom": "",
+              "text": "alpha\nomega\n"
+            },
+            "detectedLineEnding": "\n",
+            "normalized": "alpha\nomega\n",
+            "fuzzyView": "alpha\nomega\n"
+          },
+          "matching": {
+            "status": "rejected",
+            "error": {
+              "name": "Error",
+              "message": "Could not find edits[1] in files/introduced.txt. The oldText must match exactly including all whitespace and newlines.",
+              "ownProperties": {}
+            }
+          },
+          "fuzzyFind": {
+            "status": "fulfilled",
+            "value": {
+              "found": true,
+              "index": 0,
+              "matchLength": 5,
+              "usedFuzzyMatch": false,
+              "contentForReplacement": "alpha\nomega\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "generated": null
+        },
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "error": "Could not find edits[1] in files/introduced.txt. The oldText must match exactly including all whitespace and newlines."
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "rejected",
+          "error": {
+            "name": "Error",
+            "message": "Could not find edits[1] in files/introduced.txt. The oldText must match exactly including all whitespace and newlines.",
+            "ownProperties": {}
+          }
+        },
+        "filesystem": {
+          "before": {
+            "bytes": 12,
+            "sha256": "b712eddc43eed4e738d7783ddcad4affe6a28788f5150a693250cf6be5d7ac8a",
+            "base64": "YWxwaGEKb21lZ2EK",
+            "utf8": "alpha\nomega\n"
+          },
+          "after": {
+            "bytes": 12,
+            "sha256": "b712eddc43eed4e738d7783ddcad4affe6a28788f5150a693250cf6be5d7ac8a",
+            "base64": "YWxwaGEKb21lZ2EK",
+            "utf8": "alpha\nomega\n"
+          },
+          "byteIdentical": true
+        }
+      },
+      {
+        "caseId": "normalized-ambiguity",
+        "path": "files/ambiguity.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/ambiguity.txt",
+            "edits": [
+              {
+                "oldText": "value=\"same\"",
+                "newText": "different"
+              }
+            ]
+          },
+          "suppliedAfter": {
+            "path": "files/ambiguity.txt",
+            "edits": [
+              {
+                "oldText": "value=\"same\"",
+                "newText": "different"
+              }
+            ]
+          },
+          "prepared": {
+            "path": "files/ambiguity.txt",
+            "edits": [
+              {
+                "oldText": "value=\"same\"",
+                "newText": "different"
+              }
+            ]
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": {
+          "normalization": {
+            "splitBom": {
+              "bom": "",
+              "text": "value=\"same\"\nvalue=“same”\n"
+            },
+            "detectedLineEnding": "\n",
+            "normalized": "value=\"same\"\nvalue=“same”\n",
+            "fuzzyView": "value=\"same\"\nvalue=\"same\"\n"
+          },
+          "matching": {
+            "status": "rejected",
+            "error": {
+              "name": "Error",
+              "message": "Found 2 occurrences of the text in files/ambiguity.txt. The text must be unique. Please provide more context to make it unique.",
+              "ownProperties": {}
+            }
+          },
+          "fuzzyFind": {
+            "status": "fulfilled",
+            "value": {
+              "found": true,
+              "index": 0,
+              "matchLength": 12,
+              "usedFuzzyMatch": false,
+              "contentForReplacement": "value=\"same\"\nvalue=“same”\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "generated": null
+        },
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "error": "Found 2 occurrences of the text in files/ambiguity.txt. The text must be unique. Please provide more context to make it unique."
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "rejected",
+          "error": {
+            "name": "Error",
+            "message": "Found 2 occurrences of the text in files/ambiguity.txt. The text must be unique. Please provide more context to make it unique.",
+            "ownProperties": {}
+          }
+        },
+        "filesystem": {
+          "before": {
+            "bytes": 30,
+            "sha256": "4690591afc9837ca15f6d35d239170a9dbb0d0a4c27d07f486be74853c04569e",
+            "base64": "dmFsdWU9InNhbWUiCnZhbHVlPeKAnHNhbWXigJ0K",
+            "utf8": "value=\"same\"\nvalue=“same”\n"
+          },
+          "after": {
+            "bytes": 30,
+            "sha256": "4690591afc9837ca15f6d35d239170a9dbb0d0a4c27d07f486be74853c04569e",
+            "base64": "dmFsdWU9InNhbWUiCnZhbHVlPeKAnHNhbWXigJ0K",
+            "utf8": "value=\"same\"\nvalue=“same”\n"
+          },
+          "byteIdentical": true
+        }
+      },
+      {
+        "caseId": "nested-overlap",
+        "path": "files/overlap.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/overlap.txt",
+            "edits": [
+              {
+                "oldText": "abcdef",
+                "newText": "wide"
+              },
+              {
+                "oldText": "bcd",
+                "newText": "inner"
+              }
+            ]
+          },
+          "suppliedAfter": {
+            "path": "files/overlap.txt",
+            "edits": [
+              {
+                "oldText": "abcdef",
+                "newText": "wide"
+              },
+              {
+                "oldText": "bcd",
+                "newText": "inner"
+              }
+            ]
+          },
+          "prepared": {
+            "path": "files/overlap.txt",
+            "edits": [
+              {
+                "oldText": "abcdef",
+                "newText": "wide"
+              },
+              {
+                "oldText": "bcd",
+                "newText": "inner"
+              }
+            ]
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": {
+          "normalization": {
+            "splitBom": {
+              "bom": "",
+              "text": "prefix abcdef suffix\n"
+            },
+            "detectedLineEnding": "\n",
+            "normalized": "prefix abcdef suffix\n",
+            "fuzzyView": "prefix abcdef suffix\n"
+          },
+          "matching": {
+            "status": "rejected",
+            "error": {
+              "name": "Error",
+              "message": "edits[0] and edits[1] overlap in files/overlap.txt. Merge them into one edit or target disjoint regions.",
+              "ownProperties": {}
+            }
+          },
+          "fuzzyFind": {
+            "status": "fulfilled",
+            "value": {
+              "found": true,
+              "index": 7,
+              "matchLength": 6,
+              "usedFuzzyMatch": false,
+              "contentForReplacement": "prefix abcdef suffix\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "generated": null
+        },
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "error": "edits[0] and edits[1] overlap in files/overlap.txt. Merge them into one edit or target disjoint regions."
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "rejected",
+          "error": {
+            "name": "Error",
+            "message": "edits[0] and edits[1] overlap in files/overlap.txt. Merge them into one edit or target disjoint regions.",
+            "ownProperties": {}
+          }
+        },
+        "filesystem": {
+          "before": {
+            "bytes": 21,
+            "sha256": "a4bafa3746bff3377eaaebd2bd4f7a711512553387074cdb61df00970e536aea",
+            "base64": "cHJlZml4IGFiY2RlZiBzdWZmaXgK",
+            "utf8": "prefix abcdef suffix\n"
+          },
+          "after": {
+            "bytes": 21,
+            "sha256": "a4bafa3746bff3377eaaebd2bd4f7a711512553387074cdb61df00970e536aea",
+            "base64": "cHJlZml4IGFiY2RlZiBzdWZmaXgK",
+            "utf8": "prefix abcdef suffix\n"
+          },
+          "byteIdentical": true
+        }
+      },
+      {
+        "caseId": "no-op",
+        "path": "files/no-op.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/no-op.txt",
+            "edits": [
+              {
+                "oldText": "same",
+                "newText": "same"
+              }
+            ]
+          },
+          "suppliedAfter": {
+            "path": "files/no-op.txt",
+            "edits": [
+              {
+                "oldText": "same",
+                "newText": "same"
+              }
+            ]
+          },
+          "prepared": {
+            "path": "files/no-op.txt",
+            "edits": [
+              {
+                "oldText": "same",
+                "newText": "same"
+              }
+            ]
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": {
+          "normalization": {
+            "splitBom": {
+              "bom": "",
+              "text": "same\n"
+            },
+            "detectedLineEnding": "\n",
+            "normalized": "same\n",
+            "fuzzyView": "same\n"
+          },
+          "matching": {
+            "status": "rejected",
+            "error": {
+              "name": "Error",
+              "message": "No changes made to files/no-op.txt. The replacement produced identical content. This might indicate an issue with special characters or the text not existing as expected.",
+              "ownProperties": {}
+            }
+          },
+          "fuzzyFind": {
+            "status": "fulfilled",
+            "value": {
+              "found": true,
+              "index": 0,
+              "matchLength": 4,
+              "usedFuzzyMatch": false,
+              "contentForReplacement": "same\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "generated": null
+        },
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "error": "No changes made to files/no-op.txt. The replacement produced identical content. This might indicate an issue with special characters or the text not existing as expected."
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "rejected",
+          "error": {
+            "name": "Error",
+            "message": "No changes made to files/no-op.txt. The replacement produced identical content. This might indicate an issue with special characters or the text not existing as expected.",
+            "ownProperties": {}
+          }
+        },
+        "filesystem": {
+          "before": {
+            "bytes": 5,
+            "sha256": "a6328afc76e9db71da297ebff4b0d3e7a7eb3b01d917c05a6573fef121b6ecb6",
+            "base64": "c2FtZQo=",
+            "utf8": "same\n"
+          },
+          "after": {
+            "bytes": 5,
+            "sha256": "a6328afc76e9db71da297ebff4b0d3e7a7eb3b01d917c05a6573fef121b6ecb6",
+            "base64": "c2FtZQo=",
+            "utf8": "same\n"
+          },
+          "byteIdentical": true
+        }
+      },
+      {
+        "caseId": "empty-edits",
+        "path": "files/empty-edits.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/empty-edits.txt",
+            "edits": []
+          },
+          "suppliedAfter": {
+            "path": "files/empty-edits.txt",
+            "edits": []
+          },
+          "prepared": {
+            "path": "files/empty-edits.txt",
+            "edits": []
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": {
+          "normalization": {
+            "splitBom": {
+              "bom": "",
+              "text": "unchanged\n"
+            },
+            "detectedLineEnding": "\n",
+            "normalized": "unchanged\n",
+            "fuzzyView": "unchanged\n"
+          },
+          "matching": {
+            "status": "rejected",
+            "error": {
+              "name": "Error",
+              "message": "No changes made to files/empty-edits.txt. The replacements produced identical content.",
+              "ownProperties": {}
+            }
+          },
+          "fuzzyFind": null,
+          "generated": null
+        },
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "error": "No changes made to files/empty-edits.txt. The replacements produced identical content."
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "rejected",
+          "error": {
+            "name": "Error",
+            "message": "Edit tool input is invalid. edits must contain at least one replacement.",
+            "ownProperties": {}
+          }
+        },
+        "filesystem": {
+          "before": {
+            "bytes": 10,
+            "sha256": "1cd263f1102656dd6b6cf1d626d1a96f9eba0406af3cb2a52560d473d4801052",
+            "base64": "dW5jaGFuZ2VkCg==",
+            "utf8": "unchanged\n"
+          },
+          "after": {
+            "bytes": 10,
+            "sha256": "1cd263f1102656dd6b6cf1d626d1a96f9eba0406af3cb2a52560d473d4801052",
+            "base64": "dW5jaGFuZ2VkCg==",
+            "utf8": "unchanged\n"
+          },
+          "byteIdentical": true
+        }
+      },
+      {
+        "caseId": "empty-old-text",
+        "path": "files/empty-old.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/empty-old.txt",
+            "edits": [
+              {
+                "oldText": "",
+                "newText": "insert"
+              }
+            ]
+          },
+          "suppliedAfter": {
+            "path": "files/empty-old.txt",
+            "edits": [
+              {
+                "oldText": "",
+                "newText": "insert"
+              }
+            ]
+          },
+          "prepared": {
+            "path": "files/empty-old.txt",
+            "edits": [
+              {
+                "oldText": "",
+                "newText": "insert"
+              }
+            ]
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": {
+          "normalization": {
+            "splitBom": {
+              "bom": "",
+              "text": "unchanged\n"
+            },
+            "detectedLineEnding": "\n",
+            "normalized": "unchanged\n",
+            "fuzzyView": "unchanged\n"
+          },
+          "matching": {
+            "status": "rejected",
+            "error": {
+              "name": "Error",
+              "message": "oldText must not be empty in files/empty-old.txt.",
+              "ownProperties": {}
+            }
+          },
+          "fuzzyFind": {
+            "status": "fulfilled",
+            "value": {
+              "found": true,
+              "index": 0,
+              "matchLength": 0,
+              "usedFuzzyMatch": false,
+              "contentForReplacement": "unchanged\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "generated": null
+        },
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "error": "oldText must not be empty in files/empty-old.txt."
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "rejected",
+          "error": {
+            "name": "Error",
+            "message": "oldText must not be empty in files/empty-old.txt.",
+            "ownProperties": {}
+          }
+        },
+        "filesystem": {
+          "before": {
+            "bytes": 10,
+            "sha256": "1cd263f1102656dd6b6cf1d626d1a96f9eba0406af3cb2a52560d473d4801052",
+            "base64": "dW5jaGFuZ2VkCg==",
+            "utf8": "unchanged\n"
+          },
+          "after": {
+            "bytes": 10,
+            "sha256": "1cd263f1102656dd6b6cf1d626d1a96f9eba0406af3cb2a52560d473d4801052",
+            "base64": "dW5jaGFuZ2VkCg==",
+            "utf8": "unchanged\n"
+          },
+          "byteIdentical": true
+        }
+      },
+      {
+        "caseId": "unicode-fuzzy-overlay",
+        "path": "files/unicode.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/unicode.txt",
+            "edits": "[{\"oldText\":\"value=Foo-café 😀\",\"newText\":\"value=Bar 😀\"},{\"oldText\":\"tail  \",\"newText\":\"done\"}]"
+          },
+          "suppliedAfter": {
+            "path": "files/unicode.txt",
+            "edits": [
+              {
+                "oldText": "value=Foo-café 😀",
+                "newText": "value=Bar 😀"
+              },
+              {
+                "oldText": "tail  ",
+                "newText": "done"
+              }
+            ]
+          },
+          "prepared": {
+            "path": "files/unicode.txt",
+            "edits": [
+              {
+                "oldText": "value=Foo-café 😀",
+                "newText": "value=Bar 😀"
+              },
+              {
+                "oldText": "tail  ",
+                "newText": "done"
+              }
+            ]
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": {
+          "normalization": {
+            "splitBom": {
+              "bom": "",
+              "text": "untouched: “keep”   \nuntouched: \"keep\"\nvalue=Ｆｏｏ—café 😀   \ntail  \n"
+            },
+            "detectedLineEnding": "\n",
+            "normalized": "untouched: “keep”   \nuntouched: \"keep\"\nvalue=Ｆｏｏ—café 😀   \ntail  \n",
+            "fuzzyView": "untouched: \"keep\"\nuntouched: \"keep\"\nvalue=Foo-café 😀\ntail\n"
+          },
+          "matching": {
+            "status": "fulfilled",
+            "value": {
+              "baseContent": "untouched: “keep”   \nuntouched: \"keep\"\nvalue=Ｆｏｏ—café 😀   \ntail  \n",
+              "newContent": "untouched: “keep”   \nuntouched: \"keep\"\nvalue=Bar 😀\ndone\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "fuzzyFind": {
+            "status": "fulfilled",
+            "value": {
+              "found": true,
+              "index": 36,
+              "matchLength": 17,
+              "usedFuzzyMatch": true,
+              "contentForReplacement": "untouched: \"keep\"\nuntouched: \"keep\"\nvalue=Foo-café 😀\ntail\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "generated": {
+            "display": {
+              "status": "fulfilled",
+              "value": {
+                "diff": " 1 untouched: “keep”   \n 2 untouched: \"keep\"\n-3 value=Ｆｏｏ—café 😀   \n-4 tail  \n+3 value=Bar 😀\n+4 done",
+                "firstChangedLine": 3
+              },
+              "ownUndefinedPaths": []
+            },
+            "patch": {
+              "status": "fulfilled",
+              "value": "--- files/unicode.txt\n+++ files/unicode.txt\n@@ -1,4 +1,4 @@\n untouched: “keep”   \n untouched: \"keep\"\n-value=Ｆｏｏ—café 😀   \n-tail  \n+value=Bar 😀\n+done\n",
+              "ownUndefinedPaths": []
+            },
+            "restoredLineEndings": "untouched: “keep”   \nuntouched: \"keep\"\nvalue=Bar 😀\ndone\n"
+          }
+        },
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "diff": " 1 untouched: “keep”   \n 2 untouched: \"keep\"\n-3 value=Ｆｏｏ—café 😀   \n-4 tail  \n+3 value=Bar 😀\n+4 done",
+            "firstChangedLine": 3
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "fulfilled",
+          "value": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Successfully replaced 2 block(s) in files/unicode.txt."
+              }
+            ],
+            "details": {
+              "diff": " 1 untouched: “keep”   \n 2 untouched: \"keep\"\n-3 value=Ｆｏｏ—café 😀   \n-4 tail  \n+3 value=Bar 😀\n+4 done",
+              "patch": "--- files/unicode.txt\n+++ files/unicode.txt\n@@ -1,4 +1,4 @@\n untouched: “keep”   \n untouched: \"keep\"\n-value=Ｆｏｏ—café 😀   \n-tail  \n+value=Bar 😀\n+done\n",
+              "firstChangedLine": 3
+            }
+          },
+          "ownUndefinedPaths": []
+        },
+        "filesystem": {
+          "before": {
+            "bytes": 83,
+            "sha256": "611c2f8b5e3496832f8c5d653dde1313773fc60be6d4d941014566a20ad14093",
+            "base64": "dW50b3VjaGVkOiDigJxrZWVw4oCdICAgCnVudG91Y2hlZDogImtlZXAiCnZhbHVlPe+8pu+9j++9j+KAlGNhZmXMgSDwn5iAICAgCnRhaWwgIAo=",
+            "utf8": "untouched: “keep”   \nuntouched: \"keep\"\nvalue=Ｆｏｏ—café 😀   \ntail  \n"
+          },
+          "after": {
+            "bytes": 63,
+            "sha256": "d27f4d1ce020f8c7e446d3eff609aa79c5f4d4035bc3ad8c1de73a958ad110a6",
+            "base64": "dW50b3VjaGVkOiDigJxrZWVw4oCdICAgCnVudG91Y2hlZDogImtlZXAiCnZhbHVlPUJhciDwn5iACmRvbmUK",
+            "utf8": "untouched: “keep”   \nuntouched: \"keep\"\nvalue=Bar 😀\ndone\n"
+          },
+          "byteIdentical": false
+        }
+      },
+      {
+        "caseId": "bom-mixed-endings",
+        "path": "files/BOM π.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/BOM π.txt",
+            "oldText": "second\nthird",
+            "newText": "SECOND\nTHIRD"
+          },
+          "suppliedAfter": {
+            "path": "files/BOM π.txt",
+            "oldText": "second\nthird",
+            "newText": "SECOND\nTHIRD"
+          },
+          "prepared": {
+            "path": "files/BOM π.txt",
+            "edits": [
+              {
+                "oldText": "second\nthird",
+                "newText": "SECOND\nTHIRD"
+              }
+            ]
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": {
+          "normalization": {
+            "splitBom": {
+              "bom": "﻿",
+              "text": "first\r\nsecond\nthird\rEND"
+            },
+            "detectedLineEnding": "\r\n",
+            "normalized": "first\nsecond\nthird\nEND",
+            "fuzzyView": "first\nsecond\nthird\nEND"
+          },
+          "matching": {
+            "status": "fulfilled",
+            "value": {
+              "baseContent": "first\nsecond\nthird\nEND",
+              "newContent": "first\nSECOND\nTHIRD\nEND"
+            },
+            "ownUndefinedPaths": []
+          },
+          "fuzzyFind": {
+            "status": "fulfilled",
+            "value": {
+              "found": true,
+              "index": 6,
+              "matchLength": 12,
+              "usedFuzzyMatch": false,
+              "contentForReplacement": "first\nsecond\nthird\nEND"
+            },
+            "ownUndefinedPaths": []
+          },
+          "generated": {
+            "display": {
+              "status": "fulfilled",
+              "value": {
+                "diff": " 1 first\n-2 second\n-3 third\n+2 SECOND\n+3 THIRD\n 4 END",
+                "firstChangedLine": 2
+              },
+              "ownUndefinedPaths": []
+            },
+            "patch": {
+              "status": "fulfilled",
+              "value": "--- files/BOM π.txt\n+++ files/BOM π.txt\n@@ -1,4 +1,4 @@\n first\n-second\n-third\n+SECOND\n+THIRD\n END\n\\ No newline at end of file\n",
+              "ownUndefinedPaths": []
+            },
+            "restoredLineEndings": "first\r\nSECOND\r\nTHIRD\r\nEND"
+          }
+        },
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "diff": " 1 first\n-2 second\n-3 third\n+2 SECOND\n+3 THIRD\n 4 END",
+            "firstChangedLine": 2
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "fulfilled",
+          "value": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Successfully replaced 1 block(s) in files/BOM π.txt."
+              }
+            ],
+            "details": {
+              "diff": " 1 first\n-2 second\n-3 third\n+2 SECOND\n+3 THIRD\n 4 END",
+              "patch": "--- files/BOM π.txt\n+++ files/BOM π.txt\n@@ -1,4 +1,4 @@\n first\n-second\n-third\n+SECOND\n+THIRD\n END\n\\ No newline at end of file\n",
+              "firstChangedLine": 2
+            }
+          },
+          "ownUndefinedPaths": []
+        },
+        "filesystem": {
+          "before": {
+            "bytes": 26,
+            "sha256": "bf73506568fc1bd131670810f07f9eb9c07a51378d43ef67e0126cfa4add92be",
+            "base64": "77u/Zmlyc3QNCnNlY29uZAp0aGlyZA1FTkQ=",
+            "utf8": "﻿first\r\nsecond\nthird\rEND"
+          },
+          "after": {
+            "bytes": 28,
+            "sha256": "a8c47410005d638cb7a2d5b652d97576b9a73b907d32bf76338ffa8d5da041ee",
+            "base64": "77u/Zmlyc3QNClNFQ09ORA0KVEhJUkQNCkVORA==",
+            "utf8": "﻿first\r\nSECOND\r\nTHIRD\r\nEND"
+          },
+          "byteIdentical": false
+        }
+      },
+      {
+        "caseId": "single-object-preparation",
+        "path": "files/single.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/single.txt",
+            "edits": {
+              "oldText": "one",
+              "newText": "ONE"
+            }
+          },
+          "suppliedAfter": {
+            "path": "files/single.txt",
+            "edits": [
+              {
+                "oldText": "one",
+                "newText": "ONE"
+              }
+            ]
+          },
+          "prepared": {
+            "path": "files/single.txt",
+            "edits": [
+              {
+                "oldText": "one",
+                "newText": "ONE"
+              }
+            ]
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": {
+          "normalization": {
+            "splitBom": {
+              "bom": "",
+              "text": "one\ntwo\n"
+            },
+            "detectedLineEnding": "\n",
+            "normalized": "one\ntwo\n",
+            "fuzzyView": "one\ntwo\n"
+          },
+          "matching": {
+            "status": "fulfilled",
+            "value": {
+              "baseContent": "one\ntwo\n",
+              "newContent": "ONE\ntwo\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "fuzzyFind": {
+            "status": "fulfilled",
+            "value": {
+              "found": true,
+              "index": 0,
+              "matchLength": 3,
+              "usedFuzzyMatch": false,
+              "contentForReplacement": "one\ntwo\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "generated": {
+            "display": {
+              "status": "fulfilled",
+              "value": {
+                "diff": "-1 one\n+1 ONE\n 2 two",
+                "firstChangedLine": 1
+              },
+              "ownUndefinedPaths": []
+            },
+            "patch": {
+              "status": "fulfilled",
+              "value": "--- files/single.txt\n+++ files/single.txt\n@@ -1,2 +1,2 @@\n-one\n+ONE\n two\n",
+              "ownUndefinedPaths": []
+            },
+            "restoredLineEndings": "ONE\ntwo\n"
+          }
+        },
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "diff": "-1 one\n+1 ONE\n 2 two",
+            "firstChangedLine": 1
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "fulfilled",
+          "value": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Successfully replaced 1 block(s) in files/single.txt."
+              }
+            ],
+            "details": {
+              "diff": "-1 one\n+1 ONE\n 2 two",
+              "patch": "--- files/single.txt\n+++ files/single.txt\n@@ -1,2 +1,2 @@\n-one\n+ONE\n two\n",
+              "firstChangedLine": 1
+            }
+          },
+          "ownUndefinedPaths": []
+        },
+        "filesystem": {
+          "before": {
+            "bytes": 8,
+            "sha256": "c3f9c8c283a2b1f2f1896f27a01cbe3cddc0c9d93f752e4639035a0f5b36f6e8",
+            "base64": "b25lCnR3bwo=",
+            "utf8": "one\ntwo\n"
+          },
+          "after": {
+            "bytes": 8,
+            "sha256": "c78a5ec2c28be893afb6225ef05c556ef289bb4b6b76e7fc358c29e791179123",
+            "base64": "T05FCnR3bwo=",
+            "utf8": "ONE\ntwo\n"
+          },
+          "byteIdentical": false
+        }
+      },
+      {
+        "caseId": "legacy-appended",
+        "path": "files/legacy.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/legacy.txt",
+            "edits": [
+              {
+                "oldText": "beta",
+                "newText": "BETA"
+              }
+            ],
+            "oldText": "alpha",
+            "newText": "ALPHA"
+          },
+          "suppliedAfter": {
+            "path": "files/legacy.txt",
+            "edits": [
+              {
+                "oldText": "beta",
+                "newText": "BETA"
+              }
+            ],
+            "oldText": "alpha",
+            "newText": "ALPHA"
+          },
+          "prepared": {
+            "path": "files/legacy.txt",
+            "edits": [
+              {
+                "oldText": "beta",
+                "newText": "BETA"
+              },
+              {
+                "oldText": "alpha",
+                "newText": "ALPHA"
+              }
+            ]
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": {
+          "normalization": {
+            "splitBom": {
+              "bom": "",
+              "text": "alpha\nbeta\n"
+            },
+            "detectedLineEnding": "\n",
+            "normalized": "alpha\nbeta\n",
+            "fuzzyView": "alpha\nbeta\n"
+          },
+          "matching": {
+            "status": "fulfilled",
+            "value": {
+              "baseContent": "alpha\nbeta\n",
+              "newContent": "ALPHA\nBETA\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "fuzzyFind": {
+            "status": "fulfilled",
+            "value": {
+              "found": true,
+              "index": 6,
+              "matchLength": 4,
+              "usedFuzzyMatch": false,
+              "contentForReplacement": "alpha\nbeta\n"
+            },
+            "ownUndefinedPaths": []
+          },
+          "generated": {
+            "display": {
+              "status": "fulfilled",
+              "value": {
+                "diff": "-1 alpha\n-2 beta\n+1 ALPHA\n+2 BETA",
+                "firstChangedLine": 1
+              },
+              "ownUndefinedPaths": []
+            },
+            "patch": {
+              "status": "fulfilled",
+              "value": "--- files/legacy.txt\n+++ files/legacy.txt\n@@ -1,2 +1,2 @@\n-alpha\n-beta\n+ALPHA\n+BETA\n",
+              "ownUndefinedPaths": []
+            },
+            "restoredLineEndings": "ALPHA\nBETA\n"
+          }
+        },
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "diff": "-1 alpha\n-2 beta\n+1 ALPHA\n+2 BETA",
+            "firstChangedLine": 1
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "fulfilled",
+          "value": {
+            "content": [
+              {
+                "type": "text",
+                "text": "Successfully replaced 2 block(s) in files/legacy.txt."
+              }
+            ],
+            "details": {
+              "diff": "-1 alpha\n-2 beta\n+1 ALPHA\n+2 BETA",
+              "patch": "--- files/legacy.txt\n+++ files/legacy.txt\n@@ -1,2 +1,2 @@\n-alpha\n-beta\n+ALPHA\n+BETA\n",
+              "firstChangedLine": 1
+            }
+          },
+          "ownUndefinedPaths": []
+        },
+        "filesystem": {
+          "before": {
+            "bytes": 11,
+            "sha256": "e49c81e2d2f84e259d40e2fb8192f3bcd198b355184845d76d8f58807d0d78ee",
+            "base64": "YWxwaGEKYmV0YQo=",
+            "utf8": "alpha\nbeta\n"
+          },
+          "after": {
+            "bytes": 11,
+            "sha256": "83df7e59ceaa1be993682062cd27bf49781e1308635f50e096567e573b94a12a",
+            "base64": "QUxQSEEKQkVUQQo=",
+            "utf8": "ALPHA\nBETA\n"
+          },
+          "byteIdentical": false
+        }
+      },
+      {
+        "caseId": "missing-file-access",
+        "path": "files/missing.txt",
+        "preparation": {
+          "suppliedBefore": {
+            "path": "files/missing.txt",
+            "edits": [
+              {
+                "oldText": "old",
+                "newText": "new"
+              }
+            ]
+          },
+          "suppliedAfter": {
+            "path": "files/missing.txt",
+            "edits": [
+              {
+                "oldText": "old",
+                "newText": "new"
+              }
+            ]
+          },
+          "prepared": {
+            "path": "files/missing.txt",
+            "edits": [
+              {
+                "oldText": "old",
+                "newText": "new"
+              }
+            ]
+          },
+          "ownUndefinedPaths": []
+        },
+        "helperObservations": null,
+        "preview": {
+          "status": "fulfilled",
+          "value": {
+            "error": "Could not edit file: files/missing.txt. Error code: ENOENT."
+          },
+          "ownUndefinedPaths": []
+        },
+        "result": {
+          "status": "rejected",
+          "error": {
+            "name": "Error",
+            "message": "Could not edit file: files/missing.txt. Error code: ENOENT.",
+            "ownProperties": {}
+          }
+        },
+        "filesystem": {
+          "before": null,
+          "after": null,
+          "byteIdentical": true
+        }
+      }
+    ],
+    "checks": {
+      "caseCount": 12,
+      "wholeUnchangedEditAndDiffModules": true,
+      "factory": "createEditToolDefinition",
+      "defaultRealFilesystemOperations": true,
+      "rendererOrNativeHelperInvoked": false,
+      "noClockOrRngOverride": true,
+      "networkAndProcessesBlocked": true
+    },
+    "filesystemScope": "Only this child verified-confined owned workspace; authored relative paths are actual source inputs",
+    "failureContract": "Raw error name/message and all additional own properties; stack excluded from serializable contract observation, never normalized"
+  }
+}

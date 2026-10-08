@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "session-context-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "P4-03",
+    "P4-04",
+    "P4-06"
+  ],
+  "clock": {
+    "mechanism": "Entry ISO dates and nested message Unix milliseconds are authored; Date/Date.now remain unchanged"
+  },
+  "seed": "Explicit authored IDs and selected leaf IDs; no RNG replacement",
+  "normalizerVersion": "object-key-order-v1; raw-json-scalars-arrays-and-opaque-fields-retained",
+  "input": {
+    "path": "fixtures/pi-v0.99.1/session-context/core.input.json",
+    "sha256": "f08048cf0be58181482aa5029f8c1cde340a62cbd18fa90760cfb5bc5010c0b9",
+    "kind": "authored-v3-session-forest-and-selected-leaf-input"
+  },
+  "expected": {
+    "path": "fixtures/pi-v0.99.1/session-context/core.expected.json",
+    "sha256": "27926944c7f0cf5cdf1f65188dcce0cf14132b932e8784af65796c723f516a09",
+    "kind": "captured-unchanged-session-context-oracle"
+  },
+  "lock": {
+    "path": "fixtures/pi-v0.99.1/session-context/oracle.lock.json",
+    "sha256": "f5c886a1b9e171103eba930297333961cd9e5352b7b235f29eb40defdf16d2bb"
+  },
+  "provenance": {
+    "source": "Unchanged whole packages/coding-agent/src/core/session-manager.ts and messages.ts public exports",
+    "dependencies": "Exact eight upstream-lock archives and fully verified installed files",
+    "sourceResolver": "Unchanged canonical experimental/source-resolver.ts",
+    "observations": "Synchronous public projection/context and separate LLM conversion snapshots; own undefined fields separately recorded",
+    "input": "authored v3 entries and leaf IDs, no user session/tool output",
+    "credentials": "explicit credential-free offline child environment",
+    "clock": "authored dates only; no Date/Date.now or RNG override",
+    "repeatRuns": 2,
+    "byteIdentical": true,
+    "captureCommand": "node tools/PiReferenceRunner/capture-session-context.mjs --capture-new --oracle APPROVED_SESSION_ORACLE"
+  },
+  "scope": "Four selected context cases including one stored compaction/edit/summary/bash path; genuine source only, no native parity/session persistence/generation/full phase closure"
+}

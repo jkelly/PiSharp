@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "kind": "typescript7-native-async-semantic-smoke-plan",
+  "status": "authored; root-reviewed offline setup and native invocation pending",
+  "oracle": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-oracle-v0.99.1",
+  "runtime": {
+    "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "git": {
+    "path": "C:/Program Files/Git/cmd/git.exe",
+    "sha256": "7b7971dd13f0c3a284e538601f2f9770b3a87dfaccb5fb52d68141c67ed22364",
+    "actions": ["rev-parse HEAD", "status --porcelain=v1 --untracked-files=all", "ls-tree -r -z HEAD", "cat-file blob OBJECT"]
+  },
+  "source": {
+    "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-edit-oracle-v0.99.1/upstream",
+    "repository": "https://github.com/earendil-works/pi",
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "canonicalFiles": 2093,
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+    "attributeConversions": ["pi-test.bat", "pi-test.ps1"]
+  },
+  "admission": {
+    "path": "compatibility/ast-archive-admission.json",
+    "sha256": "b019f67110323622948e54771e015f7fbe2e8a4d1ec99ed1be450064f914c3e2",
+    "inspector": "tools/SurfaceInventory/inspect-ast-archives.mjs",
+    "inspectorSha256": "ac6c53f6dd692b2c69bd8ecfcd1003370f6d389a776a4a269f6d14be370db763",
+    "inspectorDependency": "tools/CompatibilityReport/raw-json.mjs",
+    "inspectorDependencySha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9",
+    "archiveRoot": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/PiSharp-native-extension-surface-work/artifacts/ast-archive-inspection/archives"
+  },
+  "packages": [
+    {
+      "name": "typescript", "version": "7.0.2", "archive": "typescript-7.0.2.tgz",
+      "url": "https://registry.npmjs.org/typescript/-/typescript-7.0.2.tgz",
+      "bytes": 365612, "files": 416,
+      "sha256": "da2513f4b95176d6dde8b51aab7afe8a927656c9d277369793f77f7e59371c08",
+      "integrity": "sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA=="
+    },
+    {
+      "name": "@typescript/typescript-win32-x64", "version": "7.0.2", "archive": "typescript-win32-x64-7.0.2.tgz",
+      "url": "https://registry.npmjs.org/@typescript/typescript-win32-x64/-/typescript-win32-x64-7.0.2.tgz",
+      "bytes": 9776626, "files": 113,
+      "sha256": "61fc4e141d2bc687db580e71bbfa63b9c209f0310645d82ca1b457eb3a24fd19",
+      "integrity": "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="
+    }
+  ],
+  "native": {
+    "path": "node_modules/@typescript/typescript-win32-x64/lib/tsc.exe",
+    "bytes": 24520544,
+    "sha256": "f9ecfbdc93753d2c972d66a8d0d75f5bd737fd4a5f88b422d9091ea282bcb2c7",
+    "arguments": ["--api", "--async", "--cwd", "{oracle}/upstream", "--callbacks=readFile,fileExists,directoryExists,getAccessibleEntries,realpath"],
+    "stdio": ["pipe", "pipe", "inherit"],
+    "childExitTimeoutMs": 30000
+  },
+  "smokeInput": "fixtures/semantic-api/input.json",
+  "limits": {
+    "regularFileBytes": 33554432,
+    "sourceTotalBytes": 134217728,
+    "capturedBytes": 33554432,
+    "driverTimeoutMs": 120000,
+    "jsonDepth": 64,
+    "jsonNodes": 250000
+  },
+  "futureDeclarationGates": [
+    {"name": "@types/node", "version": "22.19.19", "integrity": "sha512-dyh/xO2Fh5bYrfWaaqGrRQQGkNdmYw6AmaAUvYeUMNTWQtvb796ikLdmTchRmOlOiIJ1TDXfWgVx1QkUlQ6Hew==", "status": "not acquired/admitted by this lane"},
+    {"name": "undici-types", "version": "6.21.0", "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==", "status": "not acquired/admitted by this lane"},
+    {"scope": "reachable SDK/library and published declaration closure", "status": "derive exact package instances from actual diagnostics; mandatory unresolved"}
+  ],
+  "claims": {"upstreamModulesExecuted": false, "semanticPublicClosure": false, "phaseGatesPassed": []}
+}

@@ -1,0 +1,3202 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "comparisonPolicy": {
+    "version": 1,
+    "raw": "Full own enumerable observations and exact physical UTF-8/base64 bytes are retained. Own undefined fields are separately enumerated. No raw ID, clock, cwd, parent link, record or path is replaced.",
+    "contract": "A separately named derivation projects checkpoint counts, ordered entry types, runtime/LLM roles and text, model/thinking settings, full custom state and hidden-message payloads; it also evaluates declared within-run identity, ancestry, parent-file and byte-preservation relations.",
+    "omittedFromCrossRunContract": [
+      "actual generated IDs",
+      "actual timestamp values",
+      "actual absolute scratch/cwd/file paths",
+      "raw byte hashes",
+      "filesystem call counts"
+    ],
+    "omittedFieldsRetainedAt": "cases[].rawObservations (and the retained scratch JSONL files); omissions affect only explicit cross-run contract comparison.",
+    "repeatRule": "Two fresh runs must have equal derived contracts and loaded module pins. Raw observations may differ because real clocks, random identifiers and fresh paths are used.",
+    "modelInputs": "No provider execution. Ordinary user/assistant inputs and custom payloads are finite authored data. Custom state is raw session data; display:false custom messages contribute to context and public convertToLlm.",
+    "scope": "Eight concrete SessionManager lifecycle schedules; no original package, full phase, provider, compaction or native parity closure claim."
+  },
+  "authoredInput": {
+    "model": {
+      "provider": "fixture",
+      "modelId": "fixture-model"
+    },
+    "thinkingLevel": "off",
+    "system": "fixture system",
+    "hidden": {
+      "customType": "fixture.hidden",
+      "content": "fixture hidden",
+      "display": false,
+      "details": {
+        "opaque": {
+          "retained": true
+        },
+        "displayOnly": false
+      }
+    },
+    "stateType": "fixture.native/state",
+    "state": {
+      "version": 1,
+      "value": "common",
+      "future": {
+        "enabled": false,
+        "values": [
+          1.25,
+          null,
+          "λ"
+        ]
+      }
+    },
+    "user": "fixture user",
+    "assistant": "fixture assistant",
+    "left": "fixture left",
+    "right": "fixture right"
+  },
+  "cases": [
+    {
+      "caseId": "memory-zero-files",
+      "operations": [
+        "SessionManager.inMemory",
+        "appendModelChange",
+        "appendThinkingLevelChange",
+        "appendMessage(system)",
+        "appendCustomEntry(common)",
+        "appendCustomMessageEntry(display:false)",
+        "appendMessage(user)",
+        "appendMessage(left assistant)",
+        "appendCustomEntry(left)",
+        "branch(common user)",
+        "appendMessage(right assistant)",
+        "appendCustomEntry(right)",
+        "branch(left state)",
+        "createBranchedSession(left state)",
+        "newSession"
+      ],
+      "contract": {
+        "checkpoints": [
+          {
+            "name": "created",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 0,
+            "branchCount": 0,
+            "entryTypes": [],
+            "branchTypes": [],
+            "runtimeRoles": [],
+            "llmRoles": [],
+            "runtimeText": [],
+            "llmText": [],
+            "model": null,
+            "thinkingLevel": "off",
+            "physicalCustomState": [],
+            "selectedCustomState": [],
+            "hiddenMessages": [],
+            "isPersistedConfiguration": false,
+            "sessionFileDefined": false,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "selected-left",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 10,
+            "branchCount": 8,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom",
+              "message",
+              "custom"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "right",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": false,
+            "sessionFileDefined": false,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "forked-left",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 8,
+            "branchCount": 8,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": false,
+            "sessionFileDefined": false,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "new-session",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 0,
+            "branchCount": 0,
+            "entryTypes": [],
+            "branchTypes": [],
+            "runtimeRoles": [],
+            "llmRoles": [],
+            "runtimeText": [],
+            "llmText": [],
+            "model": null,
+            "thinkingLevel": "off",
+            "physicalCustomState": [],
+            "selectedCustomState": [],
+            "hiddenMessages": [],
+            "isPersistedConfiguration": false,
+            "sessionFileDefined": false,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          }
+        ],
+        "relations": {
+          "managerOperationsUseZeroFilesystemCalls": true,
+          "noPhysicalFiles": true,
+          "memoryForkReturnsUndefined": true,
+          "memoryForkHasNoParentFile": true,
+          "forkIdentityFresh": true,
+          "newIdentityFresh": true,
+          "forkRetainsSelectedIds": true,
+          "forkExcludesRightSibling": true,
+          "newSessionIsEmptyRoot": true
+        }
+      }
+    },
+    {
+      "caseId": "lazy-setup-no-file",
+      "operations": [
+        "SessionManager.create",
+        "appendModelChange",
+        "appendThinkingLevelChange",
+        "appendMessage(system)",
+        "appendCustomEntry(common)",
+        "appendCustomMessageEntry(display:false)",
+        "newSession"
+      ],
+      "contract": {
+        "checkpoints": [
+          {
+            "name": "created",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 0,
+            "branchCount": 0,
+            "entryTypes": [],
+            "branchTypes": [],
+            "runtimeRoles": [],
+            "llmRoles": [],
+            "runtimeText": [],
+            "llmText": [],
+            "model": null,
+            "thinkingLevel": "off",
+            "physicalCustomState": [],
+            "selectedCustomState": [],
+            "hiddenMessages": [],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "setup-pending",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 5,
+            "branchCount": 5,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom"
+            ],
+            "llmRoles": [
+              "system",
+              "user"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "new-session",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 0,
+            "branchCount": 0,
+            "entryTypes": [],
+            "branchTypes": [],
+            "runtimeRoles": [],
+            "llmRoles": [],
+            "runtimeText": [],
+            "llmText": [],
+            "model": null,
+            "thinkingLevel": "off",
+            "physicalCustomState": [],
+            "selectedCustomState": [],
+            "hiddenMessages": [],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          }
+        ],
+        "relations": {
+          "setupDoesNotCreateFile": true,
+          "hiddenMessageDoesNotTriggerPersistence": true,
+          "setupRetainsFiveRecords": true,
+          "configuredPersistenceIsNotFileExistence": true,
+          "setupKeepsIdentity": true,
+          "newIdentityFresh": true,
+          "newSessionIsEmptyRoot": true,
+          "abandonedPendingSourceHasNoFile": true
+        }
+      }
+    },
+    {
+      "caseId": "lazy-user-materializes",
+      "operations": [
+        "SessionManager.create",
+        "appendModelChange",
+        "appendThinkingLevelChange",
+        "appendMessage(system)",
+        "appendCustomEntry(common)",
+        "appendCustomMessageEntry(display:false)",
+        "appendMessage(user)",
+        "appendMessage(assistant)",
+        "newSession"
+      ],
+      "contract": {
+        "checkpoints": [
+          {
+            "name": "before-user",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 5,
+            "branchCount": 5,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom"
+            ],
+            "llmRoles": [
+              "system",
+              "user"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "after-first-user",
+            "fileExists": true,
+            "physicalRecordCount": 7,
+            "entryCount": 6,
+            "branchCount": 6,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "after-assistant",
+            "fileExists": true,
+            "physicalRecordCount": 8,
+            "entryCount": 7,
+            "branchCount": 7,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture assistant"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture assistant"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "new-session",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 0,
+            "branchCount": 0,
+            "entryTypes": [],
+            "branchTypes": [],
+            "runtimeRoles": [],
+            "llmRoles": [],
+            "runtimeText": [],
+            "llmText": [],
+            "model": null,
+            "thinkingLevel": "off",
+            "physicalCustomState": [],
+            "selectedCustomState": [],
+            "hiddenMessages": [],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          }
+        ],
+        "relations": {
+          "firstUserCreatesFile": true,
+          "firstUserMaterializesEntireAccumulatedLog": true,
+          "assistantAppendsToActualPrefix": true,
+          "sourceIdentityKeptUntilNew": true,
+          "newIdentityFresh": true,
+          "newSessionDeferred": true,
+          "newSessionPreservesOldPhysicalFile": true
+        }
+      }
+    },
+    {
+      "caseId": "lazy-assistant-materializes",
+      "operations": [
+        "SessionManager.create",
+        "appendModelChange",
+        "appendThinkingLevelChange",
+        "appendMessage(system)",
+        "appendCustomEntry(common)",
+        "appendCustomMessageEntry(display:false)",
+        "appendMessage(assistant)"
+      ],
+      "contract": {
+        "checkpoints": [
+          {
+            "name": "before-assistant",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 5,
+            "branchCount": 5,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom"
+            ],
+            "llmRoles": [
+              "system",
+              "user"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "after-first-assistant",
+            "fileExists": true,
+            "physicalRecordCount": 7,
+            "entryCount": 6,
+            "branchCount": 6,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture assistant"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture assistant"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          }
+        ],
+        "relations": {
+          "firstAssistantCreatesFile": true,
+          "firstAssistantMaterializesEntireAccumulatedLog": true,
+          "noOrdinaryUserRequired": true,
+          "identityKept": true
+        }
+      }
+    },
+    {
+      "caseId": "in-file-branch-keeps-siblings",
+      "operations": [
+        "SessionManager.create",
+        "appendModelChange",
+        "appendThinkingLevelChange",
+        "appendMessage(system)",
+        "appendCustomEntry(common)",
+        "appendCustomMessageEntry(display:false)",
+        "appendMessage(user)",
+        "appendMessage(left assistant)",
+        "appendCustomEntry(left)",
+        "branch(common user)",
+        "appendMessage(right assistant)",
+        "appendCustomEntry(right)",
+        "branch(left state)",
+        "resetLeaf",
+        "branch(left state)",
+        "SessionManager.open"
+      ],
+      "contract": {
+        "checkpoints": [
+          {
+            "name": "selected-left",
+            "fileExists": true,
+            "physicalRecordCount": 11,
+            "entryCount": 10,
+            "branchCount": 8,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom",
+              "message",
+              "custom"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "right",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "selected-root",
+            "fileExists": true,
+            "physicalRecordCount": 11,
+            "entryCount": 10,
+            "branchCount": 0,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom",
+              "message",
+              "custom"
+            ],
+            "branchTypes": [],
+            "runtimeRoles": [],
+            "llmRoles": [],
+            "runtimeText": [],
+            "llmText": [],
+            "model": null,
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "right",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [],
+            "hiddenMessages": [],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "restored-left",
+            "fileExists": true,
+            "physicalRecordCount": 11,
+            "entryCount": 10,
+            "branchCount": 8,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom",
+              "message",
+              "custom"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "right",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "reopened-physical-tail",
+            "fileExists": true,
+            "physicalRecordCount": 11,
+            "entryCount": 10,
+            "branchCount": 8,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom",
+              "message",
+              "custom"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture right"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture right"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "right",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "right",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          }
+        ],
+        "relations": {
+          "selectedLeafDiffersFromPhysicalTail": true,
+          "siblingRetainedPhysically": true,
+          "siblingExcludedFromSelectedBranch": true,
+          "rootHasEmptyBranchAndContext": true,
+          "rootAndReturnDoNotRewriteFile": true,
+          "returnRestoresSelectedBranch": true,
+          "reopenUsesPhysicalTail": true,
+          "reopenPreservesSourceBytes": true
+        }
+      }
+    },
+    {
+      "caseId": "fork-selected-fresh-parent",
+      "operations": [
+        "SessionManager.create",
+        "appendModelChange",
+        "appendThinkingLevelChange",
+        "appendMessage(system)",
+        "appendCustomEntry(common)",
+        "appendCustomMessageEntry(display:false)",
+        "appendMessage(user)",
+        "appendMessage(left assistant)",
+        "appendCustomEntry(left)",
+        "branch(common user)",
+        "appendMessage(right assistant)",
+        "appendCustomEntry(right)",
+        "branch(left state)",
+        "createBranchedSession(left state)",
+        "SessionManager.open(fork)"
+      ],
+      "contract": {
+        "checkpoints": [
+          {
+            "name": "selected-source",
+            "fileExists": true,
+            "physicalRecordCount": 11,
+            "entryCount": 10,
+            "branchCount": 8,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom",
+              "message",
+              "custom"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "right",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "forked-left",
+            "fileExists": true,
+            "physicalRecordCount": 9,
+            "entryCount": 8,
+            "branchCount": 8,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "reopened-fork",
+            "fileExists": true,
+            "physicalRecordCount": 9,
+            "entryCount": 8,
+            "branchCount": 8,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message",
+              "custom"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture left"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          }
+        ],
+        "relations": {
+          "forkIdentityFresh": true,
+          "forkPathFresh": true,
+          "forkHasActualSourceParentFile": true,
+          "forkKeepsActualSourceCwd": true,
+          "forkRetainsSelectedIds": true,
+          "forkExcludesRightSibling": true,
+          "conversationForkIsImmediatelyPhysical": true,
+          "forkPreservesSourceBytes": true,
+          "reopenPreservesBothPhysicalFiles": true,
+          "reopenRestoresSelectedContext": true
+        }
+      }
+    },
+    {
+      "caseId": "setup-only-fork-remains-lazy",
+      "operations": [
+        "SessionManager.create",
+        "appendModelChange",
+        "appendThinkingLevelChange",
+        "appendMessage(system)",
+        "appendCustomEntry(common)",
+        "appendCustomMessageEntry(display:false)",
+        "appendCustomEntry(left)",
+        "branch(hidden setup)",
+        "appendCustomEntry(right)",
+        "createBranchedSession(left state)",
+        "appendCustomEntry(after-fork)",
+        "appendMessage(assistant)"
+      ],
+      "contract": {
+        "checkpoints": [
+          {
+            "name": "setup-only-source",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 7,
+            "branchCount": 6,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "custom",
+              "custom"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "custom"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom"
+            ],
+            "llmRoles": [
+              "system",
+              "user"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "right",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "right",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "setup-only-fork",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 6,
+            "branchCount": 6,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "custom"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "custom"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom"
+            ],
+            "llmRoles": [
+              "system",
+              "user"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "fork-state-pending",
+            "fileExists": false,
+            "physicalRecordCount": 0,
+            "entryCount": 7,
+            "branchCount": 7,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "custom",
+              "custom"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "custom",
+              "custom"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom"
+            ],
+            "llmRoles": [
+              "system",
+              "user"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "after-fork",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "after-fork",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "fork-first-assistant",
+            "fileExists": true,
+            "physicalRecordCount": 9,
+            "entryCount": 8,
+            "branchCount": 8,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "custom",
+              "custom",
+              "message"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "custom",
+              "custom",
+              "message"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture assistant"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture assistant"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "after-fork",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "left",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              },
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "after-fork",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          }
+        ],
+        "relations": {
+          "sourceSetupHasNoPhysicalFile": true,
+          "setupOnlyForkHasNoPhysicalFile": true,
+          "furtherStateStillDoesNotCreateFile": true,
+          "forkIdentityFresh": true,
+          "forkHasAllocatedSourceParentFile": true,
+          "forkSelectsLeftAndExcludesRight": true,
+          "firstAssistantMaterializesAccumulatedFork": true,
+          "unmaterializedSourceStaysAbsent": true
+        }
+      }
+    },
+    {
+      "caseId": "open-reload-hidden-state",
+      "operations": [
+        "SessionManager.create",
+        "appendModelChange",
+        "appendThinkingLevelChange",
+        "appendMessage(system)",
+        "appendCustomEntry(common)",
+        "appendCustomMessageEntry(display:false)",
+        "appendMessage(user)",
+        "appendMessage(assistant)",
+        "SessionManager.open"
+      ],
+      "contract": {
+        "checkpoints": [
+          {
+            "name": "before-open",
+            "fileExists": true,
+            "physicalRecordCount": 8,
+            "entryCount": 7,
+            "branchCount": 7,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture assistant"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture assistant"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          },
+          {
+            "name": "after-open",
+            "fileExists": true,
+            "physicalRecordCount": 8,
+            "entryCount": 7,
+            "branchCount": 7,
+            "entryTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message"
+            ],
+            "branchTypes": [
+              "model_change",
+              "thinking_level_change",
+              "message",
+              "custom",
+              "custom_message",
+              "message",
+              "message"
+            ],
+            "runtimeRoles": [
+              "system",
+              "custom",
+              "user",
+              "assistant"
+            ],
+            "llmRoles": [
+              "system",
+              "user",
+              "user",
+              "assistant"
+            ],
+            "runtimeText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture assistant"
+            ],
+            "llmText": [
+              "fixture system",
+              "fixture hidden",
+              "fixture user",
+              "fixture assistant"
+            ],
+            "model": {
+              "provider": "fixture",
+              "modelId": "fixture-model"
+            },
+            "thinkingLevel": "off",
+            "physicalCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "selectedCustomState": [
+              {
+                "customType": "fixture.native/state",
+                "data": {
+                  "version": 1,
+                  "value": "common",
+                  "future": {
+                    "enabled": false,
+                    "values": [
+                      1.25,
+                      null,
+                      "λ"
+                    ]
+                  }
+                }
+              }
+            ],
+            "hiddenMessages": [
+              {
+                "customType": "fixture.hidden",
+                "content": "fixture hidden",
+                "display": false,
+                "details": {
+                  "opaque": {
+                    "retained": true
+                  },
+                  "displayOnly": false
+                }
+              }
+            ],
+            "isPersistedConfiguration": true,
+            "sessionFileDefined": true,
+            "headerVersion": 3,
+            "headerMatchesSessionIdentity": true,
+            "headerCwdMatchesRequested": true,
+            "actualHeaderTimestampValid": true,
+            "leafMatchesBranchTail": true,
+            "physicalRecordsMatchManager": true,
+            "customStateExcludedFromRuntime": true,
+            "actualFilenameContainsIdentity": true
+          }
+        ],
+        "relations": {
+          "openReadsActualHeaderCwd": true,
+          "openPreservesIdentityAndRawRecords": true,
+          "openDoesNotRewriteValidBytes": true,
+          "hiddenMessageContributesToRuntime": true,
+          "hiddenMessageContributesToLlmAsUser": true,
+          "stateRetainedRaw": true,
+          "stateExcludedFromModel": true,
+          "openRestoresContextAndLlm": true
+        }
+      }
+    }
+  ]
+}

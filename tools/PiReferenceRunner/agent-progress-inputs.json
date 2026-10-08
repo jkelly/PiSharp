@@ -1,0 +1,445 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "whole-agent-progress-metadata-v1",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "P1-06",
+    "P1-07",
+    "P1-08",
+    "P3-01",
+    "P3-03"
+  ],
+  "inputKind": "authored fake provider frames, tool implementations/results/hooks and gate choreography; no authored expected output",
+  "seed": "none; authored identifiers and values",
+  "normalizerVersion": "raw-json-v1-key-order-only-with-numeric-lexemes",
+  "clock": {
+    "unixMilliseconds": 1700000000000,
+    "mechanism": "Child-only Date.now replacement; source bytes unchanged; original restored after capture"
+  },
+  "model": {
+    "id": "offline-agent-model",
+    "name": "Authored offline model",
+    "api": "offline-fake",
+    "provider": "offline-authored",
+    "baseUrl": "https://pisharp.invalid",
+    "reasoning": false,
+    "input": [
+      "text"
+    ],
+    "cost": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0
+    },
+    "contextWindow": 4096,
+    "maxTokens": 128
+  },
+  "systemPrompt": "Authored agent progress capture system",
+  "prompt": {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Run the authored tool batch."
+      }
+    ],
+    "timestamp": 1699999999000
+  },
+  "assistantMessage": {
+    "role": "assistant",
+    "api": "offline-fake",
+    "provider": "offline-authored",
+    "model": "offline-agent-model",
+    "usage": {
+      "input": 0,
+      "output": 0,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 0,
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0
+      }
+    },
+    "stopReason": "toolUse",
+    "timestamp": 1700000000000
+  },
+  "toolParameters": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "value"
+    ],
+    "additionalProperties": false
+  },
+  "cases": [
+    {
+      "caseId": "parallel-progress-hooks-and-structured-content",
+      "mode": "parallel-blocked-update",
+      "toolExecution": "parallel",
+      "blockedToolId": "call-alpha",
+      "tools": [
+        {
+          "call": {
+            "id": "call-alpha",
+            "name": "alpha",
+            "arguments": {
+              "value": 1
+            }
+          },
+          "description": "Authored offline tool alpha",
+          "updates": [
+            {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "call-alpha:one"
+                }
+              ],
+              "details": {
+                "sequence": 1,
+                "retainedNull": null,
+                "opaque": [
+                  "x",
+                  1.25,
+                  null
+                ]
+              }
+            },
+            {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "call-alpha:two"
+                }
+              ],
+              "details": {
+                "sequence": 2
+              }
+            }
+          ],
+          "lateUpdate": {
+            "content": [
+              {
+                "type": "text",
+                "text": "call-alpha:late"
+              }
+            ],
+            "details": {
+              "sequence": 99
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "answer": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "answer"
+            ]
+          },
+          "beforeHook": {
+            "block": false,
+            "reason": null
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "alpha raw"
+              }
+            ],
+            "details": {
+              "raw": true,
+              "explicitNull": null
+            },
+            "structuredContent": {
+              "answer": 1.25,
+              "opaque": [
+                "alpha",
+                null
+              ]
+            },
+            "usage": {
+              "input": 2,
+              "output": 3,
+              "cacheRead": 0,
+              "cacheWrite": 1,
+              "totalTokens": 6,
+              "cost": {
+                "input": 0.01,
+                "output": 0.02,
+                "cacheRead": 0,
+                "cacheWrite": 0.005,
+                "total": 0.035
+              }
+            },
+            "isError": false,
+            "terminate": true,
+            "opaqueResult": {
+              "numeric": 7,
+              "absentDifferentFromNull": null
+            }
+          },
+          "afterHook": {
+            "content": [
+              {
+                "type": "text",
+                "text": "alpha hook replaced content"
+              }
+            ],
+            "details": null,
+            "usage": null,
+            "terminate": null,
+            "isError": true
+          }
+        },
+        {
+          "call": {
+            "id": "call-beta",
+            "name": "beta",
+            "arguments": {
+              "value": 2
+            }
+          },
+          "description": "Authored offline tool beta",
+          "updates": [
+            {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "call-beta:one"
+                }
+              ],
+              "details": null
+            }
+          ],
+          "lateUpdate": {
+            "content": [
+              {
+                "type": "text",
+                "text": "call-beta:late"
+              }
+            ],
+            "details": {
+              "sequence": 99
+            }
+          },
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "beta raw"
+              }
+            ],
+            "structuredContent": [
+              null,
+              7,
+              "beta"
+            ],
+            "usage": null,
+            "terminate": null
+          },
+          "afterHook": {
+            "details": {
+              "after": true
+            },
+            "structuredContent": null,
+            "terminate": true
+          }
+        }
+      ]
+    },
+    {
+      "caseId": "sequential-absent-null-fields",
+      "mode": "sequential-field-shapes",
+      "toolExecution": "sequential",
+      "tools": [
+        {
+          "call": {
+            "id": "call-null",
+            "name": "null_fields",
+            "arguments": {
+              "value": 3
+            }
+          },
+          "description": "Authored offline tool null_fields",
+          "updates": [
+            {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "null partial"
+                }
+              ],
+              "details": null
+            }
+          ],
+          "lateUpdate": {
+            "content": [
+              {
+                "type": "text",
+                "text": "call-null:late"
+              }
+            ],
+            "details": {
+              "sequence": 99
+            }
+          },
+          "result": {
+            "content": null,
+            "details": null,
+            "structuredContent": null,
+            "usage": null,
+            "terminate": null
+          },
+          "afterHook": {
+            "details": null,
+            "structuredContent": null,
+            "usage": null,
+            "terminate": null
+          }
+        },
+        {
+          "call": {
+            "id": "call-absent",
+            "name": "absent_fields",
+            "arguments": {
+              "value": 4
+            }
+          },
+          "description": "Authored offline tool absent_fields",
+          "updates": [
+            {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "absent partial"
+                }
+              ]
+            }
+          ],
+          "lateUpdate": {
+            "content": [
+              {
+                "type": "text",
+                "text": "call-absent:late"
+              }
+            ],
+            "details": {
+              "sequence": 99
+            }
+          },
+          "result": {}
+        }
+      ]
+    },
+    {
+      "caseId": "abort-during-awaited-update-and-late-callback",
+      "mode": "abort-blocked-update",
+      "toolExecution": "parallel",
+      "blockedToolId": "call-abort",
+      "tools": [
+        {
+          "call": {
+            "id": "call-abort",
+            "name": "abortable",
+            "arguments": {
+              "value": 5
+            }
+          },
+          "description": "Authored offline tool abortable",
+          "updates": [
+            {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "call-abort:one"
+                }
+              ],
+              "details": {
+                "sequence": 1,
+                "retainedNull": null,
+                "opaque": [
+                  "x",
+                  1.25,
+                  null
+                ]
+              }
+            },
+            {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "call-abort:two"
+                }
+              ],
+              "details": {
+                "sequence": 2
+              }
+            }
+          ],
+          "lateUpdate": {
+            "content": [
+              {
+                "type": "text",
+                "text": "call-abort:late"
+              }
+            ],
+            "details": {
+              "sequence": 99
+            }
+          },
+          "updateAfterAbort": {
+            "content": [
+              {
+                "type": "text",
+                "text": "accepted after signal abort before execute throws"
+              }
+            ],
+            "details": {
+              "sequence": 3,
+              "aborted": true
+            }
+          },
+          "abortError": "Authored tool observed its AbortSignal",
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "unreachable authored result"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "contractsToObserve": [
+    "Every Agent event and all fake provider frames retained",
+    "First update listener blocks while second update can reach the second listener",
+    "All accepted update promises settle before afterToolCall/tool_execution_end",
+    "Parallel unrelated tool can finalize before blocked update releases; tool messages retain call order",
+    "Complete hook contexts and return values preserve absent/null metadata",
+    "Structured content retained on tool execution result and absent in toolResult message",
+    "Public abort reaches tool signal; source accepts a synchronous update after abort before execute settles",
+    "Late callbacks after tool end and idle return undefined without an event",
+    "agent_end listener barrier retains streaming state and delays waitForIdle"
+  ],
+  "unsupportedClaims": [
+    "No provider or SDK request/wire/auth qualification",
+    "No native parity: serialized/awaited native progress and late-rejection profiles remain unresolved",
+    "No full phase closure, cross-platform lifecycle qualification, persistence or production file tool effects",
+    "Null/missing content examples are deliberately untyped JavaScript return shapes, beyond the static AgentToolResult content declaration"
+  ]
+}

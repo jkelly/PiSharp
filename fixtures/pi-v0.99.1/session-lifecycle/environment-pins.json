@@ -1,0 +1,194 @@
+{
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceFingerprint": {
+    "canonicalGit": {
+      "files": 2093,
+      "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+    },
+    "acquiredCheckout": {
+      "files": 2093,
+      "sha256": "676a5df7a526ab0fb6a78f734b57093bb7571913fc17251d02cb0c84527dcf21"
+    },
+    "declaredCheckoutConversions": [
+      {
+        "path": "pi-test.bat",
+        "eol": "crlf",
+        "canonicalSha256": "d454a5a0e203d9009283b887720472b022b0853380758b11419c8547a32dbb88",
+        "checkoutSha256": "c9d3430a614cabfaae5a9e97259643ab9041629bc8253f58f22579a5b6d9c448"
+      },
+      {
+        "path": "pi-test.ps1",
+        "eol": "crlf",
+        "canonicalSha256": "9f76d37f75b1d6f03be14d8bce3ca05331c4b09b8003a53329d8e4fe942792ef",
+        "checkoutSha256": "9b97fa3be6582e935f43865599d21bbb216e5ffe2cb1eb198c77e7298490b895"
+      }
+    ]
+  },
+  "runtime": {
+    "version": "v24.19.0",
+    "absoluteExecutable": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+    "reuseExisting": true,
+    "sourceExecution": "Node native TypeScript stripping; unchanged whole session-manager.ts and canonical experimental source resolver"
+  },
+  "platform": "win32",
+  "architecture": "x64",
+  "npmVersion": "11.6.2",
+  "setupReceiptSha256": "3e43ae32f145a1cb62d277deda4659d91e78fd49bb0615f88b06fa9c8f2c7f61",
+  "preparedReceiptSha256": "447e1290ef2e206417bd0370ddea4becb4f436685d580d1bc8660eaa80cd864f",
+  "projectionManifestSha256": "c1ee65b53638da6ee8ce476689538a252f7b638204da3f8edf1b68a963e391dc",
+  "projectionLockSha256": "aba478db394088191bec4a6ba6ae69c5dc2dfec9ef883fc4b1869579f1f02f7d",
+  "dependencies": [
+    {
+      "name": "cross-spawn",
+      "version": "7.0.6",
+      "archiveSha256": "188c320cdc413adfec03098fda72af7a9b02152ba13d3a8f87f172d93ced38ea",
+      "integrity": "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==",
+      "files": {
+        "files": 9,
+        "sha256": "ba72b9234e47f979c9938a5fe3e0bc95d6e26b91efdca9c1eb43b82aebb48d8a"
+      },
+      "manifestSha256": "2e106cd9b4ae4e34ead35218371a0d4e172da72515a4f8f97d69a2e1fe3dee82",
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 1105,
+          "sha256": "aaa78451b6fecd1b9c4594c796c133c0e90cad100372ff8bc6de615e9ef9adf1"
+        }
+      ]
+    },
+    {
+      "name": "isexe",
+      "version": "2.0.0",
+      "archiveSha256": "47cfe872e088e28c53b736fef305324b57cc1cfc9f72a9b0f769f92731cb8359",
+      "integrity": "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==",
+      "files": {
+        "files": 8,
+        "sha256": "b7667089801bc4b1e8c039f04e0c5e57780d91386eb91035cad2f64931caff9e"
+      },
+      "manifestSha256": "395c2af9abeeaafe7391974c1eacfb2a2bdeef187f21c3f5582c49e0368e59bf",
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 765,
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b"
+        }
+      ]
+    },
+    {
+      "name": "partial-json",
+      "version": "0.1.7",
+      "archiveSha256": "30eafeed6fdc25fb2ca24f34c37796d9f98f0bf5e156452b98a2c356762f6322",
+      "integrity": "sha512-Njv/59hHaokb/hRUjce3Hdv12wd60MtM9Z5Olmn+nehe0QDAsRtRbJPvJ0Z91TusF0SuZRIvnM+S4l6EIP8leA==",
+      "files": {
+        "files": 9,
+        "sha256": "b1c730b893ef274e6d457f23eebc9c39162cd6aaf777247942b9ad0cc1f1cb8e"
+      },
+      "manifestSha256": "42b3ae6c99ec959249f8eb4d3da7fdb44ec1f96ec627fa7f9ca5487a4e80963f",
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 1075,
+          "sha256": "cd519ad3d7e012427f978dfb2e3b92ee403d189d7b859ba6bf68fd7e12ca456f"
+        }
+      ]
+    },
+    {
+      "name": "path-key",
+      "version": "3.1.1",
+      "archiveSha256": "4b8999acb914830edcd3c5b8fec632b32c6bc759ac3edc86336f5a9e08ba7b92",
+      "integrity": "sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q==",
+      "files": {
+        "files": 5,
+        "sha256": "6ac2c1a195bff17fbb5d24d5f4abddcccda3acdef5327234dd85d10a7f7420c7"
+      },
+      "manifestSha256": "25594dab72681c910d9cc919263a4daf27d77a75e0d2c26a4d958d6d6b798f86",
+      "licenses": [
+        {
+          "path": "license",
+          "bytes": 1109,
+          "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
+        }
+      ]
+    },
+    {
+      "name": "shebang-command",
+      "version": "2.0.0",
+      "archiveSha256": "9acba5bd18a51e9cdf5898380e4df63f803e1844def64ae1a46f88cff86d556e",
+      "integrity": "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==",
+      "files": {
+        "files": 4,
+        "sha256": "f002dd6b9045846243d11a2512bfcccf0de1ab6144fa75280ee7fecd87f73902"
+      },
+      "manifestSha256": "44de390ae5ed6c5f9758b8b9c90b93fa53977d5361731600429f1de08f4b3f30",
+      "licenses": [
+        {
+          "path": "license",
+          "bytes": 1116,
+          "sha256": "69dee148a2cc470554dfa7142e830662062394d0fe67cddd379aba90dc60d6b3"
+        }
+      ]
+    },
+    {
+      "name": "shebang-regex",
+      "version": "3.0.0",
+      "archiveSha256": "fedbabaa6db26c6be0183f82777dfa852d59a62f8885de93bd32ebc28758958f",
+      "integrity": "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==",
+      "files": {
+        "files": 5,
+        "sha256": "5e14378a819f5ec437cba4c696f38fcae5b6e120dbe929ca3219f44a24ca5c39"
+      },
+      "manifestSha256": "b8018c6b8cc9900dfd1ac18a54956ba34c453fdc2da5e5fe555ee8f04133a1c5",
+      "licenses": [
+        {
+          "path": "license",
+          "bytes": 1109,
+          "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0"
+        }
+      ]
+    },
+    {
+      "name": "typebox",
+      "version": "1.3.27",
+      "archiveSha256": "5a288bcd3d68f44567de84b185e04d205ef7d5b53602846bc3db30fdd219dda3",
+      "integrity": "sha512-zu+jc1pcy4UiNThxikUr36f0Rybk9PEeCg/NE6adeWr/SKsdNO4EzZHYRDlv2YCVAfj3Odq3dESSo/jNyoBXzA==",
+      "files": {
+        "files": 1385,
+        "sha256": "9762e85e6a6e12cc6593cee73c1ffcc85857ba4c7f6d2ab52feeb4b28954ed25"
+      },
+      "manifestSha256": "c59ddfd977ce941f1e8ee8b0a0b14396c332fa27cc5fa6fa165227ffd5a3992f",
+      "licenses": [
+        {
+          "path": "license",
+          "bytes": 1094,
+          "sha256": "e8a7cc256941a26ba8234f04390165243a4d42f74fd6491934140605bf7eae2d"
+        }
+      ]
+    },
+    {
+      "name": "which",
+      "version": "2.0.2",
+      "archiveSha256": "a13adf5fddeb769655edce551e81fbb11904b9c9be76d95e41da8c4c499d4edc",
+      "integrity": "sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==",
+      "files": {
+        "files": 6,
+        "sha256": "1ba286268b83272bf342d7374558066d12020123159aa508100dce289b2a6b63"
+      },
+      "manifestSha256": "43010039ed5e89f7186960be682b3cb5cda5ab6cdfb06cbfd4f081cf0e7b4260",
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 765,
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b"
+        }
+      ]
+    }
+  ],
+  "lifecycleHarness": {
+    "path": "tools/PiReferenceRunner/capture-session-lifecycle.mjs",
+    "bytes": 45847,
+    "sha256": "9bf405272c72fdf9cfea159ddc0bb3fc160cee5ceee1e15bba644af317a61865"
+  },
+  "qualificationLockSha256": "b2fbfda80b8aee1bf3cbd1742cfe13c575d0032250d8f316b1503b8c400552f2",
+  "dependencyVerification": "Every installed file equals its integrity-pinned archive before and after both children; exact eight-package top-level set."
+}

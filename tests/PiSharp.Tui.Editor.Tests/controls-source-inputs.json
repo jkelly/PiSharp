@@ -1,0 +1,901 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "New control editing/line kill/yank-only public Editor schedules; all three prior corpora reused unchanged; host submission/Reset and prompt history not captured",
+  "cases": [
+    {
+      "id": "controls-default-cursor-aliases-and-no-op-word-group-boundaries",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abc\ndef"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u0002"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[1;5H"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[1;5F"
+        },
+        {
+          "kind": "input",
+          "data": "X"
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "Y"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-default-char-delete-aliases-and-no-op-callbacks",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "abc"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": "\u0004"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[127;2u"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[F"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[57349;2u"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0004"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-newline-raw-lf-coded-control-j-and-alt-enter",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "ab"
+        },
+        {
+          "kind": "input",
+          "data": "\n"
+        },
+        {
+          "kind": "input",
+          "data": "cd"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[106;5u"
+        },
+        {
+          "kind": "input",
+          "data": "ef"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b\r"
+        },
+        {
+          "kind": "input",
+          "data": "G"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-empty-line-kill-and-empty-yank-pop",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        }
+      ]
+    },
+    {
+      "id": "controls-forward-line-kill-yank-and-each-undo",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "alpha beta"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-backward-line-kill-yank-and-each-undo",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "alpha beta"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-forward-kills-accumulate-newline-and-following-line",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ab\ncd\nef"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-backward-kills-prepend-newline-and-previous-line",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ab\ncd\nef"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-mixed-direction-kills-share-source-accumulation",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "left RIGHT\nEND"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[C"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-yank-pop-two-stage-callbacks-and-ring-rotation",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "one"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "set",
+          "data": "TWO"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "set",
+          "data": "three"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-yank-pop-only-immediately-after-yank",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "one"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "set",
+          "data": "two"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[F"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "X"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        }
+      ]
+    },
+    {
+      "id": "controls-no-op-kill-preserves-yank-pop-action",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "one"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "set",
+          "data": "two"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-marker-line-kill-retains-registry-and-yanks-alias",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "\u001b[200~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-killed-marker-survives-set-text-but-registry-does-not",
+      "steps": [
+        {
+          "kind": "input",
+          "data": "\u001b[200~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "set",
+          "data": ""
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        }
+      ]
+    },
+    {
+      "id": "controls-yank-multiline-and-cycle-different-line-counts",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "ab\ncd"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "set",
+          "data": "XYZ"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "set",
+          "data": "q\nr"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "set",
+          "data": "!"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[H"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-scalar-seam-line-kill-and-grapheme-joining-yank",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "👩👩"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[D"
+        },
+        {
+          "kind": "input",
+          "data": "‍"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-movement-no-op-ends-kill-accumulation-and-undo-does-not-restore-ring",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "a\nb"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[F"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u000b"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    },
+    {
+      "id": "controls-programmatic-insert-and-paste-end-kill-or-yank-actions",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "one"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "insert",
+          "data": "TWO"
+        },
+        {
+          "kind": "input",
+          "data": "\u0015"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~X\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "input",
+          "data": "\u0019"
+        },
+        {
+          "kind": "input",
+          "data": "\u0003"
+        },
+        {
+          "kind": "input",
+          "data": "\u001by"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "status": "SOURCE PIN RECONCILIATION; NO RUNTIME CREDIT",
+  "basis": "f496c4c8574ec4e5049364f244410dba284df03b preparation preflight",
+  "reviewedProduction": "3a71816e1d39d73d7a9bd15ea192527e013c235b",
+  "preservedHistoricalCheckout": "PiSharp-selected-companion-validation",
+  "historicalBoundarySha256": "614f40468eb264d6c479ab1ccbe9ddcb4382d2e7a80322843244b723fe724166",
+  "relative": "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+  "previousBytes": 36212,
+  "previousSha256": "88372a76390b788ddc9da77396513754fdacf1e5113313156a1e36d041d622e5",
+  "actualBytes": 36998,
+  "actualSha256": "06bd642e404432a740200c5be84ee6bc081df3b723de0697339cd953a763a73c",
+  "allEightScenarioAssertionsChanged": false,
+  "nativeRuntimeExecutions": 0,
+  "registryUpdates": "Same actual declaration source/fixture bytes, no target or deadline changes"
+}

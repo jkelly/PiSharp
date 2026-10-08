@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "id": "PM-TOOL-IDENTITY-REPLACEMENT-SUCCESSOR-R1",
+  "originalCaseId": "PM-TOOL-IDENTITY-REPLACEMENT",
+  "predecessorFixture": {
+    "path": "tests/PiSharp.PiMessages.Tests/authored-cases-r2.json",
+    "sha256": "1b8a6fbb80726e6f1a6cb1848d2df9b7da41c9015d91592d9f077f2aa8c04891"
+  },
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceAuthority": "EXISTING PINNED SOURCE TEXT; ORIGINAL FIXTURE EXPLICITLY HAS NO GENUINE OBSERVATION",
+  "genuineSourceCapture": null,
+  "input": "Use unchanged predecessor input; no event/model/context/options substitution",
+  "outputFixture": {
+    "path": "tests/PiSharp.PiMessages.Tests/identity-successor-output-r1.json",
+    "sha256": "93c80e37db4fa20ef386594beeb6a609f5c9996738ed7de45373543dbfaf2a52"
+  },
+  "assertions": [
+    {
+      "id": "PM-TOOL-IDENTITY-REPLACEMENT-SUCCESSOR-R1/1",
+      "name": "Full final identity, arguments and source/native projections",
+      "group": "frames"
+    },
+    {
+      "id": "PM-TOOL-IDENTITY-REPLACEMENT-SUCCESSOR-R1/2",
+      "name": "Exact owned provider request and no parser tool effect",
+      "group": "ownership"
+    }
+  ],
+  "dependencies": [
+    {
+      "id": "PM-TOOL-IDENTITY-REPLACEMENT-SUCCESSOR-R1/1",
+      "name": "Full final identity, arguments and source/native projections",
+      "priorGroup": "frames",
+      "requiredGroups": [
+        "provider",
+        "frames"
+      ],
+      "scope": "CASE"
+    },
+    {
+      "id": "PM-TOOL-IDENTITY-REPLACEMENT-SUCCESSOR-R1/2",
+      "name": "Exact owned provider request and no parser tool effect",
+      "priorGroup": "ownership",
+      "requiredGroups": [
+        "payload",
+        "request",
+        "response",
+        "ownership",
+        "input-unchanged",
+        "effects",
+        "operation-join"
+      ],
+      "scope": "CASE"
+    }
+  ],
+  "originalCriteria": "Retained unchanged as historical restriction scopes; no retroactive closure",
+  "qualification": "OPEN_UNEXECUTED_UNREVIEWED"
+}

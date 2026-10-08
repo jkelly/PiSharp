@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "status": "SOURCE-ONLY EXACT PIN MIGRATION; NO RUNTIME ACCEPTANCE",
+  "base": "fe8599b51fd4d4d4a976160adeaecb0ea60e82e6",
+  "baseTree": "839dca6d224728d838076134a1104a8378ad65c6",
+  "sourceManifestSha256": "630092a5d9b4570880634b76b1481751b69e8bfefa90e77e250dd0875b9cb0a9",
+  "blocker": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-held-boundary-migration-r52\\immutable-r51-blocker.json",
+    "bytes": 22623,
+    "sha256": "bfaf18bc1efc23916956ed7d4627e1aed15757c3589886a7f024d43334e46d69"
+  },
+  "historicalDeclaration": {
+    "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.r46.json",
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\fixtures\\held-io-source-boundary.r46.json",
+    "bytes": 10349,
+    "sha256": "b07cbd573359f4be1c11c731f8c23311a37d9ec66d84d228a35ce0644f5ee9a7"
+  },
+  "currentDeclaration": {
+    "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.json",
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\fixtures\\held-io-source-boundary.json",
+    "bytes": 11374,
+    "sha256": "c3532dd55a0135e156c7de28b05acaaca04f576b8f32ab1f11260f67ba895017"
+  },
+  "migration": [
+    {
+      "relative": "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+      "historical": {
+        "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-simple-terminal-integration-work\\src\\PiSharp.Cli\\Interactive\\TerminalChatInput.cs",
+        "relative": "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+        "bytes": 23973,
+        "sha256": "b78911cd89dd2511b4ffcd4125bffaa932f70165e2b9f34efae75a9b51808735"
+      },
+      "reviewed": {
+        "relative": "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+        "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\src\\PiSharp.Cli\\Interactive\\TerminalChatInput.cs",
+        "bytes": 27946,
+        "sha256": "59a9e4622dd6ee4adc3650e3b59dda0ce99cb3ef5244ff15f073831dd48586e7"
+      }
+    },
+    {
+      "relative": "src/PiSharp.Cli/Interactive/TerminalSessionView.cs",
+      "historical": {
+        "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-simple-terminal-integration-work\\src\\PiSharp.Cli\\Interactive\\TerminalSessionView.cs",
+        "relative": "src/PiSharp.Cli/Interactive/TerminalSessionView.cs",
+        "bytes": 16745,
+        "sha256": "bc90a7807a1e77c211e392a5d9f895c018c1cd78bab7dff32c7e5b7c87c7fc1b"
+      },
+      "reviewed": {
+        "relative": "src/PiSharp.Cli/Interactive/TerminalSessionView.cs",
+        "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\src\\PiSharp.Cli\\Interactive\\TerminalSessionView.cs",
+        "bytes": 17989,
+        "sha256": "c40a22603258ee58ef5972e96098e1297ca238fd08b3d84d739beb9080d1c0ef"
+      }
+    }
+  ],
+  "preserved": [
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/HeldIoTests.cs",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\HeldIoTests.cs",
+      "bytes": 34276,
+      "sha256": "a4dc73ee294a84f9e52cc15b6e092db472430c1a47c8a96bafb1a8b024bd6bc3"
+    },
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/Program.cs",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\Program.cs",
+      "bytes": 15295,
+      "sha256": "67de8756784db53f2531b173e4cf7dd7a0db0753a6ac93b2848679a8b8886d9a"
+    },
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/AlternateKeyControls.cs",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\AlternateKeyControls.cs",
+      "bytes": 11499,
+      "sha256": "3a73bd3fb1c26282b7a36156d48e051fe03c5ea6423c3d6d534cc36d1ce72446"
+    },
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/HeldIoEvidence.cs",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\HeldIoEvidence.cs",
+      "bytes": 11098,
+      "sha256": "352f7bfb6e04c52a201facc7b7d17dffd16cacb4a8ec9427f19a69aeae18d495"
+    },
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/shift-space-source-observations.json",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\fixtures\\shift-space-source-observations.json",
+      "bytes": 38454,
+      "sha256": "d71057f550e047c30684d427865561d12c7a8c0d7db6dd1378c2ddf42bfbfb1c"
+    },
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-failure-cancellation-design.json",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\fixtures\\held-io-failure-cancellation-design.json",
+      "bytes": 19581,
+      "sha256": "b1f4a5b2bbd7ab1df1e9ac7b0fb3a8af0cb325a4d9ef5ab8bad99e58d27d845d"
+    },
+    {
+      "relative": "tools/prepare-native-products.ps1",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\tools\\prepare-native-products.ps1",
+      "bytes": 20224,
+      "sha256": "76f9611b17d6923ebf88bd0609cc40a257e59fce18ee4be4d804b2eb44a38eb5"
+    },
+    {
+      "relative": "tools/native-companion-registration.ps1",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\tools\\native-companion-registration.ps1",
+      "bytes": 48388,
+      "sha256": "9edd9197bdef2d28271e380dca1d00c2f4972a03d3ac728a40368f7fad16ea4f"
+    },
+    {
+      "relative": "tools/native-companion-targets.json",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\tools\\native-companion-targets.json",
+      "bytes": 53886,
+      "sha256": "ecea8c274bd15256f8dcf7855783b4be4a88a470ec6217b734c37d154a8ce6b2"
+    },
+    {
+      "relative": "PiSharp.slnx",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\PiSharp.slnx",
+      "bytes": 6950,
+      "sha256": "16a6895d999d154582eb9150316ec9b6da61df8fcf30e8f8f2d6df038c400419"
+    }
+  ],
+  "checks": {
+    "exactlyTwoProductionPinsMigrated": true,
+    "allOtherDeclarationFieldsUnchanged": true,
+    "allBoundaryFilesMatchExactCurrentRawSource": true,
+    "historicalRawDeclarationPreserved": true,
+    "scenarios": 8,
+    "strictSourceAndDllChecksRetained": true
+  },
+  "leadSuccessorRequired": [
+    "Reconcile exact source/fixture registration pins for current, historical and migration JSON on a fresh central successor.",
+    "Seal complete source closure; verify every scoped boundary.files against exact immutable manifest before native preparation.",
+    "After a permitted runtime window, prepare immutable products and run the unchanged full Kitty held-I/O consumer plus new startup controls and complete gates."
+  ],
+  "sourceOnly": true,
+  "nativeBuilds": 0,
+  "nativeExecutions": 0,
+  "parsersExecuted": 0,
+  "sourceCaptures": 0,
+  "securityChanges": 0,
+  "newAcceptance": false
+}

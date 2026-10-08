@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "normalizerVersion": "object-key-order-v1",
+  "scope": "One genuine unchanged upstream frame encoder/reducer scenario; no native projection or provider wire qualification",
+  "fixtures": [
+    {
+      "fixtureId": "interleaved-signed",
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "requirementIds": [
+        "stream.indexed-events"
+      ],
+      "scenario": "Interleaved indexed thinking/text/tool events, split JSON escapes, authoritative ends and final opaque signatures",
+      "clock": {
+        "unixMilliseconds": 1700000000000,
+        "mechanism": "Explicit input timestamps; reducer invokes no clock"
+      },
+      "seed": "none; explicit response/tool IDs",
+      "environment": {
+        "platform": "win32",
+        "architecture": "x64",
+        "credentials": "not inherited",
+        "network": "disabled",
+        "workspace": "isolated home/workspace"
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/frame/interleaved-signed.input.json",
+        "sha256": "986b394b81014fae385688b136049cbe81ef665f478f6e6a72e2f4784f301729"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/frame/interleaved-signed.expected.json",
+        "sha256": "8ed97e0a7779566e94321e2b46306061c24a10440ad3f1c7903e0409260712a4"
+      },
+      "provenance": {
+        "kind": "captured-upstream-frame-oracle",
+        "inputKind": "authored-synthetic-input",
+        "source": "Unmodified pinned AssistantMessageFrameEncoder, reduceAssistantMessageFrames and parseStreamingJson",
+        "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+        "dependencyLock": "tools/PiReferenceRunner/frame-lock.json",
+        "capturedAt": "2026-09-30",
+        "captureCommand": "node tools/PiReferenceRunner/frame-run.mjs --capture-new",
+        "nativeProjection": false,
+        "providerWireTraffic": false
+      }
+    }
+  ]
+}

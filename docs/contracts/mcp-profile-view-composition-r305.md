@@ -1,0 +1,9 @@
+# Actual MCP/profile view composition
+
+This isolated source successor composes reviewed rollback5519, CLI routingc4a, candidate failure stope3a, successful-bind racing-close stop003, and immutable actual profile views61ff. The root bridge captures the current native registry and final policy before admission awaits, verifies exact references, validates independent native/discovery owners before wrapping, and transfers one profile-view hold through the same native resource owner. Admission retains one optional single-cast BindProfileView callback. The runtime lease invokes MCP binding followed by that callback on the same exact attachment. Profile attachment resolves the already-bound view instead of separately attaching startup activation.
+
+Rejected admission/binding resources remain joined through the factory original-task evidence helper. Existing admitted binders are preserved and validated; navigation uses current view native registry, not startup adapters. No target authority is granted by a view binder. The existing final policy continues to reject unadmitted dynamic extension/resource effects.
+
+Four rollback groups, three CLI routing groups, two candidate stop-order groups, four authored view groups and one actual MCP/profile binding group are registered once and directly awaited. Expected source inventory: Coding862, Rpc126, Extensions316 (1304 distinct full-three groups); this is authored source inventory, not runtime acceptance. The extra native fixture source is compiled by its existing fixture project in future qualification.
+
+All new source is uncompiled and unexecuted. Exact4707 outcomes do not qualify this successor. Independent source/API/race review, fresh exact-source product allocation and an explicit runtime grant are required. Startup resource authority/publication, dynamic admitted target policy, OAuth/SDK host injection and original parity/platform/release gates remain separate. Canonical is unchanged.

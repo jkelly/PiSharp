@@ -1,5 +1,5 @@
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -9,8 +9,41 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.OpenAIResponses;
 
+internal sealed class ResponsesFailureContext
+{
+    internal Exception? SourceException;
+    internal Task? SourceTask;
+    internal string? DisplayMessage;
+    internal readonly List<Exception> CleanupExceptions = [];
+    internal readonly List<Task> CleanupTasks = [];
+    internal async ValueTask<T> Source<T>(Func<ValueTask<T>> invoke)
+    {
+        Task<T>? original = null;
+        try { original = invoke().AsTask(); return await original.ConfigureAwait(false); }
+        catch (Exception error) { SourceException ??= error; SourceTask ??= original; throw; }
+    }
+    internal async ValueTask Source(Func<ValueTask> invoke)
+    {
+        Task? original = null;
+        try { original = invoke().AsTask(); await original.ConfigureAwait(false); }
+        catch (Exception error) { SourceException ??= error; SourceTask ??= original; throw; }
+    }
+    internal async ValueTask Cleanup(Func<ValueTask> invoke)
+    {
+        Task? original = null;
+        try { original = invoke().AsTask(); await original.ConfigureAwait(false); }
+        catch (Exception error) { CleanupExceptions.Add(error); if (original is not null) CleanupTasks.Add(original); }
+    }
+    internal void Cleanup(Action invoke)
+    {
+        try { invoke(); } catch (Exception error) { CleanupExceptions.Add(error); }
+    }
+}
+
 /// <summary>Caller-supplied rates per million tokens; no provider catalog or service-tier adjustment.</summary>
-public sealed record ResponsesTokenRates(decimal Input = 0, decimal Output = 0, decimal CacheRead = 0, decimal CacheWrite = 0);
+public sealed record ResponsesTokenRateTier(decimal InputTokensAbove, decimal Input, decimal Output, decimal CacheRead, decimal CacheWrite);
+public sealed record ResponsesTokenRates(decimal Input = 0, decimal Output = 0, decimal CacheRead = 0, decimal CacheWrite = 0)
+{ public ImmutableArray<ResponsesTokenRateTier> Tiers { get; init; } = []; }
 
 public sealed record ResponsesTextToolOptions(
     int MaximumEvents = 4096, int MaximumEventCharacters = 65_536,
@@ -22,6 +55,7 @@ public sealed record ResponsesTextToolOptions(
 public sealed class ResponsesTextToolTransport : IChatTransport
 {
     private readonly Func<ChatRequest, CancellationToken, IAsyncEnumerable<JsonData>> _source;
+    private readonly Func<ChatRequest, CancellationToken, ResponsesFailureContext, ValueTask<IAsyncEnumerator<JsonData>>>? _prepareSource;
     private readonly ResponsesTextToolOptions _options;
     private readonly ResponsesTokenRates _rates;
     private static readonly JsonSerializerOptions SignatureJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
@@ -38,52 +72,100 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         if (_options.MaximumEvents <= 0 || _options.MaximumEventCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
             _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > 64)
             throw new ArgumentOutOfRangeException(nameof(options), "Responses limits must be positive; JSON depth must be at most 64.");
-        if (_rates.Input < 0 || _rates.Output < 0 || _rates.CacheRead < 0 || _rates.CacheWrite < 0)
+        if (_rates.Input < 0 || _rates.Output < 0 || _rates.CacheRead < 0 || _rates.CacheWrite < 0 ||
+            _rates.Tiers.IsDefault || _rates.Tiers.Any(tier => tier is null || tier.Input < 0 || tier.Output < 0 || tier.CacheRead < 0 || tier.CacheWrite < 0))
             throw new ArgumentOutOfRangeException(nameof(options), "Responses token rates must be nonnegative.");
+    }
+
+    // HTTP acquisition is distinct from the first DTO pull: Start must not wait for SSE bytes.
+    internal ResponsesTextToolTransport(Func<ChatRequest, CancellationToken, ResponsesFailureContext, ValueTask<IAsyncEnumerator<JsonData>>> prepareSource,
+        ResponsesTextToolOptions? options)
+        : this((Func<ChatRequest, CancellationToken, IAsyncEnumerable<JsonData>>)((_, _) => throw Protocol()), options)
+    {
+        ArgumentNullException.ThrowIfNull(prepareSource);
+        _prepareSource = prepareSource;
     }
 
     public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        cancellationToken.ThrowIfCancellationRequested();
         var state = new State(request, _options, _rates);
-        yield return state.Start;
-        cancellationToken.ThrowIfCancellationRequested();
-        var source = _source(request, cancellationToken) ?? throw Protocol();
+        var context = new ResponsesFailureContext();
         Exception? sourceFailure = null;
-        // Cleanup completes before a successful terminal is exposed. Early disposal also awaits this scope.
-        await using (var enumerator = source.GetAsyncEnumerator(cancellationToken))
+        IAsyncEnumerator<JsonData>? enumerator = null;
+        var drained = false;
+        // No terminal is exposed until all original callback, pull and cleanup operations settle.
+        try
         {
-            while (true)
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                enumerator = _prepareSource is { } prepare
+                    ? await context.Source(() => prepare(request, cancellationToken, context)).ConfigureAwait(false)
+                    : (_source(request, cancellationToken) ?? throw Protocol()).GetAsyncEnumerator(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            catch (Exception failure) { sourceFailure = failure; context.SourceException ??= failure; }
+            if (sourceFailure is null) yield return state.Start;
+            while (sourceFailure is null)
             {
                 List<StreamEvent> events;
                 try
                 {
-                    if (!await enumerator.MoveNextAsync().ConfigureAwait(false)) break;
+                    if (!await context.Source(() => enumerator!.MoveNextAsync()).ConfigureAwait(false)) break;
                     cancellationToken.ThrowIfCancellationRequested();
-                    events = state.Process(enumerator.Current);
+                    events = state.Process(enumerator!.Current);
                 }
-                catch (Exception failure) { sourceFailure = failure; break; }
+                catch (Exception failure) { sourceFailure = failure; context.SourceException ??= failure; break; }
                 foreach (var progress in events)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    yield return progress;
+                }
+                if (state.ProviderFailed) break;
+            }
+            // Once input is exhausted or failed, no later terminal can backfill these
+            // valid done items. Preserve their authoritative state before reporting failure.
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                List<StreamEvent> pending = [];
+                try { pending = state.EndPendingThinking(); }
+                catch (Exception failure) { sourceFailure ??= failure; context.SourceException ??= failure; }
+                foreach (var progress in pending)
+                {
                     yield return progress;
                 }
             }
-            // Once input is exhausted or failed, no later terminal can backfill these
-            // valid done items. Preserve their authoritative state before rethrowing.
-            if (!cancellationToken.IsCancellationRequested)
-                foreach (var progress in state.EndPendingThinking())
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    yield return progress;
-                }
+            drained = true;
         }
-        if (sourceFailure is not null) ExceptionDispatchInfo.Capture(sourceFailure).Throw();
-        cancellationToken.ThrowIfCancellationRequested();
-        yield return state.Finish();
+        finally
+        {
+            if (enumerator is not null) await context.Cleanup(() => enumerator.DisposeAsync()).ConfigureAwait(false);
+            if (!drained && context.CleanupExceptions.Count != 0)
+                throw new AggregateException("Responses early disposal failed.", context.CleanupExceptions);
+        }
+        StreamTerminalEvent terminal;
+        if (sourceFailure is null && context.CleanupExceptions.Count == 0 && !cancellationToken.IsCancellationRequested)
+        {
+            try { terminal = state.Finish(); }
+            catch (Exception failure) { context.SourceException ??= failure; terminal = state.Error(StopReason.Error, FailureMessage(request, failure, context)); }
+        }
+        else terminal = state.Error(cancellationToken.IsCancellationRequested ? StopReason.Aborted : StopReason.Error,
+            cancellationToken.IsCancellationRequested && sourceFailure is null && context.CleanupExceptions.Count == 0 ? "Request was aborted" :
+                FailureMessage(request, sourceFailure ?? context.CleanupExceptions[0], context));
+        yield return terminal with { NativeSourceException = context.SourceException, NativeSourceTask = context.SourceTask,
+            NativeCleanupExceptions = context.CleanupExceptions.Count == 0 ? null : context.CleanupExceptions.ToArray(),
+            NativeCleanupTasks = context.CleanupTasks.Count == 0 ? null : context.CleanupTasks.ToArray() };
     }
+
+    private static string FailureMessage(ChatRequest request, Exception failure, ResponsesFailureContext context)
+    {
+        var message = context.DisplayMessage ?? (failure is HttpRequestException { StatusCode: { } status }
+            ? $"{(request.Model.Provider == "openai" ? "OpenAI" : request.Model.Provider)} API error ({(int)status}): {failure.Message}" : failure.Message);
+        return DisplayError(message);
+    }
+    private static string DisplayError(string message) => message.Contains("subscription_sharing_usage_limit_exceeded", StringComparison.Ordinal)
+        ? message + "\nCheck your ChatGPT usage: https://chatgpt.com/settings/usage" : message;
 
     private static StreamProtocolException Protocol() => new("Invalid or unsupported Responses text/tool stream.");
     private static StreamLimitException Limit() => new("Responses text/tool stream exceeds configured limits.");
@@ -147,6 +229,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         private long _inputCharacters;
         private bool _completed;
         private bool _incomplete;
+        public bool ProviderFailed { get; private set; }
         private StopReason _stopReason = StopReason.Stop;
         public StreamStarted Start { get; }
 
@@ -293,6 +376,28 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     }
                     slot.Ended = true;
                     break;
+                case "error":
+                    ProviderFailure("Error Code " + String(value, "code", allowEmpty: true) + ": " + String(value, "message", allowEmpty: true));
+                    break;
+                case "response.failed":
+                    var failed = Object(value.GetProperty("response"));
+                    if (OptionalStringOrNull(failed, "status") is { } failedStatus)
+                        _properties = _properties.Set("rawStopReason", StringData(failedStatus));
+                    string failureMessage;
+                    if (failed.TryGetProperty("error", out var providerError) && providerError.ValueKind != JsonValueKind.Null)
+                    {
+                        Object(providerError);
+                        var code = OptionalStringOrNull(providerError, "code");
+                        var message = OptionalStringOrNull(providerError, "message");
+                        failureMessage = (string.IsNullOrEmpty(code) ? "unknown" : code) + ": " +
+                            (string.IsNullOrEmpty(message) ? "no message" : message);
+                    }
+                    else if (failed.TryGetProperty("incomplete_details", out var failedDetails) && failedDetails.ValueKind != JsonValueKind.Null &&
+                        OptionalStringOrNull(Object(failedDetails), "reason") is { Length: > 0 } failedReason)
+                        failureMessage = "incomplete: " + failedReason;
+                    else failureMessage = "Unknown error (no error details in response)";
+                    ProviderFailure(failureMessage);
+                    break;
                 case "response.completed":
                 case "response.incomplete":
                     var response = Object(value.GetProperty("response"));
@@ -314,8 +419,8 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     _properties = _properties.Set("rawStopReason", StringData(status + (string.IsNullOrEmpty(incompleteReason) ? "" : "." + incompleteReason)));
                     _stopReason = !_incomplete ? StopReason.Stop : incompleteReason == "max_output_tokens" ? StopReason.Length : StopReason.Error;
                     if (_stopReason == StopReason.Error)
-                        _properties = _properties.Set("errorMessage", StringData(incompleteReason == "content_filter" ?
-                            "Response incomplete: content_filter" : "Response incomplete without a provider reason"));
+                        _properties = _properties.Set("errorMessage", StringData(!string.IsNullOrEmpty(incompleteReason) ?
+                            "Response incomplete: " + incompleteReason : "Response incomplete without a provider reason"));
                     if (response.TryGetProperty("usage", out var usage)) _usage = Usage(Object(usage));
                     ApplyServiceTier(OptionalStringOrNull(response, "service_tier") ?? _options.ServiceTier);
                     foreach (var finished in _slots.Values.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
@@ -325,6 +430,14 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                 default: throw Protocol();
             }
             return events;
+        }
+
+        private void ProviderFailure(string message)
+        {
+            _properties = _properties.Set("errorMessage", StringData(DisplayError(message)));
+            _stopReason = StopReason.Error;
+            ProviderFailed = true;
+            _completed = true;
         }
 
         private static void EndThinking(Slot slot, Action<StreamEvent> emit)
@@ -343,15 +456,12 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                 throw Protocol();
             }
         }
-        // Handle the pinned token-limit and content-filter outcomes. Keep unknown
-        // untyped reasons outside this bounded profile rather than copying them to diagnostics.
+        // Pi preserves any provider string reason; normal DTO limits still apply.
         private static string? IncompleteReason(JsonElement response)
         {
             if (!response.TryGetProperty("incomplete_details", out var details) || details.ValueKind == JsonValueKind.Null) return null;
             Object(details);
-            var reason = OptionalStringOrNull(details, "reason");
-            if (reason is not (null or "" or "max_output_tokens" or "content_filter")) throw Protocol();
-            return reason;
+            return OptionalStringOrNull(details, "reason");
         }
         private static string ReasoningText(JsonElement item, string field)
         {
@@ -414,9 +524,10 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         {
             if (!_completed) throw new StreamProtocolException("Responses stream ended before a supported terminal response.");
             var unfinished = _slots.Values.Any(slot => !slot.Ended);
-            if (!_incomplete && unfinished)
+            if (!_incomplete && !ProviderFailed && unfinished)
                 throw new StreamProtocolException("Responses stream completed with unfinished content.");
-            if (_incomplete && _stopReason == StopReason.Length && unfinished)
+            if (_incomplete && _stopReason == StopReason.Length &&
+                _slots.Values.Any(slot => !slot.Ended && slot.Kind != "message"))
             {
                 // Preserve usage and partial content, but never invent authoritative ends.
                 _stopReason = StopReason.Error;
@@ -433,6 +544,12 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             return terminal;
         }
 
+        public StreamError Error(StopReason reason, string message)
+        {
+            _properties = _properties.Set("errorMessage", StringData(message));
+            var snapshot = _reducer.Snapshot() with { Usage = _usage, ExtraProperties = _properties, StopReason = reason };
+            return new(reason, snapshot);
+        }
         private void ApplyServiceTier(string? tier)
         {
             var multiplier = ResponsesServiceTier.Multiplier(_modelId, tier);
@@ -458,10 +575,16 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             if (usage.TryGetProperty("output_tokens_details", out var outputDetails))
                 reasoning = Number(Object(outputDetails), "reasoning_tokens");
             var uncached = Math.Max(0, checked(input - cached - written));
-            var inputCost = ComputedCost(checked(_rates.Input / 1_000_000m * uncached));
-            var outputCost = ComputedCost(checked(_rates.Output / 1_000_000m * output));
-            var cachedCost = ComputedCost(checked(_rates.CacheRead / 1_000_000m * cached));
-            var writtenCost = ComputedCost(checked(_rates.CacheWrite / 1_000_000m * written));
+            // Pi models.ts calculateCost: greatest strictly exceeded threshold, first equal threshold wins.
+            var inputTokens = checked(uncached + cached + written);
+            var rates = _rates; var matchedThreshold = -1m;
+            foreach (var tier in _rates.Tiers)
+                if (inputTokens > tier.InputTokensAbove && tier.InputTokensAbove > matchedThreshold)
+                { rates = new(tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite); matchedThreshold = tier.InputTokensAbove; }
+            var inputCost = ComputedCost(checked(rates.Input / 1_000_000m * uncached));
+            var outputCost = ComputedCost(checked(rates.Output / 1_000_000m * output));
+            var cachedCost = ComputedCost(checked(rates.CacheRead / 1_000_000m * cached));
+            var writtenCost = ComputedCost(checked(rates.CacheWrite / 1_000_000m * written));
             return new(uncached, output, cached, written, total,
                 new(inputCost, outputCost, cachedCost, writtenCost, ComputedCost(checked(inputCost + outputCost + cachedCost + writtenCost))),
                 JsonFields.Empty.Set("reasoning", JsonData.Parse(reasoning.ToString(System.Globalization.CultureInfo.InvariantCulture))));

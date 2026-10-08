@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "scope": "CURRENT Pi v0.99.1 postcommit name-change observer and native extension notifications",
+  "baseline": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "acceptedBase": "8f6dd81e3dea8346af73d5d51a6b0735c5f66b18",
+  "acceptedTree": "5b7efebe86f2e26cfcf1e33f2f80bd3e99a68706",
+  "status": "SOURCE_AUTHORED_REVIEW_AND_COORDINATOR_QUALIFICATION_PENDING",
+  "newGroupsAuthored": 6,
+  "existingCheckpointGroupExpanded": 1,
+  "buildsExecuted": 0,
+  "testsExecuted": 0,
+  "providerCalls": 0,
+  "upstreamCaptures": 0,
+  "contract": "docs/contracts/native-session-info-changed.md",
+  "testFilters": [
+    "native session-info-changed ",
+    "rpc.session-metadata.admitted-name-checkpoint-cancellation-and-original-disposal-join"
+  ],
+  "remaining": [
+    "Exact source review and coordinator native qualification",
+    "Affected RPC, CodingAgent, Sessions and registry regression qualification",
+    "Original synchronous observer/detached extension timing differential; native tasks deliberately joined",
+    "Streaming naming remains refused; no new clear/reload/permission APIs"
+  ]
+}

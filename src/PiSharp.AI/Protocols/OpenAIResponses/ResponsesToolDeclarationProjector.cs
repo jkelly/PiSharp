@@ -8,7 +8,7 @@ using PiSharp.Contracts;
 namespace PiSharp.AI.Protocols.OpenAIResponses;
 
 public sealed record ResponsesToolDeclarationProjectionOptions(
-    bool SupportsStrictMode = true, bool? Strict = false,
+    bool SupportsStrictMode = false, bool? Strict = false,
     int MaximumMessages = 256, int MaximumEntryCharacters = 65_536, int MaximumInputCharacters = 1_048_576,
     int MaximumDeclarations = 1024, int MaximumActiveTools = 128, int MaximumJsonDepth = 32,
     int MaximumOutputCharacters = 1_048_576, int MaximumOutputBytes = 1_048_576);
@@ -109,7 +109,13 @@ public sealed class ResponsesToolDeclarationProjector
         JsonObject? strictParameters = null;
         if (declaration.TryGetProperty("constrainedSampling", out var sampling) && sampling.ValueKind != JsonValueKind.False)
         {
-            if (sampling.ValueKind != JsonValueKind.Object || Text(sampling.GetProperty("type")) != "json_schema")
+            // Pi d866 constrained-sampling.ts: grammar is ignored when custom grammar tools are unsupported.
+            // This function-tool profile does not enable custom grammar tools.
+            if (sampling.ValueKind != JsonValueKind.Object)
+                throw Failure(ResponsesProjectionFailure.UnsupportedContent);
+            var samplingType = Text(sampling.GetProperty("type"));
+            if (samplingType == "grammar") return FunctionTool(name, description, parameters, strict, token);
+            if (samplingType != "json_schema")
                 throw Failure(ResponsesProjectionFailure.UnsupportedContent);
             var preference = Text(sampling.GetProperty("strict"));
             if (preference is not ("prefer" or "require")) throw Failure(ResponsesProjectionFailure.UnsupportedContent);
@@ -121,6 +127,12 @@ public sealed class ResponsesToolDeclarationProjector
             }
             else if (preference == "require") throw Failure(ResponsesProjectionFailure.UnsupportedContent);
         }
+        return FunctionTool(name, description, parameters, strict, token, strictParameters);
+    }
+
+    private JsonObject FunctionTool(string name, string description, JsonElement parameters, bool? strict,
+        CancellationToken token, JsonObject? strictParameters = null)
+    {
         if (strict == true && strictParameters is null)
         {
             try { strictParameters = MakeStrict(parameters, token); }

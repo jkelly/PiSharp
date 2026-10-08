@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "status": "EXACT VIEW SOURCE PIN MIGRATION; NO RUNTIME ACCEPTANCE",
+  "base": "3e429c9fce75d46b74c89861a795e2a55811083d",
+  "baseTree": "43eb0bc71df7d9a6aad63a68db83793316cdb688",
+  "baseManifest": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-text-startup-unicode-correction\\candidate-source-manifest.json",
+    "bytes": 517114,
+    "sha256": "33e58175a293c3f5dae1a5eb0c79901f240eae0184c3c8fad445a78088c46f89"
+  },
+  "historicalDeclaration": {
+    "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.before-queue-adoption.json",
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\fixtures\\held-io-source-boundary.before-queue-adoption.json",
+    "bytes": 11374,
+    "sha256": "c3532dd55a0135e156c7de28b05acaaca04f576b8f32ab1f11260f67ba895017"
+  },
+  "currentDeclaration": {
+    "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.json",
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\fixtures\\held-io-source-boundary.json",
+    "bytes": 12678,
+    "sha256": "8b8576c1f4bf7307f3ba1853cf31d207d8e6b833103433bb1ec8f25c438eb3b4"
+  },
+  "migration": {
+    "relative": "src/PiSharp.Cli/Interactive/TerminalSessionView.cs",
+    "historical": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-held-boundary-migration-work\\src\\PiSharp.Cli\\Interactive\\TerminalSessionView.cs",
+      "relative": "src/PiSharp.Cli/Interactive/TerminalSessionView.cs",
+      "bytes": 17989,
+      "sha256": "c40a22603258ee58ef5972e96098e1297ca238fd08b3d84d739beb9080d1c0ef"
+    },
+    "queuePreviewSource": {
+      "relative": "src/PiSharp.Cli/Interactive/TerminalSessionView.cs",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\src\\PiSharp.Cli\\Interactive\\TerminalSessionView.cs",
+      "bytes": 18853,
+      "sha256": "36bd9b9808735ea85f006b6ccce373d1d165d8a3e559d80407623c14f4b05e9e"
+    }
+  },
+  "preserved": [
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/HeldIoTests.cs",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\HeldIoTests.cs",
+      "bytes": 34276,
+      "sha256": "a4dc73ee294a84f9e52cc15b6e092db472430c1a47c8a96bafb1a8b024bd6bc3"
+    },
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/Program.cs",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\Program.cs",
+      "bytes": 15295,
+      "sha256": "67de8756784db53f2531b173e4cf7dd7a0db0753a6ac93b2848679a8b8886d9a"
+    },
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/AlternateKeyControls.cs",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\AlternateKeyControls.cs",
+      "bytes": 11499,
+      "sha256": "3a73bd3fb1c26282b7a36156d48e051fe03c5ea6423c3d6d534cc36d1ce72446"
+    },
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/HeldIoEvidence.cs",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\HeldIoEvidence.cs",
+      "bytes": 11098,
+      "sha256": "352f7bfb6e04c52a201facc7b7d17dffd16cacb4a8ec9427f19a69aeae18d495"
+    },
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/shift-space-source-observations.json",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\fixtures\\shift-space-source-observations.json",
+      "bytes": 38454,
+      "sha256": "d71057f550e047c30684d427865561d12c7a8c0d7db6dd1378c2ddf42bfbfb1c"
+    },
+    {
+      "relative": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-failure-cancellation-design.json",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\fixtures\\held-io-failure-cancellation-design.json",
+      "bytes": 19581,
+      "sha256": "b1f4a5b2bbd7ab1df1e9ac7b0fb3a8af0cb325a4d9ef5ab8bad99e58d27d845d"
+    },
+    {
+      "relative": "tools/prepare-native-products.ps1",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\tools\\prepare-native-products.ps1",
+      "bytes": 20472,
+      "sha256": "8d2dbf0ecaaad8c52e67182a04653aedafe99f7fc4c0aee9dddacc9e19eac439"
+    },
+    {
+      "relative": "tools/native-companion-registration.ps1",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\tools\\native-companion-registration.ps1",
+      "bytes": 51861,
+      "sha256": "4990684479c4fa897780d8d0a23bee198622796a6632feb9c64f23201c9ab226"
+    },
+    {
+      "relative": "tools/native-companion-targets.json",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\tools\\native-companion-targets.json",
+      "bytes": 56701,
+      "sha256": "981e9aaa252737913fed1e02271ab580ebd5ea5f663ebfd4960d7a439b91b186"
+    },
+    {
+      "relative": "PiSharp.slnx",
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-queue-preview-work\\PiSharp.slnx",
+      "bytes": 6950,
+      "sha256": "16a6895d999d154582eb9150316ec9b6da61df8fcf30e8f8f2d6df038c400419"
+    }
+  ],
+  "checks": {
+    "exactlyOneProductionPinMigrated": true,
+    "allOtherDeclarationFieldsUnchanged": true,
+    "allBoundaryFilesMatchExactCurrentRawSource": true,
+    "boundaryMembers": 14,
+    "historicalRawDeclarationPreserved": true,
+    "scenarios": 8,
+    "strictSourceAndDllChecksRetained": true
+  },
+  "leadSuccessorRequired": [
+    "Reconcile current/historical/migration fixture registration on the integrated successor",
+    "Reverify all 14 boundary members against the full immutable integrated source manifest",
+    "Run all unchanged held-I/O scenarios under fresh complete SDK/product admission when permitted"
+  ],
+  "sourceOnly": true,
+  "nativeBuilds": 0,
+  "nativeExecutions": 0,
+  "languageParsers": 0,
+  "sourceCaptures": 0,
+  "newAcceptance": false
+}

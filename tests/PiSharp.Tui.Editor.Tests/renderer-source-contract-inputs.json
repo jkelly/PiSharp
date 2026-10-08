@@ -1,0 +1,447 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "Actual public Editor and unchanged source alternate-screen TUI through a borrowed fake terminal writer. Raw output is evidence only and never written to a physical terminal.",
+  "cases": [
+    {
+      "id": "ascii",
+      "text": "alpha beta",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "cjk-combining-zwj",
+      "text": "a界é👩‍💻",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "tab",
+      "text": "a\tb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "thai-lao-am",
+      "text": "กำກຳ",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-sgr",
+      "text": "a\u001b[31mRED\u001b[0mb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-erase",
+      "text": "a\u001b[2Jb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-cup",
+      "text": "a\u001b[999;999Hb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-osc52",
+      "text": "a\u001b]52;c;ZGVtbw==\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-title",
+      "text": "a\u001b]0;preview-name\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-osc8",
+      "text": "a\u001b]8;;https://example.invalid/\u0007link\u001b]8;;\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-forged-caret",
+      "text": "a\u001b_pi:c\u0007bc",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-dcs",
+      "text": "a\u001bPqpayload\u001b\\b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-apc",
+      "text": "a\u001b_payload\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-bel",
+      "text": "a\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-backspace",
+      "text": "a\bb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-nel",
+      "text": "ab",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-c1-csi",
+      "text": "a2Jb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-c1-osc",
+      "text": "a52;c;ZGVtbw==b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "one-column-wide",
+      "text": "界",
+      "columns": 1,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "two-column-wide",
+      "text": "界",
+      "columns": 2,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "one-row-source",
+      "text": "a\nb\nc\nd\ne\nf\ng",
+      "columns": 16,
+      "terminalRows": 1,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "two-row-source",
+      "text": "a\nb\nc\nd\ne\nf\ng",
+      "columns": 16,
+      "terminalRows": 2,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "three-row-source",
+      "text": "a\nb\nc\nd\ne\nf\ng",
+      "columns": 16,
+      "terminalRows": 3,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "user-erase-narrow",
+      "text": "a\u001b[2Jb",
+      "columns": 4,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": true
+    },
+    {
+      "id": "unfocused-source-caret",
+      "text": "alpha",
+      "columns": 16,
+      "terminalRows": 24,
+      "admission": "set",
+      "focused": false
+    },
+    {
+      "id": "user-sgr-insert",
+      "text": "a\u001b[31mRED\u001b[0mb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-sgr-paste",
+      "text": "a\u001b[31mRED\u001b[0mb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-erase-insert",
+      "text": "a\u001b[2Jb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-erase-paste",
+      "text": "a\u001b[2Jb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-cup-insert",
+      "text": "a\u001b[999;999Hb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-cup-paste",
+      "text": "a\u001b[999;999Hb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-osc52-insert",
+      "text": "a\u001b]52;c;ZGVtbw==\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-osc52-paste",
+      "text": "a\u001b]52;c;ZGVtbw==\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-title-insert",
+      "text": "a\u001b]0;preview-name\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-title-paste",
+      "text": "a\u001b]0;preview-name\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-osc8-insert",
+      "text": "a\u001b]8;;https://example.invalid/\u0007link\u001b]8;;\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-osc8-paste",
+      "text": "a\u001b]8;;https://example.invalid/\u0007link\u001b]8;;\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-forged-caret-insert",
+      "text": "a\u001b_pi:c\u0007bc",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-forged-caret-paste",
+      "text": "a\u001b_pi:c\u0007bc",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-dcs-insert",
+      "text": "a\u001bPqpayload\u001b\\b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-dcs-paste",
+      "text": "a\u001bPqpayload\u001b\\b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-apc-insert",
+      "text": "a\u001b_payload\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-apc-paste",
+      "text": "a\u001b_payload\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-bel-insert",
+      "text": "a\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-bel-paste",
+      "text": "a\u0007b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-backspace-insert",
+      "text": "a\bb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-backspace-paste",
+      "text": "a\bb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-nel-insert",
+      "text": "ab",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-nel-paste",
+      "text": "ab",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-c1-csi-insert",
+      "text": "a2Jb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-c1-csi-paste",
+      "text": "a2Jb",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-c1-osc-insert",
+      "text": "a52;c;ZGVtbw==b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-c1-osc-paste",
+      "text": "a52;c;ZGVtbw==b",
+      "columns": 80,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    },
+    {
+      "id": "user-erase-narrow-insert",
+      "text": "a\u001b[2Jb",
+      "columns": 4,
+      "terminalRows": 24,
+      "admission": "insert",
+      "focused": true
+    },
+    {
+      "id": "user-erase-narrow-paste",
+      "text": "a\u001b[2Jb",
+      "columns": 4,
+      "terminalRows": 24,
+      "admission": "paste",
+      "focused": true
+    }
+  ]
+}

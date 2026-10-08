@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><StartupObject>PiSharp.Qualification.GrammarQualificationEntry</StartupObject></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.AI/PiSharp.AI.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Contracts/PiSharp.Contracts.csproj" />
+    <Compile Include="../PiSharp.ResponsesGrammarFallback.Tests/Program.cs" Link="OriginalGrammarControls.cs" />
+    <Compile Include="../PiSharp.OriginalProviderQualification.Shared/QualificationEvidence.cs" Link="QualificationEvidence.cs" />
+  </ItemGroup>
+</Project>

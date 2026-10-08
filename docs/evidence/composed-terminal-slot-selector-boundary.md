@@ -1,0 +1,7 @@
+# Composed terminal-slot and selector source boundary
+
+Merge cleared slot3cf39b28203ae41a3cb80be7caefd8ed56ead660 into reviewedmain71b5f5ebfc9e41b68b1b4adb5dbe120442c4cd9e. Retain its TerminalChatInput member and main's newer selector TerminalInputDecoder member. All14members match actualfiles and all8scenarioobjects remain identical toclearedslotcandidate.
+
+Actualcombinedboundary: 15427 bytes, SHA256 24c45a73251f23459b2eabdec55bfe083e65b50fa8a8e0f66c918548444c0ad8. Both sourcefixture andcopiedoutput registrydeclarations use these actualcombinedbytes. Preserve Pi outputrelative/copy/projectpins andall26targets/arguments/deadlines.
+
+Status-ledgerconflict retains all3 distinct reviewed records; registrationconflict retains15slotcontrols and2combinedchildcases. Diagnostics observer andRPCoriginalhost/child/readjoins areunchanged. Source-only reconciliation; runtimequalifications requirefreshcandidate/source/product admission. Reader-sideprivate-token limitation staysopen andseparatelyowned. Historicalreceipts remainunchanged.

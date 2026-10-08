@@ -1,0 +1,42 @@
+{
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceFile": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-upstream-v0.99.1/packages/ai/src/utils/overflow.ts",
+  "sourceFileSha256": "9a7200aac0cce1769e3acdf01e66048fea0ee62f3a93a3dac08055c41a33e2cb",
+  "actualSourceFileUnchanged": true,
+  "actualCompleteModuleExports": true,
+  "sourceRuntime": "v24.19.0",
+  "nodeBinary": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "producerHarness": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\capture-recovery-classifier-source.mjs",
+    "sha256": "e3eecc4583a77c89c769579ace9dcb88a99e4d7fa0077072bcc70a844f5dfe53"
+  },
+  "consumerSourceExecution": "fde4034c2611574215577060ed002d3fe8b8ae3b",
+  "helperCases": 65,
+  "helperPatterns": 24,
+  "runs": [
+    {
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 30591,
+      "stderrBytes": 0,
+      "timeoutMilliseconds": 20000,
+      "maxBufferBytes": 8388608
+    },
+    {
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 30591,
+      "stderrBytes": 0,
+      "timeoutMilliseconds": 20000,
+      "maxBufferBytes": 8388608
+    }
+  ],
+  "repeatBytesEqual": true,
+  "providerRequests": 0,
+  "wholeAgentSessionOracle": false
+}

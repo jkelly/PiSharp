@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "generator": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\generate-pinned-sea-data.mjs",
+    "bytes": 4515,
+    "sha256": "bf8ab284ccaa65b46cafb5fe8256ca526ca53a81174bc5ffd09a7b7c30425a29"
+  },
+  "host": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "bytes": 92825416,
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "versions": {
+    "node": "24.19.0",
+    "acorn": "8.17.0",
+    "ada": "3.4.4",
+    "amaro": "1.1.10",
+    "ares": "1.34.6",
+    "brotli": "1.2.0",
+    "cldr": "48.0",
+    "icu": "78.3",
+    "llhttp": "9.4.3",
+    "merve": "1.2.2",
+    "modules": "137",
+    "napi": "10",
+    "nbytes": "0.1.4",
+    "ncrypto": "0.0.1",
+    "nghttp2": "1.69.0",
+    "nghttp3": "",
+    "ngtcp2": "",
+    "openssl": "3.5.7",
+    "simdjson": "4.6.4",
+    "simdutf": "6.4.0",
+    "sqlite": "3.53.3",
+    "tz": "2026b",
+    "undici": "7.29.0",
+    "unicode": "17.0",
+    "uv": "1.52.1",
+    "uvwasi": "0.0.23",
+    "v8": "13.6.233.17-node.51",
+    "zlib": "1.3.2.1-motley-3246f1b",
+    "zstd": "1.5.7"
+  },
+  "officialSourceCommit": "21d1eb0f306e1141c10931e914dfc038c06121da",
+  "officialPackageProof": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78-sea\\official-node-icu-data-verification.json",
+    "bytes": 2419,
+    "sha256": "6d03538aab3af201a3b4081defef4fa9840e19060b6c58a7c2749a0ebf97fa6b"
+  },
+  "officialLineBreak": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78\\LineBreak-17.0.0.txt",
+    "bytes": 263180,
+    "sha256": "e6a18fa91f8f6a6f8e534b1d3f128c21ada45bfe152eb6b1bcc5e15fd8ac92e6"
+  },
+  "scriptRanges": [
+    [
+      3713,
+      3714,
+      128
+    ],
+    [
+      3716,
+      3716,
+      128
+    ],
+    [
+      3718,
+      3722,
+      128
+    ],
+    [
+      3724,
+      3747,
+      128
+    ],
+    [
+      3749,
+      3749,
+      128
+    ],
+    [
+      3751,
+      3773,
+      128
+    ],
+    [
+      3776,
+      3780,
+      128
+    ],
+    [
+      3782,
+      3782,
+      128
+    ],
+    [
+      3784,
+      3790,
+      128
+    ],
+    [
+      3804,
+      3807,
+      128
+    ],
+    [
+      4096,
+      4159,
+      512
+    ],
+    [
+      4176,
+      4239,
+      512
+    ],
+    [
+      4250,
+      4255,
+      512
+    ],
+    [
+      6016,
+      6099,
+      256
+    ],
+    [
+      6103,
+      6103,
+      256
+    ],
+    [
+      6108,
+      6109,
+      256
+    ],
+    [
+      43488,
+      43503,
+      512
+    ],
+    [
+      43514,
+      43518,
+      512
+    ],
+    [
+      43616,
+      43647,
+      512
+    ]
+  ],
+  "data": [
+    {
+      "name": "Lao",
+      "flag": 128,
+      "raw": {
+        "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78-sea\\pinned-laodict.dict",
+        "bytes": 162624,
+        "sha256": "b044d4232c2fea926b88f6047c4efcd683e7cf0573cf9f60990aa7500c60ef0c"
+      },
+      "gzipBytes": 118333,
+      "base64Characters": 157780
+    },
+    {
+      "name": "Khmer",
+      "flag": 256,
+      "raw": {
+        "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78-sea\\pinned-khmerdict.dict",
+        "bytes": 445552,
+        "sha256": "080582d61636c7f9039d65bc37452d100faa07f3ba7f5e21aa32aa1672441413"
+      },
+      "gzipBytes": 331194,
+      "base64Characters": 441592
+    },
+    {
+      "name": "Burmese",
+      "flag": 512,
+      "raw": {
+        "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78-sea\\pinned-burmesedict.dict",
+        "bytes": 254448,
+        "sha256": "99f1b2afe6672bc495a872e85dd5ed2be5ffc4d9b8377deff2dbc18a2b4538e5"
+      },
+      "gzipBytes": 171906,
+      "base64Characters": 229208
+    }
+  ],
+  "generated": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-word-sea-work\\tests\\PiSharp.Tui.Editor.Tests\\word-data\\icu78-sea\\PinnedWordSeaData.generated.cs.txt",
+    "bytes": 947366,
+    "sha256": "2d22ff871f654b242649057ae521b9faa02429da11ae7b0e3059d2770afda06c"
+  }
+}

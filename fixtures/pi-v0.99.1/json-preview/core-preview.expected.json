@@ -1,0 +1,614 @@
+{
+  "fixtureId": "core-preview",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "captured-upstream-json-preview-oracle",
+  "normalizerVersion": "object-key-order-v1",
+  "observations": {
+    "cases": [
+      {
+        "caseId": "undefined",
+        "category": "empty",
+        "input": {
+          "kind": "undefined"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "undefined-input"
+        },
+        "resultKind": "object",
+        "result": {}
+      },
+      {
+        "caseId": "empty",
+        "category": "empty",
+        "input": {
+          "kind": "string",
+          "text": ""
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {}
+      },
+      {
+        "caseId": "whitespace",
+        "category": "empty",
+        "input": {
+          "kind": "string",
+          "text": " \t\r\n"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {}
+      },
+      {
+        "caseId": "valid-object",
+        "category": "strict-valid",
+        "input": {
+          "kind": "string",
+          "text": "{\"keep\":null,\"false\":false,\"order\":[\"b\",\"a\"],\"nested\":{\"text\":\"π\\r\\n\"}}"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "accepted"
+        },
+        "resultKind": "object",
+        "result": {
+          "keep": null,
+          "false": false,
+          "order": [
+            "b",
+            "a"
+          ],
+          "nested": {
+            "text": "π\r\n"
+          }
+        }
+      },
+      {
+        "caseId": "valid-array",
+        "category": "strict-valid",
+        "input": {
+          "kind": "string",
+          "text": "[1,\"π\",null,false,{\"a\":[]}]"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "accepted"
+        },
+        "resultKind": "array",
+        "result": [
+          1,
+          "π",
+          null,
+          false,
+          {
+            "a": []
+          }
+        ]
+      },
+      {
+        "caseId": "valid-string",
+        "category": "strict-valid",
+        "input": {
+          "kind": "string",
+          "text": "\"π text\""
+        },
+        "strictRuntimeInputCheck": {
+          "status": "accepted"
+        },
+        "resultKind": "string",
+        "result": "π text"
+      },
+      {
+        "caseId": "valid-true",
+        "category": "strict-valid",
+        "input": {
+          "kind": "string",
+          "text": "true"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "accepted"
+        },
+        "resultKind": "boolean",
+        "result": true
+      },
+      {
+        "caseId": "valid-null",
+        "category": "strict-valid",
+        "input": {
+          "kind": "string",
+          "text": "null"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "accepted"
+        },
+        "resultKind": "null",
+        "result": null
+      },
+      {
+        "caseId": "valid-number",
+        "category": "strict-valid",
+        "input": {
+          "kind": "string",
+          "text": "12.5"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "accepted"
+        },
+        "resultKind": "number",
+        "result": 12.5
+      },
+      {
+        "caseId": "object-open",
+        "category": "incomplete-object",
+        "input": {
+          "kind": "string",
+          "text": "{"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {}
+      },
+      {
+        "caseId": "object-key",
+        "category": "incomplete-object",
+        "input": {
+          "kind": "string",
+          "text": "{\"path\""
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {}
+      },
+      {
+        "caseId": "object-colon",
+        "category": "incomplete-object",
+        "input": {
+          "kind": "string",
+          "text": "{\"path\":"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {}
+      },
+      {
+        "caseId": "nested-open",
+        "category": "incomplete-nesting",
+        "input": {
+          "kind": "string",
+          "text": "{\"outer\":{\"items\":[1,{\"name\":\"π"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {
+          "outer": {
+            "items": [
+              1,
+              {
+                "name": "π"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "caseId": "array-open",
+        "category": "incomplete-array",
+        "input": {
+          "kind": "string",
+          "text": "["
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "array",
+        "result": []
+      },
+      {
+        "caseId": "array-comma",
+        "category": "incomplete-array",
+        "input": {
+          "kind": "string",
+          "text": "[1,2,"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "array",
+        "result": [
+          1,
+          2
+        ]
+      },
+      {
+        "caseId": "string-open",
+        "category": "incomplete-string",
+        "input": {
+          "kind": "string",
+          "text": "\"hello"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "string",
+        "result": "hello"
+      },
+      {
+        "caseId": "true-prefix",
+        "category": "incomplete-literal",
+        "input": {
+          "kind": "string",
+          "text": "tru"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "boolean",
+        "result": true
+      },
+      {
+        "caseId": "false-prefix",
+        "category": "incomplete-literal",
+        "input": {
+          "kind": "string",
+          "text": "fal"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "boolean",
+        "result": false
+      },
+      {
+        "caseId": "null-prefix",
+        "category": "incomplete-literal",
+        "input": {
+          "kind": "string",
+          "text": "nu"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {}
+      },
+      {
+        "caseId": "minus-prefix",
+        "category": "incomplete-number",
+        "input": {
+          "kind": "string",
+          "text": "-"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {}
+      },
+      {
+        "caseId": "decimal-prefix",
+        "category": "incomplete-number",
+        "input": {
+          "kind": "string",
+          "text": "12."
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {}
+      },
+      {
+        "caseId": "exponent-prefix",
+        "category": "incomplete-number",
+        "input": {
+          "kind": "string",
+          "text": "12e+"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "number",
+        "result": 12
+      },
+      {
+        "caseId": "split-backslash-prefix",
+        "category": "split-escape",
+        "input": {
+          "kind": "string",
+          "text": "{\"path\":\"C:\\"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {
+          "path": "C:"
+        }
+      },
+      {
+        "caseId": "split-backslash-complete",
+        "category": "split-escape",
+        "input": {
+          "kind": "string",
+          "text": "{\"path\":\"C:\\\\temp\\\\π\"}"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "accepted"
+        },
+        "resultKind": "object",
+        "result": {
+          "path": "C:\\temp\\π"
+        }
+      },
+      {
+        "caseId": "escaped-quote-prefix",
+        "category": "split-escape",
+        "input": {
+          "kind": "string",
+          "text": "{\"text\":\"say \\\"hello"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {
+          "text": "say \"hello"
+        }
+      },
+      {
+        "caseId": "unicode-prefix",
+        "category": "partial-unicode",
+        "input": {
+          "kind": "string",
+          "text": "{\"text\":\"prefix \\u03"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {
+          "text": "prefix "
+        }
+      },
+      {
+        "caseId": "unicode-surrogate-prefix",
+        "category": "partial-unicode",
+        "input": {
+          "kind": "string",
+          "text": "{\"text\":\"\\uD83D\\u"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {
+          "text": "\ud83d"
+        }
+      },
+      {
+        "caseId": "unicode-surrogate-complete",
+        "category": "partial-unicode",
+        "input": {
+          "kind": "string",
+          "text": "{\"text\":\"\\uD83D\\uDE00\"}"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "accepted"
+        },
+        "resultKind": "object",
+        "result": {
+          "text": "😀"
+        }
+      },
+      {
+        "caseId": "malformed-token",
+        "category": "malformed-fallback",
+        "input": {
+          "kind": "string",
+          "text": "not-json"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {}
+      },
+      {
+        "caseId": "malformed-object",
+        "category": "malformed-fallback",
+        "input": {
+          "kind": "string",
+          "text": "{broken"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {}
+      },
+      {
+        "caseId": "malformed-nested-tail",
+        "category": "malformed-fallback",
+        "input": {
+          "kind": "string",
+          "text": "{\"a\":1,wrong}"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {
+          "a": 1
+        }
+      },
+      {
+        "caseId": "raw-control-repair",
+        "category": "malformed-repair",
+        "input": {
+          "kind": "string",
+          "text": "{\"text\":\"line\nnext\"}"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {
+          "text": "line\nnext"
+        }
+      },
+      {
+        "caseId": "invalid-escape-repair",
+        "category": "malformed-repair",
+        "input": {
+          "kind": "string",
+          "text": "{\"path\":\"C:\\q\"}"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "incomplete-or-invalid-json"
+        },
+        "resultKind": "object",
+        "result": {
+          "path": "C:\\q"
+        }
+      },
+      {
+        "caseId": "exact-large-integer",
+        "category": "numeric-limits",
+        "input": {
+          "kind": "string",
+          "text": "9007199254740992"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "accepted"
+        },
+        "resultKind": "number",
+        "result": 9007199254740992
+      },
+      {
+        "caseId": "inexact-large-integer",
+        "category": "numeric-limits",
+        "input": {
+          "kind": "string",
+          "text": "9007199254740993"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "unsupported-runtime-precision",
+          "reason": "Number loses precision in the JS runtime: 9007199254740993"
+        },
+        "resultKind": "number",
+        "result": 9007199254740992
+      },
+      {
+        "caseId": "inexact-decimal-a",
+        "category": "numeric-limits",
+        "input": {
+          "kind": "string",
+          "text": "0.123456789012345678901"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "unsupported-runtime-precision",
+          "reason": "Number loses precision in the JS runtime: 0.123456789012345678901"
+        },
+        "resultKind": "number",
+        "result": 0.12345678901234568
+      },
+      {
+        "caseId": "inexact-decimal-b",
+        "category": "numeric-limits",
+        "input": {
+          "kind": "string",
+          "text": "0.123456789012345678902"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "unsupported-runtime-precision",
+          "reason": "Number loses precision in the JS runtime: 0.123456789012345678902"
+        },
+        "resultKind": "number",
+        "result": 0.12345678901234568
+      },
+      {
+        "caseId": "negative-zero",
+        "category": "numeric-limits",
+        "input": {
+          "kind": "string",
+          "text": "-0"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "unsupported-runtime-precision",
+          "reason": "Negative zero is unsupported in runtime evidence"
+        },
+        "resultKind": "number",
+        "runtimeOnlyNumber": {
+          "representation": "-0",
+          "jsonResultAvailable": false
+        }
+      },
+      {
+        "caseId": "overflow-number",
+        "category": "numeric-limits",
+        "input": {
+          "kind": "string",
+          "text": "1e400"
+        },
+        "strictRuntimeInputCheck": {
+          "status": "unsupported-runtime-precision",
+          "reason": "Number loses precision in the JS runtime: 1e400"
+        },
+        "resultKind": "number",
+        "runtimeOnlyNumber": {
+          "representation": "Infinity",
+          "jsonResultAvailable": false
+        }
+      }
+    ],
+    "effects": [],
+    "checks": {
+      "capturedCaseCount": 39,
+      "categories": [
+        "empty",
+        "incomplete-array",
+        "incomplete-literal",
+        "incomplete-nesting",
+        "incomplete-number",
+        "incomplete-object",
+        "incomplete-string",
+        "malformed-fallback",
+        "malformed-repair",
+        "numeric-limits",
+        "partial-unicode",
+        "split-escape",
+        "strict-valid"
+      ],
+      "unsupportedStrictPrecisionCases": [
+        "inexact-large-integer",
+        "inexact-decimal-a",
+        "inexact-decimal-b",
+        "negative-zero",
+        "overflow-number"
+      ],
+      "runtimeOnlyNumberCases": [
+        "negative-zero",
+        "overflow-number"
+      ],
+      "resultKinds": [
+        "array",
+        "boolean",
+        "null",
+        "number",
+        "object",
+        "string"
+      ],
+      "numericParityQualified": false
+    }
+  }
+}

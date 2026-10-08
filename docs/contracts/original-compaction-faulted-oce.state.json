@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "b91468aaac8b7da27c49a3f05e05d79689839373",
+  "baseTree": "ce7509c9c4a42ecc134691c9354355afa6a66388",
+  "baseStatus": "historical-blocked-lone-faulted-OCE-task-state-loss",
+  "status": "source-only-ordinary-observer-failure-provenance-wrapper",
+  "newGroups": 1,
+  "totalAuthoredLifecycleGroups": 11,
+  "registeredNewGroups": 0,
+  "executedNewGroups": 0,
+  "compilers": 0,
+  "builds": 0,
+  "acceptedParity": false,
+  "remaining": ["independent source review", "coordinator runner registration", "authorized exact-producer runtime qualification"]
+}

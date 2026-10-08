@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup Condition="'$(TypedSdkToolUseRetainedProduction)' != 'true'">
+    <ProjectReference Include="../../src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TypedSdkToolUseRetainedProduction)' == 'true'">
+    <Reference Include="PiSharp.Extensions.Runtime"><HintPath>$(TypedSdkToolRetainedProductionRoot)/PiSharp.Extensions.Runtime.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="PiSharp.Extensions.Abstractions"><HintPath>$(TypedSdkToolRetainedProductionRoot)/PiSharp.Extensions.Abstractions.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="PiSharp.Contracts"><HintPath>$(TypedSdkToolRetainedProductionRoot)/PiSharp.Contracts.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="PiSharp.Extensions.Agent"><HintPath>$(TypedSdkToolRetainedProductionRoot)/PiSharp.Extensions.Agent.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="PiSharp.Agent"><HintPath>$(TypedSdkToolRetainedProductionRoot)/PiSharp.Agent.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="PiSharp.AI"><HintPath>$(TypedSdkToolRetainedProductionRoot)/PiSharp.AI.dll</HintPath><Private>true</Private></Reference>
+  </ItemGroup>
+  <Target Name="RequireRetainedTypedSdkToolProduction" BeforeTargets="ResolveReferences" Condition="'$(TypedSdkToolUseRetainedProduction)' == 'true'">
+    <Error Condition="'$(TypedSdkToolRetainedProductionRoot)' == ''" Text="The explicit retained production root is required." />
+    <Error Condition="'%(Reference.HintPath)' != '' and !Exists('%(Reference.HintPath)')" Text="An admitted retained production assembly is absent: %(Reference.HintPath)" />
+  </Target>
+</Project>

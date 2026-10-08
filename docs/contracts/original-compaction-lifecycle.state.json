@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "ee44d9184e71327a8c54c171360121d2d3e01d30",
+  "oracleCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "status": "actual-session-to-rpc-callers-authored-source-only",
+  "events": ["SessionCompactionStarted", "SessionCompactionPrepared", "SessionCompactionEnded"],
+  "originalEvents": ["compaction_start", "compaction_end"],
+  "productionCaller": "RpcSessionDispatcher.ObserveOperationAsync",
+  "authoredGroups": 9,
+  "registeredGroups": 0,
+  "executedGroups": 0,
+  "builds": 0,
+  "compilers": 0,
+  "acceptedParity": false,
+  "remaining": ["independent source review", "coordinator runner registration", "exact producer runtime qualification", "persisted recovery/model policy", "native generator diagnostic divergence", "native retain-none boundary divergence"]
+}

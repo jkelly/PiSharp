@@ -1,31 +1,41 @@
 # PiSharp
 
-PiSharp is an independent native .NET implementation of bounded Pi behavior targeting the public Pi **v0.99.1** source baseline. This repository preserves its original public planning history and adds a source snapshot. It is preview implementation source; complete upstream parity and release readiness remain open.
+PiSharp is a native .NET 10 / C# port of the [Pi coding agent](https://github.com/earendil-works/pi), in early implementation.
 
-The snapshot includes native contracts, AI adapters, Agent, tools, sessions, coding-agent profile, extension APIs/runtime, RPC, terminal UI, CLI, optional Node compatibility source, schemas and examples. Azure Responses and Mistral Conversations are bounded explicit-configuration adapters; no credentials, catalog authority or live API qualification is supplied.
+The development build includes a native offline CLI, durable sessions and branch/history views, session replacement, native C# extension loading, and bounded optional Node bridge workflows. Accepted session lifecycle and history milestones include fresh context replacement, old-context write rejection and joined cleanup. Provider and interoperability capabilities retain their individually tested scopes. All eight original phase gates remain open. See [implementation status](IMPLEMENTATION_STATUS.md) for current evidence and gaps.
 
-## Build and public offline checks
+## Native validation tooling
 
-Use SDK **10.0.401**, pinned in [global.json](global.json) with roll-forward disabled. Projects target `net10.0` and have no external PackageReference dependencies. [NuGet.Config](NuGet.Config) clears package feeds; matching SDK reference packs must already be available.
+Use the .NET SDK version pinned in `global.json`. The retained [native test runner](tools/test-native.ps1) consumes separately prepared, exactly pinned source and build receipts through `SourceManifest`, `SourceManifestSha256`, `PermittedBuildReceipt`, and `PermittedBuildReceiptSha256`. It validates and runs those existing products; it does not restore, rebuild, or publish them. The [preparation tool](tools/prepare-native-products.ps1) separately requires an explicit source manifest, runtime allocation, and finite execution budget.
 
-The public solution contains all 14 production projects and two self-contained fake-HTTP test projects. From the repository root:
+These historical preparation and recapture tools intentionally fail closed when their exact inputs are unavailable. Private qualification receipts are not transferable authority for this public checkout. The export includes source and portable fixture integrity checks, but does not claim that this public tree or the complete native gate was executed. A direct SDK project build is a separate operation and has not been certified by export metadata checks. See [public snapshot provenance](PUBLIC-SNAPSHOT-PROVENANCE.md) for the source basis, derivative fixture rules, and bounded historical results.
 
-```powershell
-dotnet restore PiSharp.slnx --locked-mode --configfile NuGet.Config
-dotnet build PiSharp.slnx --configuration Release --no-restore
-dotnet tests/PiSharp.AzureResponses.Tests/bin/Release/net10.0/PiSharp.AzureResponses.Tests.dll
-dotnet tests/PiSharp.MistralConversations.Tests/bin/Release/net10.0/PiSharp.MistralConversations.Tests.dll
-dotnet src/PiSharp.Cli/bin/Release/net10.0/PiSharp.Cli.dll --help
-```
+Provider fixtures distinguish authored contract cases from captured observations. Path-normalized public derivatives are labeled as such; they must not be treated as original raw wire evidence or whole-provider equivalence.
 
-The two test products contain 15 Azure and 23 Mistral authored offline groups using injected fake HTTP handlers. They make no live provider requests. No passing result on this new snapshot is claimed before its fresh checks complete.
+## Planned direction
 
-Private development history, acquired archives, genuine reference captures/goldens and operational qualification records are excluded. The original complete native/reference gate depends on those omitted inputs, so these commands do not reproduce it. See [source scope and qualification limits](docs/public-source-scope.md).
+- A native C# core that runs without Node.js.
+- Native C# plugins through a dedicated plugin SDK.
+- An optional Node.js bridge for interoperability; Node.js will only be needed when using that bridge.
 
-Optional Node worker source is included for separately configured compatibility work. Node/npm acquisition, optional worker execution and module/package parity are outside these native commands. This snapshot publishes no binary package or release.
+These capabilities are being implemented and qualified against the complete original plan. Read the [architecture and implementation strategy](docs/architecture.md) and the [planning index](docs/plans/README.md) for the remaining phases.
 
-## Plans and attribution
+## Explicit session imports and exports
 
-The [original planning index](docs/plans/README.md) remains available. Planned work, historical acceptance labels and current bounded observations are distinct. [Architecture](docs/architecture.md), [schemas](schemas), and [samples](samples) provide context.
+The CLI accepts explicit source and new destination paths. `session migrate` converts supported legacy records using an explicit v1 ID plan; `session copy --format native-exact` preserves valid current source bytes; `--format current-jsonl` emits current records with transformation receipts. `--format native-archive-exact` preserves a complete future or damaged source as inert archival data. Existing destinations are never overwritten. See the [command contract](docs/contracts/session-copy-command.md) for complete arguments and the [P4-05 milestone](docs/compatibility/p4-05-interoperability-milestone.md) for qualification status.
 
-PiSharp uses [MIT](LICENSE). Copied or substantially adapted Pi source retains its pinned MIT attribution in [third-party notices](THIRD-PARTY-NOTICES.md). Those notices do not establish redistribution clearance for omitted compiled/vendored/generated archives. This is an independent port, not an official upstream release.
+## Upstream baseline and attribution
+
+The canonical upstream is [earendil-works/pi](https://github.com/earendil-works/pi). Planning is pinned to **v0.99.1**, commit [`d86654abb8862e201933517d6f1fce9f88dd117f`](https://github.com/earendil-works/pi/tree/d86654abb8862e201933517d6f1fce9f88dd117f).
+
+Upstream Pi is MIT-licensed. Its [license at the planning baseline](https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/LICENSE) identifies **Copyright (c) 2025 Mario Zechner**. Public upstream contracts and behavior inform this implementation; applicable attribution is retained in [third-party notices](THIRD-PARTY-NOTICES.md). No private project code or context is used.
+
+PiSharp is an independent project; no upstream endorsement is claimed.
+
+## Contributing
+
+Planning feedback and documentation improvements are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes.
+
+## License
+
+PiSharp's original contributions are available under the [MIT License](LICENSE).

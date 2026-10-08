@@ -36,6 +36,11 @@ public abstract record StreamTerminalEvent(StopReason Reason, AssistantMessage M
 {
     public NativeChatDiagnostic? NativeDiagnostic { get; init; }
     public NativeChatDiagnostic? NativeCleanupDiagnostic { get; init; }
+    // Native qualification references only. Existing constructors and wire shapes are unchanged.
+    [System.Text.Json.Serialization.JsonIgnore] public Exception? NativeSourceException { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore] public Task? NativeSourceTask { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore] public IReadOnlyList<Exception>? NativeCleanupExceptions { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore] public IReadOnlyList<Task>? NativeCleanupTasks { get; init; }
 }
 public sealed record StreamDone(StopReason Reason, AssistantMessage Message, JsonFields? Properties = null)
     : StreamTerminalEvent(Reason, Message, Properties);

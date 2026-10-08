@@ -25,7 +25,10 @@ public interface IExtensionSessionCreationCommandContext : IExtensionSessionComm
         CancellationToken cancellationToken = default);
 }
 public enum ExtensionSessionCreationKind { New, ForkBefore, ForkAt, Clone }
-public sealed record ExtensionSessionCreationRequest(ExtensionSessionCreationKind Kind, string? EntryId = null, string? ParentSession = null);
+public sealed record ExtensionSessionCreationRequest(ExtensionSessionCreationKind Kind, string? EntryId = null, string? ParentSession = null)
+{
+    public ExtensionNewSessionSetupCallback? Setup { get; init; }
+}
 public sealed record ExtensionSessionCreationResult(IExtensionSessionCreationCommandContext Context, string? SelectedText);
 
 public sealed record ExtensionSessionEntryAcknowledgment(string SessionId, long Generation, JsonData Entry,

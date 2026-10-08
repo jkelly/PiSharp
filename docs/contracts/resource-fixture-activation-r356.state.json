@@ -1,0 +1,21 @@
+{
+  "base": "10f8428a1d98edea7cc3e8dfb97d7d1fdff0b92c",
+  "baseTree": "ada4406978ecb2c0e02c8350b063bc705a434d29",
+  "scope": "fixture-only resource catalog activation and held saver admission original joins",
+  "fixture": "tests/PiSharp.CodingAgent.Tests/McpProfileResourceAdmissionTests.cs",
+  "activation": "PersistentAgentSession.SetActiveToolsAsync after actual lifecycle owner binding; three verified catalog names",
+  "productionChanged": false,
+  "existingCases": 10,
+  "addedCases": 0,
+  "compiled": false,
+  "executed": false,
+  "capturedFailurePreserved": true,
+  "capturedFullReportPresent": false,
+  "timeoutCaseAttribution": "unknown from retained captures",
+  "qualification": "none",
+  "remaining": [
+    "independent source review",
+    "fresh candidate composition",
+    "separate finite native grant"
+  ]
+}

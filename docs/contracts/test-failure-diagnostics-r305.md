@@ -1,0 +1,7 @@
+# Bounded retained-test failure diagnostics
+
+CodingAgent, RPC and Extensions failure report rows retain the existing error field and additionally record exception types, HRESULTs, at most eight source frames per node (file basenames, method metadata and line numbers), and a bounded causal graph. Sixty-four distinct exception objects and 128 causal edges cap output. Repeated references get repeated positioned edges; nested and empty aggregates remain nodes. Truncation is explicit. Optimized/no-PDB frames may have no filename or zero line.
+
+The new collector never reads Message, Data, arguments, token values, response bodies, credentials or absolute source paths. Existing error and stderr behavior is unchanged. Capture errors mark diagnostics unavailable without replacing the original test failure. This supplies locations and structural original exception evidence; it does not infer original Task state where the caller failed to retain its task.
+
+Source only, exact4707 prerequisite. No compiler, tests or diagnostic collector execution occurred. No fixture assertions, deadlines, original joins, pass/fail rules, test inventory, projects or package locks changed. Independent API review and explicit exact-source qualification remain required.

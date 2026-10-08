@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "status": "PINNED_LINKED_SOURCE_NOT_EXECUTED",
+  "sourceBasis": "98d26295f9385d44b26b67b9248ddc169823a282",
+  "preservedBodyFiles": [
+    "TerminalRpcAdmissionCancellationCases.cs",
+    "TerminalRpcReadCancellationCases.cs",
+    "TerminalOwnedChildShutdownCases.cs"
+  ],
+  "conditionalProfilesOnly": [
+    "EvidenceAdmission.cs",
+    "ConsumerEvidence.cs"
+  ],
+  "files": [
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/ConsumerEvidence.cs",
+      "bytes": 10222,
+      "sha256": "b18dd21182e29c586c8094131a55a00cb929975eaad9047706fed14a97ac9ac5"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/ConsumerExecution.cs",
+      "bytes": 714,
+      "sha256": "492a576afab36f441665fc5ba565dd9ed740d2da22fa8cce5fd30848a94a818d"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/EvidenceAdmission.cs",
+      "bytes": 27108,
+      "sha256": "3f1d7de1d83258177064dfa7ccebf3fc933924416bdca8c44ec80885478da91a"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/FailureReportCases.cs",
+      "bytes": 5031,
+      "sha256": "9bbc66d873e969d7eb99857c1f016c627df732cef8550bbd859bb78cd9428c5f"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/SelectorFixture.cs",
+      "bytes": 16246,
+      "sha256": "9e90f852ef7381069ee2e7bc63af9350d299faa6d835f12d7cfa2475f2d1b0d8"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/SelectorInputProtocolCases.cs",
+      "bytes": 5269,
+      "sha256": "6c6488df963560ed422d35b5ae7b0f916658a8fb18aa0f0c068e47adfebdbb93"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/StartupBarrierCases.cs",
+      "bytes": 7164,
+      "sha256": "f7f6cd9f8c9fa9e69e959dc59625adf0aebca248caa9ecb42fbb87c8e42e9dcb"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/StartupControlledTerminal.cs",
+      "bytes": 8046,
+      "sha256": "3ee15ce3de7aa0c4e568d7199e0c04086df67f05a7cbd7d19467a289d1088724"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/StartupInputFixture.cs",
+      "bytes": 7667,
+      "sha256": "18b6eef9f2aa3cc4abd75f095e320917bd73a6f3eab120fd75b6740855c1d688"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/StartupOwnedFiles.cs",
+      "bytes": 12494,
+      "sha256": "ff6b1965b79a5e723b90a9b4f4080eb086d42bac97776349077e9175745b7a07"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/StartupPublishedExtension.cs",
+      "bytes": 2062,
+      "sha256": "033a1deb315a34dfaa9c5f31f0bf679c43b019340abcb80521417483eecf6783"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalInputDrainCases.cs",
+      "bytes": 12173,
+      "sha256": "fcd6f391676d6f2fbcc1c27148a3e355f1dc556edc67194f60dd29b7fec01b2e"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalOwnedChildShutdownCases.cs",
+      "bytes": 18132,
+      "sha256": "fd42e68ad661d10b79aeccda6798a2a44aa3dde3888a79eb70228658e17bc0f5"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalRpcAdmissionCancellationCases.cs",
+      "bytes": 16194,
+      "sha256": "c3ea09e31d245151a9d694a23bc0955dfb51f7af881e49660019e6271b740eaa"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalRpcReadCancellationCases.cs",
+      "bytes": 15390,
+      "sha256": "f11d4eda3a3cebd68e8e3042698fedd792251540b7d776215f9088ef3d0998ab"
+    },
+    {
+      "relative": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalSelectDialogCases.cs",
+      "bytes": 23998,
+      "sha256": "0a3b311e44369f61865b059685e631e4cdf874a67bc6dbeb7091831d16be603e"
+    }
+  ]
+}

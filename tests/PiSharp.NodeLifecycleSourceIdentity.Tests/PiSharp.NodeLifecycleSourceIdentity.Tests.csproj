@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Contracts/PiSharp.Contracts.csproj" />
+    <ProjectReference Include="../../src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj" />
+    <!-- Compile the actual admission source and its metadata dependency, without a mirror or shim. -->
+    <Compile Include="../../src/PiSharp.Compatibility.Node/NodeTierAAdmission.cs" Link="Production/NodeTierAAdmission.cs" />
+    <Compile Include="../../src/PiSharp.Compatibility.Node/NodeToolLoadoutMetadata.cs" Link="Production/NodeToolLoadoutMetadata.cs" />
+  </ItemGroup>
+</Project>

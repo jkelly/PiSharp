@@ -1,0 +1,565 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "claim": "No upstream/native parity or phase closure",
+  "rows": [
+    {
+      "requirementId": "cli.commands",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "experience",
+      "targetPhase": 5,
+      "testId": "planned.cli.commands",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "cli.flags",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "experience",
+      "targetPhase": 5,
+      "testId": "planned.cli.flags",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "cli.exit-codes",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "experience",
+      "targetPhase": 5,
+      "testId": "planned.cli.exit-codes",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "config.precedence",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "composition",
+      "targetPhase": 5,
+      "testId": "planned.config.precedence",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "config.environment",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "composition",
+      "targetPhase": 5,
+      "testId": "planned.config.environment",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "tools.read",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "tools",
+      "targetPhase": 3,
+      "testId": "planned.tools.read",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "tools.bash",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "tools",
+      "targetPhase": 3,
+      "testId": "planned.tools.bash",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "tools.powershell",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "tools",
+      "targetPhase": 3,
+      "testId": "planned.tools.powershell",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "tools.edit",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "tools",
+      "targetPhase": 3,
+      "testId": "planned.tools.edit",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "tools.write",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "tools",
+      "targetPhase": 3,
+      "testId": "planned.tools.write",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "tools.grep",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "tools",
+      "targetPhase": 3,
+      "testId": "planned.tools.grep",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "tools.find",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "tools",
+      "targetPhase": 3,
+      "testId": "planned.tools.find",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "tools.ls",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "tools",
+      "targetPhase": 3,
+      "testId": "planned.tools.ls",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "tools.truncation",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "tools",
+      "targetPhase": 3,
+      "testId": "planned.tools.truncation",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "events.agent",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "agent",
+      "targetPhase": 3,
+      "testId": "planned.events.agent",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "stream.indexed-events",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.stream.indexed-events",
+      "reason": "Authored native frame-contract tests and/or captured upstream queue probes cover a narrow seam; full requirement enumeration and differential qualification remain deferred.",
+      "evidenceState": "NarrowEvidenceOnly",
+      "evidence": [
+        {
+          "fixtureId": "text-authoritative-end",
+          "kind": "authored-synthetic-contract",
+          "manifest": "fixtures/pi-v0.99.1/manifest.json"
+        },
+        {
+          "fixtureId": "interleaved-thinking-tool",
+          "kind": "authored-synthetic-contract",
+          "manifest": "fixtures/pi-v0.99.1/manifest.json"
+        },
+        {
+          "fixtureId": "redacted-thinking-usage",
+          "kind": "authored-synthetic-contract",
+          "manifest": "fixtures/pi-v0.99.1/manifest.json"
+        }
+      ]
+    },
+    {
+      "requirementId": "stream.terminal-settlement",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.stream.terminal-settlement",
+      "reason": "Authored native frame-contract tests and/or captured upstream queue probes cover a narrow seam; full requirement enumeration and differential qualification remain deferred.",
+      "evidenceState": "NarrowEvidenceOnly",
+      "evidence": [
+        {
+          "fixtureId": "text-authoritative-end",
+          "kind": "authored-synthetic-contract",
+          "manifest": "fixtures/pi-v0.99.1/manifest.json"
+        },
+        {
+          "fixtureId": "interleaved-thinking-tool",
+          "kind": "authored-synthetic-contract",
+          "manifest": "fixtures/pi-v0.99.1/manifest.json"
+        },
+        {
+          "fixtureId": "redacted-thinking-usage",
+          "kind": "authored-synthetic-contract",
+          "manifest": "fixtures/pi-v0.99.1/manifest.json"
+        },
+        {
+          "fixtureId": "prestart-error",
+          "kind": "authored-synthetic-contract",
+          "manifest": "fixtures/pi-v0.99.1/manifest.json"
+        },
+        {
+          "fixtureId": "queue-order-first-terminal",
+          "kind": "captured-upstream-oracle",
+          "manifest": "fixtures/pi-v0.99.1/manifest.json"
+        },
+        {
+          "fixtureId": "queue-error-before-start",
+          "kind": "captured-upstream-oracle",
+          "manifest": "fixtures/pi-v0.99.1/manifest.json"
+        },
+        {
+          "fixtureId": "queue-mutable-partials",
+          "kind": "captured-upstream-oracle",
+          "manifest": "fixtures/pi-v0.99.1/manifest.json"
+        }
+      ]
+    },
+    {
+      "requirementId": "sdk.exports",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "composition",
+      "targetPhase": 4,
+      "testId": "planned.sdk.exports",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "sessions.entries",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "sessions",
+      "targetPhase": 4,
+      "testId": "planned.sessions.entries",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "sessions.migrations",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "sessions",
+      "targetPhase": 4,
+      "testId": "planned.sessions.migrations",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "sessions.compaction",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "sessions",
+      "targetPhase": 4,
+      "testId": "planned.sessions.compaction",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "rpc.commands",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "rpc",
+      "targetPhase": 5,
+      "testId": "planned.rpc.commands",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "rpc.framing",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "rpc",
+      "targetPhase": 5,
+      "testId": "planned.rpc.framing",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "extensions.hooks",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "extensions",
+      "targetPhase": 6,
+      "testId": "planned.extensions.hooks",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "extensions.registration",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "extensions",
+      "targetPhase": 6,
+      "testId": "planned.extensions.registration",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "resources.discovery",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "composition",
+      "targetPhase": 5,
+      "testId": "planned.resources.discovery",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "authentication.precedence",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.authentication.precedence",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "authentication.storage",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "composition",
+      "targetPhase": 5,
+      "testId": "planned.authentication.storage",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "providers.catalog",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.providers.catalog",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "providers.transcripts",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.providers.transcripts",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "providers.transports",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.providers.transports",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "api.openai-completions",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.api.openai-completions",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "api.mistral-conversations",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.api.mistral-conversations",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "api.openai-responses",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.api.openai-responses",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "api.azure-openai-responses",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.api.azure-openai-responses",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "api.openai-codex-responses",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.api.openai-codex-responses",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "api.anthropic-messages",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.api.anthropic-messages",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "api.bedrock-converse-stream",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.api.bedrock-converse-stream",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "api.google-generative-ai",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.api.google-generative-ai",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "api.google-vertex",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.api.google-vertex",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "api.pi-messages",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "ai",
+      "targetPhase": 2,
+      "testId": "planned.api.pi-messages",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "mcp.runtime",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "integrations",
+      "targetPhase": 3,
+      "testId": "planned.mcp.runtime",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "codemode.runtime",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "integrations",
+      "targetPhase": 3,
+      "testId": "planned.codemode.runtime",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "terminal.rendering",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "experience",
+      "targetPhase": 5,
+      "testId": "planned.terminal.rendering",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "terminal.images",
+      "status": "Deferred",
+      "mandatory": true,
+      "owner": "experience",
+      "targetPhase": 5,
+      "testId": "planned.terminal.images",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    },
+    {
+      "requirementId": "node.bridge",
+      "status": "Deferred",
+      "mandatory": false,
+      "owner": "extensions",
+      "targetPhase": 7,
+      "testId": "planned.node.bridge",
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open.",
+      "evidenceState": "Unverified",
+      "evidence": []
+    }
+  ]
+}

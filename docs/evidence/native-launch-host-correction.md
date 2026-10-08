@@ -1,0 +1,11 @@
+# Native launch host and workload correction
+
+Base `da218c24759bee49ba6744a7b2823fdf6994319e` remains preserved. This isolated successor addresses the two combined-batch findings only.
+
+P2: test-native.ps1 now obtains its executable from the immutable validated build receipt via Get-NativeLaunchHost, without ambient PATH selection. The resolver rehashes the receipt, requires an absolute positive byte/hash host pin, verifies the actual host file and returns its absolute path. Every core and companion launch boundary rechecks the receipt/host and requires the actual selected executable to match that recorded path. This also preserves the host passed to CodingAgent/Tui child tests. Source/product/SDK admission and original process cleanup remain intact.
+
+Ten focused PowerShell admission controls are authored in tools/test-native-launch-host-admission.ps1: substituted PATH, absent PATH, identical bytes at a different selected path, absent host, wrong size, wrong hash, relative path, host mutation after selection, receipt mutation after validation and explicit empty selected path. They invoke the production resolver over labelled inert control inputs; these are never build receipts or native evidence. All are unexecuted. The test requires pinned source closure and writes only a fresh owned artifacts branch when eventually authorized.
+
+P3: the offline plan now states ten fixture restore/publish pairs, including StatefulTodo and SessionCheckpoint. Preparation has 24 original steps: SDK version, host info, locked solution restore, solution build and twenty fixture steps. The fixed native workload remains ten core plus 26 companion runners. No wall-clock guarantee is claimed.
+
+Static checks only: all eleven launch-boundary call sites pass the selected executable; no ambient dotnet resolution remains in test-native.ps1; source diffs are limited to gate/helper, authored controls and documentation/status. No provider/core/terminal production or existing test source was changed. No parser, test, native build, SDK or product execution occurred. Lead reports prior combined composition statically clear. Independent review of this correction and runtime authorization remain pending. Terminal interrupt/exit successors remain excluded.

@@ -6,6 +6,7 @@ param(
     [Parameter(Mandatory)][ValidateSet('tool', 'standalone')][string]$Kind,
     [Parameter(Mandatory)][string]$Version,
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$SourceCommit,
+    [bool]$EnablePromptTemplateYaml = $true,
     [ValidateSet('win-x64', 'linux-x64', 'osx-arm64')][string]$Rid,
     [string]$RepeatArtifact
 )
@@ -14,7 +15,7 @@ $ErrorActionPreference = 'Stop'
 if ((Get-FileHash -LiteralPath $Artifact -Algorithm SHA256).Hash.ToLowerInvariant() -cne $ExpectedSha256) {
     throw 'Candidate archive differs from the independently supplied checksum.'
 }
-$arguments = @{ Path = $Artifact; Repo = $Repo; Kind = $Kind; Version = $Version; SourceCommit = $SourceCommit }
+$arguments = @{ Path = $Artifact; Repo = $Repo; Kind = $Kind; Version = $Version; SourceCommit = $SourceCommit; EnablePromptTemplateYaml = $EnablePromptTemplateYaml }
 if ($Rid) { $arguments.Rid = $Rid }
 $report = Assert-PiSharpDistribution @arguments
 if ($RepeatArtifact) {

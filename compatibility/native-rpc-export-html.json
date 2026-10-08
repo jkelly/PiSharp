@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORED_RPC_HTML_EXPORT_SOURCE_REVIEW_AND_QUALIFICATION_PENDING",
+  "base": "2405f51e2fd2fe3889b871c2c13e8e0dfae8d7db",
+  "baseTree": "31074f90390ac126017e0d398a4c08c577add13d",
+  "rendererSource": "5981a1c347ba837fff59152887e5f1112ca3d7c3",
+  "composedRenderer": "6c0e58be793b0c3d82708d10acfb614f81b11766",
+  "rendererIndependentReviewSha256": "81f9c27de9a093907ac13b570a67a3e6df52d04e8a146051eb938257736291e9",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "command": "export_html",
+  "sourceLinks": [
+    "https://github.com/badlogic/pi-mono/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/modes/rpc/rpc-types.ts",
+    "https://github.com/badlogic/pi-mono/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/modes/rpc/rpc-mode.ts#L598-L600",
+    "https://github.com/badlogic/pi-mono/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/export-html/index.ts#L236-L281"
+  ],
+  "supported": [
+    "Strict optional-string outputPath grammar; native admission requires explicit absolute nonempty NUL-free path",
+    "Correlated success data contains only normalized absolute path after original write invoker settles",
+    "Atomic capture of acknowledged immutable header/all entries/selected context leaf, validated captured attachment, no source-file reread",
+    "Recorded system prompt/tool declarations replayed from captured effective context; no provider or extension discovery",
+    "Complete response budget and corrected standalone renderer admission/output bounds checked before writer invocation",
+    "Explicit borrowed ToolInvoker final-action preparation/validation/policy/execution/finalization; no default write authority",
+    "Caller/startup/EOF/captured-attachment lifetime cancellation propagated while original invoker/I/O/queue cleanup remain directly awaited",
+    "Static standalone UTF8 without BOM, full forest/archive, selected ancestry and renderer content escaping"
+  ],
+  "hostContract": {
+    "constructorParameters": [
+      "ToolInvoker? exportHtmlWriter = null",
+      "SessionHtmlRenderer? htmlRenderer = null"
+    ],
+    "admission": "Host explicitly supplies its existing write invoker; RPC constructs no adapter, policy, grant, ToolDefinition or executable",
+    "recommendedComposition": "ReadWriteTools.CreateInvoker(existingHostPolicy), retaining its configured file operations, path bounds and FileMutationQueue. Host must faithfully map write path/content to the same requested output; host transforms/hooks must not silently redirect or replace export contents.",
+    "ownership": "Invoker/renderer are borrowed, no disposal or host mutation. Output originals and existing dispatcher pending-command shutdown are joined.",
+    "path": "No implicit cwd/home/default filename, relative expansion or tilde expansion. Absolute input is normalized with Path.GetFullPath. Lexically normalized current source path is refused; aliases and containment remain the admitted host policy/file-adapter responsibility.",
+    "write": "Existing write adapter may create parent directories and overwrite the explicitly authorized output. Nonatomic writes have existing partial-effect semantics; cancellation/failure reports may-have-changed rather than rollback or publication certainty.",
+    "metadata": "Captured recorded prompt/declarations only; unrecorded dynamic runtime metadata and custom renderer callbacks remain outside scope."
+  },
+  "authoredRpcGroups": 8,
+  "testPrefix": "rpc.export-html.",
+  "rendererGroupsAuthored": 7,
+  "rendererGroupsRegisteredHere": 0,
+  "buildsExecuted": 0,
+  "testsExecuted": 0,
+  "apiCalls": 0,
+  "sourceExecution": 0,
+  "sourceParityAccepted": false,
+  "mainMerged": false,
+  "publicPush": false,
+  "limits": [
+    "Native explicit absolute path and explicit policy-mediated host admission differ from upstream optional default/relative path and direct ambient writeFileSync",
+    "In-memory sessions and deferred unmaterialized file-backed sessions refused before write admission, matching pinned source preconditions",
+    "Static renderer profile: no interactive viewer/Markdown activation/inline images/theme discovery/custom extension HTML; no visual or byte parity",
+    "Output lifetime may end or fail after partial filesystem effects; no atomic publication/fsync/rollback claim",
+    "Only recorded system/tool metadata exported; no provider inference/current unrecorded runtime metadata capture",
+    "Fixed borrowed invoker policy/cwd/bounds remain host-owned across session replacement; no policy rebind or CLI installation",
+    "Input path length bounded at min(MaximumPromptCharacters,4096); renderer limits and existing writer limits also apply"
+  ],
+  "regressionScope": [
+    "8 rpc.export-html groups",
+    "rpc.dispatch-errors-bounds-parse-recovery-backpressure-and-awaited-owned-cleanup",
+    "Full PiSharp.Rpc.Tests",
+    "7 renderer groups after coordinator registers SessionHtmlRendererTests.Cases()"
+  ],
+  "remaining": [
+    "Independent RPC source review",
+    "Coordinator CLI/host explicit invoker installation if desired",
+    "Coordinator renderer test registration",
+    "Authorized exact-candidate compilation and offline execution"
+  ]
+}

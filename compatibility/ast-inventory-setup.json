@@ -1,0 +1,2868 @@
+{
+  "schemaVersion": 1,
+  "kind": "pinned-public-AST-inventory-setup-research",
+  "status": "research-only; no network/archive acquisition/setup/install/parser/checker/source execution or gate change",
+  "recommendation": {
+    "firstStage": "Inspect six exact official archives inertly: locked TypeScript wrapper/platform pair and four Babel parser packages. This is a proposal; no archive was acquired or installed.",
+    "compilerApiBoundary": "The TypeScript 7.0.2 lock declares 20 platform-specific optional @typescript packages. It does not establish that createSourceFile/createProgram/TypeChecker JS APIs are packaged. No older compiler substitute is selected.",
+    "syntaxAlternative": "A separately approved four-package Babel syntax inventory could improve the existing lexical census. It cannot certify TypeScript semantic public/transitive closure.",
+    "semanticMinimumBoundary": "TypeScript 7.0.2, the selected win32-x64 7.0.2 candidate, @types/node 22.19.19 and undici-types 6.21.0 are four exact prerequisite candidates, not the complete public TypeChecker dependency closure.",
+    "existingMandatoryRows": "All 712 required native surface rows and complete eight-phase mandatory profiles remain required. This research approves no syntax/API/ABI difference or release profile.",
+    "licenseBoundary": "Lock license labels are declared metadata. Compiler/parser/type archive package.json, lifecycle/native entries and complete packaged notices remain unverified here. Existing dependency/license evidence and redistribution HOLD are unchanged."
+  },
+  "candidateStages": [
+    {
+      "id": "archive-api-admission",
+      "status": "Pending root review and separate helper/acquisition scope",
+      "packageLockPaths": [
+        "node_modules/typescript",
+        "node_modules/@typescript/typescript-win32-x64",
+        "node_modules/@babel/parser",
+        "node_modules/@babel/types",
+        "node_modules/@babel/helper-string-parser",
+        "node_modules/@babel/helper-validator-identifier"
+      ],
+      "packageCount": 6,
+      "effects": "Anonymous HTTPS GET only to exact recorded official registry tarball URLs; exclusive new archive files under proposed root; no package install, extraction or execution",
+      "requiredInspection": [
+        "Verify each compressed archive against its unchanged upstream SHA-512 SRI before reading members; retain actual byte count/SHA-256 and acquisition provenance",
+        "Bound compressed/expanded bytes and reject absolute/traversal/duplicate member paths or link escapes",
+        "Retain actual package.json exports/main/types/dependencies/optional/peer metadata, all install lifecycle declarations, bin/native entries and exact full LICENSE/NOTICE text",
+        "Determine supported TypeScript 7.0.2 parser/checker API and whether it requires a prebuilt platform executable or client transport. Do not infer an older JS Compiler API from package name",
+        "Verify actual Babel TypeScript syntax/parser API and exactly four required package declarations against the pinned lock"
+      ],
+      "compilerApiAdmitted": null,
+      "packagedLicenseClosure": false
+    },
+    {
+      "id": "babel-syntax-census-candidate",
+      "status": "Proposed AST-only stage; not installed or executed",
+      "packageLockPaths": [
+        "node_modules/@babel/parser",
+        "node_modules/@babel/types",
+        "node_modules/@babel/helper-string-parser",
+        "node_modules/@babel/helper-validator-identifier"
+      ],
+      "packageCount": 4,
+      "requiredDependencyClosureByLock": "@babel/parser 7.29.8 -> @babel/types 7.29.8 -> @babel/helper-string-parser 7.29.7 and @babel/helper-validator-identifier 7.29.7",
+      "requiredTypesPackages": [],
+      "optionalPackages": [],
+      "scripts": false,
+      "binLinks": false,
+      "nativeBuilds": false,
+      "scope": "Syntax AST over canonical source bytes; declaration/export/import/member census with exact source ranges; literal local module graph; explicit unresolved grammar/targets",
+      "doesNotProve": [
+        "TypeScript semantic symbols, aliases or declaration merging",
+        "Resolved inherited, generic-instantiated or external/transitive type members",
+        "TypeChecker diagnostics or complete public contract closure",
+        "Runtime dynamic exports, callback/reducer behavior, native SDK ABI or release approval"
+      ],
+      "noImplicitFallback": "No unpinned TypeScript 5/6, runtime parser/types, fabricated ambient declarations, SDK replacements or source transforms"
+    },
+    {
+      "id": "locked-typescript-semantic-prerequisites",
+      "status": "HOLD pending archive/API admission; this is not a complete public checker plan",
+      "packageLockPaths": [
+        "node_modules/typescript",
+        "node_modules/@typescript/typescript-win32-x64",
+        "node_modules/@types/node",
+        "node_modules/undici-types"
+      ],
+      "packageCount": 4,
+      "targetPlatformCandidate": "win32-x64; future preparation must verify actual runtime architecture before selecting platform",
+      "platformRowsRetained": 20,
+      "nodeTypesRequiredClosure": "@types/node 22.19.19 -> undici-types 6.21.0",
+      "compilerJsApiPresent": null,
+      "prebuiltNativeCompilerEntryPresent": null,
+      "omitOptionalWarning": "--omit=optional alone cannot be assumed to yield a usable TypeScript 7.0.2 compiler. If actual API needs win32-x64, select only that exact artifact explicitly; prebuilt native execution is a distinct reviewed effect, not a native build.",
+      "otherPlatforms": "Retain their exact lock rows as evidence; do not acquire/install incompatible platform packages",
+      "additionalDeclarationClosure": "Actual provider SDK, source library and optional peer declaration demand remains unresolved"
+    },
+    {
+      "id": "full-public-transitive-checker",
+      "status": "HOLD; minimal closure not computed",
+      "roots": "All exports keys/conditions/patterns and legacy main/types targets in the 14 recorded workspace manifests, plus named extra source/config/example/test profiles without silently removing mandatory product scope",
+      "additionalTypesBoundary": "All 13 locked @types package-instance rows plus undici-types are retained as candidates. Their need differs between source, test and example profiles; they are not blanket installation authorization.",
+      "dependencyBoundary": "Public AI option exports refer to Anthropic/OpenAI/Bedrock/Google declarations. Coding-agent public contracts reach process/package management, terminal, providers, MCP/codemode and sessions. Resolve actual imported declaration paths and preserve nested version identities.",
+      "skipLibCheckBoundary": "Pinned config has skipLibCheck:true. Record that original profile; complete library/signature semantic qualification additionally needs skipLibCheck:false diagnostics or an explicit unsatisfied gate.",
+      "shimPolicy": "No any/ambient module stubs, imported SDK replacement, extracted/copied compiler functions, source transforms or fabricated declaration files",
+      "checkerExecuted": false,
+      "dependenciesInstalled": false,
+      "diagnosticsComplete": false
+    }
+  ],
+  "workspaceProposal": {
+    "root": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-ast-inventory-oracle-v0.99.1",
+    "existedAtResearch": false,
+    "createdByResearch": false,
+    "ownedDirectories": ["archives", "tools/npm-11.6.2", "cache", "config", "home", "tmp", "upstream", "inventory"],
+    "ownership": "Refuse preexisting non-owned/nonempty target; preserve uncertain/changed writes and all accepted/failed-partial oracles. Verify resolved confinement before recursive cleanup.",
+    "source": "Verify retained source archive and prior full fingerprints; any fresh source copy must have no hardlinks and retain canonical bytes, with two already declared attribute conversions identified separately",
+    "cache": "Verify/copy existing pinned npm bootstrap and cache into owned directories; no writable references to accepted-oracle caches",
+    "environment": [
+      "Allowlisted credential-free child environment; remove provider/OAuth secrets, proxy configuration, NODE_OPTIONS, NODE_PATH and inherited npm/user configuration",
+      "Task-local home/profile/appdata/temp/config/cache; use absolute runtime/npm paths; no system/global PATH or package mutation",
+      "Exact official registry acquisition/scoped restore only in a separately approved concrete executor invocation",
+      "Later parser/checker invocation offline; no upstream module execution or provider/SDK runtime import while reading declarations",
+      "No upstream prepare/husky/build/generate/catalog/native/install lifecycle or product binary execution"
+    ]
+  },
+  "commandProposal": {
+    "status": "Future command vector only; no setup helper/projected lock/layout exists and nothing was executed",
+    "futureBabelPackageManifest": {
+      "name": "pisharp-pinned-ast-syntax-oracle",
+      "version": "0.0.0",
+      "private": true,
+      "type": "module",
+      "dependencies": {"@babel/parser": "7.29.8"}
+    },
+    "futureBabelLock": "Fresh lockVersion:3 projection of exactly the four pinned required package rows; keep source ranges resolving to recorded versions. Do not run upstream workspace npm ci or let network select newer dependencies.",
+    "executable": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "futureBabelRestoreArguments": [
+      "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-ast-inventory-oracle-v0.99.1\\tools\\npm-11.6.2\\bin\\npm-cli.js",
+      "ci",
+      "--ignore-scripts",
+      "--omit=optional",
+      "--no-bin-links",
+      "--no-audit",
+      "--no-fund",
+      "--registry=https://registry.npmjs.org/",
+      "--cache=P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-ast-inventory-oracle-v0.99.1\\cache",
+      "--userconfig=P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-ast-inventory-oracle-v0.99.1\\config\\npmrc",
+      "--globalconfig=P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-ast-inventory-oracle-v0.99.1\\config\\empty-global.npmrc"
+    ],
+    "workingDirectory": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-ast-inventory-oracle-v0.99.1",
+    "compilerRestore": "Not finalized until packaged compiler/API/platform inspection. The Babel vector cannot be reused blindly for TypeScript optional platform dependencies.",
+    "actualToolRequirements": "Ordinary authorized task-local exact official archive reads/scoped scripts-disabled restore require applicable concrete network executor approval when sandbox sockets are restricted. This research requested no approval and observed no rejection; no additional immediate user-permission blocker is asserted."
+  },
+  "inventoryRecipe": [
+    {
+      "stage": "entrypoints and source inputs",
+      "requirements": [
+        "Hash complete canonical source and actual parser/compiler/runtime/npm artifacts; preserve original manifests/configs and source/public/build condition profiles",
+        "Enumerate every exports key in declaration order, source/types/import/require/default conditions, literal subpaths/patterns and legacy main/types fallback",
+        "Follow named/star/default/namespace re-exports and source mappings with explicit provenance. Coding-agent bundled rpc-entry maps through its build script; do not assert identical published/source surfaces by rewriting dist paths blindly.",
+        "Record private, test, example, experimental and additional config roots separately; original config exclusions are evidence, not approved compatibility exclusions"
+      ]
+    },
+    {
+      "stage": "syntax without upstream execution",
+      "requirements": [
+        "Use actual admitted compiler/parser API, correct TS/TSX/JS/declaration mode and pinned parser options; reject parse errors/unsupported grammar rather than count recovered nodes as complete",
+        "Retain exact signature text, UTF-16 source offsets with UTF-8 byte mapping, comments/JSDoc, modifiers, literal/string/numeric lexemes and source declaration order",
+        "Census all declarations and members including nested inline fields, optional/readonly/accessors, constructors/call/index signatures, overload sets and their implementation separately",
+        "Retain type-only imports/exports, named aliases/default/namespace exports, star conflicts/cycles, import-type queries and dynamic import edges without invoking modules",
+        "Unresolved/computed module specifiers or runtime export/registration mutations become explicit blocker rows, never absent requirements"
+      ]
+    },
+    {
+      "stage": "semantic public closure",
+      "requirements": [
+        "Real supported compiler program/checker or whole-package client API with noEmit and confined host reads; source aliases are compiler resolution configuration, not runtime import shims",
+        "Resolve public exports and aliases through actual symbols, preserve merged declarations/namespaces/overloads and all contributing origins",
+        "Expand inherited/intersection/union members and generic instantiations/defaults/constraints, indexed/mapped/conditional/infer/import/utility types; retain cycles with stable identities, not arbitrary depth-based omissions",
+        "Inventory resolved package instance/target/conditions/type directives/JS inference and every diagnostic; request only exact missing archives after declaration demand is demonstrated",
+        "Retain optional peer, platform-specific and generated declaration resolution gaps; skipLibCheck or missing imports cannot be used as semantic-completeness proof"
+      ]
+    },
+    {
+      "stage": "qualification and gate separation",
+      "requirements": [
+        "Independent file/declaration/member/export census and mutations for omitted source/export/member, duplicate alias, overload/extends/intersection/namespace, export cycles/star ambiguity, conditional targets and unresolved/computed exports",
+        "Two clean offline runs with complete actual loaded parser/compiler/dependency/source/runtime pins and deterministic output identities",
+        "Preserve source/overload/event order and null/missing/undefined distinctions; do not convert precise numeric lexemes via AST Number values",
+        "Report syntax qualification, semantic closure, behavioral parity, native ABI and P1/P6/P7/profile acceptance independently; unsupported/partial results keep mandatory gates HOLD"
+      ]
+    }
+  ],
+  "remainingBlockers": [
+    {"id": "AST-SETUP-API", "status": "HOLD", "detail": "TypeScript 7.0.2 packaged API/platform requirements remain uninspected; no qualified compiler is installed"},
+    {"id": "AST-SETUP-PARSER", "status": "HOLD", "detail": "Four exact Babel package lock rows do not establish acquired bytes, packaged notices/lifecycle/API or parser qualification"},
+    {"id": "AST-SETUP-TYPES", "status": "HOLD", "detail": "Locked @types/node 22.19.19/undici-types 6.21.0 are missing; runtime versions are not baseline replacements"},
+    {"id": "AST-SETUP-TRANSITIVE", "status": "HOLD", "detail": "Full public checker dependency demand and exact minimal closure are not computed; candidate SDK/type rows are not exhaustive installation authorization"},
+    {"id": "AST-SETUP-LICENSE", "status": "HOLD", "detail": "New compiler/parser/type packaged notices, lifecycle/native entries and registry provenance/attestations remain unqualified"},
+    {"id": "AST-SETUP-SCOPE", "status": "HOLD", "detail": "Existing 712-row native inventory and all eight-phase mandatory profiles remain open; no scope/ABI/bridge/profile approval follows from setup research"}
+  ],
+  "owner": {
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "xhigh",
+    "lane": "/root/reference_baseline"
+  },
+  "source": {
+    "repository": "https://github.com/earendil-works/pi",
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "tag": "v0.99.1",
+    "tree": "200bd10bb146773516f862a02b8aaebeed163e00",
+    "readOnlyCheckout": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-edit-oracle-v0.99.1\\upstream",
+    "lockVersion": 3,
+    "lockPackageEntries": 442,
+    "canonicalFingerprint": {
+      "files": 2093,
+      "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+      "evidence": "previous qualified source/archive receipts; listed pins hashed by research, not a new whole-tree verification"
+    },
+    "sourcePins": [
+      {
+        "path": "package.json",
+        "bytes": 5023,
+        "sha256": "afa486075d170d51b601e8ea92fb1c8c8720fb5b4efb67947285f157d88f3eed",
+        "sourceUrl": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/package.json"
+      },
+      {
+        "path": "package-lock.json",
+        "bytes": 186139,
+        "sha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d",
+        "sourceUrl": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/package-lock.json"
+      },
+      {
+        "path": "tsconfig.json",
+        "bytes": 3988,
+        "sha256": "1ef1041faebef510f59480731ece80657f7e67b1091a0b0dcf05ca51e8a267a6",
+        "sourceUrl": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/tsconfig.json"
+      },
+      {
+        "path": "tsconfig.base.json",
+        "bytes": 554,
+        "sha256": "eea9b73c99e36e35d2afca6fb313899ebb214840beedad7a67ec07d880857f1b",
+        "sourceUrl": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/tsconfig.base.json"
+      },
+      {
+        "path": "scripts/check-entry-graphs.mjs",
+        "bytes": 5582,
+        "sha256": "d8e3fe3a9a1bbb053bc6558b00a32ece95795c58105a45782ac77f70ee03c065",
+        "sourceUrl": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/scripts/check-entry-graphs.mjs"
+      },
+      {
+        "path": "scripts/build-coding-agent-bundle.mjs",
+        "bytes": 9083,
+        "sha256": "8d02b51bbb2f2cdce95846e4d7209f36bb00bef9aa08200b31c8658962f473d8",
+        "sourceUrl": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/scripts/build-coding-agent-bundle.mjs"
+      },
+      {
+        "path": "packages/coding-agent/src/core/extensions/types.ts",
+        "bytes": 81892,
+        "sha256": "de0ccce3b8b222d19a2ecef24902fc72aab62b6573129cbf886bc064dd6ab505",
+        "sourceUrl": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/extensions/types.ts"
+      },
+      {
+        "path": "packages/ai/src/types.ts",
+        "bytes": 48466,
+        "sha256": "7ac401b31a7679a77469037091093c4c25d3719d7c9e9078378fece509fa8e8d",
+        "sourceUrl": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/types.ts"
+      },
+      {
+        "path": "packages/coding-agent/src/rpc-entry.ts",
+        "bytes": 410,
+        "sha256": "3222ea0128d7c779a2fcf964c692420761fd014f4f42795bf9da5962e2e83b1d",
+        "sourceUrl": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/rpc-entry.ts"
+      },
+      {
+        "path": "packages/coding-agent/tsconfig.build.json",
+        "bytes": 873,
+        "sha256": "7ad2da3a5117aadbbb19a272f233d298041efda3c5f97ad1e094be24102d49da",
+        "sourceUrl": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/tsconfig.build.json"
+      },
+      {
+        "path": "packages/tui/tsconfig.build.json",
+        "bytes": 175,
+        "sha256": "d666ba0c2a900cf47541404ace5c4977f13c6d9fc82ed91588f74aa6b2b9099c",
+        "sourceUrl": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/tui/tsconfig.build.json"
+      }
+    ],
+    "workspaceManifests": [
+      {
+        "path": "packages/agent/package.json",
+        "bytes": 2840,
+        "sha256": "72250dc992253e2de5a6c93ad2f99941ffcc14ee2562db98bbb24e6a7378544b",
+        "name": "@earendil-works/pi-agent-core",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./node": {
+            "types": "./dist/node.d.ts",
+            "import": "./dist/node.js"
+          },
+          "./harness/context": {
+            "types": "./dist/harness/context.d.ts",
+            "import": "./dist/harness/context.js"
+          },
+          "./experimental/pico3": {
+            "types": "./dist/harness/pico3/index.d.ts",
+            "import": "./dist/harness/pico3/index.js"
+          },
+          "./harness/env/nodejs": {
+            "types": "./dist/harness/env/nodejs.d.ts",
+            "import": "./dist/harness/env/nodejs.js"
+          },
+          "./harness/runtime/reducer": {
+            "types": "./dist/harness/runtime/reducer.d.ts",
+            "import": "./dist/harness/runtime/reducer.js"
+          },
+          "./harness/session": {
+            "types": "./dist/harness/session/index.d.ts",
+            "import": "./dist/harness/session/index.js"
+          },
+          "./harness/session/testing": {
+            "types": "./dist/harness/session/testing/index.d.ts",
+            "import": "./dist/harness/session/testing/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "@earendil-works/chord": "^0.99.1",
+          "@earendil-works/pi-ai": "^0.99.1",
+          "@earendil-works/pi-telemetry": "^0.99.1",
+          "diff": "8.0.4",
+          "ignore": "7.0.8",
+          "typebox": "1.3.27",
+          "yaml": "2.9.0"
+        },
+        "devDependencies": {
+          "@types/node": "22.19.19",
+          "@vitest/coverage-v8": "4.1.11",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/ai/package.json",
+        "bytes": 2636,
+        "sha256": "86a8ccb86ce00af196fc7d48417f82e99c6da40c68d8d138ace2a4f0fda4090d",
+        "name": "@earendil-works/pi-ai",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./compat": {
+            "types": "./dist/compat.d.ts",
+            "import": "./dist/compat.js"
+          },
+          "./providers/*": {
+            "types": "./dist/providers/*.d.ts",
+            "import": "./dist/providers/*.js"
+          },
+          "./api/*": {
+            "types": "./dist/api/*.d.ts",
+            "import": "./dist/api/*.js"
+          },
+          "./utils/*": {
+            "types": "./dist/utils/*.d.ts",
+            "import": "./dist/utils/*.js"
+          },
+          "./oauth": {
+            "types": "./dist/oauth.d.ts",
+            "import": "./dist/oauth.js"
+          },
+          "./bedrock-provider": {
+            "types": "./dist/bedrock-provider.d.ts",
+            "import": "./dist/bedrock-provider.js"
+          },
+          "./bun-oauth": {
+            "types": "./dist/bun-oauth.d.ts",
+            "import": "./dist/bun-oauth.js"
+          }
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "@anthropic-ai/sdk": "0.124.0",
+          "@aws-sdk/client-bedrock-runtime": "3.1127.0",
+          "@earendil-works/pi-telemetry": "^0.99.1",
+          "@google/genai": "2.21.0",
+          "@smithy/node-http-handler": "4.12.1",
+          "http-proxy-agent": "9.1.0",
+          "https-proxy-agent": "9.1.0",
+          "openai": "7.19.0",
+          "partial-json": "0.1.7",
+          "typebox": "1.3.27"
+        },
+        "devDependencies": {
+          "@types/node": "22.19.19",
+          "canvas": "3.2.3",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/chord/package.json",
+        "bytes": 1572,
+        "sha256": "bb36b1901c4137656b1e321dc0694f1ca470b0af8a5c3a0c853d668fb13b05e1",
+        "name": "@earendil-works/chord",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "source": "./src/index.ts",
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./context": {
+            "source": "./src/context/index.ts",
+            "types": "./dist/context/index.d.ts",
+            "import": "./dist/context/index.js"
+          },
+          "./delta": {
+            "source": "./src/delta/index.ts",
+            "types": "./dist/delta/index.d.ts",
+            "import": "./dist/delta/index.js"
+          },
+          "./bundler": {
+            "source": "./src/bundler.ts",
+            "types": "./dist/bundler.d.ts",
+            "import": "./dist/bundler.js"
+          },
+          "./node": {
+            "source": "./src/node.ts",
+            "types": "./dist/node.d.ts",
+            "import": "./dist/node.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "esbuild": "0.28.2"
+        },
+        "devDependencies": {
+          "shx": "0.4.0",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/client/package.json",
+        "bytes": 1197,
+        "sha256": "670fd24263ce1e1175d138e14128b88a6b00c10cd5a7f9f96f087a9254e3da63",
+        "name": "@earendil-works/pi-client",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./unix": {
+            "types": "./dist/unix.d.ts",
+            "import": "./dist/unix.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "@earendil-works/chord": "^0.99.1",
+          "@earendil-works/pi-protocol": "^0.99.1"
+        },
+        "devDependencies": {
+          "shx": "0.4.0",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/codemode/package.json",
+        "bytes": 1392,
+        "sha256": "290ddda1586ebeade5f28dc73846a335c3314fefc65ce1e06931a99e2ae09c66",
+        "name": "@earendil-works/pi-codemode",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "source": "./src/index.ts",
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./declarations": {
+            "source": "./src/declarations.ts",
+            "types": "./dist/declarations.d.ts",
+            "import": "./dist/declarations.js"
+          },
+          "./source": {
+            "source": "./src/source.ts",
+            "types": "./dist/source.d.ts",
+            "import": "./dist/source.js"
+          },
+          "./worker": {
+            "source": "./src/runtime/worker.ts",
+            "types": "./dist/runtime/worker.d.ts",
+            "import": "./dist/runtime/worker.js"
+          }
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "quickjs-wasi": "3.6.2"
+        },
+        "devDependencies": {
+          "shx": "0.4.0",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/coding-agent/package.json",
+        "bytes": 4163,
+        "sha256": "c701ddbf28b5170deb478b8586ee713f9372027c04736946a4ffe82168ece5ba",
+        "name": "@earendil-works/pi-coding-agent",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./rpc-entry": {
+            "import": "./dist/bundle/rpc-entry.js"
+          },
+          "./client": {
+            "source": "./src/client/index.ts"
+          },
+          "./experimental/plugin": {
+            "source": "./src/experimental/plugin.ts"
+          }
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "@earendil-works/chord": "^0.99.1",
+          "@earendil-works/pi-agent-core": "^0.99.1",
+          "@earendil-works/pi-ai": "^0.99.1",
+          "@earendil-works/pi-codemode": "^0.99.1",
+          "@earendil-works/pi-mcp": "^0.99.1",
+          "@earendil-works/pi-tui": "^0.99.1",
+          "@silvia-odwyer/photon-node": "0.3.4",
+          "chalk": "6.0.0",
+          "cross-spawn": "7.0.6",
+          "diff": "8.0.4",
+          "grok-mermaid": "0.2.3",
+          "highlight.js": "10.7.3",
+          "hosted-git-info": "9.0.3",
+          "ignore": "7.0.8",
+          "jiti": "2.7.0",
+          "minimatch": "10.2.6",
+          "proper-lockfile": "4.1.2",
+          "quickjs-wasi": "3.6.2",
+          "semver": "7.8.5",
+          "typebox": "1.3.27",
+          "undici": "8.10.2",
+          "yaml": "2.9.0"
+        },
+        "devDependencies": {
+          "@earendil-works/pi-client": "^0.99.1",
+          "@earendil-works/pi-protocol": "^0.99.1",
+          "@earendil-works/pi-server": "^0.99.1",
+          "@types/cross-spawn": "6.0.6",
+          "@types/hosted-git-info": "3.0.5",
+          "@types/node": "22.19.19",
+          "@types/proper-lockfile": "4.1.4",
+          "@types/semver": "7.7.1",
+          "marked": "18.0.11",
+          "shx": "0.4.0",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/durable/package.json",
+        "bytes": 2476,
+        "sha256": "967059f6c6f03827c39f802957d7b4524d711f5fa2908e78fdb4c7479deed9ea",
+        "name": "@earendil-works/pi-durable",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "source": "./src/index.ts",
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./env": {
+            "source": "./src/env/index.ts",
+            "types": "./dist/env/index.d.ts",
+            "import": "./dist/env/index.js"
+          },
+          "./env/node": {
+            "source": "./src/env/node.ts",
+            "types": "./dist/env/node.d.ts",
+            "import": "./dist/env/node.js"
+          },
+          "./storage/memory": {
+            "source": "./src/storage/memory.ts",
+            "types": "./dist/storage/memory.d.ts",
+            "import": "./dist/storage/memory.js"
+          },
+          "./storage/jsonl": {
+            "source": "./src/storage/jsonl/index.ts",
+            "types": "./dist/storage/jsonl/index.d.ts",
+            "import": "./dist/storage/jsonl/index.js"
+          },
+          "./storage/jsonl/node": {
+            "source": "./src/storage/jsonl/node.ts",
+            "types": "./dist/storage/jsonl/node.d.ts",
+            "import": "./dist/storage/jsonl/node.js"
+          },
+          "./storage/sqlite": {
+            "source": "./src/storage/sqlite/index.ts",
+            "types": "./dist/storage/sqlite/index.d.ts",
+            "import": "./dist/storage/sqlite/index.js"
+          },
+          "./storage/sqlite/node": {
+            "source": "./src/storage/sqlite/node.ts",
+            "types": "./dist/storage/sqlite/node.d.ts",
+            "import": "./dist/storage/sqlite/node.js"
+          },
+          "./testing": {
+            "source": "./src/testing/index.ts",
+            "types": "./dist/testing/index.d.ts",
+            "import": "./dist/testing/index.js"
+          },
+          "./package.json": "./package.json"
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "@earendil-works/chord": "^0.99.1",
+          "@earendil-works/pi-ai": "^0.99.1"
+        },
+        "devDependencies": {
+          "shx": "0.4.0",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/evals/package.json",
+        "bytes": 660,
+        "sha256": "d08e6638ba06da2efe51798cb2b7e3baeefb61ee2ca3b2a1653415c6c0fc5312",
+        "name": "@earendil-works/pi-evals",
+        "version": "0.99.1",
+        "private": true,
+        "exportsPresent": false,
+        "exports": null,
+        "main": null,
+        "types": null,
+        "dependencies": null,
+        "devDependencies": {
+          "@earendil-works/pi-ai": "^0.99.1",
+          "@earendil-works/pi-coding-agent": "^0.99.1",
+          "@types/node": "22.19.19",
+          "@vitest-evals/core": "0.15.0",
+          "autoevals": "0.3.0",
+          "shx": "0.4.0",
+          "vitest": "4.1.11",
+          "vitest-evals": "0.15.0"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/mcp/package.json",
+        "bytes": 1317,
+        "sha256": "b2f0c5e40c0b986627073ec008dfc50bcb7d927d39fa5cfe09920bf255253df1",
+        "name": "@earendil-works/pi-mcp",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "source": "./src/index.ts",
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./oauth": {
+            "source": "./src/oauth/index.ts",
+            "types": "./dist/oauth/index.d.ts",
+            "import": "./dist/oauth/index.js"
+          },
+          "./testing": {
+            "source": "./src/testing/index.ts",
+            "types": "./dist/testing/index.d.ts",
+            "import": "./dist/testing/index.js"
+          }
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "cross-spawn": "7.0.6"
+        },
+        "devDependencies": {
+          "@types/cross-spawn": "6.0.6",
+          "shx": "0.4.0",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/protocol/package.json",
+        "bytes": 961,
+        "sha256": "30786c727360cba10345b8eddcd18e3f8dd5d2fb9f977eaed45c24867aabb4f8",
+        "name": "@earendil-works/pi-protocol",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          }
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "@earendil-works/chord": "^0.99.1",
+          "typebox": "1.3.27"
+        },
+        "devDependencies": {
+          "shx": "0.4.0",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/server/package.json",
+        "bytes": 1315,
+        "sha256": "c811c794181bac8b88ce5ba557d9bd95f4645ee6c154c2aae3983de68d0b9267",
+        "name": "@earendil-works/pi-server",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./testing": {
+            "types": "./dist/testing/index.d.ts",
+            "import": "./dist/testing/index.js"
+          },
+          "./unix": {
+            "types": "./dist/transports/unix/index.d.ts",
+            "import": "./dist/transports/unix/index.js"
+          }
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "@earendil-works/chord": "^0.99.1",
+          "@earendil-works/pi-agent-core": "^0.99.1",
+          "@earendil-works/pi-protocol": "^0.99.1"
+        },
+        "devDependencies": {
+          "shx": "0.4.0",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/telemetry/package.json",
+        "bytes": 996,
+        "sha256": "95ad7482a6bcd863fed61b26d2ce4ae96c3c80bb543950bf4d340e4ff301d811",
+        "name": "@earendil-works/pi-telemetry",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          },
+          "./testing": {
+            "types": "./dist/testing/index.d.ts",
+            "import": "./dist/testing/index.js"
+          }
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": null,
+        "devDependencies": {
+          "@types/node": "22.19.19",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/tui/package.json",
+        "bytes": 1594,
+        "sha256": "bfe1aa9bb42fa627e833cb1de27c417d38615cb261c1f46214c73850d353c817",
+        "name": "@earendil-works/pi-tui",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": false,
+        "exports": null,
+        "main": "dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "get-east-asian-width": "1.6.0",
+          "marked": "18.0.11"
+        },
+        "devDependencies": {
+          "@xterm/headless": "5.5.0",
+          "chalk": "6.0.0"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      },
+      {
+        "path": "packages/session-backends/sqlite-node/package.json",
+        "bytes": 1229,
+        "sha256": "caedb28b756310cf98b5aa0fadf0174d81a240a62fa15ec40071973ff1de4bef",
+        "name": "@earendil-works/pi-session-backend-sqlite-node",
+        "version": "0.99.1",
+        "private": null,
+        "exportsPresent": true,
+        "exports": {
+          ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+          }
+        },
+        "main": "./dist/index.js",
+        "types": "./dist/index.d.ts",
+        "dependencies": {
+          "@earendil-works/pi-ai": "^0.99.1",
+          "@earendil-works/pi-agent-core": "^0.99.1"
+        },
+        "devDependencies": {
+          "@vitest/coverage-v8": "4.1.11",
+          "vitest": "4.1.11"
+        },
+        "optionalDependencies": null,
+        "peerDependencies": null,
+        "peerDependenciesMeta": null
+      }
+    ],
+    "rootManifest": {
+      "name": "pi-monorepo",
+      "private": true,
+      "type": "module",
+      "workspaces": [
+        "packages/*",
+        "packages/session-backends/*",
+        "packages/coding-agent/examples/extensions/with-deps",
+        "packages/coding-agent/examples/extensions/custom-provider-anthropic",
+        "packages/coding-agent/examples/extensions/custom-provider-gitlab-duo",
+        "packages/coding-agent/examples/extensions/sandbox",
+        "packages/coding-agent/examples/extensions/gondolin"
+      ],
+      "scripts": {
+        "clean": "npm run clean --workspaces",
+        "build": "cd packages/chord && npm run build && cd ../tui && npm run build && cd ../telemetry && npm run build && cd ../codemode && npm run build && cd ../mcp && npm run build && cd ../ai && npm run build && cd ../durable && npm run build && cd ../agent && npm run build && cd ../session-backends/sqlite-node && npm run build && cd ../../protocol && npm run build && cd ../client && npm run build && cd ../server && npm run build && cd ../coding-agent && npm run build",
+        "build:offline": "cd packages/chord && npm run build && cd ../tui && npm run build && cd ../telemetry && npm run build && cd ../codemode && npm run build && cd ../mcp && npm run build && cd ../ai && npm run build:offline && cd ../durable && npm run build && cd ../agent && npm run build && cd ../session-backends/sqlite-node && npm run build && cd ../../protocol && npm run build && cd ../client && npm run build && cd ../server && npm run build && cd ../coding-agent && npm run build",
+        "build:native:darwin": "npm --prefix packages/tui run build:native:darwin",
+        "build:native:linux": "npm --prefix packages/tui run build:native:linux",
+        "build:native:win32": "npm --prefix packages/tui run build:native:win32",
+        "check": "biome check --write --error-on-warnings . && npm run check:pinned-deps && npm run check:runtime-deps && npm run check:ts-imports && npm run check:entry-graphs && npm run check:shrinkwrap && npm run check:install-lock:coding-agent && tsc --noEmit && npm run check:browser-smoke",
+        "check:browser-smoke": "node scripts/check-browser-smoke.mjs",
+        "check:pinned-deps": "node scripts/check-pinned-deps.mjs",
+        "check:runtime-deps": "node scripts/check-runtime-deps.mjs",
+        "check:package-install": "node scripts/coding-agent-consumer.mjs",
+        "check:shrinkwrap": "node scripts/generate-coding-agent-shrinkwrap.mjs --check",
+        "check:install-lock:coding-agent": "node scripts/generate-coding-agent-install-lock.mjs --check",
+        "check:ts-imports": "node scripts/check-ts-relative-imports.mjs",
+        "check:entry-graphs": "node scripts/check-entry-graphs.mjs",
+        "generate:models": "npm --prefix packages/ai run generate-models",
+        "hydrate:model-data": "npm --prefix packages/ai run hydrate-model-data",
+        "check:model-data": "npm --prefix packages/ai run check:model-data",
+        "generate:model-catalog": "npm --prefix packages/ai run generate-model-catalog",
+        "diff:model-catalog": "node scripts/diff-model-catalog.mjs",
+        "eval": "npm run eval --workspace=@earendil-works/pi-evals --",
+        "check:model-catalog": "node scripts/publish-model-catalog.mjs --input .artifacts/model-catalog --dry-run",
+        "profile:tui": "node scripts/profile-coding-agent-node.mjs --mode tui",
+        "profile:rpc": "node scripts/profile-coding-agent-node.mjs --mode rpc",
+        "test": "npm run test:scripts && npm run test --workspaces --if-present",
+        "test:scripts": "node --test scripts/*.test.mjs scripts/*.test.ts",
+        "version:patch": "npm version patch --workspaces --no-git-tag-version --no-workspaces-update && node scripts/sync-versions.js && npm install --package-lock-only --ignore-scripts",
+        "version:minor": "npm version minor --workspaces --no-git-tag-version --no-workspaces-update && node scripts/sync-versions.js && npm install --package-lock-only --ignore-scripts",
+        "version:major": "npm version major --workspaces --no-git-tag-version --no-workspaces-update && node scripts/sync-versions.js && npm install --package-lock-only --ignore-scripts",
+        "version:set": "npm version --workspaces --no-workspaces-update",
+        "prepublishOnly": "npm run clean && npm run build && npm run check",
+        "publish": "npm run prepublishOnly && node scripts/publish.mjs",
+        "publish:dry": "npm run prepublishOnly && node scripts/publish.mjs --dry-run",
+        "release:local": "node scripts/local-release.mjs",
+        "shrinkwrap:coding-agent": "node scripts/generate-coding-agent-shrinkwrap.mjs",
+        "install-lock:coding-agent": "node scripts/generate-coding-agent-install-lock.mjs",
+        "release:patch": "node scripts/release.mjs patch",
+        "release:minor": "node scripts/release.mjs minor",
+        "release:major": "node scripts/release.mjs major",
+        "release:fix-links": "node scripts/release-notes.mjs fix-github-releases",
+        "prepare": "husky"
+      },
+      "devDependencies": {
+        "@anthropic-ai/sandbox-runtime": "0.0.26",
+        "@biomejs/biome": "2.3.5",
+        "@types/node": "22.19.19",
+        "esbuild": "0.28.2",
+        "husky": "9.1.7",
+        "shx": "0.4.0",
+        "typescript": "7.0.2"
+      },
+      "engines": {
+        "node": ">=22.19.0"
+      },
+      "version": "0.0.3",
+      "overrides": {
+        "protobufjs": "7.6.6"
+      }
+    },
+    "rootCompilerConfig": {
+      "extends": "./tsconfig.base.json",
+      "compilerOptions": {
+        "noEmit": true,
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "paths": {
+          "@earendil-works/chord": [
+            "./packages/chord/src/index.ts"
+          ],
+          "@earendil-works/chord/bundler": [
+            "./packages/chord/src/bundler.ts"
+          ],
+          "@earendil-works/chord/context": [
+            "./packages/chord/src/context/index.ts"
+          ],
+          "@earendil-works/chord/delta": [
+            "./packages/chord/src/delta/index.ts"
+          ],
+          "@earendil-works/chord/node": [
+            "./packages/chord/src/node.ts"
+          ],
+          "@earendil-works/pi-telemetry": [
+            "./packages/telemetry/src/index.ts"
+          ],
+          "@earendil-works/pi-telemetry/testing": [
+            "./packages/telemetry/src/testing/index.ts"
+          ],
+          "@earendil-works/pi-codemode": [
+            "./packages/codemode/src/index.ts"
+          ],
+          "@earendil-works/pi-codemode/declarations": [
+            "./packages/codemode/src/declarations.ts"
+          ],
+          "@earendil-works/pi-codemode/source": [
+            "./packages/codemode/src/source.ts"
+          ],
+          "@earendil-works/pi-codemode/worker": [
+            "./packages/codemode/src/runtime/worker.ts"
+          ],
+          "@earendil-works/pi-mcp": [
+            "./packages/mcp/src/index.ts"
+          ],
+          "@earendil-works/pi-mcp/oauth": [
+            "./packages/mcp/src/oauth/index.ts"
+          ],
+          "@earendil-works/pi-mcp/testing": [
+            "./packages/mcp/src/testing/index.ts"
+          ],
+          "@earendil-works/pi-ai": [
+            "./packages/ai/src/index.ts"
+          ],
+          "@earendil-works/pi-ai/oauth": [
+            "./packages/ai/src/oauth.ts"
+          ],
+          "@earendil-works/pi-ai/*": [
+            "./packages/ai/src/*.ts",
+            "./packages/ai/src/providers/*.ts"
+          ],
+          "@earendil-works/pi-ai/dist/*": [
+            "./packages/ai/src/*"
+          ],
+          "@earendil-works/pi-durable": [
+            "./packages/durable/src/index.ts"
+          ],
+          "@earendil-works/pi-durable/testing": [
+            "./packages/durable/src/testing/index.ts"
+          ],
+          "@earendil-works/pi-durable/*": [
+            "./packages/durable/src/*"
+          ],
+          "@earendil-works/pi-agent-core": [
+            "./packages/agent/src/index.ts"
+          ],
+          "@earendil-works/pi-agent-core/harness/session/testing": [
+            "./packages/agent/src/harness/session/testing/index.ts"
+          ],
+          "@earendil-works/pi-agent-core/experimental/pico3": [
+            "./packages/agent/src/harness/pico3/index.ts"
+          ],
+          "@earendil-works/pi-agent-core/node": [
+            "./packages/agent/src/node.ts"
+          ],
+          "@earendil-works/pi-agent-core/*": [
+            "./packages/agent/src/*.ts",
+            "./packages/agent/src/*/index.ts",
+            "./packages/agent/src/*"
+          ],
+          "@earendil-works/pi-session-backend-sqlite-node": [
+            "./packages/session-backends/sqlite-node/src/index.ts"
+          ],
+          "@earendil-works/pi-coding-agent": [
+            "./packages/coding-agent/src/index.ts"
+          ],
+          "@earendil-works/pi-coding-agent/experimental/plugin": [
+            "./packages/coding-agent/src/experimental/plugin.ts"
+          ],
+          "@earendil-works/pi-coding-agent/hooks": [
+            "./packages/coding-agent/src/core/hooks/index.ts"
+          ],
+          "@earendil-works/pi-coding-agent/*": [
+            "./packages/coding-agent/src/*"
+          ],
+          "@earendil-works/pi-protocol": [
+            "./packages/protocol/src/index.ts"
+          ],
+          "@earendil-works/pi-protocol/*": [
+            "./packages/protocol/src/*"
+          ],
+          "@earendil-works/pi-client": [
+            "./packages/client/src/index.ts"
+          ],
+          "@earendil-works/pi-client/unix": [
+            "./packages/client/src/unix.ts"
+          ],
+          "@earendil-works/pi-client/*": [
+            "./packages/client/src/*"
+          ],
+          "@earendil-works/pi-server": [
+            "./packages/server/src/index.ts"
+          ],
+          "@earendil-works/pi-server/unix": [
+            "./packages/server/src/transports/unix/index.ts"
+          ],
+          "@earendil-works/pi-server/*": [
+            "./packages/server/src/*"
+          ],
+          "typebox": [
+            "./node_modules/typebox"
+          ],
+          "@earendil-works/pi-tui": [
+            "./packages/tui/src/index.ts"
+          ],
+          "@earendil-works/pi-tui/*": [
+            "./packages/tui/src/*"
+          ],
+          "@earendil-works/pi-agent-old": [
+            "./packages/agent-old/src/index.ts"
+          ],
+          "@earendil-works/pi-agent-old/*": [
+            "./packages/agent-old/src/*"
+          ]
+        }
+      },
+      "include": [
+        "scripts/model-catalog-protocol.ts",
+        "scripts/model-catalog-protocol.test.ts",
+        "packages/*/src/**/*",
+        "packages/*/test/**/*",
+        "packages/session-backends/*/src/**/*",
+        "packages/session-backends/*/test/**/*",
+        "packages/coding-agent/examples/**/*",
+        "packages/agent/examples/**/*"
+      ],
+      "exclude": [
+        "**/dist/**",
+        "packages/coding-agent/examples/extensions/gondolin/**"
+      ]
+    },
+    "baseCompilerConfig": {
+      "compilerOptions": {
+        "target": "ES2024",
+        "module": "Node16",
+        "lib": [
+          "ES2024"
+        ],
+        "strict": true,
+        "erasableSyntaxOnly": true,
+        "verbatimModuleSyntax": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "inlineSources": true,
+        "inlineSourceMap": false,
+        "moduleResolution": "Node16",
+        "resolveJsonModule": true,
+        "allowImportingTsExtensions": true,
+        "rewriteRelativeImportExtensions": true,
+        "types": [
+          "node"
+        ]
+      }
+    }
+  },
+  "existingAvailability": {
+    "qualifiedOracles": [
+      {
+        "root": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1",
+        "nodeModulesExists": true,
+        "typescriptRootExists": false,
+        "typescriptPlatformRootExists": false,
+        "nodeTypesRootExists": false,
+        "babelParserRootExists": false,
+        "topLevelDirectories": [
+          "partial-json",
+          "typebox"
+        ],
+        "inspectionBoundary": "immediate directories/selected paths and qualified receipts; no new recursive installed tree proof or package execution"
+      },
+      {
+        "root": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-responses-sdk-oracle-v0.99.1",
+        "nodeModulesExists": true,
+        "typescriptRootExists": false,
+        "typescriptPlatformRootExists": false,
+        "nodeTypesRootExists": false,
+        "babelParserRootExists": false,
+        "topLevelDirectories": [
+          "openai",
+          "partial-json",
+          "typebox"
+        ],
+        "inspectionBoundary": "immediate directories/selected paths and qualified receipts; no new recursive installed tree proof or package execution"
+      },
+      {
+        "root": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1",
+        "nodeModulesExists": true,
+        "typescriptRootExists": false,
+        "typescriptPlatformRootExists": false,
+        "nodeTypesRootExists": false,
+        "babelParserRootExists": false,
+        "topLevelDirectories": [
+          "cross-spawn",
+          "isexe",
+          "partial-json",
+          "path-key",
+          "shebang-command",
+          "shebang-regex",
+          "typebox",
+          "which"
+        ],
+        "inspectionBoundary": "immediate directories/selected paths and qualified receipts; no new recursive installed tree proof or package execution"
+      },
+      {
+        "root": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-edit-oracle-v0.99.1",
+        "nodeModulesExists": true,
+        "typescriptRootExists": false,
+        "typescriptPlatformRootExists": false,
+        "nodeTypesRootExists": false,
+        "babelParserRootExists": false,
+        "topLevelDirectories": [
+          "chalk",
+          "cross-spawn",
+          "diff",
+          "get-east-asian-width",
+          "highlight.js",
+          "isexe",
+          "marked",
+          "partial-json",
+          "path-key",
+          "shebang-command",
+          "shebang-regex",
+          "typebox",
+          "which"
+        ],
+        "inspectionBoundary": "immediate directories/selected paths and qualified receipts; no new recursive installed tree proof or package execution"
+      },
+      {
+        "root": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-anthropic-sdk-oracle-v0.99.1-reviewed",
+        "nodeModulesExists": true,
+        "typescriptRootExists": false,
+        "typescriptPlatformRootExists": false,
+        "nodeTypesRootExists": false,
+        "babelParserRootExists": false,
+        "topLevelDirectories": [
+          "@anthropic-ai",
+          "@babel",
+          "@stablelib",
+          "fast-sha256",
+          "json-schema-to-ts",
+          "partial-json",
+          "standardwebhooks",
+          "ts-algebra"
+        ],
+        "inspectionBoundary": "immediate directories/selected paths and qualified receipts; no new recursive installed tree proof or package execution"
+      }
+    ],
+    "publicCheckoutNodeModulesPresent": false,
+    "codexRuntimeNodeModules": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\node_modules",
+    "codexTopLevelTypescriptPresent": false,
+    "codexPnpmCompilerOrParserDirectoryMatches": [],
+    "codexNodeTypesVersion": "25.9.5",
+    "codexUndiciTypesVersion": "7.24.6",
+    "runtimeTypesAreBaseline": false,
+    "runtimeTypeReason": "These differ from upstream-locked @types/node 22.19.19 and undici-types 6.21.0; ambient/global fallback is not admitted",
+    "npmBootstrapPackagesAreCompilerEvidence": false
+  },
+  "runtime": {
+    "version": "v24.19.0",
+    "absoluteExecutable": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+    "upstreamEngine": ">=22.19.0",
+    "compilerEngineDeclaration": ">=16.20.0",
+    "newExecutionByThisTask": false
+  },
+  "packageManager": {
+    "version": "11.6.2",
+    "existingVerifiedArchive": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1\\archives\\npm-11.6.2.tgz",
+    "archiveBytes": 2663834,
+    "sha256": "585f95094ee5cb2788ee11d90f2a518a7c9ef6e083fa141d0b63ca3383675a20",
+    "integrity": "sha512-7iKzNfy8lWYs3zq4oFPa8EXZz5xt9gQNKJZau3B1ErLBb6bF7sBJ00x09485DOvRT2l5Gerbl3VlZNT57MxJVA==",
+    "reuse": "Later helper may verify and copy immutable archive/bootstrap/cache into new owned root; accepted-oracle caches stay read-only",
+    "executedByThisTask": false
+  },
+  "packages": {
+    "compiler": [
+      {
+        "name": "typescript",
+        "sourceLockPath": "node_modules/typescript",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/typescript/-/typescript-7.0.2.tgz",
+          "integrity": "sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==",
+          "dev": true,
+          "license": "Apache-2.0",
+          "bin": {
+            "tsc": "bin/tsc"
+          },
+          "engines": {
+            "node": ">=16.20.0"
+          },
+          "optionalDependencies": {
+            "@typescript/typescript-aix-ppc64": "7.0.2",
+            "@typescript/typescript-darwin-arm64": "7.0.2",
+            "@typescript/typescript-darwin-x64": "7.0.2",
+            "@typescript/typescript-freebsd-arm64": "7.0.2",
+            "@typescript/typescript-freebsd-x64": "7.0.2",
+            "@typescript/typescript-linux-arm": "7.0.2",
+            "@typescript/typescript-linux-arm64": "7.0.2",
+            "@typescript/typescript-linux-loong64": "7.0.2",
+            "@typescript/typescript-linux-mips64el": "7.0.2",
+            "@typescript/typescript-linux-ppc64": "7.0.2",
+            "@typescript/typescript-linux-riscv64": "7.0.2",
+            "@typescript/typescript-linux-s390x": "7.0.2",
+            "@typescript/typescript-linux-x64": "7.0.2",
+            "@typescript/typescript-netbsd-arm64": "7.0.2",
+            "@typescript/typescript-netbsd-x64": "7.0.2",
+            "@typescript/typescript-openbsd-arm64": "7.0.2",
+            "@typescript/typescript-openbsd-x64": "7.0.2",
+            "@typescript/typescript-sunos-x64": "7.0.2",
+            "@typescript/typescript-win32-arm64": "7.0.2",
+            "@typescript/typescript-win32-x64": "7.0.2"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/typescript/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-aix-ppc64",
+        "sourceLockPath": "node_modules/@typescript/typescript-aix-ppc64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-aix-ppc64/-/typescript-aix-ppc64-7.0.2.tgz",
+          "integrity": "sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==",
+          "cpu": [
+            "ppc64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "aix"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-aix-ppc64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-darwin-arm64",
+        "sourceLockPath": "node_modules/@typescript/typescript-darwin-arm64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-darwin-arm64/-/typescript-darwin-arm64-7.0.2.tgz",
+          "integrity": "sha512-gowzar9MwS/aRWp6f3a4KUqzRjAZjOsmGNCM6LcTgXum+dBfgsBVMN+AgvOCCbguXyick6LJhpBszxMebJ8syA==",
+          "cpu": [
+            "arm64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "darwin"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-darwin-arm64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-darwin-x64",
+        "sourceLockPath": "node_modules/@typescript/typescript-darwin-x64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-darwin-x64/-/typescript-darwin-x64-7.0.2.tgz",
+          "integrity": "sha512-SZ9xZInqApNlNGc9s0W1VSsktYSOe9cFqNOIqmN1Gs8SmkjKZYFt017G4VwPxASInODuAdbTW7sXiFUf893RgA==",
+          "cpu": [
+            "x64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "darwin"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-darwin-x64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-freebsd-arm64",
+        "sourceLockPath": "node_modules/@typescript/typescript-freebsd-arm64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-freebsd-arm64/-/typescript-freebsd-arm64-7.0.2.tgz",
+          "integrity": "sha512-W5NH4y/J0plIIS5b2xvTEkU7JFxyqdMAOgf+Ilhl0vHQXKO5dZoxd+C/jEtq56c4F3wk71RB4BMRQ2XdI+bwYQ==",
+          "cpu": [
+            "arm64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "freebsd"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-freebsd-arm64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-freebsd-x64",
+        "sourceLockPath": "node_modules/@typescript/typescript-freebsd-x64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-freebsd-x64/-/typescript-freebsd-x64-7.0.2.tgz",
+          "integrity": "sha512-UMGDx5sTpzNw3WiPebH7l90IWfJggEd+egHt/q6p7/Cm3zqoV7VxkGXt+3DxPIw8CcmvAB0j3sVVfbhX+M4Tpw==",
+          "cpu": [
+            "x64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "freebsd"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-freebsd-x64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-linux-arm",
+        "sourceLockPath": "node_modules/@typescript/typescript-linux-arm",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-linux-arm/-/typescript-linux-arm-7.0.2.tgz",
+          "integrity": "sha512-gffT3xPz9sR7j/YJExkyPntrI0P2EP9XbOyWzth2/Gs0RstK+90RBcO0ncXoXy/beYll1SXw846Nf2zdnEz0QQ==",
+          "cpu": [
+            "arm"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "linux"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-linux-arm/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-linux-arm64",
+        "sourceLockPath": "node_modules/@typescript/typescript-linux-arm64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-linux-arm64/-/typescript-linux-arm64-7.0.2.tgz",
+          "integrity": "sha512-Qh4eU4/y3yDjnfjjyPYihMj5/ODIlmt+Bzu17OI+fiSRDW57QmU5SiN63exPRNJPKUzcc1INa1NXdrJ+MqHjUQ==",
+          "cpu": [
+            "arm64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "linux"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-linux-arm64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-linux-loong64",
+        "sourceLockPath": "node_modules/@typescript/typescript-linux-loong64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-linux-loong64/-/typescript-linux-loong64-7.0.2.tgz",
+          "integrity": "sha512-uEHck9i8hoAzXPiYRib1O7miOnz23SxIeVl6F4LXox+qov1K35jHcEW6VHKvZI+pyvl7fZEP4MCU5LYvIq1GuQ==",
+          "cpu": [
+            "loong64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "linux"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-linux-loong64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-linux-mips64el",
+        "sourceLockPath": "node_modules/@typescript/typescript-linux-mips64el",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-linux-mips64el/-/typescript-linux-mips64el-7.0.2.tgz",
+          "integrity": "sha512-R4KvAMnE43W5Qeqb0Ly56O3mWMWIAgsMyz36DCaycd5nbg/9kzm0liw3JocfRqyJY0KPmzFjbswozXyW0DnIYA==",
+          "cpu": [
+            "mips64el"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "linux"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-linux-mips64el/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-linux-ppc64",
+        "sourceLockPath": "node_modules/@typescript/typescript-linux-ppc64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-linux-ppc64/-/typescript-linux-ppc64-7.0.2.tgz",
+          "integrity": "sha512-DORx5b3sd/4S7eayxm4FQv+A7CrkUIGRaHiwI8oiHTAI1fAPWhF4J0vAlkC8biAlHSVVwxMQ3tjZ2/DVbnQiiA==",
+          "cpu": [
+            "ppc64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "linux"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-linux-ppc64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-linux-riscv64",
+        "sourceLockPath": "node_modules/@typescript/typescript-linux-riscv64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-linux-riscv64/-/typescript-linux-riscv64-7.0.2.tgz",
+          "integrity": "sha512-wf0jqEDOjrPRnKwYRyyJDRo11KMbvMFrU+q4zqKyChODBzvlkbhNQfKvLxQCcwTpdDaXSHZTVuh0JoCrKCUMHQ==",
+          "cpu": [
+            "riscv64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "linux"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-linux-riscv64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-linux-s390x",
+        "sourceLockPath": "node_modules/@typescript/typescript-linux-s390x",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-linux-s390x/-/typescript-linux-s390x-7.0.2.tgz",
+          "integrity": "sha512-IkwJc3L7yhytWd/ewjyxNDfOmswCm9GWMJT/ue/dU4aZNbwZeYAetq42VyLmsmSjvoX7z74X6ZaYCtzAr0EuGw==",
+          "cpu": [
+            "s390x"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "linux"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-linux-s390x/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-linux-x64",
+        "sourceLockPath": "node_modules/@typescript/typescript-linux-x64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-linux-x64/-/typescript-linux-x64-7.0.2.tgz",
+          "integrity": "sha512-EYdf2cNg7rgCWJnxCdJ+F3V39O8ihb37eHAu1LK8oAFizgTQbPOK7zHHXbPt8rX24COqODXeI3sIf0fCXG7H/A==",
+          "cpu": [
+            "x64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "linux"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-linux-x64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-netbsd-arm64",
+        "sourceLockPath": "node_modules/@typescript/typescript-netbsd-arm64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-netbsd-arm64/-/typescript-netbsd-arm64-7.0.2.tgz",
+          "integrity": "sha512-+polYF4MF04aPpO5FTkHran9yUQDSXqy5GiSDKpsll5jy3l3+g9QLhpf39T+ePtefhXLOGrLl0QIjkQP6VnelA==",
+          "cpu": [
+            "arm64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "netbsd"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-netbsd-arm64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-netbsd-x64",
+        "sourceLockPath": "node_modules/@typescript/typescript-netbsd-x64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-netbsd-x64/-/typescript-netbsd-x64-7.0.2.tgz",
+          "integrity": "sha512-8YIT0EHM/3dq10ZOVF/A7pc/YSMtbcecct4rWtexrnSCHOPcpC2KTLXfTCR6vDpnSiY12heNb1GiN/wu+T/FyA==",
+          "cpu": [
+            "x64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "netbsd"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-netbsd-x64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-openbsd-arm64",
+        "sourceLockPath": "node_modules/@typescript/typescript-openbsd-arm64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-openbsd-arm64/-/typescript-openbsd-arm64-7.0.2.tgz",
+          "integrity": "sha512-APT8+ClYnuYm1u9+kgGXoMj2VzWzcymwh2gNSQVySHfkRDGOTVkoWLjCmOQSaO+PoqQ57B0flRp9SA+7GnnkzQ==",
+          "cpu": [
+            "arm64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "openbsd"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-openbsd-arm64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-openbsd-x64",
+        "sourceLockPath": "node_modules/@typescript/typescript-openbsd-x64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-openbsd-x64/-/typescript-openbsd-x64-7.0.2.tgz",
+          "integrity": "sha512-yX7s+Q0Dln0Dt9tEzZsAjXXR/+ytBM7AlglaqyeMPxQszJ1JhlJdZ6jLA+IzldHtflX81em7lDao1xXu+aRRkg==",
+          "cpu": [
+            "x64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "openbsd"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-openbsd-x64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-sunos-x64",
+        "sourceLockPath": "node_modules/@typescript/typescript-sunos-x64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-sunos-x64/-/typescript-sunos-x64-7.0.2.tgz",
+          "integrity": "sha512-dLJDGaLZ1D4HPQn62u1n8mBDkJREwMsAkCdkwd4Ieqw+x3TUyTsqY0YiBCtE6H6OzzgGk3iuZ3vFWRS+E8/d1g==",
+          "cpu": [
+            "x64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "sunos"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-sunos-x64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-win32-arm64",
+        "sourceLockPath": "node_modules/@typescript/typescript-win32-arm64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-win32-arm64/-/typescript-win32-arm64-7.0.2.tgz",
+          "integrity": "sha512-Gyl1Vy6OsWesLzmq+EP0Fb7b4Nid5232AvcA2SFcdYreldpNtYFFofPjnt62y9hQy7VTaZp65ICJjuAQRaVcIQ==",
+          "cpu": [
+            "arm64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "win32"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-win32-arm64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@typescript/typescript-win32-x64",
+        "sourceLockPath": "node_modules/@typescript/typescript-win32-x64",
+        "lockEntry": {
+          "version": "7.0.2",
+          "resolved": "https://registry.npmjs.org/@typescript/typescript-win32-x64/-/typescript-win32-x64-7.0.2.tgz",
+          "integrity": "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g==",
+          "cpu": [
+            "x64"
+          ],
+          "dev": true,
+          "license": "Apache-2.0",
+          "optional": true,
+          "os": [
+            "win32"
+          ],
+          "engines": {
+            "node": ">=16.20.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@typescript/typescript-win32-x64/7.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      }
+    ],
+    "syntaxParser": [
+      {
+        "name": "@babel/parser",
+        "sourceLockPath": "node_modules/@babel/parser",
+        "lockEntry": {
+          "version": "7.29.8",
+          "resolved": "https://registry.npmjs.org/@babel/parser/-/parser-7.29.8.tgz",
+          "integrity": "sha512-E8lTAYNB1KW+FH+VGJuZM1ioAx2E6oVlvQFRrf5P8ZZmsiJXYAD9vTFV7yyEURNzgh1dFqMZuO6tUwcARbqFCA==",
+          "dev": true,
+          "license": "MIT",
+          "dependencies": {
+            "@babel/types": "^7.29.8"
+          },
+          "bin": {
+            "parser": "bin/babel-parser.js"
+          },
+          "engines": {
+            "node": ">=6.0.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@babel/parser/7.29.8",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@babel/types",
+        "sourceLockPath": "node_modules/@babel/types",
+        "lockEntry": {
+          "version": "7.29.8",
+          "resolved": "https://registry.npmjs.org/@babel/types/-/types-7.29.8.tgz",
+          "integrity": "sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==",
+          "dev": true,
+          "license": "MIT",
+          "dependencies": {
+            "@babel/helper-string-parser": "^7.29.7",
+            "@babel/helper-validator-identifier": "^7.29.7"
+          },
+          "engines": {
+            "node": ">=6.9.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@babel/types/7.29.8",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@babel/helper-string-parser",
+        "sourceLockPath": "node_modules/@babel/helper-string-parser",
+        "lockEntry": {
+          "version": "7.29.7",
+          "resolved": "https://registry.npmjs.org/@babel/helper-string-parser/-/helper-string-parser-7.29.7.tgz",
+          "integrity": "sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw==",
+          "dev": true,
+          "license": "MIT",
+          "engines": {
+            "node": ">=6.9.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@babel/helper-string-parser/7.29.7",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@babel/helper-validator-identifier",
+        "sourceLockPath": "node_modules/@babel/helper-validator-identifier",
+        "lockEntry": {
+          "version": "7.29.7",
+          "resolved": "https://registry.npmjs.org/@babel/helper-validator-identifier/-/helper-validator-identifier-7.29.7.tgz",
+          "integrity": "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==",
+          "dev": true,
+          "license": "MIT",
+          "engines": {
+            "node": ">=6.9.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@babel/helper-validator-identifier/7.29.7",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      }
+    ],
+    "types": [
+      {
+        "name": "@types/chai",
+        "sourceLockPath": "node_modules/@types/chai",
+        "lockEntry": {
+          "version": "5.2.3",
+          "resolved": "https://registry.npmjs.org/@types/chai/-/chai-5.2.3.tgz",
+          "integrity": "sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==",
+          "dev": true,
+          "license": "MIT",
+          "dependencies": {
+            "@types/deep-eql": "*",
+            "assertion-error": "^2.0.1"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/chai/5.2.3",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/cross-spawn",
+        "sourceLockPath": "node_modules/@types/cross-spawn",
+        "lockEntry": {
+          "version": "6.0.6",
+          "resolved": "https://registry.npmjs.org/@types/cross-spawn/-/cross-spawn-6.0.6.tgz",
+          "integrity": "sha512-fXRhhUkG4H3TQk5dBhQ7m/JDdSNHKwR2BBia62lhwEIq9xGiQKLxd6LymNhn47SjXhsUEPmxi+PKw2OkW4LLjA==",
+          "dev": true,
+          "license": "MIT",
+          "dependencies": {
+            "@types/node": "*"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/cross-spawn/6.0.6",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/deep-eql",
+        "sourceLockPath": "node_modules/@types/deep-eql",
+        "lockEntry": {
+          "version": "4.0.2",
+          "resolved": "https://registry.npmjs.org/@types/deep-eql/-/deep-eql-4.0.2.tgz",
+          "integrity": "sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==",
+          "dev": true,
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/deep-eql/4.0.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/estree",
+        "sourceLockPath": "node_modules/@types/estree",
+        "lockEntry": {
+          "version": "1.0.9",
+          "resolved": "https://registry.npmjs.org/@types/estree/-/estree-1.0.9.tgz",
+          "integrity": "sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==",
+          "dev": true,
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/estree/1.0.9",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/hosted-git-info",
+        "sourceLockPath": "node_modules/@types/hosted-git-info",
+        "lockEntry": {
+          "version": "3.0.5",
+          "resolved": "https://registry.npmjs.org/@types/hosted-git-info/-/hosted-git-info-3.0.5.tgz",
+          "integrity": "sha512-Dmngh7U003cOHPhKGyA7LWqrnvcTyILNgNPmNCxlx7j8MIi54iBliiT8XqVLIQ3GchoOjVAyBzNJVyuaJjqokg==",
+          "dev": true,
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/hosted-git-info/3.0.5",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/lodash",
+        "sourceLockPath": "node_modules/@types/lodash",
+        "lockEntry": {
+          "version": "4.17.24",
+          "resolved": "https://registry.npmjs.org/@types/lodash/-/lodash-4.17.24.tgz",
+          "integrity": "sha512-gIW7lQLZbue7lRSWEFql49QJJWThrTFFeIMJdp3eH4tKoxm1OvEPg02rm4wCCSHS0cL3/Fizimb35b7k8atwsQ==",
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/lodash/4.17.24",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/lodash-es",
+        "sourceLockPath": "node_modules/@types/lodash-es",
+        "lockEntry": {
+          "version": "4.17.12",
+          "resolved": "https://registry.npmjs.org/@types/lodash-es/-/lodash-es-4.17.12.tgz",
+          "integrity": "sha512-0NgftHUcV4v34VhXm8QBSftKVXtbkBG3ViCjs6+eJ5a6y6Mi/jiFGPc1sC7QK+9BFhWrURE3EOggmWaSxL9OzQ==",
+          "license": "MIT",
+          "dependencies": {
+            "@types/lodash": "*"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/lodash-es/4.17.12",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/ms",
+        "sourceLockPath": "node_modules/@types/ms",
+        "lockEntry": {
+          "version": "2.1.0",
+          "resolved": "https://registry.npmjs.org/@types/ms/-/ms-2.1.0.tgz",
+          "integrity": "sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==",
+          "dev": true,
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/ms/2.1.0",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/node",
+        "sourceLockPath": "node_modules/@types/node",
+        "lockEntry": {
+          "version": "22.19.19",
+          "resolved": "https://registry.npmjs.org/@types/node/-/node-22.19.19.tgz",
+          "integrity": "sha512-dyh/xO2Fh5bYrfWaaqGrRQQGkNdmYw6AmaAUvYeUMNTWQtvb796ikLdmTchRmOlOiIJ1TDXfWgVx1QkUlQ6Hew==",
+          "license": "MIT",
+          "dependencies": {
+            "undici-types": "~6.21.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/node/22.19.19",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/proper-lockfile",
+        "sourceLockPath": "node_modules/@types/proper-lockfile",
+        "lockEntry": {
+          "version": "4.1.4",
+          "resolved": "https://registry.npmjs.org/@types/proper-lockfile/-/proper-lockfile-4.1.4.tgz",
+          "integrity": "sha512-uo2ABllncSqg9F1D4nugVl9v93RmjxF6LJzQLMLDdPaXCUIDPeOJ21Gbqi43xNKzBi/WQ0Q0dICqufzQbMjipQ==",
+          "dev": true,
+          "license": "MIT",
+          "dependencies": {
+            "@types/retry": "*"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/proper-lockfile/4.1.4",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/retry",
+        "sourceLockPath": "node_modules/@types/retry",
+        "lockEntry": {
+          "version": "0.12.5",
+          "resolved": "https://registry.npmjs.org/@types/retry/-/retry-0.12.5.tgz",
+          "integrity": "sha512-3xSjTp3v03X/lSQLkczaN9UIEwJMoMCA1+Nb5HfbJEQWogdeQIyVtTvxPXDQjZ5zws8rFQfVfRdz03ARihPJgw==",
+          "dev": true,
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/retry/0.12.5",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/semver",
+        "sourceLockPath": "node_modules/@types/semver",
+        "lockEntry": {
+          "version": "7.7.1",
+          "resolved": "https://registry.npmjs.org/@types/semver/-/semver-7.7.1.tgz",
+          "integrity": "sha512-FmgJfu+MOcQ370SD0ev7EI8TlCAfKYU+B4m5T3yXc1CiRN94g/SZPtsCkk506aUDtlMnFZvasDwHHUcZUEaYuA==",
+          "dev": true,
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/semver/7.7.1",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@types/retry",
+        "sourceLockPath": "node_modules/p-retry/node_modules/@types/retry",
+        "lockEntry": {
+          "version": "0.12.0",
+          "resolved": "https://registry.npmjs.org/@types/retry/-/retry-0.12.0.tgz",
+          "integrity": "sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==",
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@types/retry/0.12.0",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "undici-types",
+        "sourceLockPath": "node_modules/undici-types",
+        "lockEntry": {
+          "version": "6.21.0",
+          "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz",
+          "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==",
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/undici-types/6.21.0",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      }
+    ],
+    "declarationExamples": [
+      {
+        "name": "typebox",
+        "sourceLockPath": "node_modules/typebox",
+        "lockEntry": {
+          "version": "1.3.27",
+          "resolved": "https://registry.npmjs.org/typebox/-/typebox-1.3.27.tgz",
+          "integrity": "sha512-zu+jc1pcy4UiNThxikUr36f0Rybk9PEeCg/NE6adeWr/SKsdNO4EzZHYRDlv2YCVAfj3Odq3dESSo/jNyoBXzA==",
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/typebox/1.3.27",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@anthropic-ai/sdk",
+        "sourceLockPath": "node_modules/@anthropic-ai/sdk",
+        "lockEntry": {
+          "version": "0.124.0",
+          "resolved": "https://registry.npmjs.org/@anthropic-ai/sdk/-/sdk-0.124.0.tgz",
+          "integrity": "sha512-cN5O8i9UVxHeOQAzj/XjshWXG8KiibJDw9OGpH2Z/eR3n/RBxdoLxDJOcfqAJWvjaMDFfHTBADU04hWRJVkDyA==",
+          "license": "MIT",
+          "dependencies": {
+            "json-schema-to-ts": "^3.1.1",
+            "standardwebhooks": "^1.0.0"
+          },
+          "bin": {
+            "anthropic-ai-sdk": "bin/cli"
+          },
+          "peerDependencies": {
+            "zod": "^3.25.0 || ^4.0.0"
+          },
+          "peerDependenciesMeta": {
+            "zod": {
+              "optional": true
+            }
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@anthropic-ai/sdk/0.124.0",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "openai",
+        "sourceLockPath": "packages/ai/node_modules/openai",
+        "lockEntry": {
+          "version": "7.19.0",
+          "resolved": "https://registry.npmjs.org/openai/-/openai-7.19.0.tgz",
+          "integrity": "sha512-MX2s3u2L5racTO0CC/SWpCOasJQBCJrqLKXK+l82cAhdeF8mPMBEe/gxMm0ZFa2xpKpOFLRjxv5afYEZbBXmbQ==",
+          "license": "Apache-2.0",
+          "engines": {
+            "node": ">=22.0.0"
+          },
+          "peerDependencies": {
+            "@aws-sdk/credential-provider-node": ">=3.972.0 <4",
+            "@smithy/hash-node": ">=4.3.0 <5",
+            "@smithy/signature-v4": ">=5.4.0 <6",
+            "undici": ">=5 <9",
+            "ws": "^8.21.0",
+            "zod": "^3.25 || ^4.0"
+          },
+          "peerDependenciesMeta": {
+            "@aws-sdk/credential-provider-node": {
+              "optional": true
+            },
+            "@smithy/hash-node": {
+              "optional": true
+            },
+            "@smithy/signature-v4": {
+              "optional": true
+            },
+            "undici": {
+              "optional": true
+            },
+            "ws": {
+              "optional": true
+            },
+            "zod": {
+              "optional": true
+            }
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/openai/7.19.0",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "openai",
+        "sourceLockPath": "node_modules/openai",
+        "lockEntry": {
+          "version": "6.40.0",
+          "resolved": "https://registry.npmjs.org/openai/-/openai-6.40.0.tgz",
+          "integrity": "sha512-MWtTjd/gQt4jpbji61NTgFWJLoY/PdRJ6wG9/ZDRMYNMlBKrCrSlkLI+KgHP1vR1qT6LKSAyAqIxno6lcK9JiA==",
+          "dev": true,
+          "license": "Apache-2.0",
+          "peerDependencies": {
+            "ws": "^8.18.0",
+            "zod": "^3.25 || ^4.0"
+          },
+          "peerDependenciesMeta": {
+            "ws": {
+              "optional": true
+            },
+            "zod": {
+              "optional": true
+            }
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/openai/6.40.0",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@aws-sdk/client-bedrock-runtime",
+        "sourceLockPath": "node_modules/@aws-sdk/client-bedrock-runtime",
+        "lockEntry": {
+          "version": "3.1127.0",
+          "resolved": "https://registry.npmjs.org/@aws-sdk/client-bedrock-runtime/-/client-bedrock-runtime-3.1127.0.tgz",
+          "integrity": "sha512-IDl/lrPb90aH+pZFHGNDmgH9nAUQj5PlZH1sJ3w7RikctyjHSnY3oNjZhrLoaBoQn/rNK0zsP6OHEqEhj2tdLA==",
+          "license": "Apache-2.0",
+          "dependencies": {
+            "@aws-sdk/core": "^3.977.9",
+            "@aws-sdk/credential-provider-node": "^3.972.82",
+            "@aws-sdk/eventstream-handler-node": "^3.972.34",
+            "@aws-sdk/middleware-eventstream": "^3.972.29",
+            "@aws-sdk/middleware-websocket": "^3.972.52",
+            "@aws-sdk/token-providers": "3.1127.0",
+            "@aws-sdk/types": "^3.974.5",
+            "@smithy/core": "^3.33.3",
+            "@smithy/fetch-http-handler": "^5.7.2",
+            "@smithy/node-http-handler": "^4.11.3",
+            "@smithy/types": "^4.17.2",
+            "tslib": "^2.6.2"
+          },
+          "engines": {
+            "node": ">=20.0.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@aws-sdk/client-bedrock-runtime/3.1127.0",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@google/genai",
+        "sourceLockPath": "node_modules/@google/genai",
+        "lockEntry": {
+          "version": "2.21.0",
+          "resolved": "https://registry.npmjs.org/@google/genai/-/genai-2.21.0.tgz",
+          "integrity": "sha512-+PDtco2/Z0ONdzCGekCoCT+O1VJS9xJQNN4XzQpXG/t3El/SWWMkCWlFRO1KmivOHPa4Q0VjUYu1HBKCZ/v33Q==",
+          "hasInstallScript": true,
+          "license": "Apache-2.0",
+          "dependencies": {
+            "google-auth-library": "^10.3.0",
+            "p-retry": "^4.6.2",
+            "protobufjs": "^7.5.4",
+            "ws": "^8.18.0"
+          },
+          "engines": {
+            "node": ">=20.0.0"
+          },
+          "peerDependencies": {
+            "@modelcontextprotocol/sdk": "^1.25.2"
+          },
+          "peerDependenciesMeta": {
+            "@modelcontextprotocol/sdk": {
+              "optional": true
+            }
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@google/genai/2.21.0",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@smithy/node-http-handler",
+        "sourceLockPath": "node_modules/@smithy/node-http-handler",
+        "lockEntry": {
+          "version": "4.12.1",
+          "resolved": "https://registry.npmjs.org/@smithy/node-http-handler/-/node-http-handler-4.12.1.tgz",
+          "integrity": "sha512-ThMkboGeONWXAelq9FvGsuJC4rOi+qyC4/zhUF58xYpxUg5sQKx2VXZYJmtNjr4dSuBJ1HeJXETQILCz3wOHvw==",
+          "license": "Apache-2.0",
+          "dependencies": {
+            "@smithy/core": "^3.33.3",
+            "@smithy/types": "^4.18.0",
+            "tslib": "^2.6.2"
+          },
+          "engines": {
+            "node": ">=18.0.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@smithy/node-http-handler/4.12.1",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "cross-spawn",
+        "sourceLockPath": "node_modules/cross-spawn",
+        "lockEntry": {
+          "version": "7.0.6",
+          "resolved": "https://registry.npmjs.org/cross-spawn/-/cross-spawn-7.0.6.tgz",
+          "integrity": "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==",
+          "license": "MIT",
+          "dependencies": {
+            "path-key": "^3.1.0",
+            "shebang-command": "^2.0.0",
+            "which": "^2.0.1"
+          },
+          "engines": {
+            "node": ">= 8"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/cross-spawn/7.0.6",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "proper-lockfile",
+        "sourceLockPath": "node_modules/proper-lockfile",
+        "lockEntry": {
+          "version": "4.1.2",
+          "resolved": "https://registry.npmjs.org/proper-lockfile/-/proper-lockfile-4.1.2.tgz",
+          "integrity": "sha512-TjNPblN4BwAWMXU8s9AEz4JmQxnD1NNL7bNOY/AKUzyamc379FWASUhc/K1pL2noVb+XmZKLL68cjzLsiOAMaA==",
+          "license": "MIT",
+          "dependencies": {
+            "graceful-fs": "^4.2.4",
+            "retry": "^0.12.0",
+            "signal-exit": "^3.0.2"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/proper-lockfile/4.1.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "hosted-git-info",
+        "sourceLockPath": "node_modules/hosted-git-info",
+        "lockEntry": {
+          "version": "9.0.3",
+          "resolved": "https://registry.npmjs.org/hosted-git-info/-/hosted-git-info-9.0.3.tgz",
+          "integrity": "sha512-Hc+ghLoSt6QaYZUv0WBiIvmMDZuZZ7oaDvdH8MbfOO4lOsxdXLEvuC6ePoGs9H1X9oCLyq6+NVN0MKqD+ydxyg==",
+          "license": "ISC",
+          "dependencies": {
+            "lru-cache": "^11.1.0"
+          },
+          "engines": {
+            "node": "^20.17.0 || >=22.9.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/hosted-git-info/9.0.3",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "semver",
+        "sourceLockPath": "node_modules/semver",
+        "lockEntry": {
+          "version": "7.8.5",
+          "resolved": "https://registry.npmjs.org/semver/-/semver-7.8.5.tgz",
+          "integrity": "sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==",
+          "license": "ISC",
+          "bin": {
+            "semver": "bin/semver.js"
+          },
+          "engines": {
+            "node": ">=10"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/semver/7.8.5",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "quickjs-wasi",
+        "sourceLockPath": "node_modules/quickjs-wasi",
+        "lockEntry": {
+          "version": "3.6.2",
+          "resolved": "https://registry.npmjs.org/quickjs-wasi/-/quickjs-wasi-3.6.2.tgz",
+          "integrity": "sha512-FCqGtGOrMgzUiIrMNMA2YnsOxCNwo31dzqXvclXUC6xeT35NJLKXQJsvbeCTjvoFAwZgEAPg8U6+KAPDGXn8Mg==",
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/quickjs-wasi/3.6.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@silvia-odwyer/photon-node",
+        "sourceLockPath": "node_modules/@silvia-odwyer/photon-node",
+        "lockEntry": {
+          "version": "0.3.4",
+          "resolved": "https://registry.npmjs.org/@silvia-odwyer/photon-node/-/photon-node-0.3.4.tgz",
+          "integrity": "sha512-bnly4BKB3KDTFxrUIcgCLbaeVVS8lrAkri1pEzskpmxu9MdfGQTy8b8EgcD83ywD3RPMsIulY8xJH5Awa+t9fA==",
+          "license": "Apache-2.0"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@silvia-odwyer/photon-node/0.3.4",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "esbuild",
+        "sourceLockPath": "node_modules/esbuild",
+        "lockEntry": {
+          "version": "0.28.2",
+          "resolved": "https://registry.npmjs.org/esbuild/-/esbuild-0.28.2.tgz",
+          "integrity": "sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==",
+          "hasInstallScript": true,
+          "license": "MIT",
+          "bin": {
+            "esbuild": "bin/esbuild"
+          },
+          "engines": {
+            "node": ">=18"
+          },
+          "optionalDependencies": {
+            "@esbuild/aix-ppc64": "0.28.2",
+            "@esbuild/android-arm": "0.28.2",
+            "@esbuild/android-arm64": "0.28.2",
+            "@esbuild/android-x64": "0.28.2",
+            "@esbuild/darwin-arm64": "0.28.2",
+            "@esbuild/darwin-x64": "0.28.2",
+            "@esbuild/freebsd-arm64": "0.28.2",
+            "@esbuild/freebsd-x64": "0.28.2",
+            "@esbuild/linux-arm": "0.28.2",
+            "@esbuild/linux-arm64": "0.28.2",
+            "@esbuild/linux-ia32": "0.28.2",
+            "@esbuild/linux-loong64": "0.28.2",
+            "@esbuild/linux-mips64el": "0.28.2",
+            "@esbuild/linux-ppc64": "0.28.2",
+            "@esbuild/linux-riscv64": "0.28.2",
+            "@esbuild/linux-s390x": "0.28.2",
+            "@esbuild/linux-x64": "0.28.2",
+            "@esbuild/netbsd-arm64": "0.28.2",
+            "@esbuild/netbsd-x64": "0.28.2",
+            "@esbuild/openbsd-arm64": "0.28.2",
+            "@esbuild/openbsd-x64": "0.28.2",
+            "@esbuild/openharmony-arm64": "0.28.2",
+            "@esbuild/sunos-x64": "0.28.2",
+            "@esbuild/win32-arm64": "0.28.2",
+            "@esbuild/win32-ia32": "0.28.2",
+            "@esbuild/win32-x64": "0.28.2"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/esbuild/0.28.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "jiti",
+        "sourceLockPath": "node_modules/jiti",
+        "lockEntry": {
+          "version": "2.7.0",
+          "resolved": "https://registry.npmjs.org/jiti/-/jiti-2.7.0.tgz",
+          "integrity": "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==",
+          "license": "MIT",
+          "bin": {
+            "jiti": "lib/jiti-cli.mjs"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/jiti/2.7.0",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "undici",
+        "sourceLockPath": "node_modules/undici",
+        "lockEntry": {
+          "version": "8.10.2",
+          "resolved": "https://registry.npmjs.org/undici/-/undici-8.10.2.tgz",
+          "integrity": "sha512-/y4/bH9YNU5hi9NIrpOuvGXFcxrj3CMrV+/AYpowAYTpHn8gX/XPFjNy766FPoYY0miQhdW977JFWKGNhBdwyQ==",
+          "license": "MIT",
+          "engines": {
+            "node": ">=22.19.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/undici/8.10.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "json-schema-to-ts",
+        "sourceLockPath": "node_modules/json-schema-to-ts",
+        "lockEntry": {
+          "version": "3.1.1",
+          "resolved": "https://registry.npmjs.org/json-schema-to-ts/-/json-schema-to-ts-3.1.1.tgz",
+          "integrity": "sha512-+DWg8jCJG2TEnpy7kOm/7/AxaYoaRbjVB4LFZLySZlWn8exGs3A4OLJR966cVvU26N7X9TWxl+Jsw7dzAqKT6g==",
+          "license": "MIT",
+          "dependencies": {
+            "@babel/runtime": "^7.18.3",
+            "ts-algebra": "^2.0.0"
+          },
+          "engines": {
+            "node": ">=16"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/json-schema-to-ts/3.1.1",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "ts-algebra",
+        "sourceLockPath": "node_modules/ts-algebra",
+        "lockEntry": {
+          "version": "2.0.0",
+          "resolved": "https://registry.npmjs.org/ts-algebra/-/ts-algebra-2.0.0.tgz",
+          "integrity": "sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw==",
+          "license": "MIT"
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/ts-algebra/2.0.0",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "@babel/runtime",
+        "sourceLockPath": "node_modules/@babel/runtime",
+        "lockEntry": {
+          "version": "7.29.2",
+          "resolved": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.2.tgz",
+          "integrity": "sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g==",
+          "license": "MIT",
+          "engines": {
+            "node": ">=6.9.0"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/@babel/runtime/7.29.2",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      },
+      {
+        "name": "assertion-error",
+        "sourceLockPath": "node_modules/assertion-error",
+        "lockEntry": {
+          "version": "2.0.1",
+          "resolved": "https://registry.npmjs.org/assertion-error/-/assertion-error-2.0.1.tgz",
+          "integrity": "sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==",
+          "dev": true,
+          "license": "MIT",
+          "engines": {
+            "node": ">=12"
+          }
+        },
+        "versionMetadataUrl": "https://registry.npmjs.org/assertion-error/2.0.1",
+        "evidence": "unchanged pinned package-lock declaration only; this task did not acquire registry metadata or archive",
+        "archiveAcquiredByThisTask": false,
+        "archiveInspection": null,
+        "packagedNoticeVerifiedByThisTask": false,
+        "packagedLifecycleAndNativeEntryVerifiedByThisTask": false,
+        "installedByThisTask": false,
+        "registrySignatureAndAttestationVerified": false
+      }
+    ]
+  },
+  "localEvidencePins": [
+    {
+      "path": "compatibility/baseline.lock.json",
+      "bytes": 59384,
+      "sha256": "3d39afb8a23079ae35a123b66dee1bbd291cdf16c2bf30b16ecb3ca923338a1a"
+    },
+    {
+      "path": "artifacts/released-baseline/pi-0.99.1-source.tar.gz",
+      "bytes": 8646242,
+      "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b"
+    },
+    {
+      "path": "artifacts/released-baseline/inspection.json",
+      "bytes": 41808,
+      "sha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b"
+    },
+    {
+      "path": "compatibility/responses-sdk-oracle-setup.json",
+      "bytes": 43422,
+      "sha256": "e3e8f2eb4c0f5df31408f65aa800c385197b9dde63212171581ad30fe3965934"
+    },
+    {
+      "path": "compatibility/anthropic-oracle-setup.json",
+      "bytes": 21806,
+      "sha256": "e11d383b6a5ecb736c89523c065d96e540b2392108b1c23ffa315113bc28c1c9"
+    },
+    {
+      "path": "compatibility/edit-oracle-setup.json",
+      "bytes": 27373,
+      "sha256": "2c1a92e8cc89f344aa397a12cd2708e2909792ad81ec402a3570b7863e110bea"
+    },
+    {
+      "path": "compatibility/session-context-oracle-setup.json",
+      "bytes": 15667,
+      "sha256": "3e43ae32f145a1cb62d277deda4659d91e78fd49bb0615f88b06fa9c8f2c7f61"
+    },
+    {
+      "path": "compatibility/extensions/native-surface.json",
+      "bytes": 1257586,
+      "sha256": "11cc23450f834eab5c4d6dfe31b2e8e518be1bb64cdd69b6a9aa1f168b026b4f"
+    },
+    {
+      "path": "docs/extensions/native-api-inventory.md",
+      "bytes": 21596,
+      "sha256": "00a3da1aca93cc1fe9eed2adcb693e5d2dfeb6d89f4486fd18adbeb4e7aa3ef5"
+    },
+    {
+      "path": "docs/plans/01-compatibility-target.md",
+      "bytes": 10078,
+      "sha256": "7d43210fb14f6935b31521bba482a425e64a940db3ad7db5824d89eff1b21982"
+    },
+    {
+      "path": "docs/plans/06-native-extension-sdk.md",
+      "bytes": 22158,
+      "sha256": "421c13b4c84a3e490ee61cc7c80fd4bbb50f8f9c9a6788aa2460ca026bf133f7"
+    },
+    {
+      "path": "docs/plans/07-node-bridge.md",
+      "bytes": 8846,
+      "sha256": "d8f2ebff557f8fbec36dcb50c0b3f6f980075c53f7b6533ee9d667bdfdce2091"
+    }
+  ]
+}

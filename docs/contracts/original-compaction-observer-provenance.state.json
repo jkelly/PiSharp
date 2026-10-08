@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "ccc648fff028d5fd095ff2e2ae577e0b7b913273",
+  "baseTree": "643544c102362b670f7f79e1db928ab78b0a5eb7",
+  "baseStatus": "historical-aggregate-observer-inventory-boundary-holes",
+  "status": "source-only-complete-per-observer-failure-provenance",
+  "newGroups": 1,
+  "totalAuthoredLifecycleGroups": 13,
+  "registeredNewGroups": 0,
+  "executedNewGroups": 0,
+  "compilers": 0,
+  "builds": 0,
+  "globalCollectorEdits": 0,
+  "acceptedParity": false,
+  "remaining": ["independent source re-review", "coordinator runner registration", "authorized exact-producer runtime qualification"]
+}

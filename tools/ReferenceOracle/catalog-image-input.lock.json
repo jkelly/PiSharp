@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "kind": "additive-whole-source-catalog-image-input-lock",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceArchive": {
+    "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b",
+    "bytes": 8646242
+  },
+  "preparedSourceManifest": {
+    "sha256": "ab6152cb440e6ccc8f0e88ff297dc8bc05cf1eaa4214907bfa311699e28237c3",
+    "bytes": 901993
+  },
+  "node": {
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+    "bytes": 92825416
+  },
+  "files": [
+    {
+      "relative": "upstream/packages/ai/scripts/model-data.ts",
+      "bytes": 12490,
+      "sha256": "39d8d085e709af4e67cf157868dccbec2fd7777c2bf80061f457c8eebcf76b83"
+    },
+    {
+      "relative": "upstream/packages/ai/src/api/openai-completions.ts",
+      "bytes": 63058,
+      "sha256": "7c1bc51ddf740ce69b371e1ae391fcdcecde26852428451e7b17eeabdcfb4eb4"
+    },
+    {
+      "relative": "upstream/packages/ai/src/api/transform-messages.ts",
+      "bytes": 7666,
+      "sha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669"
+    },
+    {
+      "relative": "upstream/packages/ai/src/model-catalog.ts",
+      "bytes": 2706,
+      "sha256": "567b559600439eac5e6c341658bb45b149c5e8a22e34624a54ad5a06f5a92885"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/.manifest.json",
+      "bytes": 3779,
+      "sha256": "58698cae7d0a3b270f360072c6106435ca1870a178254bd80d5dbfb4716734e6"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/amazon-bedrock.json",
+      "bytes": 90990,
+      "sha256": "c6e1a0105ac45dbf41eba6311562d55ccbed48a5d1ce4c8d9b8e86ff9a572863"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/ant-ling.json",
+      "bytes": 1692,
+      "sha256": "628feab3ef6c7d80ce96f75999804e1d9f05fec3851e5302e30fff3b69db90f6"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/anthropic.json",
+      "bytes": 10901,
+      "sha256": "3ff00b68990382e42626ebd1b65dcc28ae3cad9e6faa8920331ba92f067f1b3a"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/azure-openai-responses.json",
+      "bytes": 20456,
+      "sha256": "af60bfc0f822233177c69b63cb9d7aa9e6c99829da729f5e4805023f6e3d96e1"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/baseten.json",
+      "bytes": 17098,
+      "sha256": "883cdb952fd9eb8d8e3605c460744af36802d325f9a38f75998365e2871a5bcc"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/cerebras.json",
+      "bytes": 1109,
+      "sha256": "c07ed7880030c5c85a89520ec4e0fceaf2b2988356345cb1287538337971badd"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/cloudflare-ai-gateway.json",
+      "bytes": 36059,
+      "sha256": "52decade622d1d25f1af90385b1aec7331dad00d56e010a5e4d15118efae67ce"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/cloudflare-workers-ai.json",
+      "bytes": 12659,
+      "sha256": "b9f76cc83756a05920a8a7046c515919a1de918331b860a211f309bb716c4bb0"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/deepseek.json",
+      "bytes": 1387,
+      "sha256": "10a296fb3e898f7715c80890c8af0af4f5fd58f22dbcd6612fdc5d762157ccdc"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/fireworks.json",
+      "bytes": 16231,
+      "sha256": "d6144ba451bd7a0617669527bec1898f97a633f7d7ea5035d8e03234550340c0"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/github-copilot.json",
+      "bytes": 26521,
+      "sha256": "b5a5defdbb6a351d3764ec542dd2b194c1162a4f6ee977494dcc43e7d6873597"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/google-vertex.json",
+      "bytes": 7825,
+      "sha256": "40090c680538bc867f2624d986a449f361be4dfa6ba96d7a27402050f036e009"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/google.json",
+      "bytes": 13373,
+      "sha256": "c0f5a633e5e5a5044432db3e537f4bc674d4de18df09325c6349547fcc13cabe"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/groq.json",
+      "bytes": 3354,
+      "sha256": "910952ad9dad07856983459d63fce0148dba1203edd7b10d801a77c5824f3405"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/huggingface.json",
+      "bytes": 36433,
+      "sha256": "1b8604bd31a5e05fe43a40ec1ec6dfc1a51a28b0b020151ef057fab43f57c923"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/kimi-coding.json",
+      "bytes": 2282,
+      "sha256": "582250b920454d98940da3e7e99d30b807edbea28f2eb8ac15f658d2ef41e8fc"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/meta.json",
+      "bytes": 2819,
+      "sha256": "0c7e9a370a7005c5a89dc94f0f93bc67b8935c3f802de324f11af6ff56fff429"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/minimax-cn.json",
+      "bytes": 1127,
+      "sha256": "f962c20ee6a6a342820f778e9dc363a18a524bf11998f6e2c57f2989915d62e5"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/minimax.json",
+      "bytes": 1112,
+      "sha256": "17a432f80d0ea6dd26eade80a4314250d3a855678601728a5f70dd8fa0d21dd2"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/mistral.json",
+      "bytes": 12596,
+      "sha256": "10f33bff9adf1248f7e6848e5890c265399f1f94e5b42cfdc28c109d547af98d"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/moonshotai-cn.json",
+      "bytes": 2882,
+      "sha256": "79c9585dc84ee525ebaebbc78b3c55f3d369ec884d4f943488f1e0b14e3587f5"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/moonshotai.json",
+      "bytes": 2870,
+      "sha256": "1da2c4e34f22aef17a07c974d85bdee8e1b68b6dc712e3769c935b3f1e7dadca"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/nvidia.json",
+      "bytes": 12038,
+      "sha256": "3b4e7b799bf3eaacd1af0491eef77fe33147ea7f72a3a9fa54d77af0e7eacf4c"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/openai-codex.json",
+      "bytes": 6476,
+      "sha256": "3cc35a7e122e5c77ee8ec30a9a3bd8bd59629997e85ba2cb3f9e0ed62e9a09c0"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/openai.json",
+      "bytes": 28816,
+      "sha256": "ca5ec1028efc512502591bf2562a2a6dc330f26a5f4c4a08c8a149a43c5bd7da"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/opencode-go.json",
+      "bytes": 17032,
+      "sha256": "d05b3eb87b81c6e5a94801484e668e660fe60c68f06a972b716d581c3bbd7c25"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/opencode.json",
+      "bytes": 44976,
+      "sha256": "4adb1cfc19a5294a2d9ea5179089b86364ddbfa31485043a3fc278fa8f7e2e73"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/openrouter.json",
+      "bytes": 267751,
+      "sha256": "b49405ced089750d475945738a91ac669fa00e04d574da7720935bcfe16ba272"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/qwen-token-plan-cn.json",
+      "bytes": 12210,
+      "sha256": "2469a4091c474ec3db0a49a9962d8d2726c074ad9065b96bc4e0c87861c4c6c5"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/qwen-token-plan-individual.json",
+      "bytes": 5782,
+      "sha256": "0fb7cf64faf39d1a3b0a884210a86c87084b805eda15644f5f39293287b959dd"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/qwen-token-plan.json",
+      "bytes": 12230,
+      "sha256": "eff10620cb577142de4ec02698d5961a71fda2fe4f6ae7ea9432bad9d6844176"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/radius.json",
+      "bytes": 19164,
+      "sha256": "8e868af981cc64a39da11b135a96252e3eeccb14b92e80d8fbba899ff96f2616"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/together.json",
+      "bytes": 12930,
+      "sha256": "94ec3839972061405885d64f5fdbde48eb1f29a159be5e607e9770befd54e28e"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/typesafe.json",
+      "bytes": 291,
+      "sha256": "a4429a2f696d5cc5273969af61a7310bda07d6bdcd27bf9ac9c76c534cc43716"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/vercel-ai-gateway.json",
+      "bytes": 118194,
+      "sha256": "e64081d4ced20a7e754dab586d5f733eb92f00feab30c76fdcb7ce29ce5111be"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/xai.json",
+      "bytes": 2609,
+      "sha256": "879c49b78b663a52a220ac4ee013e726b10c4f50aaa03bc58ee53a4b54c76928"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/xiaomi-token-plan-ams.json",
+      "bytes": 2156,
+      "sha256": "ca65178f4525d9705bc8d085ed136cecbe149c4080e857ea6a64ae643d2ac00a"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/xiaomi-token-plan-cn.json",
+      "bytes": 2148,
+      "sha256": "b065326926681c2262084e59c1c19ebdaf146c07107b5242c76b456becf74db0"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/xiaomi-token-plan-sgp.json",
+      "bytes": 2156,
+      "sha256": "92c3d6d707f81fd9cd2b6d1fb57dc431d90ba51e10fe49d97bc8806035c23492"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/xiaomi.json",
+      "bytes": 3144,
+      "sha256": "b81d01a374f7b558728c78d81f4168efa9c8996e6e2b5618409a8094b083c759"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/zai-coding-cn.json",
+      "bytes": 2672,
+      "sha256": "ee5ee705fb6e413a6088db5e3616c27fce802a8ece6c355f1db35490d787f610"
+    },
+    {
+      "relative": "upstream/packages/ai/src/providers/data/zai.json",
+      "bytes": 4221,
+      "sha256": "58e6642fdfb736f0b9a4a277c760c536a3cea66a030abbfb2615f7b2851d5c6f"
+    },
+    {
+      "relative": "upstream/packages/ai/src/types.ts",
+      "bytes": 48466,
+      "sha256": "7ac401b31a7679a77469037091093c4c25d3719d7c9e9078378fece509fa8e8d"
+    }
+  ]
+}

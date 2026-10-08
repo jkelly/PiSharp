@@ -1,0 +1,331 @@
+    // Managed ICU78.3 dictionary engines. Full source/data/licensing provenance:
+    // tests/PiSharp.Tui.Editor.Tests/word-data/icu78. No OS ICU or Node runtime calls.
+    private static class WordDictionary
+    {
+        private static readonly Lazy<CompactDictionary> Cjk = new(() => new(Load(PinnedWordDictionaryData.CjkBase64, PinnedWordDictionaryData.CjkBytes, PinnedWordDictionaryData.CjkHash), true));
+        private static readonly Lazy<CompactDictionary> Thai = new(() => new(Load(PinnedWordDictionaryData.ThaiBase64, PinnedWordDictionaryData.ThaiBytes, PinnedWordDictionaryData.ThaiHash), false));
+        private static readonly Lazy<NormalizationData> Normalization = new(() => new(Load(PinnedWordDictionaryData.NormalizationBase64, PinnedWordDictionaryData.NormalizationBytes, PinnedWordDictionaryData.NormalizationHash)));
+        private static byte[] Load(string base64, int size, string sha256)
+        {
+            if (size is < 1 or > 2_007_296 || base64.Length > 2_106_316) throw new TerminalTextEditorException(TerminalTextEditorFailure.ResourceLimit);
+            using var compressed = new MemoryStream(Convert.FromBase64String(base64), false);
+            using var gzip = new System.IO.Compression.GZipStream(compressed, System.IO.Compression.CompressionMode.Decompress);
+            var data = new byte[size]; gzip.ReadExactly(data);
+            if (gzip.ReadByte() != -1 || Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(data)) != sha256)
+                throw new TerminalTextEditorException(TerminalTextEditorFailure.InvalidOptions);
+            return data;
+        }
+        internal static int Flags(int scalar) => Normalization.Value.Flags(scalar);
+        internal static string Normalize(string value) => Normalization.Value.Normalize(value);
+        internal static int? ExactValue(string value, bool thai)
+        {
+            var cursor = new TrieCursor(thai ? Thai.Value : Cjk.Value); var result = 0;
+            foreach (var unit in value) { result = cursor.Next(unit); if (result == 0) return null; }
+            return result >= 2 ? cursor.Value() : null;
+        }
+        private readonly record struct Candidate(int Length, int CodePoints, int Value);
+        private sealed class CompactDictionary
+        {
+            private readonly byte[] data; internal readonly bool UChars; internal readonly int Transform;
+            private readonly int start, units;
+            internal CompactDictionary(byte[] value, bool uchars)
+            {
+                data = value; UChars = uchars;
+                var header = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(data);
+                if (data[2] != 0xda || data[3] != 0x27 || data[8] != 0 || data[10] != 2 ||
+                    !data.AsSpan(12, 4).SequenceEqual("Dict"u8) || data[16] != 1 || header > data.Length - 32)
+                    throw new TerminalTextEditorException(TerminalTextEditorFailure.InvalidOptions);
+                int Index(int at) => System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(header + at * 4, 4));
+                if ((Index(4) & 7) != (uchars ? 1 : 0) || Index(0) < 32 || Index(3) > data.Length - header || Index(3) <= Index(0))
+                    throw new TerminalTextEditorException(TerminalTextEditorFailure.InvalidOptions);
+                start = header + Index(0); units = (Index(3) - Index(0)) / (uchars ? 2 : 1); Transform = Index(5);
+            }
+            internal int Unit(int position)
+            {
+                if ((uint)position >= (uint)units) throw new TerminalTextEditorException(TerminalTextEditorFailure.InvalidOptions);
+                return UChars ? System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(start + position * 2, 2)) : data[start + position];
+            }
+            internal List<Candidate> Matches(string text, int at, int end, int maximum, out int prefix)
+            {
+                var cursor = new TrieCursor(this); var matches = new List<Candidate>(20); var cp = 0; var startAt = at;
+                while (at < end)
+                {
+                    var rune = Rune.GetRuneAt(text, at); at += rune.Utf16SequenceLength; cp++;
+                    var result = cursor.Next(rune.Value);
+                    if (result >= 2) { if (matches.Count < 20) matches.Add(new(at - startAt, cp, cursor.Value())); if (result == 2) break; }
+                    else if (result == 0) break;
+                    if (at - startAt >= maximum) break;
+                }
+                prefix = cp; return matches;
+            }
+        }
+        private struct TrieCursor
+        {
+            private readonly CompactDictionary dictionary; private int position, remaining;
+            internal TrieCursor(CompactDictionary value) { dictionary = value; position = 0; remaining = -1; }
+            private int MinimumValue => dictionary.UChars ? 0x40 : 0x20;
+            private bool Final(int node) => dictionary.UChars ? (node & 0x8000) != 0 : (node & 1) != 0;
+            private int Result() { var node = dictionary.Unit(position); return remaining < 0 && node >= MinimumValue ? Final(node) ? 2 : 3 : 1; }
+            internal int Value()
+            {
+                var at = position; var node = dictionary.Unit(at++);
+                if (!dictionary.UChars) return ReadValue(ref at, node >> 1);
+                if (Final(node)) return ReadValue(ref at, node & 0x7fff);
+                return node < 0x4040 ? (node >> 6) - 1 : node < 0x7fc0 ? (((node & 0x7fc0) - 0x4040) << 10) | dictionary.Unit(at) : (dictionary.Unit(at) << 16) | dictionary.Unit(at + 1);
+            }
+            private int ReadValue(ref int at, int lead)
+            {
+                if (dictionary.UChars) return lead < 0x4000 ? lead : lead < 0x7fff ? ((lead - 0x4000) << 16) | dictionary.Unit(at++) : (dictionary.Unit(at++) << 16) | dictionary.Unit(at++);
+                if (lead < 0x51) return lead - 0x10;
+                if (lead < 0x6c) return ((lead - 0x51) << 8) | dictionary.Unit(at++);
+                if (lead < 0x7e) return ((lead - 0x6c) << 16) | (dictionary.Unit(at++) << 8) | dictionary.Unit(at++);
+                if (lead == 0x7e) return (dictionary.Unit(at++) << 16) | (dictionary.Unit(at++) << 8) | dictionary.Unit(at++);
+                return (dictionary.Unit(at++) << 24) | (dictionary.Unit(at++) << 16) | (dictionary.Unit(at++) << 8) | dictionary.Unit(at++);
+            }
+            private int Delta(ref int at)
+            {
+                var lead = dictionary.Unit(at++);
+                if (dictionary.UChars) return lead < 0xfc00 ? lead : lead < 0xffff ? ((lead - 0xfc00) << 16) | dictionary.Unit(at++) : (dictionary.Unit(at++) << 16) | dictionary.Unit(at++);
+                if (lead < 0xc0) return lead;
+                if (lead < 0xf0) return ((lead - 0xc0) << 8) | dictionary.Unit(at++);
+                if (lead < 0xfe) return ((lead - 0xf0) << 16) | (dictionary.Unit(at++) << 8) | dictionary.Unit(at++);
+                if (lead == 0xfe) return (dictionary.Unit(at++) << 16) | (dictionary.Unit(at++) << 8) | dictionary.Unit(at++);
+                return (dictionary.Unit(at++) << 24) | (dictionary.Unit(at++) << 16) | (dictionary.Unit(at++) << 8) | dictionary.Unit(at++);
+            }
+            internal int Next(int scalar)
+            {
+                if (position < 0) return 0;
+                if (!dictionary.UChars && (dictionary.Transform & 0x7f000000) == 0x1000000)
+                { if (scalar == 0x200d) scalar = 255; else if (scalar == 0x200c) scalar = 254; else { scalar -= dictionary.Transform & 0x1fffff; if (scalar is < 0 or > 253) scalar = 255; } }
+                var at = position;
+                if (remaining >= 0)
+                {
+                    if (dictionary.Unit(at++) != scalar) { position = -1; return 0; }
+                    remaining--; position = at; return Result();
+                }
+                var node = dictionary.Unit(at++); var minimumLinear = dictionary.UChars ? 0x30 : 0x10;
+                while (true)
+                {
+                    if (node < minimumLinear) return Branch(at, node, scalar);
+                    if (node < MinimumValue)
+                    {
+                        if (dictionary.Unit(at++) != scalar) break;
+                        remaining = node - minimumLinear - 1; position = at; return Result();
+                    }
+                    if (Final(node)) break;
+                    if (dictionary.UChars) { if (node >= 0x4040) at += node < 0x7fc0 ? 1 : 2; node &= 0x3f; }
+                    else { _ = ReadValue(ref at, node >> 1); node = dictionary.Unit(at++); }
+                }
+                position = -1; return 0;
+            }
+            private int Branch(int at, int length, int scalar)
+            {
+                if (length == 0) length = dictionary.Unit(at++); length++;
+                while (length > 5)
+                {
+                    var pivot = dictionary.Unit(at++); var jump = Delta(ref at);
+                    if (scalar < pivot) { length >>= 1; at += jump; } else length -= length >> 1;
+                }
+                while (length > 1)
+                {
+                    var key = dictionary.Unit(at++); var valueAt = at; var node = dictionary.Unit(at++);
+                    var value = ReadValue(ref at, dictionary.UChars ? node & 0x7fff : node >> 1);
+                    if (scalar == key) { position = Final(node) ? valueAt : at + value; remaining = -1; return Result(); }
+                    length--;
+                }
+                if (dictionary.Unit(at++) == scalar) { position = at; remaining = -1; return Result(); }
+                position = -1; return 0;
+            }
+        }
+        private sealed class NormalizationData
+        {
+            private readonly Dictionary<int, string> mappings = [];
+            private readonly Dictionary<int, int> classes = [];
+            private readonly Dictionary<long, int> compositions = [];
+            private readonly HashSet<int> backwardStarters = [];
+            private readonly int[][] flags;
+            internal NormalizationData(byte[] data)
+            {
+                using var json = System.Text.Json.JsonDocument.Parse(data); var root = json.RootElement;
+                foreach (var entry in root.GetProperty("mapping").EnumerateArray()) mappings.Add(entry[0].GetInt32(), entry[1].GetString()!);
+                foreach (var entry in root.GetProperty("ccc").EnumerateArray()) classes.Add(entry[0].GetInt32(), entry[1].GetInt32());
+                foreach (var entry in root.GetProperty("compose").EnumerateArray()) { var second = entry[1].GetInt32(); compositions.Add(((long)entry[0].GetInt32() << 21) | (uint)second, entry[2].GetInt32()); if (Class(second) == 0) backwardStarters.Add(second); }
+                flags = root.GetProperty("flags").EnumerateArray().Select(row => row.EnumerateArray().Select(value => value.GetInt32()).ToArray()).ToArray();
+                if (mappings.Count != 5914 || classes.Count > 2000 || compositions.Count > 2000 || flags.Length > 5000) throw new TerminalTextEditorException(TerminalTextEditorFailure.InvalidOptions);
+            }
+            internal int Flags(int scalar)
+            {
+                var lo = 0; var hi = flags.Length - 1;
+                while (lo <= hi) { var at = (lo + hi) / 2; if (scalar < flags[at][0]) hi = at - 1; else if (scalar > flags[at][1]) lo = at + 1; else return flags[at][2]; }
+                return 0;
+            }
+            private int Class(int scalar) => classes.GetValueOrDefault(scalar);
+            private IEnumerable<int> Decompose(int scalar)
+            {
+                if (scalar is >= 0xac00 and <= 0xd7a3)
+                { var index = scalar - 0xac00; yield return 0x1100 + index / 588; yield return 0x1161 + index % 588 / 28; if (index % 28 != 0) yield return 0x11a7 + index % 28; }
+                else if (mappings.TryGetValue(scalar, out var value)) { foreach (var rune in value.EnumerateRunes()) yield return rune.Value; }
+                else yield return scalar;
+            }
+            internal bool BoundaryBefore(int scalar)
+            { var first = Decompose(scalar).First(); return Class(first) == 0 && !backwardStarters.Contains(first) && first is not (>= 0x1161 and <= 0x1175 or >= 0x11a8 and <= 0x11c2); }
+            private int Compose(int first, int second)
+            {
+                if (first is >= 0x1100 and <= 0x1112 && second is >= 0x1161 and <= 0x1175) return 0xac00 + ((first - 0x1100) * 21 + second - 0x1161) * 28;
+                if (first is >= 0xac00 and <= 0xd7a3 && (first - 0xac00) % 28 == 0 && second is >= 0x11a8 and <= 0x11c2) return first + second - 0x11a7;
+                return compositions.GetValueOrDefault(((long)first << 21) | (uint)second, -1);
+            }
+            internal string Normalize(string text)
+            {
+                const int limit = 65_536 * 18; var decomposed = new List<int>();
+                foreach (var rune in text.EnumerateRunes()) foreach (var value in Decompose(rune.Value)) { if (decomposed.Count == limit) throw new TerminalTextEditorException(TerminalTextEditorFailure.ResourceLimit); decomposed.Add(value); }
+                // Stable canonical ordering in linear time, avoiding insertion-sort blowup
+                // on maximum-length adversarial runs of combining marks.
+                var scratch = new int[decomposed.Count]; var counts = new int[256];
+                for (var begin = 0; begin < decomposed.Count;)
+                {
+                    if (Class(decomposed[begin]) == 0) { begin++; continue; }
+                    var end = begin + 1; while (end < decomposed.Count && Class(decomposed[end]) != 0) end++;
+                    if (end - begin > 1)
+                    {
+                        Array.Clear(counts); for (var i = begin; i < end; i++) counts[Class(decomposed[i])]++;
+                        var total = begin; for (var c = 1; c < counts.Length; c++) { var size = counts[c]; counts[c] = total; total += size; }
+                        for (var i = begin; i < end; i++) scratch[counts[Class(decomposed[i])]++] = decomposed[i];
+                        for (var i = begin; i < end; i++) decomposed[i] = scratch[i];
+                    }
+                    begin = end;
+                }
+                var output = new List<int>(decomposed.Count); var starter = -1; var previousClass = 0;
+                foreach (var scalar in decomposed)
+                {
+                    var currentClass = Class(scalar); var composed = starter >= 0 && (previousClass == 0 || previousClass < currentClass) ? Compose(output[starter], scalar) : -1;
+                    if (composed >= 0) output[starter] = composed;
+                    else { if (currentClass == 0) starter = output.Count; output.Add(scalar); previousClass = currentClass; }
+                }
+                var result = new StringBuilder(output.Count); foreach (var scalar in output) result.Append(new Rune(scalar).ToString()); return result.ToString();
+            }
+        }
+        internal static List<int> Apply(string text, List<int> boundaries)
+        {
+            var result = new SortedSet<int>(boundaries);
+            for (var at = 0; at < text.Length;)
+            {
+                var scalar = Rune.GetRuneAt(text, at); var flags = Flags(scalar.Value);
+                var cjk = (flags & 3) == 3; var thai = (flags & 16) != 0;
+                if (!cjk && !thai || thai && WordData.Property(scalar.Value) is WordData.Kind.Extend or WordData.Kind.Format or WordData.Kind.ZWJ) { at += scalar.Utf16SequenceLength; continue; }
+                var start = at; at += scalar.Utf16SequenceLength;
+                while (at < text.Length && (Flags(Rune.GetRuneAt(text, at).Value) & (cjk ? 1 : 16)) != 0) at += Rune.GetRuneAt(text, at).Utf16SequenceLength;
+                var end = at;
+                if (end - start > 1) result.GetViewBetween(start + 1, end - 1).Clear();
+                foreach (var point in cjk ? CjkBreaks(text, start, end) : ThaiBreaks(text, start, end)) if (point > start && point < end) result.Add(point);
+            }
+            return result.ToList();
+        }
+        private static List<int> CjkBreaks(string text, int start, int end)
+        {
+            var normalized = new StringBuilder(); var offsets = new List<int>(); var norm = Normalization.Value;
+            for (var at = start; at < end;)
+            {
+                var chunkStart = at; at += Rune.GetRuneAt(text, at).Utf16SequenceLength;
+                while (at < end && !norm.BoundaryBefore(Rune.GetRuneAt(text, at).Value)) at += Rune.GetRuneAt(text, at).Utf16SequenceLength;
+                var chunk = norm.Normalize(text[chunkStart..at]); normalized.Append(chunk);
+                foreach (var rune in chunk.EnumerateRunes()) offsets.Add(chunkStart);
+            }
+            offsets.Add(end); var value = normalized.ToString(); var runes = value.EnumerateRunes().ToArray(); var count = runes.Length;
+            var cost = new uint[count + 1]; Array.Fill(cost, uint.MaxValue); cost[0] = 0;
+            var previous = new int[count + 1]; Array.Fill(previous, -1); var unit = 0; var previousKatakana = false;
+            for (var i = 0; i < count; i++)
+            {
+                if (cost[i] == uint.MaxValue) { unit += runes[i].Utf16SequenceLength; continue; }
+                var matches = Cjk.Value.Matches(value, unit, value.Length, 20, out _);
+                if (matches.Count == 0 || matches[0].CodePoints != 1) matches.Add(new(runes[i].Utf16SequenceLength, 1, 255));
+                foreach (var match in matches)
+                { var target = i + match.CodePoints; var nextCost = cost[i] + (uint)match.Value; if (nextCost < cost[target]) { cost[target] = nextCost; previous[target] = i; } }
+                var katakana = IsKatakana(runes[i].Value);
+                if (katakana && !previousKatakana)
+                {
+                    var j = i + 1; while (j < count && j - i < 20 && IsKatakana(runes[j].Value)) j++;
+                    var length = j - i;
+                    if (length < 20) { var extra = length <= 8 ? new uint[] { 8192, 984, 408, 240, 204, 252, 300, 372, 480 }[length] : 8192; var nextCost = cost[i] + extra; if (nextCost < cost[j]) { cost[j] = nextCost; previous[j] = i; } }
+                }
+                previousKatakana = katakana; unit += runes[i].Utf16SequenceLength;
+            }
+            var result = new List<int>();
+            for (var at = count; at > 0; at = previous[at]) { var position = offsets[at]; if (position > start && position < end) result.Add(position); if (previous[at] < 0) break; }
+            result.Sort(); return result.Distinct().ToList();
+        }
+        private static bool IsKatakana(int scalar) => scalar is >= 0x30a1 and <= 0x30fe && scalar != 0x30fb || scalar is >= 0xff66 and <= 0xff9f;
+        private sealed class PossibleWord
+        {
+            private int offset = -1, current, mark; internal int Prefix; private List<Candidate> values = [];
+            internal int Candidates(string text, ref int at, int end)
+            {
+                if (offset != at) { offset = at; values = Thai.Value.Matches(text, at, end, end - at, out Prefix); }
+                current = mark = values.Count - 1; if (current >= 0) at = offset + values[current].Length; return values.Count;
+            }
+            internal void Mark() => mark = current;
+            internal bool Back(ref int at) { if (current <= 0) return false; at = offset + values[--current].Length; return true; }
+            internal Candidate Accept(ref int at) { var value = values[mark]; at = offset + value.Length; return value; }
+        }
+        private static List<int> ThaiBreaks(string text, int start, int end)
+        {
+            var result = new List<int>(); if (end - start <= 4) return result;
+            var words = new PossibleWord[] { new(), new(), new() }; var found = 0; var at = start;
+            bool EndWord(int scalar) => (Flags(scalar) & 16) != 0 && scalar != 0x0e31 && scalar is not (>= 0x0e40 and <= 0x0e44);
+            static bool BeginWord(int scalar) => scalar is >= 0x0e01 and <= 0x0e2e or >= 0x0e40 and <= 0x0e44;
+            static bool Suffix(int scalar) => scalar is 0x0e2f or 0x0e46;
+            while (at < end)
+            {
+                var current = at; var length = 0; var cpLength = 0; var first = words[found % 3]; var candidates = first.Candidates(text, ref at, end);
+                if (candidates == 1) { var word = first.Accept(ref at); length = word.Length; cpLength = word.CodePoints; found++; }
+                else if (candidates > 1)
+                {
+                    if (at < end)
+                    {
+                        var stop = false;
+                        do
+                        {
+                            var second = words[(found + 1) % 3];
+                            if (second.Candidates(text, ref at, end) > 0)
+                            {
+                                first.Mark(); if (at >= end) { stop = true; break; }
+                                do { if (words[(found + 2) % 3].Candidates(text, ref at, end) > 0) { first.Mark(); stop = true; break; } } while (second.Back(ref at));
+                            }
+                            if (stop) break;
+                        } while (first.Back(ref at));
+                    }
+                    var word = first.Accept(ref at); length = word.Length; cpLength = word.CodePoints; found++;
+                }
+                if (at < end && cpLength < 3)
+                {
+                    var next = words[found % 3];
+                    if (next.Candidates(text, ref at, end) <= 0 && (length == 0 || next.Prefix < 3))
+                    {
+                        var chars = 0;
+                        while (true)
+                        {
+                            var previousScalar = Rune.GetRuneAt(text, at); at += previousScalar.Utf16SequenceLength; chars += previousScalar.Utf16SequenceLength;
+                            if (at >= end) break;
+                            if (EndWord(previousScalar.Value) && BeginWord(Rune.GetRuneAt(text, at).Value))
+                            { var resume = at; var foundNext = words[(found + 1) % 3].Candidates(text, ref at, end); at = resume; if (foundNext > 0) break; }
+                        }
+                        if (length == 0) found++; length += chars;
+                    }
+                    else at = current + length;
+                }
+                while (at < end && ((Flags(Rune.GetRuneAt(text, at).Value) & 48) == 48 || text[at] == ' ')) { var size = Rune.GetRuneAt(text, at).Utf16SequenceLength; at += size; length += size; }
+                if (at < end && length > 0)
+                {
+                    if (words[found % 3].Candidates(text, ref at, end) <= 0 && Suffix(Rune.GetRuneAt(text, at).Value))
+                    {
+                        if (text[at] == '\u0e2f' && !Suffix(text[at - 1])) { at++; length++; }
+                        if (at < end && text[at] == '\u0e46' && text[at - 1] != '\u0e46') { at++; length++; }
+                    }
+                    else at = current + length;
+                }
+                if (length > 0) result.Add(current + length);
+                else throw new TerminalTextEditorException(TerminalTextEditorFailure.InvalidOptions);
+            }
+            if (result.Count != 0 && result[^1] >= end) result.RemoveAt(result.Count - 1); return result;
+        }
+    }

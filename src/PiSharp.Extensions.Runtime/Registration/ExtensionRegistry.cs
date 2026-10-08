@@ -2,17 +2,19 @@ using System.Collections.Immutable;
 using System.Text;
 using PiSharp.Contracts;
 using PiSharp.Extensions.Events;
+using PiSharp.Extensions.Facade.Context;
 
 namespace PiSharp.Extensions.Runtime;
 
 /// <summary>Experimental transactional descriptor registry. It does not load assemblies or grant trust.</summary>
-public sealed class ExtensionRegistry : IAsyncDisposable
+public sealed partial class ExtensionRegistry : IAsyncDisposable
 {
     private readonly object gate = new();
     private readonly object identity = new();
     private readonly ExtensionRegistryOptions options;
     private readonly IExtensionUiProvider? uiProvider;
     private readonly IExtensionSessionViewProvider? sessionProvider;
+    internal IExtensionContextReadHost? FacadeHost { get; }
     private readonly Dictionary<string, RegistrationScope> owners = new(StringComparer.Ordinal);
     private readonly List<RegistrationScope> ownerOrder = [];
     private ExtensionRegistrySnapshot snapshot;
@@ -32,10 +34,15 @@ public sealed class ExtensionRegistry : IAsyncDisposable
 
     public ExtensionRegistry(ExtensionRegistryOptions? options, IExtensionUiProvider? uiProvider,
         IExtensionSessionViewProvider? sessionProvider)
+        : this(options, uiProvider, sessionProvider, null) { }
+
+    public ExtensionRegistry(ExtensionRegistryOptions? options, IExtensionUiProvider? uiProvider,
+        IExtensionSessionViewProvider? sessionProvider, IExtensionContextReadHost? facadeHost)
     {
         this.options = options ?? new();
         this.uiProvider = uiProvider;
         this.sessionProvider = sessionProvider;
+        FacadeHost = facadeHost;
         var supported = ExperimentalExtensionContract.Features;
         AvailableFeatures = sessionProvider is null ? supported.Remove(ExtensionSessionSnapshotLimits.Feature) :
             supported.Contains(ExtensionSessionSnapshotLimits.Feature) ? supported :
@@ -314,6 +321,7 @@ public sealed class ExtensionRegistry : IAsyncDisposable
             // Entry identity prevents an old handle removing a new registration that reuses its ID.
             if (!scope.Staged.Remove(entry)) return;
             entry.Registered = false;
+            RetireEventBusSubscription(entry);
             ReleaseChargeIfRetired(scope, entry);
             if (scope.State == RegistrationScopeState.Active) Publish();
         }
@@ -920,6 +928,7 @@ public sealed class ExtensionRegistry : IAsyncDisposable
         {
             scope.Staged.Remove(entry);
             entry.Registered = false;
+            RetireEventBusSubscription(entry);
             ReleaseChargeIfRetired(scope, entry);
         }
         return (scope.Disposal, true);

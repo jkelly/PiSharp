@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "prestart-error",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "authored-synthetic-contract",
+  "scenario": "Error may precede start and settles once",
+  "requirementIds": [
+    "stream.terminal-settlement"
+  ],
+  "clock": {
+    "unixMilliseconds": 1700000000000
+  },
+  "seed": "none",
+  "normalizerVersion": "object-key-order-v1",
+  "provenance": {
+    "kind": "authored-synthetic-contract",
+    "origin": "Newly authored PiSharp fixture; frame shape sourced from pinned public types; expected reduction not captured from upstream",
+    "upstreamOutput": false
+  },
+  "frames": [],
+  "terminal": {
+    "type": "error",
+    "reason": "error",
+    "error": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-responses",
+      "provider": "authored-synthetic",
+      "model": "fixture-model",
+      "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 0,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "error",
+      "timestamp": 1700000000000,
+      "errorMessage": "Synthetic missing authentication before start"
+    }
+  },
+  "expected": {
+    "events": [
+      {
+        "type": "error",
+        "reason": "error",
+        "error": {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "authored-synthetic",
+          "model": "fixture-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "error",
+          "timestamp": 1700000000000,
+          "errorMessage": "Synthetic missing authentication before start"
+        }
+      }
+    ],
+    "result": {
+      "role": "assistant",
+      "content": [],
+      "api": "openai-responses",
+      "provider": "authored-synthetic",
+      "model": "fixture-model",
+      "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 0,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "error",
+      "timestamp": 1700000000000,
+      "errorMessage": "Synthetic missing authentication before start"
+    }
+  }
+}

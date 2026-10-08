@@ -1,0 +1,15 @@
+{
+  "status": "STATIC ACTUAL SOURCE PIN RECONCILIATION ONLY",
+  "reviewedCompileFix": "c3f08c3c03dffc48af8e40b078f1e6a8f0239b8e",
+  "preservedHistoricalCheckout": "PiSharp-reviewed-main-core-validation",
+  "historicalBoundarySha256": "be228b02e5d6b978f00ce5c373f26219d3a0aa09622d78d0530bb1cf515a103a",
+  "relative": "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+  "previousSha256": "0f8d83589b217ad4342b3ee2aa789d08b2d387a3002138e62314712476f01a98",
+  "actualSha256": "68e890025b31b59733ec4f910b102bb8eb8572be67c5a877c697dca467bb9338",
+  "actualBytes": 38880,
+  "sourceMembers": 14,
+  "scenarioAssertionsChanged": false,
+  "productionEdits": 0,
+  "testsExecuted": 0,
+  "targetIdsOrDeadlinesChanged": false
+}

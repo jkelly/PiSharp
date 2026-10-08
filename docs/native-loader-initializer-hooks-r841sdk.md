@@ -1,0 +1,7 @@
+# Explicit single native initializer and retirement hooks
+
+PluginAssemblyLoader.LoadAsync adds optional single-cast activation and retirement delegates after the existing cancellation parameter. Existing callers keep registry.ActivateAsync and exact scope.DisposeAsync. No manifest, trust, system import, snapshot, entry type or execution admission policy changes.
+
+The activation receives the one actual instantiated IPiSharpExtension and returns its original Task<RegistrationScope>. The loader captures and directly joins it once, retaining raw fault aggregate plus direct exception; publication requires the same registry, owner ID and active scope. The retirement delegate is paired with that initializer and is invoked once for scope ownership before instance cleanup/unload. Actual cleanup originals retain aggregate/direct fault graphs. OwnedPluginInstance keeps the existing exactly-once actual extension disposal cache. A failed retirement keeps the existing retained loader ownership rather than releasing failed snapshot/context roots.
+
+C's NativeExtensionRegistrationBridge supplies ActivateOwnerAsync and RetireOwnerAsync. MCP prepares one DecoratedExtension before C activation, commits only against C's exact Scope/ActivationOriginal afterward, and aborts native initialization failure. These hooks permit that chain; NativeExtensionActivation still requires the separately authored concrete caller installation. No claim of composed initialization or new runtime acceptance is made by this API source freeze.

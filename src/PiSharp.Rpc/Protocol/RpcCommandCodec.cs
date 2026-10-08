@@ -13,7 +13,7 @@ namespace PiSharp.Rpc.Protocol;
 internal sealed record RpcCommandEnvelope(string? Id, string Type, string? Message = null, JsonData? Images = null,
     string? StreamingBehavior = null, string? Mode = null, string? Since = null, SessionCatalogQuery? CatalogQuery = null,
     string? TargetId = null, JsonData? Replacement = null, long? ExpectedGeneration = null,
-    SessionCompactionRequest? Compaction = null, SessionBranchSummaryRequest? BranchSummary = null);
+    SessionCompactionRequest? Compaction = null, SessionBranchSummaryRequest? BranchSummary = null, string? Provider = null, string? ModelId = null, string? ThinkingLevel = null);
 internal sealed class RpcCommandException(string? id, string command, string message) : Exception(message)
 { public string? Id { get; } = id; public string Command { get; } = command; }
 
@@ -76,6 +76,15 @@ internal static class RpcCommandCodec
                 !generation.TryGetInt64(out var expected) || expected is < 1 or > 9_007_199_254_740_991)
                 throw new RpcCommandException(id, name, "Queue restoration requires a captured positive integer generation.");
             return new(id, name, Message: Required("currentText", 65_536), ExpectedGeneration: expected);
+        }
+        if (name == "export_html") return new(id, name, Message: Optional("outputPath", Math.Min(options.MaximumPromptCharacters, 4096)));
+        if (name == "compact") return new(id, name,
+            Compaction: new(SummaryOptions: new(CustomInstructions: Optional("customInstructions", Math.Min(options.MaximumPromptCharacters, 65_536)))));
+        if (name is "set_auto_compaction" or "set_auto_retry")
+        {
+            if (!body.TryGetProperty("enabled", out var enabled) || enabled.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                throw new RpcCommandException(id, name, "Command requires a boolean enabled.");
+            return new(id, name, Mode: enabled.GetBoolean() ? "enabled" : "disabled");
         }
         if (name is "pisharp_compact" or "pisharp_branch_summary" or "pisharp_set_auto_compaction")
         {
@@ -176,6 +185,22 @@ internal static class RpcCommandCodec
             if (body.TryGetProperty("root", out selectedRoot) && selectedRoot.ValueKind is not (JsonValueKind.True or JsonValueKind.False) || root && leaf is not null)
                 throw new RpcCommandException(id, name, "Invalid session branch selection.");
             return new(id, name, Message: path, Mode: root || leaf is not null ? "selected" : "latest", Since: leaf);
+        }
+        if (name == "set_session_name") return new(id, name, Message: Required("name", Math.Min(options.MaximumPromptCharacters, 65_536)));
+        if (name == "set_model")
+        {
+            var provider = Required("provider", options.MaximumCommandBytes);
+            var modelId = Required("modelId", options.MaximumCommandBytes);
+            if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(modelId) || provider.Any(char.IsControl) || modelId.Any(char.IsControl))
+                throw new RpcCommandException(id, name, "Model selection requires bounded nonempty provider and modelId strings.");
+            return new(id, name, Provider: provider, ModelId: modelId);
+        }
+        if (name == "set_thinking_level")
+        {
+            var level = Required("level", 16);
+            if (level is not ("off" or "minimal" or "low" or "medium" or "high" or "xhigh" or "max"))
+                throw new RpcCommandException(id, name, "Thinking level is invalid.");
+            return new(id, name, ThinkingLevel: level);
         }
         if (name == "new_session") return new(id, name, Message: Optional("parentSession", 4096));
         if (name == "fork")

@@ -1,0 +1,1677 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "Supplemental genuine supplementary Unicode evidence; original malformed emoji-name fixtures remain frozen and are never replaced",
+  "cases": [
+    {
+      "id": "genuine-supplementary-smile-cjk-sticky-resize",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "AB界D\n1🙂2\nabcdef"
+        },
+        {
+          "kind": "render",
+          "columns": 12,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 5,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "genuine-woman-technologist-combining-sticky-resize",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "AéZ\n👩‍💻x\nQQQQ"
+        },
+        {
+          "kind": "render",
+          "columns": 10,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 4,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "genuine-family-flag-modifier-soft-wrap",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z"
+        },
+        {
+          "kind": "render",
+          "columns": 6,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 9,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "render",
+          "columns": 32,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "genuine-supplementary-source-half-open-end-affinity",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "a🙂bc\n👩‍💻\n"
+        },
+        {
+          "kind": "render",
+          "columns": 5,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 3,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 12,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "genuine-supplementary-history-first-last-wrap-and-draft",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "prior 👩‍💻"
+        },
+        {
+          "kind": "history",
+          "data": "one 🙂 two 🇺🇸 end"
+        },
+        {
+          "kind": "set",
+          "data": "👍🏽 draft"
+        },
+        {
+          "kind": "render",
+          "columns": 6,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 18,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        }
+      ]
+    },
+    {
+      "id": "genuine-supplementary-page-and-terminal-height",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻"
+        },
+        {
+          "kind": "render",
+          "columns": 8,
+          "terminalRows": 20
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[5~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[6~"
+        },
+        {
+          "kind": "render",
+          "columns": 14,
+          "terminalRows": 40
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[5~"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[6~"
+        },
+        {
+          "kind": "render",
+          "columns": 8,
+          "terminalRows": 5
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "genuine-supplementary-paste-marker-following-emoji",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "🙂"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[200~👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\u001b[201~"
+        },
+        {
+          "kind": "render",
+          "columns": 9,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 5,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 24,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        }
+      ]
+    },
+    {
+      "id": "genuine-supplementary-history-raw-undo",
+      "steps": [
+        {
+          "kind": "history",
+          "data": "🙂 👩‍💻 🇺🇸"
+        },
+        {
+          "kind": "set",
+          "data": "seed 👍🏽"
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "X"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "input",
+          "data": "\u001f"
+        },
+        {
+          "kind": "render",
+          "columns": 8,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 32,
+          "terminalRows": 24
+        }
+      ]
+    }
+  ],
+  "unicodeInputWitnesses": [
+    {
+      "id": "genuine-supplementary-smile-cjk-sticky-resize",
+      "inputStrings": [
+        {
+          "kind": "set",
+          "text": "AB界D\n1🙂2\nabcdef",
+          "utf16Length": 16,
+          "codePoints": [
+            65,
+            66,
+            30028,
+            68,
+            10,
+            49,
+            128578,
+            50,
+            10,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102
+          ],
+          "supplementaryCodePoints": [
+            128578
+          ]
+        },
+        {
+          "kind": "input",
+          "text": "\u0001",
+          "utf16Length": 1,
+          "codePoints": [
+            1
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u0006",
+          "utf16Length": 1,
+          "codePoints": [
+            6
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u0006",
+          "utf16Length": 1,
+          "codePoints": [
+            6
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u0006",
+          "utf16Length": 1,
+          "codePoints": [
+            6
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        }
+      ]
+    },
+    {
+      "id": "genuine-woman-technologist-combining-sticky-resize",
+      "inputStrings": [
+        {
+          "kind": "set",
+          "text": "AéZ\n👩‍💻x\nQQQQ",
+          "utf16Length": 16,
+          "codePoints": [
+            65,
+            101,
+            769,
+            90,
+            10,
+            128105,
+            8205,
+            128187,
+            120,
+            10,
+            81,
+            81,
+            81,
+            81
+          ],
+          "supplementaryCodePoints": [
+            128105,
+            128187
+          ]
+        },
+        {
+          "kind": "input",
+          "text": "\u0001",
+          "utf16Length": 1,
+          "codePoints": [
+            1
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u0006",
+          "utf16Length": 1,
+          "codePoints": [
+            6
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u0006",
+          "utf16Length": 1,
+          "codePoints": [
+            6
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        }
+      ]
+    },
+    {
+      "id": "genuine-family-flag-modifier-soft-wrap",
+      "inputStrings": [
+        {
+          "kind": "set",
+          "text": "a 👩‍👩‍👧‍👦 🇺🇸 👍🏽 z",
+          "utf16Length": 25,
+          "codePoints": [
+            97,
+            32,
+            128105,
+            8205,
+            128105,
+            8205,
+            128103,
+            8205,
+            128102,
+            32,
+            127482,
+            127480,
+            32,
+            128077,
+            127997,
+            32,
+            122
+          ],
+          "supplementaryCodePoints": [
+            128105,
+            128105,
+            128103,
+            128102,
+            127482,
+            127480,
+            128077,
+            127997
+          ]
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        }
+      ]
+    },
+    {
+      "id": "genuine-supplementary-source-half-open-end-affinity",
+      "inputStrings": [
+        {
+          "kind": "set",
+          "text": "a🙂bc\n👩‍💻\n",
+          "utf16Length": 12,
+          "codePoints": [
+            97,
+            128578,
+            98,
+            99,
+            10,
+            128105,
+            8205,
+            128187,
+            10
+          ],
+          "supplementaryCodePoints": [
+            128578,
+            128105,
+            128187
+          ]
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        }
+      ]
+    },
+    {
+      "id": "genuine-supplementary-history-first-last-wrap-and-draft",
+      "inputStrings": [
+        {
+          "kind": "history",
+          "text": "prior 👩‍💻",
+          "utf16Length": 11,
+          "codePoints": [
+            112,
+            114,
+            105,
+            111,
+            114,
+            32,
+            128105,
+            8205,
+            128187
+          ],
+          "supplementaryCodePoints": [
+            128105,
+            128187
+          ]
+        },
+        {
+          "kind": "history",
+          "text": "one 🙂 two 🇺🇸 end",
+          "utf16Length": 19,
+          "codePoints": [
+            111,
+            110,
+            101,
+            32,
+            128578,
+            32,
+            116,
+            119,
+            111,
+            32,
+            127482,
+            127480,
+            32,
+            101,
+            110,
+            100
+          ],
+          "supplementaryCodePoints": [
+            128578,
+            127482,
+            127480
+          ]
+        },
+        {
+          "kind": "set",
+          "text": "👍🏽 draft",
+          "utf16Length": 10,
+          "codePoints": [
+            128077,
+            127997,
+            32,
+            100,
+            114,
+            97,
+            102,
+            116
+          ],
+          "supplementaryCodePoints": [
+            128077,
+            127997
+          ]
+        },
+        {
+          "kind": "input",
+          "text": "\u0001",
+          "utf16Length": 1,
+          "codePoints": [
+            1
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        }
+      ]
+    },
+    {
+      "id": "genuine-supplementary-page-and-terminal-height",
+      "inputStrings": [
+        {
+          "kind": "set",
+          "text": "0 🙂 👩‍💻\n1 🙂 👩‍💻\n2 🙂 👩‍💻\n3 🙂 👩‍💻\n4 🙂 👩‍💻\n5 🙂 👩‍💻\n6 🙂 👩‍💻\n7 🙂 👩‍💻\n8 🙂 👩‍💻\n9 🙂 👩‍💻\n10 🙂 👩‍💻\n11 🙂 👩‍💻\n12 🙂 👩‍💻\n13 🙂 👩‍💻\n14 🙂 👩‍💻",
+          "utf16Length": 169,
+          "codePoints": [
+            48,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            49,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            50,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            51,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            52,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            53,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            54,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            55,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            56,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            57,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            49,
+            48,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            49,
+            49,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            49,
+            50,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            49,
+            51,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            10,
+            49,
+            52,
+            32,
+            128578,
+            32,
+            128105,
+            8205,
+            128187
+          ],
+          "supplementaryCodePoints": [
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187,
+            128578,
+            128105,
+            128187
+          ]
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[5~",
+          "utf16Length": 4,
+          "codePoints": [
+            27,
+            91,
+            53,
+            126
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[6~",
+          "utf16Length": 4,
+          "codePoints": [
+            27,
+            91,
+            54,
+            126
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[5~",
+          "utf16Length": 4,
+          "codePoints": [
+            27,
+            91,
+            53,
+            126
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[6~",
+          "utf16Length": 4,
+          "codePoints": [
+            27,
+            91,
+            54,
+            126
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        }
+      ]
+    },
+    {
+      "id": "genuine-supplementary-paste-marker-following-emoji",
+      "inputStrings": [
+        {
+          "kind": "set",
+          "text": "🙂",
+          "utf16Length": 2,
+          "codePoints": [
+            128578
+          ],
+          "supplementaryCodePoints": [
+            128578
+          ]
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[200~👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\n👩‍💻\u001b[201~",
+          "utf16Length": 83,
+          "codePoints": [
+            27,
+            91,
+            50,
+            48,
+            48,
+            126,
+            128105,
+            8205,
+            128187,
+            10,
+            128105,
+            8205,
+            128187,
+            10,
+            128105,
+            8205,
+            128187,
+            10,
+            128105,
+            8205,
+            128187,
+            10,
+            128105,
+            8205,
+            128187,
+            10,
+            128105,
+            8205,
+            128187,
+            10,
+            128105,
+            8205,
+            128187,
+            10,
+            128105,
+            8205,
+            128187,
+            10,
+            128105,
+            8205,
+            128187,
+            10,
+            128105,
+            8205,
+            128187,
+            10,
+            128105,
+            8205,
+            128187,
+            10,
+            128105,
+            8205,
+            128187,
+            27,
+            91,
+            50,
+            48,
+            49,
+            126
+          ],
+          "supplementaryCodePoints": [
+            128105,
+            128187,
+            128105,
+            128187,
+            128105,
+            128187,
+            128105,
+            128187,
+            128105,
+            128187,
+            128105,
+            128187,
+            128105,
+            128187,
+            128105,
+            128187,
+            128105,
+            128187,
+            128105,
+            128187,
+            128105,
+            128187,
+            128105,
+            128187
+          ]
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        }
+      ]
+    },
+    {
+      "id": "genuine-supplementary-history-raw-undo",
+      "inputStrings": [
+        {
+          "kind": "history",
+          "text": "🙂 👩‍💻 🇺🇸",
+          "utf16Length": 13,
+          "codePoints": [
+            128578,
+            32,
+            128105,
+            8205,
+            128187,
+            32,
+            127482,
+            127480
+          ],
+          "supplementaryCodePoints": [
+            128578,
+            128105,
+            128187,
+            127482,
+            127480
+          ]
+        },
+        {
+          "kind": "set",
+          "text": "seed 👍🏽",
+          "utf16Length": 9,
+          "codePoints": [
+            115,
+            101,
+            101,
+            100,
+            32,
+            128077,
+            127997
+          ],
+          "supplementaryCodePoints": [
+            128077,
+            127997
+          ]
+        },
+        {
+          "kind": "input",
+          "text": "\u0001",
+          "utf16Length": 1,
+          "codePoints": [
+            1
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "X",
+          "utf16Length": 1,
+          "codePoints": [
+            88
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001f",
+          "utf16Length": 1,
+          "codePoints": [
+            31
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[A",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            65
+          ],
+          "supplementaryCodePoints": []
+        },
+        {
+          "kind": "input",
+          "text": "\u001b[B",
+          "utf16Length": 3,
+          "codePoints": [
+            27,
+            91,
+            66
+          ],
+          "supplementaryCodePoints": []
+        }
+      ]
+    }
+  ]
+}

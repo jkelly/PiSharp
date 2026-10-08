@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "environmentPins": {
+    "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "sourceTree": "200bd10bb146773516f862a02b8aaebeed163e00",
+    "executedSource": {
+      "path": "packages/coding-agent/src/modes/rpc/jsonl.ts",
+      "bytes": 1503,
+      "sha256": "95723d349fcebad1f1da7ce103d02ba7d5e2c876b7d178d41d8b56beedbd93e0",
+      "canonicalGitBlobSha256": "95723d349fcebad1f1da7ce103d02ba7d5e2c876b7d178d41d8b56beedbd93e0"
+    },
+    "runtime": {
+      "version": "v24.19.0",
+      "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+      "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+      "flags": [
+        "--experimental-strip-types",
+        "--disable-warning=ExperimentalWarning"
+      ]
+    },
+    "platform": "win32",
+    "architecture": "x64",
+    "externalDependencies": []
+  },
+  "harnessFiles": [
+    {
+      "path": "tools/PiReferenceRunner/capture-rpc-jsonl.mjs",
+      "bytes": 22495,
+      "sha256": "8e0cf55e2aae89bb711330ba02eedd033b37a8d9d2d6c02a8e518ae4b160065e"
+    },
+    {
+      "path": "tools/PiReferenceRunner/offline-guard.mjs",
+      "bytes": 784,
+      "sha256": "ae3741bdce496451bd04afcf8628df6ddc5bc5cfad8af6ee5e52cbc7b065a094"
+    },
+    {
+      "path": "tools/CompatibilityReport/raw-json.mjs",
+      "bytes": 3665,
+      "sha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9"
+    }
+  ],
+  "loadedModules": [
+    {
+      "path": "packages/coding-agent/src/modes/rpc/jsonl.ts",
+      "bytes": 1503,
+      "sha256": "95723d349fcebad1f1da7ce103d02ba7d5e2c876b7d178d41d8b56beedbd93e0"
+    }
+  ],
+  "sourceRuntimeBuiltins": [
+    "node:string_decoder"
+  ],
+  "sourceChecks": {
+    "before": {
+      "revision": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "tree": "200bd10bb146773516f862a02b8aaebeed163e00",
+      "status": "",
+      "sourceSha256": "95723d349fcebad1f1da7ce103d02ba7d5e2c876b7d178d41d8b56beedbd93e0",
+      "canonicalGitBlobSha256": "95723d349fcebad1f1da7ce103d02ba7d5e2c876b7d178d41d8b56beedbd93e0"
+    },
+    "after": {
+      "revision": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "tree": "200bd10bb146773516f862a02b8aaebeed163e00",
+      "status": "",
+      "sourceSha256": "95723d349fcebad1f1da7ce103d02ba7d5e2c876b7d178d41d8b56beedbd93e0",
+      "canonicalGitBlobSha256": "95723d349fcebad1f1da7ce103d02ba7d5e2c876b7d178d41d8b56beedbd93e0"
+    }
+  },
+  "rawCaptures": [
+    {
+      "path": "fixtures/pi-v0.99.1/rpc-jsonl/capture-1.raw.json",
+      "bytes": 72704,
+      "sha256": "bd112a6089b798ba1cfd181d4660ea493e209f320a53f0313cb50add54609a1c"
+    },
+    {
+      "path": "fixtures/pi-v0.99.1/rpc-jsonl/capture-2.raw.json",
+      "bytes": 72704,
+      "sha256": "bd112a6089b798ba1cfd181d4660ea493e209f320a53f0313cb50add54609a1c"
+    }
+  ],
+  "captureHistory": [
+    {
+      "kind": "initial genuine capture",
+      "goldenSha256": "3d283bdcb705937e25685a04355d300fa61683b5312670396233066d2789f6e0",
+      "sourceAndDependencyBytesChanged": false
+    }
+  ]
+}

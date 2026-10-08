@@ -1,0 +1,534 @@
+{
+  "schemaVersion": 1,
+  "profile": "real-command-input-0",
+  "status": "Todo lifecycle source aligned to declared a519ae9 R1016 native snapshot ABI; independent source review and isolated qualification pending",
+  "author": {
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "xhigh"
+  },
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "runtime": {
+    "version": "v24.19.0",
+    "platform": "win32",
+    "architecture": "x64",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "helpers": [
+    {
+      "bytes": 23799,
+      "path": "tools/NodeCommandInputBridge/worker.mjs",
+      "sha256": "61ed16f4f4b7001ff3c0e2153e9df9e9e1d46855b4eb0ea9da0f397e085bb03c"
+    },
+    {
+      "bytes": 52757,
+      "path": "tools/NodeCommandInputBridge/module-loader.mjs",
+      "sha256": "fe183cb6441052b4f2f8a19a2079b53005e309d40ab1cb75150ebb4aa2ef1a41"
+    },
+    {
+      "bytes": 10011,
+      "path": "tools/NodeBridge/wire.mjs",
+      "sha256": "83dd5314526f8ece061ea85da50326ed45867fe7edb76d37ac67f208775d3deb"
+    },
+    {
+      "bytes": 6651,
+      "path": "tools/NodeCommandInputBridge/admission.mjs",
+      "sha256": "800b04603f93f2e633a8a57a9e3e3d2ed567cf2408d764e94b4934da30ff911a"
+    },
+    {
+      "bytes": 666,
+      "path": "tools/NodeCommandInputBridge/tool-context.mjs",
+      "sha256": "4e0131c01d02883b170135e1b2882b962f9e0e1f302f13a2561948e8c9371689"
+    },
+    {
+      "bytes": 4005,
+      "path": "tools/NodeCommandInputBridge/tool-progress.mjs",
+      "sha256": "237eedf025e3d8cf944c306a05dcb3ba33a79c8bfd5fa68abf1be9ea4f6c4455"
+    },
+    {
+      "bytes": 5212,
+      "path": "tools/NodeCommandInputBridge/tool-loadout.mjs",
+      "sha256": "896ff1779c110bf5086449732695e184a8da90b65d2ead2a8b521c87240242f6"
+    },
+    {
+      "path": "tools/NodeCompatibility/OriginalPluginMapping/original-plugin-mapping.mjs",
+      "bytes": 4826,
+      "sha256": "6c825ff6240c2ef91331f1304e380918936614a265c383974c97e8e53fe476ab"
+    },
+    {
+      "path": "tools/NodeCompatibility/OriginalPluginMapping/original-virtual-module-injection.mjs",
+      "bytes": 1961,
+      "sha256": "9b9fa533f463339085fab300e0b3aa1bd909527d0b1c5ec0f86db814c4afb1f2"
+    },
+    {
+      "path": "tools/NodeCompatibility/OriginalPluginMapping/live-original-virtual-modules.mjs",
+      "bytes": 3997,
+      "sha256": "4aa3935f6b04bd537a27129c31ac21e35fc65d05229f8005eae06d5087205a51"
+    },
+    {
+      "path": "tools/NodeCommandInputBridge/renderer-owner.mjs",
+      "bytes": 15986,
+      "sha256": "7f3fad4e3f780ca8f4d3f79acbf326eef02cc27d3e0f3c1e1b27501ab077179e"
+    },
+    {
+      "path": "tools/NodeCommandInputBridge/tui-component-bridge.mjs",
+      "bytes": 13412,
+      "sha256": "9d314801c41ab30dafa4f94c914d66280766f99825f072d8031e3c0f5458d5cb"
+    },
+    {
+      "path": "tools/NodeCompatibility/OriginalPluginMapping/original-theme-tui-suppliers.mjs",
+      "bytes": 1191,
+      "sha256": "ada483d849881a59eaccb142b3d5c8df39ef55bcc54807ea2ca044e936372e1e"
+    },
+    {
+      "path": "tools/NodeCommandInputBridge/session-manager-facade.mjs",
+      "bytes": 4982,
+      "sha256": "c57c7a22de765af9ec42d5fc27ce0ccf0eaf6058ddfe1fbce61d416f528e79a4"
+    }
+  ],
+  "sourceReferenceExpectedSha256": "d74d53610906cb41ec6c2ad8a10f57d242c2a2846631a0ec4901ef5a3225930d",
+  "sourceReference": [
+    {
+      "path": "compatibility/node/command-input-reference.plan.json",
+      "bytes": 5491,
+      "sha256": "7eae052f5eb4447ccb2c15c2140684f6bb6260a9e1c28a8437d29dce5de759f4"
+    },
+    {
+      "path": "fixtures/reference/node-command-input/manifest.json",
+      "bytes": 1616039,
+      "sha256": "5619550b6b561596dcdb253106879eb976554d6c9daa8c8a5fb189d95a825900"
+    },
+    {
+      "path": "fixtures/reference/node-command-input/expected.json",
+      "bytes": 288460,
+      "sha256": "d74d53610906cb41ec6c2ad8a10f57d242c2a2846631a0ec4901ef5a3225930d"
+    }
+  ],
+  "sourcePins": [
+    {
+      "path": "packages/coding-agent/examples/extensions/commands.ts",
+      "bytes": 2594,
+      "sha256": "36716b53da169936c7e1360a4fde1e2fc0c3356a6505f177235f09c5538c6e4f"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/input-transform.ts",
+      "bytes": 1444,
+      "sha256": "cf0f65d610631ca75d18aae1c8f1408139702f674cb2835f8c009b943776474b"
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/types.ts",
+      "bytes": 81892,
+      "sha256": "de0ccce3b8b222d19a2ecef24902fc72aab62b6573129cbf886bc064dd6ab505"
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/loader.ts",
+      "bytes": 27197,
+      "sha256": "aa903524bb2db3ee9fb7f21e863e373e7f12a56c74fd05d27c879a4a7020deb0"
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/runner.ts",
+      "bytes": 51250,
+      "sha256": "1a0d73843fba5773d415f484c46898138723b73d27bf8c3159f491fa0b6232f3"
+    },
+    {
+      "path": "packages/coding-agent/src/core/agent-session.ts",
+      "bytes": 155372,
+      "sha256": "26e76e13456757b0419df26b1f4d9bce9faa28c2588ad66af3e4cc3e9b179e0a"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1069,
+      "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/pirate.ts",
+      "bytes": 1461,
+      "sha256": "dd6ce684bbe7630e4a749fe133ef8b8b875adbc7e31284b17fe0b8157d51e013"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/hello.ts",
+      "bytes": 640,
+      "sha256": "0aa4e9800c2526914d4c1edb00b2cfa9bd9dd6da5218289994cccd5f5bfa4934"
+    },
+    {
+      "path": "packages/ai/src/utils/validation.ts",
+      "bytes": 9902,
+      "sha256": "460786b57dead200e411b9afec916a5049c96ebcff4da082096456ac06d44fb7"
+    },
+    {
+      "path": "packages/ai/src/index.ts",
+      "bytes": 2395,
+      "sha256": "c909ef4f82daff2f494ce1aa29d8bd68390f6513c5aff047088cadb3fa96ecea"
+    },
+    {
+      "path": "packages/ai/src/utils/typebox-helpers.ts",
+      "bytes": 789,
+      "sha256": "caf756258ce20c793dc8002cb8130a8efce18a7b5262ba0c54832b96f5a76e9f"
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/virtual-modules.ts",
+      "bytes": 2010,
+      "sha256": "9a6cdfd7c21fd38fcf1e885990886e38a45f0f0355b918a4bbd757f460470622"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/truncate.ts",
+      "bytes": 9255,
+      "sha256": "8e4507c3ed7ca7548cf7c2d7f77d07f2ae63a38b756789cbb44e9062db6c8762"
+    },
+    {
+      "path": "packages/coding-agent/src/core/tools/file-mutation-queue.ts",
+      "bytes": 1697,
+      "sha256": "33cb06ac9bcdf32c8b84d9d12e33be44c503a7670f668e003a3262cd34294d11"
+    },
+    {
+      "path": "packages/tui/src/keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+    },
+    {
+      "path": "packages/tui/src/utils.ts",
+      "bytes": 38919,
+      "sha256": "5ecbc6c9b4850e78bf19de1fe8859b99b9c4c5f8a6384728d255a8e7e8a610ee"
+    },
+    {
+      "path": "packages/tui/src/components/text.ts",
+      "bytes": 3349,
+      "sha256": "3042e09dd8dcb870c23506e6fafb2dfcc095e7e375adad2fb62e447da17e5e3b"
+    },
+    {
+      "path": "packages/tui/src/components/box.ts",
+      "bytes": 4754,
+      "sha256": "731cc9a2526e23ed4f4a72264a25ce3a62c6be0889b658c1fa03708f3e4d0ac5"
+    },
+    {
+      "path": "packages/tui/src/tui.ts",
+      "bytes": 49604,
+      "sha256": "92dcb7f5f9a3a9575421d8de366be5cc78890be8df38d86c4ed3c0d77c7f88a4"
+    },
+    {
+      "path": "packages/tui/src/terminal-colors.ts",
+      "bytes": 3082,
+      "sha256": "72d1ef298837bfe520bd8a060cb93ea27547dcbff04a167ace0f55b5183e550d"
+    },
+    {
+      "path": "packages/tui/src/terminal-image.ts",
+      "bytes": 23218,
+      "sha256": "b901b8df0ad84e04ac0ee612c419b45d960430f63d2bdaa974c8dd9d89f3e6e5"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/todo.ts",
+      "bytes": 8848,
+      "sha256": "e46824d00217e25242c186d41837cc84ca81b23f978500323448502a9a424ee2"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/truncated-tool.ts",
+      "bytes": 6490,
+      "sha256": "4ed5fbeb6da53eab8d1e04721d77961b8d1b3bf5e11d1512a17fc5a3f58f9955"
+    },
+    {
+      "path": "packages/coding-agent/src/modes/interactive/theme/theme.ts",
+      "bytes": 38308,
+      "sha256": "082e9706529d468cfd3315f1d4c865a60ecd463e9fdd207b0b43607998a58ddc"
+    },
+    {
+      "path": "packages/coding-agent/src/modes/interactive/theme/system-theme.ts",
+      "bytes": 25485,
+      "sha256": "7234770316787805fa49595537c5f9e60bf9d5fe006a0fa2a8e596baff7c6adb"
+    },
+    {
+      "path": "packages/coding-agent/src/modes/interactive/theme/dark.json",
+      "bytes": 2334,
+      "sha256": "c11a588b714d35300293079b425fb09a3693d4b2d453585d211b08163c648b75"
+    },
+    {
+      "path": "packages/coding-agent/src/modes/interactive/theme/light.json",
+      "bytes": 2332,
+      "sha256": "f590c51c2bc8b238891efd0e983473ed2e2a6487b6692cc1d4b2845165e703f7"
+    },
+    {
+      "path": "packages/coding-agent/src/core/keybindings.ts",
+      "bytes": 12726,
+      "sha256": "e328f1c3b85926efbb42a960ba4b19f9b4a251f77640053659528706a340bd4e"
+    },
+    {
+      "path": "packages/tui/src/keybindings.ts",
+      "bytes": 10125,
+      "sha256": "eea5e3fe258ad50337595bb5320955a6d97bac0c8f6c0a838f988d75079bcf38"
+    },
+    {
+      "path": "packages/tui/src/colors.ts",
+      "bytes": 11501,
+      "sha256": "d4fe729c424d2c07bc64cf0c3edfdbf5642865cba395dfb37234c6c88d65f468"
+    },
+    {
+      "path": "packages/tui/src/oklab.ts",
+      "bytes": 10079,
+      "sha256": "45b067e6e3605b385f595adecd7c0216f1c6b6686680d5c73f661286de736be6"
+    },
+    {
+      "path": "packages/coding-agent/src/config.ts",
+      "bytes": 21035,
+      "sha256": "058e3ae23dece7482858c28fa731f56cecba6d52c3243aab76a94fb26ad3e993"
+    },
+    {
+      "path": "packages/coding-agent/src/utils/fs-watch.ts",
+      "bytes": 573,
+      "sha256": "f40e22497371b59286e516eeff70495b20a099daef160c82cc1c196cf637df41"
+    },
+    {
+      "path": "packages/coding-agent/src/utils/syntax-highlight.ts",
+      "bytes": 5581,
+      "sha256": "ead0ebee63d7ac661568a5aafdb09e28d6d8e893a8389aa64143b00e707416bb"
+    },
+    {
+      "path": "packages/coding-agent/src/utils/text.ts",
+      "bytes": 404,
+      "sha256": "bb323f9607c499115b532021f4f0163c6df04d834aee9c32c3c77b273bd2d7c6"
+    }
+  ],
+  "qualifiedInputs": {
+    "canonicalPlanSha256": "e55b7af94907598157809fc6da08ad1d60899c23b849d3623c28174d5d7fc622",
+    "canonicalManifestSha256": "b74a7ece33b0596850266a1e1686b3c9cd1d5c978e3dcae1f07174adc3757ff9",
+    "canonicalExpectedSha256": "d13bca9d8ca51152c6b95b9bd2db8ab5bbcb76f361e647dcf1e97365e155b843",
+    "jitiArchiveSha256": "8dd0d365fb49c0e7cc42d6a00df6fb2da9056fc24492094346fc34ecdbcf28ca",
+    "inventoryAuthority": "Existing protected-paths supervisor qualification is composed read-only; no predecessor worker starts or pins change. Whole source, fifteen existing dependency inventories, archive, publisher and canonical controls checked before/after.",
+    "sourceReferenceQualification": "Root reports seven corrected process controls and two full matching captures. Fresh golden verification and independent qualification remain separate. Prior exact-clock preflight failure preserved. All eight frozen reference helpers held as read-only inputs, not executable bridge modules."
+  },
+  "requiredScenarioIds": [
+    "commands-completions",
+    "commands-list",
+    "commands-empty-cancel",
+    "commands-reentrant",
+    "input-chain",
+    "input-handled",
+    "input-clock",
+    "input-no-ui",
+    "original-pirate-toggle-hook-and-hello-registry",
+    "original-tool-preparation-required-name",
+    "original-tool-context-shape-parent-signal",
+    "authored-progress-identity-order-backpressure",
+    "authored-progress-cancel-publication-failure-stale",
+    "authored-tool-loadout-read-only-metadata",
+    "pinned-original-getNamespace-seven-cases",
+    "native-node-loadout-metadata-contracts",
+    "legacy-default-route",
+    "bounded-hello-and-genuine-imports",
+    "unchanged-todo-lifecycle-diagnostic",
+    "rg-call",
+    "rg-result-partial",
+    "rg-result-no-matches",
+    "rg-result-expanded",
+    "worker-genuine-original-renderers-seven-controls",
+    "worker-real-native-renderer-handle-four-controls",
+    "source-owner.genuine-rg-self-ancestor-and-unrelated-disposal"
+  ],
+  "sourceBoundary": {
+    "factory": "Unchanged original commands/input/pirate/hello and explicitly bounded todo/truncated-tool source pins through original loader/Jiti. Original rg tool/renderCall/renderResult callbacks are retained; todo on.session_start remains explicitly unsupported.",
+    "virtualModuleReplacementCount": 1,
+    "virtualModuleReplacement": "Frozen legacy provider for default selection; exact original supplier for bounded sourcePaths. Genuine targeted Theme/Keybindings dependencies use direct original references. No full namespace parity.",
+    "catalog": "Synchronous pi.getCommands reads the immutable actual native invocation snapshot and revision through AsyncLocalStorage. Source-only hello/review/skill-a table remains separate; actual native catalog includes its own Commands registration and actual host resources only.",
+    "completion": "Original complete arrays/null from the registered callback; pure owner-admitted request with no host callback handle.",
+    "contexts": "Whole per-invocation Runner.createCommandContext, createContext or createToolContext(actual native toolCallId, actual signal). Tool contexts must have the guarded tools getter and executeTool method; those bind to named UnsupportedHostOperation diagnostics. Nested execution remains unsupported. Existing UI prompt/capability seams retained.",
+    "dialogs": "Actual native owned UI scopes handle select/confirm. Cancellation/unavailable preserve typed receipt and source undefined/false defaults. No receipt invents confirmation.",
+    "notify": "Original synchronous notify returns undefined; actual bounded native async publication is serialized and joined before source settlement, including original callers that do not await.",
+    "input": "Each registered original callback runs once under the native typed reducer. Original source/images/streamingBehavior preserved; an explicit second original factory instance supplies the ordered chain control.",
+    "clock": "Real Date remains the default. Only explicit opted-in exact original 2026-10-01T12:00:00.000Z installs FixedDate for no-argument construction/Date.now. Actual locale/ICU/environment retained and Date restored on finalization.",
+    "noUi": "Original Print/Json unavailable notify returns undefined and preserves Handled/zero provider/zero append; the actual native receipt is unavailable/NoUi/published=false. Separate explicitly denied RPC features retain original source failure plus sanitized native diagnostic/Continue semantics. Canonical source no-op reference remains unchanged.",
+    "durable": "Actual native command-first admission and input reduction precede provider/durable effects. Handled has zero provider/append effects. Save/acknowledge/reopen/resume/branch must preserve the same exact approved package/command/tool declaration.",
+    "authority": "Native owner registry, initial and final schema validation, argument policy and lifecycle remain authoritative. Progress callbacks borrow only their actual tool invocation and must match owner handle, operationId, callbackId, toolCallId and monotonic sequence. No tools, filesystem, process or session operations are granted through progress or preparation.",
+    "toolPreparation": "Whole unchanged packages/ai/src/utils/validation.ts validateToolArguments on the actual retained original definition/schema. Pure handle-free owner-admitted initial preparation; receives no host context. Source before/after and schema observations retained. No replacement validation after tool_call hooks.",
+    "toolProgress": "Synchronous source onUpdate returns undefined. At most 16 updates, each at most 65536 UTF8 bytes, at most 262144 cumulative bytes. At most one native delivery pending; bounded serialized source queue; overflow is a recorded failure even if caught. Matching actual ReportUpdateAsync receipt required. Source/UI/progress settlement and cancellation writes joined before context retirement. Late callback/sink admission rejected. No retries after failure. Progress payloads must be plain JSON data; functions, symbols, accessors, arbitrary prototypes, sparse arrays and nonfinite numbers explicitly reject.",
+    "unsupported": [
+      "flags",
+      "shortcuts",
+      "other lifecycle hooks",
+      "message/entry renderers",
+      "markdown transformers",
+      "nested tools",
+      "providers/virtual models/MCP",
+      "new dependencies including ms",
+      "prepareArguments and richer tool metadata except namespace/prepareLoadout",
+      "header/footer/editor/widget rendering and custom overlay options"
+    ],
+    "toolLoadoutNamespace": "Read-only actual native snapshot through existing handle-free owner-admitted prepare request; bounded synchronous original prepareLoadout callbacks and getNamespace metadata. No execution capability.",
+    "renderer": "Frozen R874 source owner retains actual original renderer/custom components, state, Theme/Keybindings, source scope and parent writer. Only rows and original visibleWidth cell widths cross transport; component requests have no fresh native handle. Native persistent UI participant and row/invalidation host remain counterpart qualification blockers."
+  },
+  "limits": {
+    "frameBytes": 1048576,
+    "pendingSourceOperations": 16,
+    "nativeContexts": 8,
+    "operationBytes": 524288,
+    "retainedOperations": 128,
+    "retainedBytes": 8388608,
+    "publicationCount": 16,
+    "publicationBytes": 262144,
+    "progressFrameBytes": 65536,
+    "progressCount": 16,
+    "progressBytes": 262144,
+    "nativePendingProgressPerOperation": 1
+  },
+  "nativeBridgeExecuted": false,
+  "executedCorpusCountCredit": 0,
+  "phaseGatesPassed": [],
+  "admissionRevision": "bounded-original-suppliers-1",
+  "qualificationScope": {
+    "reviewRequiredBeforeExecution": true,
+    "originalSources": [
+      "commands.ts",
+      "input-transform.ts",
+      "pirate.ts",
+      "hello.ts",
+      "todo.ts (explicit unsupported lifecycle)",
+      "truncated-tool.ts (original factory and renderers; execute denied)"
+    ],
+    "dependencyAllowlistChanged": false,
+    "originalReferenceGoldensChanged": false,
+    "toolProgressCorpus": "Authored fault controls; original hello emits no updates. No additional original tool/update corpus credit.",
+    "cliPackageAgentPipelineQualification": false,
+    "nativeBuildRun": false,
+    "nativeTestsRun": false,
+    "nodeTestsRun": false,
+    "executedCorpusCredit": 0,
+    "namespaceMetadataAuthoredOnly": true,
+    "rendererControlsAuthored": 16,
+    "rendererControlsRun": 0
+  },
+  "originalNamespaceInjection": {
+    "profile": "bounded-original-suppliers-1",
+    "provider": "tools/NodeCompatibility/OriginalPluginMapping/live-original-virtual-modules.mjs",
+    "sourcePins": [
+      {
+        "path": "packages/ai/src/index.ts",
+        "bytes": 2395,
+        "sha256": "c909ef4f82daff2f494ce1aa29d8bd68390f6513c5aff047088cadb3fa96ecea"
+      },
+      {
+        "path": "packages/ai/src/utils/typebox-helpers.ts",
+        "bytes": 789,
+        "sha256": "caf756258ce20c793dc8002cb8130a8efce18a7b5262ba0c54832b96f5a76e9f"
+      },
+      {
+        "path": "packages/coding-agent/src/core/extensions/virtual-modules.ts",
+        "bytes": 2010,
+        "sha256": "9a6cdfd7c21fd38fcf1e885990886e38a45f0f0355b918a4bbd757f460470622"
+      },
+      {
+        "path": "packages/coding-agent/src/core/extensions/types.ts",
+        "bytes": 81892,
+        "sha256": "de0ccce3b8b222d19a2ecef24902fc72aab62b6573129cbf886bc064dd6ab505"
+      },
+      {
+        "path": "packages/coding-agent/src/core/tools/truncate.ts",
+        "bytes": 9255,
+        "sha256": "8e4507c3ed7ca7548cf7c2d7f77d07f2ae63a38b756789cbb44e9062db6c8762"
+      },
+      {
+        "path": "packages/coding-agent/src/core/tools/file-mutation-queue.ts",
+        "bytes": 1697,
+        "sha256": "33cb06ac9bcdf32c8b84d9d12e33be44c503a7670f668e003a3262cd34294d11"
+      },
+      {
+        "path": "packages/tui/src/keys.ts",
+        "bytes": 44954,
+        "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+      },
+      {
+        "path": "packages/tui/src/utils.ts",
+        "bytes": 38919,
+        "sha256": "5ecbc6c9b4850e78bf19de1fe8859b99b9c4c5f8a6384728d255a8e7e8a610ee"
+      },
+      {
+        "path": "packages/tui/src/components/text.ts",
+        "bytes": 3349,
+        "sha256": "3042e09dd8dcb870c23506e6fafb2dfcc095e7e375adad2fb62e447da17e5e3b"
+      },
+      {
+        "path": "packages/tui/src/components/box.ts",
+        "bytes": 4754,
+        "sha256": "731cc9a2526e23ed4f4a72264a25ce3a62c6be0889b658c1fa03708f3e4d0ac5"
+      },
+      {
+        "path": "packages/tui/src/tui.ts",
+        "bytes": 49604,
+        "sha256": "92dcb7f5f9a3a9575421d8de366be5cc78890be8df38d86c4ed3c0d77c7f88a4"
+      },
+      {
+        "path": "packages/tui/src/terminal-colors.ts",
+        "bytes": 3082,
+        "sha256": "72d1ef298837bfe520bd8a060cb93ea27547dcbff04a167ace0f55b5183e550d"
+      },
+      {
+        "path": "packages/tui/src/terminal-image.ts",
+        "bytes": 23218,
+        "sha256": "b901b8df0ad84e04ac0ee612c419b45d960430f63d2bdaa974c8dd9d89f3e6e5"
+      },
+      {
+        "path": "packages/coding-agent/src/modes/interactive/theme/theme.ts",
+        "bytes": 38308,
+        "sha256": "082e9706529d468cfd3315f1d4c865a60ecd463e9fdd207b0b43607998a58ddc"
+      },
+      {
+        "path": "packages/coding-agent/src/modes/interactive/theme/system-theme.ts",
+        "bytes": 25485,
+        "sha256": "7234770316787805fa49595537c5f9e60bf9d5fe006a0fa2a8e596baff7c6adb"
+      },
+      {
+        "path": "packages/coding-agent/src/modes/interactive/theme/dark.json",
+        "bytes": 2334,
+        "sha256": "c11a588b714d35300293079b425fb09a3693d4b2d453585d211b08163c648b75"
+      },
+      {
+        "path": "packages/coding-agent/src/modes/interactive/theme/light.json",
+        "bytes": 2332,
+        "sha256": "f590c51c2bc8b238891efd0e983473ed2e2a6487b6692cc1d4b2845165e703f7"
+      },
+      {
+        "path": "packages/coding-agent/src/core/keybindings.ts",
+        "bytes": 12726,
+        "sha256": "e328f1c3b85926efbb42a960ba4b19f9b4a251f77640053659528706a340bd4e"
+      },
+      {
+        "path": "packages/tui/src/keybindings.ts",
+        "bytes": 10125,
+        "sha256": "eea5e3fe258ad50337595bb5320955a6d97bac0c8f6c0a838f988d75079bcf38"
+      },
+      {
+        "path": "packages/tui/src/colors.ts",
+        "bytes": 11501,
+        "sha256": "d4fe729c424d2c07bc64cf0c3edfdbf5642865cba395dfb37234c6c88d65f468"
+      },
+      {
+        "path": "packages/tui/src/oklab.ts",
+        "bytes": 10079,
+        "sha256": "45b067e6e3605b385f595adecd7c0216f1c6b6686680d5c73f661286de736be6"
+      },
+      {
+        "path": "packages/coding-agent/src/config.ts",
+        "bytes": 21035,
+        "sha256": "058e3ae23dece7482858c28fa731f56cecba6d52c3243aab76a94fb26ad3e993"
+      },
+      {
+        "path": "packages/coding-agent/src/utils/fs-watch.ts",
+        "bytes": 573,
+        "sha256": "f40e22497371b59286e516eeff70495b20a099daef160c82cc1c196cf637df41"
+      },
+      {
+        "path": "packages/coding-agent/src/utils/syntax-highlight.ts",
+        "bytes": 5581,
+        "sha256": "ead0ebee63d7ac661568a5aafdb09e28d6d8e893a8389aa64143b00e707416bb"
+      },
+      {
+        "path": "packages/coding-agent/src/utils/text.ts",
+        "bytes": 404,
+        "sha256": "bb323f9607c499115b532021f4f0163c6df04d834aee9c32c3c77b273bd2d7c6"
+      }
+    ],
+    "legacyRoute": "Default sourcePaths absent preserves exact frozen reference replacement",
+    "packageAuthority": "Unchanged canonical15-package before/after inventories; no new dependencies",
+    "rendererTransportImplemented": true,
+    "wholeNamespaceParity": false,
+    "originalSpecifiers": 20,
+    "boundedSuppliedSpecifiers": 12,
+    "rendererRuntimeQualified": false,
+    "rendererContract": "RENDERER_SHARED_FROZEN_CONTRACT_R874ROOT.json"
+  }
+}

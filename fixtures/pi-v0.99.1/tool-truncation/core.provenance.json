@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "https://github.com/earendil-works/pi",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "pure-head-tail-tool-output-truncation",
+  "inputOrigin": "PiSharp-authored synthetic boundary corpus",
+  "observationsOrigin": "Unchanged upstream truncateHead and truncateTail exports observed under Node type stripping",
+  "runner": {
+    "path": "tools/PiReferenceRunner/capture-tool-truncation.mjs",
+    "sha256": "0f9899a8c01813e8cf13265d11f45bd6693da0e5fc52fd9d901ab910b54a4e6a"
+  },
+  "runtime": {
+    "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+    "platform": "win32",
+    "architecture": "x64",
+    "flags": [
+      "--experimental-strip-types",
+      "--disable-warning=ExperimentalWarning"
+    ]
+  },
+  "sourceChecks": {
+    "before": {
+      "revision": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "status": "",
+      "sourceSha256": "8e4507c3ed7ca7548cf7c2d7f77d07f2ae63a38b756789cbb44e9062db6c8762"
+    },
+    "after": {
+      "revision": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "status": "",
+      "sourceSha256": "8e4507c3ed7ca7548cf7c2d7f77d07f2ae63a38b756789cbb44e9062db6c8762"
+    }
+  },
+  "dependencyClosure": {
+    "sourceModules": [
+      {
+        "path": "packages/coding-agent/src/core/tools/truncate.ts",
+        "sha256": "8e4507c3ed7ca7548cf7c2d7f77d07f2ae63a38b756789cbb44e9062db6c8762"
+      }
+    ],
+    "sourceImports": [],
+    "externalPackages": [],
+    "builtinsUsedBySource": [
+      "Buffer"
+    ],
+    "copiedOrExtractedSource": false,
+    "sourcePatches": [],
+    "resolutionShims": []
+  },
+  "input": {
+    "path": "fixtures/pi-v0.99.1/tool-truncation/core.input.json",
+    "sha256": "c573c8413bfa1c78a872d17672d5f0a861ce2637b05055e6fa11c5f87f2f5c04"
+  },
+  "captures": [
+    {
+      "path": "core.capture-1.json",
+      "sha256": "8c088a8230dcf627221c2b3d3f22b2c7dc4aee2f3bd9e8b434f3c13b2124496d",
+      "bytes": 498500
+    },
+    {
+      "path": "core.capture-2.json",
+      "sha256": "8c088a8230dcf627221c2b3d3f22b2c7dc4aee2f3bd9e8b434f3c13b2124496d",
+      "bytes": 498500
+    },
+    {
+      "path": "core.expected.json",
+      "sha256": "8c088a8230dcf627221c2b3d3f22b2c7dc4aee2f3bd9e8b434f3c13b2124496d",
+      "bytes": 498500
+    }
+  ],
+  "independentCaptureProcesses": 2,
+  "capturesByteIdentical": true,
+  "normalization": [],
+  "caseCount": 124,
+  "limits": [
+    "Head and tail string primitives only",
+    "No external-byte decoding or binary detection",
+    "Nonnegative signed-32-bit integer or null/default budgets only",
+    "No file/process/tool effects or integration claims",
+    "Other truncate.ts exports are outside this slice",
+    "Windows x64 reference capture; platform matrix remains open"
+  ]
+}

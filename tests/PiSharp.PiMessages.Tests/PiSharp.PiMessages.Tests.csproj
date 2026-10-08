@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.AI/PiSharp.AI.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Agent/PiSharp.Agent.csproj" />
+    <Compile Remove="HeldOwnershipHarness.cs" />
+    <None Update="identity-successor-output-r1.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

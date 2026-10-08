@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "Raw recall controls/tab, cursor inside untrusted sequence, source scroll preservation and zero-width/style seams; supplement retains initial55 full observations",
+  "cases": [
+    {
+      "columns": 16,
+      "terminalRows": 24,
+      "focused": true,
+      "id": "history-raw-tab",
+      "text": "a\tb",
+      "admission": "history"
+    },
+    {
+      "columns": 16,
+      "terminalRows": 24,
+      "focused": true,
+      "id": "history-raw-nel-cr",
+      "text": "ab\rc",
+      "admission": "history"
+    },
+    {
+      "columns": 16,
+      "terminalRows": 24,
+      "focused": true,
+      "id": "history-raw-controls",
+      "text": "a\u0007\b\u001bb",
+      "admission": "history"
+    },
+    {
+      "columns": 16,
+      "terminalRows": 24,
+      "focused": true,
+      "id": "user-erase-caret-inside",
+      "text": "a\u001b[2Jb",
+      "admission": "set",
+      "keys": [
+        "\u0001",
+        "\u0006",
+        "\u0006"
+      ]
+    },
+    {
+      "columns": 16,
+      "terminalRows": 24,
+      "focused": true,
+      "id": "user-osc52-caret-inside",
+      "text": "a\u001b]52;c;ZGVtbw==\u0007b",
+      "admission": "set",
+      "keys": [
+        "\u0001",
+        "\u0006",
+        "\u0006"
+      ]
+    },
+    {
+      "columns": 16,
+      "terminalRows": 24,
+      "focused": true,
+      "id": "scroll-edit-preserves-offset",
+      "text": "line0\nline1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9",
+      "admission": "set",
+      "initialRender": true,
+      "keys": [
+        "\u001b[A",
+        "\u001b[A",
+        "\u001b[A",
+        "\u001b[A",
+        "\u001b[A",
+        "\u001b[A"
+      ],
+      "afterInsert": "x"
+    },
+    {
+      "columns": 16,
+      "terminalRows": 24,
+      "focused": true,
+      "id": "leading-combining",
+      "text": "́a",
+      "admission": "set"
+    },
+    {
+      "columns": 16,
+      "terminalRows": 24,
+      "focused": true,
+      "id": "combining-after-caret-split",
+      "text": "aéb",
+      "admission": "set",
+      "keys": [
+        "\u0001",
+        "\u0006",
+        "\u0006"
+      ]
+    }
+  ]
+}

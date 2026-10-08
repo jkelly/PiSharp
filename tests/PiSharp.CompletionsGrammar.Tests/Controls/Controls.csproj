@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../../src/PiSharp.Agent/PiSharp.Agent.csproj" /></ItemGroup>
+  <ItemGroup><Compile Remove="Strict/**/*.cs" /></ItemGroup>
+</Project>

@@ -1,0 +1,14 @@
+{
+  "authority": "SOURCE_DERIVED_EXPECTATIONS_ONLY_NOT_EXECUTED_ORACLE_CAPTURE",
+  "originalVersion": "0.99.1",
+  "originalCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "nativeCases": ["pi-messages.public-direct-agent-two-turn-final-identity", "pi-messages.public-simple-agent-two-turn-final-identity"],
+  "oracleModes": ["direct", "simple"],
+  "schedule": ["first start", "toolcall_start provisional-call/inspect", "toolcall_delta arguments value 1", "toolcall_end final-call/other/arguments value 7", "done toolUse", "actual tool executor held", "actual tool-result callback held", "second request", "continued assistant", "done stop"],
+  "sharedValueExpectations": {"physicalRequests":2,"toolInvocations":1,"finalCallId":"final-call","finalToolName":"other","finalArguments":{"value":7},"toolResult":"tool-result-seven","finalAssistantText":"continued","sessionId":"inert-session"},
+  "originalReferenceExpectations": {"retainedStartCallIsEndCall":true,"retainedStartCallAfterEnd":{"id":"final-call","name":"other","arguments":{"value":7}},"retainedDeltaArgumentsAfterEnd":{"value":1},"deltaArgumentsIsFinalArguments":false,"standardRoleConvertToLlmPreservesMessageReferences":true},
+  "nativeSnapshotExpectations": {"startedCallRetains":{"id":"provisional-call","name":"inspect","arguments":{}},"startedCallIsEndedCall":false,"endedCall":{"id":"final-call","name":"other","arguments":{"value":7}}},
+  "compareBoundaries": {"finalCallAndSecondRequestValues":"mandatory meaningful native/Source value comparison", "startCallObjectAlias":"explicit incompatible observable identity surfaces; not claimed closed", "systemToolDeclarationAndTimestamps":"Agent profile construction differs; do not compare full request bytes without a separately admitted equivalent profile"},
+  "futureExecutionGates": ["independent source/API review", "fresh genuine native production/fixture build and two cases", "separately admitted original SDK modules/TypeBox exact closure and Node owner", "actual direct and simple original oracle runs", "paired measured values and alias observations", "retain all raw original faults if graph/report output fails"],
+  "nativeExecutions":0,"nodeExecutions":0,"originalSdkExecutions":0
+}

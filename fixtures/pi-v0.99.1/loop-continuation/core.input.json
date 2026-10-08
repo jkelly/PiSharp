@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "loop-continuation-core",
+  "kind": "authored-loop-continuation-input",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": ["events.agent"],
+  "scenario": "Two unchanged low-level runAgentLoop captures: one non-terminating tool batch automatically continues to text; steering enqueued at an awaited assistant barrier joins the next tool-continuation request while follow-up waits until a text turn would stop",
+  "clock": {
+    "unixMilliseconds": 1700000000000,
+    "mechanism": "Disclosed harness Date.now override restored in finally; authored message timestamps and IDs; unchanged upstream source, no timestamp normalization"
+  },
+  "seed": "none; explicit authored IDs and awaited assistant/tool gates",
+  "normalizerVersion": "object-key-order-v1",
+  "model": {
+    "id": "oracle-model",
+    "name": "Synthetic continuation oracle model",
+    "api": "openai-responses",
+    "provider": "synthetic-oracle",
+    "baseUrl": "https://invalid.example",
+    "reasoning": false,
+    "input": ["text"],
+    "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+    "contextWindow": 8192,
+    "maxTokens": 1024
+  },
+  "tool": {
+    "name": "lookup",
+    "description": "Synthetic lookup tool with an awaited completion gate",
+    "parameters": {
+      "type": "object",
+      "properties": {"value": {"type": "integer"}},
+      "required": ["value"],
+      "additionalProperties": false
+    }
+  },
+  "scenarios": [
+    {
+      "scenarioId": "automatic-tool-to-text",
+      "prompts": [
+        {"role": "system", "content": "Use the synthetic lookup tool and summarize its result.", "timestamp": 1700000000010},
+        {"role": "user", "content": "Look up value 7.", "timestamp": 1700000000011}
+      ],
+      "steeringMessages": [],
+      "followUpMessages": [],
+      "toolResult": {"content": [{"type": "text", "text": "lookup:7"}], "details": {"value": 7}, "terminate": false},
+      "providerTurns": [
+        {
+          "role": "assistant",
+          "content": [{"type": "toolCall", "id": "continuation-call", "name": "lookup", "arguments": {"value": 7}}],
+          "api": "openai-responses", "provider": "synthetic-oracle", "model": "oracle-model",
+          "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 0, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}},
+          "stopReason": "toolUse", "timestamp": 1700000000012
+        },
+        {
+          "role": "assistant",
+          "content": [{"type": "text", "text": "The lookup returned 7."}],
+          "api": "openai-responses", "provider": "synthetic-oracle", "model": "oracle-model",
+          "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 0, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}},
+          "stopReason": "stop", "timestamp": 1700000000013
+        }
+      ]
+    },
+    {
+      "scenarioId": "steering-before-follow-up",
+      "prompts": [
+        {"role": "system", "content": "Use the synthetic lookup tool and respond to queued messages.", "timestamp": 1700000000020},
+        {"role": "user", "content": "Look up value 9.", "timestamp": 1700000000021}
+      ],
+      "steeringMessages": [{"role": "user", "content": "Include the units in your answer.", "timestamp": 1700000000023}],
+      "followUpMessages": [{"role": "user", "content": "Then give a separate brief recap.", "timestamp": 1700000000025}],
+      "toolResult": {"content": [{"type": "text", "text": "lookup:9 units"}], "details": {"value": 9, "units": "units"}, "terminate": false},
+      "providerTurns": [
+        {
+          "role": "assistant",
+          "content": [{"type": "toolCall", "id": "queued-call", "name": "lookup", "arguments": {"value": 9}}],
+          "api": "openai-responses", "provider": "synthetic-oracle", "model": "oracle-model",
+          "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 0, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}},
+          "stopReason": "toolUse", "timestamp": 1700000000022
+        },
+        {
+          "role": "assistant",
+          "content": [{"type": "text", "text": "The lookup returned 9 units."}],
+          "api": "openai-responses", "provider": "synthetic-oracle", "model": "oracle-model",
+          "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 0, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}},
+          "stopReason": "stop", "timestamp": 1700000000024
+        },
+        {
+          "role": "assistant",
+          "content": [{"type": "text", "text": "Recap: 9 units were returned."}],
+          "api": "openai-responses", "provider": "synthetic-oracle", "model": "oracle-model",
+          "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "totalTokens": 0, "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}},
+          "stopReason": "stop", "timestamp": 1700000000026
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "kind": "authored-synthetic-input",
+    "origin": "New authored fake provider responses, tool results and queued callback messages executed by unchanged pinned runAgentLoop; expected observations captured from that run, no provider wire traffic"
+  }
+}

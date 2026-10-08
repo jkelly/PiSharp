@@ -1,0 +1,71 @@
+{
+  "solutionInsertBefore": "</Solution>",
+  "appendTarget": {
+    "originalExpectationChanges": 0,
+    "entryAssembly": "tests/PiSharp.MistralConversations.Tests/bin/Release/net10.0/PiSharp.MistralConversations.Tests.dll",
+    "id": "mistral-text",
+    "projectSha256": "5b39ed009ad7fad5a5972ae64105cad9242c73b3a0a050dac5b0f972f3594582",
+    "fixturePins": [],
+    "currentExecution": "UNEXECUTED",
+    "project": "tests/PiSharp.MistralConversations.Tests/PiSharp.MistralConversations.Tests.csproj",
+    "timeoutSeconds": 60,
+    "reportName": "mistral-text.json",
+    "arguments": [
+      {
+        "kind": "literal",
+        "value": "--report"
+      },
+      {
+        "kind": "report"
+      }
+    ],
+    "lockFile": {
+      "path": "tests/PiSharp.MistralConversations.Tests/packages.lock.json",
+      "sha256": "56f1771a69e65e2d5fe591f44a8b0344755bebc7ff94255c2c622ae969801f41",
+      "bytes": 163,
+      "status": "PINNED_EXISTING"
+    },
+    "outputFixturePins": []
+  },
+  "packagesAdded": [],
+  "nativeRuns": 0,
+  "status": "PROPOSED_ONLY",
+  "solutionLines": [
+    "  <Folder Name=\"/tests/companions/PiSharp.MistralConversations.Tests/\">",
+    "    <Project Path=\"tests/PiSharp.MistralConversations.Tests/PiSharp.MistralConversations.Tests.csproj\" />",
+    "  </Folder>"
+  ],
+  "runnerWithExact": "        'terminal-select-list', 'terminal-select-dialog', 'anthropic-simple', 'authentication', 'terminal-ownership-focused', 'mistral-text')",
+  "provenance": "Integrating owner regenerates final candidate/tree/static-review seal; full source manifest including all changed runner/solution/prepare/authored files; real runtime allocation tied to new manifest; actual build receipt/products all51 roots and settled logs; prepared admission registeredTargets30 productRoots51; launch/report/output joins with new registry SHA. No past review or future product hashes fabricated.",
+  "prepareRootGateWithExact": "        if ($roots.Count -ne 51) { throw 'All original 50 output roots plus the isolated Mistral text consumer root are required.' }",
+  "runnerReplaceExact": "        'terminal-select-list', 'terminal-select-dialog', 'anthropic-simple', 'authentication', 'terminal-ownership-focused')",
+  "basis": "a54840b36360b70cbfae16e36f831ddc642f3b1c",
+  "prepareRootGateReplaceExact": "        if ($roots.Count -ne 50) { throw 'All original 49 output roots plus the isolated focused ownership consumer root are required.' }",
+  "basisPins": [
+    {
+      "path": "PiSharp.slnx",
+      "sha256": "372c4ca6f0e528c3aedd5dd4ff77a67c07f3ce38675993fe28fbfa0a0b363e50",
+      "bytes": 7481
+    },
+    {
+      "path": "tools/native-companion-registration.ps1",
+      "sha256": "d60ed46ac1e0b69a699cf0e4e469ae01d722a3d2dedeee2b2fc03fe00729f13d",
+      "bytes": 82983
+    },
+    {
+      "path": "tools/native-companion-targets.json",
+      "sha256": "02a0e9fb466f980379df9aee7532f1ca8b032230a90e1fd54617f6cee48a5476",
+      "bytes": 65609
+    },
+    {
+      "path": "tools/prepare-native-products.ps1",
+      "sha256": "c9f99ba5cc28c4d42351962f0d36e86ed044cd835dc5e13fe49ba081d30d0066",
+      "bytes": 25971
+    }
+  ],
+  "registrationRequiredCount": {
+    "old": 29,
+    "new": 30
+  },
+  "newOutputRoot": "tests/PiSharp.MistralConversations.Tests/bin/Release/net10.0"
+}

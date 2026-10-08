@@ -1,0 +1,423 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "scope": "Additive full public Editor keycap/official-ZWJ width, wrap, caret, resize and navigation. All inherited expected objects unchanged.",
+  "cases": [
+    {
+      "id": "complete-rgi-source-component-0",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "#️⃣"
+        },
+        {
+          "kind": "render",
+          "columns": 4,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 8,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 10
+        }
+      ]
+    },
+    {
+      "id": "complete-rgi-source-component-1",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "1️⃣ 2️⃣\n中文"
+        },
+        {
+          "kind": "render",
+          "columns": 4,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 8,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 10
+        }
+      ]
+    },
+    {
+      "id": "complete-rgi-source-component-2",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "A0️⃣B\n👩‍💻x\nlongtail"
+        },
+        {
+          "kind": "render",
+          "columns": 4,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 8,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 10
+        }
+      ]
+    },
+    {
+      "id": "complete-rgi-source-component-3",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "A👨‍❤️‍👨B"
+        },
+        {
+          "kind": "render",
+          "columns": 4,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 8,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 10
+        }
+      ]
+    },
+    {
+      "id": "complete-rgi-source-component-4",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "A🫱🏽‍🫲🏼B"
+        },
+        {
+          "kind": "render",
+          "columns": 4,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 8,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 10
+        }
+      ]
+    },
+    {
+      "id": "complete-rgi-source-component-5",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "A🧑🏽‍🦽‍➡️B"
+        },
+        {
+          "kind": "render",
+          "columns": 4,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 8,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 10
+        }
+      ]
+    },
+    {
+      "id": "complete-rgi-source-component-6",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "A🤦🏻‍♂️B"
+        },
+        {
+          "kind": "render",
+          "columns": 4,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 8,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 10
+        }
+      ]
+    },
+    {
+      "id": "complete-rgi-source-component-7",
+      "steps": [
+        {
+          "kind": "set",
+          "data": "A🧑🏾‍🩰B"
+        },
+        {
+          "kind": "render",
+          "columns": 4,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0001"
+        },
+        {
+          "kind": "input",
+          "data": "\u0006"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 8,
+          "terminalRows": 24
+        },
+        {
+          "kind": "input",
+          "data": "\u0005"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[A"
+        },
+        {
+          "kind": "input",
+          "data": "\u001b[B"
+        },
+        {
+          "kind": "render",
+          "columns": 16,
+          "terminalRows": 10
+        }
+      ]
+    }
+  ]
+}

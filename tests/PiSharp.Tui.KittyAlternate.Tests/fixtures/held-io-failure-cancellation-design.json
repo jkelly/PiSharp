@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "status": "PLANNED TEST DESIGN ONLY; NOT IMPLEMENTED OR EXECUTED",
+  "reason": "Independent KITTY_R31_STATIC_REVIEW cleanup coverage risk, not a demonstrated production cleanup defect",
+  "base": "00bead397dcf07564f7c1612034adcb9e47f053a",
+  "sourceOracle": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-kitty-shift-space-work\\tests\\PiSharp.Tui.KittyAlternate.Tests\\fixtures\\shift-space-source-observations.json",
+    "bytes": 38454,
+    "sha256": "d71057f550e047c30684d427865561d12c7a8c0d7db6dd1378c2ddf42bfbfb1c"
+  },
+  "scenarioCount": 8,
+  "scenarios": [
+    {
+      "id": "legacy-held-read-cancellation",
+      "resource": "read",
+      "trigger": "cancel",
+      "steps": [
+        "Finish startup paint and arm the next physical read gate.",
+        "Queue exact ESC[32:65;2u once; await admission and the subsequent held ReadEntered signal.",
+        "Observe the corrected space draft/frame through the existing same-focus barrier while the physical read remains held.",
+        "Cancel the owned run token; await the gate CancellationObserved signal without completing the borrowed read.",
+        "At the retained checkpoint record active read, run/reader/view-dispose task state and causal event order; no cooperative EOF substitutes the gate.",
+        "Release the same read with EOF after cancellation, await the original run and owned close/dispose tasks, and record the original OperationCanceledException."
+      ],
+      "route": "legacy",
+      "input": "\u001b[32:65;2u",
+      "injectionAfterStartup": true,
+      "gate": "one bounded TaskCompletionSource with RunContinuationsAsynchronously; CancellationToken registration records cancellation but does not release a noncooperative operation",
+      "checkpointAssertions": [
+        "The target operation entered exactly once and remains active at the held checkpoint.",
+        "No completed run/dispose/acknowledgement may report a join while its owned operation is still held.",
+        "Capture task status and a monotonically ordered log at explicit gate/cancellation/settlement signals; use no sleep as the causal proof."
+      ],
+      "finalAssertions": [
+        "Every started read and write has a settled counter; ActiveReads=ActiveWrites=0.",
+        "The exact original run, physical I/O and paint/dispose tasks are awaited; no replacement tasks or detached cleanup.",
+        "The borrowed terminal disposal count is zero; view/stop/receipt resources complete exactly once.",
+        "For failure, retain the injected exception as primary and record all cleanup exceptions; for cancellation, retain OperationCanceledException rather than a successful EOF.",
+        "The editor focus attachment is detached after full join; acknowledged receipt/end notifications are joined and not silently dropped.",
+        "Record the actual boundary and source/DLL identities and every causal event; any failed retention/settlement prevents acceptance."
+      ]
+    },
+    {
+      "id": "legacy-held-read-failure",
+      "resource": "read",
+      "trigger": "failure",
+      "steps": [
+        "Finish startup paint; queue exact alternate once and hold the following physical read.",
+        "Observe space with the unchanged Source comparison before fault injection.",
+        "Keep the original read task active until its explicit release; snapshot pending lifecycle state.",
+        "Release it by throwing a unique IOException instance.",
+        "Await the original run, preserve the producer failure identity and independently await all started read/render tasks and view disposal."
+      ],
+      "route": "legacy",
+      "input": "\u001b[32:65;2u",
+      "injectionAfterStartup": true,
+      "gate": "one bounded TaskCompletionSource with RunContinuationsAsynchronously; CancellationToken registration records cancellation but does not release a noncooperative operation",
+      "checkpointAssertions": [
+        "The target operation entered exactly once and remains active at the held checkpoint.",
+        "No completed run/dispose/acknowledgement may report a join while its owned operation is still held.",
+        "Capture task status and a monotonically ordered log at explicit gate/cancellation/settlement signals; use no sleep as the causal proof."
+      ],
+      "finalAssertions": [
+        "Every started read and write has a settled counter; ActiveReads=ActiveWrites=0.",
+        "The exact original run, physical I/O and paint/dispose tasks are awaited; no replacement tasks or detached cleanup.",
+        "The borrowed terminal disposal count is zero; view/stop/receipt resources complete exactly once.",
+        "For failure, retain the injected exception as primary and record all cleanup exceptions; for cancellation, retain OperationCanceledException rather than a successful EOF.",
+        "The editor focus attachment is detached after full join; acknowledged receipt/end notifications are joined and not silently dropped.",
+        "Record the actual boundary and source/DLL identities and every causal event; any failed retention/settlement prevents acceptance."
+      ]
+    },
+    {
+      "id": "legacy-held-write-cancellation",
+      "resource": "write",
+      "trigger": "cancel",
+      "steps": [
+        "Finish initial view/startup paint before arming a one-write gate.",
+        "Queue exact ESC[32:65;2u; hold the next actual view WriteAsync and await WriteEntered.",
+        "The held write deliberately ignores cancellation; retain full write text/index and the actual alternate draft callback as evidence.",
+        "Cancel the owned run; await CancellationObserved and the cooperative reader-settled signal; record pending run/render/dispose state while ActiveWrites remains one.",
+        "Release the same write normally, await the original run and all write/render/dispose tasks, and retain the original cancellation outcome."
+      ],
+      "route": "legacy",
+      "input": "\u001b[32:65;2u",
+      "injectionAfterStartup": true,
+      "gate": "one bounded TaskCompletionSource with RunContinuationsAsynchronously; CancellationToken registration records cancellation but does not release a noncooperative operation",
+      "checkpointAssertions": [
+        "The target operation entered exactly once and remains active at the held checkpoint.",
+        "No completed run/dispose/acknowledgement may report a join while its owned operation is still held.",
+        "Capture task status and a monotonically ordered log at explicit gate/cancellation/settlement signals; use no sleep as the causal proof."
+      ],
+      "finalAssertions": [
+        "Every started read and write has a settled counter; ActiveReads=ActiveWrites=0.",
+        "The exact original run, physical I/O and paint/dispose tasks are awaited; no replacement tasks or detached cleanup.",
+        "The borrowed terminal disposal count is zero; view/stop/receipt resources complete exactly once.",
+        "For failure, retain the injected exception as primary and record all cleanup exceptions; for cancellation, retain OperationCanceledException rather than a successful EOF.",
+        "The editor focus attachment is detached after full join; acknowledged receipt/end notifications are joined and not silently dropped.",
+        "Record the actual boundary and source/DLL identities and every causal event; any failed retention/settlement prevents acceptance."
+      ]
+    },
+    {
+      "id": "legacy-held-write-failure",
+      "resource": "write",
+      "trigger": "failure",
+      "steps": [
+        "Finish startup before arming the next actual write; queue the exact alternate once and await WriteEntered.",
+        "Keep that original write pending; record the actual draft and attempted full write without claiming the partially written frame matches Source.",
+        "Release the original write by throwing a unique IOException instance.",
+        "Await the original run and keep that failure as primary; explicitly await the reader cancellation, original render callback and owned view disposal, recording any secondary cleanup error separately."
+      ],
+      "route": "legacy",
+      "input": "\u001b[32:65;2u",
+      "injectionAfterStartup": true,
+      "gate": "one bounded TaskCompletionSource with RunContinuationsAsynchronously; CancellationToken registration records cancellation but does not release a noncooperative operation",
+      "checkpointAssertions": [
+        "The target operation entered exactly once and remains active at the held checkpoint.",
+        "No completed run/dispose/acknowledgement may report a join while its owned operation is still held.",
+        "Capture task status and a monotonically ordered log at explicit gate/cancellation/settlement signals; use no sleep as the causal proof."
+      ],
+      "finalAssertions": [
+        "Every started read and write has a settled counter; ActiveReads=ActiveWrites=0.",
+        "The exact original run, physical I/O and paint/dispose tasks are awaited; no replacement tasks or detached cleanup.",
+        "The borrowed terminal disposal count is zero; view/stop/receipt resources complete exactly once.",
+        "For failure, retain the injected exception as primary and record all cleanup exceptions; for cancellation, retain OperationCanceledException rather than a successful EOF.",
+        "The editor focus attachment is detached after full join; acknowledged receipt/end notifications are joined and not silently dropped.",
+        "Record the actual boundary and source/DLL identities and every causal event; any failed retention/settlement prevents acceptance."
+      ]
+    },
+    {
+      "id": "acknowledged-held-read-cancellation",
+      "resource": "read",
+      "trigger": "cancel",
+      "steps": [
+        "Finish startup paint and arm the next physical read gate.",
+        "Queue exact ESC[32:65;2u once; await admission and the subsequent held ReadEntered signal.",
+        "Observe the corrected space draft/frame through the existing same-focus barrier while the physical read remains held.",
+        "Cancel the owned run token; await the gate CancellationObserved signal without completing the borrowed read.",
+        "At the retained checkpoint record active read, run/reader/view-dispose task state and causal event order; no cooperative EOF substitutes the gate.",
+        "Release the same read with EOF after cancellation, await the original run and owned close/dispose tasks, and record the original OperationCanceledException."
+      ],
+      "route": "acknowledged",
+      "input": "\u001b[32:65;2u",
+      "injectionAfterStartup": true,
+      "gate": "one bounded TaskCompletionSource with RunContinuationsAsynchronously; CancellationToken registration records cancellation but does not release a noncooperative operation",
+      "checkpointAssertions": [
+        "The target operation entered exactly once and remains active at the held checkpoint.",
+        "No completed run/dispose/acknowledgement may report a join while its owned operation is still held.",
+        "Capture task status and a monotonically ordered log at explicit gate/cancellation/settlement signals; use no sleep as the causal proof."
+      ],
+      "finalAssertions": [
+        "Every started read and write has a settled counter; ActiveReads=ActiveWrites=0.",
+        "The exact original run, physical I/O and paint/dispose tasks are awaited; no replacement tasks or detached cleanup.",
+        "The borrowed terminal disposal count is zero; view/stop/receipt resources complete exactly once.",
+        "For failure, retain the injected exception as primary and record all cleanup exceptions; for cancellation, retain OperationCanceledException rather than a successful EOF.",
+        "The editor focus attachment is detached after full join; acknowledged receipt/end notifications are joined and not silently dropped.",
+        "Record the actual boundary and source/DLL identities and every causal event; any failed retention/settlement prevents acceptance."
+      ]
+    },
+    {
+      "id": "acknowledged-held-read-failure",
+      "resource": "read",
+      "trigger": "failure",
+      "steps": [
+        "Finish startup paint; queue exact alternate once and hold the following physical read.",
+        "Observe space with the unchanged Source comparison before fault injection.",
+        "Keep the original read task active until its explicit release; snapshot pending lifecycle state.",
+        "Release it by throwing a unique IOException instance.",
+        "Await the original run, preserve the producer failure identity and independently await all started read/render tasks and view disposal."
+      ],
+      "route": "acknowledged",
+      "input": "\u001b[32:65;2u",
+      "injectionAfterStartup": true,
+      "gate": "one bounded TaskCompletionSource with RunContinuationsAsynchronously; CancellationToken registration records cancellation but does not release a noncooperative operation",
+      "checkpointAssertions": [
+        "The target operation entered exactly once and remains active at the held checkpoint.",
+        "No completed run/dispose/acknowledgement may report a join while its owned operation is still held.",
+        "Capture task status and a monotonically ordered log at explicit gate/cancellation/settlement signals; use no sleep as the causal proof."
+      ],
+      "finalAssertions": [
+        "Every started read and write has a settled counter; ActiveReads=ActiveWrites=0.",
+        "The exact original run, physical I/O and paint/dispose tasks are awaited; no replacement tasks or detached cleanup.",
+        "The borrowed terminal disposal count is zero; view/stop/receipt resources complete exactly once.",
+        "For failure, retain the injected exception as primary and record all cleanup exceptions; for cancellation, retain OperationCanceledException rather than a successful EOF.",
+        "The editor focus attachment is detached after full join; acknowledged receipt/end notifications are joined and not silently dropped.",
+        "Record the actual boundary and source/DLL identities and every causal event; any failed retention/settlement prevents acceptance."
+      ]
+    },
+    {
+      "id": "acknowledged-held-write-cancellation",
+      "resource": "write",
+      "trigger": "cancel",
+      "steps": [
+        "Finish initial view/startup paint before arming a one-write gate.",
+        "Queue exact ESC[32:65;2u; hold the next actual view WriteAsync and await WriteEntered.",
+        "The held write deliberately ignores cancellation; retain full write text/index and the actual alternate draft callback as evidence.",
+        "Cancel the owned run; await CancellationObserved and the cooperative reader-settled signal; record pending run/render/dispose state while ActiveWrites remains one.",
+        "Release the same write normally, await the original run and all write/render/dispose tasks, and retain the original cancellation outcome."
+      ],
+      "route": "acknowledged",
+      "input": "\u001b[32:65;2u",
+      "injectionAfterStartup": true,
+      "gate": "one bounded TaskCompletionSource with RunContinuationsAsynchronously; CancellationToken registration records cancellation but does not release a noncooperative operation",
+      "checkpointAssertions": [
+        "The target operation entered exactly once and remains active at the held checkpoint.",
+        "No completed run/dispose/acknowledgement may report a join while its owned operation is still held.",
+        "Capture task status and a monotonically ordered log at explicit gate/cancellation/settlement signals; use no sleep as the causal proof."
+      ],
+      "finalAssertions": [
+        "Every started read and write has a settled counter; ActiveReads=ActiveWrites=0.",
+        "The exact original run, physical I/O and paint/dispose tasks are awaited; no replacement tasks or detached cleanup.",
+        "The borrowed terminal disposal count is zero; view/stop/receipt resources complete exactly once.",
+        "For failure, retain the injected exception as primary and record all cleanup exceptions; for cancellation, retain OperationCanceledException rather than a successful EOF.",
+        "The editor focus attachment is detached after full join; acknowledged receipt/end notifications are joined and not silently dropped.",
+        "Record the actual boundary and source/DLL identities and every causal event; any failed retention/settlement prevents acceptance."
+      ]
+    },
+    {
+      "id": "acknowledged-held-write-failure",
+      "resource": "write",
+      "trigger": "failure",
+      "steps": [
+        "Finish startup before arming the next actual write; queue the exact alternate once and await WriteEntered.",
+        "Keep that original write pending; record the actual draft and attempted full write without claiming the partially written frame matches Source.",
+        "Release the original write by throwing a unique IOException instance.",
+        "Await the original run and keep that failure as primary; explicitly await the reader cancellation, original render callback and owned view disposal, recording any secondary cleanup error separately."
+      ],
+      "route": "acknowledged",
+      "input": "\u001b[32:65;2u",
+      "injectionAfterStartup": true,
+      "gate": "one bounded TaskCompletionSource with RunContinuationsAsynchronously; CancellationToken registration records cancellation but does not release a noncooperative operation",
+      "checkpointAssertions": [
+        "The target operation entered exactly once and remains active at the held checkpoint.",
+        "No completed run/dispose/acknowledgement may report a join while its owned operation is still held.",
+        "Capture task status and a monotonically ordered log at explicit gate/cancellation/settlement signals; use no sleep as the causal proof."
+      ],
+      "finalAssertions": [
+        "Every started read and write has a settled counter; ActiveReads=ActiveWrites=0.",
+        "The exact original run, physical I/O and paint/dispose tasks are awaited; no replacement tasks or detached cleanup.",
+        "The borrowed terminal disposal count is zero; view/stop/receipt resources complete exactly once.",
+        "For failure, retain the injected exception as primary and record all cleanup exceptions; for cancellation, retain OperationCanceledException rather than a successful EOF.",
+        "The editor focus attachment is detached after full join; acknowledged receipt/end notifications are joined and not silently dropped.",
+        "Record the actual boundary and source/DLL identities and every causal event; any failed retention/settlement prevents acceptance."
+      ]
+    }
+  ],
+  "implementationPoints": [
+    "Extend the owned ReplayTerminal with explicitly armed read/write gates and first-failure injection; no production API/controller/session/transport edits.",
+    "Extend owned ReplayHarness.Start/Close to preserve the original run/paint/read/write tasks and expected-failure receipts rather than hide faults behind the current EOF-only close.",
+    "Use existing TerminalChatInput host routes and actual TerminalSessionView. Do not seed Source text/cursor, claim a partial frame equality, acquire real console handles or dispose borrowed terminals."
+  ],
+  "executionPrerequisite": "Fresh parent policy-permitted boundary; no native build/run, blocked artifact retry/repackaging/alternate host, or full/physical gate substitution authorized.",
+  "implemented": false,
+  "compiled": false,
+  "executed": false,
+  "behaviorAcceptance": false
+}

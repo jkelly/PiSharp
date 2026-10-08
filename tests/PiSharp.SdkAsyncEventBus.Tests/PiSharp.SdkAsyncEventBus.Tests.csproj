@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup Condition="'$(SdkEventBusRetainedProductsRoot)' == ''">
+    <ProjectReference Include="../../src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(SdkEventBusRetainedProductsRoot)' != ''">
+    <Reference Include="PiSharp.Extensions.Runtime"><HintPath>$(SdkEventBusRetainedProductsRoot)/PiSharp.Extensions.Runtime.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="PiSharp.Extensions.Abstractions"><HintPath>$(SdkEventBusRetainedProductsRoot)/PiSharp.Extensions.Abstractions.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="PiSharp.Contracts"><HintPath>$(SdkEventBusRetainedProductsRoot)/PiSharp.Contracts.dll</HintPath><Private>true</Private></Reference>
+  </ItemGroup>
+</Project>

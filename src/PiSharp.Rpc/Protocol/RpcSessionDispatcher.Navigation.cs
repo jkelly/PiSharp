@@ -101,6 +101,11 @@ public sealed partial class RpcSessionDispatcher
         {
             CheckOpen();
             view = _navigation ?? throw new RpcCommandException(command.Id, command.Type, "Navigation view is retired.");
+            // Fence further tree effects after a delivery fault. Concurrent commands
+            // admitted before this fence remain owned and retain their own originals.
+            lock (_gate) if (view.Mode == "tree" && !_sessionTreePublicationFailures.IsEmpty)
+                throw new RpcCommandException(command.Id, command.Type,
+                    "Session tree selection committed; lifecycle publication failed. Inspect the committed state before reopening navigation.");
             if (view.Id != command.Message || view.Mode != command.Mode || view.Core.Generation != command.ExpectedGeneration ||
                 _sessionOwner is null || !ReferenceEquals(_sessionOwner.Current, view.Core.Attachment) ||
                 !ReferenceEquals(_session, view.Core.Attachment.Session) || !view.Choices.Any(choice => choice.Id == command.TargetId))
@@ -133,8 +138,31 @@ public sealed partial class RpcSessionDispatcher
                 {
                     cancellation.ThrowIfCancellationRequested();
                     Preflight(preview.EditorText, preview.NewLeafId, preview.SessionId, view.Core.Generation);
+                    if (_selectedTreePublisher is not null)
+                        _ = TreePublicationFailureResponse(command, preview.SessionId, view.Core.Generation, preview.NewLeafId);
                     return ValueTask.FromResult(true);
                 }).ConfigureAwait(false);
+            if (receipt.Disposition == SessionTreeNavigationDisposition.Selected && _selectedTreePublisher is not null)
+            {
+                Task? original = null;
+                var priorCallback = _inCallback.Value;
+                _inCallback.Value = true;
+                try
+                {
+                    // Acquire once and join without the caller's postcommit cancellation.
+                    // The accepted chooser supplies oldLeaf, never a later owner read.
+                    original = _selectedTreePublisher(receipt, view.Core.LeafId).AsTask();
+                    await original.ConfigureAwait(false);
+                }
+                catch (Exception direct)
+                {
+                    var failure = new RpcSessionTreePublicationException(receipt, original,
+                        original is { IsFaulted: true } ? original.Exception! : direct, direct);
+                    lock (_gate) _sessionTreePublicationFailures = _sessionTreePublicationFailures.Add(failure);
+                    throw failure;
+                }
+                finally { _inCallback.Value = priorCallback; }
+            }
             return Response(receipt.Disposition.ToString(), receipt.View.Generation, receipt.EditorText, receipt.LeafId, receipt.SessionId);
         }
         if (!_sessionOwner!.CanCreateSessions) throw new RpcCommandException(command.Id, command.Type, "Fork is unavailable.");

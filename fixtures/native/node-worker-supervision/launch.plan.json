@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "kind": "authored-fixed-node-worker-process-plan",
+  "status": "Owner stdout-drain correction authored; root gates 6/4, 7/3, 7/3 passed/failed; next actual gate pending",
+  "sourceCapture": false,
+  "author": { "model": "gpt-6.1-sol", "reasoningEffort": "xhigh" },
+  "runtime": {
+    "approvedRecordedPath": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+    "version": "v24.19.0",
+    "platform": "win32",
+    "architecture": "x64",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+    "selection": "Explicit local absolute caller path; identical admitted bytes required; no PATH search or acquisition"
+  },
+  "entry": {
+    "path": "tools/NodeWorker/protocol-probe-worker.mjs",
+    "bytes": 14271,
+    "sha256": "96aef982693de523a759cbd0254d1fe61f6eb57ec3f1a2727b9d2c54ebab8cdb",
+    "origin": "Authored fixed protocol/lifecycle peer, not upstream Pi or a TypeScript facade",
+    "imports": ["node:fs", "node:path", "node:child_process", "node:url"],
+    "externalDependencies": [],
+    "modes": ["normal", "no-hello", "wrong-generation", "exit-before-hello", "ignore-shutdown"],
+    "privateFixedChildMode": "owned-child",
+    "arguments": ["--worker-generation", "--session-generation", "--mode"]
+  },
+  "ownership": {
+    "runRoot": "Fresh absolute caller-owned root, outside repository/runtime; atomic creation; uncertain roots preserved",
+    "environment": ["HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TMP", "TEMP", "TMPDIR", "SystemRoot", "WINDIR"],
+    "inheritedSecrets": false,
+    "stdout": "Accepted strict v1 byte protocol until the borrowed read pump joins; subsequent bounded physical drain has no protocol event/response/callback authority",
+    "stderr": "Independent bounded raw prefix, observed total bytes and streaming SHA256; overflow faults and terminates",
+    "pins": "Executable and complete entry held read-only through actual process/protocol/child joins and rechecked",
+    "receipts": ["launch.receipt.json", "stderr.bin", "stdout-after-protocol.bin", "termination.json", "peer-cleanup.receipt.json", "shutdown-tail.receipt.json", "effect.receipt.json", "owned-child.json"],
+    "retry": "None; actual effects can remain unknown after a lost reply",
+    "cleanup": "Shared awaited task; owned stdin closes after stopped/write settlement; one bounded raw stdout reader starts only after actual protocol Completion/read-pump join; its physical EOF plus actual root/child exits, writes/callbacks and stderr EOF join"
+  },
+  "limits": {
+    "startupMilliseconds": 5000,
+    "shutdownGraceMilliseconds": 500,
+    "livenessMilliseconds": 2000,
+    "maximumStderrBytes": 65536,
+    "stderrReadBufferBytes": 4096,
+    "maximumStdoutAfterProtocolBytes": 65536,
+    "stdoutAfterProtocolReadBufferBytes": 4096,
+    "peerFrameBytes": 1048576,
+    "peerPendingCalls": 32,
+    "peerActiveHandlers": 16,
+    "peerPendingWrites": 32,
+    "peerRetainedWireBytes": 8388608
+  },
+  "testGate": {
+    "class": "NodeWorkerSupervisorTests",
+    "casesApi": "Cases(string dotnetHost, string nodePath, string repoRoot)",
+    "project": "tests/PiSharp.ExtensionHost.ProcessTests/PiSharp.ExtensionHost.ProcessTests.csproj",
+    "definedGroups": 10,
+    "executedByAuthor": 0,
+    "failureDiagnostics": "Affected positive groups retain bounded primary-test-failure.json before disposal and aggregate distinct primary/cleanup errors; no assertion/error suppression",
+    "scratch": "Fresh per-group parent beneath caller-set TMPDIR/TEMP, with fresh physical child run roots; preserve all receipts",
+    "realLinkNegativePrerequisite": "Fresh task-local Windows directory junction must be created and its actual ReparsePoint/target verified; no skip or system/security change; remove only the checked junction without target traversal",
+    "groups": [
+      "Read-only admission: missing/wrong runtime, tampered fixed entry, overlaps, existing root, actual link and late ownership",
+      "Real runtime identity, complete cleared environment, Unicode/NUL/tagged values and stderr separation",
+      "Startup no-hello timeout, wrong generation and exit before hello with joined facts",
+      "Native callback reentrancy into actual worker request; complete ordered progress and result",
+      "Sent cancellation retains pending state until actual authored release; no retry",
+      "Actual paused-stdin pipe backpressure, queued NotSent cancellation, grace and real write settlement",
+      "Single fixed receipt before exit without reply: Unknown effect outcome",
+      "Stderr overflow, stdout contamination and fixed post-ack tail overflow terminate and join",
+      "Ignored shutdown and one fixed child: actual process-tree termination and both exits joined",
+      "Generation replacement, cooperative native callback finalization, stale handles and shared cleanup"
+    ]
+  },
+  "remainingMandatoryWork": [
+    "Root corrected build and actual process-gate execution; independent review",
+    "Real unchanged extension corpus/native facade comparison against separate 87d169 reference",
+    "Original loader/public virtual namespace/dependency branches",
+    "Native registration/reducer/broker/policy/final-argument and snapshot composition",
+    "Worker discovery/runtime and continuous heartbeat/platform policy",
+    "General trusted-extension descendant recovery and noncooperative native callback policy",
+    "P7-01 feasibility, P7-02 support matrix, P7-05 through P7-10 and P7-G"
+  ],
+  "firstRootGate": {
+    "snapshot": "b3d241c979b05c2936e16922f705c85cc76e5719",
+    "buildWarnings": 0,
+    "buildErrors": 0,
+    "passedGroups": 6,
+    "failedGroups": 4,
+    "log": "artifacts/node-worker-supervision-first-process.log",
+    "report": "artifacts/node-worker/process-results.json",
+    "facts": "Three normal peers emitted probe-stop but remained alive with owned stdin open until grace expired; symbolic-link fixture creation failed with required Windows privilege absent",
+    "correction": "Close owned stdin at the real stopped/write-settlement barrier; defer peer EOF admission until delivered frames settle while declared uncooperative mode survives EOF; publish hold release waiter before progress; replace privilege-dependent fixture with verified task-local junction"
+  },
+  "firstCorrectionRootGate": {
+    "snapshot": "221e13db0afc95d31a71b8dfa1980827bd87d895",
+    "buildWarnings": 0,
+    "buildErrors": 0,
+    "passedGroups": 7,
+    "failedGroups": 3,
+    "log": "artifacts/node-worker-supervision-corrected-process.log",
+    "report": "artifacts/node-worker/process-results.json",
+    "facts": "Actual junction admission passed; nested, cancellation and fresh-generation normal peers again acknowledged shutdown then were killed at unchanged grace, exit -1; final snapshots joined but did not establish pre-timeout stage state",
+    "nextCorrection": "Await stdout end after all handler/write/ack/stderr callbacks settle, then release public stdio references; retain actual bounded peer resource/stream stages and native cleanup task/snapshot stages; preserve primary assertion errors if awaited fixture disposal also fails",
+    "claims": "Candidate pending root execution; no process.exit(0), extended grace, weakened no-kill assertion or extension parity"
+  },
+  "secondCorrectionRootGate": {
+    "snapshot": "c5fb8e2ba801e8a42e7da7927a642e341952a87f",
+    "buildWarnings": 0,
+    "buildErrors": 0,
+    "passedGroups": 7,
+    "failedGroups": 3,
+    "log": "artifacts/node-worker-supervision-second-corrected-process.log",
+    "report": "artifacts/node-worker/process-results.json",
+    "actualFailureFields": "Nested PID28304, cancellation PID9892 and fresh-generation PID14812: native grace InputClosed/InputCloseCompleted/ProtocolCompleted true, pending/callback/write/buffer zero, exit/stderr incomplete. Peer stops before stdout.end callback after stdin destruction, with zero work/bytes, no Timeout and 3 PipeWrap resources",
+    "ordinaryWritableFlagCorrection": "Passing runtime PID33736 actually observes writableEnded=false and writableFinished=false after its end callback; replace only the two new unpassed true expectations with these pinned special-stdio observations, retaining callback stages and natural exit requirements",
+    "nextCorrection": "Bounded exclusive physical stdout drain after actual protocol reader join; grace/final joins include drain; overflow/read fault forces owned termination. Fixed131072-byte attempted post-ack tail/cap64 negative records actual prefix/total/overflow/EOF without delivery or event-admission claims",
+    "claims": "New candidate pending actual execution; all ten groups, old assertions, 500ms grace and no-kill positives retained"
+  },
+  "claims": { "nativeProcessSliceAuthored": true, "actualProcessGatePassed": false, "upstreamExtensionParity": false, "phaseCompletion": false }
+}

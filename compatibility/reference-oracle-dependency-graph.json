@@ -1,0 +1,232 @@
+{
+  "scope": "Advisory stripped-source static imports for explicit-stream runAgentLoop and assistant frame reducer; runtime qualification still required",
+  "sourceRoot": "<verified public Pi v0.99.1 checkout>",
+  "runtime": "v24.19.0",
+  "sourceExecuted": false,
+  "modules": [
+    {
+      "path": "packages/agent/src/agent-loop.ts",
+      "sha256": "e773e822a2587caf314e6bb66ea6370fce3468b7eecd26d6a67afe673f81eabc",
+      "imports": [
+        "@earendil-works/pi-ai",
+        "./stream-fn.ts"
+      ]
+    },
+    {
+      "path": "packages/agent/src/stream-fn.ts",
+      "sha256": "1f9dee101a5ce1052558458d9ce47e53e05187224e879217899059a80d90bc45",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/api/lazy.ts",
+      "sha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a",
+      "imports": [
+        "../utils/event-stream.ts"
+      ]
+    },
+    {
+      "path": "packages/ai/src/auth/context.ts",
+      "sha256": "03101bfa711fad214af111e25328b6f607d6b0a7ebfe289af58a89cd55baf639",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/auth/credential-store.ts",
+      "sha256": "50ebde56b80b5862025e031719006ea303edd9aa80fec780fbc64319bb9e2847",
+      "imports": [
+        "../utils/abort.ts"
+      ]
+    },
+    {
+      "path": "packages/ai/src/auth/helpers.ts",
+      "sha256": "37b4c7f8048f09a54363607fa91bb1c265ddfe0790067de3c3220c1f06485b90",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/auth/resolve.ts",
+      "sha256": "d03ed5bf0abcbdc482df879f209156f18f8bfdc381869db77301a8273f990007",
+      "imports": [
+        "../utils/abort.ts",
+        "../utils/models-error.ts",
+        "../utils/models-error.ts"
+      ]
+    },
+    {
+      "path": "packages/ai/src/auth/types.ts",
+      "sha256": "8fb9acd4c998502826b22df2d88bcded441cc473a606c5b7bdf21271afd1a74a",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/index.ts",
+      "sha256": "c909ef4f82daff2f494ce1aa29d8bd68390f6513c5aff047088cadb3fa96ecea",
+      "imports": [
+        "typebox",
+        "./api/lazy.ts",
+        "./auth/context.ts",
+        "./auth/credential-store.ts",
+        "./auth/helpers.ts",
+        "./auth/types.ts",
+        "./models.ts",
+        "./models-store.ts",
+        "./providers/faux.ts",
+        "./session-resources.ts",
+        "./types.ts",
+        "./utils/assistant-message-frame.ts",
+        "./utils/diagnostics.ts",
+        "./utils/event-stream.ts",
+        "./utils/json-parse.ts",
+        "./utils/overflow.ts",
+        "./utils/retry.ts",
+        "./utils/text.ts",
+        "./utils/transcript.ts",
+        "./utils/typebox-helpers.ts",
+        "./utils/uuid.ts",
+        "./utils/validation.ts"
+      ]
+    },
+    {
+      "path": "packages/ai/src/models-store.ts",
+      "sha256": "34ee433ca1501e98d19f31e0e5adf8d1721902e9f35e46c270626e32d7f711cc",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/models.ts",
+      "sha256": "4739010c7e4f7596607b1dd495b9d5ab6cd921e29f55c5c331259a04b7253269",
+      "imports": [
+        "./api/lazy.ts",
+        "./auth/context.ts",
+        "./auth/credential-store.ts",
+        "./auth/resolve.ts",
+        "./models-store.ts",
+        "./utils/abort.ts",
+        "./utils/model-operations.ts",
+        "./utils/transcript.ts",
+        "./auth/resolve.ts",
+        "./utils/model-operations.ts"
+      ]
+    },
+    {
+      "path": "packages/ai/src/providers/faux.ts",
+      "sha256": "dcf37d154680cef0fa5188efd4881450073c5342a9b56cc9e25cee9b9f1ccfcc",
+      "imports": [
+        "../models.ts",
+        "../utils/event-stream.ts",
+        "../utils/text.ts"
+      ]
+    },
+    {
+      "path": "packages/ai/src/session-resources.ts",
+      "sha256": "3e6d76f038d6b7fe515ede0b6650d41a7df16eb4b3a9f1aa91c9de329ff092e2",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/types.ts",
+      "sha256": "7ac401b31a7679a77469037091093c4c25d3719d7c9e9078378fece509fa8e8d",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/utils/abort.ts",
+      "sha256": "e81dc16de331e82d7f15759b27e38c7d0a3d28955693e0cf157dd52dadea7035",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/utils/assistant-message-frame.ts",
+      "sha256": "e3db9eb5fb4a56f6c45b43ff6a5ef87347c8c19f28b0cbdf389b1ddf1928a6e9",
+      "imports": [
+        "./json-parse.ts"
+      ]
+    },
+    {
+      "path": "packages/ai/src/utils/diagnostics.ts",
+      "sha256": "06fcbc2347f65a43938078094a7118036b5f12e73147affb5c73cd72753443f0",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/utils/event-stream.ts",
+      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/utils/json-parse.ts",
+      "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "imports": [
+        "partial-json"
+      ]
+    },
+    {
+      "path": "packages/ai/src/utils/model-operations.ts",
+      "sha256": "d024c049a08df73498362f297ca10c45a401fb5a3364c0a4d7890ec92a3c4763",
+      "imports": [
+        "./models-error.ts"
+      ]
+    },
+    {
+      "path": "packages/ai/src/utils/models-error.ts",
+      "sha256": "f35f82bd86123be7ef05e86036f18e8d3d5df14f394f558b22c38b23d122c12c",
+      "imports": [
+        "./diagnostics.ts"
+      ]
+    },
+    {
+      "path": "packages/ai/src/utils/overflow.ts",
+      "sha256": "9a7200aac0cce1769e3acdf01e66048fea0ee62f3a93a3dac08055c41a33e2cb",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/utils/retry.ts",
+      "sha256": "58a081dc9e2e8f6c381e11d38ed4f9e1df33e30c35d1f94b2b40ea4a1c3ec6c7",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/utils/text.ts",
+      "sha256": "d37c1825855c7fc71669a545b5b266810242c1c7e58d57228c0c143f29c1c544",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/utils/transcript.ts",
+      "sha256": "cad0c126cdfadc1b4f430cc5a95b1c9285ecd1ee9957642d7773b1357bbc9ac5",
+      "imports": [
+        "./text.ts"
+      ]
+    },
+    {
+      "path": "packages/ai/src/utils/typebox-helpers.ts",
+      "sha256": "caf756258ce20c793dc8002cb8130a8efce18a7b5262ba0c54832b96f5a76e9f",
+      "imports": [
+        "typebox"
+      ]
+    },
+    {
+      "path": "packages/ai/src/utils/uuid.ts",
+      "sha256": "234a48d4b999e69188fdfa49173ccfa7887d947e443ef206cc30219515105a1f",
+      "imports": []
+    },
+    {
+      "path": "packages/ai/src/utils/validation.ts",
+      "sha256": "460786b57dead200e411b9afec916a5049c96ebcff4da082096456ac06d44fb7",
+      "imports": [
+        "typebox/compile",
+        "typebox/value"
+      ]
+    }
+  ],
+  "externalImports": {
+    "partial-json": [
+      "packages/ai/src/utils/json-parse.ts"
+    ],
+    "typebox": [
+      "packages/ai/src/index.ts",
+      "packages/ai/src/utils/typebox-helpers.ts"
+    ],
+    "typebox/compile": [
+      "packages/ai/src/utils/validation.ts"
+    ],
+    "typebox/value": [
+      "packages/ai/src/utils/validation.ts"
+    ]
+  },
+  "unresolved": [],
+  "dynamicModules": [
+    "packages/ai/src/auth/context.ts",
+    "packages/ai/src/auth/helpers.ts"
+  ]
+}

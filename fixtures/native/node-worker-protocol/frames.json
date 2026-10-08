@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "kind": "authored-native-protocol-frames",
+  "sourceCapture": false,
+  "frames": [
+    {
+      "version": 1,
+      "kind": "hello",
+      "workerGeneration": 3,
+      "sessionGeneration": 7,
+      "features": [
+        "requests",
+        "callbacks",
+        "progress",
+        "cancel",
+        "tagged-values"
+      ]
+    },
+    {
+      "version": 1,
+      "kind": "request",
+      "workerGeneration": 3,
+      "sessionGeneration": 7,
+      "id": 1,
+      "method": "outer",
+      "value": {
+        "presence": "undefined"
+      }
+    },
+    {
+      "version": 1,
+      "kind": "request",
+      "workerGeneration": 3,
+      "sessionGeneration": 7,
+      "id": 1,
+      "method": "callback",
+      "value": {
+        "presence": "absent"
+      },
+      "handle": {
+        "ownerId": "fixture-extension",
+        "ownerGeneration": 2,
+        "registrationId": "r1",
+        "callbackId": "c1"
+      }
+    },
+    {
+      "version": 1,
+      "kind": "progress",
+      "workerGeneration": 3,
+      "sessionGeneration": 7,
+      "id": 1,
+      "value": {
+        "presence": "json",
+        "data": {
+          "text": "step\u0000a b 👋"
+        }
+      }
+    },
+    {
+      "version": 1,
+      "kind": "response",
+      "workerGeneration": 3,
+      "sessionGeneration": 7,
+      "id": 1,
+      "value": {
+        "presence": "json",
+        "data": null
+      }
+    },
+    {
+      "version": 1,
+      "kind": "cancel",
+      "workerGeneration": 3,
+      "sessionGeneration": 7,
+      "id": 2
+    },
+    {
+      "version": 1,
+      "kind": "error",
+      "workerGeneration": 3,
+      "sessionGeneration": 7,
+      "id": 2,
+      "error": {
+        "code": "Cancelled",
+        "outcome": "unknown"
+      }
+    },
+    {
+      "version": 1,
+      "kind": "shutdown",
+      "workerGeneration": 3,
+      "sessionGeneration": 7
+    }
+  ]
+}

@@ -4,6 +4,7 @@ using PiSharp.AI;
 using PiSharp.Agent;
 using PiSharp.Contracts;
 using PiSharp.Sessions.Context;
+using PiSharp.CodingAgent.ToolSelection;
 
 namespace PiSharp.CodingAgent;
 
@@ -15,6 +16,8 @@ public sealed record SessionRegisteredTool(JsonData Declaration, IPreparedToolAd
     public ToolExposure Exposure { get; init; } = ToolExposure.Direct;
     public ToolNamespace? Namespace { get; init; }
     public bool DefaultActive { get; init; } = true;
+    /// <summary>Catalog origin for default-extension initial selection; never inferred from the tool name.</summary>
+    public bool IsExtension { get; init; }
     public Func<ToolLoadout, ToolLoadoutChanges?>? PrepareLoadout { get; init; }
 }
 public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int MaximumTools = 128,
@@ -26,11 +29,18 @@ public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int 
     public ToolInvocationScopeOptions? InvocationScopes { get; init; }
     /// <summary>Bind nested calls to the actual ReplaceableAgentSession attachment before use.</summary>
     public bool BindNestedCallsToSessionOwner { get; init; }
+    public AllowedToolSelection? LifetimeToolSelection { get; init; }
+    public ImmutableArray<string>? InitialActiveToolNames { get; init; }
     public Action<string, Exception>? ReportLoadoutDiagnostic { get; init; }
+    /// <summary>Borrowed generation-bound drain of captured prepare diagnostics. Admitted reporter work must be directly joined.</summary>
+    public Func<CancellationToken, ValueTask>? DrainLoadoutDiagnostics { get; init; }
+    /// <summary>Explicit pure base-section construction, validated before the owning transcript append.</summary>
+    public Func<SessionPromptSectionRequest, SessionPromptSectionPreparation?>? PreparePromptSections { get; init; }
 }
 public sealed record SessionRuntimeSelection(AgentConfiguration Configuration, ImmutableArray<JsonData> ActiveToolDeclarations)
 {
     public ImmutableArray<ToolLoadoutDiagnostic> LoadoutDiagnostics { get; init; } = [];
+    public long ModelCatalogRevision { get; init; }
 }
 public sealed record SessionRuntimeUpdate(ModelDescriptor? Model = null, string? ThinkingLevel = null,
     TranscriptEntry? SystemMessage = null)
@@ -58,16 +68,21 @@ public sealed class SessionRuntimeRegistryException : Exception
 }
 
 /// <summary>Explicit borrowed model/adapters and mandatory final-action policy; no executable binding is read from disk.</summary>
-public sealed class SessionRuntimeRegistry
+public sealed partial class SessionRuntimeRegistry
 {
-    private readonly ImmutableDictionary<(string Provider, string Id), SessionModelBinding> _models;
     private readonly ImmutableDictionary<string, SessionRegisteredTool> _tools;
     private readonly ImmutableArray<SessionRegisteredTool> _registeredTools;
     private readonly IToolActionPolicy _policy;
     private readonly SessionRuntimeRegistryOptions _options;
+    private readonly SemaphoreSlim _loadoutDrain = new(1, 1);
+    private readonly AsyncLocal<bool> _inLoadoutDrain = new();
 
     public SessionRuntimeRegistry(ImmutableArray<SessionModelBinding> models, ImmutableArray<SessionRegisteredTool> tools,
         IToolActionPolicy policy, SessionRuntimeRegistryOptions? options = null)
+        : this(models, tools, policy, options, null) { }
+
+    private SessionRuntimeRegistry(ImmutableArray<SessionModelBinding> models, ImmutableArray<SessionRegisteredTool> tools,
+        IToolActionPolicy policy, SessionRuntimeRegistryOptions? options, ModelCatalogStore? retainedCatalog)
     {
         ArgumentNullException.ThrowIfNull(policy);
         _options = options ?? new();
@@ -78,8 +93,9 @@ public sealed class SessionRuntimeRegistry
         if (models.Length > _options.MaximumModels || tools.Length > _options.MaximumTools)
             throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
         var modelIndex = ImmutableDictionary.CreateBuilder<(string, string), SessionModelBinding>();
+        var thinkingIndex = ImmutableDictionary.CreateBuilder<(string, string), ImmutableArray<string>>();
         long modelCharacters = 0;
-        foreach (var binding in models)
+        foreach (var binding in retainedCatalog is null ? models : ImmutableArray<SessionModelBinding>.Empty)
         {
             if (binding?.Model is { } bounded &&
                 (long)(bounded.Provider?.Length ?? 0) + (bounded.Id?.Length ?? 0) + (bounded.Api?.Length ?? 0) >
@@ -91,8 +107,13 @@ public sealed class SessionRuntimeRegistry
                 !modelIndex.TryAdd((binding.Model.Provider, binding.Model.Id), binding))
                 throw Error(SessionRuntimeRegistryFailure.InvalidRegistration);
             modelCharacters += (long)binding.Model.Provider.Length + binding.Model.Id.Length + binding.Model.Api.Length;
+            try { thinkingIndex.Add((binding.Model.Provider, binding.Model.Id), ThinkingLevels.GetSupported(binding.Transport, binding.Model)); }
+            catch (ArgumentException) { throw Error(SessionRuntimeRegistryFailure.InvalidRegistration); }
             if (modelCharacters > _options.MaximumCharacters) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
         }
+        if (_options.LifetimeToolSelection is { } lifetime)
+            tools = lifetime.FilterCatalog(tools, tool => tool?.Declaration is { } declaration
+                ? Name(declaration.Value) : throw Error(SessionRuntimeRegistryFailure.InvalidRegistration));
         var toolIndex = ImmutableDictionary.CreateBuilder<string, SessionRegisteredTool>(StringComparer.Ordinal);
         long characters = 0;
         foreach (var registration in tools)
@@ -110,7 +131,7 @@ public sealed class SessionRuntimeRegistry
             if (name != adapterName || !toolIndex.TryAdd(name, registration with { Adapter = new NamedAdapter(name, registration.Adapter) }))
                 throw Error(SessionRuntimeRegistryFailure.InvalidRegistration);
         }
-        _models = modelIndex.ToImmutable(); _tools = toolIndex.ToImmutable(); _policy = policy;
+        _modelCatalog = retainedCatalog ?? new(new(0, models, modelIndex.ToImmutable(), thinkingIndex.ToImmutable())); _tools = toolIndex.ToImmutable(); _policy = policy;
         _registeredTools = tools.Select(tool => _tools[Name(tool.Declaration.Value)]).ToImmutableArray();
         // Validate invocation limits even when this registry initially declares no active tools.
         _ = _options.InvocationScopes is { } initialScopes
@@ -120,13 +141,53 @@ public sealed class SessionRuntimeRegistry
             : new ToolInvoker([], policy, options: _options.ToolInvokerOptions);
     }
 
+    public AllowedToolSelection? LifetimeToolSelection => _options.LifetimeToolSelection;
+    internal ImmutableArray<string>? InitialActiveToolNames => _options.InitialActiveToolNames;
+    internal SessionRuntimeRegistry RetainToolSelection(AllowedToolSelection? lifetime)
+    {
+        if (lifetime is null || ReferenceEquals(lifetime, LifetimeToolSelection)) return this;
+        return new(this, lifetime);
+    }
     internal bool RequiresInvocationOwner => _options.BindNestedCallsToSessionOwner;
+    internal bool HasLoadoutDiagnosticDrain => _options.DrainLoadoutDiagnostics is not null;
+    internal async ValueTask DrainLoadoutDiagnosticsAsync(CancellationToken token)
+    {
+        var drain = _options.DrainLoadoutDiagnostics; if (drain is null) return;
+        if (_inLoadoutDrain.Value) throw new InvalidOperationException("A diagnostic reporter cannot await its own registry drain.");
+        await _loadoutDrain.WaitAsync(token).ConfigureAwait(false);
+        var prior = _inLoadoutDrain.Value; _inLoadoutDrain.Value = true;
+        try { await drain(token).ConfigureAwait(false); }
+        finally { _inLoadoutDrain.Value = prior; _loadoutDrain.Release(); }
+    }
+    internal Task<T> PrepareAndDrainAsync<T>(Func<T> prepare, CancellationToken token)
+        => SessionLoadoutDiagnosticBoundary.RunAsync(prepare, () => DrainLoadoutDiagnosticsAsync(token));
+
+    /// <summary>Exact admitted native capabilities; catalog claims alone cannot enable a level.</summary>
+    public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor model)
+    {
+        var catalog = _modelCatalog.Read();
+        var binding = Model(model, catalog);
+        return catalog.Thinking[(binding.Model.Provider, binding.Model.Id)];
+    }
+
+    public string GetDefaultThinkingLevel(ModelDescriptor model)
+    {
+        var levels = GetSupportedThinkingLevels(model);
+        return levels.Contains("off", StringComparer.Ordinal) ? "off" : levels[0];
+    }
 
     private SessionRuntimeRegistry(SessionRuntimeRegistry source, ToolInvocationScopeOptions scopes)
     {
-        _models = source._models; _tools = source._tools; _registeredTools = source._registeredTools; _policy = source._policy;
+        _modelCatalog = source._modelCatalog; _tools = source._tools; _registeredTools = source._registeredTools; _policy = source._policy;
         _options = source._options with { InvocationScopes = scopes };
+        _loadoutDrain = source._loadoutDrain; _inLoadoutDrain = source._inLoadoutDrain;
     }
+    private SessionRuntimeRegistry(SessionRuntimeRegistry source, AllowedToolSelection lifetime)
+        : this(source._modelCatalog.Read().Bindings, source._registeredTools, source._policy,
+            source._options with { LifetimeToolSelection = lifetime,
+                InitialActiveToolNames = lifetime.SelectInitial(source._registeredTools.Select(tool => new ToolSelectionDescriptor(
+                    Name(tool.Declaration.Value), tool.Exposure, tool.DefaultActive, tool.IsExtension)).ToImmutableArray()) }, source._modelCatalog)
+    { _modelCatalog = source._modelCatalog; _loadoutDrain = source._loadoutDrain; _inLoadoutDrain = source._inLoadoutDrain; }
     internal SessionRuntimeRegistry BindInvocationOwner(ToolInvocationScopeOptions scopes) => new(this, scopes);
 
     internal ImmutableArray<string> NormalizeActiveTools(ImmutableArray<string> names, CancellationToken cancellationToken)
@@ -144,6 +205,7 @@ public sealed class SessionRuntimeRegistry
                 throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
             nameCharacters += name.Length;
             if (!Identity(name)) throw Error(SessionRuntimeRegistryFailure.InvalidRegistration);
+            if (_options.LifetimeToolSelection?.IsAllowed(name) == false) throw Error(SessionRuntimeRegistryFailure.UnknownTool);
             if (seen.Add(name) && _tools.TryGetValue(name, out var tool) && tool.Exposure != ToolExposure.Hidden)
                 selected.Add(name);
         }
@@ -175,27 +237,34 @@ public sealed class SessionRuntimeRegistry
     }
 
     public SessionRuntimeSelection Resolve(SessionContextProjection context, ModelDescriptor? fallbackModel = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, ImmutableArray<string>? initialActiveToolNames = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
+        var catalog = _modelCatalog.Read();
         SessionModelBinding model;
         if (context.Model is { } selected)
         {
-            if (!_models.TryGetValue((selected.Provider, selected.ModelId), out model!))
+            if (!catalog.Models.TryGetValue((selected.Provider, selected.ModelId), out model!))
                 throw Error(SessionRuntimeRegistryFailure.UnknownModel);
         }
-        else model = Model(fallbackModel);
-        return Resolve(model.Model, context.LlmMessages, context.ThinkingLevel, cancellationToken);
+        else model = Model(fallbackModel, catalog);
+        return ResolveCatalog(catalog, model.Model, context.LlmMessages, context.ThinkingLevel, cancellationToken, initialActiveToolNames: initialActiveToolNames);
     }
 
     public SessionRuntimeSelection Resolve(ModelDescriptor model, ImmutableArray<TranscriptEntry> messages,
         string thinkingLevel = "off", CancellationToken cancellationToken = default, bool prepareLoadout = true,
-        ToolLoadoutPresentation? preparedLoadout = null)
+        ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null)
+        => ResolveCatalog(_modelCatalog.Read(), model, messages, thinkingLevel, cancellationToken, prepareLoadout, preparedLoadout, initialActiveToolNames);
+
+    private SessionRuntimeSelection ResolveCatalog(ModelCatalog catalog, ModelDescriptor model, ImmutableArray<TranscriptEntry> messages,
+        string thinkingLevel = "off", CancellationToken cancellationToken = default, bool prepareLoadout = true,
+        ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var binding = Model(model);
-        if (thinkingLevel != "off") throw Error(SessionRuntimeRegistryFailure.UnsupportedThinkingLevel);
+        var binding = Model(model, catalog);
+        if (!catalog.Thinking[(binding.Model.Provider, binding.Model.Id)].Contains(thinkingLevel, StringComparer.Ordinal))
+            throw Error(SessionRuntimeRegistryFailure.UnsupportedThinkingLevel);
         if (messages.IsDefault) throw Error(SessionRuntimeRegistryFailure.InvalidTranscript);
         if (messages.Length > _options.MaximumMessages) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
         var active = new Dictionary<string, JsonData>(StringComparer.Ordinal);
@@ -229,6 +298,26 @@ public sealed class SessionRuntimeRegistry
                     }
                     active[name] = JsonData.FromElement(declaration);
                 }
+        }
+        if (initialActiveToolNames is { } initial)
+        {
+            if (initial.IsDefault || initial.Length > _options.MaximumDeclarations) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
+            var effective = new Dictionary<string, JsonData>(StringComparer.Ordinal); var effectiveOrder = new List<string>(); long initialCharacters = 0;
+            foreach (var name in initial)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (name is null || !Identity(name)) throw Error(SessionRuntimeRegistryFailure.InvalidRegistration);
+                if (name.Length > _options.MaximumCharacters - initialCharacters) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
+                initialCharacters += name.Length;
+                if (_options.LifetimeToolSelection?.IsAllowed(name) == false) continue;
+                if (!_tools.TryGetValue(name, out var tool)) throw Error(SessionRuntimeRegistryFailure.UnknownTool);
+                if (tool.Exposure is not (ToolExposure.Direct or ToolExposure.ModelOnly)) continue;
+                // A recorded declaration that remains selected still has to match its current admitted binding.
+                if (active.TryGetValue(name, out var recorded) && !Same(recorded.Value, tool.Declaration.Value, cancellationToken))
+                    throw Error(SessionRuntimeRegistryFailure.DeclarationMismatch);
+                if (effective.TryAdd(name, tool.Declaration)) effectiveOrder.Add(name);
+            }
+            active = effective; order = effectiveOrder;
         }
         var resolved = ImmutableArray.CreateBuilder<SessionRegisteredTool>();
         var rawDeclarations = ImmutableArray.CreateBuilder<JsonData>();
@@ -271,8 +360,9 @@ public sealed class SessionRuntimeRegistry
             } };
         }
         cancellationToken.ThrowIfCancellationRequested();
-        return new(new(binding.Model, binding.Transport, definitions, binding.ToolHooks, binding.ExecutionMode, hooks),
-            rawDeclarations.ToImmutable()) { LoadoutDiagnostics = loadoutDiagnostics };
+        return new(new AgentConfiguration(binding.Model, binding.Transport, definitions, binding.ToolHooks, binding.ExecutionMode, hooks)
+            { ThinkingLevel = thinkingLevel },
+            rawDeclarations.ToImmutable()) { LoadoutDiagnostics = loadoutDiagnostics, ModelCatalogRevision = catalog.Revision };
 
         void Count()
         {
@@ -280,13 +370,13 @@ public sealed class SessionRuntimeRegistry
         }
     }
 
-    private SessionModelBinding Model(ModelDescriptor? model)
+    private SessionModelBinding Model(ModelDescriptor? model, ModelCatalog catalog)
     {
         if (model is null || model.Provider is null || model.Id is null || model.Api is null)
             throw Error(SessionRuntimeRegistryFailure.UnknownModel);
         if ((long)model.Provider.Length + model.Id.Length + model.Api.Length > _options.MaximumCharacters)
             throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
-        if (!_models.TryGetValue((model.Provider, model.Id), out var binding) || binding.Model != model)
+        if (!catalog.Models.TryGetValue((model.Provider, model.Id), out var binding) || binding.Model != model)
             throw Error(SessionRuntimeRegistryFailure.UnknownModel);
         return binding;
     }
@@ -362,6 +452,7 @@ public sealed class SessionRuntimeRegistry
     }
     private sealed class NamedAdapter(string name, IPreparedToolAdapter inner) : IInvocationPreparedToolAdapter, IInitialToolArgumentPreparationAdapter
     {
+        public IPreparedToolAdapter Original => inner;
         public string Name => name;
         public ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken token) =>
             inner is IInitialToolArgumentPreparationAdapter initial

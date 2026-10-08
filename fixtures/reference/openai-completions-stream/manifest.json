@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "openai-completions-stream-three-cases",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "api.openai-completions",
+    "stream.indexed-events",
+    "stream.terminal-settlement"
+  ],
+  "input": {
+    "path": "fixtures/reference/openai-completions-stream/input.json",
+    "sha256": "fad084d8113bdbc482e79bd9fbc0070bb8895d701fee489fdf0cdfcc180e2607",
+    "kind": "authored-transcripts-options-and-in-memory-chat-completion-chunks"
+  },
+  "expected": {
+    "path": "fixtures/reference/openai-completions-stream/expected.json",
+    "sha256": "3d8214d2471e67580a14fbc8441aa35721c559312463e570411aa01dba68183d",
+    "kind": "captured-unchanged-openai-completions-wrapper-sdk"
+  },
+  "lock": {
+    "path": "tools/ReferenceOracle/openai-completions-stream.lock.json",
+    "sha256": "0f5f4ca5d6a6c93a95c4a0c27b640ff21c3460c9aef8e1112c0700c0605fffe9"
+  },
+  "nativeComparison": "not performed",
+  "independentAcceptance": "pending"
+}

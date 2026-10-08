@@ -1,0 +1,84 @@
+{
+  "provider": "dcb991cfdf66595564edd8bd9b3d6b10714f3af0",
+  "testsExecuted": 0,
+  "heldIoPins": 14,
+  "base": "8d40e2c244ba9fc76d4fb5e1c9acbd4cf7f42a42",
+  "sourceMerge": "01bf0473bfaba376382ed9393a46b2bcf5b12082",
+  "paths": [
+    {
+      "path": "docs/contracts/responses-http-sse.md",
+      "resolution": "Exact provider blob",
+      "provider": "3f378dc65da46d20d9158755bf2cf9145f4829f4",
+      "actual": "3f378dc65da46d20d9158755bf2cf9145f4829f4"
+    },
+    {
+      "path": "docs/contracts/responses-key-auth-request.md",
+      "resolution": "Exact provider blob",
+      "provider": "d273366724b2c1c7359b21e8727c5b3309108dc2",
+      "actual": "d273366724b2c1c7359b21e8727c5b3309108dc2"
+    },
+    {
+      "path": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesHttpSseTransport.cs",
+      "resolution": "Exact provider blob",
+      "provider": "4cc552dabcd8d60781e9d5593bc8b17cc2f61e04",
+      "actual": "4cc552dabcd8d60781e9d5593bc8b17cc2f61e04"
+    },
+    {
+      "path": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesKeyAuthRequestFactory.cs",
+      "resolution": "Exact provider blob",
+      "provider": "650520e713a3e1a0b838e5e7894f41414c25e77c",
+      "actual": "650520e713a3e1a0b838e5e7894f41414c25e77c"
+    },
+    {
+      "path": "tests/PiSharp.Compatibility.Tests/Program.cs",
+      "resolution": "Exact provider blob",
+      "provider": "37e8bd0bf4af5e432b72c48d582df34ef8a2f136",
+      "actual": "37e8bd0bf4af5e432b72c48d582df34ef8a2f136"
+    },
+    {
+      "path": "tests/PiSharp.Compatibility.Tests/ThinkingCheckpointTests.cs",
+      "resolution": "Exact provider blob",
+      "provider": "a19661d8f1332af2ca11d90a2d35eeab1e157ea4",
+      "actual": "a19661d8f1332af2ca11d90a2d35eeab1e157ea4"
+    },
+    {
+      "path": "tests/PiSharp.GoogleGenerativeAI.Tests/Program.cs",
+      "resolution": "Exact provider blob",
+      "provider": "bf23fb0f7545dba0544abd7553f28a7378035850",
+      "actual": "bf23fb0f7545dba0544abd7553f28a7378035850"
+    },
+    {
+      "path": "tests/PiSharp.Rpc.Tests/Program.cs",
+      "resolution": "Union of four owned-case conditions; registrations retained",
+      "provider": "82858031239208a1ed0fc42ba802a9db94fa62b9",
+      "actual": "4319edd8400502a4d8b08f11de33b433aa2521ba"
+    },
+    {
+      "path": "tests/PiSharp.Transport.Tests/Program.cs",
+      "resolution": "Exact provider blob",
+      "provider": "8c6c07ad26a41d1648e33d43de3f5911c5ddf886",
+      "actual": "8c6c07ad26a41d1648e33d43de3f5911c5ddf886"
+    },
+    {
+      "path": "tests/PiSharp.Transport.Tests/ResponsesIncompleteTests.cs",
+      "resolution": "Exact provider blob",
+      "provider": "398699d8d446942d8aafe16c8ba3883937f0a3c7",
+      "actual": "398699d8d446942d8aafe16c8ba3883937f0a3c7"
+    },
+    {
+      "path": "tests/PiSharp.Transport.Tests/ResponsesReasoningTests.cs",
+      "resolution": "Exact provider blob",
+      "provider": "fd39da371c9b4d602e6cebb18f864b408bd2cc68",
+      "actual": "fd39da371c9b4d602e6cebb18f864b408bd2cc68"
+    },
+    {
+      "path": "tests/PiSharp.Transport.Tests/ResponsesServiceTierTests.cs",
+      "resolution": "Exact provider blob",
+      "provider": "09d2622e899ddef60ce2b197b0f4f9086b141e1c",
+      "actual": "09d2622e899ddef60ce2b197b0f4f9086b141e1c"
+    }
+  ],
+  "nativeBuilds": 0,
+  "status": "STATIC_ONLY",
+  "priorLaneBlobs": "Preserved except intentional RPC runner union"
+}

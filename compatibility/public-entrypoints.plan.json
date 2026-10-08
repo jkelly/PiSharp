@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "inventoryId": "pi-v0.99.1-public-entrypoints-v1",
+  "kind": "static-canonical-source-and-released-entrypoint-plan",
+  "source": {
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "tree": "200bd10bb146773516f862a02b8aaebeed163e00",
+    "fileCount": 2093,
+    "packageManifestCount": 23,
+    "publishedPackageCount": 13,
+    "attributes": { "path": ".gitattributes", "sha256": "bdeaa42202295cf795f30f9a6fbe281fe594fdaf7eebde0b41d7568303973242" },
+    "allowedCheckoutConversions": [
+      { "path": "pi-test.bat", "sha256": "d454a5a0e203d9009283b887720472b022b0853380758b11419c8547a32dbb88", "conversion": "LF-to-CRLF" },
+      { "path": "pi-test.ps1", "sha256": "9f76d37f75b1d6f03be14d8bce3ca05331c4b09b8003a53329d8e4fe942792ef", "conversion": "LF-to-CRLF" }
+    ]
+  },
+  "runtime": { "version": "v24.19.0", "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237" },
+  "inputs": [
+    { "role": "existingInventory", "path": "compatibility/coding-agent-command-rpc-inventory.json", "sha256": "b45c7e117fdb46dde823de9c81717349fdc09fb0b265b706f6433afc13484a14" },
+    { "role": "registryInspection", "path": "artifacts/released-baseline/inspection.json", "sha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b" },
+    { "role": "aiInspection", "path": "artifacts/released-npm-ai/inspection.json", "sha256": "0c385e57ebdc3a01e0a7a50748af231a6fbefdea91b643356d6d0e239ebf6168" },
+    { "role": "aiReceipt", "path": "artifacts/released-npm-ai/evidence.lock.json", "sha256": "35fe3e5e8713163c4277fa72747de1ad38a2f842ea7543d00f567f3865ee0d94" },
+    { "role": "aiAcquisition", "path": "artifacts/released-npm-ai/acquisition.json", "sha256": "557c86d17b3cd831ef5ad91cb360b7a7363158cf45880088211e6ae1afdc9373" },
+    { "role": "aiArchive", "path": "artifacts/released-npm-ai/pi-ai-0.99.1.tgz", "sha256": "f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3" }
+  ],
+  "releasedArchive": {
+    "name": "@earendil-works/pi-ai",
+    "version": "0.99.1",
+    "bytes": 760966,
+    "regularFileCount": 813,
+    "integrity": "sha512-4nV9JKc94iPX8bwdGPc2nTuVPKIPsffhnp3WoN9NYCNqbtoOF8LhYcIs/+Sn/alroqJK/5QRu6/Z6Ck+n0hyBA==",
+    "shasum": "2945bf014fbb314bd37b919e83317560e0a8fa1d"
+  },
+  "productDependencyRoot": "@earendil-works/pi-coding-agent",
+  "reviewObligations": [
+    "Public member/signature and observable behavior contracts require a later qualified TypeScript parser and owner review.",
+    "Runtime reachability, dynamic imports, lazy providers, workers, generated assets, native addons and optional dependencies remain unverified.",
+    "Source conditions, public experimental exports and private example/eval/install metadata remain visible; no package-name exclusion is authorized.",
+    "Only the acquired AI archive qualifies released-file presence; the other twelve published archives remain unacquired.",
+    "Behavioral, file/wire, native C# SDK and optional TypeScript bridge compatibility require separate evidence and parent-owned profile decisions."
+  ]
+}

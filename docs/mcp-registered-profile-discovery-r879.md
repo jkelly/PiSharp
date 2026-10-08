@@ -1,0 +1,7 @@
+# Registered profile discovery admission
+
+`McpRegisteredProfileDiscoveryAdmission` registers explicitly supplied executable discovery definitions in one caller-owned dedicated discovery scope, creates the genuine captured ExtensionAgentBinding, and merges those exact declarations/adapters into the profile runtime's acquired catalog. Its `Prepare` callback captures opaque discovery identities against that final catalog and verifies the actual exposure plan. Existing tool bindings are retained. The caller explicitly supplies argument admission and hook composition and owns scope retirement, including preparation failures.
+
+The new source control uses an actual registered OfflineSessionProfile, a nonempty codemode MCP server capture, genuine semantic registration and identity minting, attachment binding, withdrawal/refresh, and exact retirement of both generation registries. It checks that the old identity is refused against the refreshed catalog. Cleanup directly joins registry originals and retains their full Task.Exception together with the primary failure.
+
+The semantic executor is an explicitly injected fixture callback. This control establishes the real identity and profile lifecycle route; it does not qualify a JavaScript interpreter, search ranking, live transport, or credential acquisition. Hook composition remains an explicitly admitted host dependency. Compilation and runtime qualification are pending; no native execution was performed by the source author.

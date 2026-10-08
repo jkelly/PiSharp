@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><AssemblyName>PiSharp.CodingAgent.Tests</AssemblyName></PropertyGroup>
+  <ItemGroup>
+    <!-- Same friend-assembly identity as the existing Kitty companion; bind exact source/DLL paths in admission. -->
+    <ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" />
+    <Content Include="fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,386 @@
+{
+  "schemaVersion": 1,
+  "status": "reviewable setup plan and helper; preparation, network acquisition, restore and genuine session capture not executed",
+  "source": {
+    "repository": "https://github.com/earendil-works/pi",
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "lockPath": "package-lock.json",
+    "lockSha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d",
+    "canonicalFingerprint": {
+      "files": 2093,
+      "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+    },
+    "pins": [
+      {
+        "path": "package-lock.json",
+        "bytes": 186139,
+        "sha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d"
+      },
+      {
+        "path": "packages/ai/package.json",
+        "bytes": 2636,
+        "sha256": "86a8ccb86ce00af196fc7d48417f82e99c6da40c68d8d138ace2a4f0fda4090d"
+      },
+      {
+        "path": "packages/coding-agent/package.json",
+        "bytes": 4163,
+        "sha256": "c701ddbf28b5170deb478b8586ee713f9372027c04736946a4ffe82168ece5ba"
+      },
+      {
+        "path": "packages/coding-agent/src/core/session-manager.ts",
+        "bytes": 63809,
+        "sha256": "450d82c529933214e088b8422f00061815e617f352f6c834689787a314064bff"
+      },
+      {
+        "path": "packages/coding-agent/src/core/messages.ts",
+        "bytes": 5206,
+        "sha256": "5397e3c96c9504266e4ee8b6e88d5098b3280ee7dbb0c687b74708c62a06c8d4"
+      },
+      {
+        "path": "packages/coding-agent/src/config.ts",
+        "bytes": 21035,
+        "sha256": "058e3ae23dece7482858c28fa731f56cecba6d52c3243aab76a94fb26ad3e993"
+      },
+      {
+        "path": "packages/coding-agent/src/utils/paths.ts",
+        "bytes": 4950,
+        "sha256": "64c3ebef724fa21ed0042e127908b4323a5d2f1b8aaa91eee550442332fe8502"
+      },
+      {
+        "path": "packages/coding-agent/src/utils/child-process.ts",
+        "bytes": 4146,
+        "sha256": "cd324f5b9a1abadd85ab5a331750d475c8bd51ec65cae091ad9b416245ec85d4"
+      },
+      {
+        "path": "packages/coding-agent/src/utils/text.ts",
+        "bytes": 404,
+        "sha256": "bb323f9607c499115b532021f4f0163c6df04d834aee9c32c3c77b273bd2d7c6"
+      },
+      {
+        "path": "packages/coding-agent/src/experimental/source-resolver.ts",
+        "bytes": 3592,
+        "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6"
+      },
+      {
+        "path": "tsconfig.json",
+        "bytes": 3988,
+        "sha256": "1ef1041faebef510f59480731ece80657f7e67b1091a0b0dcf05ca51e8a267a6"
+      }
+    ],
+    "requiredEagerImport": "session-manager.ts imports config.ts and paths.ts; both import child-process.ts, which imports cross-spawn eagerly",
+    "rootCrossSpawnDeclaration": "7.0.6",
+    "excludedLockEntries": [
+      "node_modules/execa/node_modules/cross-spawn (6.0.6 and its older dev-only closure)",
+      "packages/ai/node_modules/openai and all provider SDKs"
+    ]
+  },
+  "runtime": {
+    "version": "v24.19.0",
+    "absoluteExecutable": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+    "reuseExisting": true,
+    "sourceExecution": "Node native TypeScript stripping; unchanged whole session-manager.ts and canonical experimental source resolver"
+  },
+  "packageManager": {
+    "version": "11.6.2",
+    "existingVerifiedArchive": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1\\archives\\npm-11.6.2.tgz",
+    "archiveBytes": 2663834,
+    "sha256": "585f95094ee5cb2788ee11d90f2a518a7c9ef6e083fa141d0b63ca3383675a20",
+    "integrity": "sha512-7iKzNfy8lWYs3zq4oFPa8EXZz5xt9gQNKJZau3B1ErLBb6bF7sBJ00x09485DOvRT2l5Gerbl3VlZNT57MxJVA==",
+    "tarballIfMissing": "https://registry.npmjs.org/npm/-/npm-11.6.2.tgz",
+    "bootstrapReuse": "Verify and copy the existing archive into the new owned workspace, inspect confined member/link paths before unpacking only the npm CLI into its tools directory; no global installation",
+    "cacheReuse": "Copy verified existing cache contents into the new workspace's owned cache; never point a writable npm cache at the accepted oracle's cache",
+    "engine": "^20.17.0 || >=22.9.0"
+  },
+  "workspace": {
+    "proposedRoot": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1",
+    "existedAtResearch": false,
+    "upstreamSubdirectory": "upstream",
+    "sourceAcquisition": "Fresh task-local Git clone without hardlinks from the already acquired public pinned checkout; no Git network required",
+    "existingQualifiedOracle": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1",
+    "existingQualifiedOracleMutation": false,
+    "requiredOwnedDirectories": [
+      "upstream",
+      "archives",
+      "tools/npm-11.6.2",
+      "cache",
+      "config",
+      "home",
+      "tmp",
+      "captures"
+    ],
+    "existingTargetPolicy": "Refuse a preexisting nonempty or incomplete target; exact owned prepared/restored layouts may be validated idempotently; no deletion or overwrite of uncertain state",
+    "existedAtPlanCreation": false
+  },
+  "projection": {
+    "packageJson": {
+      "name": "pisharp-session-context-reference-oracle",
+      "version": "0.0.0",
+      "private": true,
+      "type": "module",
+      "dependencies": {
+        "cross-spawn": "7.0.6",
+        "isexe": "2.0.0",
+        "partial-json": "0.1.7",
+        "path-key": "3.1.1",
+        "shebang-command": "2.0.0",
+        "shebang-regex": "3.0.0",
+        "typebox": "1.3.27",
+        "which": "2.0.2"
+      }
+    },
+    "lockfileVersion": 3,
+    "requires": true,
+    "rule": "Fresh isolated root manifest explicitly pins the eight-package closure. Keep every selected original node_modules/<name> entry object unchanged; no source, package, or original lock mutation.",
+    "mandatoryExternalPackageCount": 8,
+    "additionalPackageCount": 6,
+    "dependencyGraph": {
+      "cross-spawn": [
+        "path-key",
+        "shebang-command",
+        "which"
+      ],
+      "shebang-command": [
+        "shebang-regex"
+      ],
+      "which": [
+        "isexe"
+      ]
+    },
+    "optionalPeersInstalled": [],
+    "runtimeClosureProved": false
+  },
+  "packages": [
+    {
+      "name": "cross-spawn",
+      "sourceLockPath": "node_modules/cross-spawn",
+      "projectedLockPath": "node_modules/cross-spawn",
+      "lockEntry": {
+        "version": "7.0.6",
+        "resolved": "https://registry.npmjs.org/cross-spawn/-/cross-spawn-7.0.6.tgz",
+        "integrity": "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==",
+        "license": "MIT",
+        "dependencies": {
+          "path-key": "^3.1.0",
+          "shebang-command": "^2.0.0",
+          "which": "^2.0.1"
+        },
+        "engines": {
+          "node": ">= 8"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Exact canonical public source lock entry; packaged bytes/license and full installed closure remain unobserved for the new six packages"
+    },
+    {
+      "name": "isexe",
+      "sourceLockPath": "node_modules/isexe",
+      "projectedLockPath": "node_modules/isexe",
+      "lockEntry": {
+        "version": "2.0.0",
+        "resolved": "https://registry.npmjs.org/isexe/-/isexe-2.0.0.tgz",
+        "integrity": "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==",
+        "license": "ISC"
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Exact canonical public source lock entry; packaged bytes/license and full installed closure remain unobserved for the new six packages"
+    },
+    {
+      "name": "partial-json",
+      "sourceLockPath": "node_modules/partial-json",
+      "projectedLockPath": "node_modules/partial-json",
+      "lockEntry": {
+        "version": "0.1.7",
+        "resolved": "https://registry.npmjs.org/partial-json/-/partial-json-0.1.7.tgz",
+        "integrity": "sha512-Njv/59hHaokb/hRUjce3Hdv12wd60MtM9Z5Olmn+nehe0QDAsRtRbJPvJ0Z91TusF0SuZRIvnM+S4l6EIP8leA==",
+        "license": "MIT"
+      },
+      "reuseVerifiedCacheArchive": true,
+      "authority": "Exact canonical public source lock entry; packaged bytes/license and full installed closure remain unobserved for the new six packages"
+    },
+    {
+      "name": "path-key",
+      "sourceLockPath": "node_modules/path-key",
+      "projectedLockPath": "node_modules/path-key",
+      "lockEntry": {
+        "version": "3.1.1",
+        "resolved": "https://registry.npmjs.org/path-key/-/path-key-3.1.1.tgz",
+        "integrity": "sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q==",
+        "license": "MIT",
+        "engines": {
+          "node": ">=8"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Exact canonical public source lock entry; packaged bytes/license and full installed closure remain unobserved for the new six packages"
+    },
+    {
+      "name": "shebang-command",
+      "sourceLockPath": "node_modules/shebang-command",
+      "projectedLockPath": "node_modules/shebang-command",
+      "lockEntry": {
+        "version": "2.0.0",
+        "resolved": "https://registry.npmjs.org/shebang-command/-/shebang-command-2.0.0.tgz",
+        "integrity": "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==",
+        "license": "MIT",
+        "dependencies": {
+          "shebang-regex": "^3.0.0"
+        },
+        "engines": {
+          "node": ">=8"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Exact canonical public source lock entry; packaged bytes/license and full installed closure remain unobserved for the new six packages"
+    },
+    {
+      "name": "shebang-regex",
+      "sourceLockPath": "node_modules/shebang-regex",
+      "projectedLockPath": "node_modules/shebang-regex",
+      "lockEntry": {
+        "version": "3.0.0",
+        "resolved": "https://registry.npmjs.org/shebang-regex/-/shebang-regex-3.0.0.tgz",
+        "integrity": "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==",
+        "license": "MIT",
+        "engines": {
+          "node": ">=8"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Exact canonical public source lock entry; packaged bytes/license and full installed closure remain unobserved for the new six packages"
+    },
+    {
+      "name": "typebox",
+      "sourceLockPath": "node_modules/typebox",
+      "projectedLockPath": "node_modules/typebox",
+      "lockEntry": {
+        "version": "1.3.27",
+        "resolved": "https://registry.npmjs.org/typebox/-/typebox-1.3.27.tgz",
+        "integrity": "sha512-zu+jc1pcy4UiNThxikUr36f0Rybk9PEeCg/NE6adeWr/SKsdNO4EzZHYRDlv2YCVAfj3Odq3dESSo/jNyoBXzA==",
+        "license": "MIT"
+      },
+      "reuseVerifiedCacheArchive": true,
+      "authority": "Exact canonical public source lock entry; packaged bytes/license and full installed closure remain unobserved for the new six packages"
+    },
+    {
+      "name": "which",
+      "sourceLockPath": "node_modules/which",
+      "projectedLockPath": "node_modules/which",
+      "lockEntry": {
+        "version": "2.0.2",
+        "resolved": "https://registry.npmjs.org/which/-/which-2.0.2.tgz",
+        "integrity": "sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==",
+        "license": "ISC",
+        "dependencies": {
+          "isexe": "^2.0.0"
+        },
+        "bin": {
+          "node-which": "bin/node-which"
+        },
+        "engines": {
+          "node": ">= 8"
+        }
+      },
+      "reuseVerifiedCacheArchive": false,
+      "authority": "Exact canonical public source lock entry; packaged bytes/license and full installed closure remain unobserved for the new six packages"
+    }
+  ],
+  "setupProposal": {
+    "registry": "https://registry.npmjs.org/",
+    "networkHosts": [
+      "registry.npmjs.org"
+    ],
+    "newRequiredArchives": [
+      "https://registry.npmjs.org/cross-spawn/-/cross-spawn-7.0.6.tgz",
+      "https://registry.npmjs.org/isexe/-/isexe-2.0.0.tgz",
+      "https://registry.npmjs.org/path-key/-/path-key-3.1.1.tgz",
+      "https://registry.npmjs.org/shebang-command/-/shebang-command-2.0.0.tgz",
+      "https://registry.npmjs.org/shebang-regex/-/shebang-regex-3.0.0.tgz",
+      "https://registry.npmjs.org/which/-/which-2.0.2.tgz"
+    ],
+    "reuseArchives": [
+      "https://registry.npmjs.org/partial-json/-/partial-json-0.1.7.tgz",
+      "https://registry.npmjs.org/typebox/-/typebox-1.3.27.tgz"
+    ],
+    "npmBootstrapNetworkExpected": false,
+    "restoreArguments": [
+      "ci",
+      "--ignore-scripts",
+      "--omit=optional",
+      "--omit=peer",
+      "--no-audit",
+      "--no-fund",
+      "--bin-links=false",
+      "--registry=https://registry.npmjs.org/"
+    ],
+    "dynamicArguments": [
+      "--prefix <newOracle>",
+      "--cache <newOracle>/cache",
+      "--userconfig <newOracle>/config/user.npmrc",
+      "--globalconfig <newOracle>/config/global.npmrc"
+    ],
+    "archiveAcquisition": "Explicit --restore only: anonymous GETs to the exact six official lock URLs, no redirects; SRI and inert confined tar inspection before npm ci. Previously verified two-package archive/cache bytes are copied locally read-only.",
+    "environment": "Credential-free explicit child env; task-local home/appdata/temp/npm cache/config; no inherited user npm/git credentials, provider/cloud/proxy variables, NODE_OPTIONS or certificate overrides",
+    "lifecycleScripts": false,
+    "nativeBuilds": false,
+    "binLinks": false,
+    "typescriptBuilds": false,
+    "modelCatalogGeneration": false,
+    "globalInstall": false,
+    "permanentPathChange": false,
+    "systemConfigurationChange": false,
+    "sourceTransformOrModuleReplacement": false,
+    "providerCalls": false,
+    "actualPrepareExecuted": false,
+    "actualRestoreExecuted": false
+  },
+  "reusedArchiveInspector": {
+    "path": "tools/PiReferenceRunner/setup-responses-sdk-oracle.mjs",
+    "sha256": "1da4ce53bf9b7ccc462bad540294353fd7ab42ba35ca171d3921916409d2b513",
+    "export": "inspectPackageArchive",
+    "rule": "Hash before import; reuse only existing inert archive parser export. Importing its module does not run its setup main."
+  },
+  "genuineCaptureBoundary": {
+    "entryModule": "upstream/packages/coding-agent/src/core/session-manager.ts",
+    "exports": [
+      "buildSessionContext",
+      "buildSessionProjection",
+      "buildContextEntries",
+      "sessionEntryToContextMessages"
+    ],
+    "selectedFirstProfile": "Public pure context/projection exports with authored v3 entries and explicit leaf IDs; invoke no SessionManager constructors, migrations, file IO, random IDs or clocks",
+    "separateLlmConversion": "packages/coding-agent/src/core/messages.ts convertToLlm is a separate exported transformation; public buildSessionContext returns AgentMessages including custom/summary roles",
+    "sourceWholeModuleRule": "Load unchanged entire module; no private-function extraction, import erasure, child-process shim or replacement loader",
+    "fakeClockOrIdRequired": false,
+    "offlinePreload": {
+      "existingObserver": "tools/PiReferenceRunner/full-preload.mjs",
+      "observerSha256": "e1f62a2048bc484a162085430a5afb6f88547d78049b6f29b2a0e4f65fcd79e2",
+      "existingGuard": "tools/PiReferenceRunner/offline-guard.mjs",
+      "guardSha256": "ae3741bdce496451bd04afcf8628df6ddc5bc5cfad8af6ee5e52cbc7b065a094",
+      "sourceResolverUnchanged": true,
+      "networkAndChildProcessesDisabledInCaptureChild": true
+    },
+    "contextCaptureQualified": false
+  },
+  "qualificationRequirements": [
+    "Before and after setup verify clean exact upstream HEAD and all 2093 canonical source files, acquired checkout conversions, runtime/npm and reused accepted archive bytes.",
+    "Acquire exact six registry tarballs only in explicit reviewed --restore; verify SRI and tar names, types, confinement, no native addon/install lifecycle or unexpected dependencies.",
+    "Inspect packaged root license evidence (MIT/ISC); preserve dependency declarations and lock entry identity. Registry signatures/attestations remain separate open checks.",
+    "Use npm11.6.2 ci with ignore-scripts, bin links/optional peers/audit/fund disabled, explicit owned prefix/cache/config and scrubbed environment.",
+    "Require exactly eight installed package directories, full archive-byte equality, unchanged root projected lock/manifest and matching hidden npm lock; preserve partial or uncertain writes on failure.",
+    "After successful restore prove genuine unchanged whole session module load; report any further missing dependency instead of installing automatically or substituting source.",
+    "Freeze only subsequently observed context outputs, source/dependency loaded closure, deterministic repeatability and authored-versus-observed provenance."
+  ],
+  "approval": {
+    "setupPreparationScope": "Root reviews this new three-file plan/helper/doc; root invokes local --prepare after freeze.",
+    "networkRestoreScope": "Root submits the concrete exact-package --restore command to applicable executor require_escalated auto-review; this helper has not performed downloads or installation.",
+    "executorRejectionRule": "Do not bypass a rejection; report exact action/reason and leave the original qualified oracles unchanged."
+  },
+  "limitations": [
+    "The prior two- and three-package source-only load probes both failed at eager cross-spawn import; no genuine full-session context observations currently exist.",
+    "Eight packages are the exact static required profile, not proof the whole module now loads or all session APIs work.",
+    "Pure export qualification does not establish persistence, migration, compaction generation, file IO or session runtime behavior.",
+    "Upstream pure helpers have malformed graph/leaf fallback and content-repair behavior; native stricter admission differences must be disclosed.",
+    "No accepted oracle, old lock/golden, source module or dependency installation is modified by this proposal."
+  ]
+}

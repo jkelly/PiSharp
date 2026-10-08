@@ -62,7 +62,8 @@ public sealed class ExtensionAgentBinding
     public ExtensionAgentBinding(ExtensionRegistry registry, IToolActionPolicy policy,
         ExtensionToolArgumentValidator validateArguments, IEnumerable<ToolActionTransform>? transforms = null,
         IEnumerable<ToolResultTransform>? resultTransforms = null, ToolInvokerOptions? invokerOptions = null,
-        ExtensionAgentBindingOptions? options = null, CancellationToken sessionCancellationToken = default)
+        ExtensionAgentBindingOptions? options = null, CancellationToken sessionCancellationToken = default,
+        ExtensionRegistrySnapshot? capturedSnapshot = null)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(policy);
@@ -75,7 +76,7 @@ public sealed class ExtensionAgentBinding
         ArgumentNullException.ThrowIfNull(this.options.ResultValues);
         _ = ToolResultValueCodec.Read(JsonData.EmptyObject, this.options.ResultValues);
         sessionCancellationToken.ThrowIfCancellationRequested();
-        Snapshot = registry.CaptureSnapshot();
+        Snapshot = capturedSnapshot ?? registry.CaptureSnapshot();
         var limits = invokerOptions ?? new();
         if (Snapshot.Tools.Length > this.options.MaximumTools || Snapshot.Tools.Length > limits.MaximumTools)
             throw new InvalidOperationException("Extension Agent binding tool limit exceeded.");

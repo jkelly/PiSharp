@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>PiSharp.CodingAgent.Tests</AssemblyName>
+    <DefineConstants>$(DefineConstants);SELECTOR_OWNERSHIP_FOCUSED</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/ConsumerEvidence.cs" Link="Original/ConsumerEvidence.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/ConsumerExecution.cs" Link="Original/ConsumerExecution.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/EvidenceAdmission.cs" Link="Original/EvidenceAdmission.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/FailureReportCases.cs" Link="Original/FailureReportCases.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/SelectorFixture.cs" Link="Original/SelectorFixture.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/SelectorInputProtocolCases.cs" Link="Original/SelectorInputProtocolCases.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/StartupBarrierCases.cs" Link="Original/StartupBarrierCases.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/StartupControlledTerminal.cs" Link="Original/StartupControlledTerminal.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/StartupInputFixture.cs" Link="Original/StartupInputFixture.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/StartupOwnedFiles.cs" Link="Original/StartupOwnedFiles.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/StartupPublishedExtension.cs" Link="Original/StartupPublishedExtension.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/TerminalInputDrainCases.cs" Link="Original/TerminalInputDrainCases.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/TerminalOwnedChildShutdownCases.cs" Link="Original/TerminalOwnedChildShutdownCases.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/TerminalRpcAdmissionCancellationCases.cs" Link="Original/TerminalRpcAdmissionCancellationCases.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/TerminalRpcReadCancellationCases.cs" Link="Original/TerminalRpcReadCancellationCases.cs" />
+    <Compile Include="../PiSharp.Terminal.SelectList.Integration.Tests/TerminalSelectDialogCases.cs" Link="Original/TerminalSelectDialogCases.cs" />
+    <Content Include="../PiSharp.Terminal.SelectList.Integration.Tests/fixtures/source-authority.json" Link="fixtures/source-authority.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="focused-case-plan.json" Link="fixtures/focused-case-plan.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

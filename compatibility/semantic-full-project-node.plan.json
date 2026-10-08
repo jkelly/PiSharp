@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "kind": "unchanged-whole-upstream-config-node-declaration-semantic-profile",
+  "status": "authored; root native capture and two fresh observations pending",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "oracle": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-node-v0.99.1",
+  "receipt": {
+    "path": ".pisharp-node-declarations-admitted.json",
+    "sha256": "9ea0d71520ad542fdbabafc3711238ca02ad43e0c85649367c6f740979fb2617",
+    "payloadFiles": 2737,
+    "sourceFiles": 2093,
+    "compilerFiles": 529,
+    "addedFiles": 114,
+    "declarationFiles": 108,
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+  },
+  "metadataPins": [
+    {
+      "path": ".pisharp-node-declarations-owner.json",
+      "bytes": 1346,
+      "sha256": "151672b0908e971d995eb778eb89873f962abd421986434ff6a94e359dd2274b"
+    },
+    {
+      "path": ".pisharp-node-declarations-prepared.json",
+      "bytes": 505954,
+      "sha256": "e2fef024f4bfa00b3d05aad87a2d5477f2b8ea5c404ba3a3f247033d11378e98"
+    },
+    {
+      "path": ".pisharp-node-declarations-admission-started.json",
+      "bytes": 453,
+      "sha256": "16dae00c2e87e7536e85f02fff7bffdb0483d65f4282fd17660967c2e487f352"
+    }
+  ],
+  "declarationSetup": {
+    "plan": "compatibility/semantic-node-declarations.plan.json",
+    "helper": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+    "pins": [
+      {
+        "path": "compatibility/semantic-node-declarations.plan.json",
+        "bytes": 6377,
+        "sha256": "62a9dc8b188893836423f329ba9df5f5386f92a6455ba3f4f4d3cb59925d369b"
+      },
+      {
+        "path": "docs/compatibility/semantic-node-declarations-setup.md",
+        "bytes": 7763,
+        "sha256": "62a702291477d43588cb686e621371c98cc5d4219273f52414245c8ba218a688"
+      },
+      {
+        "path": "tools/SemanticInventory/node-declaration-archive.mjs",
+        "bytes": 6790,
+        "sha256": "baee47b869aab6d2409c0a3906b1e0ea5bf5fe236ca24837fae71aa81d633ffd"
+      },
+      {
+        "path": "tools/SemanticInventory/semantic-node-declarations.test.mjs",
+        "bytes": 10796,
+        "sha256": "05ae6df8c9fbb2e3d4b151a5b3f8e1d4f3655f5693f714fc688054ef1bb1621c"
+      },
+      {
+        "path": "tools/SemanticInventory/setup-semantic-node-declarations.mjs",
+        "bytes": 22278,
+        "sha256": "13af52a5c4e5ced26ca779195f4c10fa739868c89112b4877aa9c1e3c1e3d034"
+      }
+    ]
+  },
+  "origin": {
+    "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-oracle-v0.99.1",
+    "receipt": ".pisharp-semantic-api-oracle.json",
+    "receiptSha256": "1dd4d68e2702eaa3327bfd3d21b9df052bb0dffd931375974b9891088c67b28d",
+    "immutableFiles": 2623,
+    "sourceFiles": 2093,
+    "compilerFiles": 529,
+    "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+    "lockSha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d"
+  },
+  "runtime": {
+    "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "native": {
+    "path": "node_modules/@typescript/typescript-win32-x64/lib/tsc.exe",
+    "sha256": "f9ecfbdc93753d2c972d66a8d0d75f5bd737fd4a5f88b422d9091ea282bcb2c7",
+    "arguments": [
+      "--api",
+      "--async",
+      "--cwd",
+      "{oracle}/upstream",
+      "--callbacks=readFile,fileExists,directoryExists,getAccessibleEntries,realpath"
+    ],
+    "stdio": [
+      "pipe",
+      "pipe",
+      "inherit"
+    ],
+    "exitTimeoutMs": 30000
+  },
+  "sourcePins": [
+    {
+      "path": "upstream/tsconfig.json",
+      "sha256": "1ef1041faebef510f59480731ece80657f7e67b1091a0b0dcf05ca51e8a267a6"
+    },
+    {
+      "path": "upstream/tsconfig.base.json",
+      "sha256": "eea9b73c99e36e35d2afca6fb313899ebb214840beedad7a67ec07d880857f1b"
+    },
+    {
+      "path": "upstream/package-lock.json",
+      "sha256": "e245cabcefdd23d1ab3cfd21db492e21ca11b7ef4a20f6304aead4dc2b5b569d"
+    }
+  ],
+  "publicEntrypointPlan": {
+    "path": "compatibility/public-entrypoints.plan.json",
+    "sha256": "9524ccdeaaaaec2409f17c823a8baf0f9da0acd27c5492fdaf986e63fd815857"
+  },
+  "baseline": {
+    "pins": [
+      {
+        "path": "fixtures/semantic-full-project/expected.json",
+        "bytes": 13991317,
+        "sha256": "ad2f8b8926dbb9a3485023a460fd139f982c488d6f413e5f0bc32851b6ea3008"
+      },
+      {
+        "path": "fixtures/semantic-full-project/manifest.json",
+        "bytes": 2324,
+        "sha256": "fb17f711b431843a55d12f1d62dc5ef9bbf4611309389f0d8fa2c28d598c75f3"
+      }
+    ],
+    "snapshotSha256": "ad2f8b8926dbb9a3485023a460fd139f982c488d6f413e5f0bc32851b6ea3008",
+    "sourceFiles": 1737,
+    "rootFiles": 1661,
+    "unresolvedRecords": 892,
+    "diagnosticCounts": {
+      "getConfigFileParsingDiagnostics": 0,
+      "getGlobalDiagnostics": 3,
+      "getProgramDiagnostics": 1,
+      "getSyntacticDiagnostics": 0,
+      "getBindDiagnostics": 0,
+      "getSemanticDiagnostics": 9784,
+      "getSuggestionDiagnostics": 824,
+      "getDeclarationDiagnostics": 0
+    },
+    "comparison": "complete family counts and unresolved count only; retained complete independent raw diagnostics; no path normalization or old golden copy"
+  },
+  "configurationFacts": {
+    "originalNoEmit": true,
+    "originalSkipLibCheck": true,
+    "originalAmbientTypes": [
+      "node"
+    ],
+    "originalExclusions": [
+      "**/dist/**",
+      "packages/coding-agent/examples/extensions/gondolin/**"
+    ],
+    "compatibilityScopeExclusionsApproved": false
+  },
+  "diagnosticMethods": [
+    "getConfigFileParsingDiagnostics",
+    "getGlobalDiagnostics",
+    "getProgramDiagnostics",
+    "getSyntacticDiagnostics",
+    "getBindDiagnostics",
+    "getSemanticDiagnostics",
+    "getSuggestionDiagnostics",
+    "getDeclarationDiagnostics"
+  ],
+  "limits": {
+    "fileBytes": 33554432,
+    "snapshotBytes": 134217728,
+    "protocolBytes": 536870912,
+    "driverTimeoutMs": 300000,
+    "jsonDepth": 64,
+    "jsonNodes": 4000000
+  },
+  "executionBoundary": {
+    "parentNativeExecution": "root reviewed invocation only",
+    "runtimeModulePrefix": "node_modules/typescript/",
+    "vfsPayloadFiles": 2737,
+    "sourceCorpus": "original 2093 canonical source rows; added 114 archive members retained separately and present to actual checker",
+    "upstreamModulesExecuted": false,
+    "addedPackageRuntimeExecuted": false,
+    "scratch": "explicit absolute fresh caller-owned root disjoint from oracle, origin and repository; all child outputs/home/temp/config remain there",
+    "nodeGuardIsNativeOsSandbox": false,
+    "apiCloseIsHelperExitJoin": false
+  },
+  "semanticPublicClosure": false,
+  "fullStructuralTypeInventoryPending": true,
+  "remainingDeclarationClosure": "derive residual unresolved exact lock instances after this genuine capture; all SDK/test/example/optional peer instances remain mandatory",
+  "phaseGatesPassed": []
+}

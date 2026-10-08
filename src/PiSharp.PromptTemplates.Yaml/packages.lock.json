@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "YamlDotNet": {
+        "type": "Direct",
+        "requested": "[16.3.0, 16.3.0]",
+        "resolved": "16.3.0",
+        "contentHash": "SgMOdxbz8X65z8hraIs6hOEdnkH6hESTAIUa7viEngHOYaH+6q5XJmwr1+yb9vJpNQ19hCQY69xbFsLtXpobQA=="
+      },
+      "pisharp.agent": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.AI": "[1.0.0, )",
+          "PiSharp.Contracts": "[1.0.0, )"
+        }
+      },
+      "pisharp.ai": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.0.0, )"
+        }
+      },
+      "pisharp.codingagent": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Agent": "[1.0.0, )",
+          "PiSharp.Sessions": "[1.0.0, )"
+        }
+      },
+      "pisharp.contracts": {
+        "type": "Project"
+      },
+      "pisharp.sessions": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.0.0, )"
+        }
+      }
+    }
+  }
+}

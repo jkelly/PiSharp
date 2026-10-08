@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "status": "Authored candidate; supervisor owner integration and coordinator execution pending",
+  "basedOn": "7452a7b2a355e1f603a31eb693def91a9f565df1",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceVersion": "0.99.1",
+  "helperRows": [
+    {
+      "path": "tools/NodeCommandInputBridge/worker.mjs",
+      "bytes": 9485,
+      "sha256": "01a0a979c6a2f244f04d3bc826977c25f6db4978f32cb6323c7a67b793757750"
+    },
+    {
+      "path": "tools/NodeCommandInputBridge/module-loader.mjs",
+      "bytes": 26245,
+      "sha256": "a02ef73c4f14a079689a7fd1be215dd12b64d3f97940d0409bdcede6893efe9f"
+    },
+    {
+      "path": "tools/NodeCommandInputBridge/admission.mjs",
+      "bytes": 5321,
+      "sha256": "2ab9a847d6ea437a40e8fbfc62c448ed714b172bd8e5e317f35f80ec6ccc973b"
+    }
+  ],
+  "additionalSourceRows": [
+    {
+      "path": "packages/coding-agent/examples/extensions/pirate.ts",
+      "bytes": 1461,
+      "sha256": "dd6ce684bbe7630e4a749fe133ef8b8b875adbc7e31284b17fe0b8157d51e013"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/hello.ts",
+      "bytes": 640,
+      "sha256": "0aa4e9800c2526914d4c1edb00b2cfa9bd9dd6da5218289994cccd5f5bfa4934"
+    }
+  ],
+  "integrationOwnerFiles": [
+    "compatibility/node/command-input-bridge.plan.json",
+    "src/PiSharp.ExtensionHost/Supervision/NodeCommandInputWorkerLaunch.cs"
+  ],
+  "unchangedReferenceExpectedSha256": "d74d53610906cb41ec6c2ad8a10f57d242c2a2846631a0ec4901ef5a3225930d",
+  "authoredNodeTests": 7,
+  "nativeScenarioAuthored": true,
+  "nodeTestsRun": false,
+  "nativeBuildRun": false,
+  "nativeTestsRun": false,
+  "executedCorpusCredit": 0
+}

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-03",
+  "originalScope": "P2-06 existing Anthropic request-local native mid-conversation tool changes",
+  "base": "642af28ad101604eaa881adb20fd24a69536e435",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "status": "AUTHORED_UNBUILT_UNEXECUTED",
+  "sharedContractChanges": [],
+  "authoredTestGroups": [
+    "NativeToolChangesExactWire",
+    "NativeToolChangesCachePlacement",
+    "NativeToolChangesRedefinitionAndCapabilityFallback",
+    "NativeToolChangesAdjacencyOAuthAndBounds",
+    "NativeToolChangesRequestPublication"
+  ],
+  "nativeBuilds": 0,
+  "nativeTestsExecuted": 0,
+  "sourceOracleExecutions": 0,
+  "independentAcceptance": "pending",
+  "phaseGatesClosed": [],
+  "hardeningDifferences": [
+    "Reserve source deferred placeholder name and reject OAuth-canonical declaration collisions",
+    "Growing distinct declaration union plus placeholder must fit MaximumActiveTools"
+  ],
+  "guide": "docs/contracts/anthropic-native-tool-changes.md",
+  "remaining": ["Coordinator native execution allocation", "Source differential qualification", "Independent acceptance", "Generic activation integration owned separately by core worker"]
+}

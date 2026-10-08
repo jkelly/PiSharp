@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "phase": "P2-08",
+  "api": "azure-openai-responses",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "base": "4b63271a13e10505ab0e648592021050155454d1",
+  "status": "SOURCE_ONLY_AUTHORED; NATIVE_UNEXECUTED; PARITY_OPEN",
+  "contract": "docs/contracts/azure-responses-explicit-adapter.md",
+  "inventory": "tests/PiSharp.AzureResponses.Tests/source-inventory.json",
+  "testProject": "tests/PiSharp.AzureResponses.Tests/PiSharp.AzureResponses.Tests.csproj",
+  "authoredGroups": 15,
+  "authoredCompleteBodyComparisons": 37,
+  "genuineSourceCasesCaptured": 0,
+  "nativeExecutedGroups": 0,
+  "identityAcquisition": "SEPARATE_OWNER; NOT_IMPLEMENTED",
+  "originalProviderPhaseGate": "OPEN",
+  "sourceQualification": "OPEN",
+  "independentReview": "PENDING",
+  "activeValidationModified": false
+}

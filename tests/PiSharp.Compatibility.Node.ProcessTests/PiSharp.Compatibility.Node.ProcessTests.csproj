@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Agent/PiSharp.Agent.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Tools/PiSharp.Tools.csproj" />
+    <ProjectReference Include="../../src/PiSharp.Rpc/PiSharp.Rpc.csproj" />
+  </ItemGroup>
+</Project>

@@ -11,11 +11,15 @@ public sealed record AnthropicFallbackModel(string Provider, string Model, Anthr
 public sealed record AnthropicMessagesOptions(int MaximumEvents = 4096, int MaximumEventCharacters = 65_536,
     int MaximumInputCharacters = 1_048_576, int MaximumContentSlots = 64, int MaximumContentCharacters = 1_048_576,
     int MaximumSignatureCharacters = 1_048_576, int MaximumJsonDepth = 32, AnthropicTokenRates? Rates = null,
-    ImmutableArray<AnthropicFallbackModel> AllowedFallbackModels = default);
+    ImmutableArray<AnthropicFallbackModel> AllowedFallbackModels = default, bool OAuthToolNames = false,
+    int MaximumToolDeclarations = 1024, int MaximumActiveTools = 128)
+{
+    public bool CaptureSourceEmissionSnapshots { get; init; }
+}
 public enum AnthropicMessagesFailure { SourceFailed, MalformedStream, UnexpectedEof, ResourceLimit, ProviderError, Cancelled, CleanupFailed }
 
 /// <summary>Offline parsed Messages DTO adapter. Owns its source enumerator; never sends or executes tools.</summary>
-public sealed class AnthropicMessagesTransport : IChatTransport
+public sealed partial class AnthropicMessagesTransport : IChatTransport
 {
     private readonly Func<ChatRequest, CancellationToken, IAsyncEnumerable<JsonData>> _source;
     private readonly AnthropicMessagesOptions _options;
@@ -25,7 +29,7 @@ public sealed class AnthropicMessagesTransport : IChatTransport
         ArgumentNullException.ThrowIfNull(source); _source = source; _options = options ?? new();
         if (_options.MaximumEvents <= 0 || _options.MaximumEventCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
             _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 || _options.MaximumSignatureCharacters <= 0 ||
-            _options.MaximumJsonDepth is < 1 or > 64) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic stream limits.");
+            _options.MaximumJsonDepth is < 1 or > 64 || _options.MaximumToolDeclarations <= 0 || _options.MaximumActiveTools <= 0) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic stream limits.");
         ValidateRates(_options.Rates ?? new());
         if (!_options.AllowedFallbackModels.IsDefaultOrEmpty)
         {
@@ -65,7 +69,7 @@ public sealed class AnthropicMessagesTransport : IChatTransport
         if (enumerator is null) { yield return state.Finish(failure ?? AnthropicMessagesFailure.SourceFailed); yield break; }
         try
         {
-            yield return state.Start;
+            yield return state.CaptureEmission(state.Start);
             while (failure is null)
             {
                 if (cancellationToken.IsCancellationRequested) { failure = AnthropicMessagesFailure.Cancelled; break; }
@@ -119,9 +123,10 @@ public sealed class AnthropicMessagesTransport : IChatTransport
         public int Index { get; } = index; public string Kind { get; } = kind; public JsonFields Properties { get; } = properties;
         public StringBuilder Signature { get; } = new(signature); public bool Ended;
     }
-    private sealed class State
+    private sealed partial class State
     {
         private readonly AnthropicMessagesOptions _options;
+        private readonly ImmutableArray<string> _currentToolNames;
         private AnthropicTokenRates _rates;
         private readonly AssistantStreamReducer _reducer;
         private readonly Dictionary<int, Slot> _slots = [];
@@ -145,8 +150,45 @@ public sealed class AnthropicMessagesTransport : IChatTransport
                 string.IsNullOrWhiteSpace(request.Model.Id) || string.IsNullOrWhiteSpace(request.Model.Provider)) throw Protocol();
             Unicode(request.Model.Id); Unicode(request.Model.Provider);
             _options = options; _rates = options.Rates ?? new();
+            _currentToolNames = options.OAuthToolNames ? CurrentTools(request, options) : [];
             Start = new(new(request.Model.Api, request.Model.Provider, request.Model.Id, request.Timestamp, [], TokenUsage.Zero, StopReason.Pending));
             _reducer = new(Start.Partial, new(options.MaximumContentSlots, options.MaximumContentCharacters)); _reducer.Apply(Start);
+        }
+        private string ResponseToolName(string wireName)
+        {
+            // Original fromClaudeCodeName selects the first current declaration.
+            var folded = wireName.ToLowerInvariant();
+            return _currentToolNames.FirstOrDefault(name => name.ToLowerInvariant() == folded) ?? wireName;
+        }
+        private static ImmutableArray<string> CurrentTools(ChatRequest request, AnthropicMessagesOptions options)
+        {
+            var order = new List<string>(); var names = new HashSet<string>(StringComparer.Ordinal);
+            long characters = 0; var declarations = 0;
+            foreach (var entry in request.Messages)
+            {
+                if (entry is null || entry.WireBody is null) throw Protocol();
+                var raw = entry.WireBody.ToString(); characters += raw.Length;
+                if (characters > options.MaximumInputCharacters) throw Limit();
+                if (entry.Role != "system") continue;
+                var body = JsonData.Parse(raw).Value; Object(body);
+                foreach (var property in new[] { "toolsRemoved", "toolsAdded" })
+                {
+                    if (!body.TryGetProperty(property, out var tools)) continue;
+                    if (tools.ValueKind != JsonValueKind.Array) throw Protocol();
+                    foreach (var tool in tools.EnumerateArray())
+                    {
+                        if (++declarations > options.MaximumToolDeclarations) throw Limit();
+                        var name = String(Object(tool), "name"); Unicode(name);
+                        if (property == "toolsRemoved") { if (names.Remove(name)) order.Remove(name); }
+                        else if (names.Add(name))
+                        {
+                            if (names.Count > options.MaximumActiveTools) throw Limit();
+                            order.Add(name);
+                        }
+                    }
+                }
+            }
+            return order.ToImmutableArray();
         }
         public List<StreamEvent> Process(JsonData data)
         {
@@ -213,7 +255,7 @@ public sealed class AnthropicMessagesTransport : IChatTransport
                             var initialInput = block.TryGetProperty("input", out var input) && input.ValueKind != JsonValueKind.Null
                                 ? JsonData.FromElement(Object(input)) : JsonData.EmptyObject;
                             slot = new(index, kind, toolProperties);
-                            Emit(new ToolCallStarted(index, new(String(block, "id"), String(block, "name"), initialInput, toolProperties))); break;
+                            Emit(new ToolCallStarted(index, new(String(block, "id"), ResponseToolName(String(block, "name")), initialInput, toolProperties))); break;
                         default: throw Protocol();
                     }
                     _slots.Add(wireIndex, slot); break;
@@ -232,7 +274,8 @@ public sealed class AnthropicMessagesTransport : IChatTransport
                             ChargeSignature(piece.Length); active.Signature.Append(piece); break;
                         case "input_json_delta":
                             if (active.Kind != "tool_use") throw Protocol();
-                            Emit(new ToolCallDelta(active.Index, String(delta, "partial_json", allowEmpty: true))); break;
+                            Emit(new ToolCallDelta(active.Index, String(delta, "partial_json", allowEmpty: true)));
+                            if (_options.CaptureSourceEmissionSnapshots) _sourceToolDeltaIndices.Add(active.Index); break;
                         default: throw Protocol();
                     }
                     break;
@@ -275,6 +318,8 @@ public sealed class AnthropicMessagesTransport : IChatTransport
                     _ = Object(value.GetProperty("error")); throw new ProviderSignalException();
                 default: throw Protocol();
             }
+            if (_options.CaptureSourceEmissionSnapshots)
+                for (var index = 0; index < progress.Count; index++) progress[index] = CaptureEmission(progress[index]);
             return progress;
         }
         public StreamTerminalEvent Finish(AnthropicMessagesFailure? failure)
@@ -300,7 +345,7 @@ public sealed class AnthropicMessagesTransport : IChatTransport
                 .Set("anthropicFailure", TextData(failure.Value.ToString()));
             var final = snapshot with { Content = content.ToImmutable(), Usage = _usage, StopReason = reason, ExtraProperties = properties };
             StreamTerminalEvent terminal = failure is null ? new StreamDone(reason, final) : new StreamError(reason, final);
-            _reducer.Apply(terminal); return terminal;
+            _reducer.Apply(terminal); return (StreamTerminalEvent)CaptureEmission(terminal);
         }
         private void ReadUsage(JsonElement usage, bool initial)
         {

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "createdAt": "2026-09-30T22:20:53.651Z",
+  "node": {
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "files": [
+    {
+      "path": "acquire.mjs",
+      "bytes": 22861,
+      "sha256": "fa8b32ff4dc22d9be52c3796c353f89983b9ae2aa3720a75eaaf303112f7b517"
+    },
+    {
+      "path": "pi-0.99.1-source.tar.gz",
+      "bytes": 8646242,
+      "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b"
+    },
+    {
+      "path": "SHA256SUMS",
+      "bytes": 823,
+      "sha256": "1490fbb52c4cbf6f175b1b66147702b5e6584504277fc0c424745c32770bdbba"
+    },
+    {
+      "path": "metadata.json",
+      "bytes": 72880,
+      "sha256": "1aafbfc3e2a0610b4066dd4cd94e239a64bc3b08506cd0d67f41cd18a34af789"
+    },
+    {
+      "path": "inspection.json",
+      "bytes": 41808,
+      "sha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b"
+    }
+  ],
+  "mode": "default verify is offline and immutable; first acquisition/inspection refuse overwrite",
+  "artifactAuthority": "official GitHub release source archive and raw official npm version metadata; no install/extraction/asset execution"
+}

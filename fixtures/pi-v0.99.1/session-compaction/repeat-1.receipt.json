@@ -1,0 +1,11 @@
+{
+  "repeat": 1,
+  "scratch": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-session-compaction-work\\artifacts\\compaction-reference\\genuine-source-r2\\scratch\\capture-sU64Zh",
+  "status": 0,
+  "signal": null,
+  "error": null,
+  "stdoutBytes": 1123831,
+  "stderrBytes": 0,
+  "boundedTimeoutMilliseconds": 20000,
+  "maxBufferBytes": 8388608
+}

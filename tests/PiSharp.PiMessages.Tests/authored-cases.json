@@ -1,0 +1,2434 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORED CASES ONLY; NOT CAPTURED, COMPILED OR EXECUTED",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "planningBase": "bffd6063b15b8b44129b692d94ce4dc4a17ce09b",
+  "sourceAnchors": [
+    {
+      "behavior": "wire event declarations",
+      "start": 54,
+      "end": 89
+    },
+    {
+      "behavior": "event converter / authoritative ends",
+      "start": 180,
+      "end": 274
+    },
+    {
+      "behavior": "Pi-specific SSE reader and first-data parser",
+      "start": 276,
+      "end": 321
+    },
+    {
+      "behavior": "catch error / usage and cache",
+      "start": 323,
+      "end": 353
+    },
+    {
+      "behavior": "payload/request/hooks/terminal/EOF",
+      "start": 355,
+      "end": 430
+    },
+    {
+      "behavior": "simple forwarding",
+      "start": 432,
+      "end": 445
+    }
+  ],
+  "cases": [
+    {
+      "id": "PM-REQUEST-DEFAULT",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Request path and body preserve the raw transcript; omit unset option properties.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ]
+      },
+      "requiredChecks": [
+        "POST https://pi-messages.invalid/base/messages; request body keys model/context/options",
+        "Bearer key plus accept/content-type; no network fallback",
+        "Raw history and input options unchanged"
+      ]
+    },
+    {
+      "id": "PM-AUTH-MISSING",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Missing key yields an error before payload callback, response hook or HTTP send.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {},
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ]
+      },
+      "requiredChecks": [
+        "Source returns its error event stream; do not borrow Completions synchronous-rejection semantics",
+        "Error assistant content empty; usage zero; no start event/send"
+      ]
+    },
+    {
+      "id": "PM-OPTIONS-SIMPLE",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Simple forwards reasoning directly and serializes the six used options; debug adds query.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key",
+          "temperature": 0,
+          "maxTokens": 17,
+          "reasoning": "xhigh",
+          "cacheRetention": "none",
+          "sessionId": "authored-session",
+          "toolChoice": {
+            "type": "function",
+            "function": {
+              "name": "inspect"
+            }
+          },
+          "debug": true
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "entry": "streamSimple"
+      },
+      "requiredChecks": [
+        "reasoning xhigh unchanged; no Completions context clamp",
+        "Exact options/body and ?debug=1 URL"
+      ]
+    },
+    {
+      "id": "PM-HEADERS-OVERRIDE",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Options headers override the auth/accept/content-type defaults.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key",
+          "headers": {
+            "authorization": "Bearer authored-inert-header-key",
+            "accept": "authored-inert-accept",
+            "x-authored": "value"
+          }
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ]
+      },
+      "requiredChecks": [
+        "Observe physical emitted headers, not constructed expected headers",
+        "No model-only header lookup invented"
+      ]
+    },
+    {
+      "id": "PM-CACHE-SCOPED",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Only scoped legacy long cache opt-in is used when explicit cache retention is absent.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key",
+          "env": {
+            "PI_CACHE_RETENTION": "long"
+          }
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ]
+      },
+      "requiredChecks": [
+        "Capture cacheRetention long; no ambient environment lookup in the future harness"
+      ]
+    },
+    {
+      "id": "PM-PAYLOAD-HELD-UNDEFINED",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Held async payload callback retains original payload when returning undefined.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "hook": {
+          "kind": "payload",
+          "mode": "held",
+          "returnMode": "undefined"
+        }
+      },
+      "requiredChecks": [
+        "Explicit entered/release barriers; zero sends before release",
+        "Actual payload/model observations, body and publication ordering retained"
+      ]
+    },
+    {
+      "id": "PM-PAYLOAD-REPLACE",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Whole replacement changes sent body after an awaited callback.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "hook": {
+          "kind": "payload",
+          "mode": "held",
+          "returnMode": "replacement",
+          "replacement": {
+            "model": "authored-replacement",
+            "context": {
+              "messages": []
+            },
+            "options": {
+              "maxTokens": 19
+            }
+          }
+        }
+      },
+      "requiredChecks": [
+        "No field merge; sent whole replacement and no send before release"
+      ]
+    },
+    {
+      "id": "PM-PAYLOAD-NULL",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Source null replacement is a literal whole-payload replacement, not undefined retention.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "hook": {
+          "kind": "payload",
+          "returnMode": "null"
+        }
+      },
+      "requiredChecks": [
+        "Observe sent body null",
+        "Native options must distinguish retain from literal null; coordinate API before production"
+      ]
+    },
+    {
+      "id": "PM-PAYLOAD-THROW",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Thrown payload callback causes a pre-send terminal error.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "hook": {
+          "kind": "payload",
+          "throwMessage": "Authored inert callback failure"
+        }
+      },
+      "requiredChecks": [
+        "Zero sends; terminal empty assistant with zero usage; owned request cleanup"
+      ]
+    },
+    {
+      "id": "PM-RESPONSE-HELD",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "OnResponse is awaited before status rejection or event conversion.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "hook": {
+          "kind": "response",
+          "mode": "held"
+        }
+      },
+      "requiredChecks": [
+        "One send; no provider hook or public publication while held",
+        "Exact response status/headers/model retained"
+      ]
+    },
+    {
+      "id": "PM-PROVIDER-HELD",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Provider callback precedes conversion and publication.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "hook": {
+          "kind": "provider",
+          "mode": "held",
+          "eventOrdinal": 2
+        }
+      },
+      "requiredChecks": [
+        "Record actual incoming DTO/model; no conversion/publication of held delta",
+        "Result and canonical completion pending; explicit release"
+      ]
+    },
+    {
+      "id": "PM-TEXT-AUTHORITATIVE-END",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Text end content and signature override the delta buffer.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ]
+      },
+      "requiredChecks": [
+        "Final text final, not draft; textSignature present",
+        "Whole progress/final/ownUndefined/serialized bytes"
+      ]
+    },
+    {
+      "id": "PM-THINKING-AUTHORITATIVE-END",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Thinking end replaces deltas and retains signature/redacted.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "thinking_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "thinking_delta",
+            "contentIndex": 0,
+            "delta": "draft reasoning"
+          },
+          {
+            "type": "thinking_end",
+            "contentIndex": 0,
+            "content": "authoritative reasoning",
+            "contentSignature": "authored-thinking-signature",
+            "redacted": true
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ]
+      },
+      "requiredChecks": [
+        "Final content/signature/redacted exact"
+      ]
+    },
+    {
+      "id": "PM-TOOL-AUTHORITATIVE-END",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Final server tool arguments replace partial display arguments.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "toolcall_start",
+            "contentIndex": 0,
+            "id": "authored-call-1",
+            "toolName": "inspect"
+          },
+          {
+            "type": "toolcall_delta",
+            "contentIndex": 0,
+            "delta": "{\"value\":1}"
+          },
+          {
+            "type": "toolcall_end",
+            "contentIndex": 0,
+            "toolCall": {
+              "type": "toolCall",
+              "id": "authored-call-1",
+              "name": "inspect",
+              "arguments": {
+                "value": 7
+              }
+            }
+          },
+          {
+            "type": "done",
+            "reason": "toolUse",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ]
+      },
+      "requiredChecks": [
+        "Partial value1 versus final value7; final strict object validation",
+        "Provider and parser never invoke a tool"
+      ]
+    },
+    {
+      "id": "PM-INTERLEAVED-SLOTS",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Indexed text/thinking/tool progress interleaves without reordering slots.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "thinking_start",
+            "contentIndex": 1
+          },
+          {
+            "type": "toolcall_start",
+            "contentIndex": 2,
+            "id": "authored-call-2",
+            "toolName": "inspect"
+          },
+          {
+            "type": "toolcall_delta",
+            "contentIndex": 2,
+            "delta": "{\"value\":"
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "A"
+          },
+          {
+            "type": "thinking_delta",
+            "contentIndex": 1,
+            "delta": "B"
+          },
+          {
+            "type": "toolcall_delta",
+            "contentIndex": 2,
+            "delta": "7}"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Text"
+          },
+          {
+            "type": "thinking_end",
+            "contentIndex": 1,
+            "content": "Thinking",
+            "redacted": false
+          },
+          {
+            "type": "toolcall_end",
+            "contentIndex": 2,
+            "toolCall": {
+              "type": "toolCall",
+              "id": "authored-call-2",
+              "name": "inspect",
+              "arguments": {
+                "value": 7
+              }
+            }
+          },
+          {
+            "type": "done",
+            "reason": "toolUse",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ]
+      },
+      "requiredChecks": [
+        "content indices remain0/1/2; exact authoritative end values",
+        "Absent signatures represented separately from null"
+      ]
+    },
+    {
+      "id": "PM-DONE-METADATA",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Done carries exact server usage/costs, responseId, thinking level and rewrite diagnostics.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "length",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            },
+            "responseId": "authored-response",
+            "providerThinkingLevel": "medium",
+            "rewrite": {
+              "policyId": "authored-policy",
+              "policyVersion": 2,
+              "changed": true,
+              "tokenCountChange": -3,
+              "messageCountChange": 1,
+              "systemPromptChanged": true
+            }
+          }
+        ]
+      },
+      "requiredChecks": [
+        "Do not recompute server-supplied usage/costs",
+        "Whole diagnostic presence/opaque fields and final reason"
+      ]
+    },
+    {
+      "id": "PM-USAGE-ZERO",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Present zero usage remains exact rather than guessed from emitted text.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            }
+          }
+        ]
+      },
+      "requiredChecks": [
+        "Compare whole zero usage/cost object and absence sidecars"
+      ]
+    },
+    {
+      "id": "PM-WIRE-ERROR-PARTIAL",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "An explicit error event retains converter partial content and supplied usage.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "error",
+            "reason": "error",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            },
+            "errorMessage": "Authored inert provider error",
+            "responseId": "authored-error-response"
+          }
+        ]
+      },
+      "requiredChecks": [
+        "No tool authority/continuation",
+        "Distinct from catch-created empty error assistant"
+      ]
+    },
+    {
+      "id": "PM-EOF-PARTIAL",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "EOF without terminal creates a fresh empty error assistant.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          }
+        ]
+      },
+      "requiredChecks": [
+        "Whole original events/partial then error with empty content and zero usage",
+        "Actual EOF read plus reader release and joined native disposal"
+      ]
+    },
+    {
+      "id": "PM-MALFORMED-JSON",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Malformed data after partial content creates the catch error shape.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          }
+        ],
+        "appendRawFrame": "data: {invalid\n\n"
+      },
+      "requiredChecks": [
+        "Retain exact actual failure and prior publications; no success terminal"
+      ]
+    },
+    {
+      "id": "PM-HTTP-ERROR-STRUCTURED",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Response hook precedes typed response failure and diagnostic body preservation.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 429,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "statusText": "Authored rate limit",
+        "httpBody": "{\"error\":{\"message\":\"Authored inert rejection\",\"code\":\"authored_code\",\"details\":{\"opaque\":null},\"extension\":\"retained\"}}"
+      },
+      "requiredChecks": [
+        "Zero provider events; no fabricated retry (Source Pi Messages does not consume maxRetries here)",
+        "Response failure diagnostic includes unknown error fields; no API key in error/trace"
+      ]
+    },
+    {
+      "id": "PM-FRAME-FIRST-DATA",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Only the first data line is parsed; later data lines are ignored.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "rawFrames": [
+          "event: authored-ignored\ndata: {\"type\":\"start\"}\ndata: {invalid ignored line\n\n"
+        ]
+      },
+      "requiredChecks": [
+        "Generic SSE multiline joining must not be substituted"
+      ]
+    },
+    {
+      "id": "PM-FRAME-CRLF-FRAGMENT",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "CRLF/UTF8 decoding works across every authored byte boundary.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Unicode 😀é漢字",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "fragmentation": "enumerate-all-byte-splits-after-future-boundary",
+        "lineEnding": "\r\n"
+      },
+      "requiredChecks": [
+        "Same whole events/body/final at every split; no sleeps/time-based gate"
+      ]
+    },
+    {
+      "id": "PM-FRAME-EOF-PENDING",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "A terminal data frame without trailing blank line is dispatched at EOF.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "terminalFrameSuffix": ""
+      },
+      "requiredChecks": [
+        "Actual pending terminal admitted before unexpected-EOF classification"
+      ]
+    },
+    {
+      "id": "PM-FRAME-DONE-SENTINEL",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "The [DONE] sentinel is ignored and does not replace a terminal event.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          }
+        ],
+        "appendRawFrame": "data: [DONE]\n\n"
+      },
+      "requiredChecks": [
+        "Missing terminal still fails; no synthetic done"
+      ]
+    },
+    {
+      "id": "PM-FRAME-LONE-CR",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "A lone CR is not the Pi Messages frame separator.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "rawBody": "data: {\"type\":\"start\"}\r\rdata: {\"type\":\"done\"}\r\r"
+      },
+      "requiredChecks": [
+        "Compare actual Source parse/failure; do not silently use standard SSE CR separation"
+      ]
+    },
+    {
+      "id": "PM-TOOL-IDENTITY-REPLACEMENT",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Source Object.assign can change tool identity at its end; native reducer currently forbids that.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "toolcall_start",
+            "contentIndex": 0,
+            "id": "authored-call-1",
+            "toolName": "inspect"
+          },
+          {
+            "type": "toolcall_delta",
+            "contentIndex": 0,
+            "delta": "{\"value\":1}"
+          },
+          {
+            "type": "toolcall_end",
+            "contentIndex": 0,
+            "toolCall": {
+              "type": "toolCall",
+              "id": "authored-replaced-call",
+              "name": "other",
+              "arguments": {
+                "value": 7
+              }
+            }
+          },
+          {
+            "type": "done",
+            "reason": "toolUse",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ]
+      },
+      "requiredChecks": [
+        "Retain as explicit Source/native contract conflict until lead releases a solution",
+        "Do not modify shared reducer or treat rejection as parity"
+      ]
+    },
+    {
+      "id": "PM-CANCEL-HELD",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Cancellation while provider callback is held must settle owned work.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "draft"
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "final",
+            "contentSignature": "authored-text-signature"
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "hook": {
+          "kind": "provider",
+          "mode": "held",
+          "eventOrdinal": 2
+        },
+        "cancel": {
+          "when": "controller-observed-entered-before-release"
+        }
+      },
+      "requiredChecks": [
+        "Token-aware callback exits; no later conversion/tool effect",
+        "Release/join only own reader/response; retain Source error shape and cleanup outcome"
+      ]
+    },
+    {
+      "id": "PM-NATIVE-TOOL-CONTINUATION",
+      "status": "AUTHORED INPUT; EXPECTATIONS REQUIRE GENUINE SOURCE CAPTURE AND NATIVE EXECUTION",
+      "criterion": "Native canonical result supplies the next context after cleanup and commit.",
+      "input": {
+        "model": {
+          "api": "pi-messages",
+          "provider": "authored-inert-provider",
+          "id": "authored-inert-model",
+          "baseUrl": "https://pi-messages.invalid/base///",
+          "reasoning": true,
+          "contextWindow": 65536,
+          "maxTokens": 8192
+        },
+        "context": {
+          "messages": [
+            {
+              "role": "system",
+              "systemMessage": "Authored inert system.",
+              "timestamp": 123
+            },
+            {
+              "role": "user",
+              "content": "Authored inert request.",
+              "timestamp": 123
+            }
+          ]
+        },
+        "options": {
+          "apiKey": "authored-inert-key"
+        },
+        "httpStatus": 200,
+        "httpHeaders": {
+          "content-type": "text/event-stream"
+        },
+        "events": [
+          {
+            "type": "start"
+          },
+          {
+            "type": "toolcall_start",
+            "contentIndex": 0,
+            "id": "authored-call-1",
+            "toolName": "inspect"
+          },
+          {
+            "type": "toolcall_delta",
+            "contentIndex": 0,
+            "delta": "{\"value\":1}"
+          },
+          {
+            "type": "toolcall_end",
+            "contentIndex": 0,
+            "toolCall": {
+              "type": "toolCall",
+              "id": "authored-call-1",
+              "name": "inspect",
+              "arguments": {
+                "value": 7
+              }
+            }
+          },
+          {
+            "type": "done",
+            "reason": "toolUse",
+            "usage": {
+              "input": 11,
+              "output": 7,
+              "cacheRead": 3,
+              "cacheWrite": 2,
+              "totalTokens": 23,
+              "cost": {
+                "input": 0.011,
+                "output": 0.014,
+                "cacheRead": 0.003,
+                "cacheWrite": 0.004,
+                "total": 0.032
+              }
+            }
+          }
+        ],
+        "secondTurn": {
+          "events": [
+            {
+              "type": "start"
+            },
+            {
+              "type": "text_start",
+              "contentIndex": 0
+            },
+            {
+              "type": "text_delta",
+              "contentIndex": 0,
+              "delta": "draft"
+            },
+            {
+              "type": "text_end",
+              "contentIndex": 0,
+              "content": "Observed seven.",
+              "contentSignature": "authored-text-signature"
+            },
+            {
+              "type": "done",
+              "reason": "stop",
+              "usage": {
+                "input": 11,
+                "output": 7,
+                "cacheRead": 3,
+                "cacheWrite": 2,
+                "totalTokens": 23,
+                "cost": {
+                  "input": 0.011,
+                  "output": 0.014,
+                  "cacheRead": 0.003,
+                  "cacheWrite": 0.004,
+                  "total": 0.032
+                }
+              }
+            }
+          ]
+        }
+      },
+      "requiredChecks": [
+        "Use actual native finalized tool args7; fake inspect effect once after awaited assistant barrier",
+        "Append actual assistant/toolResult; compare second physical request; never seed Source assistant output",
+        "Existing Agent/ToolInvoker source unchanged; ownership approval required for integration assertions"
+      ]
+    }
+  ]
+}

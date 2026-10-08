@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-03",
+  "originalScope": "P2-06 existing Anthropic provider-local fallback request/stream behavior",
+  "base": "7452a7b2a355e1f603a31eb693def91a9f565df1",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "status": "AUTHORED_UNBUILT_UNEXECUTED",
+  "behavior": [
+    "Existing fallback request declaration and beta compose with HTTP/SSE settlement",
+    "message_start returned model selects explicit exact same-provider fallback token rates",
+    "Initial and delta usage, one-hour cache costs and failed partial output use selected rates",
+    "Pre-output fallback markers and optional stops emit no assistant content",
+    "Mid-output fallback fails and retains observed content with awaited cleanup"
+  ],
+  "authoredTestGroups": [
+    "FallbackRatesAndMarkers",
+    "FallbackBoundariesAndProfiles",
+    "anthropic-http.fallback-request-marker-pricing-and-error-settlement"
+  ],
+  "existingTestUpdate": "Replace former unsupported pre-output marker negative control with mid-output marker negative control",
+  "nativeBuilds": 0,
+  "nativeTestsExecuted": 0,
+  "sourceOracleExecutions": 0,
+  "independentAcceptance": "pending",
+  "hardeningDifferences": [
+    "Reject duplicate configured provider/model profiles and malformed/nonnegative-rate profile inputs",
+    "Reject duplicate marker starts/stops, reused wire indices and marker deltas",
+    "Bound configured fallback profiles and marker indices by MaximumContentSlots"
+  ],
+  "remaining": [
+    "Coordinator-owned native build and focused plus adjacent tests require allocation",
+    "Unchanged source differential and independent acceptance remain pending",
+    "Catalog-to-profile composition and pricing tiers are outside this provider-local slice",
+    "No original task or phase gate is closed"
+  ],
+  "guide": "docs/contracts/anthropic-fallback-parity.md"
+}

@@ -1,0 +1,2401 @@
+{
+  "createdUtc": "2026-10-03T06:38:14.125Z",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "boundary": "Unchanged public Editor with raw input/render/getText/getCursor/onChange/onSubmit; no private state, method or input replacement",
+  "manifest": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\source-manifest.json",
+    "bytes": 969151,
+    "sha256": "772c23326a8a341cc40235a95366639ea28cca1823089969cee1c5deb58b4048"
+  },
+  "inputs": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-kitty-lock-modifiers\\lock-editor-source-inputs.json",
+    "bytes": 7145,
+    "sha256": "7a180181df9a148d5d4c56f4dd01422b10b448b07372485aac0992a218e0a097"
+  },
+  "driver": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\terminal-kitty-lock-modifiers\\capture-lock-editor-source.mjs",
+    "bytes": 3652,
+    "sha256": "e79802affa4e6224031fa1cf2be871b3319b99d4e143fbe2a57092a47408310a"
+  },
+  "node": {
+    "path": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+    "bytes": 92825416,
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "loadedFiles": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\editor.ts",
+      "bytes": 84348,
+      "sha256": "30a47fd49042579be7b85262677df62d4ff37a8f9a3a0e6c41ce3cf1d402b9c3"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keybindings.ts",
+      "bytes": 10125,
+      "sha256": "eea5e3fe258ad50337595bb5320955a6d97bac0c8f6c0a838f988d75079bcf38"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\kill-ring.ts",
+      "bytes": 1295,
+      "sha256": "d829ae816560b12d2800a38db9f7278f76d9ef43d0e53e004a86add9b56c559a"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\tui.ts",
+      "bytes": 49604,
+      "sha256": "92dcb7f5f9a3a9575421d8de366be5cc78890be8df38d86c4ed3c0d77c7f88a4"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\terminal-colors.ts",
+      "bytes": 3082,
+      "sha256": "72d1ef298837bfe520bd8a060cb93ea27547dcbff04a167ace0f55b5183e550d"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\terminal-image.ts",
+      "bytes": 23218,
+      "sha256": "b901b8df0ad84e04ac0ee612c419b45d960430f63d2bdaa974c8dd9d89f3e6e5"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\utils.ts",
+      "bytes": 38919,
+      "sha256": "5ecbc6c9b4850e78bf19de1fe8859b99b9c4c5f8a6384728d255a8e7e8a610ee"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\index.js",
+      "bytes": 730,
+      "sha256": "d7b1ba05914c0fc311c20e5618bf8d0893c9c74078a07975e2df981445e64887"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\lookup.js",
+      "bytes": 2671,
+      "sha256": "c80ecc22b120b27ef5ea9facb7000b8fd4ec037a84d9231d215f1c44bc9c21d0"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\lookup-data.js",
+      "bytes": 4734,
+      "sha256": "f6b40f86c9a2a6808ec808fa8ddcb8da261254cc6121d37ffaeb2bf35dad1d5b"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\node_modules\\get-east-asian-width\\utilities.js",
+      "bytes": 650,
+      "sha256": "4b08a7e9e3ffacbcf198a6abceb2338d52ac671899e52ccc2851c898bfccac42"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\undo-stack.ts",
+      "bytes": 643,
+      "sha256": "1373c1e0a1e2c58ac90c93d32a9e5c1226d7f53314c77dd3d0f8ec349d2b3627"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\word-navigation.ts",
+      "bytes": 3987,
+      "sha256": "b73e915a524926ac8881731e89026b0bc7b5b0bd465de67257af81a420465c7f"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\components\\select-list.ts",
+      "bytes": 9385,
+      "sha256": "0fc369801e745eff15567d72829bf67887f5efec8bc6816aaf1ee65338618373"
+    }
+  ],
+  "effects": [],
+  "cases": [
+    {
+      "id": "editing-lock-0",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[120;1:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[97;5:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57418;1:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57426;1:1u",
+          "text": "ax",
+          "expandedText": "ax",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57402;1:1u",
+          "text": "a3x",
+          "expandedText": "a3x",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57424;1:1u",
+          "text": "a3x",
+          "expandedText": "a3x",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[127;1:1u",
+          "text": "a3",
+          "expandedText": "a3",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[13;2:1u",
+          "text": "a3\n",
+          "expandedText": "a3\n",
+          "cursor": {
+            "line": 1,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[120;1:2u",
+          "text": "a3\nx",
+          "expandedText": "a3\nx",
+          "cursor": {
+            "line": 1,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n",
+            "a3\nx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;1:1u",
+          "text": "",
+          "expandedText": "",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n",
+            "a3\nx",
+            ""
+          ],
+          "submits": [
+            "a3\nx"
+          ],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-0-semantic-0-action-1",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;1:1u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-0-semantic-1-action-1",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;2:1u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-0-semantic-0-action-2",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;1:2u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-0-semantic-1-action-2",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;2:2u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-0-semantic-0-action-3",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;1:3u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-0-semantic-1-action-3",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;2:3u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "editing-lock-64",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[120;65:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[97;69:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57418;65:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57426;65:1u",
+          "text": "ax",
+          "expandedText": "ax",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57402;65:1u",
+          "text": "a3x",
+          "expandedText": "a3x",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57424;65:1u",
+          "text": "a3x",
+          "expandedText": "a3x",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[127;65:1u",
+          "text": "a3",
+          "expandedText": "a3",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[13;66:1u",
+          "text": "a3\n",
+          "expandedText": "a3\n",
+          "cursor": {
+            "line": 1,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[120;65:2u",
+          "text": "a3\nx",
+          "expandedText": "a3\nx",
+          "cursor": {
+            "line": 1,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n",
+            "a3\nx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;65:1u",
+          "text": "",
+          "expandedText": "",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n",
+            "a3\nx",
+            ""
+          ],
+          "submits": [
+            "a3\nx"
+          ],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-64-semantic-0-action-1",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;65:1u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-64-semantic-1-action-1",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;66:1u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-64-semantic-0-action-2",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;65:2u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-64-semantic-1-action-2",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;66:2u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-64-semantic-0-action-3",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;65:3u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-64-semantic-1-action-3",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;66:3u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "editing-lock-128",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[120;129:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[97;133:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57418;129:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57426;129:1u",
+          "text": "ax",
+          "expandedText": "ax",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57402;129:1u",
+          "text": "a3x",
+          "expandedText": "a3x",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57424;129:1u",
+          "text": "a3x",
+          "expandedText": "a3x",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[127;129:1u",
+          "text": "a3",
+          "expandedText": "a3",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[13;130:1u",
+          "text": "a3\n",
+          "expandedText": "a3\n",
+          "cursor": {
+            "line": 1,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[120;129:2u",
+          "text": "a3\nx",
+          "expandedText": "a3\nx",
+          "cursor": {
+            "line": 1,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n",
+            "a3\nx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;129:1u",
+          "text": "",
+          "expandedText": "",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n",
+            "a3\nx",
+            ""
+          ],
+          "submits": [
+            "a3\nx"
+          ],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-128-semantic-0-action-1",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;129:1u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-128-semantic-1-action-1",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;130:1u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-128-semantic-0-action-2",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;129:2u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-128-semantic-1-action-2",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;130:2u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-128-semantic-0-action-3",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;129:3u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-128-semantic-1-action-3",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;130:3u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "editing-lock-192",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[120;193:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[97;197:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57418;193:1u",
+          "text": "abx",
+          "expandedText": "abx",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57426;193:1u",
+          "text": "ax",
+          "expandedText": "ax",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57402;193:1u",
+          "text": "a3x",
+          "expandedText": "a3x",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57424;193:1u",
+          "text": "a3x",
+          "expandedText": "a3x",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[127;193:1u",
+          "text": "a3",
+          "expandedText": "a3",
+          "cursor": {
+            "line": 0,
+            "col": 2
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[13;194:1u",
+          "text": "a3\n",
+          "expandedText": "a3\n",
+          "cursor": {
+            "line": 1,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[120;193:2u",
+          "text": "a3\nx",
+          "expandedText": "a3\nx",
+          "cursor": {
+            "line": 1,
+            "col": 1
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n",
+            "a3\nx"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;193:1u",
+          "text": "",
+          "expandedText": "",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab",
+            "abx",
+            "ax",
+            "a3x",
+            "a3",
+            "a3\n",
+            "a3\nx",
+            ""
+          ],
+          "submits": [
+            "a3\nx"
+          ],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-192-semantic-0-action-1",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;193:1u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-192-semantic-1-action-1",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;194:1u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-192-semantic-0-action-2",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;193:2u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-192-semantic-1-action-2",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;194:2u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-192-semantic-0-action-3",
+      "parsedKey": "enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;193:3u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    },
+    {
+      "id": "jump-lock-192-semantic-1-action-3",
+      "parsedKey": "shift+enter",
+      "decodedPrintable": "",
+      "steps": [
+        {
+          "raw": "ab",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 3
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u0001",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001d",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 0
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        },
+        {
+          "raw": "\u001b[57414;194:3u",
+          "text": "ab",
+          "expandedText": "ab",
+          "cursor": {
+            "line": 0,
+            "col": 1
+          },
+          "changes": [
+            "ab"
+          ],
+          "submits": [],
+          "renderRequests": 0
+        }
+      ]
+    }
+  ]
+}

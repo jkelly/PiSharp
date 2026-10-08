@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "executionCandidate": "86e618d1237634425329e499c0f9c5de72cea3f9",
+  "harnessSha256": "2b557e7fb744a902711555cfa71672d4ee314152b861b7f66e111203eda842b5",
+  "exitCode": 0,
+  "unifiedExecSessionId": 43165,
+  "naturalExitObserved": true,
+  "stdoutBytes": 31397,
+  "stderrBytes": 0,
+  "supplementalBeforeSha256": "7e9044b9d76f89074806745a473de7fe2f82b740b530d197a158f62ccd079c4c",
+  "supplementalAfterSha256": "7e9044b9d76f89074806745a473de7fe2f82b740b530d197a158f62ccd079c4c",
+  "supplementalUnchanged": true
+}

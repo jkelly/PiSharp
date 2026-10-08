@@ -1,0 +1,517 @@
+{
+  "schemaVersion": 1,
+  "status": "AUTHORED FROM STATIC SOURCE INSPECTION; NOT CAPTURED GOLDENS; UNCOMPILED/UNEXECUTED",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceKeyProtocolMode": "legacy; Source Kitty protocol active=false for these authored ESC-prefix scenarios",
+  "registryDefinitions": {
+    "left": {
+      "defaultKeys": [
+        "left",
+        "ctrl+b"
+      ]
+    },
+    "right": {
+      "defaultKeys": [
+        "right",
+        "ctrl+f"
+      ]
+    },
+    "undo": {
+      "defaultKeys": "ctrl+-"
+    }
+  },
+  "registryCases": [
+    {
+      "id": "default-keys",
+      "user": {},
+      "expectedKeys": {
+        "left": [
+          "left",
+          "ctrl+b"
+        ],
+        "right": [
+          "right",
+          "ctrl+f"
+        ],
+        "undo": [
+          "ctrl+-"
+        ]
+      },
+      "conflicts": []
+    },
+    {
+      "id": "scalar-user-override",
+      "user": {
+        "left": "alt+j"
+      },
+      "expectedKeys": {
+        "left": [
+          "alt+j"
+        ],
+        "right": [
+          "right",
+          "ctrl+f"
+        ],
+        "undo": [
+          "ctrl+-"
+        ]
+      },
+      "conflicts": []
+    },
+    {
+      "id": "ordered-array-dedup",
+      "user": {
+        "left": [
+          "alt+j",
+          "left",
+          "alt+j",
+          "ctrl+b",
+          "left"
+        ]
+      },
+      "expectedKeys": {
+        "left": [
+          "alt+j",
+          "left",
+          "ctrl+b"
+        ]
+      },
+      "conflicts": []
+    },
+    {
+      "id": "empty-array-disables-default",
+      "user": {
+        "left": []
+      },
+      "expectedKeys": {
+        "left": []
+      },
+      "conflicts": []
+    },
+    {
+      "id": "unknown-id-is-not-activated",
+      "user": {
+        "missing": "alt+j"
+      },
+      "expectedKeys": {
+        "left": [
+          "left",
+          "ctrl+b"
+        ],
+        "missing": []
+      },
+      "conflicts": []
+    },
+    {
+      "id": "explicit-two-action-conflict",
+      "user": {
+        "left": "alt+j",
+        "right": [
+          "alt+j",
+          "alt+k"
+        ]
+      },
+      "expectedKeys": {
+        "left": [
+          "alt+j"
+        ],
+        "right": [
+          "alt+j",
+          "alt+k"
+        ]
+      },
+      "conflicts": [
+        {
+          "key": "alt+j",
+          "keybindings": [
+            "left",
+            "right"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "duplicate-single-claim-is-not-conflict",
+      "user": {
+        "left": [
+          "alt+j",
+          "alt+j"
+        ]
+      },
+      "expectedKeys": {
+        "left": [
+          "alt+j"
+        ]
+      },
+      "conflicts": []
+    },
+    {
+      "id": "override-versus-default-not-user-conflict",
+      "user": {
+        "right": "left"
+      },
+      "expectedKeys": {
+        "left": [
+          "left",
+          "ctrl+b"
+        ],
+        "right": [
+          "left"
+        ]
+      },
+      "conflicts": []
+    },
+    {
+      "id": "unknown-user-id-does-not-claim",
+      "user": {
+        "left": "alt+j",
+        "missing": "alt+j"
+      },
+      "expectedKeys": {
+        "left": [
+          "alt+j"
+        ],
+        "missing": []
+      },
+      "conflicts": []
+    },
+    {
+      "id": "replacement-resets-omitted-overrides",
+      "updates": [
+        {
+          "left": "alt+j",
+          "right": []
+        },
+        {
+          "undo": "alt+u"
+        }
+      ],
+      "expectedKeys": {
+        "left": [
+          "left",
+          "ctrl+b"
+        ],
+        "right": [
+          "right",
+          "ctrl+f"
+        ],
+        "undo": [
+          "alt+u"
+        ]
+      },
+      "conflicts": []
+    },
+    {
+      "id": "remove-user-override-restores-defaults",
+      "updates": [
+        {
+          "left": []
+        },
+        {}
+      ],
+      "expectedKeys": {
+        "left": [
+          "left",
+          "ctrl+b"
+        ]
+      },
+      "conflicts": []
+    },
+    {
+      "id": "get-keys-copy-isolation",
+      "user": {
+        "left": "alt+j"
+      },
+      "mutateReturnedKeys": {
+        "action": "left",
+        "append": "ctrl+x"
+      },
+      "expectedKeys": {
+        "left": [
+          "alt+j"
+        ]
+      },
+      "conflicts": []
+    },
+    {
+      "id": "conflict-copy-isolation",
+      "user": {
+        "left": "alt+j",
+        "right": "alt+j"
+      },
+      "mutateReturnedConflict": {
+        "appendAction": "missing"
+      },
+      "conflicts": [
+        {
+          "key": "alt+j",
+          "keybindings": [
+            "left",
+            "right"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "resolved-singleton-scalar-and-multiple-array",
+      "user": {
+        "left": "alt+j",
+        "right": []
+      },
+      "resolved": {
+        "left": "alt+j",
+        "right": [],
+        "undo": "ctrl+-"
+      }
+    },
+    {
+      "id": "matches-iterates-configured-alternatives",
+      "user": {
+        "left": [
+          "alt+j",
+          "alt+k"
+        ]
+      },
+      "symbolicMatcherCalls": [
+        {
+          "input": "alt+k",
+          "action": "left",
+          "expected": true
+        },
+        {
+          "input": "ctrl+b",
+          "action": "left",
+          "expected": false
+        },
+        {
+          "input": "alt+j",
+          "action": "missing",
+          "expected": false
+        }
+      ]
+    }
+  ],
+  "editorCases": [
+    {
+      "id": "remap-left-alt-j",
+      "initialText": "abc",
+      "initialCursor": 3,
+      "userBindings": {
+        "tui.editor.cursorLeft": "alt+j"
+      },
+      "raw": [
+        "\u001bj"
+      ],
+      "desired": {
+        "text": "abc",
+        "expandedText": "abc",
+        "cursorUtf16Offset": 2,
+        "changes": [],
+        "history": []
+      },
+      "currentNativePrediction": {
+        "text": "abc",
+        "expandedText": "abc",
+        "cursorUtf16Offset": 3,
+        "changes": [],
+        "history": []
+      }
+    },
+    {
+      "id": "remap-right-alt-k",
+      "initialText": "abc",
+      "initialCursor": 1,
+      "userBindings": {
+        "tui.editor.cursorRight": "alt+k"
+      },
+      "raw": [
+        "\u001bk"
+      ],
+      "desired": {
+        "text": "abc",
+        "expandedText": "abc",
+        "cursorUtf16Offset": 2,
+        "changes": [],
+        "history": []
+      },
+      "currentNativePrediction": {
+        "text": "abc",
+        "expandedText": "abc",
+        "cursorUtf16Offset": 1,
+        "changes": [],
+        "history": []
+      }
+    },
+    {
+      "id": "disable-left",
+      "initialText": "abc",
+      "initialCursor": 3,
+      "userBindings": {
+        "tui.editor.cursorLeft": []
+      },
+      "raw": [
+        "\u001b[D"
+      ],
+      "desired": {
+        "text": "abc",
+        "expandedText": "abc",
+        "cursorUtf16Offset": 3,
+        "changes": [],
+        "history": []
+      },
+      "currentNativePrediction": {
+        "text": "abc",
+        "expandedText": "abc",
+        "cursorUtf16Offset": 2,
+        "changes": [],
+        "history": []
+      }
+    },
+    {
+      "id": "remap-word-left-alt-j",
+      "initialText": "a b",
+      "initialCursor": 3,
+      "userBindings": {
+        "tui.editor.cursorWordLeft": "alt+j"
+      },
+      "raw": [
+        "\u001bj"
+      ],
+      "desired": {
+        "text": "a b",
+        "expandedText": "a b",
+        "cursorUtf16Offset": 2,
+        "changes": [],
+        "history": []
+      },
+      "currentNativePrediction": {
+        "text": "a b",
+        "expandedText": "a b",
+        "cursorUtf16Offset": 3,
+        "changes": [],
+        "history": []
+      }
+    },
+    {
+      "id": "remap-history-previous-ctrl-p",
+      "initialText": "draft",
+      "initialCursor": 5,
+      "history": [
+        "one",
+        "two"
+      ],
+      "userBindings": {
+        "tui.editor.historyPrevious": "ctrl+p"
+      },
+      "raw": [
+        "\u0010"
+      ],
+      "desired": {
+        "text": "two",
+        "expandedText": "two",
+        "cursorUtf16Offset": 0,
+        "changes": [
+          "two"
+        ],
+        "history": [
+          "two",
+          "one"
+        ]
+      },
+      "currentNativePrediction": {
+        "text": "draft",
+        "expandedText": "draft",
+        "cursorUtf16Offset": 5,
+        "changes": [],
+        "history": [
+          "two",
+          "one"
+        ]
+      }
+    },
+    {
+      "id": "remap-newline-alt-j",
+      "initialText": "abc",
+      "initialCursor": 3,
+      "userBindings": {
+        "tui.input.newLine": "alt+j"
+      },
+      "raw": [
+        "\u001bj"
+      ],
+      "desired": {
+        "text": "abc\n",
+        "expandedText": "abc\n",
+        "cursorUtf16Offset": 4,
+        "changes": [
+          "abc\n"
+        ],
+        "history": []
+      },
+      "currentNativePrediction": {
+        "text": "abc",
+        "expandedText": "abc",
+        "cursorUtf16Offset": 3,
+        "changes": [],
+        "history": []
+      }
+    },
+    {
+      "id": "default-left-control-b-guard",
+      "initialText": "abc",
+      "initialCursor": 3,
+      "userBindings": {},
+      "raw": [
+        "\u0002"
+      ],
+      "desired": {
+        "text": "abc",
+        "expandedText": "abc",
+        "cursorUtf16Offset": 2,
+        "changes": [],
+        "history": []
+      },
+      "currentNativePrediction": {
+        "text": "abc",
+        "expandedText": "abc",
+        "cursorUtf16Offset": 2,
+        "changes": [],
+        "history": []
+      },
+      "guard": true
+    },
+    {
+      "id": "default-left-arrow-guard",
+      "initialText": "abc",
+      "initialCursor": 3,
+      "userBindings": {},
+      "raw": [
+        "\u001b[D"
+      ],
+      "desired": {
+        "text": "abc",
+        "expandedText": "abc",
+        "cursorUtf16Offset": 2,
+        "changes": [],
+        "history": []
+      },
+      "currentNativePrediction": {
+        "text": "abc",
+        "expandedText": "abc",
+        "cursorUtf16Offset": 2,
+        "changes": [],
+        "history": []
+      },
+      "guard": true
+    }
+  ],
+  "registryCaseCount": 15,
+  "editorCaseCount": 8,
+  "missingBehaviorCases": 6,
+  "guardCases": 2,
+  "currentRegistryApiPresent": false,
+  "currentNativeConfigurationApplied": false,
+  "sourceCaptured": false,
+  "nativeExecuted": false,
+  "acceptance": false
+}

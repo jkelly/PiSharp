@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceVersion": "0.99.1",
+  "base": "4b63271a13e10505ab0e648592021050155454d1",
+  "baseTree": "993e39dbc5a502d670846edee0f9e55a849cfe63",
+  "basis": "READ_ONLY_PINNED_LOCAL_SOURCE_TEXT; AUTHORED_EXPECTATIONS; NO_SOURCE_EXECUTION",
+  "files": [
+    {
+      "path": "packages/ai/src/api/azure-openai-responses.ts",
+      "bytes": 12324,
+      "sha256": "1ba1e70c6424bcc482dbb1a29ffe143fa3754fcff6cbc64afe7363c514050dcb"
+    },
+    {
+      "path": "packages/ai/src/providers/azure-openai-responses.ts",
+      "bytes": 628,
+      "sha256": "76e9f5cde761fcd516370d4d99519e4658e0db1029518746d0d0c0550ce54fa5"
+    },
+    {
+      "path": "packages/ai/src/api/openai-responses-shared.ts",
+      "bytes": 30902,
+      "sha256": "85db12efcd109d505c98846e34c45cb4a3260edcee88ef28c8afd1db20eac26a"
+    },
+    {
+      "path": "packages/ai/src/api/openai-prompt-cache.ts",
+      "bytes": 358,
+      "sha256": "78727b9b42d5c5cdc47d17f44d532cdf951cbee3b158cacfb3e640d8f792e8a4"
+    },
+    {
+      "path": "packages/ai/src/utils/error-body.ts",
+      "bytes": 6444,
+      "sha256": "7170181ae6926709fe4ab7ac6b5b51c46ffe906868a7aac3c7627cb28ad77c09"
+    },
+    {
+      "path": "packages/ai/src/utils/transcript.ts",
+      "bytes": 9403,
+      "sha256": "cad0c126cdfadc1b4f430cc5a95b1c9285ecd1ee9957642d7773b1357bbc9ac5"
+    },
+    {
+      "path": "packages/ai/package.json",
+      "bytes": 2636,
+      "sha256": "86a8ccb86ce00af196fc7d48417f82e99c6da40c68d8d138ace2a4f0fda4090d"
+    },
+    {
+      "path": "packages/ai/src/utils/pi-user-agent.ts",
+      "bytes": 682,
+      "sha256": "c60d2777f4362985b74f7d7cfadf35a47ae2c6f8b5cc0b809efbb4c546579b8e"
+    },
+    {
+      "path": "packages/ai/src/utils/provider-env.ts",
+      "bytes": 1718,
+      "sha256": "3829251ae0674cef7ca09800cee9f46d4e305770129b72b822ea2f6f85efe675"
+    },
+    {
+      "path": "packages/ai/src/utils/provider-retry.ts",
+      "bytes": 4034,
+      "sha256": "d0f68cfe9fe6a5d4be778eaefedc0b453021f89026810691dcd1479371dca699"
+    }
+  ],
+  "sdk": {
+    "version": "7.19.0",
+    "basis": "ALREADY_RESTORED_LOCAL_SOURCE; NO_DOWNLOAD_OR_EXECUTION",
+    "files": [
+      {
+        "path": "azure.mjs",
+        "bytes": 8609,
+        "sha256": "c51d3e6bd65d5c2b7b4ae2c2817a565f6f86cf715aa2972fab94ca1c577c0f33"
+      },
+      {
+        "path": "client.mjs",
+        "bytes": 73588,
+        "sha256": "fc5b25a2e1a7a3a0f67e2cf1c21b4bd768d778aaeb877cbc3789088e3e1eca02"
+      },
+      {
+        "path": "core/error.mjs",
+        "bytes": 5050,
+        "sha256": "f9af78fa51cabb0128ebdd820259ba93a38d405434e698381b9dbc5b7ca55174"
+      },
+      {
+        "path": "internal/utils/query.mjs",
+        "bytes": 180,
+        "sha256": "7bfea4786ca2f38368611bec9ad6db2a860b9f04c60b4e16bb6d625ff7382d68"
+      },
+      {
+        "path": "internal/qs/stringify.mjs",
+        "bytes": 11652,
+        "sha256": "82a44a313e7d3bd0da87e343df95b43073adefcf957437d1b14ea26aecc51e8f"
+      },
+      {
+        "path": "package.json",
+        "bytes": 7323,
+        "sha256": "8a855f81669a434ce894e2d1ae2f18e9050e93c57d14091f155cd543056bdc30"
+      }
+    ]
+  },
+  "unchangedReusedNativeOwners": [
+    {
+      "path": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTranscriptProjector.cs",
+      "bytes": 31007,
+      "sha256": "f1168f1c55c5d3d50241c8ab2af7f01f7897875b83074d9b7765b97e97758f84"
+    },
+    {
+      "path": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesToolDeclarationProjector.cs",
+      "bytes": 14784,
+      "sha256": "0f0b612dc2b40142723ae41f0bbc68ecb6db3147556e11d66d28395c08fbe724"
+    },
+    {
+      "path": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTextToolTransport.cs",
+      "bytes": 29496,
+      "sha256": "298d776d9a192e7b6bbeebb986e6a93dc8aa4c3c07312012fe8bc54204072517"
+    },
+    {
+      "path": "src/PiSharp.AI/Transports/HttpSseTransport.cs",
+      "bytes": 6037,
+      "sha256": "113d4a12c5779bb911185380b6ff8388024dd957e36896dafa45396019348233"
+    },
+    {
+      "path": "src/PiSharp.AI/Transports/SseDecoder.cs",
+      "bytes": 10514,
+      "sha256": "5db0a3a3ac64a160d78e35964a652a66db3c879f0f74007b508478c854e21097"
+    }
+  ],
+  "authoredGroups": 15,
+  "authoredCompleteBodyComparisons": 37,
+  "executedBuilds": 0,
+  "executedTests": 0,
+  "genuineSourceCasesCaptured": 0,
+  "qualification": "OPEN",
+  "sourceMap": [
+    {
+      "source": "api/azure-openai-responses.ts",
+      "native": "AzureResponsesRequestFactory",
+      "scope": "configuration/deployment/buildParams/header precedence/payload hook"
+    },
+    {
+      "source": "SDK azure.mjs + client.mjs",
+      "native": "AzureResponsesRequestFactory + AzureResponsesTransport",
+      "scope": "Responses route/api-version/api-key and error-object normalization"
+    },
+    {
+      "source": "api/openai-responses-shared.ts",
+      "native": "unchanged Responses transcript/DTO mapper",
+      "scope": "bounded text/tool/reasoning subset"
+    },
+    {
+      "source": "utils/error-body.ts + SDK core/error.mjs",
+      "native": "AzureResponsesTransport.ReadErrorAsync",
+      "scope": "object/plaintext HTTP errors and inner-body formatting"
+    }
+  ]
+}

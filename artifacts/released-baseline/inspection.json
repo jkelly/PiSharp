@@ -1,0 +1,1009 @@
+{
+  "schemaVersion": 1,
+  "kind": "official-released-source-and-registry-metadata-inspection",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "release": {
+    "tag": "v0.99.1",
+    "publishedAt": "2026-09-29T18:27:00Z",
+    "htmlUrl": "https://github.com/earendil-works/pi/releases/tag/v0.99.1",
+    "apiReportedImmutable": false,
+    "archiveUrl": "https://github.com/earendil-works/pi/releases/download/v0.99.1/pi-0.99.1-source.tar.gz",
+    "archiveBytes": 8646242,
+    "archiveSha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b",
+    "checksumFileSha256": "1490fbb52c4cbf6f175b1b66147702b5e6584504277fc0c424745c32770bdbba"
+  },
+  "archiveSafety": {
+    "extracted": false,
+    "executed": false,
+    "memberKinds": {
+      "0": 2136,
+      "5": 249
+    },
+    "paxMetadataHeaders": 0,
+    "confinedReleaseRoot": "pi-0.99.1/",
+    "absoluteTraversalAndEscapingLinksRejected": true
+  },
+  "sourceComparison": {
+    "authority": "canonical git archive bytes at exact pinned commit",
+    "comparedRegularFiles": 2093,
+    "comparedLinks": 0,
+    "differingTrackedFiles": 0,
+    "addedRegularFiles": [
+      {
+        "path": "packages/ai/src/providers/data/.manifest.json",
+        "bytes": 3779,
+        "sha256": "58698cae7d0a3b270f360072c6106435ca1870a178254bd80d5dbfb4716734e6"
+      },
+      {
+        "path": "packages/ai/src/providers/data/amazon-bedrock.json",
+        "bytes": 90990,
+        "sha256": "c6e1a0105ac45dbf41eba6311562d55ccbed48a5d1ce4c8d9b8e86ff9a572863"
+      },
+      {
+        "path": "packages/ai/src/providers/data/ant-ling.json",
+        "bytes": 1692,
+        "sha256": "628feab3ef6c7d80ce96f75999804e1d9f05fec3851e5302e30fff3b69db90f6"
+      },
+      {
+        "path": "packages/ai/src/providers/data/anthropic.json",
+        "bytes": 10901,
+        "sha256": "3ff00b68990382e42626ebd1b65dcc28ae3cad9e6faa8920331ba92f067f1b3a"
+      },
+      {
+        "path": "packages/ai/src/providers/data/azure-openai-responses.json",
+        "bytes": 20456,
+        "sha256": "af60bfc0f822233177c69b63cb9d7aa9e6c99829da729f5e4805023f6e3d96e1"
+      },
+      {
+        "path": "packages/ai/src/providers/data/baseten.json",
+        "bytes": 17098,
+        "sha256": "883cdb952fd9eb8d8e3605c460744af36802d325f9a38f75998365e2871a5bcc"
+      },
+      {
+        "path": "packages/ai/src/providers/data/cerebras.json",
+        "bytes": 1109,
+        "sha256": "c07ed7880030c5c85a89520ec4e0fceaf2b2988356345cb1287538337971badd"
+      },
+      {
+        "path": "packages/ai/src/providers/data/cloudflare-ai-gateway.json",
+        "bytes": 36059,
+        "sha256": "52decade622d1d25f1af90385b1aec7331dad00d56e010a5e4d15118efae67ce"
+      },
+      {
+        "path": "packages/ai/src/providers/data/cloudflare-workers-ai.json",
+        "bytes": 12659,
+        "sha256": "b9f76cc83756a05920a8a7046c515919a1de918331b860a211f309bb716c4bb0"
+      },
+      {
+        "path": "packages/ai/src/providers/data/deepseek.json",
+        "bytes": 1387,
+        "sha256": "10a296fb3e898f7715c80890c8af0af4f5fd58f22dbcd6612fdc5d762157ccdc"
+      },
+      {
+        "path": "packages/ai/src/providers/data/fireworks.json",
+        "bytes": 16231,
+        "sha256": "d6144ba451bd7a0617669527bec1898f97a633f7d7ea5035d8e03234550340c0"
+      },
+      {
+        "path": "packages/ai/src/providers/data/github-copilot.json",
+        "bytes": 26521,
+        "sha256": "b5a5defdbb6a351d3764ec542dd2b194c1162a4f6ee977494dcc43e7d6873597"
+      },
+      {
+        "path": "packages/ai/src/providers/data/google-vertex.json",
+        "bytes": 7825,
+        "sha256": "40090c680538bc867f2624d986a449f361be4dfa6ba96d7a27402050f036e009"
+      },
+      {
+        "path": "packages/ai/src/providers/data/google.json",
+        "bytes": 13373,
+        "sha256": "c0f5a633e5e5a5044432db3e537f4bc674d4de18df09325c6349547fcc13cabe"
+      },
+      {
+        "path": "packages/ai/src/providers/data/groq.json",
+        "bytes": 3354,
+        "sha256": "910952ad9dad07856983459d63fce0148dba1203edd7b10d801a77c5824f3405"
+      },
+      {
+        "path": "packages/ai/src/providers/data/huggingface.json",
+        "bytes": 36433,
+        "sha256": "1b8604bd31a5e05fe43a40ec1ec6dfc1a51a28b0b020151ef057fab43f57c923"
+      },
+      {
+        "path": "packages/ai/src/providers/data/kimi-coding.json",
+        "bytes": 2282,
+        "sha256": "582250b920454d98940da3e7e99d30b807edbea28f2eb8ac15f658d2ef41e8fc"
+      },
+      {
+        "path": "packages/ai/src/providers/data/meta.json",
+        "bytes": 2819,
+        "sha256": "0c7e9a370a7005c5a89dc94f0f93bc67b8935c3f802de324f11af6ff56fff429"
+      },
+      {
+        "path": "packages/ai/src/providers/data/minimax-cn.json",
+        "bytes": 1127,
+        "sha256": "f962c20ee6a6a342820f778e9dc363a18a524bf11998f6e2c57f2989915d62e5"
+      },
+      {
+        "path": "packages/ai/src/providers/data/minimax.json",
+        "bytes": 1112,
+        "sha256": "17a432f80d0ea6dd26eade80a4314250d3a855678601728a5f70dd8fa0d21dd2"
+      },
+      {
+        "path": "packages/ai/src/providers/data/mistral.json",
+        "bytes": 12596,
+        "sha256": "10f33bff9adf1248f7e6848e5890c265399f1f94e5b42cfdc28c109d547af98d"
+      },
+      {
+        "path": "packages/ai/src/providers/data/moonshotai-cn.json",
+        "bytes": 2882,
+        "sha256": "79c9585dc84ee525ebaebbc78b3c55f3d369ec884d4f943488f1e0b14e3587f5"
+      },
+      {
+        "path": "packages/ai/src/providers/data/moonshotai.json",
+        "bytes": 2870,
+        "sha256": "1da2c4e34f22aef17a07c974d85bdee8e1b68b6dc712e3769c935b3f1e7dadca"
+      },
+      {
+        "path": "packages/ai/src/providers/data/nvidia.json",
+        "bytes": 12038,
+        "sha256": "3b4e7b799bf3eaacd1af0491eef77fe33147ea7f72a3a9fa54d77af0e7eacf4c"
+      },
+      {
+        "path": "packages/ai/src/providers/data/openai-codex.json",
+        "bytes": 6476,
+        "sha256": "3cc35a7e122e5c77ee8ec30a9a3bd8bd59629997e85ba2cb3f9e0ed62e9a09c0"
+      },
+      {
+        "path": "packages/ai/src/providers/data/openai.json",
+        "bytes": 28816,
+        "sha256": "ca5ec1028efc512502591bf2562a2a6dc330f26a5f4c4a08c8a149a43c5bd7da"
+      },
+      {
+        "path": "packages/ai/src/providers/data/opencode-go.json",
+        "bytes": 17032,
+        "sha256": "d05b3eb87b81c6e5a94801484e668e660fe60c68f06a972b716d581c3bbd7c25"
+      },
+      {
+        "path": "packages/ai/src/providers/data/opencode.json",
+        "bytes": 44976,
+        "sha256": "4adb1cfc19a5294a2d9ea5179089b86364ddbfa31485043a3fc278fa8f7e2e73"
+      },
+      {
+        "path": "packages/ai/src/providers/data/openrouter.json",
+        "bytes": 267751,
+        "sha256": "b49405ced089750d475945738a91ac669fa00e04d574da7720935bcfe16ba272"
+      },
+      {
+        "path": "packages/ai/src/providers/data/qwen-token-plan-cn.json",
+        "bytes": 12210,
+        "sha256": "2469a4091c474ec3db0a49a9962d8d2726c074ad9065b96bc4e0c87861c4c6c5"
+      },
+      {
+        "path": "packages/ai/src/providers/data/qwen-token-plan-individual.json",
+        "bytes": 5782,
+        "sha256": "0fb7cf64faf39d1a3b0a884210a86c87084b805eda15644f5f39293287b959dd"
+      },
+      {
+        "path": "packages/ai/src/providers/data/qwen-token-plan.json",
+        "bytes": 12230,
+        "sha256": "eff10620cb577142de4ec02698d5961a71fda2fe4f6ae7ea9432bad9d6844176"
+      },
+      {
+        "path": "packages/ai/src/providers/data/radius.json",
+        "bytes": 19164,
+        "sha256": "8e868af981cc64a39da11b135a96252e3eeccb14b92e80d8fbba899ff96f2616"
+      },
+      {
+        "path": "packages/ai/src/providers/data/together.json",
+        "bytes": 12930,
+        "sha256": "94ec3839972061405885d64f5fdbde48eb1f29a159be5e607e9770befd54e28e"
+      },
+      {
+        "path": "packages/ai/src/providers/data/typesafe.json",
+        "bytes": 291,
+        "sha256": "a4429a2f696d5cc5273969af61a7310bda07d6bdcd27bf9ac9c76c534cc43716"
+      },
+      {
+        "path": "packages/ai/src/providers/data/vercel-ai-gateway.json",
+        "bytes": 118194,
+        "sha256": "e64081d4ced20a7e754dab586d5f733eb92f00feab30c76fdcb7ce29ce5111be"
+      },
+      {
+        "path": "packages/ai/src/providers/data/xai.json",
+        "bytes": 2609,
+        "sha256": "879c49b78b663a52a220ac4ee013e726b10c4f50aaa03bc58ee53a4b54c76928"
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi-token-plan-ams.json",
+        "bytes": 2156,
+        "sha256": "ca65178f4525d9705bc8d085ed136cecbe149c4080e857ea6a64ae643d2ac00a"
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi-token-plan-cn.json",
+        "bytes": 2148,
+        "sha256": "b065326926681c2262084e59c1c19ebdaf146c07107b5242c76b456becf74db0"
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi-token-plan-sgp.json",
+        "bytes": 2156,
+        "sha256": "92c3d6d707f81fd9cd2b6d1fb57dc431d90ba51e10fe49d97bc8806035c23492"
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi.json",
+        "bytes": 3144,
+        "sha256": "b81d01a374f7b558728c78d81f4168efa9c8996e6e2b5618409a8094b083c759"
+      },
+      {
+        "path": "packages/ai/src/providers/data/zai-coding-cn.json",
+        "bytes": 2672,
+        "sha256": "ee5ee705fb6e413a6088db5e3616c27fce802a8ece6c355f1db35490d787f610"
+      },
+      {
+        "path": "packages/ai/src/providers/data/zai.json",
+        "bytes": 4221,
+        "sha256": "58e6642fdfb736f0b9a4a277c760c536a3cea66a030abbfb2615f7b2851d5c6f"
+      }
+    ]
+  },
+  "sourceLicense": {
+    "path": "LICENSE",
+    "bytes": 1069,
+    "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48",
+    "declaration": "MIT",
+    "attribution": "Copyright (c) 2025 Mario Zechner",
+    "fullDependencyAndCatalogLicensingReviewed": false
+  },
+  "catalog": {
+    "scope": "publisher source archive snapshot; npm tarball equality unverified",
+    "manifestPath": "packages/ai/src/providers/data/.manifest.json",
+    "manifestBytes": 3779,
+    "manifestSha256": "58698cae7d0a3b270f360072c6106435ca1870a178254bd80d5dbfb4716734e6",
+    "schemaVersion": 6,
+    "generatedAt": "2026-09-29T18:07:44.679Z",
+    "structureHash": "58511a57fb2db5e984ee62857d8079aec6ff800e19226c327c118e7f57ea916b",
+    "providers": 42,
+    "models": 1592,
+    "modelTypes": {
+      "chat": 1523,
+      "classifier": 12,
+      "image": 57
+    },
+    "apis": {
+      "bedrock-converse-stream": 176,
+      "openai-completions": 714,
+      "anthropic-messages": 348,
+      "azure-openai-responses": 44,
+      "openai-responses": 129,
+      "cloudflare-workers-ai-system-one": 1,
+      "google-generative-ai": 29,
+      "google-vertex": 14,
+      "mistral-conversations": 32,
+      "openai-codex-responses": 9,
+      "typesafe-system-one": 11,
+      "openrouter-images": 57,
+      "pi-messages": 28
+    },
+    "files": [
+      {
+        "path": "packages/ai/src/providers/data/amazon-bedrock.json",
+        "bytes": 90990,
+        "sha256": "c6e1a0105ac45dbf41eba6311562d55ccbed48a5d1ce4c8d9b8e86ff9a572863",
+        "models": 176
+      },
+      {
+        "path": "packages/ai/src/providers/data/ant-ling.json",
+        "bytes": 1692,
+        "sha256": "628feab3ef6c7d80ce96f75999804e1d9f05fec3851e5302e30fff3b69db90f6",
+        "models": 3
+      },
+      {
+        "path": "packages/ai/src/providers/data/anthropic.json",
+        "bytes": 10901,
+        "sha256": "3ff00b68990382e42626ebd1b65dcc28ae3cad9e6faa8920331ba92f067f1b3a",
+        "models": 16
+      },
+      {
+        "path": "packages/ai/src/providers/data/azure-openai-responses.json",
+        "bytes": 20456,
+        "sha256": "af60bfc0f822233177c69b63cb9d7aa9e6c99829da729f5e4805023f6e3d96e1",
+        "models": 44
+      },
+      {
+        "path": "packages/ai/src/providers/data/baseten.json",
+        "bytes": 17098,
+        "sha256": "883cdb952fd9eb8d8e3605c460744af36802d325f9a38f75998365e2871a5bcc",
+        "models": 21
+      },
+      {
+        "path": "packages/ai/src/providers/data/cerebras.json",
+        "bytes": 1109,
+        "sha256": "c07ed7880030c5c85a89520ec4e0fceaf2b2988356345cb1287538337971badd",
+        "models": 2
+      },
+      {
+        "path": "packages/ai/src/providers/data/cloudflare-ai-gateway.json",
+        "bytes": 36059,
+        "sha256": "52decade622d1d25f1af90385b1aec7331dad00d56e010a5e4d15118efae67ce",
+        "models": 54
+      },
+      {
+        "path": "packages/ai/src/providers/data/cloudflare-workers-ai.json",
+        "bytes": 12659,
+        "sha256": "b9f76cc83756a05920a8a7046c515919a1de918331b860a211f309bb716c4bb0",
+        "models": 19
+      },
+      {
+        "path": "packages/ai/src/providers/data/deepseek.json",
+        "bytes": 1387,
+        "sha256": "10a296fb3e898f7715c80890c8af0af4f5fd58f22dbcd6612fdc5d762157ccdc",
+        "models": 2
+      },
+      {
+        "path": "packages/ai/src/providers/data/fireworks.json",
+        "bytes": 16231,
+        "sha256": "d6144ba451bd7a0617669527bec1898f97a633f7d7ea5035d8e03234550340c0",
+        "models": 22
+      },
+      {
+        "path": "packages/ai/src/providers/data/github-copilot.json",
+        "bytes": 26521,
+        "sha256": "b5a5defdbb6a351d3764ec542dd2b194c1162a4f6ee977494dcc43e7d6873597",
+        "models": 33
+      },
+      {
+        "path": "packages/ai/src/providers/data/google.json",
+        "bytes": 13373,
+        "sha256": "c0f5a633e5e5a5044432db3e537f4bc674d4de18df09325c6349547fcc13cabe",
+        "models": 22
+      },
+      {
+        "path": "packages/ai/src/providers/data/google-vertex.json",
+        "bytes": 7825,
+        "sha256": "40090c680538bc867f2624d986a449f361be4dfa6ba96d7a27402050f036e009",
+        "models": 14
+      },
+      {
+        "path": "packages/ai/src/providers/data/groq.json",
+        "bytes": 3354,
+        "sha256": "910952ad9dad07856983459d63fce0148dba1203edd7b10d801a77c5824f3405",
+        "models": 7
+      },
+      {
+        "path": "packages/ai/src/providers/data/huggingface.json",
+        "bytes": 36433,
+        "sha256": "1b8604bd31a5e05fe43a40ec1ec6dfc1a51a28b0b020151ef057fab43f57c923",
+        "models": 76
+      },
+      {
+        "path": "packages/ai/src/providers/data/kimi-coding.json",
+        "bytes": 2282,
+        "sha256": "582250b920454d98940da3e7e99d30b807edbea28f2eb8ac15f658d2ef41e8fc",
+        "models": 4
+      },
+      {
+        "path": "packages/ai/src/providers/data/meta.json",
+        "bytes": 2819,
+        "sha256": "0c7e9a370a7005c5a89dc94f0f93bc67b8935c3f802de324f11af6ff56fff429",
+        "models": 5
+      },
+      {
+        "path": "packages/ai/src/providers/data/minimax.json",
+        "bytes": 1112,
+        "sha256": "17a432f80d0ea6dd26eade80a4314250d3a855678601728a5f70dd8fa0d21dd2",
+        "models": 3
+      },
+      {
+        "path": "packages/ai/src/providers/data/minimax-cn.json",
+        "bytes": 1127,
+        "sha256": "f962c20ee6a6a342820f778e9dc363a18a524bf11998f6e2c57f2989915d62e5",
+        "models": 3
+      },
+      {
+        "path": "packages/ai/src/providers/data/mistral.json",
+        "bytes": 12596,
+        "sha256": "10f33bff9adf1248f7e6848e5890c265399f1f94e5b42cfdc28c109d547af98d",
+        "models": 32
+      },
+      {
+        "path": "packages/ai/src/providers/data/moonshotai.json",
+        "bytes": 2870,
+        "sha256": "1da2c4e34f22aef17a07c974d85bdee8e1b68b6dc712e3769c935b3f1e7dadca",
+        "models": 4
+      },
+      {
+        "path": "packages/ai/src/providers/data/moonshotai-cn.json",
+        "bytes": 2882,
+        "sha256": "79c9585dc84ee525ebaebbc78b3c55f3d369ec884d4f943488f1e0b14e3587f5",
+        "models": 4
+      },
+      {
+        "path": "packages/ai/src/providers/data/nvidia.json",
+        "bytes": 12038,
+        "sha256": "3b4e7b799bf3eaacd1af0491eef77fe33147ea7f72a3a9fa54d77af0e7eacf4c",
+        "models": 19
+      },
+      {
+        "path": "packages/ai/src/providers/data/openai.json",
+        "bytes": 28816,
+        "sha256": "ca5ec1028efc512502591bf2562a2a6dc330f26a5f4c4a08c8a149a43c5bd7da",
+        "models": 44
+      },
+      {
+        "path": "packages/ai/src/providers/data/openai-codex.json",
+        "bytes": 6476,
+        "sha256": "3cc35a7e122e5c77ee8ec30a9a3bd8bd59629997e85ba2cb3f9e0ed62e9a09c0",
+        "models": 9
+      },
+      {
+        "path": "packages/ai/src/providers/data/opencode.json",
+        "bytes": 44976,
+        "sha256": "4adb1cfc19a5294a2d9ea5179089b86364ddbfa31485043a3fc278fa8f7e2e73",
+        "models": 79
+      },
+      {
+        "path": "packages/ai/src/providers/data/opencode-go.json",
+        "bytes": 17032,
+        "sha256": "d05b3eb87b81c6e5a94801484e668e660fe60c68f06a972b716d581c3bbd7c25",
+        "models": 29
+      },
+      {
+        "path": "packages/ai/src/providers/data/openrouter.json",
+        "bytes": 267751,
+        "sha256": "b49405ced089750d475945738a91ac669fa00e04d574da7720935bcfe16ba272",
+        "models": 462
+      },
+      {
+        "path": "packages/ai/src/providers/data/qwen-token-plan.json",
+        "bytes": 12230,
+        "sha256": "eff10620cb577142de4ec02698d5961a71fda2fe4f6ae7ea9432bad9d6844176",
+        "models": 20
+      },
+      {
+        "path": "packages/ai/src/providers/data/qwen-token-plan-cn.json",
+        "bytes": 12210,
+        "sha256": "2469a4091c474ec3db0a49a9962d8d2726c074ad9065b96bc4e0c87861c4c6c5",
+        "models": 20
+      },
+      {
+        "path": "packages/ai/src/providers/data/qwen-token-plan-individual.json",
+        "bytes": 5782,
+        "sha256": "0fb7cf64faf39d1a3b0a884210a86c87084b805eda15644f5f39293287b959dd",
+        "models": 9
+      },
+      {
+        "path": "packages/ai/src/providers/data/radius.json",
+        "bytes": 19164,
+        "sha256": "8e868af981cc64a39da11b135a96252e3eeccb14b92e80d8fbba899ff96f2616",
+        "models": 28
+      },
+      {
+        "path": "packages/ai/src/providers/data/together.json",
+        "bytes": 12930,
+        "sha256": "94ec3839972061405885d64f5fdbde48eb1f29a159be5e607e9770befd54e28e",
+        "models": 20
+      },
+      {
+        "path": "packages/ai/src/providers/data/typesafe.json",
+        "bytes": 291,
+        "sha256": "a4429a2f696d5cc5273969af61a7310bda07d6bdcd27bf9ac9c76c534cc43716",
+        "models": 1
+      },
+      {
+        "path": "packages/ai/src/providers/data/vercel-ai-gateway.json",
+        "bytes": 118194,
+        "sha256": "e64081d4ced20a7e754dab586d5f733eb92f00feab30c76fdcb7ce29ce5111be",
+        "models": 253
+      },
+      {
+        "path": "packages/ai/src/providers/data/xai.json",
+        "bytes": 2609,
+        "sha256": "879c49b78b663a52a220ac4ee013e726b10c4f50aaa03bc58ee53a4b54c76928",
+        "models": 4
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi.json",
+        "bytes": 3144,
+        "sha256": "b81d01a374f7b558728c78d81f4168efa9c8996e6e2b5618409a8094b083c759",
+        "models": 6
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi-token-plan-ams.json",
+        "bytes": 2156,
+        "sha256": "ca65178f4525d9705bc8d085ed136cecbe149c4080e857ea6a64ae643d2ac00a",
+        "models": 4
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi-token-plan-cn.json",
+        "bytes": 2148,
+        "sha256": "b065326926681c2262084e59c1c19ebdaf146c07107b5242c76b456becf74db0",
+        "models": 4
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi-token-plan-sgp.json",
+        "bytes": 2156,
+        "sha256": "92c3d6d707f81fd9cd2b6d1fb57dc431d90ba51e10fe49d97bc8806035c23492",
+        "models": 4
+      },
+      {
+        "path": "packages/ai/src/providers/data/zai.json",
+        "bytes": 4221,
+        "sha256": "58e6642fdfb736f0b9a4a277c760c536a3cea66a030abbfb2615f7b2851d5c6f",
+        "models": 7
+      },
+      {
+        "path": "packages/ai/src/providers/data/zai-coding-cn.json",
+        "bytes": 2672,
+        "sha256": "ee5ee705fb6e413a6088db5e3616c27fce802a8ece6c355f1db35490d787f610",
+        "models": 4
+      }
+    ],
+    "allFileAndStructureHashesMatched": true,
+    "rawNumericLexemesPreservedInArchive": true,
+    "reconstructed": false
+  },
+  "publicNpmVersionMetadata": [
+    {
+      "name": "@earendil-works/pi-agent-core",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-agent-core/0.99.1",
+      "metadataSha256": "cd845eb2316c70f8cda819aff4cd0aa65002bae99c310d531f1b5426a5e25070",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-agent-core/-/pi-agent-core-0.99.1.tgz",
+      "integrity": "sha512-zywvWnj5FujeuFI/x/CJHwwxhcLIQgjqseTA+bQgX4O8gJTcgjRd/I8SZnQDqJvxC9QcV12ujiGLviv6EgwcCg==",
+      "shasum": "e918b147f4d3ae1c8c5d435229a2d56d76a3191c",
+      "reportedFiles": 470,
+      "reportedUnpackedBytes": 3902014,
+      "registrySignatures": [
+        {
+          "sig": "MEUCIQC7rkJxyokYA/C9I/uTcnrnRO8Z51EDXypGkRhlQAJFUQIgLGuHAqboZdJxf2jjj1ly2MfljSjB6AWDpDjSi3z5/RA=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCIQCakANq0jvv/tGjv8uJZcZFLkEBfUgnEK6w1TbSwnx7/AIgOONb1E/95R0zedQRvA56qlj/OJqRkYz2e2qHvcGUHbY=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-agent-core@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/pi-ai",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-ai/0.99.1",
+      "metadataSha256": "ba57282ebb3656598d5a3e36de21b09f6a985fc98691412f042b83039566c864",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-ai/-/pi-ai-0.99.1.tgz",
+      "integrity": "sha512-4nV9JKc94iPX8bwdGPc2nTuVPKIPsffhnp3WoN9NYCNqbtoOF8LhYcIs/+Sn/alroqJK/5QRu6/Z6Ck+n0hyBA==",
+      "shasum": "2945bf014fbb314bd37b919e83317560e0a8fa1d",
+      "reportedFiles": 813,
+      "reportedUnpackedBytes": 3944328,
+      "registrySignatures": [
+        {
+          "sig": "MEUCIGD8pMwfVv8FfFsS0Rlla8MC7d9LavkwzpjaZIMjsQjyAiEA/a/47gGRRaX8PBaQJNVZiy59NZ1U5mWAr6Bwnu8N5aU=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCIQCCKvmBlBMrEAzqYGzvQO+CfLgE4mw+1dcSqlJ+1t4gzwIgR0OavEx/5TzTc0b0imtmhBNnU1Fra7eCA4Mce8GBOYE=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-ai@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/chord",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fchord/0.99.1",
+      "metadataSha256": "e97cd65ecf3602e12ef917c655cf6662d6563e4e532f06e219042db4d190eec5",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/chord/-/chord-0.99.1.tgz",
+      "integrity": "sha512-4xyn0IBzJ+Xu/iOGi2hjXJGAR61QEhEWZsIqTDqr+GmItdquYwBO5jYFnqGiBaTqlY12/EpM7QHoEKSHbyvOug==",
+      "shasum": "7f6ba945b705a5ab48d25dbed39b253afcec68df",
+      "reportedFiles": 119,
+      "reportedUnpackedBytes": 1024462,
+      "registrySignatures": [
+        {
+          "sig": "MEUCIQDpmWqak7Mc90NEjz7a2q9UaWl9igdxiUep+CvVCIPQoQIgY/TdQ9NezMmvVHLppOqvgiaia/HamiF0ohxBfRrPPGY=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCIQDRqNTC+vE5Nq3w/cdGfj76/7mTV7/oSb8yqNUDFdQcWAIgaoAuADLO0AbvnzbZUPvHRzYhn/1l3g1MLvFltt52Qoo=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fchord@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/pi-client",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-client/0.99.1",
+      "metadataSha256": "c8176ec631ca4b3c3d62a67f7afcb4b6176eeb8abc118bd4ef4ddcfc7803a111",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-client/-/pi-client-0.99.1.tgz",
+      "integrity": "sha512-0wlRybJZK3mSJagJvKh8CDfVykhDQsoB9Mtn9JekZn/FK9WN1GWWv+gxnYRfBoS1sG9+u1J+ZN9VZsCKfRJm9g==",
+      "shasum": "e37e7d219a8ab47eeee055e4946430c2ea6e40eb",
+      "reportedFiles": 35,
+      "reportedUnpackedBytes": 124618,
+      "registrySignatures": [
+        {
+          "sig": "MEUCIBwFq8DLBWEjpA4wW56z4DbW1VProH6/izgCpcaCwWeXAiEArKbhxdyDrhLKpaAljFd3lmRCTIw6eIslYW21Uqo29Hk=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCICzfhGqkQ282VaF0Frhnp0JHO5HR7xasQQdhQaPup2aJAiEA9bStt86z4V85UcQ8T2oii5AYwOYPlSj/78omxTNKaOI=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-client@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/pi-codemode",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-codemode/0.99.1",
+      "metadataSha256": "3002a5a1d0e28753b6913c3a88214b2a664dddde802584765f422b0be121ee76",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-codemode/-/pi-codemode-0.99.1.tgz",
+      "integrity": "sha512-oh8TMsBI3SWTN3xTQtX8u5n+BKhnVXcFagroWumfn6/WWfBnDYL/LmeQtjLb83WRTb9rcu+ZdK8rFa4vggvCJg==",
+      "shasum": "f9965078e21d744fe1b018959359aed1a664f17d",
+      "reportedFiles": 42,
+      "reportedUnpackedBytes": 182957,
+      "registrySignatures": [
+        {
+          "sig": "MEUCIQD0sZCS2lqdzlAgWWFtdmUxD0UumsmuhJR1tR3dwn7wCQIgTvo3KKhGb1A4Dtz89T9hyQr+04w4iJzTz9xaWfAJ6gw=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEYCIQDdeKkAizz04BOrg6bgAjMiYmTddZx82pJRqwLe+2TxFwIhANNTdDaoG7nneDpU/1TCORfJVsSv8RLKvEmkls7gvunZ",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-codemode@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/pi-coding-agent",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-coding-agent/0.99.1",
+      "metadataSha256": "7cbdbcaf9dc863ad7ffc100e231fe7662439d920272fb3359edb9ac111f4a4de",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-coding-agent/-/pi-coding-agent-0.99.1.tgz",
+      "integrity": "sha512-cWUrTOqA5M73cOYMgsh9PlhDrsBhavd+n5kVY6F7BGbGl1RjqCteVCoeVMVqhngoGACVDyw1tbLjajL8l9jrHg==",
+      "shasum": "00e7e6c668d67d0825fc8814d80097eb07ec44e0",
+      "reportedFiles": 1227,
+      "reportedUnpackedBytes": 22690585,
+      "registrySignatures": [
+        {
+          "sig": "MEYCIQC5dj9tCXu+M6GlMNp6a9iupniWaI8bOMcBFltJ+v9xzgIhAJQANAUszphK73nIYBtlwGYqcoAo6CUMGQaRS2tCJSnC",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCIQCgAt5RcTUtesDRenln3A8jb9dRVMlh6tsbSbLw8uVDsQIgVm4AXfXDzacZt5l8XLL7D1UihqWH7pKzm1F6gxq2e+g=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-coding-agent@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/pi-durable",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-durable/0.99.1",
+      "metadataSha256": "52a6001319470c92142f599848bff87930574f20442e659b3b5ffd55727f0d34",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-durable/-/pi-durable-0.99.1.tgz",
+      "integrity": "sha512-SpUP6DM3jdpo0f5y+SfTWXk0R4pDKMXoSwiGR/P7k4+B37Ojo4BAR8xLvo8PS2cOgW3drKyosyl4gd/yWEBzhA==",
+      "shasum": "6423d51dce64b292ddac75df813294f7d51a3f36",
+      "reportedFiles": 174,
+      "reportedUnpackedBytes": 1712091,
+      "registrySignatures": [
+        {
+          "sig": "MEUCIQC15EgLCwZoDQZ1pfcKcu2Bek8bBbfRhKVRxbgX7zyUtAIgQhvGtYy9oR0qVuoVt4tkgxWuzueWsDNhbdIjamW8jig=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCIHhn5+GVr5R46aJLOXqsj26BaLBeHKcjH9i2wi2CHEF7AiEA67kRFDbHWbL0mrLB1DO2urv/yBne6yoQ1QXLkbobAOs=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-durable@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/pi-mcp",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-mcp/0.99.1",
+      "metadataSha256": "3569b71c2defef12fc5d0eddaa43d0d6510f34226cf0527da869689046cdfd5a",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-mcp/-/pi-mcp-0.99.1.tgz",
+      "integrity": "sha512-YCFGPkmDzLwQuIzwfbP6Vuk/g/ukKpZhwTpbcfzomuI1Fkiu6hHRkOGwAqsO3G8cTkZWkM8vmOkFJjStQNC4qA==",
+      "shasum": "c2002b819a5d75d9cfa8091171580f794c205042",
+      "reportedFiles": 76,
+      "reportedUnpackedBytes": 362167,
+      "registrySignatures": [
+        {
+          "sig": "MEYCIQDApgVrPEQCPmhNlmcKaoCdfbn5/SLOA1hXA4cLFmU2RAIhAPBAYRCOyrzO0slsr0dn0jsx7/HxQF/w0/QyRGcOCNve",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCIQDPrL2estZfBZNg8yLB2uEAxPchbiigFFoQLEMh98/bTwIgUsV7OwafBH60rqyAM4Rax4RQTxGTYkHQrVGE4B/icLA=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-mcp@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/pi-protocol",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-protocol/0.99.1",
+      "metadataSha256": "52f2fa6aabc5faf6712b667a2d23d5669e045761812329acc2c2aec17cd57b96",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-protocol/-/pi-protocol-0.99.1.tgz",
+      "integrity": "sha512-BNPwOMNCd/L1IqovKZ0+p1xDydqnHd4tIGHf9uVZNOQJTq9QacLRKXBMzRzgy/Yqv1rPnTDjauDiIcZeOgg2xA==",
+      "shasum": "70843075112dd5a741e4930fa6a42b3101f1b97b",
+      "reportedFiles": 34,
+      "reportedUnpackedBytes": 109656,
+      "registrySignatures": [
+        {
+          "sig": "MEUCIQDgh/8IuloS9mc9Guk0mEJ7SsOqcvhdjljLqvUcLMwl3QIgFvfjaGZIbTcHbMn0lgRpf1ylhoXMhHatLPn5dXQdUUc=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCIQC6RxGkFgmCf3eEupO9hkKUOlb6lA76jQHk6+uCBZaY1gIgBqfkFofv/exFwfT6axClfrVOMSoaiBZYoZAqs5IoWjY=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-protocol@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/pi-server",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-server/0.99.1",
+      "metadataSha256": "d30773fa84be79f0fccb6ab93ea018e0f61d2581fb252c9b21b7ea79780cbdbd",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-server/-/pi-server-0.99.1.tgz",
+      "integrity": "sha512-D0clUTMtGDXGIRlHGHvDzX6YnA0fOKk1+Jv3G6gaDQ9lkZpwJrou2lTcuMxM7ufP5KSv31kSvSYR3Jx7F8Y4eQ==",
+      "shasum": "2d777a1c474a796671be584411597d5a9b0fc57f",
+      "reportedFiles": 67,
+      "reportedUnpackedBytes": 238355,
+      "registrySignatures": [
+        {
+          "sig": "MEUCIDtR+moesWFRwQxRWAo37niozzSDeYUm+6iH9ypEBV8yAiEA3Stmw6HkcDO/ua/u0OxQd2SjTMd3csreJvrTrpax1WU=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEQCIDRK5UWu91sJtvzAFBSEAnMjfzFjZ4g3rAKKYAHRbwITAiAnUI3arZdp2wHYBzXvR+/iNsGMn3u2KjB4cNzTK8PuNQ==",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-server@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/pi-telemetry",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-telemetry/0.99.1",
+      "metadataSha256": "058a94c2ff69a5fb05a02e1355e5b48d402ca1c09a50d411bedfde0f060b81b3",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-telemetry/-/pi-telemetry-0.99.1.tgz",
+      "integrity": "sha512-9PBPjGk+TXRtuMianpqBbHBpYpyKusESF6rwdmgD0WTZSTUQXhcKEO0hAINRLuSwy4V7yPvXV+EVV0ONY7mbpQ==",
+      "shasum": "37b1fb0ce8c0ca2fe04363035a4b7aea29a9e8cb",
+      "reportedFiles": 26,
+      "reportedUnpackedBytes": 122964,
+      "registrySignatures": [
+        {
+          "sig": "MEQCIAL8Kj39SpTO4n//3QjX9TIL4J3KIjpYwxJZ2F/+FMNhAiA/hgQDQmJwGVaEFTwTTkcdxsDo+mSNwle1NcV//I94cA==",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCIQCdSG0ZUiDEnciQXCX23KE52qNDTYouT4KUC1svRge6gAIgLxIUJgmgoEIN/xgrA8EJ9Ndl3GB8npFlBzqzjOzyENE=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-telemetry@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/pi-tui",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-tui/0.99.1",
+      "metadataSha256": "ab28b25f5b1bac55cb80cadac05c8b983102fb57314e6711ef89952f47576ced",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-tui/-/pi-tui-0.99.1.tgz",
+      "integrity": "sha512-gZp0Guat96Fr1AuC/xqVz5B2lulZakp/PxD1lXx3lSgBdjiqmwYhJbcQ0HRrGAfy0WtMGn9b05RJr5qJf7oIuw==",
+      "shasum": "f6f82a4792fabb4aabf310e082743d87accc90cc",
+      "reportedFiles": 200,
+      "reportedUnpackedBytes": 2348175,
+      "registrySignatures": [
+        {
+          "sig": "MEUCIQCVCk4hJZcQfHbUIeRoTAMsfXbX/ZYiMPP+mUmhiijrdAIgPPXmo+VurP8HentKfwFkyFVwuvQ8Vgl7MPohTCWb3oM=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCIQD+LtVwriXizQX+kmlnDlT/IlAgYc4E/fHjXsXJeYcD7AIgB4tpI+/skUPN1c8PKXFCXWetJHcX0Gwu58ZRBNjEC74=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-tui@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    },
+    {
+      "name": "@earendil-works/pi-session-backend-sqlite-node",
+      "version": "0.99.1",
+      "licenseDeclaration": "MIT",
+      "gitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-session-backend-sqlite-node/0.99.1",
+      "metadataSha256": "405187fe7a660d6a1a440c7f34c0cca33574cff984a8aa0a3f56c4016ce23b45",
+      "tarballUrl": "https://registry.npmjs.org/@earendil-works/pi-session-backend-sqlite-node/-/pi-session-backend-sqlite-node-0.99.1.tgz",
+      "integrity": "sha512-WXB3R1ZlbQqBansBCLvWD23BpRaJm+s/oGkhRgALwiu6DLd3decRUFZ3i6ssAznFUSsnWQTliDUpKj1sKS84bQ==",
+      "shasum": "66ce8cbf728416c1b55ea5272f5e57106d0c7af7",
+      "reportedFiles": 64,
+      "reportedUnpackedBytes": 240188,
+      "registrySignatures": [
+        {
+          "sig": "MEYCIQCV73BYmVQqur5wvCp+k+cInDnA2HPD8FDzLILPuLpQ5QIhAIvotDqmoOHKHPOSnkrjOM3ftZ4vmLcT2GX2Bt5tthCx",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEUCIQCyIzWP3wjd11w1yJ5i8/OwetoIkE/iZsvCWxcdbXy5SQIgcZt82j1WnEAwFKJohGQlIb9VOJw0nkW9AMmsC0YTpGM=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "registryAttestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/@earendil-works%2fpi-session-backend-sqlite-node@0.99.1",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "archiveAcquired": false,
+      "signatureVerified": false,
+      "attestationVerified": false
+    }
+  ],
+  "privateWorkspaceExcluded": "@earendil-works/pi-evals",
+  "nativeAssetsNotExecuted": [
+    {
+      "path": "packages/coding-agent/examples/extensions/doom-overlay/doom/build/doom.wasm",
+      "bytes": 380169,
+      "sha256": "571d161956593508cf4ade732ae93753f00484bb526667a8676571cca14dec7d"
+    },
+    {
+      "path": "packages/tui/native/darwin/prebuilds/darwin-arm64/darwin-platform.node",
+      "bytes": 52024,
+      "sha256": "36e909adf35c2734a2a52b3d65b7dbfb83f2278f306d51b7e32c5045516dfb7f"
+    },
+    {
+      "path": "packages/tui/native/darwin/prebuilds/darwin-x64/darwin-platform.node",
+      "bytes": 22784,
+      "sha256": "7ec59a02fff9562f6354274ad070ba35f8e0998b3b111eb27ad3de579ffb6c65"
+    },
+    {
+      "path": "packages/tui/native/linux/prebuilds/linux-arm64/linux-platform-x11.node",
+      "bytes": 67240,
+      "sha256": "63d4545349a25b5c97e352ea6d254cea50ff3c14161212ad3ddb3fc28022ddb5"
+    },
+    {
+      "path": "packages/tui/native/linux/prebuilds/linux-x64/linux-platform-x11.node",
+      "bytes": 18008,
+      "sha256": "522d2550f7fa5d0d5bd204f45983f786ce2be9cf80f27f00179640d31d0689d6"
+    },
+    {
+      "path": "packages/tui/native/win32/prebuilds/win32-arm64/win32-platform.node",
+      "bytes": 9216,
+      "sha256": "0e5671ab39ef577940483ced58fdf29ecdf5f864f368d90a771eec4aeeae11b8"
+    },
+    {
+      "path": "packages/tui/native/win32/prebuilds/win32-x64/win32-platform.node",
+      "bytes": 8704,
+      "sha256": "51bee02bcb73b165ab92af75ae15b88aba3f5d99f072e63ef60af92ffdc4d565"
+    }
+  ],
+  "limitations": [
+    "Published npm tarball bytes, packaged LICENSE contents, signatures and provenance attestations remain unverified.",
+    "Npm and GitHub release builds hydrate generated catalog data separately; equality cannot be inferred from source commit or version.",
+    "Archive acquisition does not acquire/install runtime dependency closure or validate provider runtime behavior.",
+    "Source MIT identity is verified; complete transitive/native/data-source licensing review remains open.",
+    "Live pi.dev catalog is an independently mutable overlay and is not used to reconstruct this released snapshot.",
+    "Original baseline.lock and developer oracle locks are immutable; this evidence does not close full phase gates."
+  ]
+}

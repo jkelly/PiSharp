@@ -1,0 +1,870 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "completeness": "seed; family representatives and all ten KnownApi IDs only, not exhaustive public surface inventory",
+  "requiredFamilies": [
+    "commands",
+    "flags",
+    "exit-codes",
+    "configuration",
+    "environment",
+    "tools",
+    "events",
+    "sdk-exports",
+    "sessions",
+    "migrations",
+    "rpc",
+    "extension-hooks",
+    "extension-sdk",
+    "resources",
+    "authentication",
+    "provider-capabilities",
+    "chat-api",
+    "mcp",
+    "codemode",
+    "terminal",
+    "typescript-source"
+  ],
+  "requirements": [
+    {
+      "id": "cli.commands",
+      "family": "commands",
+      "observable": "Built-in slash commands and mode-specific command outcomes",
+      "source": {
+        "path": "packages/coding-agent/src/core/slash-commands.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/slash-commands.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 5,
+      "owner": "experience",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.cli.commands",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "cli.flags",
+      "family": "flags",
+      "observable": "CLI argument names, accepted values, mode conflicts and help",
+      "source": {
+        "path": "packages/coding-agent/src/cli/args.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/cli/args.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 5,
+      "owner": "experience",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.cli.flags",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "cli.exit-codes",
+      "family": "exit-codes",
+      "observable": "Startup, configuration and mode failure process exit outcomes",
+      "source": {
+        "path": "packages/coding-agent/src/main.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/main.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 5,
+      "owner": "experience",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.cli.exit-codes",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "config.precedence",
+      "family": "configuration",
+      "observable": "User/project settings merge and precedence",
+      "source": {
+        "path": "packages/coding-agent/src/core/settings-manager.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/settings-manager.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 5,
+      "owner": "composition",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.config.precedence",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "config.environment",
+      "family": "environment",
+      "observable": "Agent/session home environment and asset roots",
+      "source": {
+        "path": "packages/coding-agent/src/config.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/config.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 5,
+      "owner": "composition",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.config.environment",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "tools.read",
+      "family": "tools",
+      "observable": "read schema, results, errors, cancellation and filesystem/process effects",
+      "source": {
+        "path": "packages/coding-agent/src/core/tools/read.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/read.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "tools",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.tools.read",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "tools.bash",
+      "family": "tools",
+      "observable": "bash schema, results, errors, cancellation and filesystem/process effects",
+      "source": {
+        "path": "packages/coding-agent/src/core/tools/bash.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/bash.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "tools",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.tools.bash",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "tools.powershell",
+      "family": "tools",
+      "observable": "powershell schema, results, errors, cancellation and filesystem/process effects",
+      "source": {
+        "path": "packages/coding-agent/src/core/tools/powershell.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/powershell.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "tools",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.tools.powershell",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "tools.edit",
+      "family": "tools",
+      "observable": "edit schema, results, errors, cancellation and filesystem/process effects",
+      "source": {
+        "path": "packages/coding-agent/src/core/tools/edit.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/edit.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "tools",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.tools.edit",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "tools.write",
+      "family": "tools",
+      "observable": "write schema, results, errors, cancellation and filesystem/process effects",
+      "source": {
+        "path": "packages/coding-agent/src/core/tools/write.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/write.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "tools",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.tools.write",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "tools.grep",
+      "family": "tools",
+      "observable": "grep schema, results, errors, cancellation and filesystem/process effects",
+      "source": {
+        "path": "packages/coding-agent/src/core/tools/grep.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/grep.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "tools",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.tools.grep",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "tools.find",
+      "family": "tools",
+      "observable": "find schema, results, errors, cancellation and filesystem/process effects",
+      "source": {
+        "path": "packages/coding-agent/src/core/tools/find.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/find.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "tools",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.tools.find",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "tools.ls",
+      "family": "tools",
+      "observable": "ls schema, results, errors, cancellation and filesystem/process effects",
+      "source": {
+        "path": "packages/coding-agent/src/core/tools/ls.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/ls.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "tools",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.tools.ls",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "tools.truncation",
+      "family": "tools",
+      "observable": "Shared 2000-line and 50 KiB truncation behavior",
+      "source": {
+        "path": "packages/coding-agent/src/core/tools/truncate.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/truncate.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "tools",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.tools.truncation",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "events.agent",
+      "family": "events",
+      "observable": "Agent lifecycle and ordered tool/turn events",
+      "source": {
+        "path": "packages/agent/src/types.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/agent/src/types.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "agent",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.events.agent",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "stream.indexed-events",
+      "family": "events",
+      "observable": "Indexed text, thinking and tool-call frame reduction",
+      "source": {
+        "path": "packages/ai/src/utils/assistant-message-frame.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/utils/assistant-message-frame.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "NarrowEvidenceOnly",
+      "testId": "planned.stream.indexed-events",
+      "fixtureIds": [
+        "text-authoritative-end",
+        "interleaved-thinking-tool",
+        "redacted-thinking-usage"
+      ],
+      "reason": "Authored native frame-contract tests and/or captured upstream queue probes cover a narrow seam; full requirement enumeration and differential qualification remain deferred."
+    },
+    {
+      "id": "stream.terminal-settlement",
+      "family": "events",
+      "observable": "Success/error terminal result including error before start",
+      "source": {
+        "path": "packages/ai/src/utils/event-stream.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/utils/event-stream.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "NarrowEvidenceOnly",
+      "testId": "planned.stream.terminal-settlement",
+      "fixtureIds": [
+        "text-authoritative-end",
+        "interleaved-thinking-tool",
+        "redacted-thinking-usage",
+        "prestart-error",
+        "queue-order-first-terminal",
+        "queue-error-before-start",
+        "queue-mutable-partials"
+      ],
+      "reason": "Authored native frame-contract tests and/or captured upstream queue probes cover a narrow seam; full requirement enumeration and differential qualification remain deferred."
+    },
+    {
+      "id": "sdk.exports",
+      "family": "sdk-exports",
+      "observable": "Stable coding-agent package root SDK exports",
+      "source": {
+        "path": "packages/coding-agent/src/index.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/index.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 4,
+      "owner": "composition",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.sdk.exports",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "sessions.entries",
+      "family": "sessions",
+      "observable": "JSONL v3 entry tree, branch/context projection and unknown fields",
+      "source": {
+        "path": "packages/coding-agent/src/core/session-manager.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/session-manager.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 4,
+      "owner": "sessions",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.sessions.entries",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "sessions.migrations",
+      "family": "migrations",
+      "observable": "Legacy v1/v2 session migrations without destroying original",
+      "source": {
+        "path": "packages/coding-agent/src/core/session-manager.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/session-manager.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 4,
+      "owner": "sessions",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.sessions.migrations",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "sessions.compaction",
+      "family": "sessions",
+      "observable": "Compaction checkpoint selection, summaries and retained context",
+      "source": {
+        "path": "packages/coding-agent/src/core/compaction/compaction.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/compaction/compaction.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 4,
+      "owner": "sessions",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.sessions.compaction",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "rpc.commands",
+      "family": "rpc",
+      "observable": "Command/response correlation and lifecycle",
+      "source": {
+        "path": "packages/coding-agent/src/modes/rpc/rpc-types.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/modes/rpc/rpc-types.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 5,
+      "owner": "rpc",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.rpc.commands",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "rpc.framing",
+      "family": "rpc",
+      "observable": "LF JSONL framing, malformed records and EOF disposal",
+      "source": {
+        "path": "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/modes/rpc/rpc-mode.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 5,
+      "owner": "rpc",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.rpc.framing",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "extensions.hooks",
+      "family": "extension-hooks",
+      "observable": "Per-hook reducers, cancellation and context capabilities",
+      "source": {
+        "path": "packages/coding-agent/src/core/extensions/runner.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/extensions/runner.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 6,
+      "owner": "extensions",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.extensions.hooks",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "extensions.registration",
+      "family": "extension-sdk",
+      "observable": "Registration and context API shapes",
+      "source": {
+        "path": "packages/coding-agent/src/core/extensions/types.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/extensions/types.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 6,
+      "owner": "extensions",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.extensions.registration",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "resources.discovery",
+      "family": "resources",
+      "observable": "Prompts, skills, context files, themes and extension discovery",
+      "source": {
+        "path": "packages/coding-agent/src/core/resource-loader.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/resource-loader.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 5,
+      "owner": "composition",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.resources.discovery",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "authentication.precedence",
+      "family": "authentication",
+      "observable": "Scoped explicit/environment/stored authentication resolution",
+      "source": {
+        "path": "packages/ai/src/auth/resolve.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/auth/resolve.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.authentication.precedence",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "authentication.storage",
+      "family": "authentication",
+      "observable": "Credential persistence and refresh behavior",
+      "source": {
+        "path": "packages/coding-agent/src/core/auth-storage.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/auth-storage.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 5,
+      "owner": "composition",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.authentication.storage",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "providers.catalog",
+      "family": "provider-capabilities",
+      "observable": "Model metadata, costs and capability declarations",
+      "source": {
+        "path": "packages/ai/src/models.generated.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/models.generated.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.providers.catalog",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "providers.transcripts",
+      "family": "provider-capabilities",
+      "observable": "Transcript system/tool changes and projection",
+      "source": {
+        "path": "packages/ai/src/utils/transcript.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/utils/transcript.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.providers.transcripts",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "providers.transports",
+      "family": "provider-capabilities",
+      "observable": "Required HTTP/SSE/WebSocket/deferred and cancellation capabilities",
+      "source": {
+        "path": "packages/ai/src/types.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/types.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.providers.transports",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "api.openai-completions",
+      "family": "chat-api",
+      "observable": "openai-completions: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
+      "source": {
+        "path": "packages/ai/src/api/openai-completions.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/openai-completions.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.api.openai-completions",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "api.mistral-conversations",
+      "family": "chat-api",
+      "observable": "mistral-conversations: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
+      "source": {
+        "path": "packages/ai/src/api/mistral-conversations.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/mistral-conversations.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.api.mistral-conversations",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "api.openai-responses",
+      "family": "chat-api",
+      "observable": "openai-responses: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
+      "source": {
+        "path": "packages/ai/src/api/openai-responses.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/openai-responses.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.api.openai-responses",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "api.azure-openai-responses",
+      "family": "chat-api",
+      "observable": "azure-openai-responses: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
+      "source": {
+        "path": "packages/ai/src/api/azure-openai-responses.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/azure-openai-responses.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.api.azure-openai-responses",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "api.openai-codex-responses",
+      "family": "chat-api",
+      "observable": "openai-codex-responses: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
+      "source": {
+        "path": "packages/ai/src/api/openai-codex-responses.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/openai-codex-responses.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.api.openai-codex-responses",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "api.anthropic-messages",
+      "family": "chat-api",
+      "observable": "anthropic-messages: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
+      "source": {
+        "path": "packages/ai/src/api/anthropic-messages.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/anthropic-messages.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.api.anthropic-messages",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "api.bedrock-converse-stream",
+      "family": "chat-api",
+      "observable": "bedrock-converse-stream: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
+      "source": {
+        "path": "packages/ai/src/api/bedrock-converse-stream.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/bedrock-converse-stream.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.api.bedrock-converse-stream",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "api.google-generative-ai",
+      "family": "chat-api",
+      "observable": "google-generative-ai: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
+      "source": {
+        "path": "packages/ai/src/api/google-generative-ai.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/google-generative-ai.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.api.google-generative-ai",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "api.google-vertex",
+      "family": "chat-api",
+      "observable": "google-vertex: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
+      "source": {
+        "path": "packages/ai/src/api/google-vertex.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/google-vertex.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.api.google-vertex",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "api.pi-messages",
+      "family": "chat-api",
+      "observable": "pi-messages: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
+      "source": {
+        "path": "packages/ai/src/api/pi-messages.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/pi-messages.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 2,
+      "owner": "ai",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.api.pi-messages",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "mcp.runtime",
+      "family": "mcp",
+      "observable": "Required MCP server lifecycle, authentication and tool envelopes",
+      "source": {
+        "path": "packages/coding-agent/src/core/mcp-servers.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/mcp-servers.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "integrations",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.mcp.runtime",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "codemode.runtime",
+      "family": "codemode",
+      "observable": "Required codemode tool declarations, execution and nested calls",
+      "source": {
+        "path": "packages/coding-agent/src/extensions/codemode/index.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/extensions/codemode/index.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 3,
+      "owner": "integrations",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.codemode.runtime",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "terminal.rendering",
+      "family": "terminal",
+      "observable": "Input, rendering, terminal modes and screen behavior",
+      "source": {
+        "path": "packages/tui/src/tui.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/tui/src/tui.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 5,
+      "owner": "experience",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.terminal.rendering",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "terminal.images",
+      "family": "terminal",
+      "observable": "Kitty/iTerm2 image protocols and fallbacks",
+      "source": {
+        "path": "packages/tui/src/terminal-image.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/tui/src/terminal-image.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 5,
+      "owner": "experience",
+      "mandatory": true,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.terminal.images",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    },
+    {
+      "id": "node.bridge",
+      "family": "typescript-source",
+      "observable": "Optional tested TypeScript extension bridge tiers",
+      "source": {
+        "path": "packages/coding-agent/src/core/extensions/loader.ts",
+        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/extensions/loader.ts",
+        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+      },
+      "targetPhase": 7,
+      "owner": "extensions",
+      "mandatory": false,
+      "status": "Deferred",
+      "evidenceState": "Unverified",
+      "testId": "planned.node.bridge",
+      "fixtureIds": [],
+      "reason": "Inventory seed only; complete enumeration and upstream/native differential qualification remain open."
+    }
+  ]
+}

@@ -1,0 +1,1856 @@
+{
+  "status": "STATIC_SOURCE_INTEGRATION_ONLY_NO_BUILD_OR_TEST_EXECUTION",
+  "base": "37c00373616034db8cfea2b2d7f826060921af71",
+  "sourceSnapshot": "d63114f61f4f2be933990568bfafbffc63725963",
+  "lineage": {
+    "provider": {
+      "tip": "16d779cb04c385135bb45d84f0bc17341d592593",
+      "mergeBase": "37c00373616034db8cfea2b2d7f826060921af71",
+      "commits": [
+        "9a5fddca0113722bc578480ac05f5c92b6468bcb",
+        "ff7047ebeebd857d9f51b011d3f22460f4bc920c",
+        "db2e5c36ddb81db79ae9e15d79f357df8f4aae9b",
+        "ddcee60073a03c7951a78e4a0d32c82f06a7bca5",
+        "08e21eeecf21dd48116fb00f635e240e50fcd6a7",
+        "36236be2ac377901dbfe1d30fcffd2adebc5d217",
+        "6620c55c80fe749a413b06f229d13536b79710d1",
+        "ab797d78fe6e14d39f0b8b93800ed194d400076a",
+        "101ba52905e1f26c2e627e4547aed2a887612c6b",
+        "4f9e5b54339289496650955f4b7c9fd8f5cd3596",
+        "16d779cb04c385135bb45d84f0bc17341d592593"
+      ]
+    },
+    "core": {
+      "tip": "b9f1b2bdb526c042220b05d206b23a3a1f49d1ee",
+      "mergeBase": "37c00373616034db8cfea2b2d7f826060921af71",
+      "commits": [
+        "fe31f2d943aa3a87c010b016cb701a80324ec511",
+        "0b452d88e666c542a309e3d61a48b2baeb5358d0",
+        "ad66f900c8eaa217da9b04a7e556189054be1222",
+        "325f2ef5bafc3576186f64d05d31f02e15bb0052",
+        "c660cc2aaffaa1b98f74697ab6cb0e8d8973f52d",
+        "f0c434b7562054aca718305adccf19062ca3df66",
+        "b39df2a815f82486d6591d29eb619afb08017c43",
+        "b9f1b2bdb526c042220b05d206b23a3a1f49d1ee"
+      ]
+    },
+    "terminal": {
+      "tip": "b3b8ac99f19c138c4be48677d71785552d030f65",
+      "mergeBase": "37c00373616034db8cfea2b2d7f826060921af71",
+      "commits": [
+        "380abc586ad807d43a438444032b88849c0c8d03",
+        "e876460a122ca381f3c9c5f55893c18f12240741",
+        "3e429c9fce75d46b74c89861a795e2a55811083d",
+        "5f899dd3aae50ea4e2711c3b1462770183348bda",
+        "b3b8ac99f19c138c4be48677d71785552d030f65"
+      ]
+    }
+  },
+  "changedFileCount": 112,
+  "files": [
+    {
+      "file": "compatibility/extensions/native-before-agent-start.json",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "0b3224482346b047a0b04e7b0ea8bbf83f3c2314",
+      "candidateBlobs": {
+        "core": "0b3224482346b047a0b04e7b0ea8bbf83f3c2314"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "compatibility/extensions/native-context-with-system.json",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "7790636e7852ca3e411f724353f4e39273f8dc42",
+      "candidateBlobs": {
+        "core": "7790636e7852ca3e411f724353f4e39273f8dc42"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "compatibility/extensions/native-nested-tool-broker.json",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "533ba844340523cb9756390381ae0edade5b690a",
+      "candidateBlobs": {
+        "core": "533ba844340523cb9756390381ae0edade5b690a"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "compatibility/implementation-status.json",
+      "owners": [
+        "provider",
+        "core"
+      ],
+      "currentBlob": "64e67a01abde62e3d00ffdcf3f0527411cb8f613",
+      "candidateBlobs": {
+        "provider": "d61224a00024560794b9d92daced417213eda33f",
+        "core": "6f5d2076e628e1a10b3cc7738b79f8d284e7658b"
+      },
+      "exactCandidateMatch": false
+    },
+    {
+      "file": "docs/contracts/events.md",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "3b484cf0b7fb52c2eaec7627b8436a9057395701",
+      "candidateBlobs": {
+        "provider": "3b484cf0b7fb52c2eaec7627b8436a9057395701"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "docs/contracts/google-generative-ai-native.md",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "bdaae033476b2a3764247384992cc0e16b700f84",
+      "candidateBlobs": {
+        "provider": "bdaae033476b2a3764247384992cc0e16b700f84"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "docs/contracts/native-before-agent-start.md",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "cbceee0fec5e065c6f214eeba8712c955c73e119",
+      "candidateBlobs": {
+        "core": "cbceee0fec5e065c6f214eeba8712c955c73e119"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "docs/contracts/native-context-with-system.md",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "88deabec70e8b4814e3b5940cf9e346c4ce35b79",
+      "candidateBlobs": {
+        "core": "88deabec70e8b4814e3b5940cf9e346c4ce35b79"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "docs/contracts/native-nested-tool-broker.md",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "a47869cf315cf2fc802a7ded38b71219128ad21b",
+      "candidateBlobs": {
+        "core": "a47869cf315cf2fc802a7ded38b71219128ad21b"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "docs/contracts/responses-key-auth-request.md",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "121f8993b7f1265a628d9c7f3b4cd82413652f0a",
+      "candidateBlobs": {
+        "provider": "121f8993b7f1265a628d9c7f3b4cd82413652f0a"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "docs/contracts/responses-text-tool.md",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "0172563c450ac21e2b2c1615f82a5bb8a22137b1",
+      "candidateBlobs": {
+        "provider": "0172563c450ac21e2b2c1615f82a5bb8a22137b1"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "docs/evidence/terminal-queue-adoption.md",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "0ac2bf0f4e0fd42b001297ee7263a6e441530945",
+      "candidateBlobs": {
+        "terminal": "0ac2bf0f4e0fd42b001297ee7263a6e441530945"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "docs/evidence/terminal-text-components.md",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "81cc24f386391d803e8313fb5723358c7158cdc1",
+      "candidateBlobs": {
+        "terminal": "81cc24f386391d803e8313fb5723358c7158cdc1"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "docs/evidence/terminal-text-selector-adoption.md",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "38b3f69ff9dc58f7df5ac1a551d28cb4c943ea16",
+      "candidateBlobs": {
+        "terminal": "38b3f69ff9dc58f7df5ac1a551d28cb4c943ea16"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "IMPLEMENTATION_STATUS.md",
+      "owners": [
+        "provider",
+        "core"
+      ],
+      "currentBlob": "869b7eacca6b8cc5a734e9f7863469e9667423e7",
+      "candidateBlobs": {
+        "provider": "a653e5c08d0ade7d3b7cc2d7971b2d6a4db1f174",
+        "core": "ca225aba7cfa3933fb7ac12a5561a3ffec904984"
+      },
+      "exactCandidateMatch": false
+    },
+    {
+      "file": "src/PiSharp.Agent/Agent.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "a02f0692b93450c90580627f2d61974238300a5d",
+      "candidateBlobs": {
+        "core": "a02f0692b93450c90580627f2d61974238300a5d"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Agent/AgentLoopRunner.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "52e57f0dcd76eaec4c7a4e8ef48c5a1057fa562d",
+      "candidateBlobs": {
+        "core": "52e57f0dcd76eaec4c7a4e8ef48c5a1057fa562d"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Agent/AgentPromptPreparation.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "ba5041cef9c76b4761e39dbeccc1b35fb534a2a1",
+      "candidateBlobs": {
+        "core": "ba5041cef9c76b4761e39dbeccc1b35fb534a2a1"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Agent/NestedToolUsage.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "95c06237c55faa2e3ca90f49141c37f241c30d0d",
+      "candidateBlobs": {
+        "core": "95c06237c55faa2e3ca90f49141c37f241c30d0d"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Agent/PreparedToolHooks.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "2f22733db2b715dc3c1fc15226cfd49e277e787a",
+      "candidateBlobs": {
+        "core": "2f22733db2b715dc3c1fc15226cfd49e277e787a"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Agent/ToolBatchScheduler.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "429ec75ac64695279ae8f9169685c9da3fdc8698",
+      "candidateBlobs": {
+        "core": "429ec75ac64695279ae8f9169685c9da3fdc8698"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Agent/ToolContracts.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "9b920f23bcb714b395d621ee019df1eeafe64f6c",
+      "candidateBlobs": {
+        "core": "9b920f23bcb714b395d621ee019df1eeafe64f6c"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Agent/ToolInvocationContext.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "cfdbdce7a98d4723eeb61eb58a7e2191869ed6b0",
+      "candidateBlobs": {
+        "core": "cfdbdce7a98d4723eeb61eb58a7e2191869ed6b0"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Agent/ToolInvoker.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "8efac5a194b7d5622c606cd3ffe0518d854e6d2b",
+      "candidateBlobs": {
+        "core": "8efac5a194b7d5622c606cd3ffe0518d854e6d2b"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Agent/ToolResultMessageMaterializer.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "fc1776c07d61aaf5dd57b060f85d3390109d3a62",
+      "candidateBlobs": {
+        "core": "fc1776c07d61aaf5dd57b060f85d3390109d3a62"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleGenerativeAIHttpTransport.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "ff80e0ef1ec73522388a9252471a441dc3863f19",
+      "candidateBlobs": {
+        "provider": "ff80e0ef1ec73522388a9252471a441dc3863f19"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleGenerativeAIOptions.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "8c603b4ce8013638e8dfa1ad3c576edf209c04b9",
+      "candidateBlobs": {
+        "provider": "8c603b4ce8013638e8dfa1ad3c576edf209c04b9"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleRequestProjector.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "f7d6fc52557821a0d93286c4c1a990eff0f43af4",
+      "candidateBlobs": {
+        "provider": "f7d6fc52557821a0d93286c4c1a990eff0f43af4"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleRetryPolicy.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "faf35bca93c61c4ce90b5a2311e832d94874de35",
+      "candidateBlobs": {
+        "provider": "faf35bca93c61c4ce90b5a2311e832d94874de35"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleRetryRequest.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "c7664397cc57967cab617c3ca72b6f8c73bfad00",
+      "candidateBlobs": {
+        "provider": "c7664397cc57967cab617c3ca72b6f8c73bfad00"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleSimpleContextEstimator.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "1f73830d72c78d80756e07deebb37261863e898d",
+      "candidateBlobs": {
+        "provider": "1f73830d72c78d80756e07deebb37261863e898d"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleSimpleOptions.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "3e149fd028070448628d7d30b77761de6d12e1ed",
+      "candidateBlobs": {
+        "provider": "3e149fd028070448628d7d30b77761de6d12e1ed"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/GoogleGenerativeAI/GoogleSimpleRequestFactory.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "e51977bb5fc061a6a51fc1fde9115c707ff7249b",
+      "candidateBlobs": {
+        "provider": "e51977bb5fc061a6a51fc1fde9115c707ff7249b"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesHttpSseTransport.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "c17ac2f833aa10d8df6cb88d5867c2dd8b1b28fb",
+      "candidateBlobs": {
+        "provider": "c17ac2f833aa10d8df6cb88d5867c2dd8b1b28fb"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesKeyAuthRequestFactory.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "733c5fdcee33698775fbee64f1454efee5d17ae9",
+      "candidateBlobs": {
+        "provider": "733c5fdcee33698775fbee64f1454efee5d17ae9"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Protocols/OpenAIResponses/ResponsesTextToolTransport.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "afeacfeeb2cef3884113651b590d252fb791a44d",
+      "candidateBlobs": {
+        "provider": "afeacfeeb2cef3884113651b590d252fb791a44d"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.AI/Streaming/AssistantStreamReducer.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "0f0d55650bea19f323e58082f3677b7a46d87054",
+      "candidateBlobs": {
+        "provider": "0f0d55650bea19f323e58082f3677b7a46d87054"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Cli/Commands/OfflineSessionProfile.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "d278868a838e90af7eb70b439833e78ecc9d882b",
+      "candidateBlobs": {
+        "core": "d278868a838e90af7eb70b439833e78ecc9d882b"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Cli/Extensions/NativeExtensionActivation.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "4d456b54c86cf0a1be76ccd282e1d64d2d462a41",
+      "candidateBlobs": {
+        "core": "4d456b54c86cf0a1be76ccd282e1d64d2d462a41"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/InteractiveSessionFrontend.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "48fc4d10c5f00a8df55a8460976a7cd3c591eebd",
+      "candidateBlobs": {
+        "terminal": "48fc4d10c5f00a8df55a8460976a7cd3c591eebd"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/TerminalPendingQueuePresentation.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "71b75bf39fa4170a039d89b72d4d5d255480f376",
+      "candidateBlobs": {
+        "terminal": "71b75bf39fa4170a039d89b72d4d5d255480f376"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/TerminalSelectListDialogController.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "f30d865c05b9335d0f79c618c2f75c18afcbe548",
+      "candidateBlobs": {
+        "terminal": "f30d865c05b9335d0f79c618c2f75c18afcbe548"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/TerminalSessionView.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "934f842b8fdd217c6fed556f5a7d370ffbe36ac5",
+      "candidateBlobs": {
+        "terminal": "934f842b8fdd217c6fed556f5a7d370ffbe36ac5"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/PersistentAgentSession.Compaction.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "7f20e21d02025957031954daf7673cde550b4da2",
+      "candidateBlobs": {
+        "core": "7f20e21d02025957031954daf7673cde550b4da2"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/PersistentAgentSession.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "3a0e97dcbe8e36653f2d054ad255b544933c964d",
+      "candidateBlobs": {
+        "core": "3a0e97dcbe8e36653f2d054ad255b544933c964d"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/PersistentAgentSession.Recovery.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "da9b547906a88f7de18c069b8c85ade87b6bf790",
+      "candidateBlobs": {
+        "core": "da9b547906a88f7de18c069b8c85ade87b6bf790"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/ReplaceableAgentSession.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "325dcfe6dfb2668153b6b7e173d9f3f670157dec",
+      "candidateBlobs": {
+        "core": "325dcfe6dfb2668153b6b7e173d9f3f670157dec"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.CodingAgent/SessionRuntimeRegistry.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "b155d0b340403e7a8251367a9a433abad421eb75",
+      "candidateBlobs": {
+        "core": "b155d0b340403e7a8251367a9a433abad421eb75"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Contracts/Serialization/PiWireJson.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "f9b85c39c59b95299a7f5c8b6aa1de644ba3dc3e",
+      "candidateBlobs": {
+        "provider": "f9b85c39c59b95299a7f5c8b6aa1de644ba3dc3e"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Contracts/Streaming/StreamEvents.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "66672847f01a2358b61aa73d8d826f4f36e68efc",
+      "candidateBlobs": {
+        "provider": "66672847f01a2358b61aa73d8d826f4f36e68efc"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Abstractions/Events/ReducerContracts.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "a8d754d1694aa832a1b18d5ebc101f5608ee08ad",
+      "candidateBlobs": {
+        "core": "a8d754d1694aa832a1b18d5ebc101f5608ee08ad"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Abstractions/RegistrationContracts.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "c4be8e4b63214712cc037203e44f90e3cdd5d52c",
+      "candidateBlobs": {
+        "core": "c4be8e4b63214712cc037203e44f90e3cdd5d52c"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Abstractions/ToolInvocationContracts.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "88877ee88cfc95fee9402845f5bf6f905a31cf49",
+      "candidateBlobs": {
+        "core": "88877ee88cfc95fee9402845f5bf6f905a31cf49"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Agent/ExtensionAgentBinding.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "0e2286b5fd6acf85c77453bf9b1cdcd7c2443291",
+      "candidateBlobs": {
+        "core": "0e2286b5fd6acf85c77453bf9b1cdcd7c2443291"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Agent/ExtensionToolAdapter.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "edcb65671b560846ec50aec743abe07b54ebe686",
+      "candidateBlobs": {
+        "core": "edcb65671b560846ec50aec743abe07b54ebe686"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Agent/RegisteredExtensionContextHooks.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "8ed7495762fd2b4760458d95ba4420088eb56f67",
+      "candidateBlobs": {
+        "core": "8ed7495762fd2b4760458d95ba4420088eb56f67"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Agent/RegisteredExtensionToolHooks.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "535d92ce7f3512269fa1ee81478cf207f0cb5216",
+      "candidateBlobs": {
+        "core": "535d92ce7f3512269fa1ee81478cf207f0cb5216"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Dispatch/ExtensionEventDispatcher.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "4b92a75f0a453ab3a0eb60aea7183092917d4ea3",
+      "candidateBlobs": {
+        "core": "4b92a75f0a453ab3a0eb60aea7183092917d4ea3"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Dispatch/RegisteredExtensionEventDispatcher.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "f6d8ec4c391fcabfb30ecdb1c94ce06960faf084",
+      "candidateBlobs": {
+        "core": "f6d8ec4c391fcabfb30ecdb1c94ce06960faf084"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Registration/ExtensionRegistry.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "d34fc2db47018156fdef46e88f5495dfc0266207",
+      "candidateBlobs": {
+        "core": "d34fc2db47018156fdef46e88f5495dfc0266207"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Registration/ExtensionRegistrySnapshot.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "78b4c3a845c3b41e8e9e0e2119f0074c1798cb92",
+      "candidateBlobs": {
+        "core": "78b4c3a845c3b41e8e9e0e2119f0074c1798cb92"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Registration/RegistrationScope.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "98bbc6a1cd4df1ef80e3fa3016b472bd0eb441e9",
+      "candidateBlobs": {
+        "core": "98bbc6a1cd4df1ef80e3fa3016b472bd0eb441e9"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Extensions.Runtime/Registration/StagedRegistrationSet.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "ed7c70b6b7a4463d2120b2d53ecc8e63d02e4254",
+      "candidateBlobs": {
+        "core": "ed7c70b6b7a4463d2120b2d53ecc8e63d02e4254"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Rpc/Protocol/RpcAgentEventProjector.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "4d74addf3e28dfe53f2ea5d762e3bbe99280e25f",
+      "candidateBlobs": {
+        "provider": "4d74addf3e28dfe53f2ea5d762e3bbe99280e25f"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Rpc/Protocol/RpcSessionDispatcher.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "a52ccc48ba1c3fe9a22fbe1807efbd660eb16fe4",
+      "candidateBlobs": {
+        "terminal": "a52ccc48ba1c3fe9a22fbe1807efbd660eb16fe4"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Sessions/Context/SessionContextProjector.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "8c4c91c36f9641ad40cf8663e5406f13fc2c70ac",
+      "candidateBlobs": {
+        "core": "8c4c91c36f9641ad40cf8663e5406f13fc2c70ac"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Components/Text/TerminalExtensionSelectorFrameFactory.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "ec9cacd0d105721001e440f934582669ce959fb7",
+      "candidateBlobs": {
+        "terminal": "ec9cacd0d105721001e440f934582669ce959fb7"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Components/Text/TerminalPendingQueueFrameFactory.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "b5e4f19871e15f8e10071533ec5485f6efcfd31f",
+      "candidateBlobs": {
+        "terminal": "b5e4f19871e15f8e10071533ec5485f6efcfd31f"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Components/Text/TerminalText.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "b4d69ba917e359e350c332e13d08eb2fb480c92c",
+      "candidateBlobs": {
+        "terminal": "b4d69ba917e359e350c332e13d08eb2fb480c92c"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Components/Text/TerminalTextComponentBounds.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "bb108960c59c4358cb0ec547e6b752c70397b89d",
+      "candidateBlobs": {
+        "terminal": "bb108960c59c4358cb0ec547e6b752c70397b89d"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Components/Text/TerminalTextFrameFactory.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "1ef554279343d2d4d1b498a264b273f17e04e8fb",
+      "candidateBlobs": {
+        "terminal": "1ef554279343d2d4d1b498a264b273f17e04e8fb"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Components/Text/TerminalTextSource.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "fb5c7d31c4cf6dd8d3d55a69fe87941d66a51ded",
+      "candidateBlobs": {
+        "terminal": "fb5c7d31c4cf6dd8d3d55a69fe87941d66a51ded"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Components/Text/TerminalTruncatedText.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "0687d9f03ea595da332038b3e79928e79f817efd",
+      "candidateBlobs": {
+        "terminal": "0687d9f03ea595da332038b3e79928e79f817efd"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Components/Text/UPSTREAM-LICENSE",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "4864295e12c6656c26cfc0d297f8b7e5bc55df15",
+      "candidateBlobs": {
+        "terminal": "4864295e12c6656c26cfc0d297f8b7e5bc55df15"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/fixtures/extensions/native/PluginCli/FixtureEntry.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "ae0ba088aded5436741d36ebf5c2fdeb748aa873",
+      "candidateBlobs": {
+        "core": "ae0ba088aded5436741d36ebf5c2fdeb748aa873"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Agent.Tests/NestedToolInvocationTests.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "6c70379342bf98f6cb8daddfa96bd98797b9b7c6",
+      "candidateBlobs": {
+        "core": "6c70379342bf98f6cb8daddfa96bd98797b9b7c6"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Agent.Tests/Program.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "85090e73fcb454d6e382732a80f9b9d1b0d278fb",
+      "candidateBlobs": {
+        "core": "85090e73fcb454d6e382732a80f9b9d1b0d278fb"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.CodingAgent.Tests/NativeHookOnlyActivationTests.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "ee4f08f4d02c1a43fc77e0688852f581fbeb9aa8",
+      "candidateBlobs": {
+        "core": "ee4f08f4d02c1a43fc77e0688852f581fbeb9aa8"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.CodingAgent.Tests/NestedToolHostTests.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "b95ad341ff51b687c9add70494eda898a9646b9d",
+      "candidateBlobs": {
+        "core": "b95ad341ff51b687c9add70494eda898a9646b9d"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.CodingAgent.Tests/Program.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "9b7e1dd895932772d259f775e1749eade73d60d7",
+      "candidateBlobs": {
+        "core": "9b7e1dd895932772d259f775e1749eade73d60d7"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Compatibility.Tests/Program.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "d5cb23b86f1316250f810164dbd20be1d99329d0",
+      "candidateBlobs": {
+        "provider": "d5cb23b86f1316250f810164dbd20be1d99329d0"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Compatibility.Tests/ResponsesTextToolTests.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "d1ab2fb4762e636053962f80ed73609de1f821e5",
+      "candidateBlobs": {
+        "provider": "d1ab2fb4762e636053962f80ed73609de1f821e5"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Compatibility.Tests/ThinkingCheckpointTests.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "0bc1eb8d1ce742444eb15b152a5972a15094922c",
+      "candidateBlobs": {
+        "provider": "0bc1eb8d1ce742444eb15b152a5972a15094922c"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Extensions.ContractTests/BeforeAgentStartTests.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "85eb0fb822adbbc8ff71f548c05f9c9e13a1f285",
+      "candidateBlobs": {
+        "core": "85eb0fb822adbbc8ff71f548c05f9c9e13a1f285"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Extensions.ContractTests/ContextWithSystemTests.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "2b3617284849d9db1b4d231850ae524147e8a504",
+      "candidateBlobs": {
+        "core": "2b3617284849d9db1b4d231850ae524147e8a504"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Extensions.ContractTests/NestedToolBrokerTests.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "4da9a01a8b8c63aaefadbf940a16344ec4bb2bfd",
+      "candidateBlobs": {
+        "core": "4da9a01a8b8c63aaefadbf940a16344ec4bb2bfd"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Extensions.ContractTests/Program.cs",
+      "owners": [
+        "core"
+      ],
+      "currentBlob": "af3c5dbfe6924b1660b17e99ddcd3e4643492396",
+      "candidateBlobs": {
+        "core": "af3c5dbfe6924b1660b17e99ddcd3e4643492396"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.GoogleGenerativeAI.Tests/authored-cases.json",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "993cb4dae9c13f351796c4098db5703310efcf0f",
+      "candidateBlobs": {
+        "provider": "993cb4dae9c13f351796c4098db5703310efcf0f"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.GoogleGenerativeAI.Tests/google-retry-cases.json",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "b9f8e899edce86b06f84494158c0c18bda96171f",
+      "candidateBlobs": {
+        "provider": "b9f8e899edce86b06f84494158c0c18bda96171f"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.GoogleGenerativeAI.Tests/google-simple-cases.json",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "8be9cc897e1cec1b11c69f75ad0201e95a8efff0",
+      "candidateBlobs": {
+        "provider": "8be9cc897e1cec1b11c69f75ad0201e95a8efff0"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.GoogleGenerativeAI.Tests/GoogleCases.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "811a8b48f9d541dc1327afcb33330bba281e5b15",
+      "candidateBlobs": {
+        "provider": "811a8b48f9d541dc1327afcb33330bba281e5b15"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.GoogleGenerativeAI.Tests/GoogleHistoryIdCases.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "c6b883549b7a3ed6bccb4b8e3a603a373a7a77d4",
+      "candidateBlobs": {
+        "provider": "c6b883549b7a3ed6bccb4b8e3a603a373a7a77d4"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.GoogleGenerativeAI.Tests/GoogleRetryCases.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "cef8c684b3d3e213be746a0730c0dfe5c0f0514d",
+      "candidateBlobs": {
+        "provider": "cef8c684b3d3e213be746a0730c0dfe5c0f0514d"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.GoogleGenerativeAI.Tests/GoogleSimpleCases.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "6d50052bc3a16487eef03a6ef0ca8abaf2197109",
+      "candidateBlobs": {
+        "provider": "6d50052bc3a16487eef03a6ef0ca8abaf2197109"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.GoogleGenerativeAI.Tests/PiSharp.GoogleGenerativeAI.Tests.csproj",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "f36b0dd874cbc41a347c89cb75f17f04fd55fba6",
+      "candidateBlobs": {
+        "provider": "f36b0dd874cbc41a347c89cb75f17f04fd55fba6"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Rpc.Tests/Program.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "5f147fdd25e3c3785db242ac2d71c93167b0363b",
+      "candidateBlobs": {
+        "provider": "5f147fdd25e3c3785db242ac2d71c93167b0363b"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Rpc.Tests/ResponsesCheckpointProjectionTests.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "b3c9aa51b586754061f5bc0aa7263629540547cb",
+      "candidateBlobs": {
+        "provider": "b3c9aa51b586754061f5bc0aa7263629540547cb"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "59bfb6ab915a1ab4c4edbbb686f96a4cf7e3cca8",
+      "candidateBlobs": {
+        "terminal": "59bfb6ab915a1ab4c4edbbb686f96a4cf7e3cca8"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Terminal.SelectList.Integration.Tests/fixtures/queue-adoption-source.json",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "3c2dde06788eaf5effe66d61bba2784510034ccb",
+      "candidateBlobs": {
+        "terminal": "3c2dde06788eaf5effe66d61bba2784510034ccb"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Terminal.SelectList.Integration.Tests/fixtures/text-adoption-source.json",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "8c602c09623c716d7c0d328b5299cf37b48da37f",
+      "candidateBlobs": {
+        "terminal": "8c602c09623c716d7c0d328b5299cf37b48da37f"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Terminal.SelectList.Integration.Tests/Program.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "07a66ce9d0e02e9ce4142f6fbe75b77b5ee907d3",
+      "candidateBlobs": {
+        "terminal": "07a66ce9d0e02e9ce4142f6fbe75b77b5ee907d3"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalQueueAdoptionCases.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "815e6d0146d6ac5af2a6cc720aa8f7377fe5ef88",
+      "candidateBlobs": {
+        "terminal": "815e6d0146d6ac5af2a6cc720aa8f7377fe5ef88"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Terminal.SelectList.Integration.Tests/TerminalTextAdoptionCases.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "186b6d29edf89649eca97079ba7e6e38b3a29e51",
+      "candidateBlobs": {
+        "terminal": "186b6d29edf89649eca97079ba7e6e38b3a29e51"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Transport.Tests/Program.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "e7d06708d7599b839e4e9ed27f4ed11c42e76560",
+      "candidateBlobs": {
+        "provider": "e7d06708d7599b839e4e9ed27f4ed11c42e76560"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Transport.Tests/ResponsesIncompleteTests.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "d0b8c605044784f5de80a1c9eeb29a6c5490cc01",
+      "candidateBlobs": {
+        "provider": "d0b8c605044784f5de80a1c9eeb29a6c5490cc01"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Transport.Tests/ResponsesKeyAuthRequestFactoryTests.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "af8d24eb38ac5773e6592286ac256d41ad43ac0d",
+      "candidateBlobs": {
+        "provider": "af8d24eb38ac5773e6592286ac256d41ad43ac0d"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Transport.Tests/ResponsesReasoningTests.cs",
+      "owners": [
+        "provider"
+      ],
+      "currentBlob": "87c7127cf8466948f3b9ef01505cd61b1ee49d7e",
+      "candidateBlobs": {
+        "provider": "87c7127cf8466948f3b9ef01505cd61b1ee49d7e"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-queue-adoption-migration.json",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "f37a4b95b2d95692590bf17a76a71d90f2792898",
+      "candidateBlobs": {
+        "terminal": "f37a4b95b2d95692590bf17a76a71d90f2792898"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.before-queue-adoption.json",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "6d4732841f2619fb500dc317939fd8281ce549a9",
+      "candidateBlobs": {
+        "terminal": "6d4732841f2619fb500dc317939fd8281ce549a9"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.json",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "f77ce589f29f63bc010420f96643172910448532",
+      "candidateBlobs": {
+        "terminal": "f77ce589f29f63bc010420f96643172910448532"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Tui.Tests/Program.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "1f19a586c0ef636d4607aec245c96ace8d86cdbf",
+      "candidateBlobs": {
+        "terminal": "1f19a586c0ef636d4607aec245c96ace8d86cdbf"
+      },
+      "exactCandidateMatch": true
+    },
+    {
+      "file": "tests/PiSharp.Tui.Tests/TerminalTextComponentTests.cs",
+      "owners": [
+        "terminal"
+      ],
+      "currentBlob": "3995049aecf2050830d9813617bfa72d7c70b094",
+      "candidateBlobs": {
+        "terminal": "3995049aecf2050830d9813617bfa72d7c70b094"
+      },
+      "exactCandidateMatch": true
+    }
+  ],
+  "overlaps": [
+    {
+      "file": "compatibility/implementation-status.json",
+      "owners": [
+        "provider",
+        "core"
+      ],
+      "currentBlob": "64e67a01abde62e3d00ffdcf3f0527411cb8f613",
+      "candidateBlobs": {
+        "provider": "d61224a00024560794b9d92daced417213eda33f",
+        "core": "6f5d2076e628e1a10b3cc7738b79f8d284e7658b"
+      },
+      "exactCandidateMatch": false
+    },
+    {
+      "file": "IMPLEMENTATION_STATUS.md",
+      "owners": [
+        "provider",
+        "core"
+      ],
+      "currentBlob": "869b7eacca6b8cc5a734e9f7863469e9667423e7",
+      "candidateBlobs": {
+        "provider": "a653e5c08d0ade7d3b7cc2d7971b2d6a4db1f174",
+        "core": "ca225aba7cfa3933fb7ac12a5561a3ffec904984"
+      },
+      "exactCandidateMatch": false
+    }
+  ],
+  "candidateContentMismatches": [
+    {
+      "file": "compatibility/implementation-status.json",
+      "owners": [
+        "provider",
+        "core"
+      ],
+      "currentBlob": "64e67a01abde62e3d00ffdcf3f0527411cb8f613",
+      "candidateBlobs": {
+        "provider": "d61224a00024560794b9d92daced417213eda33f",
+        "core": "6f5d2076e628e1a10b3cc7738b79f8d284e7658b"
+      },
+      "exactCandidateMatch": false
+    },
+    {
+      "file": "IMPLEMENTATION_STATUS.md",
+      "owners": [
+        "provider",
+        "core"
+      ],
+      "currentBlob": "869b7eacca6b8cc5a734e9f7863469e9667423e7",
+      "candidateBlobs": {
+        "provider": "a653e5c08d0ade7d3b7cc2d7971b2d6a4db1f174",
+        "core": "ca225aba7cfa3933fb7ac12a5561a3ffec904984"
+      },
+      "exactCandidateMatch": false
+    }
+  ],
+  "projectGraph": {
+    "projectCount": 74,
+    "missingReferences": [],
+    "graph": {
+      "fixtures/native-extensions/node-command-input/PublishedFixture.NodeCommandInput.csproj": [
+        "src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj",
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "fixtures/native-extensions/node-hello/PublishedFixture.NodeHello.csproj": [
+        "src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj",
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "fixtures/native-extensions/node-protected-paths/PublishedFixture.NodeProtectedPaths.csproj": [
+        "src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj",
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "samples/extensions/SessionCheckpoint/SessionCheckpoint.csproj": [
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "samples/extensions/StatefulTodo/StatefulTodo.csproj": [
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "src/PiSharp.AI/PiSharp.AI.csproj": [
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "src/PiSharp.Agent/PiSharp.Agent.csproj": [
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj",
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "src/PiSharp.Cli/PiSharp.Cli.csproj": [
+        "src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj",
+        "src/PiSharp.Tools/PiSharp.Tools.csproj",
+        "src/PiSharp.Rpc/PiSharp.Rpc.csproj",
+        "src/PiSharp.Tui/PiSharp.Tui.csproj",
+        "src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj",
+        "src/PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj"
+      ],
+      "src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj": [
+        "src/PiSharp.Agent/PiSharp.Agent.csproj",
+        "src/PiSharp.Sessions/PiSharp.Sessions.csproj"
+      ],
+      "src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj": [
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj",
+        "src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj",
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj"
+      ],
+      "src/PiSharp.Contracts/PiSharp.Contracts.csproj": [],
+      "src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj": [
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj": [
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "src/PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj": [
+        "src/PiSharp.Agent/PiSharp.Agent.csproj",
+        "src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj"
+      ],
+      "src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj": [
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj"
+      ],
+      "src/PiSharp.Rpc/PiSharp.Rpc.csproj": [
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj",
+        "src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj",
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj"
+      ],
+      "src/PiSharp.Sessions/PiSharp.Sessions.csproj": [
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "src/PiSharp.Tools/PiSharp.Tools.csproj": [
+        "src/PiSharp.Agent/PiSharp.Agent.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "src/PiSharp.Tui/PiSharp.Tui.csproj": [],
+      "tests/PiSharp.Agent.Tests/PiSharp.Agent.Tests.csproj": [
+        "src/PiSharp.Agent/PiSharp.Agent.csproj"
+      ],
+      "tests/PiSharp.CodingAgent.Tests/PiSharp.CodingAgent.Tests.csproj": [
+        "src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj",
+        "src/PiSharp.Cli/PiSharp.Cli.csproj"
+      ],
+      "tests/PiSharp.Compatibility.Node.ProcessTests/PiSharp.Compatibility.Node.ProcessTests.csproj": [
+        "src/PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj",
+        "src/PiSharp.Agent/PiSharp.Agent.csproj",
+        "src/PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj",
+        "src/PiSharp.Tools/PiSharp.Tools.csproj",
+        "src/PiSharp.Rpc/PiSharp.Rpc.csproj"
+      ],
+      "tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.CompletionsAnchored.Tests/Controls/Controls.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.CompletionsAnchored.Tests/PiSharp.CompletionsAnchored.Tests.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.CompletionsGrammar.Tests/Agent/Agent.csproj": [
+        "src/PiSharp.Agent/PiSharp.Agent.csproj"
+      ],
+      "tests/PiSharp.CompletionsGrammar.Tests/Controls/Controls.csproj": [
+        "src/PiSharp.Agent/PiSharp.Agent.csproj"
+      ],
+      "tests/PiSharp.CompletionsGrammar.Tests/Controls/Strict/Strict.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.CompletionsGrammar.Tests/PiSharp.CompletionsGrammar.Tests.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.CompletionsSimple.Tests/PiSharp.CompletionsSimple.Tests.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.CompletionsThinking.Tests/Agent/Agent.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj",
+        "src/PiSharp.Agent/PiSharp.Agent.csproj"
+      ],
+      "tests/PiSharp.CompletionsThinking.Tests/PiSharp.CompletionsThinking.Tests.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.ExtensionHost.ProcessTests/PiSharp.ExtensionHost.ProcessTests.csproj": [
+        "src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj"
+      ],
+      "tests/PiSharp.ExtensionHost.Tests/PiSharp.ExtensionHost.Tests.csproj": [
+        "src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj"
+      ],
+      "tests/PiSharp.Extensions.ContractTests/Consumer/PublishedConsumer.csproj": [
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "tests/PiSharp.Extensions.ContractTests/PiSharp.Extensions.ContractTests.csproj": [
+        "src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj",
+        "src/PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj",
+        "src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj",
+        "src/PiSharp.Sessions/PiSharp.Sessions.csproj",
+        "src/PiSharp.Agent/PiSharp.Agent.csproj",
+        "tests/PiSharp.Extensions.ContractTests/Consumer/PublishedConsumer.csproj"
+      ],
+      "tests/PiSharp.GoogleGenerativeAI.Tests/PiSharp.GoogleGenerativeAI.Tests.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj",
+        "src/PiSharp.Agent/PiSharp.Agent.csproj"
+      ],
+      "tests/PiSharp.NodeCommandInputPackage.Tests/PiSharp.NodeCommandInputPackage.Tests.csproj": [
+        "src/PiSharp.Cli/PiSharp.Cli.csproj"
+      ],
+      "tests/PiSharp.NodeHelloPackage.Tests/PiSharp.NodeHelloPackage.Tests.csproj": [
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj",
+        "src/PiSharp.Rpc/PiSharp.Rpc.csproj",
+        "src/PiSharp.Sessions/PiSharp.Sessions.csproj"
+      ],
+      "tests/PiSharp.NodePackage.Tests/PiSharp.NodePackage.Tests.csproj": [
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj",
+        "src/PiSharp.Rpc/PiSharp.Rpc.csproj",
+        "src/PiSharp.Sessions/PiSharp.Sessions.csproj"
+      ],
+      "tests/PiSharp.OpenRouterBinding.Tests/Controls/Controls.csproj": [
+        "tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj"
+      ],
+      "tests/PiSharp.OpenRouterBinding.Tests/PiSharp.OpenRouterBinding.Tests.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.OpenRouterCacheProfile.Tests/Controls/Controls.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.OpenRouterCacheProfile.Tests/PiSharp.OpenRouterCacheProfile.Tests.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.OpenRouterReasoning.Tests/Controls/Controls.csproj": [
+        "tests/PiSharp.Compatibility.Tests/PiSharp.Compatibility.Tests.csproj"
+      ],
+      "tests/PiSharp.OpenRouterReasoning.Tests/PiSharp.OpenRouterReasoning.Tests.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.PiMessages.Tests/PiSharp.PiMessages.Tests.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj"
+      ],
+      "tests/PiSharp.Rpc.Tests/PiSharp.Rpc.Tests.csproj": [
+        "src/PiSharp.Rpc/PiSharp.Rpc.csproj",
+        "src/PiSharp.Tools/PiSharp.Tools.csproj",
+        "src/PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj",
+        "src/PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj"
+      ],
+      "tests/PiSharp.Sessions.Tests/PiSharp.Sessions.Tests.csproj": [
+        "src/PiSharp.Sessions/PiSharp.Sessions.csproj"
+      ],
+      "tests/PiSharp.Terminal.Default.Tests/PiSharp.Terminal.Default.Tests.csproj": [
+        "src/PiSharp.Cli/PiSharp.Cli.csproj"
+      ],
+      "tests/PiSharp.Terminal.SelectList.Integration.Tests/PiSharp.Terminal.SelectList.Integration.Tests.csproj": [
+        "src/PiSharp.Cli/PiSharp.Cli.csproj"
+      ],
+      "tests/PiSharp.Tools.Tests/PiSharp.Tools.Tests.csproj": [
+        "src/PiSharp.Tools/PiSharp.Tools.csproj"
+      ],
+      "tests/PiSharp.Transport.Tests/PiSharp.Transport.Tests.csproj": [
+        "src/PiSharp.AI/PiSharp.AI.csproj",
+        "src/PiSharp.Agent/PiSharp.Agent.csproj"
+      ],
+      "tests/PiSharp.Tui.Editor.Tests/PiSharp.Tui.Editor.Tests.csproj": [
+        "src/PiSharp.Tui/PiSharp.Tui.csproj"
+      ],
+      "tests/PiSharp.Tui.Focus.Tests/PiSharp.Tui.Focus.Tests.csproj": [
+        "src/PiSharp.Cli/PiSharp.Cli.csproj"
+      ],
+      "tests/PiSharp.Tui.IndicConjunct.Tests/PiSharp.Tui.IndicConjunct.Tests.csproj": [
+        "src/PiSharp.Cli/PiSharp.Cli.csproj"
+      ],
+      "tests/PiSharp.Tui.Keybindings.Tests/PiSharp.Tui.Keybindings.Tests.csproj": [
+        "src/PiSharp.Cli/PiSharp.Cli.csproj"
+      ],
+      "tests/PiSharp.Tui.Keypad.Tests/PiSharp.Tui.Keypad.Tests.csproj": [
+        "src/PiSharp.Cli/PiSharp.Cli.csproj"
+      ],
+      "tests/PiSharp.Tui.KittyAlternate.Tests/PiSharp.Tui.KittyAlternate.Tests.csproj": [
+        "src/PiSharp.Cli/PiSharp.Cli.csproj"
+      ],
+      "tests/PiSharp.Tui.LockModifiers.Tests/PiSharp.Tui.LockModifiers.Tests.csproj": [
+        "src/PiSharp.Cli/PiSharp.Cli.csproj"
+      ],
+      "tests/PiSharp.Tui.ModifyOtherKeys.Tests/PiSharp.Tui.ModifyOtherKeys.Tests.csproj": [
+        "src/PiSharp.Cli/PiSharp.Cli.csproj"
+      ],
+      "tests/PiSharp.Tui.SelectList.Tests/PiSharp.Tui.SelectList.Tests.csproj": [
+        "src/PiSharp.Tui/PiSharp.Tui.csproj"
+      ],
+      "tests/PiSharp.Tui.Tests/PiSharp.Tui.Tests.csproj": [
+        "src/PiSharp.Tui/PiSharp.Tui.csproj"
+      ],
+      "tests/fixtures/extensions/native/FutureAbi/FutureAbi.csproj": [],
+      "tests/fixtures/extensions/native/PluginCli/PluginCli.csproj": [
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "tests/fixtures/extensions/native/PluginCliUi/PluginCliUi.csproj": [
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "tests/fixtures/extensions/native/PluginFail/PluginFail.csproj": [
+        "tests/fixtures/extensions/native/PrivateOne/PrivateOne.csproj",
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "tests/fixtures/extensions/native/PluginFuture/PluginFuture.csproj": [
+        "tests/fixtures/extensions/native/FutureAbi/FutureAbi.csproj"
+      ],
+      "tests/fixtures/extensions/native/PluginImage/PluginImage.csproj": [
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "tests/fixtures/extensions/native/PluginOne/PluginOne.csproj": [
+        "tests/fixtures/extensions/native/PrivateOne/PrivateOne.csproj",
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "tests/fixtures/extensions/native/PluginSystemImport/PluginSystemImport.csproj": [
+        "src/PiSharp.ExtensionHost/PiSharp.ExtensionHost.csproj",
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "tests/fixtures/extensions/native/PluginTwo/PluginTwo.csproj": [
+        "tests/fixtures/extensions/native/PrivateTwo/PrivateTwo.csproj",
+        "src/PiSharp.Extensions.Abstractions/PiSharp.Extensions.Abstractions.csproj",
+        "src/PiSharp.Contracts/PiSharp.Contracts.csproj"
+      ],
+      "tests/fixtures/extensions/native/PrivateOne/PrivateOne.csproj": [],
+      "tests/fixtures/extensions/native/PrivateTwo/PrivateTwo.csproj": []
+    }
+  },
+  "testRegistrations": [
+    {
+      "file": "tests/PiSharp.Agent.Tests/Program.cs",
+      "marker": "NestedToolInvocationTests.Cases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.CodingAgent.Tests/Program.cs",
+      "marker": "NestedToolHostTests.Cases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.CodingAgent.Tests/Program.cs",
+      "marker": "NativeHookOnlyActivationTests.Cases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.Extensions.ContractTests/Program.cs",
+      "marker": "BeforeAgentStartTests.Cases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.Extensions.ContractTests/Program.cs",
+      "marker": "ContextWithSystemTests.Cases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.Extensions.ContractTests/Program.cs",
+      "marker": "NestedToolBrokerTests.Cases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.Compatibility.Tests/Program.cs",
+      "marker": "ThinkingCheckpointTests",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.Transport.Tests/Program.cs",
+      "marker": "ResponsesReasoningTests",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.Transport.Tests/Program.cs",
+      "marker": "ResponsesIncompleteTests",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.GoogleGenerativeAI.Tests/GoogleCases.cs",
+      "marker": "GoogleRetryCases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.GoogleGenerativeAI.Tests/GoogleCases.cs",
+      "marker": "GoogleSimpleCases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.GoogleGenerativeAI.Tests/GoogleCases.cs",
+      "marker": "GoogleHistoryIdCases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.Rpc.Tests/Program.cs",
+      "marker": "ResponsesCheckpointProjectionTests.Cases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.Rpc.Tests/Program.cs",
+      "marker": "RpcSessionCreationTests.Cases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.Tui.Tests/Program.cs",
+      "marker": "TerminalTextComponentTests.Cases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.Terminal.SelectList.Integration.Tests/Program.cs",
+      "marker": "TerminalTextAdoptionCases.Cases",
+      "present": true
+    },
+    {
+      "file": "tests/PiSharp.Terminal.SelectList.Integration.Tests/Program.cs",
+      "marker": "TerminalQueueAdoptionCases.Cases",
+      "present": true
+    }
+  ],
+  "historicalTestFiles": {
+    "baselineCount": 588,
+    "unchangedCount": 571,
+    "laneModifiedFiles": [
+      "tests/PiSharp.Agent.Tests/Program.cs",
+      "tests/PiSharp.CodingAgent.Tests/NativeHookOnlyActivationTests.cs",
+      "tests/PiSharp.CodingAgent.Tests/Program.cs",
+      "tests/PiSharp.Compatibility.Tests/Program.cs",
+      "tests/PiSharp.Compatibility.Tests/ResponsesTextToolTests.cs",
+      "tests/PiSharp.Extensions.ContractTests/Program.cs",
+      "tests/PiSharp.GoogleGenerativeAI.Tests/GoogleCases.cs",
+      "tests/PiSharp.GoogleGenerativeAI.Tests/PiSharp.GoogleGenerativeAI.Tests.csproj",
+      "tests/PiSharp.GoogleGenerativeAI.Tests/authored-cases.json",
+      "tests/PiSharp.Rpc.Tests/Program.cs",
+      "tests/PiSharp.Rpc.Tests/RpcSessionCreationTests.cs",
+      "tests/PiSharp.Terminal.SelectList.Integration.Tests/Program.cs",
+      "tests/PiSharp.Transport.Tests/Program.cs",
+      "tests/PiSharp.Transport.Tests/ResponsesKeyAuthRequestFactoryTests.cs",
+      "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.json",
+      "tests/PiSharp.Tui.Tests/Program.cs",
+      "tests/fixtures/extensions/native/PluginCli/FixtureEntry.cs"
+    ],
+    "integrationOnlyAssertionChanges": []
+  },
+  "heldIoSourceBoundary": [
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/HeldIoTests.cs",
+      "expectedSha256": "a4dc73ee294a84f9e52cc15b6e092db472430c1a47c8a96bafb1a8b024bd6bc3",
+      "checkoutSha256": "a4dc73ee294a84f9e52cc15b6e092db472430c1a47c8a96bafb1a8b024bd6bc3",
+      "gitBlobSha256": "a4dc73ee294a84f9e52cc15b6e092db472430c1a47c8a96bafb1a8b024bd6bc3",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/Program.cs",
+      "expectedSha256": "67de8756784db53f2531b173e4cf7dd7a0db0753a6ac93b2848679a8b8886d9a",
+      "checkoutSha256": "67de8756784db53f2531b173e4cf7dd7a0db0753a6ac93b2848679a8b8886d9a",
+      "gitBlobSha256": "67de8756784db53f2531b173e4cf7dd7a0db0753a6ac93b2848679a8b8886d9a",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/AlternateKeyControls.cs",
+      "expectedSha256": "3a73bd3fb1c26282b7a36156d48e051fe03c5ea6423c3d6d534cc36d1ce72446",
+      "checkoutSha256": "3a73bd3fb1c26282b7a36156d48e051fe03c5ea6423c3d6d534cc36d1ce72446",
+      "gitBlobSha256": "3a73bd3fb1c26282b7a36156d48e051fe03c5ea6423c3d6d534cc36d1ce72446",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/shift-space-source-observations.json",
+      "expectedSha256": "d71057f550e047c30684d427865561d12c7a8c0d7db6dd1378c2ddf42bfbfb1c",
+      "checkoutSha256": "d71057f550e047c30684d427865561d12c7a8c0d7db6dd1378c2ddf42bfbfb1c",
+      "gitBlobSha256": "d71057f550e047c30684d427865561d12c7a8c0d7db6dd1378c2ddf42bfbfb1c",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-failure-cancellation-design.json",
+      "expectedSha256": "b1f4a5b2bbd7ab1df1e9ac7b0fb3a8af0cb325a4d9ef5ab8bad99e58d27d845d",
+      "checkoutSha256": "b1f4a5b2bbd7ab1df1e9ac7b0fb3a8af0cb325a4d9ef5ab8bad99e58d27d845d",
+      "gitBlobSha256": "b1f4a5b2bbd7ab1df1e9ac7b0fb3a8af0cb325a4d9ef5ab8bad99e58d27d845d",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/TerminalChatInput.cs",
+      "expectedSha256": "59a9e4622dd6ee4adc3650e3b59dda0ce99cb3ef5244ff15f073831dd48586e7",
+      "checkoutSha256": "59a9e4622dd6ee4adc3650e3b59dda0ce99cb3ef5244ff15f073831dd48586e7",
+      "gitBlobSha256": "59a9e4622dd6ee4adc3650e3b59dda0ce99cb3ef5244ff15f073831dd48586e7",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/TerminalSessionView.cs",
+      "expectedSha256": "36bd9b9808735ea85f006b6ccce373d1d165d8a3e559d80407623c14f4b05e9e",
+      "checkoutSha256": "36bd9b9808735ea85f006b6ccce373d1d165d8a3e559d80407623c14f4b05e9e",
+      "gitBlobSha256": "36bd9b9808735ea85f006b6ccce373d1d165d8a3e559d80407623c14f4b05e9e",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "src/PiSharp.Cli/Interactive/TerminalSubmissionReceipts.cs",
+      "expectedSha256": "d8006cb325976aa863bed2a43640c4e8ed107a48832eb53748387b3c176810f2",
+      "checkoutSha256": "d8006cb325976aa863bed2a43640c4e8ed107a48832eb53748387b3c176810f2",
+      "gitBlobSha256": "d8006cb325976aa863bed2a43640c4e8ed107a48832eb53748387b3c176810f2",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Input/TerminalInputDecoder.cs",
+      "expectedSha256": "749b61b948b408a08ccd4084dd47e33268f5085edbf69987866e15537e9a974a",
+      "checkoutSha256": "749b61b948b408a08ccd4084dd47e33268f5085edbf69987866e15537e9a974a",
+      "gitBlobSha256": "749b61b948b408a08ccd4084dd47e33268f5085edbf69987866e15537e9a974a",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Input/TerminalEditorFocusOwner.cs",
+      "expectedSha256": "6cfef2aa45dcd878492753eb4e99a4abf052823bbdf232ab9fa3539e43e51b21",
+      "checkoutSha256": "6cfef2aa45dcd878492753eb4e99a4abf052823bbdf232ab9fa3539e43e51b21",
+      "gitBlobSha256": "6cfef2aa45dcd878492753eb4e99a4abf052823bbdf232ab9fa3539e43e51b21",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Input/TerminalTextEditorPasteController.cs",
+      "expectedSha256": "63407650ff0ed5a59e9990069bc0ea90adc242ca5390464d7bba895b3152c4fe",
+      "checkoutSha256": "63407650ff0ed5a59e9990069bc0ea90adc242ca5390464d7bba895b3152c4fe",
+      "gitBlobSha256": "63407650ff0ed5a59e9990069bc0ea90adc242ca5390464d7bba895b3152c4fe",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Rendering/VtRenderer.cs",
+      "expectedSha256": "fd9a92436dac74536ad5270cfee756119c9b7afd09dad8727082b6a2ac9b7bdf",
+      "checkoutSha256": "fd9a92436dac74536ad5270cfee756119c9b7afd09dad8727082b6a2ac9b7bdf",
+      "gitBlobSha256": "fd9a92436dac74536ad5270cfee756119c9b7afd09dad8727082b6a2ac9b7bdf",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "src/PiSharp.Tui/Rendering/TerminalEditorFrameFactory.cs",
+      "expectedSha256": "a166e5ec4daeb3ad7fd726b175c73bc770274f6701b2deaae8c1971e188c7a27",
+      "checkoutSha256": "a166e5ec4daeb3ad7fd726b175c73bc770274f6701b2deaae8c1971e188c7a27",
+      "gitBlobSha256": "a166e5ec4daeb3ad7fd726b175c73bc770274f6701b2deaae8c1971e188c7a27",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    },
+    {
+      "file": "tests/PiSharp.Tui.KittyAlternate.Tests/HeldIoEvidence.cs",
+      "expectedSha256": "352f7bfb6e04c52a201facc7b7d17dffd16cacb4a8ec9427f19a69aeae18d495",
+      "checkoutSha256": "352f7bfb6e04c52a201facc7b7d17dffd16cacb4a8ec9427f19a69aeae18d495",
+      "gitBlobSha256": "352f7bfb6e04c52a201facc7b7d17dffd16cacb4a8ec9427f19a69aeae18d495",
+      "matchesCheckout": true,
+      "matchesGitBlob": true
+    }
+  ],
+  "nativeBuilds": 0,
+  "nativeTests": 0,
+  "upstreamExecutions": 0,
+  "namespaceReachability": {
+    "checked": 252,
+    "unresolved": [],
+    "method": "Static namespace ownership and transitive ProjectReference traversal; not compiler execution"
+  },
+  "openIntegrationCriteria": [
+    "Terminal worker correction for outer RPC test-runner WaitAsync must arrive as a separate followup",
+    "Core hook independent review is pending",
+    "Compile and run focused plus adjacent suites only after bounded test-window authorization",
+    "Fresh integrated admission/build receipts and immutable product identities are not yet generated; no prior runtime evidence transfers"
+  ],
+  "heldIoPriorDeclarationEqualsCentral": true
+}

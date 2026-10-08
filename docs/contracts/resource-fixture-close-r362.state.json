@@ -1,0 +1,15 @@
+{
+  "base": "7c0d59b49a09b5c384fa8d0d9ea14d5ca042e455",
+  "review": "R360_RESOURCE_FIXTURE_ACTIVATION_SOURCE_REVIEW.json",
+  "reviewSha256": "5da3212ee947e7bfbf5043cc293ffcc31cc07e1285d7d207abcc04b80aaa7eb6",
+  "finding": "R360-FIXTURE-CLEANUP-01",
+  "scope": "only HeldOutput explicit fixture cleanup before final collected failure",
+  "existingCases": 10,
+  "addedCases": 0,
+  "internalHeldFaultSchedules": 2,
+  "genericFixtureDisposeChanged": false,
+  "productionChanged": false,
+  "compiled": false,
+  "executed": false,
+  "qualification": "none"
+}

@@ -1,0 +1,1829 @@
+{
+  "schemaVersion": 1,
+  "requiredCount": 32,
+  "basisSourceCandidate": "328da63d49244dd1e2b1ddde978855bdfd50d79c",
+  "basisSourceTree": "c70408f0d1435e2d487068fadaee468be1b6153e",
+  "basisStaticReview": {
+    "sha256": "5caf007ac085a6883c49247aad9899ac0820906c57ac38ad8902c2a64fe95dd7",
+    "candidate": "328da63d49244dd1e2b1ddde978855bdfd50d79c"
+  },
+  "scope": "All prior29 target records retained unchanged; exact no-worker Node loadout metadata companion appended. No runtime or package acceptance.",
+  "nativeBuilds": 0,
+  "nativeAssertions": 0,
+  "targets": [
+    {
+      "id": "anchored",
+      "project": "tests/PiSharp.CompletionsAnchored.Tests/PiSharp.CompletionsAnchored.Tests.csproj",
+      "projectSha256": "7402f4c16d93f7457ac20a0fc83af5df65ad5f15b4ee230a09878c7097958245",
+      "entryAssembly": "tests/PiSharp.CompletionsAnchored.Tests/bin/Release/net10.0/PiSharp.CompletionsAnchored.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--fixture"
+        },
+        {
+          "kind": "fixture",
+          "path": "fixtures/reference/completions-anchored-tools.json"
+        },
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "fixtures/reference/completions-anchored-tools.json",
+          "bytes": 2031889,
+          "sha256": "37ba79cbf6bd41ed99c210598d4484c422a4eacd91e5e6b4af3bee62b1e695a8"
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "anchored.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.CompletionsAnchored.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 266,
+        "sha256": "e20107e935b16941e0f86fdb6fdb557bb9bb524c22620f5875d04ac390704567"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "anchored-controls",
+      "project": "tests/PiSharp.CompletionsAnchored.Tests/Controls/Controls.csproj",
+      "projectSha256": "33e0bddea2d1503e87da8cf67ce1178e30244233717afed0ee99ad2f563194f3",
+      "entryAssembly": "tests/PiSharp.CompletionsAnchored.Tests/Controls/bin/Release/net10.0/Controls.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [],
+      "outputFixturePins": [],
+      "reportName": "anchored-controls.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.CompletionsAnchored.Tests/Controls/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 266,
+        "sha256": "e20107e935b16941e0f86fdb6fdb557bb9bb524c22620f5875d04ac390704567"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "binding",
+      "project": "tests/PiSharp.OpenRouterBinding.Tests/PiSharp.OpenRouterBinding.Tests.csproj",
+      "projectSha256": "7402f4c16d93f7457ac20a0fc83af5df65ad5f15b4ee230a09878c7097958245",
+      "entryAssembly": "tests/PiSharp.OpenRouterBinding.Tests/bin/Release/net10.0/PiSharp.OpenRouterBinding.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--fixture"
+        },
+        {
+          "kind": "fixture",
+          "path": "fixtures/reference/completions-openrouter-binding.json"
+        },
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "fixtures/reference/completions-openrouter-binding.json",
+          "bytes": 2106900,
+          "sha256": "27c688b3dfbcfe254ca4ef945d9af1837a3885d39b7265225f67a97b1aff74f6"
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "binding.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.OpenRouterBinding.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 266,
+        "sha256": "e20107e935b16941e0f86fdb6fdb557bb9bb524c22620f5875d04ac390704567"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "binding-controls",
+      "project": "tests/PiSharp.OpenRouterBinding.Tests/Controls/Controls.csproj",
+      "projectSha256": "cc2e86f1a9ac59f5c317ffbe72bb8393d72ec6ad6c425c6ae68ed7a5d750da02",
+      "entryAssembly": "tests/PiSharp.OpenRouterBinding.Tests/Controls/bin/Release/net10.0/Controls.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        },
+        {
+          "kind": "literal",
+          "value": "--thinking-fixture"
+        },
+        {
+          "kind": "fixture",
+          "path": "fixtures/reference/completions-thinking.json"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "fixtures/reference/completions-thinking.json",
+          "bytes": 22810416,
+          "sha256": "e872e4581a019e438d96b06440e72d063f4f43f88b5926a1398f39342f312848"
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "binding-controls.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.OpenRouterBinding.Tests/Controls/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 413,
+        "sha256": "8df483d964de4419f74b132dc5f84eb4d2a2d62059453868ed4db52367e8dc0e"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "kitty-locks",
+      "project": "tests/PiSharp.Tui.LockModifiers.Tests/PiSharp.Tui.LockModifiers.Tests.csproj",
+      "projectSha256": "377c3076f33a154692c4a9bd5c1d609aa8c9a6e468ad4d46abd3033e1be51ab4",
+      "entryAssembly": "tests/PiSharp.Tui.LockModifiers.Tests/bin/Release/net10.0/PiSharp.CodingAgent.Tests.dll",
+      "arguments": [
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.Tui.LockModifiers.Tests/fixtures/lock-identity-source-observations.json"
+        },
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.Tui.LockModifiers.Tests/fixtures/lock-editor-source-observations.json"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.Tui.LockModifiers.Tests/fixtures/lock-identity-source-observations.json",
+          "bytes": 2361442,
+          "sha256": "123821c44f81a3e60654c0e86540a6534257c513550ede994bfcdba46ef6a20e"
+        },
+        {
+          "path": "tests/PiSharp.Tui.LockModifiers.Tests/fixtures/lock-editor-source-observations.json",
+          "bytes": 55029,
+          "sha256": "f8d9768494cc0962af501a000288778dbf88260b1f16f7ba3b01d49f37a37329"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "fixtures/lock-editor-source-observations.json",
+          "bytes": 55029,
+          "sha256": "f8d9768494cc0962af501a000288778dbf88260b1f16f7ba3b01d49f37a37329"
+        },
+        {
+          "relative": "fixtures/lock-identity-source-observations.json",
+          "bytes": 2361442,
+          "sha256": "123821c44f81a3e60654c0e86540a6534257c513550ede994bfcdba46ef6a20e"
+        }
+      ],
+      "reportName": "kitty-locks.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.Tui.LockModifiers.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 2597,
+        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "cache",
+      "project": "tests/PiSharp.OpenRouterCacheProfile.Tests/PiSharp.OpenRouterCacheProfile.Tests.csproj",
+      "projectSha256": "7402f4c16d93f7457ac20a0fc83af5df65ad5f15b4ee230a09878c7097958245",
+      "entryAssembly": "tests/PiSharp.OpenRouterCacheProfile.Tests/bin/Release/net10.0/PiSharp.OpenRouterCacheProfile.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--fixture"
+        },
+        {
+          "kind": "fixture",
+          "path": "fixtures/reference/completions-openrouter-cache-profile.json"
+        },
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "fixtures/reference/completions-openrouter-cache-profile.json",
+          "bytes": 1199845,
+          "sha256": "a61f14329141bcb29295f7af933f80d3afeb6243ce071c8be7e446f44aa24800"
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "cache.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.OpenRouterCacheProfile.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 266,
+        "sha256": "e20107e935b16941e0f86fdb6fdb557bb9bb524c22620f5875d04ac390704567"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "cache-controls",
+      "project": "tests/PiSharp.OpenRouterCacheProfile.Tests/Controls/Controls.csproj",
+      "projectSha256": "33e0bddea2d1503e87da8cf67ce1178e30244233717afed0ee99ad2f563194f3",
+      "entryAssembly": "tests/PiSharp.OpenRouterCacheProfile.Tests/Controls/bin/Release/net10.0/Controls.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [],
+      "outputFixturePins": [],
+      "reportName": "cache-controls.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.OpenRouterCacheProfile.Tests/Controls/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 266,
+        "sha256": "e20107e935b16941e0f86fdb6fdb557bb9bb524c22620f5875d04ac390704567"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "reasoning",
+      "project": "tests/PiSharp.OpenRouterReasoning.Tests/PiSharp.OpenRouterReasoning.Tests.csproj",
+      "projectSha256": "7402f4c16d93f7457ac20a0fc83af5df65ad5f15b4ee230a09878c7097958245",
+      "entryAssembly": "tests/PiSharp.OpenRouterReasoning.Tests/bin/Release/net10.0/PiSharp.OpenRouterReasoning.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--fixture"
+        },
+        {
+          "kind": "fixture",
+          "path": "fixtures/reference/completions-openrouter-reasoning.json"
+        },
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "fixtures/reference/completions-openrouter-reasoning.json",
+          "bytes": 272246,
+          "sha256": "9449ba27778bc21eca13c17fa26d53691f05bc3d00e983b17d69b7127056e0ac"
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "reasoning.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.OpenRouterReasoning.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 266,
+        "sha256": "e20107e935b16941e0f86fdb6fdb557bb9bb524c22620f5875d04ac390704567"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "reasoning-controls",
+      "project": "tests/PiSharp.OpenRouterReasoning.Tests/Controls/Controls.csproj",
+      "projectSha256": "cc2e86f1a9ac59f5c317ffbe72bb8393d72ec6ad6c425c6ae68ed7a5d750da02",
+      "entryAssembly": "tests/PiSharp.OpenRouterReasoning.Tests/Controls/bin/Release/net10.0/Controls.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [],
+      "outputFixturePins": [],
+      "reportName": "reasoning-controls.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.OpenRouterReasoning.Tests/Controls/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 413,
+        "sha256": "8df483d964de4419f74b132dc5f84eb4d2a2d62059453868ed4db52367e8dc0e"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "keypad",
+      "project": "tests/PiSharp.Tui.Keypad.Tests/PiSharp.Tui.Keypad.Tests.csproj",
+      "projectSha256": "377c3076f33a154692c4a9bd5c1d609aa8c9a6e468ad4d46abd3033e1be51ab4",
+      "entryAssembly": "tests/PiSharp.Tui.Keypad.Tests/bin/Release/net10.0/PiSharp.CodingAgent.Tests.dll",
+      "arguments": [
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.Tui.Keypad.Tests/fixtures/keypad-source-expectations.json"
+        },
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.Tui.Keypad.Tests/fixtures/pending-jump-source-observations.json"
+        },
+        {
+          "kind": "report"
+        },
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.Tui.Keypad.Tests/fixtures/identity-source-observations.json"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.Tui.Keypad.Tests/fixtures/keypad-source-expectations.json",
+          "bytes": 17273,
+          "sha256": "3f0330a66a6c0de8747102cdf16401eb732529385818f9312634e6e616c08616"
+        },
+        {
+          "path": "tests/PiSharp.Tui.Keypad.Tests/fixtures/pending-jump-source-observations.json",
+          "bytes": 12751,
+          "sha256": "dadac41a475d2a08c37e4de0c4ba23475dab75c08f45e837ca13a75b58c32817"
+        },
+        {
+          "path": "tests/PiSharp.Tui.Keypad.Tests/fixtures/identity-source-observations.json",
+          "bytes": 14426,
+          "sha256": "d7abd245c53b75cd57c61552b238e2a5bb61b896b36a58849fafbde27d604991"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "fixtures/identity-source-observations.json",
+          "bytes": 14426,
+          "sha256": "d7abd245c53b75cd57c61552b238e2a5bb61b896b36a58849fafbde27d604991"
+        },
+        {
+          "relative": "fixtures/keypad-source-expectations.json",
+          "bytes": 17273,
+          "sha256": "3f0330a66a6c0de8747102cdf16401eb732529385818f9312634e6e616c08616"
+        },
+        {
+          "relative": "fixtures/pending-jump-source-observations.json",
+          "bytes": 12751,
+          "sha256": "dadac41a475d2a08c37e4de0c4ba23475dab75c08f45e837ca13a75b58c32817"
+        }
+      ],
+      "reportName": "keypad.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.Tui.Keypad.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 2597,
+        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "modify-other-keys",
+      "project": "tests/PiSharp.Tui.ModifyOtherKeys.Tests/PiSharp.Tui.ModifyOtherKeys.Tests.csproj",
+      "projectSha256": "377c3076f33a154692c4a9bd5c1d609aa8c9a6e468ad4d46abd3033e1be51ab4",
+      "entryAssembly": "tests/PiSharp.Tui.ModifyOtherKeys.Tests/bin/Release/net10.0/PiSharp.CodingAgent.Tests.dll",
+      "arguments": [
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.Tui.ModifyOtherKeys.Tests/fixtures/mok-identity-source-observations.json"
+        },
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.Tui.ModifyOtherKeys.Tests/fixtures/mok-editor-source-observations.json"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.Tui.ModifyOtherKeys.Tests/fixtures/mok-identity-source-observations.json",
+          "bytes": 13321,
+          "sha256": "fe8280c031662a19f7240f0a58a94f8e8d5cc6d9d4219b420e28326d20dc3408"
+        },
+        {
+          "path": "tests/PiSharp.Tui.ModifyOtherKeys.Tests/fixtures/mok-editor-source-observations.json",
+          "bytes": 34351,
+          "sha256": "77ce046aa8f9a781283212606050ec3d465ec248ac566a77fc0396931a7c47ae"
+        },
+        {
+          "path": "tests/PiSharp.Tui.ModifyOtherKeys.Tests/fixtures/mok-interrupt-source-observations.json",
+          "bytes": 6660,
+          "sha256": "64f3852128ee4e8a9f63cd7ec51a1b05de8904ce89c6589cefd61c32060203ff"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "fixtures/mok-editor-source-observations.json",
+          "bytes": 34351,
+          "sha256": "77ce046aa8f9a781283212606050ec3d465ec248ac566a77fc0396931a7c47ae"
+        },
+        {
+          "relative": "fixtures/mok-identity-source-observations.json",
+          "bytes": 13321,
+          "sha256": "fe8280c031662a19f7240f0a58a94f8e8d5cc6d9d4219b420e28326d20dc3408"
+        },
+        {
+          "relative": "fixtures/mok-interrupt-source-observations.json",
+          "bytes": 6660,
+          "sha256": "64f3852128ee4e8a9f63cd7ec51a1b05de8904ce89c6589cefd61c32060203ff"
+        }
+      ],
+      "reportName": "modify-other-keys.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.Tui.ModifyOtherKeys.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 2597,
+        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "grammar",
+      "project": "tests/PiSharp.CompletionsGrammar.Tests/PiSharp.CompletionsGrammar.Tests.csproj",
+      "projectSha256": "782e1ca7cb3212d7ddcd36aea03e61ae2e71bc87202a5a349b01c948cffa2cd3",
+      "entryAssembly": "tests/PiSharp.CompletionsGrammar.Tests/bin/Release/net10.0/PiSharp.CompletionsGrammar.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--fixture"
+        },
+        {
+          "kind": "fixture",
+          "path": "fixtures/reference/completions-grammar.json"
+        },
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "fixtures/reference/completions-grammar.json",
+          "bytes": 3976344,
+          "sha256": "458d9492cfab3923c959b5f4cad6c9b00f864a508a708521c472f3231e2bf9ac"
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "grammar.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.CompletionsGrammar.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 266,
+        "sha256": "e20107e935b16941e0f86fdb6fdb557bb9bb524c22620f5875d04ac390704567"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "grammar-agent",
+      "project": "tests/PiSharp.CompletionsGrammar.Tests/Agent/Agent.csproj",
+      "projectSha256": "219039f7cc5518f419902b2f1005d8c47127f7adc4f1dcdb036d4284bf066059",
+      "entryAssembly": "tests/PiSharp.CompletionsGrammar.Tests/Agent/bin/Release/net10.0/Agent.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--fixture"
+        },
+        {
+          "kind": "fixture",
+          "path": "fixtures/reference/completions-grammar-agent.json"
+        },
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "fixtures/reference/completions-grammar-agent.json",
+          "bytes": 1136957,
+          "sha256": "5a542f36b593e9abc93bcdbe2d232f6762376e41094dacecea7adb25c54cd682"
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "grammar-agent.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.CompletionsGrammar.Tests/Agent/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 443,
+        "sha256": "2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "grammar-controls",
+      "project": "tests/PiSharp.CompletionsGrammar.Tests/Controls/Controls.csproj",
+      "projectSha256": "bf3f1aad7415a6e1e5c06683f0bfb555765ce5cc84f0b15461d31b697c6dbf24",
+      "entryAssembly": "tests/PiSharp.CompletionsGrammar.Tests/Controls/bin/Release/net10.0/Controls.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [],
+      "outputFixturePins": [],
+      "reportName": "grammar-controls.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.CompletionsGrammar.Tests/Controls/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 443,
+        "sha256": "2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "grammar-strict",
+      "project": "tests/PiSharp.CompletionsGrammar.Tests/Controls/Strict/Strict.csproj",
+      "projectSha256": "73081571e0a3ebfd4bcd3cde28a64b8c1b334d06b5a4bfe010d57eee419e689e",
+      "entryAssembly": "tests/PiSharp.CompletionsGrammar.Tests/Controls/Strict/bin/Release/net10.0/Strict.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [],
+      "outputFixturePins": [],
+      "reportName": "grammar-strict.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.CompletionsGrammar.Tests/Controls/Strict/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 266,
+        "sha256": "e20107e935b16941e0f86fdb6fdb557bb9bb524c22620f5875d04ac390704567"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "focus",
+      "project": "tests/PiSharp.Tui.Focus.Tests/PiSharp.Tui.Focus.Tests.csproj",
+      "projectSha256": "bf667d444c66f60a1f1d7ccccbd1d330188c3ee86bcb2129f7acf80f8f131a44",
+      "entryAssembly": "tests/PiSharp.Tui.Focus.Tests/bin/Release/net10.0/PiSharp.CodingAgent.Tests.dll",
+      "arguments": [
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.Tui.Focus.Tests/fixtures/focus-source-observations.json"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.Tui.Focus.Tests/fixtures/focus-source-observations.json",
+          "bytes": 134474,
+          "sha256": "2860d0b4d1c0446fb2718b4082f80f850b03caa4823652868abd2b062b013e41"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "fixtures/focus-source-observations.json",
+          "bytes": 134474,
+          "sha256": "2860d0b4d1c0446fb2718b4082f80f850b03caa4823652868abd2b062b013e41"
+        }
+      ],
+      "reportName": "focus.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.Tui.Focus.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 2597,
+        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "thinking",
+      "project": "tests/PiSharp.CompletionsThinking.Tests/PiSharp.CompletionsThinking.Tests.csproj",
+      "projectSha256": "2088c72aef69ad471f430d4b305a454e99d389ed1fdc75f50fae5c35f068481e",
+      "entryAssembly": "tests/PiSharp.CompletionsThinking.Tests/bin/Release/net10.0/PiSharp.CompletionsThinking.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--fixture"
+        },
+        {
+          "kind": "fixture",
+          "path": "fixtures/reference/completions-thinking.json"
+        },
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "fixtures/reference/completions-thinking.json",
+          "bytes": 22810416,
+          "sha256": "e872e4581a019e438d96b06440e72d063f4f43f88b5926a1398f39342f312848"
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "thinking.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.CompletionsThinking.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 266,
+        "sha256": "e20107e935b16941e0f86fdb6fdb557bb9bb524c22620f5875d04ac390704567"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "thinking-agent",
+      "project": "tests/PiSharp.CompletionsThinking.Tests/Agent/Agent.csproj",
+      "projectSha256": "eea4ce43ab0be153ea9aeed97e8a14c67959a2428fc2a1cadd1b9656f27821d2",
+      "entryAssembly": "tests/PiSharp.CompletionsThinking.Tests/Agent/bin/Release/net10.0/Agent.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--fixture"
+        },
+        {
+          "kind": "fixture",
+          "path": "fixtures/reference/completions-thinking.json"
+        },
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "fixtures/reference/completions-thinking.json",
+          "bytes": 22810416,
+          "sha256": "e872e4581a019e438d96b06440e72d063f4f43f88b5926a1398f39342f312848"
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "thinking-agent.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.CompletionsThinking.Tests/Agent/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 443,
+        "sha256": "2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "indic-conjuncts",
+      "project": "tests/PiSharp.Tui.IndicConjunct.Tests/PiSharp.Tui.IndicConjunct.Tests.csproj",
+      "projectSha256": "bf667d444c66f60a1f1d7ccccbd1d330188c3ee86bcb2129f7acf80f8f131a44",
+      "entryAssembly": "tests/PiSharp.Tui.IndicConjunct.Tests/bin/Release/net10.0/PiSharp.CodingAgent.Tests.dll",
+      "arguments": [
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.Tui.IndicConjunct.Tests/fixtures/indic-source-observations.json"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.Tui.IndicConjunct.Tests/fixtures/indic-source-observations.json",
+          "bytes": 65774,
+          "sha256": "ef27cf25714947b1fcab87ebd293ddcc5e33bc499699f944532688c6d341d70b"
+        },
+        {
+          "path": "tests/PiSharp.Tui.IndicConjunct.Tests/fixtures/indic-source-first-home-observations.json",
+          "bytes": 65839,
+          "sha256": "550ae1e45294556e280c47fd3a852d7a8360ef2d002af058ec0f01910887d70e"
+        },
+        {
+          "path": "tests/PiSharp.Tui.IndicConjunct.Tests/fixtures/indic-source-grapheme-probes.json",
+          "bytes": 653118,
+          "sha256": "90f3071b34b3f05eea4bc11b8f4a056675520a60b053652def5febc13e3d2673"
+        },
+        {
+          "path": "tests/PiSharp.Tui.IndicConjunct.Tests/fixtures/indic-source-inputs.json",
+          "bytes": 7165,
+          "sha256": "9d6c07eb7ce4c92406cd8c43d4d548259bfe12596dbf56fe933368fa2de90a2e"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "fixtures/indic-source-first-home-observations.json",
+          "bytes": 65839,
+          "sha256": "550ae1e45294556e280c47fd3a852d7a8360ef2d002af058ec0f01910887d70e"
+        },
+        {
+          "relative": "fixtures/indic-source-grapheme-probes.json",
+          "bytes": 653118,
+          "sha256": "90f3071b34b3f05eea4bc11b8f4a056675520a60b053652def5febc13e3d2673"
+        },
+        {
+          "relative": "fixtures/indic-source-inputs.json",
+          "bytes": 7165,
+          "sha256": "9d6c07eb7ce4c92406cd8c43d4d548259bfe12596dbf56fe933368fa2de90a2e"
+        },
+        {
+          "relative": "fixtures/indic-source-observations.json",
+          "bytes": 65774,
+          "sha256": "ef27cf25714947b1fcab87ebd293ddcc5e33bc499699f944532688c6d341d70b"
+        }
+      ],
+      "reportName": "indic-conjuncts.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.Tui.IndicConjunct.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 2597,
+        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "simple",
+      "project": "tests/PiSharp.CompletionsSimple.Tests/PiSharp.CompletionsSimple.Tests.csproj",
+      "projectSha256": "5b39ed009ad7fad5a5972ae64105cad9242c73b3a0a050dac5b0f972f3594582",
+      "entryAssembly": "tests/PiSharp.CompletionsSimple.Tests/bin/Release/net10.0/PiSharp.CompletionsSimple.Tests.dll",
+      "arguments": [
+        {
+          "kind": "fixture",
+          "path": "fixtures/reference/completions-simple.json"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "fixtures/reference/completions-simple.json",
+          "bytes": 8622028,
+          "sha256": "3a1887bd368cfb1ac3f3120931aada3c91400552746ced89becb64aca1bcad21"
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "simple.json",
+      "timeoutSeconds": 1800,
+      "lockFile": {
+        "path": "tests/PiSharp.CompletionsSimple.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 266,
+        "sha256": "e20107e935b16941e0f86fdb6fdb557bb9bb524c22620f5875d04ac390704567",
+        "generated": true
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "kitty-alternate",
+      "project": "tests/PiSharp.Tui.KittyAlternate.Tests/PiSharp.Tui.KittyAlternate.Tests.csproj",
+      "projectSha256": "bf667d444c66f60a1f1d7ccccbd1d330188c3ee86bcb2129f7acf80f8f131a44",
+      "entryAssembly": "tests/PiSharp.Tui.KittyAlternate.Tests/bin/Release/net10.0/PiSharp.CodingAgent.Tests.dll",
+      "arguments": [
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/alternate-key-source-observations.json"
+        },
+        {
+          "kind": "report"
+        },
+        {
+          "kind": "reviewedRoot"
+        },
+        {
+          "kind": "sourceManifest"
+        },
+        {
+          "kind": "sourceManifestSha256"
+        },
+        {
+          "kind": "buildReceipt"
+        },
+        {
+          "kind": "buildReceiptSha256"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/alternate-key-identity-source-observations.json",
+          "bytes": 3373,
+          "sha256": "1a7f7e52345dce89d801e7cdf8da5780df950338beda49af337ea441ea087d90"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/alternate-key-source-inputs.json",
+          "bytes": 1764,
+          "sha256": "821d877f96dda7985cd28397ba8d34342b113e32b372daf5682e5707e209b477"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/alternate-key-source-observations.json",
+          "bytes": 18449,
+          "sha256": "e163164ab53f9328bb58e9286b81a2cc5e64dd57a33eb45ce2b7aadf9570c91f"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/contract-editor-source-observations.json",
+          "bytes": 23497,
+          "sha256": "3c54f1cc5ef11531cfc8398cd6c593d823bb3e9f1ac184c97ec04ecd23609507"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/contract-identity-source-observations.json",
+          "bytes": 25307,
+          "sha256": "f07d67ec60b21a71519349570bd7fd6e05a70ac76c9e9802a6474e91d0de8cdc"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/functional-supplement-editor-source-observations.json",
+          "bytes": 12223,
+          "sha256": "1c7c4b78c43c0ea3ab9e8cd09ca17177fb77eb2bf6705854dd273fd0b7570a06"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/functional-supplement-identity-source-observations.json",
+          "bytes": 3641,
+          "sha256": "2df48a4e57a67591c62cff84f91fedfbb3743c9bbc97bc764f27148849f7eb9d"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-failure-cancellation-design.json",
+          "bytes": 19581,
+          "sha256": "578308c834d0466990912b97736f68d4a1e1b36ee463ad977e291f22c3cc8712"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.json",
+          "bytes": 15427,
+          "sha256": "d3c18045a9fbdf46d5fc956e837d317973c242384b33f5ed34e3f5aa3b84a145"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/old-subset-supersession-source-observations.json",
+          "bytes": 9861,
+          "sha256": "6b60bd685d6e213c477881053dfee0d4305671942f21fe655d2010650de2d748"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/shift-space-source-inputs.json",
+          "bytes": 6173,
+          "sha256": "0b18e025cb5e6e8c3f75ff6011fcc7f9ab6396cbe92717db8b9b1c38178d563c"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/shift-space-source-observations.json",
+          "bytes": 38454,
+          "sha256": "e8b5e1cdd11c1cdf986b7fccad64e39de81f70c0c5f1330a321379c698761215"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-selector-boundary-migration.json",
+          "bytes": 7733,
+          "sha256": "52771d605ab86c07af2e53ecd052187849482e79120afe05e86254e048b1a807"
+        },
+        {
+          "path": "tests/PiSharp.Tui.KittyAlternate.Tests/fixtures/held-io-source-boundary.r46.json",
+          "bytes": 10349,
+          "sha256": "1bd289065f98765f266cd92f53e3927c4b6f3f63bb5ccc859dc5fa33821100ff"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "fixtures/alternate-key-identity-source-observations.json",
+          "bytes": 3373,
+          "sha256": "1a7f7e52345dce89d801e7cdf8da5780df950338beda49af337ea441ea087d90"
+        },
+        {
+          "relative": "fixtures/alternate-key-source-inputs.json",
+          "bytes": 1764,
+          "sha256": "821d877f96dda7985cd28397ba8d34342b113e32b372daf5682e5707e209b477"
+        },
+        {
+          "relative": "fixtures/alternate-key-source-observations.json",
+          "bytes": 18449,
+          "sha256": "e163164ab53f9328bb58e9286b81a2cc5e64dd57a33eb45ce2b7aadf9570c91f"
+        },
+        {
+          "relative": "fixtures/contract-editor-source-observations.json",
+          "bytes": 23497,
+          "sha256": "3c54f1cc5ef11531cfc8398cd6c593d823bb3e9f1ac184c97ec04ecd23609507"
+        },
+        {
+          "relative": "fixtures/contract-identity-source-observations.json",
+          "bytes": 25307,
+          "sha256": "f07d67ec60b21a71519349570bd7fd6e05a70ac76c9e9802a6474e91d0de8cdc"
+        },
+        {
+          "relative": "fixtures/functional-supplement-editor-source-observations.json",
+          "bytes": 12223,
+          "sha256": "1c7c4b78c43c0ea3ab9e8cd09ca17177fb77eb2bf6705854dd273fd0b7570a06"
+        },
+        {
+          "relative": "fixtures/functional-supplement-identity-source-observations.json",
+          "bytes": 3641,
+          "sha256": "2df48a4e57a67591c62cff84f91fedfbb3743c9bbc97bc764f27148849f7eb9d"
+        },
+        {
+          "relative": "fixtures/held-io-failure-cancellation-design.json",
+          "bytes": 19581,
+          "sha256": "578308c834d0466990912b97736f68d4a1e1b36ee463ad977e291f22c3cc8712"
+        },
+        {
+          "relative": "fixtures/held-io-source-boundary.json",
+          "bytes": 15427,
+          "sha256": "d3c18045a9fbdf46d5fc956e837d317973c242384b33f5ed34e3f5aa3b84a145"
+        },
+        {
+          "relative": "fixtures/old-subset-supersession-source-observations.json",
+          "bytes": 9861,
+          "sha256": "6b60bd685d6e213c477881053dfee0d4305671942f21fe655d2010650de2d748"
+        },
+        {
+          "relative": "fixtures/shift-space-source-inputs.json",
+          "bytes": 6173,
+          "sha256": "0b18e025cb5e6e8c3f75ff6011fcc7f9ab6396cbe92717db8b9b1c38178d563c"
+        },
+        {
+          "relative": "fixtures/shift-space-source-observations.json",
+          "bytes": 38454,
+          "sha256": "e8b5e1cdd11c1cdf986b7fccad64e39de81f70c0c5f1330a321379c698761215"
+        },
+        {
+          "relative": "fixtures/held-io-selector-boundary-migration.json",
+          "bytes": 7733,
+          "sha256": "52771d605ab86c07af2e53ecd052187849482e79120afe05e86254e048b1a807"
+        },
+        {
+          "relative": "fixtures/held-io-source-boundary.r46.json",
+          "bytes": 10349,
+          "sha256": "1bd289065f98765f266cd92f53e3927c4b6f3f63bb5ccc859dc5fa33821100ff"
+        }
+      ],
+      "reportName": "kitty-alternate.json",
+      "timeoutSeconds": 600,
+      "lockFile": {
+        "path": "tests/PiSharp.Tui.KittyAlternate.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 2597,
+        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "terminal-keybindings",
+      "project": "tests/PiSharp.Tui.Keybindings.Tests/PiSharp.Tui.Keybindings.Tests.csproj",
+      "projectSha256": "7ddd990107cc090acba8589b3d16e0ae60f5c6599cab08e62831c003e466f9b0",
+      "entryAssembly": "tests/PiSharp.Tui.Keybindings.Tests/bin/Release/net10.0/PiSharp.CodingAgent.Tests.dll",
+      "arguments": [
+        {
+          "kind": "report"
+        },
+        {
+          "kind": "reviewedRoot"
+        },
+        {
+          "kind": "sourceManifest"
+        },
+        {
+          "kind": "sourceManifestSha256"
+        },
+        {
+          "kind": "buildReceipt"
+        },
+        {
+          "kind": "buildReceiptSha256"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.Tui.Keybindings.Tests/fixtures/authored-keybinding-cases.json",
+          "bytes": 10198,
+          "sha256": "1ed0169977555d0dbcacf3c38493207dd2bee72eac50efd34b0f437232957fbb"
+        },
+        {
+          "path": "tests/PiSharp.Tui.Keybindings.Tests/fixtures/source-defaults-inventory.json",
+          "bytes": 7157,
+          "sha256": "6fab77390760f8e7a6712e87039dbac7bca5cf309cfa34734b367787072742cf"
+        },
+        {
+          "path": "tests/PiSharp.Tui.Keybindings.Tests/fixtures/authored-configuration-loading-cases.json",
+          "bytes": 6823,
+          "sha256": "a7906d78092a3d705f4d9edb67552de435b7ad64e902d91cbc0b0f4870d36fae"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "fixtures/authored-keybinding-cases.json",
+          "bytes": 10198,
+          "sha256": "1ed0169977555d0dbcacf3c38493207dd2bee72eac50efd34b0f437232957fbb"
+        },
+        {
+          "relative": "fixtures/source-defaults-inventory.json",
+          "bytes": 7157,
+          "sha256": "6fab77390760f8e7a6712e87039dbac7bca5cf309cfa34734b367787072742cf"
+        },
+        {
+          "relative": "fixtures/authored-configuration-loading-cases.json",
+          "bytes": 6823,
+          "sha256": "a7906d78092a3d705f4d9edb67552de435b7ad64e902d91cbc0b0f4870d36fae"
+        }
+      ],
+      "reportName": "terminal-keybindings.json",
+      "timeoutSeconds": 1800,
+      "lockFile": {
+        "path": "tests/PiSharp.Tui.Keybindings.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 2597,
+        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299",
+        "provenance": {
+          "copiedExistingLockPath": "tests/PiSharp.Tui.KittyAlternate.Tests/packages.lock.json",
+          "copiedExistingLockSha256": "8e097c409127c9f7cfade1f4d44ae6327aec72363c62f6b5dcea8762efa834ae",
+          "compatibleProjectGraphVerifiedStatically": true,
+          "projectDependencies": 12,
+          "externalPackages": 0,
+          "restoreVerifiedForThisConsumer": false,
+          "freshLockedOfflineRestoreRequired": true
+        }
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0,
+      "plannedWorkUnits": 108,
+      "plannedUnitsAreExecutedAssertions": false,
+      "admission": "Exact complete candidate manifest, host pin, twelve product DLLs plus consumer DLL at this isolated root; borrowed consumer name never authorizes another output root."
+    },
+    {
+      "id": "pi-messages",
+      "project": "tests/PiSharp.PiMessages.Tests/PiSharp.PiMessages.Tests.csproj",
+      "projectSha256": "01e7efa7089a0770044e7b15b9a98972803b52b850e637838372ab823103a8b8",
+      "entryAssembly": "tests/PiSharp.PiMessages.Tests/bin/Release/net10.0/PiSharp.PiMessages.Tests.dll",
+      "arguments": [
+        {
+          "kind": "fixture",
+          "path": "tests/PiSharp.PiMessages.Tests/authored-cases-r2.json"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.PiMessages.Tests/authored-cases-r2.json",
+          "bytes": 868723,
+          "sha256": "1b8a6fbb80726e6f1a6cb1848d2df9b7da41c9015d91592d9f077f2aa8c04891"
+        },
+        {
+          "path": "tests/PiSharp.PiMessages.Tests/authored-cases.json",
+          "bytes": 68547,
+          "sha256": "27f8106441ae3e8db01d7a78edfe03634b752fd9ff11b4be82a4cd535c415025"
+        },
+        {
+          "path": "tests/PiSharp.PiMessages.Tests/criterion-dependencies-r3.json",
+          "bytes": 22877,
+          "sha256": "5a2ede772b7b4e906671c92a12a26654d3e1f69588bcf0b519bcb96c43aabb81"
+        },
+        {
+          "path": "tests/PiSharp.PiMessages.Tests/criterion-accounting-controls-r3.json",
+          "bytes": 3886,
+          "sha256": "ab3a6801372c6e0c34755e5e8b407bffb66a13aed6fb166cead3c46584287832"
+        },
+        {
+          "path": "tests/PiSharp.PiMessages.Tests/identity-successor-case-r1.json",
+          "bytes": 1987,
+          "sha256": "ee6505f14fcd43d1ba7d488c2dc0e03951512a2d6a897b0cc1ac742b3f21ccfa"
+        },
+        {
+          "path": "tests/PiSharp.PiMessages.Tests/identity-successor-output-r1.json",
+          "bytes": 17690,
+          "sha256": "93c80e37db4fa20ef386594beeb6a609f5c9996738ed7de45373543dbfaf2a52"
+        },
+        {
+          "path": "tests/PiSharp.PiMessages.Tests/identity-successor-admission-r1.json",
+          "bytes": 10163,
+          "sha256": "19fc6e46c6a2fd1b2144038dd39412144a2a7c9a0b94cb311fb413486886082d"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "identity-successor-output-r1.json",
+          "bytes": 17690,
+          "sha256": "93c80e37db4fa20ef386594beeb6a609f5c9996738ed7de45373543dbfaf2a52"
+        }
+      ],
+      "reportName": "pi-messages.json",
+      "timeoutSeconds": 1800,
+      "lockFile": {
+        "path": "tests/PiSharp.PiMessages.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 443,
+        "sha256": "2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9",
+        "provenance": {
+          "copiedExistingLockPath": "tests/PiSharp.Agent.Tests/packages.lock.json",
+          "copiedExistingLockSha256": "2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9",
+          "compatibleProjectGraphVerifiedStatically": true,
+          "projectDependencies": 3,
+          "externalPackages": 0,
+          "restoreVerifiedForThisConsumer": false,
+          "freshLockedOfflineRestoreRequired": true
+        }
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0,
+      "plannedAuthoredCases": 46,
+      "criterionMappings": 66,
+      "authoredReportingControls": 9,
+      "controlsExecuted": false,
+      "original29CaseFixturePreserved": true,
+      "genuineSourceCasesCaptured": 0,
+      "admission": "Full exact source/generated/product receipt; fixture/dependency/accounting bytes unchanged. Authored outcomes retain open domain/integration criteria and never grant Pi Source qualification.",
+      "versionedSelectedProfiles": {
+        "admission": {
+          "path": "tests/PiSharp.PiMessages.Tests/identity-successor-admission-r1.json",
+          "bytes": 10163,
+          "sha256": "19fc6e46c6a2fd1b2144038dd39412144a2a7c9a0b94cb311fb413486886082d"
+        },
+        "profileIds": [
+          "pi-messages-identity-provider-r1",
+          "pi-messages-identity-agent-controls-r1"
+        ],
+        "status": "SEPARATE SELECTED PROFILE ADMISSION PENDING REVIEW/RUNTIME",
+        "legacyArgumentsUnchanged": true,
+        "expectationAuthority": "AUTHORED PINNED SOURCE TEXT; GENUINE SOURCE CAPTURE ABSENT",
+        "sourceAcceptance": false
+      },
+      "legacyFullRunnerMigration": {
+        "status": "AUTHORED_FULL_RUNNER_MIGRATION; UNEXECUTED",
+        "base": "2be4f6d77a2e68795d76ef4f3d3b7a14c8392cc1",
+        "caseId": "PM-TOOL-IDENTITY-REPLACEMENT",
+        "historicalCallbacks": 4,
+        "effectiveCallbacks": 5,
+        "historicalFixtureBytesChanged": false,
+        "goldenBytesChanged": false,
+        "historicalCriteria": "OPEN",
+        "authoredControls": 3,
+        "nativeExecutions": 0
+      }
+    },
+    {
+      "id": "google-generative-ai",
+      "project": "tests/PiSharp.GoogleGenerativeAI.Tests/PiSharp.GoogleGenerativeAI.Tests.csproj",
+      "projectSha256": "b3e3ea8dad79633b01c3686e3ab0f50f7fe522c10a0bc23e53d1f12619836441",
+      "entryAssembly": "tests/PiSharp.GoogleGenerativeAI.Tests/bin/Release/net10.0/PiSharp.GoogleGenerativeAI.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.GoogleGenerativeAI.Tests/authored-cases.json",
+          "bytes": 21208,
+          "sha256": "eb7beddecfe05ea89c502e3a5d3f7910f97a73db099502cb55bfca889e8ac8d7"
+        },
+        {
+          "path": "tests/PiSharp.GoogleGenerativeAI.Tests/strict-schema-cases.json",
+          "bytes": 7477,
+          "sha256": "d7c246bac1a0a477c1d78d1ac1cc636cc9538896711e5339baeca6773491b1ea"
+        },
+        {
+          "path": "tests/PiSharp.GoogleGenerativeAI.Tests/native-diagnostic-cases.json",
+          "bytes": 5026,
+          "sha256": "0865845196292af1e9b33ec7f81b6104a4fed4e32173902c170d0e455fa0a9b8"
+        },
+        {
+          "path": "tests/PiSharp.GoogleGenerativeAI.Tests/preterminal-diagnostic-cases.json",
+          "bytes": 2765,
+          "sha256": "8ea8acf3521c41a0952c0f34362f89aab320368d897dfb398588a5ffeb793db5"
+        },
+        {
+          "path": "tests/PiSharp.GoogleGenerativeAI.Tests/pinned-google-catalog.json",
+          "bytes": 13373,
+          "sha256": "c0f5a633e5e5a5044432db3e537f4bc674d4de18df09325c6349547fcc13cabe"
+        },
+        {
+          "path": "tests/PiSharp.GoogleGenerativeAI.Tests/google-retry-cases.json",
+          "bytes": 5528,
+          "sha256": "4138c16968d48ff55bd898174ee44fc93ac6284e9ae54cb6d10df072272f5a9d"
+        },
+        {
+          "path": "tests/PiSharp.GoogleGenerativeAI.Tests/google-simple-cases.json",
+          "bytes": 12922,
+          "sha256": "75ac4772939743cf70bbf21ad7c651f67f017c0d2dcc7819e778c90ad20e83bf"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "authored-cases.json",
+          "bytes": 21208,
+          "sha256": "eb7beddecfe05ea89c502e3a5d3f7910f97a73db099502cb55bfca889e8ac8d7"
+        },
+        {
+          "relative": "strict-schema-cases.json",
+          "bytes": 7477,
+          "sha256": "d7c246bac1a0a477c1d78d1ac1cc636cc9538896711e5339baeca6773491b1ea"
+        },
+        {
+          "relative": "native-diagnostic-cases.json",
+          "bytes": 5026,
+          "sha256": "0865845196292af1e9b33ec7f81b6104a4fed4e32173902c170d0e455fa0a9b8"
+        },
+        {
+          "relative": "preterminal-diagnostic-cases.json",
+          "bytes": 2765,
+          "sha256": "8ea8acf3521c41a0952c0f34362f89aab320368d897dfb398588a5ffeb793db5"
+        },
+        {
+          "relative": "pinned-google-catalog.json",
+          "bytes": 13373,
+          "sha256": "c0f5a633e5e5a5044432db3e537f4bc674d4de18df09325c6349547fcc13cabe"
+        },
+        {
+          "relative": "google-retry-cases.json",
+          "bytes": 5528,
+          "sha256": "4138c16968d48ff55bd898174ee44fc93ac6284e9ae54cb6d10df072272f5a9d"
+        },
+        {
+          "relative": "google-simple-cases.json",
+          "bytes": 12922,
+          "sha256": "75ac4772939743cf70bbf21ad7c651f67f017c0d2dcc7819e778c90ad20e83bf"
+        }
+      ],
+      "reportName": "google-generative-ai.json",
+      "timeoutSeconds": 1800,
+      "lockFile": {
+        "path": "tests/PiSharp.GoogleGenerativeAI.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 443,
+        "sha256": "2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9",
+        "provenance": {
+          "copiedExistingLockPath": "tests/PiSharp.CompletionsThinking.Tests/Agent/packages.lock.json",
+          "copiedExistingLockSha256": "2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9",
+          "compatibleProjectGraphVerifiedStatically": true,
+          "projectDependencies": 3,
+          "externalPackages": 0,
+          "realLockBytesUnedited": true,
+          "restoreVerifiedForThisConsumer": false,
+          "freshLockedOfflineRestoreRequired": true
+        }
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0,
+      "plannedAuthoredFamilies": 25,
+      "plannedDiagnosticSchedules": 209,
+      "strictSchemaVectors": 30,
+      "strictSchemaSchedules": 60,
+      "pinnedCatalogRows": 22,
+      "sourceCaptures": 0,
+      "admission": "Full source/generated/product/host receipt plus isolated Google four-DLL scope and actual locked-restore proof. Authored controls confer no Source/SDK/package acceptance."
+    },
+    {
+      "id": "terminal-select-list",
+      "project": "tests/PiSharp.Tui.SelectList.Tests/PiSharp.Tui.SelectList.Tests.csproj",
+      "projectSha256": "24aadbfe191c0f07ee3def821dbefd5900b64c20974caf19b69c6c1840bfa3e7",
+      "entryAssembly": "tests/PiSharp.Tui.SelectList.Tests/bin/Release/net10.0/PiSharp.Tui.SelectList.Tests.dll",
+      "arguments": [
+        {
+          "kind": "report"
+        },
+        {
+          "kind": "reviewedRoot"
+        },
+        {
+          "kind": "sourceManifest"
+        },
+        {
+          "kind": "sourceManifestSha256"
+        },
+        {
+          "kind": "buildReceipt"
+        },
+        {
+          "kind": "buildReceiptSha256"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.Tui.SelectList.Tests/fixtures/source-authority.json",
+          "bytes": 2630,
+          "sha256": "cb04caa9c5f8302edf439480b3e7933ad09c989ff24f04c71fe6cb3176e145a4"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "fixtures/source-authority.json",
+          "bytes": 2630,
+          "sha256": "cb04caa9c5f8302edf439480b3e7933ad09c989ff24f04c71fe6cb3176e145a4"
+        }
+      ],
+      "reportName": "terminal-select-list.json",
+      "timeoutSeconds": 1800,
+      "lockFile": {
+        "path": "tests/PiSharp.Tui.SelectList.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 123,
+        "sha256": "55665657df1ef52b9419d1fd3a589c705e1ba81ae924d6f9f270d14e15c52692",
+        "provenance": {
+          "reviewedConsumerLockRawPreserved": true,
+          "compatibleProjectGraphVerifiedStatically": true,
+          "projectDependencies": 1,
+          "externalPackages": 0,
+          "restoreVerifiedForThisConsumer": false,
+          "freshLockedOfflineRestoreRequired": true
+        }
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0,
+      "plannedWorkUnits": 38,
+      "countsAreExecutedAssertions": false,
+      "sourceCaptures": 0,
+      "receiptScope": "selector",
+      "actualCommandStartupReadBarrierCoverage": false,
+      "admission": "Complete exact source/generated/product/host receipt plus isolated scoped assembly set and actual successful settled preparation/locked-restore proof; authored controls do not grant Source/SDK/package acceptance.",
+      "authoredSdkAdmissionControls": 6,
+      "sdkAdmissionControlsExecuted": 0
+    },
+    {
+      "id": "terminal-select-dialog",
+      "project": "tests/PiSharp.Terminal.SelectList.Integration.Tests/PiSharp.Terminal.SelectList.Integration.Tests.csproj",
+      "projectSha256": "427d32477324f4cc21b9f068d7b8ba6ddbbd19921697ba3a007554c84fb515ee",
+      "entryAssembly": "tests/PiSharp.Terminal.SelectList.Integration.Tests/bin/Release/net10.0/PiSharp.CodingAgent.Tests.dll",
+      "arguments": [
+        {
+          "kind": "report"
+        },
+        {
+          "kind": "reviewedRoot"
+        },
+        {
+          "kind": "sourceManifest"
+        },
+        {
+          "kind": "sourceManifestSha256"
+        },
+        {
+          "kind": "buildReceipt"
+        },
+        {
+          "kind": "buildReceiptSha256"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.Terminal.SelectList.Integration.Tests/fixtures/source-authority.json",
+          "bytes": 1918,
+          "sha256": "332baec3e24db9ba8cd132cd3daba7390fb6404538f6ae10afa5fee5c7218779"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "fixtures/source-authority.json",
+          "bytes": 1918,
+          "sha256": "332baec3e24db9ba8cd132cd3daba7390fb6404538f6ae10afa5fee5c7218779"
+        }
+      ],
+      "reportName": "terminal-select-dialog.json",
+      "timeoutSeconds": 1800,
+      "lockFile": {
+        "path": "tests/PiSharp.Terminal.SelectList.Integration.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 2597,
+        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299",
+        "provenance": {
+          "reviewedConsumerLockRawPreserved": true,
+          "compatibleProjectGraphVerifiedStatically": true,
+          "projectDependencies": 12,
+          "externalPackages": 0,
+          "restoreVerifiedForThisConsumer": false,
+          "freshLockedOfflineRestoreRequired": true
+        }
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0,
+      "plannedWorkUnits": 37,
+      "countsAreExecutedAssertions": false,
+      "sourceCaptures": 0,
+      "receiptScope": "selectorIntegration",
+      "actualCommandStartupReadBarrierCoverage": false,
+      "admission": "Complete exact source/generated/product/host receipt plus isolated scoped assembly set and actual successful settled preparation/locked-restore proof; authored controls do not grant Source/SDK/package acceptance.",
+      "authoredActualCommandStartupReadBarrierCases": 10,
+      "actualCommandStartupReadBarrierCasesExecuted": 0,
+      "authoredSdkAdmissionControls": 6,
+      "sdkAdmissionControlsExecuted": 0
+    },
+    {
+      "id": "anthropic-simple",
+      "project": "tests/PiSharp.AnthropicSimple.Tests/PiSharp.AnthropicSimple.Tests.csproj",
+      "projectSha256": "dd80069b3545d6291634e031ed2740773ad0af1535420f5ac44ef6451c0218c2",
+      "entryAssembly": "tests/PiSharp.AnthropicSimple.Tests/bin/Release/net10.0/PiSharp.AnthropicSimple.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.AnthropicSimple.Tests/source-inventory.json",
+          "bytes": 1338,
+          "sha256": "bfa6cb9280c250b76cb5ef9db97fb50737e62f14517d83ed614238cd6d81634c"
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "anthropic-simple.json",
+      "timeoutSeconds": 1800,
+      "lockFile": {
+        "path": "tests/PiSharp.AnthropicSimple.Tests/packages.lock.json",
+        "status": "PINNED_EXISTING",
+        "bytes": 443,
+        "sha256": "2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9",
+        "provenance": {
+          "copiedExistingLockPath": "tests/PiSharp.Agent.Tests/packages.lock.json",
+          "compatibleProjectGraphVerifiedStatically": true,
+          "externalPackages": 0,
+          "realLockBytesUnedited": true,
+          "restoreVerifiedForThisConsumer": false,
+          "freshLockedOfflineRestoreRequired": true
+        }
+      },
+      "currentExecution": "UNEXECUTED",
+      "plannedAuthoredFamilies": 13,
+      "plannedWholeBodyComparisons": 39,
+      "sourceCaptures": 0
+    },
+    {
+      "id": "authentication",
+      "project": "tests/PiSharp.Authentication.Tests/PiSharp.Authentication.Tests.csproj",
+      "projectSha256": "5b39ed009ad7fad5a5972ae64105cad9242c73b3a0a050dac5b0f972f3594582",
+      "entryAssembly": "tests/PiSharp.Authentication.Tests/bin/Release/net10.0/PiSharp.Authentication.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [],
+      "outputFixturePins": [],
+      "reportName": "authentication.json",
+      "timeoutSeconds": 60,
+      "lockFile": {
+        "status": "PINNED_EXISTING",
+        "sha256": "3e16ab11cc165b059ba0f89bcc544826628139b0300de0e22b2c6893b9f3e28b",
+        "path": "tests/PiSharp.Authentication.Tests/packages.lock.json",
+        "bytes": 235
+      },
+      "currentExecution": "UNEXECUTED",
+      "originalExpectationChanges": 0
+    },
+    {
+      "id": "terminal-ownership-focused",
+      "project": "tests/PiSharp.Terminal.Ownership.Tests/PiSharp.Terminal.Ownership.Tests.csproj",
+      "projectSha256": "ce0b960afc454c944fafb5d9fa05750e4f516e0c675a9e9ed44fa070aa5e0994",
+      "entryAssembly": "tests/PiSharp.Terminal.Ownership.Tests/bin/Release/net10.0/PiSharp.CodingAgent.Tests.dll",
+      "arguments": [
+        {
+          "kind": "report"
+        },
+        {
+          "kind": "reviewedRoot"
+        },
+        {
+          "kind": "sourceManifest"
+        },
+        {
+          "kind": "sourceManifestSha256"
+        },
+        {
+          "kind": "buildReceipt"
+        },
+        {
+          "kind": "buildReceiptSha256"
+        }
+      ],
+      "fixturePins": [
+        {
+          "path": "tests/PiSharp.Terminal.SelectList.Integration.Tests/fixtures/source-authority.json",
+          "bytes": 1918,
+          "sha256": "332baec3e24db9ba8cd132cd3daba7390fb6404538f6ae10afa5fee5c7218779"
+        },
+        {
+          "path": "tests/PiSharp.Terminal.Ownership.Tests/focused-case-plan.json",
+          "bytes": 10869,
+          "sha256": "eb27edddea5baa7cad45cafdcfeaf9f94be0e3e3f236f2c36bbad260106a3eb7"
+        },
+        {
+          "path": "tests/PiSharp.Terminal.Ownership.Tests/linked-source-inventory.json",
+          "bytes": 3879,
+          "sha256": "455af38eff65b1c887366a35ab9961b69329f87b2bd3556f37b2a427406f5d45"
+        }
+      ],
+      "outputFixturePins": [
+        {
+          "relative": "fixtures/source-authority.json",
+          "bytes": 1918,
+          "sha256": "332baec3e24db9ba8cd132cd3daba7390fb6404538f6ae10afa5fee5c7218779"
+        },
+        {
+          "relative": "fixtures/focused-case-plan.json",
+          "bytes": 10869,
+          "sha256": "eb27edddea5baa7cad45cafdcfeaf9f94be0e3e3f236f2c36bbad260106a3eb7"
+        }
+      ],
+      "reportName": "terminal-ownership-focused.json",
+      "timeoutSeconds": 1800,
+      "lockFile": {
+        "provenance": {
+          "compatibleProjectGraphVerifiedStatically": true,
+          "freshLockedOfflineRestoreRequired": true,
+          "externalPackages": 0,
+          "restoreVerifiedForThisConsumer": false,
+          "realLockBytesUnedited": true,
+          "copiedExistingLockPath": "tests/PiSharp.Terminal.SelectList.Integration.Tests/packages.lock.json"
+        },
+        "status": "PINNED_EXISTING",
+        "bytes": 2597,
+        "path": "tests/PiSharp.Terminal.Ownership.Tests/packages.lock.json",
+        "sha256": "fcae267493d5b3ff7b3805571d73f684abbb62776a32a506034803845c9b4299"
+      },
+      "partialScope": "PARTIAL_SELECTOR_OWNERSHIP_31",
+      "selectedOriginalOwnershipCases": 31,
+      "originalSelectorPlannedCases": 140,
+      "fullSelectorAcceptance": false,
+      "currentExecution": "UNEXECUTED"
+    },
+    {
+      "currentExecution": "UNEXECUTED",
+      "projectSha256": "5c1b86b2e92bd5a0256045ee065d5a9ed81a3688b9db9f35112c81235a1bae2c",
+      "originalExpectationChanges": 0,
+      "id": "node-loadout-metadata",
+      "scope": "Authored metadata adapter only; no Node worker or original extension prepareLoadout qualification",
+      "lockFile": {
+        "bytes": 915,
+        "path": "tools/NodeCommandInputBridge/NativeAdmissionTests/packages.lock.json",
+        "sha256": "05c9708303905fc59ce80b480f08074ec3de6a3d7fdfb0629e469ba321dbd9ce",
+        "status": "PINNED_EXISTING"
+      },
+      "entryAssembly": "tools/NodeCommandInputBridge/NativeAdmissionTests/bin/Release/net10.0/NativeAdmissionTests.dll",
+      "outputFixturePins": [],
+      "reportName": "node-loadout-metadata.json",
+      "fixturePins": [],
+      "project": "tools/NodeCommandInputBridge/NativeAdmissionTests/NativeAdmissionTests.csproj",
+      "arguments": [
+        {
+          "value": "--metadata-only",
+          "kind": "literal"
+        },
+        {
+          "value": "--report",
+          "kind": "literal"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "timeoutSeconds": 60
+    },
+    {
+      "id": "azure-responses",
+      "project": "tests/PiSharp.AzureResponses.Tests/PiSharp.AzureResponses.Tests.csproj",
+      "projectSha256": "dd80069b3545d6291634e031ed2740773ad0af1535420f5ac44ef6451c0218c2",
+      "entryAssembly": "tests/PiSharp.AzureResponses.Tests/bin/Release/net10.0/PiSharp.AzureResponses.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "sha256": "7ec09dfcf3a5e7d079143ce5ca9139990cfef7686fd7f536b34ddf85ec19ccc0",
+          "path": "tests/PiSharp.AzureResponses.Tests/source-inventory.json",
+          "bytes": 5179
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "azure-responses.json",
+      "timeoutSeconds": 1800,
+      "lockFile": {
+        "sha256": "2af4846d277f656313e804866b8c1adb8859481b6237ca8ad8188896090a15a9",
+        "status": "PINNED_EXISTING",
+        "path": "tests/PiSharp.AzureResponses.Tests/packages.lock.json",
+        "bytes": 443
+      },
+      "currentExecution": "UNEXECUTED",
+      "reviewedSourceCommit": "be0ae03455f37aca0252d2bdda48c356f381c08c",
+      "plannedAuthoredGroups": 15,
+      "originalExpectationChanges": 0,
+      "sourceCaptures": 0
+    },
+    {
+      "id": "mistral-text",
+      "project": "tests/PiSharp.MistralConversations.Tests/PiSharp.MistralConversations.Tests.csproj",
+      "projectSha256": "5b39ed009ad7fad5a5972ae64105cad9242c73b3a0a050dac5b0f972f3594582",
+      "entryAssembly": "tests/PiSharp.MistralConversations.Tests/bin/Release/net10.0/PiSharp.MistralConversations.Tests.dll",
+      "arguments": [
+        {
+          "kind": "literal",
+          "value": "--report"
+        },
+        {
+          "kind": "report"
+        }
+      ],
+      "fixturePins": [
+        {
+          "sha256": "b5253689591cc2bc2d95dbfe5c587b72f3aae3ae75ddd0c1b0679dbc12a91663",
+          "path": "src/PiSharp.AI/Protocols/MistralConversations/source-inventory.json",
+          "bytes": 7821
+        }
+      ],
+      "outputFixturePins": [],
+      "reportName": "mistral-text.json",
+      "timeoutSeconds": 60,
+      "lockFile": {
+        "sha256": "56f1771a69e65e2d5fe591f44a8b0344755bebc7ff94255c2c622ae969801f41",
+        "status": "PINNED_EXISTING",
+        "path": "tests/PiSharp.MistralConversations.Tests/packages.lock.json",
+        "bytes": 163
+      },
+      "currentExecution": "UNEXECUTED",
+      "reviewedSourceCommit": "3d4474e530392ea6ed057ad7a8d70d81ae23e701",
+      "plannedAuthoredGroups": 23,
+      "originalExpectationChanges": 0,
+      "sourceCaptures": 0
+    }
+  ],
+  "anthropicSimpleIntegrationBasis": {
+    "reviewedFeatureCommit": "18b2a7f215aee46c88e66d41519c802d80eb8380",
+    "mainMerge": "f952b6cc9d86d465d73939a036a531926a14ca25",
+    "sourceOnly": true,
+    "original26TargetsUnchanged": true,
+    "nativeExecutions": 0,
+    "genuineSourceCaptures": 0,
+    "authDraftExcluded": true
+  },
+  "authenticationIntegrationBasis": {
+    "reviewedFeatureCommit": "945969160fc0e33850aca6fd7b2e3ad1bee5a886",
+    "exactMergedAuthBasis": "0274fbff1b0fc5666f87ec2b9383b9302c7d3406",
+    "anthropicAdmissionBasis": "afd662a24bb6fe48b20c6cc6ea47c3b8e462d15e",
+    "exactComposedSourceBasis": "1dcb0bd3cdd13238288c599d96cc448b28dfa1db",
+    "admissionReview": "PENDING_INDEPENDENT_REVIEW",
+    "sourceOnly": true,
+    "original27TargetsUnchanged": true,
+    "nativeExecutions": 0,
+    "genuineSourceCaptures": 0
+  },
+  "heldIoReviewedSource": {
+    "candidate": "2bc409e7169b9246abdb96721709935646d25fcf",
+    "tree": "be4cb2ccad7aba6f5209ead24cfacee2e800e86d",
+    "handoffSha256": "53e916562e6ebc8803f4afb095114ea653ad9b62d98350b35f066216636ad100",
+    "independentStaticReviewSha256": "6c0aad55d1eb320cb057774c4703cb3a36a17fa91f638ac7a3770dfed46ed400",
+    "behaviorQualification": "HOLD; source-only",
+    "buildReceiptCreated": false
+  },
+  "preparedValidation": {
+    "requiresExternallyPinnedSourceManifest": true,
+    "requiresExternallyPinnedPermittedBuildReceipt": true,
+    "runnerCreatesBuildReceipt": false,
+    "runnerRestoresBuildsPublishesOrSigns": false
+  },
+  "integrationSourceComposition": {
+    "simple": "8a33753fc28a06a7eea6109c88ecd06ec451da17",
+    "terminal": "391a6e41f0a7ffbc1ac10b54e923e0169ff9f3dd",
+    "sourceOnly": true,
+    "nativeBuilds": 0,
+    "nativeAssertions": 0,
+    "allOriginalTargetsRetained": true
+  },
+  "googleIntegrationBasis": {
+    "candidate": "b707477e2ad7fa6123407742dbfdb72b2580c8e9",
+    "tree": "56d451f7344bd0029457202e87038cc5716c5872",
+    "review": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-5\\GOOGLE_DIAGNOSTICS_R49_R2_INDEPENDENT_STATIC_REVIEW.json",
+      "bytes": 9156,
+      "sha256": "b7f8c82abbd3142a9cbee40547da5e0060bb3e48bbcdfefe735cd3a85d08bdb6"
+    },
+    "lockedRestoreVerified": false
+  },
+  "selectorIntegrationBasis": {
+    "candidate": "dd2209fe8b1363398e08c726d3ce67f8b494a20c",
+    "tree": "36855844db3f00de0786693a7b66c7259764e6ae",
+    "review": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-2\\Astra-select-dialog-static-dd2209f\\REVIEW.md",
+      "bytes": 7795,
+      "sha256": "531e2f7724559c499dd7ce7c9d84c4fd5ec35a5d9566fa12994a83009d95c362"
+    },
+    "reviewSeal": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-2\\Astra-select-dialog-static-dd2209f\\seal.json",
+      "bytes": 1907,
+      "sha256": "7a402e3455eb2a20294cdad8b034d437d34e853cecbc3b4c2f86b1a48988ac88"
+    },
+    "actualCommandStartupReadBarrierRegressionCoverage": "Reviewed ten authored actual command/startup/read-barrier controls composed; all uncompiled/unexecuted. get_state SEND admission before physical read, not response completion."
+  },
+  "terminalSuccessorComposition": {
+    "startupCandidate": "6073107ba9d3073a452a4bafff577bc1f84806b7",
+    "sdkPrerequisiteCandidate": "8a43d7aa69731152e207e73ac0a1b2aa32075fe3",
+    "sdkCorrectedCandidate": "5fdb00720f8e9c52d088936948148f8f263f16bd",
+    "migrationCandidate": "d1a607759245115a905dade83b764dbcd4833cc8",
+    "startupMigrationReview": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-2\\Astra-terminal-successors-static-r53\\REVIEW.md",
+      "bytes": 7050,
+      "sha256": "291b8929c52539c60ed4f60ded8aa4176aed3fd2ba5ae3dd5947ee49d02feb00"
+    },
+    "startupMigrationReviewSeal": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-2\\Astra-terminal-successors-static-r53\\seal.json",
+      "bytes": 2059,
+      "sha256": "be685512b90aab107649afb9676f0e1a03a794ee88137e9d1346c5d5f7ec6fcc"
+    },
+    "sdkCorrectionReview": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-2\\Astra-sdk-missing-log-static-r54\\REVIEW.md",
+      "bytes": 3178,
+      "sha256": "8e595d2933839275bd60d61f8276cd47cb2ecabdbe5f940744313400ebb1134f"
+    },
+    "sdkCorrectionReviewSeal": {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-2\\Astra-sdk-missing-log-static-r54\\seal.json",
+      "bytes": 1138,
+      "sha256": "0392ae36514c8af0d487149507fe4a20be18d4002a77c976477588127660ec89"
+    },
+    "sdkMissingLogBranchSourceAddressed": true,
+    "allAuthoredUnitsUnexecuted": true,
+    "wholeMilestoneAccepted": false
+  },
+  "selectorOwnershipIntegrationBasis": {
+    "reviewedCombinedSource": "98d26295f9385d44b26b67b9248ddc169823a282",
+    "priorTargets": 28,
+    "priorRoots": 49,
+    "newTargets": 29,
+    "newRoots": 50,
+    "historicalSelectorReportSha256": "171ab1f5318d468cc2fe46be98ce20fe07c2a17668599ebb677a13c44e570e9a",
+    "independentReview": "PENDING",
+    "nativeExecutions": 0,
+    "scope": "PARTIAL_SELECTOR_OWNERSHIP_31"
+  }
+}

@@ -69,7 +69,8 @@ function Assert-PiSharpDistribution {
         [Parameter(Mandatory)][ValidateSet('tool', 'standalone')][string]$Kind,
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$SourceCommit,
-        [ValidateSet('win-x64', 'linux-x64', 'osx-arm64')][string]$Rid
+        [ValidateSet('win-x64', 'linux-x64', 'osx-arm64')][string]$Rid,
+        [bool]$EnablePromptTemplateYaml = $true
     )
     if ($Version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'Explicit SemVer candidate required.' }
     if ($Kind -eq 'standalone' -and -not $Rid) { throw 'Standalone RID required.' }
@@ -82,6 +83,10 @@ function Assert-PiSharpDistribution {
         $provenance.baselineCommit -cne $baseline.source.commit -or $provenance.baselineTag -cne $baseline.source.tag -or
         $provenance.sdk -cne $sdk -or $provenance.kind -cne $Kind -or
         ($Kind -eq 'standalone' -and $provenance.rid -cne $Rid)) { throw 'Candidate provenance mismatch.' }
+    $yamlSetting = $provenance.PSObject.Properties['enablePromptTemplateYaml']
+    if ($null -eq $yamlSetting -or $yamlSetting.Value -isnot [bool] -or $yamlSetting.Value -ne $EnablePromptTemplateYaml) {
+        throw 'Candidate YAML feature provenance mismatch.'
+    }
     foreach ($notice in @('LICENSE', 'THIRD-PARTY-NOTICES.md', 'README.md')) {
         if (-not $files.ContainsKey($notice)) { throw "Missing distribution document: $notice" }
         if ($files[$notice].sha256 -cne (Get-FileHash -LiteralPath (Join-Path $Repo $notice) -Algorithm SHA256).Hash.ToLowerInvariant()) {
@@ -134,6 +139,42 @@ function Assert-PiSharpDistribution {
     }
     $deps = Read-PiSharpArchiveText -Path $Path -Entry ($prefix + 'PiSharp.Cli.deps.json') | ConvertFrom-Json -AsHashtable
     if (@($deps.libraries.Keys | Where-Object { $_ -match '(?i)(PiSharp\.Compatibility\.Node|(^|/)node(js)?/)' }).Count) { throw 'Node dependency in native dependency manifest.' }
+    $yamlLibraries = @($deps.libraries.Keys | Where-Object { $_ -match '(?i)^(YamlDotNet|PiSharp\.PromptTemplates\.Yaml)/' })
+    $yamlFiles = @($files.Keys | Where-Object { $_ -match '(?i)(^|/)(YamlDotNet|PiSharp\.PromptTemplates\.Yaml)(\.|/|$)' })
+    if (-not $deps.ContainsKey('targets') -or -not $deps.targets.ContainsKey($deps.runtimeTarget.name)) { throw 'Dependency runtime target missing.' }
+    $target = $deps.targets[$deps.runtimeTarget.name]
+    $yamlTargetLibraries = @($deps.targets.Values | ForEach-Object { $_.Keys } | Where-Object { $_ -match '(?i)^(YamlDotNet|PiSharp\.PromptTemplates\.Yaml)/' })
+    $yamlTargetAssets = @($deps.targets.Values | ForEach-Object { $_.Values } | ForEach-Object {
+        foreach ($group in @('runtime', 'runtimeTargets', 'native', 'resources')) {
+            if ($_.ContainsKey($group)) { $_[$group].Keys }
+        }
+    } | Where-Object { $_ -match '(?i)(^|/)(YamlDotNet|PiSharp\.PromptTemplates\.Yaml)(\.|/|$)' })
+    if ($EnablePromptTemplateYaml) {
+        foreach ($name in @('YamlDotNet.dll', 'PiSharp.PromptTemplates.Yaml.dll', 'licenses/YamlDotNet.LICENSE.txt')) {
+            if (-not $files.ContainsKey($prefix + $name)) { throw "Missing YAML payload: $name" }
+        }
+        if ($files[$prefix + 'licenses/YamlDotNet.LICENSE.txt'].sha256 -cne
+            (Get-FileHash -LiteralPath (Join-Path $Repo 'third-party/YamlDotNet.LICENSE.txt') -Algorithm SHA256).Hash.ToLowerInvariant()) {
+            throw 'YAML license differs from admitted source.'
+        }
+        $yamlLock = Get-Content -LiteralPath (Join-Path $Repo 'src/PiSharp.Cli/packages.lock.json') -Raw | ConvertFrom-Json -AsHashtable
+        $parser = $yamlLock.dependencies['net10.0'].YamlDotNet
+        if ($parser.resolved -cne '16.3.0' -or $yamlLibraries.Count -ne 2 -or -not $deps.libraries.ContainsKey('YamlDotNet/16.3.0') -or
+            $deps.libraries['YamlDotNet/16.3.0'].type -cne 'package' -or
+            $deps.libraries['YamlDotNet/16.3.0'].sha512 -cne ('sha512-' + $parser.contentHash)) { throw 'YAML package identity mismatch.' }
+        $adapter = @($yamlLibraries | Where-Object { $_ -cmatch '^PiSharp\.PromptTemplates\.Yaml/' })
+        if ($adapter.Count -ne 1 -or $deps.libraries[$adapter[0]].type -cne 'project' -or
+            -not $target.ContainsKey($adapter[0]) -or -not $target.ContainsKey('YamlDotNet/16.3.0') -or
+            -not $target[$adapter[0]].ContainsKey('runtime') -or -not $target[$adapter[0]].runtime.ContainsKey('PiSharp.PromptTemplates.Yaml.dll') -or
+            -not $target['YamlDotNet/16.3.0'].ContainsKey('runtime') -or -not $target['YamlDotNet/16.3.0'].runtime.ContainsKey('lib/net8.0/YamlDotNet.dll')) {
+            throw 'YAML runtime assets missing from dependency target.'
+        }
+        if (@($yamlTargetLibraries | Where-Object { $_ -cnotin $yamlLibraries }).Count) {
+            throw 'Unexpected YAML dependency target identity.'
+        }
+    } elseif ($yamlFiles.Count -or $yamlLibraries.Count -or $yamlTargetLibraries.Count -or $yamlTargetAssets.Count) {
+        throw 'YAML payload or dependency in disabled CLI distribution.'
+    }
     if ($Kind -eq 'standalone') {
         if (-not $deps.runtimeTarget.name.EndsWith('/' + $Rid, [StringComparison]::Ordinal)) { throw 'Dependency RID mismatch.' }
         if (-not $config.runtimeOptions.ContainsKey('includedFrameworks') -or $config.runtimeOptions.ContainsKey('framework')) { throw 'Self-contained runtime configuration required.' }
@@ -149,7 +190,7 @@ function Assert-PiSharpDistribution {
         schemaVersion = 1; evidenceKind = 'offline-artifact-structure'; platformQualified = $false
         sourceCommit = $SourceCommit; baselineTag = $baseline.source.tag; baselineCommit = $baseline.source.commit
         sdk = $sdk
-        version = $Version; kind = $Kind; rid = $Rid
+        version = $Version; kind = $Kind; rid = $Rid; enablePromptTemplateYaml = $EnablePromptTemplateYaml
         archiveSha256 = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
         files = @($files.Values | Sort-Object -Property path -CaseSensitive)
         dependencies = @($deps.libraries.Keys | Sort-Object -CaseSensitive)

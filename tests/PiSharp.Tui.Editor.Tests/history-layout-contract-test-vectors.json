@@ -1,0 +1,632 @@
+{
+  "schemaVersion": 1,
+  "basedOnCandidate": "2d33681c96df7b48f57593f5cdcc4f293a9b2834",
+  "designReview": "task-5/TERMINAL_HISTORY_LAYOUT_DESIGN_REVIEW.md",
+  "scope": "Risk-focused test specifications awaiting final shared mapping/history contract",
+  "testFormat": "Signature-neutral temporal actions and assertions; no map DTO,renderer state or production history API is defined here.",
+  "completeStateInventory": [
+    "draft text and expanded text",
+    "source cursor",
+    "registered paste context/retained bytes",
+    "undo frames/retained budget",
+    "kill ring context/budget",
+    "history list/browse index/saved draft",
+    "preferred/pre-snap UTF16 offsets",
+    "admission owner/context and geometry/policy identity",
+    "actual callbacks and submission effects"
+  ],
+  "assertionsAreRecommendationsPendingLeadContract": true,
+  "implementedFutureContractTests": 0,
+  "cases": [
+    {
+      "id": "freshness.identical-marker-after-reset",
+      "risk": "freshness",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Register1001p paste and capture admitted mapping context."
+      ],
+      "actions": [
+        "Reset; register1001q paste recreating identical marker ID/display/length.",
+        "Deliver old map with one Up key."
+      ],
+      "assertions": [
+        "Reject before mutation.",
+        "Complete editor/paste/undo/browse/preferred state and callbacks equal before/after rejection.",
+        "No retry against a newly built map."
+      ],
+      "requiresContractDecisions": [
+        "authoritative freshness/admission identity"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-identical-display-distinct-paste-context"
+      ]
+    },
+    {
+      "id": "freshness.literal-marker-after-reset",
+      "risk": "freshness",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Capture mapping of registered marker."
+      ],
+      "actions": [
+        "Reset; SetText the same literal marker without registering payload.",
+        "Deliver the old map."
+      ],
+      "assertions": [
+        "Reject despite identical SourceText/caret.",
+        "No marker-interior move or stale payload resurrection."
+      ],
+      "requiresContractDecisions": [
+        "registry freshness"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-identical-display-distinct-paste-context"
+      ]
+    },
+    {
+      "id": "freshness.same-width-away-and-back",
+      "risk": "freshness",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Capture geometry A and map."
+      ],
+      "actions": [
+        "Resize A->B->A with same final dimensions.",
+        "Attempt admission of old map."
+      ],
+      "assertions": [
+        "Apply the finalized identity rule; dimension equality alone is insufficient.",
+        "A rejected key leaves complete state/callbacks unchanged."
+      ],
+      "requiresContractDecisions": [
+        "geometry/admission identity"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "freshness.new-lifetime-numeric-collision",
+      "risk": "freshness",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Capture a map/provider owner."
+      ],
+      "actions": [
+        "Dispose/recreate provider and controller with matching numeric revision/text/geometry.",
+        "Offer old map."
+      ],
+      "assertions": [
+        "Reject foreign lifetime.",
+        "Do not retain prior callbacks/draft/paste/history owner references."
+      ],
+      "requiresContractDecisions": [
+        "mapper/controller lifetime identity"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "freshness.geometry-changes-after-admission",
+      "risk": "freshness",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Admit exactly one key against a valid captured layout."
+      ],
+      "actions": [
+        "Change viewport after admission but before rendering."
+      ],
+      "assertions": [
+        "Exactly one edit/preference transition.",
+        "Later frame uses current geometry; committed key is not replayed."
+      ],
+      "requiresContractDecisions": [
+        "serialized admission boundary"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "viewport.height-only-page-move",
+      "risk": "viewport",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Multiline draft with more rows than visible window."
+      ],
+      "actions": [
+        "Change height while keeping width fixed.",
+        "PageUp then PageDown using finalized height policy."
+      ],
+      "assertions": [
+        "Page extent comes from captured agreed height, not hardcoded three draft rows.",
+        "First/last editable membership uses the complete map."
+      ],
+      "requiresContractDecisions": [
+        "page height/allocation"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-view-height-transcript-and-one-row"
+      ]
+    },
+    {
+      "id": "viewport.transcript-between-navigation-and-render",
+      "risk": "viewport",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Capture source caret/navigation result and layout."
+      ],
+      "actions": [
+        "Append transcript before view renders the new draft."
+      ],
+      "assertions": [
+        "Draft-local row and final screen row origin remain distinct.",
+        "Rendering places the same source caret using current viewport transform."
+      ],
+      "requiresContractDecisions": [
+        "row origin/viewport transform"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-view-height-transcript-and-one-row"
+      ]
+    },
+    {
+      "id": "viewport.one-row-scrolled-draft",
+      "risk": "viewport",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Draft has24 logical lines; cursor on first/middle/last in separate schedules."
+      ],
+      "actions": [
+        "Use one-row viewport; perform Up/Down/page input."
+      ],
+      "assertions": [
+        "Clipped single visible row does not classify every cursor as first/last editable row.",
+        "Cursor-follow visible origin is bounded and source caret remains legal."
+      ],
+      "requiresContractDecisions": [
+        "complete versus visible rows"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-projection-valid-scalar-carets-tiny-views"
+      ]
+    },
+    {
+      "id": "affinity.empty-and-lf-only",
+      "risk": "affinity",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Drafts empty,LF,LF-LF."
+      ],
+      "actions": [
+        "Render/navigation at columns1/2/5, heights1/3."
+      ],
+      "assertions": [
+        "Assert agreed decoration/editable-row/empty-line representation and caret affinity.",
+        "No gaps/overlap in complete source mapping."
+      ],
+      "requiresContractDecisions": [
+        "empty/decoration row semantics"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "affinity.exact-width-with-prefix",
+      "risk": "affinity",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Draft abcd with cursor0/4; prefix consumes drawing cells."
+      ],
+      "actions": [
+        "Resize columns5->1->5; Up/Down at exact logical end."
+      ],
+      "assertions": [
+        "Assert finalized exact-width end affinity in both rendered placement and navigation map.",
+        "Prompt-only/trailing rows do not silently change history eligibility."
+      ],
+      "requiresContractDecisions": [
+        "exact-wrap caret affinity"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-view-height-transcript-and-one-row"
+      ]
+    },
+    {
+      "id": "affinity.registered-marker-continuations",
+      "risk": "affinity",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Register multiline large paste producing a long marker."
+      ],
+      "actions": [
+        "Widths9->5->24; repeated Up/Down across marker continuation rows."
+      ],
+      "assertions": [
+        "Cursor never ends inside a registered atomic marker.",
+        "Continuation/decorative rows agree with actual rendered cells.",
+        "Pre-snap UTF16 preference returns after resize as source fixture requires."
+      ],
+      "requiresContractDecisions": [
+        "atomic continuation rows"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "affinity.literal-unregistered-marker",
+      "risk": "affinity",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Set literal marker text without paste registration."
+      ],
+      "actions": [
+        "Move across same width/resize schedules as registered marker."
+      ],
+      "assertions": [
+        "Literal marker does not inherit unrelated atomic registration.",
+        "No expansion against an old lifetime registry."
+      ],
+      "requiresContractDecisions": [
+        "atomic-range source context"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "affinity.unicode-offset-versus-cells",
+      "risk": "affinity",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Drafts CJK,emoji,ZWJ,combining and long-short-long source fixtures."
+      ],
+      "actions": [
+        "Render narrow-wide-narrow; Up/Down then page movement."
+      ],
+      "assertions": [
+        "Compare full source snapshots/callbacks and agreed rendered caret.",
+        "Use source UTF16 preferred/pre-snap offsets, not substituted cell arithmetic.",
+        "Legal scalar and agreed grapheme/marker boundaries."
+      ],
+      "requiresContractDecisions": [
+        "segmentation/width/wrap policy"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-projection-valid-scalar-carets-tiny-views"
+      ]
+    },
+    {
+      "id": "mapper.held-view-write",
+      "risk": "mapper-lifetime",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Hold actual fake-console frame write."
+      ],
+      "actions": [
+        "Request mapping/navigation while view draw is held.",
+        "Cancel/dispose while operation is pending; release owned write."
+      ],
+      "assertions": [
+        "Pure map computation performs no terminal I/O/callback/semaphore wait.",
+        "Deterministic admission/rejection; no sync wait cycle.",
+        "Read/timer/write cleanup joins; mapper never disposes borrowed lease."
+      ],
+      "requiresContractDecisions": [
+        "pure mapper ownership/shutdown"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-held-write-pure-projection-and-joined-cancel"
+      ]
+    },
+    {
+      "id": "mapper.failure-before-effect",
+      "risk": "mapper-lifetime",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Complete draft/paste/undo/browse/preference state and callbacks captured."
+      ],
+      "actions": [
+        "Mapping provider throws at admission."
+      ],
+      "assertions": [
+        "Exception follows agreed transport policy.",
+        "No state mutation, callback, duplicate history insertion or retry."
+      ],
+      "requiresContractDecisions": [
+        "mapper failure boundary"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "mapper.queue-saturation",
+      "risk": "mapper-lifetime",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Hold display/navigation boundary and fill admitted queue."
+      ],
+      "actions": [
+        "Offer one event/render beyond finalized cap; cancel/dispose then release."
+      ],
+      "assertions": [
+        "Declared bounded rejection; no duplicate read loop or silent dropped authoritative event.",
+        "All owned work joins without killing unrelated processes."
+      ],
+      "requiresContractDecisions": [
+        "queue/admission bound"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-view-queue-admission-and-joined-disposal"
+      ]
+    },
+    {
+      "id": "validation.default-and-empty-map",
+      "risk": "failure-atomicity",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Have a valid active draft."
+      ],
+      "actions": [
+        "Supply default/uninitialized or empty rows where the finalized map requires editable coverage."
+      ],
+      "assertions": [
+        "Pre-effect rejection preserves all state/callbacks."
+      ],
+      "requiresContractDecisions": [
+        "final map representation/validation"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "validation.gaps-overlap-order-overflow",
+      "risk": "failure-atomicity",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Prepare each malformed case separately."
+      ],
+      "actions": [
+        "Rows have source gaps,overlaps,wrong ordering,negative lengths or checked integer overflow."
+      ],
+      "assertions": [
+        "Validate before effects/allocating from unchecked lengths.",
+        "Preserve complete state/callbacks."
+      ],
+      "requiresContractDecisions": [
+        "final row representation/bounds"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "validation.scalar-and-atomic-seams",
+      "risk": "failure-atomicity",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Registered marker plus emoji/combining source text."
+      ],
+      "actions": [
+        "Offer row/caret boundaries splitting a scalar or violating finalized atomic/grapheme policy."
+      ],
+      "assertions": [
+        "Pre-effect rejection preserves text,expansion,cursor,undo,browse/preferred offsets and notifications."
+      ],
+      "requiresContractDecisions": [
+        "scalar/atomic validation"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "observer.throw-after-commit",
+      "risk": "failure-atomicity",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Valid admitted recall/navigation operation."
+      ],
+      "actions": [
+        "Throw from exactly one actual TextChanged observer after commit."
+      ],
+      "assertions": [
+        "Retain documented committed state; propagate original failure.",
+        "No generic rollback,key replay or extra undo/history insertion."
+      ],
+      "requiresContractDecisions": [
+        "history/navigation commit notification policy"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-observer-error-keeps-one-committed-undo"
+      ]
+    },
+    {
+      "id": "observer.reentry-after-commit",
+      "risk": "failure-atomicity",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Valid operation and a controlled nonrecursive callback."
+      ],
+      "actions": [
+        "Observer performs one permitted reentrant action under finalized policy."
+      ],
+      "assertions": [
+        "Assert declared admission/rejection and exactly-once notifications/undo effects.",
+        "Never infer broad callback concurrency support from this single schedule."
+      ],
+      "requiresContractDecisions": [
+        "trusted reentry policy"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "history.held-submit-cancellation",
+      "risk": "history-acceptance",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Expanded paste submission callback held."
+      ],
+      "actions": [
+        "Cancel before callback returns; release callback."
+      ],
+      "assertions": [
+        "Run joins held callback/read and does not replay submission.",
+        "Exactly one/zero history insertion according to finalized acceptance receipt, not continuation boolean."
+      ],
+      "requiresContractDecisions": [
+        "accepted-user-submission receipt/lifetime"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-held-expanded-submit-cancel-no-replay"
+      ]
+    },
+    {
+      "id": "history.false-or-throw-after-effect",
+      "risk": "history-acceptance",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Host fixture records effect before returning false or throwing."
+      ],
+      "actions": [
+        "Execute separate false/throw schedules."
+      ],
+      "assertions": [
+        "Continuation/quit and original failure remain preserved.",
+        "Classify history only by finalized receipt/effect boundary.",
+        "No implicit rollback or key replay."
+      ],
+      "requiresContractDecisions": [
+        "acceptance versus continuation"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-host-effect-false-means-quit",
+        "history-layout.baseline-host-effect-throw-preserves-error"
+      ]
+    },
+    {
+      "id": "history.effect-then-render-failure",
+      "risk": "history-acceptance",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Accepted-user-submission receipt or agreed equivalent emitted."
+      ],
+      "actions": [
+        "Throw during reset/output render."
+      ],
+      "assertions": [
+        "History insertion follows the chosen durable acceptance boundary exactly once.",
+        "Rendering failure does not retroactively undo accepted effect."
+      ],
+      "requiresContractDecisions": [
+        "acceptance and rendering failure semantics"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-host-effect-reset-render-failure-no-replay"
+      ]
+    },
+    {
+      "id": "history.repeated-enter-eof",
+      "risk": "history-acceptance",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Hold first expanded submit and queue another Enter."
+      ],
+      "actions": [
+        "Complete physical EOF; release submission."
+      ],
+      "assertions": [
+        "Preserve queued host invocation order/joins.",
+        "Recall insertion follows declared empty-command/repeated-Enter receipt rules, not blindly every callback."
+      ],
+      "requiresContractDecisions": [
+        "receipt and empty/command inclusion"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-held-expanded-submit-repeated-enter-eof"
+      ]
+    },
+    {
+      "id": "history.session-switch-while-browsing",
+      "risk": "history-acceptance",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Browse recalled prompt with a saved draft/marker context."
+      ],
+      "actions": [
+        "Switch/reset/recreate session/provider using finalized hydration/lifetime policy."
+      ],
+      "assertions": [
+        "No old draft resurrection,stale registry expansion or retained session/provider/callback references.",
+        "Only immutable admitted recall strings/data survive where explicitly allowed."
+      ],
+      "requiresContractDecisions": [
+        "hydration/switch/reset policy"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "retention.entries-and-total-budget",
+      "risk": "retention",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "100/101 history entries and exact declared budget boundary."
+      ],
+      "actions": [
+        "Add/hydrate next/oversized entries in separate cases."
+      ],
+      "assertions": [
+        "Specified oldest eviction or pre-effect rejection.",
+        "Count entry strings and all declared retained browse/paste/undo/map allocations."
+      ],
+      "requiresContractDecisions": [
+        "independent/aggregate caps and eviction"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "retention.browse-paste-undo-combined",
+      "risk": "retention",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Maximum admitted history plus large browse draft,paste registry,expanded cache and undo."
+      ],
+      "actions": [
+        "Enter/leave browsing,undo,reset and lifetime end."
+      ],
+      "assertions": [
+        "Aggregate bound remains explicit; references release at declared boundaries.",
+        "No history-owned copy of source marker payload unless contract declares it."
+      ],
+      "requiresContractDecisions": [
+        "aggregate retained-state policy"
+      ],
+      "existingBaselineTests": []
+    },
+    {
+      "id": "retention.maximum-draft-width-one",
+      "risk": "retention",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "65536-character draft at width1."
+      ],
+      "actions": [
+        "Build/render full map repeatedly across1->256->1 widths."
+      ],
+      "assertions": [
+        "Bound complete rows/cells/cache using actual representation.",
+        "No expanded-string allocation per row; no unbounded retained map versions."
+      ],
+      "requiresContractDecisions": [
+        "full-map/cache budget"
+      ],
+      "existingBaselineTests": [
+        "history-layout.baseline-full-draft-narrow-wide-narrow"
+      ]
+    },
+    {
+      "id": "retention.disposal-and-new-owner",
+      "risk": "retention",
+      "status": "pending-final-lead-contract",
+      "setup": [
+        "Admit maps/history/browse state and held provider operations."
+      ],
+      "actions": [
+        "Dispose then construct new owner."
+      ],
+      "assertions": [
+        "Joined provider work and released references.",
+        "No numeric revision collision admits the prior lifetime map."
+      ],
+      "requiresContractDecisions": [
+        "provider shutdown/cache ownership"
+      ],
+      "existingBaselineTests": []
+    }
+  ]
+}

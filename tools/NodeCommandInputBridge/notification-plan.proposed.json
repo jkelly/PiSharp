@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "profile": "real-command-input-0",
+  "status": "Authored tool parity and admission successor; independent reviewer clearance required before any coordinator execution",
+  "author": {
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "xhigh"
+  },
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "runtime": {
+    "version": "v24.19.0",
+    "platform": "win32",
+    "architecture": "x64",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "helpers": [
+    {
+      "bytes": 10442,
+      "path": "tools/NodeCommandInputBridge/worker.mjs",
+      "sha256": "1e3ac9ab26bdb36e8dc471913dcb73443adb9bc34a108dabe732b6f83d625a9a"
+    },
+    {
+      "bytes": 29973,
+      "path": "tools/NodeCommandInputBridge/module-loader.mjs",
+      "sha256": "67ebd445352d9f095542cdabf73e1ed84e3972c6032929f5c950c39b827bf3e0"
+    },
+    {
+      "bytes": 10011,
+      "path": "tools/NodeBridge/wire.mjs",
+      "sha256": "83dd5314526f8ece061ea85da50326ed45867fe7edb76d37ac67f208775d3deb"
+    },
+    {
+      "bytes": 5679,
+      "path": "tools/NodeCommandInputBridge/admission.mjs",
+      "sha256": "0ddf8553bc600a581ebe5116e5c4f372c6689baf4dcd816714ea01a69e5fe164"
+    },
+    {
+      "bytes": 666,
+      "path": "tools/NodeCommandInputBridge/tool-context.mjs",
+      "sha256": "4e0131c01d02883b170135e1b2882b962f9e0e1f302f13a2561948e8c9371689"
+    },
+    {
+      "bytes": 4005,
+      "path": "tools/NodeCommandInputBridge/tool-progress.mjs",
+      "sha256": "237eedf025e3d8cf944c306a05dcb3ba33a79c8bfd5fa68abf1be9ea4f6c4455"
+    },
+    {
+      "bytes": 5212,
+      "path": "tools/NodeCommandInputBridge/tool-loadout.mjs",
+      "sha256": "896ff1779c110bf5086449732695e184a8da90b65d2ead2a8b521c87240242f6"
+    }
+  ],
+  "sourceReferenceExpectedSha256": "d74d53610906cb41ec6c2ad8a10f57d242c2a2846631a0ec4901ef5a3225930d",
+  "sourceReference": [
+    {
+      "path": "compatibility/node/command-input-reference.plan.json",
+      "bytes": 5491,
+      "sha256": "7eae052f5eb4447ccb2c15c2140684f6bb6260a9e1c28a8437d29dce5de759f4"
+    },
+    {
+      "path": "fixtures/reference/node-command-input/manifest.json",
+      "bytes": 1616039,
+      "sha256": "5619550b6b561596dcdb253106879eb976554d6c9daa8c8a5fb189d95a825900"
+    },
+    {
+      "path": "fixtures/reference/node-command-input/expected.json",
+      "bytes": 288460,
+      "sha256": "d74d53610906cb41ec6c2ad8a10f57d242c2a2846631a0ec4901ef5a3225930d"
+    }
+  ],
+  "sourcePins": [
+    {
+      "path": "packages/coding-agent/examples/extensions/commands.ts",
+      "bytes": 2594,
+      "sha256": "36716b53da169936c7e1360a4fde1e2fc0c3356a6505f177235f09c5538c6e4f"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/input-transform.ts",
+      "bytes": 1444,
+      "sha256": "cf0f65d610631ca75d18aae1c8f1408139702f674cb2835f8c009b943776474b"
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/types.ts",
+      "bytes": 81892,
+      "sha256": "de0ccce3b8b222d19a2ecef24902fc72aab62b6573129cbf886bc064dd6ab505"
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/loader.ts",
+      "bytes": 27197,
+      "sha256": "aa903524bb2db3ee9fb7f21e863e373e7f12a56c74fd05d27c879a4a7020deb0"
+    },
+    {
+      "path": "packages/coding-agent/src/core/extensions/runner.ts",
+      "bytes": 51250,
+      "sha256": "1a0d73843fba5773d415f484c46898138723b73d27bf8c3159f491fa0b6232f3"
+    },
+    {
+      "path": "packages/coding-agent/src/core/agent-session.ts",
+      "bytes": 155372,
+      "sha256": "26e76e13456757b0419df26b1f4d9bce9faa28c2588ad66af3e4cc3e9b179e0a"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1069,
+      "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/pirate.ts",
+      "bytes": 1461,
+      "sha256": "dd6ce684bbe7630e4a749fe133ef8b8b875adbc7e31284b17fe0b8157d51e013"
+    },
+    {
+      "path": "packages/coding-agent/examples/extensions/hello.ts",
+      "bytes": 640,
+      "sha256": "0aa4e9800c2526914d4c1edb00b2cfa9bd9dd6da5218289994cccd5f5bfa4934"
+    },
+    {
+      "path": "packages/ai/src/utils/validation.ts",
+      "bytes": 9902,
+      "sha256": "460786b57dead200e411b9afec916a5049c96ebcff4da082096456ac06d44fb7"
+    }
+  ],
+  "qualifiedInputs": {
+    "canonicalPlanSha256": "e55b7af94907598157809fc6da08ad1d60899c23b849d3623c28174d5d7fc622",
+    "canonicalManifestSha256": "b74a7ece33b0596850266a1e1686b3c9cd1d5c978e3dcae1f07174adc3757ff9",
+    "canonicalExpectedSha256": "d13bca9d8ca51152c6b95b9bd2db8ab5bbcb76f361e647dcf1e97365e155b843",
+    "jitiArchiveSha256": "8dd0d365fb49c0e7cc42d6a00df6fb2da9056fc24492094346fc34ecdbcf28ca",
+    "inventoryAuthority": "Existing protected-paths supervisor qualification is composed read-only; no predecessor worker starts or pins change. Whole source, fifteen existing dependency inventories, archive, publisher and canonical controls checked before/after.",
+    "sourceReferenceQualification": "Root reports seven corrected process controls and two full matching captures. Fresh golden verification and independent qualification remain separate. Prior exact-clock preflight failure preserved. All eight frozen reference helpers held as read-only inputs, not executable bridge modules."
+  },
+  "requiredScenarioIds": [
+    "commands-completions",
+    "commands-list",
+    "commands-empty-cancel",
+    "commands-reentrant",
+    "input-chain",
+    "input-handled",
+    "input-clock",
+    "input-no-ui",
+    "original-pirate-toggle-hook-and-hello-registry",
+    "original-tool-preparation-required-name",
+    "original-tool-context-shape-parent-signal",
+    "authored-progress-identity-order-backpressure",
+    "authored-progress-cancel-publication-failure-stale",
+    "authored-tool-loadout-read-only-metadata",
+    "pinned-original-getNamespace-seven-cases",
+    "native-node-loadout-metadata-contracts"
+  ],
+  "sourceBoundary": {
+    "factory": "Whole unchanged commands.ts, input-transform.ts, pirate.ts and hello.ts only, selected from explicit immutable source pins through original loadExtensions/Jiti 2.7.0. Original registered functions and TypeBox schema objects stay in Node.",
+    "virtualModuleReplacementCount": 1,
+    "virtualModuleReplacement": "Exact pinned canonical controlled virtual map. The full SDK namespace and arbitrary extension support remain open.",
+    "catalog": "Synchronous pi.getCommands reads the immutable actual native invocation snapshot and revision through AsyncLocalStorage. Source-only hello/review/skill-a table remains separate; actual native catalog includes its own Commands registration and actual host resources only.",
+    "completion": "Original complete arrays/null from the registered callback; pure owner-admitted request with no host callback handle.",
+    "contexts": "Whole per-invocation Runner.createCommandContext, createContext or createToolContext(actual native toolCallId, actual signal). Tool contexts must have the guarded tools getter and executeTool method; those bind to named UnsupportedHostOperation diagnostics. Nested execution remains unsupported. Existing UI prompt/capability seams retained.",
+    "dialogs": "Actual native owned UI scopes handle select/confirm. Cancellation/unavailable preserve typed receipt and source undefined/false defaults. No receipt invents confirmation.",
+    "notify": "Original synchronous notify returns undefined; actual bounded native async publication is serialized and joined before source settlement, including original callers that do not await.",
+    "input": "Each registered original callback runs once under the native typed reducer. Original source/images/streamingBehavior preserved; an explicit second original factory instance supplies the ordered chain control.",
+    "clock": "Real Date remains the default. Only explicit opted-in exact original 2026-10-01T12:00:00.000Z installs FixedDate for no-argument construction/Date.now. Actual locale/ICU/environment retained and Date restored on finalization.",
+    "noUi": "Original Print/Json unavailable notify returns undefined and preserves Handled/zero provider/zero append; the actual native receipt is unavailable/NoUi/published=false. Separate explicitly denied RPC features retain original source failure plus sanitized native diagnostic/Continue semantics. Canonical source no-op reference remains unchanged.",
+    "durable": "Actual native command-first admission and input reduction precede provider/durable effects. Handled has zero provider/append effects. Save/acknowledge/reopen/resume/branch must preserve the same exact approved package/command/tool declaration.",
+    "authority": "Native owner registry, initial and final schema validation, argument policy and lifecycle remain authoritative. Progress callbacks borrow only their actual tool invocation and must match owner handle, operationId, callbackId, toolCallId and monotonic sequence. No tools, filesystem, process or session operations are granted through progress or preparation.",
+    "toolPreparation": "Whole unchanged packages/ai/src/utils/validation.ts validateToolArguments on the actual retained original definition/schema. Pure handle-free owner-admitted initial preparation; receives no host context. Source before/after and schema observations retained. No replacement validation after tool_call hooks.",
+    "toolProgress": "Synchronous source onUpdate returns undefined. At most 16 updates, each at most 65536 UTF8 bytes, at most 262144 cumulative bytes. At most one native delivery pending; bounded serialized source queue; overflow is a recorded failure even if caught. Matching actual ReportUpdateAsync receipt required. Source/UI/progress settlement and cancellation writes joined before context retirement. Late callback/sink admission rejected. No retries after failure. Progress payloads must be plain JSON data; functions, symbols, accessors, arbitrary prototypes, sparse arrays and nonfinite numbers explicitly reject.",
+    "unsupported": [
+      "flags",
+      "shortcuts",
+      "other lifecycle hooks",
+      "custom component/header/footer/editor/widget rendering",
+      "message/entry renderers",
+      "markdown transformers",
+      "nested tools",
+      "providers/virtual models/MCP",
+      "new dependencies including ms",
+      "prepareArguments and richer tool metadata except namespace/prepareLoadout"
+    ],
+    "toolLoadoutNamespace": "Read-only actual native snapshot through existing handle-free owner-admitted prepare request; bounded synchronous original prepareLoadout callbacks and getNamespace metadata. No execution capability."
+  },
+  "limits": {
+    "frameBytes": 1048576,
+    "pendingSourceOperations": 16,
+    "nativeContexts": 8,
+    "operationBytes": 524288,
+    "retainedOperations": 128,
+    "retainedBytes": 8388608,
+    "publicationCount": 16,
+    "publicationBytes": 262144,
+    "progressFrameBytes": 65536,
+    "progressCount": 16,
+    "progressBytes": 262144,
+    "nativePendingProgressPerOperation": 1
+  },
+  "nativeBridgeExecuted": false,
+  "executedCorpusCountCredit": 0,
+  "phaseGatesPassed": [],
+  "admissionRevision": "bounded-tier-a-namespace-metadata-1",
+  "qualificationScope": {
+    "reviewRequiredBeforeExecution": true,
+    "originalSources": [
+      "commands.ts",
+      "input-transform.ts",
+      "pirate.ts",
+      "hello.ts"
+    ],
+    "dependencyAllowlistChanged": false,
+    "originalReferenceGoldensChanged": false,
+    "toolProgressCorpus": "Authored fault controls; original hello emits no updates. No additional original tool/update corpus credit.",
+    "cliPackageAgentPipelineQualification": false,
+    "nativeBuildRun": false,
+    "nativeTestsRun": false,
+    "nodeTestsRun": false,
+    "executedCorpusCredit": 0,
+    "namespaceMetadataAuthoredOnly": true
+  }
+}

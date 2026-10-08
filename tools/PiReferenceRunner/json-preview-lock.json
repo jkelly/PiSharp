@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "environmentLockPath": "tools/PiReferenceRunner/full-lock.json",
+  "environmentLockSha256": "66bd6efa573d9f0a160eb4005e0aba325debdbfdde40c042afab975c4c5caa1a",
+  "loadedModules": [
+    {
+      "path": "node_modules/partial-json/dist/index.js",
+      "sha256": "23f750aa1170c830b7ef180135852317886cc58ce7d2597e5eeee044539072c7",
+      "bytes": 8376
+    },
+    {
+      "path": "node_modules/partial-json/dist/options.js",
+      "sha256": "779b2aded6d4e2ec6171ea9d5d5d97551e8c3258b6e78a01d2e9fc6235865b36",
+      "bytes": 2849
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/json-parse.ts",
+      "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "bytes": 2774
+    },
+    {
+      "path": "upstream/packages/coding-agent/src/experimental/source-resolver.ts",
+      "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6",
+      "bytes": 3592
+    }
+  ],
+  "sourceHashes": [
+    {
+      "path": "upstream/packages/ai/src/utils/json-parse.ts",
+      "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "bytes": 2774,
+      "canonicalGitBlobSha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "canonicalGitBlobBytes": 2774
+    },
+    {
+      "path": "upstream/packages/coding-agent/src/experimental/source-resolver.ts",
+      "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6",
+      "bytes": 3592,
+      "canonicalGitBlobSha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6",
+      "canonicalGitBlobBytes": 3592
+    }
+  ],
+  "harnessFiles": [
+    {
+      "path": "tools/PiReferenceRunner/json-preview-run.mjs",
+      "sha256": "2c5f7314a0dc0523938f102264809a27866213702c716927ba054d352521c2b8"
+    },
+    {
+      "path": "tools/PiReferenceRunner/json-preview-capture.mjs",
+      "sha256": "756d29f97ae716bd78a4b977c56d2baf2e826650424fc244afa1b2717a545c34"
+    },
+    {
+      "path": "tools/PiReferenceRunner/full-preload.mjs",
+      "sha256": "e1f62a2048bc484a162085430a5afb6f88547d78049b6f29b2a0e4f65fcd79e2"
+    },
+    {
+      "path": "tools/PiReferenceRunner/offline-guard.mjs",
+      "sha256": "ae3741bdce496451bd04afcf8628df6ddc5bc5cfad8af6ee5e52cbc7b065a094"
+    },
+    {
+      "path": "tools/CompatibilityReport/raw-json.mjs",
+      "sha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9"
+    }
+  ]
+}

@@ -23,7 +23,7 @@ public sealed partial class PersistentAgentSession
             {
                 if (_replacing && !_retired) throw new InvalidOperationException("Session replacement is in progress.");
                 _admissionStopped = true;
-                idle = Task.WhenAll(agentIdle, _active?.Task ?? Task.CompletedTask, _inputSubmission?.Idle.Task ?? Task.CompletedTask);
+                idle = Task.WhenAll(new[] { agentIdle, _active?.Task ?? Task.CompletedTask, _inputSubmission?.Idle.Task ?? Task.CompletedTask, LoadoutDiagnosticIdleLocked(), RetrySettingsIdleLocked() }.Concat(CaptureUserBashCompletionsLocked()));
                 completion = new(TaskCreationOptions.RunContinuationsAsynchronously); _admissionStop = completion.Task;
             }
             settled = _admissionStop;
@@ -38,9 +38,14 @@ public sealed partial class PersistentAgentSession
         var failures = new List<Exception>();
         try
         {
+            Task bashAbort;
+            try { bashAbort = AbortUserBashAsync(); } catch (Exception error) { AddDistinctFailure(failures, error); bashAbort = Task.CompletedTask; }
             try { InvokeShutdownCancellation(() => _closing.Cancel()); } catch (Exception error) { RetainOwnedCancellationFailure(error, input: false); }
             try { InvokeShutdownCancellation(() => Abort()); } catch (Exception error) { AddDistinctFailure(failures, error); }
             try { await idle.ConfigureAwait(false); } catch (Exception error) { AddDistinctFailure(failures, error); }
+            try { await bashAbort.ConfigureAwait(false); } catch (Exception error) { AddDistinctFailure(failures, error); }
+            try { await FlushPendingUserBashMessagesAsync().ConfigureAwait(false); } catch (Exception error) { AddDistinctFailure(failures, error); }
+            try { await DrainLoadoutAtCloseAsync().ConfigureAwait(false); } catch (Exception error) { AddDistinctFailure(failures, error); }
             lock (_gate)
             {
                 var ordered = new List<Exception>(_ownedCancellationFailures);

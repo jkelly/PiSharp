@@ -25,7 +25,8 @@ public static class SessionContextEditCommand
     /// <param name="replacementFiles">Trusted read-only file acquisition seam, never selected by serialized input.</param>
     public static async Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr,
         CancellationToken cancellationToken = default, SessionContextEditCommandOptions? options = null,
-        Func<string, CancellationToken, ValueTask<Stream>>? replacementFiles = null)
+        Func<string, CancellationToken, ValueTask<Stream>>? replacementFiles = null,
+        PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null)
     {
         ArgumentNullException.ThrowIfNull(stdout); ArgumentNullException.ThrowIfNull(stderr);
         var limits = options ?? new();
@@ -39,8 +40,10 @@ public static class SessionContextEditCommand
             var replacement = await ReadReplacementAsync(parsed.Replacement, limits.MaximumReplacementBytes,
                 replacementFiles, cancellationToken).ConfigureAwait(false);
             string? report = null;
-            await using (var profile = await OfflineSessionProfile.CreateAsync(parsed.Workspace, parsed.Session, null,
-                ImmutableArray<JsonData>.Empty, [], [], cancellationToken, offlineApi: parsed.OfflineApi).ConfigureAwait(false))
+            var profile = await OfflineSessionProfile.CreateAsync(parsed.Workspace, parsed.Session, null,
+                ImmutableArray<JsonData>.Empty, [], [], cancellationToken, offlineApi: parsed.OfflineApi, mcpAdmission: mcpAdmission).ConfigureAwait(false);
+            PersistentAgentSession? session = null; Exception? operationFailure = null;
+            try
             {
                 var sessionOptions = new PersistentAgentSessionOptions(UseLatestLeaf: parsed.Latest, SelectedLeafId: parsed.Leaf,
                     AgentOptions: new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024)),
@@ -48,13 +51,13 @@ public static class SessionContextEditCommand
                 long sequence = 0; var start = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 long Clock() => start + Interlocked.Increment(ref sequence);
                 string NextId() => "cli-edit-" + Guid.NewGuid().ToString("N");
-                var lifecycle = new PersistentSessionLifecycle(profile.Registry, Clock, NextId, sessionOptions);
-                await using var session = await lifecycle.OpenAsync(new(parsed.Session, parsed.Latest, parsed.Leaf),
+                var lifecycle = profile.CreateLifecycle(Clock, NextId, sessionOptions);
+                session = await lifecycle.OpenAsync(new(parsed.Session, parsed.Latest, parsed.Leaf),
                     profile.SelectedModel, cancellationToken).ConfigureAwait(false);
                 if (!string.Equals(SessionCommands.Absolute(session.WorkingDirectory), profile.Workspace,
                     OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                     throw new SessionCommandException(SessionCommandFailure.WorkspaceMismatch);
-                profile.AttachOwner(session, sessionOptions, Clock, NextId, lifecycle: lifecycle);
+                await profile.AttachOwnerAsync(session, sessionOptions, Clock, NextId, lifecycle: lifecycle).ConfigureAwait(false);
                 var attachment = profile.Sessions!.Current;
                 var receipt = await profile.Sessions.AppendContextEditAsync(attachment, new(parsed.Target, replacement),
                     cancellationToken, (prospective, token) =>
@@ -71,9 +74,10 @@ public static class SessionContextEditCommand
                 acknowledged = receipt.Append.CheckpointAcknowledged;
                 if (!acknowledged || report is null || profile.Requests.Length != 0)
                     throw new SessionCommandException(SessionCommandFailure.CommandFailed);
-                // Cleanup physically settles before delivery; a known checkpoint survives late cancellation.
-                await profile.Sessions.DisposeAsync().ConfigureAwait(false);
             }
+            catch (Exception error) { operationFailure = error; }
+            // Attached owner retires its catalog before writer/profile settlement, including failure paths.
+            finally { await profile.SettleOwnedCommandAsync(session, operationFailure).ConfigureAwait(false); }
             outputStarted = true;
             await stdout.WriteLineAsync(report).ConfigureAwait(false);
             await stdout.FlushAsync().ConfigureAwait(false);

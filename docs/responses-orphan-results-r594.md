@@ -1,0 +1,13 @@
+# Responses missing tool result profile
+
+`ResponsesTranscriptProjectionOptions.SynthesizeMissingToolResults = true` enables the pinned Pi v0.99.1 orphan-call fallback for Responses transcripts. The default is false, preserving the existing strict profile. NativeProviderFactory.CreateResponses already passes this explicit projection profile through normal and `off` thinking routes.
+
+When EOF, a new user or a new assistant closes pending tool calls, unanswered calls receive `function_call_output` with `No result provided` in call order. Real results stay in their original order. Transparent system messages are emitted after real and synthetic results. The canonical caller history stays immutable. Foreign IDs are normalized before pairing. Error/aborted assistant turns are skipped and do not acquire synthesized outputs.
+
+Synthesized intermediate entries use the request timestamp rather than ambient wall time; timestamp/isError are not transmitted in Responses output. The output matches the pinned textual wire projection. Existing resource budgets, identity collision rejection, duplicate/unmatched result rejection and cancellation remain active. The strict unmatched-result behavior is deliberately narrower than the original transform pass, which forwards unmatched tool results; this change only closes missing-result synthesis.
+
+The standalone `tests/PiSharp.ResponsesOrphan.Tests` executable contains ten authored source-derived controls and three original-task telemetry records. Injected HTTP callbacks hold the actual SendAsync operation while the original ChatClient completion Task is observed pending, then release and directly await both originals. Normal/off native provider routes and direct factory/transport paths use offline handlers. No provider service or credential resolution is required. The expectations are derived from pinned source; they are not Node differential captures.
+
+Source authority: Pi `d86654abb8862e201933517d6f1fce9f88dd117f`, `packages/ai/src/api/transform-messages.ts`, git blob `94bf539ccb0c7aa47013f073cd7e77b5e8eb5f1b`, second-pass `closePendingToolCalls`. Responses output conversion: `packages/ai/src/api/openai-responses-shared.ts`, git blob `54abbdc8fef34bd7227b046dc574bb87737d61df`.
+
+This successor is source-only until root serial restore/build/focused qualification. Existing cache/model compatibility acceptance and the historical 155-operation ledger remain on their own producers. This opt-in scope does not close full original-provider parity or activate the fallback for callers that keep the strict default.

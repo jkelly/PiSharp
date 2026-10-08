@@ -1,0 +1,11 @@
+# Retained4707 failure correction composition
+
+This source-only successor preserves exact4707 and its 1158/1180 result with22 failures. It composes bounded authored corrections for all22 failure associations: public-close disposed-versus-retired fixture semantics and known physical-stop task receipts; live profile sharing and known cleanup wrappers; actual invocation-owner binding; durable publication baselines plus inspected intentional postack cleanup; Bash/retry typed poison cleanup and pinned-original idle abort_retry success; notification original fault inventory; narrowly proven owned native GET995 abort; committed-notification shutdown phase and physical-stop original evidence.
+
+New regressions register exactly once: four shutdown-stop groups, two shutdown-phase groups, twenty MCP HTTP/original groups and one additional connected postack publication group. The three focused shutdown delegates that reuse existing tests remain unregistered to avoid duplicate credit. Existing two actual postcommit cases now directly await original settlement; all new owning groups select direct-await branches.
+
+Expected authored full-three source inventory: Coding806, RPC107, Extensions294 =1207 distinct groups. Focused startup/MCP results add no distinct credit. Bounded source diagnostic graph adds no test groups and changes no assertions/pass rules. Native result records remain unchanged; no new compilation, restore, tests, HTTP or processes occurred.
+
+Static leaf review resolves notification inventory, committed phase and diagnostics privacy findings; publication fixture leaf separately reviewed. Final composition/API review, remaining fixture independent reviews, fresh exact-source allocation/products and explicit runtime grant are required. The old e75 notification flattening cut and726/435 precommit cancellation heuristic remain historical blocked cuts, superseded by composed7388 andd64.
+
+Actual host/profile-view composition is a separate branch, as are resource/OAuth/SDK leaves. Canonical is unchanged; no merge or full parity claim.

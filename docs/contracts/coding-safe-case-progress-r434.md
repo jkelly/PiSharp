@@ -1,0 +1,9 @@
+# Bounded Coding diagnostic progress
+
+The existing Coding runner accepts optional `--safe-case-progress`. It emits one flushed stdout JSON record prefixed `CASE START` immediately before each original case invocation and one `CASE END` after its original completes or throws. The source-catalog ordinal, authored case name and declaring-type/method identity identify the case even when multiple catalog entries share a method. Ordinals are assigned before exact-name/filter selection and are meaningful only for the exact source candidate; adding registrations changes that catalog.
+
+Safe mode records failures through the existing bounded structural `TestFailureDiagnostics` graph. It does not print exception messages, `Data`, argument values, payloads or absolute PDB paths, and omits the legacy `error.Message` field from failed report rows. Authored source case names are catalog identities, not exception text. Progress collector faults never replace a thrown case exception or interrupt that original's cleanup; they increment `progressCaptureFailures`, prevent zero exit and remain a separate report field. Normal mode retains existing output behavior.
+
+In safe mode the runner directly awaits the actual case task. No generic thirty-second `WaitAsync` wraps that task. The separately admitted existing original owner supplies the finite process ceiling and physical stop/capture/job/lease joins; a physical timeout does not prove all application case cleanup completed normally. `START` proves invocation was about to begin, not that acquisition, effects or cleanup completed. Only an acknowledged `END`, complete singleton report, zero progress faults and complete original-owner receipt establish the bounded case result.
+
+No new process runner, scheduler, package, runtime authority or production/session behavior is added. The source change has not been compiled or executed.

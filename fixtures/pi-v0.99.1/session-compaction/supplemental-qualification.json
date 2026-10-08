@@ -1,0 +1,1215 @@
+{
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "originalCanonicalFingerprint": {
+    "files": 2093,
+    "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+  },
+  "original715LockSha256": "b2fbfda80b8aee1bf3cbd1742cfe13c575d0032250d8f316b1503b8c400552f2",
+  "additiveCanonicalCandidates": 117,
+  "compatStaticCandidates": 113,
+  "directCompactionCandidates": 4,
+  "catalogDataPins": 43,
+  "publisherArchive": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\archives\\released-baseline\\pi-0.99.1-source.tar.gz",
+    "bytes": 8646242,
+    "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b"
+  },
+  "admission": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\.pisharp-released-catalog-admitted.json",
+    "sha256": "2e5fea6e5ed55fdff54dfc507499eb98e0bfba6851a9004d6c5e9b1af09981f4"
+  },
+  "resolverBoundary": "Only absent canonical providers/data JSON imports are forwarded read-only to their exact43 admitted publisher files. Loaded physical URL/bytes/SHA receipt is separate from canonical2093 fingerprint.",
+  "actualLoadedCanonicalModules": null,
+  "actualLoadedCatalogData": null,
+  "wholeSourceCaptureExecuted": false,
+  "originalSourceAndDependenciesMutated": false,
+  "noNetworkOrPackageAcquisition": true,
+  "fullP1": "HOLD unchanged",
+  "phaseGatesPassed": [],
+  "files": [
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\core\\compaction\\compaction.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/coding-agent/src/core/compaction/compaction.ts",
+      "bytes": 35513,
+      "sha256": "d5aebd41333957b57fa3f1bee2a18b3c00b5d47bb1b4af6f913cf8cd791099c8",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\core\\compaction\\branch-summarization.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/coding-agent/src/core/compaction/branch-summarization.ts",
+      "bytes": 12714,
+      "sha256": "0279195d2cddfe99d4e42a1327d18c7f55ff15a8807d2c5d6cd465b2ab163011",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\core\\compaction\\utils.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/coding-agent/src/core/compaction/utils.ts",
+      "bytes": 5809,
+      "sha256": "cc0baada8a2e31bcf1dbc18948c69ba2264fb2ad4d2c583ceb772fd3c3233674",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\coding-agent\\src\\core\\usage-totals.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/coding-agent/src/core/usage-totals.ts",
+      "bytes": 3135,
+      "sha256": "8b18dd04d65e90af9b331cd5aa23d7891aab8a296f38a6026ce17a098d674ee9",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\anthropic-messages.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/anthropic-messages.lazy.ts",
+      "bytes": 199,
+      "sha256": "5d1925e8b2664c91a11ef4c73d8c400b4075597c8c4e8beb085f8e4ba137fc08",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\azure-openai-responses.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/azure-openai-responses.lazy.ts",
+      "bytes": 206,
+      "sha256": "de36a9a2749ac4cb45a5449356bceadb676d1a16e6d46f4fc5522a3f700aa2fd",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\bedrock-converse-stream.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/bedrock-converse-stream.lazy.ts",
+      "bytes": 1148,
+      "sha256": "3ee8a1b2a2cd58927bee18ab5b4150401da810e9d5f4595822b3b10ded35de86",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\cloudflare-workers-ai-system-one.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/cloudflare-workers-ai-system-one.lazy.ts",
+      "bytes": 275,
+      "sha256": "7dbbb52e4c1412671c0c6f72938acdbac02ddc0a7841736eac9e942e71709776",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\google-generative-ai.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/google-generative-ai.lazy.ts",
+      "bytes": 202,
+      "sha256": "ba7700f2e44838fb19da46f866f47f35f4e10f5068800be1ea698e9e95e1e1ce",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\google-vertex.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/google-vertex.lazy.ts",
+      "bytes": 189,
+      "sha256": "891f0e07eaaa1bb1df97f0a2d8f067df6acbab50078242108d93b96a710c4712",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\mistral-conversations.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/mistral-conversations.lazy.ts",
+      "bytes": 205,
+      "sha256": "74267bc430c0c2562d166e4ae9d05966634e91b226bc564010b2b199db52dd86",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\openai-codex-responses.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/openai-codex-responses.lazy.ts",
+      "bytes": 206,
+      "sha256": "89e1883f937df0992b852970f574b5e1fc2a69fefaacc89628cd1d924a8af63f",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\openai-completions.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/openai-completions.lazy.ts",
+      "bytes": 199,
+      "sha256": "a1defe07f6d7bd37de3933164cc88cfeb2d46cf390d0bbb52c85b280cc58d193",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\openai-responses.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/openai-responses.lazy.ts",
+      "bytes": 195,
+      "sha256": "ea6bf6019f6b2f949bce4ad248ec1e0fa25dd058a009cf70fb5eb0e99b4c94db",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\openrouter-images.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/openrouter-images.lazy.ts",
+      "bytes": 252,
+      "sha256": "ede9cfb9c7e12da4480a6db246eb9d8a4bff146c096d30f3d57ce8f4cd1b5cdc",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\pi-messages.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/pi-messages.lazy.ts",
+      "bytes": 185,
+      "sha256": "620e55f1a498f70c8578deb6375f9433c6991c98f6c323465b1889c2f07a72d9",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\api\\typesafe-system-one.lazy.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/api/typesafe-system-one.lazy.ts",
+      "bytes": 251,
+      "sha256": "db33fa5f4feab933ffa9478329e10124297dab2727093ea082e5f6ddbc3c8655",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\auth\\oauth\\load.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/auth/oauth/load.ts",
+      "bytes": 3494,
+      "sha256": "8417cf2dea16b38f94ccb6c21ae1c4e6b4104370093c32b8dfe77747763b3f9c",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\compat.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/compat.ts",
+      "bytes": 10806,
+      "sha256": "fe077a90f918a69fa6595cf9a7b4571e28e78b57fd52ccde498c5151838569be",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\env-api-keys.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/env-api-keys.ts",
+      "bytes": 7616,
+      "sha256": "b511a61d0353ced580019476ed506f4f078284cd16407acda8558a587819d057",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\image-models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/image-models.ts",
+      "bytes": 2428,
+      "sha256": "64fcb173b4f2860091e45e4c4449b2ae5b34841248b5e00116f183cb9030fd57",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\images-api-registry.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/images-api-registry.ts",
+      "bytes": 1578,
+      "sha256": "721eea58a7286bea742611b4513c0c076c739db64835ef5183c23da7abf1f80b",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\images.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/images.ts",
+      "bytes": 920,
+      "sha256": "5f8f99d4676492cb42de5b05cb39a482cf4918914265ad25ba4d3393d1d084c1",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\legacy-api-aliases.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/legacy-api-aliases.ts",
+      "bytes": 6009,
+      "sha256": "784ae74c00b3cf2836b6ed930519b5d7d3aa1a7a4e7ace933af3bdad77df67e3",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\model-catalog.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/model-catalog.ts",
+      "bytes": 2706,
+      "sha256": "567b559600439eac5e6c341658bb45b149c5e8a22e34624a54ad5a06f5a92885",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\models.generated.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/models.generated.ts",
+      "bytes": 18386,
+      "sha256": "62575d37eab170c537388163845a5f88524975dcabe4b6af8c29b340bbd97f2d",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\all.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/all.ts",
+      "bytes": 8336,
+      "sha256": "44836b4af421c5e692d10879251bca1d744eef881f632a48e3935a49d5bc242b",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\amazon-bedrock.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/amazon-bedrock.models.ts",
+      "bytes": 849,
+      "sha256": "cf226e43ccaad60aa5d3816a8f84f44716d2d9d1faab9cf76a71acff9ecca99d",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\amazon-bedrock.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/amazon-bedrock.ts",
+      "bytes": 3333,
+      "sha256": "e32611e8d2d4e71ee5d0ba426da60c0aecf42d1bc34ccc3d0d49ce877c621a8c",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\ant-ling.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/ant-ling.models.ts",
+      "bytes": 789,
+      "sha256": "beec454635d299e7e23a4edbb7105307cf2f56cc65273c3688e5c3d662f8d41b",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\ant-ling.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/ant-ling.ts",
+      "bytes": 575,
+      "sha256": "20ba100f8a9150f809fc42bf60f1d23840cc358d636793f1ec9fddf0e9feb2a7",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\anthropic.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/anthropic.models.ts",
+      "bytes": 799,
+      "sha256": "860de2b51218c8110b981cd52eee065ff4a118014a7ed5bb2d0c2c73417a53ab",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\anthropic.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/anthropic.ts",
+      "bytes": 1934,
+      "sha256": "dda69449a53c84b8b0a17b28f80fba278988d85665557be2db0dc3b20557567a",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\azure-openai-responses.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/azure-openai-responses.models.ts",
+      "bytes": 929,
+      "sha256": "0fe8d71373d81a82d39f7a8ecda369b834398c824293d1516e965fed283554f9",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\azure-openai-responses.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/azure-openai-responses.ts",
+      "bytes": 628,
+      "sha256": "76e9f5cde761fcd516370d4d99519e4658e0db1029518746d0d0c0550ce54fa5",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\baseten.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/baseten.models.ts",
+      "bytes": 779,
+      "sha256": "4781d5590a9708bfbd253b58ca98dd048bfdaa92ed345ad5962c349d434267e9",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\baseten.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/baseten.ts",
+      "bytes": 572,
+      "sha256": "c3833be0c64c4d5c96810403e23e966bb779bf2c045619b6fbac18ff27ac92f5",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\cerebras.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/cerebras.models.ts",
+      "bytes": 789,
+      "sha256": "70608ff67ae8f07fe5b7b038b642b57ddd3f103fa27f175f4b5a9e74798f2455",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\cerebras.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/cerebras.ts",
+      "bytes": 575,
+      "sha256": "457fc35499abea92be4ad7add4f08502d069293380be61bf05b11ae5352bce4f",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\cloudflare-ai-gateway.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/cloudflare-ai-gateway.models.ts",
+      "bytes": 919,
+      "sha256": "8e5a65c0d7334a99de1399cb187be73a37d822706ecae471be35ae5088f3c808",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\cloudflare-ai-gateway.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/cloudflare-ai-gateway.ts",
+      "bytes": 1404,
+      "sha256": "6f19bdcb965750aa1367f1c09eb883da16526644ad3a3cbcb60da8b53ca418ff",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\cloudflare-auth.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/cloudflare-auth.ts",
+      "bytes": 3505,
+      "sha256": "d0532efb4f00126286d71dbce6fcb95e581cd9477467dc4bd20f1df1a466f03e",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\cloudflare-stream.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/cloudflare-stream.ts",
+      "bytes": 1465,
+      "sha256": "6870da9b78b83699e3d8787ad4ce1ff7d78005a237e052f15b839887157a81a9",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\cloudflare-workers-ai.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/cloudflare-workers-ai.models.ts",
+      "bytes": 919,
+      "sha256": "9eb2fc6e8f4a303901b95966d08f9a4713fb59205016c5e7f118402bd37e3bb5",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\cloudflare-workers-ai.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/cloudflare-workers-ai.ts",
+      "bytes": 1051,
+      "sha256": "ad4d97721b01048d10b3e7ea6d2d0755dcd087f6623c1497c6f06c70c8511711",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\deepseek.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/deepseek.models.ts",
+      "bytes": 789,
+      "sha256": "0d18c65982658c059b8e344475020f6f9e3435325c798555d34212e9a3f0033b",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\deepseek.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/deepseek.ts",
+      "bytes": 573,
+      "sha256": "4d4ac9870d3dcdb13a90627a95598314459f5cc2f8a122f802fab3b0d2840fee",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\fireworks.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/fireworks.models.ts",
+      "bytes": 799,
+      "sha256": "ab7b48e4debc1993bc3098b002a792342f1146df31ed30e9721fe595eddee2ad",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\fireworks.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/fireworks.ts",
+      "bytes": 769,
+      "sha256": "72dbb53e3bb8b0bc6c42dd7937ec11dd0126efe3176f11153b1d599a0c7776af",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\github-copilot.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/github-copilot.models.ts",
+      "bytes": 849,
+      "sha256": "58beac7f7a4f3cb3fe410d37f0092aad1868edb539555f3993c7e2f084be8f35",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\github-copilot.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/github-copilot.ts",
+      "bytes": 1524,
+      "sha256": "9f898d669b65e9650009e4e45518fc207416c94ca9570276ef9bd7f13fde8f3b",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\google-vertex.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/google-vertex.models.ts",
+      "bytes": 839,
+      "sha256": "5e11c0ef6a852002234f8b6af7827501fab475d49850168e57f32c1e15b4c7a6",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\google-vertex.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/google-vertex.ts",
+      "bytes": 3734,
+      "sha256": "5e321e6d5b80824752ca96e7c9aba8a3fccce722a1793a40d5341a0406ef4878",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\google.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/google.models.ts",
+      "bytes": 769,
+      "sha256": "e1ca5c3b5e6781cb5f547b0321b2d02012dc3e679e047319510b342fc8a8e0c8",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\google.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/google.ts",
+      "bytes": 587,
+      "sha256": "2d807d5f9273ede8c23970fe0414883ab362c677df80e4603d30b621232a2036",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\groq.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/groq.models.ts",
+      "bytes": 749,
+      "sha256": "816ff730c20cb0c6e2eeb68fbe2b64f942f2f63201e52112ee8532908efbb97a",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\groq.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/groq.ts",
+      "bytes": 547,
+      "sha256": "a8bbced4fbc37370892fec68fb7f03cf634d08d134d9f003fa63edb5a8b60873",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\huggingface.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/huggingface.models.ts",
+      "bytes": 819,
+      "sha256": "2fcc3825ac0046f83e9f00e9fb2cf8017b50da64270da24e487f92cd0320da0c",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\huggingface.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/huggingface.ts",
+      "bytes": 594,
+      "sha256": "51c4af194c9989ab033c5b3303831ec9e2df999f51d9fa40ab6d28f632e8ff43",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\images\\register-builtins.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/images/register-builtins.ts",
+      "bytes": 1696,
+      "sha256": "4149e3a2acaf11e8bf1890859ed1c4af13ff7eb1a2cb9bb55f1b5be5770732b6",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\kimi-coding.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/kimi-coding.models.ts",
+      "bytes": 819,
+      "sha256": "36399a9a92489a33d1a802161a12a18a307933c9987e5367236c2623f4ecb7cc",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\kimi-coding.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/kimi-coding.ts",
+      "bytes": 833,
+      "sha256": "ef864d572eef11900f24bb6a5dc620982bd9c39fac600970deec55466348f8b0",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\meta.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/meta.models.ts",
+      "bytes": 749,
+      "sha256": "24d7128b0f9ae6d52dc087b963f40dd8094bab7158e29ea548684e035df306cb",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\meta.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/meta.ts",
+      "bytes": 764,
+      "sha256": "71fdf9ee2c1cdeda61913088e019cc8e8618977611b3c5ccbf6219d4817e771c",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\minimax-cn.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/minimax-cn.models.ts",
+      "bytes": 809,
+      "sha256": "9fde8ef6ed63048f0c8f60f8162b66b778984ba8f85fd5429aff11c0780f199b",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\minimax-cn.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/minimax-cn.ts",
+      "bytes": 598,
+      "sha256": "ae3170234556ef355f7cffcfc666888992ae50caa8daf07352f22bac69cca0ba",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\minimax.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/minimax.models.ts",
+      "bytes": 779,
+      "sha256": "cb863afb2cc806e2926d4c4c9c8a47d4e1784fa1e835adbb3abf533e765034f1",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\minimax.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/minimax.ts",
+      "bytes": 573,
+      "sha256": "d571a6a8b5a47daf40b034a2dae4ac902a252fbd44b073c4caee8eeb1d7035b5",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\mistral.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/mistral.models.ts",
+      "bytes": 779,
+      "sha256": "ee4a9fecb37c77d0933442ccf42320e4ca8cb29920a8109ab931f1104820542a",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\mistral.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/mistral.ts",
+      "bytes": 575,
+      "sha256": "dfcd087d7317d6a6cd1acf701547567435f5eaf0c1cc1d8eb89eed7e977c2fb3",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\moonshotai-cn.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/moonshotai-cn.models.ts",
+      "bytes": 839,
+      "sha256": "18e043473d2a8d9a6d5411557139a0b8b9c1fe5d26d07ce327846e11f67bd78f",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\moonshotai-cn.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/moonshotai-cn.ts",
+      "bytes": 608,
+      "sha256": "da8ec0ed30a2cf42972cead61a93b1fcb64380095f9d062ee4ed9e4807ebd5bc",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\moonshotai.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/moonshotai.models.ts",
+      "bytes": 809,
+      "sha256": "c52853776d3f22055b6dbf12a19ed7476a4bfac67c20690585ee5f58af975192",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\moonshotai.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/moonshotai.ts",
+      "bytes": 591,
+      "sha256": "2e269cca0231ebdbd2a58848ab3d19b0a43697e132b48a679e3c1b0cd4897665",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\nvidia.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/nvidia.models.ts",
+      "bytes": 769,
+      "sha256": "853c4a682a40ad3fb29004d5547c2ef601f93699f2486e97659bdfcd9ec7d33f",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\nvidia.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/nvidia.ts",
+      "bytes": 568,
+      "sha256": "73c981d27b364f83a32983d19f4ded346acf6af7eb4a653334622f891aedf860",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\openai-codex.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/openai-codex.models.ts",
+      "bytes": 829,
+      "sha256": "28f44dcf4ed1b5861eb1273727bb7480d4574c432ece2501e95a393fc06beea4",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\openai-codex.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/openai-codex.ts",
+      "bytes": 748,
+      "sha256": "12814aededc491cab80a2b66403a06d04bfd6595ceaed6fda5d79d2991875ae1",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\openai.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/openai.models.ts",
+      "bytes": 769,
+      "sha256": "178182f4c2ac6ea1c984aa54c015cd78d8eb7ca654d4a0817d745da380ddd231",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\openai.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/openai.ts",
+      "bytes": 803,
+      "sha256": "6d2aa4a30a13ed9359e3f711baa2549ab8d5aa2c555e6a03ffece4bcc55fb6e6",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\opencode-go.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/opencode-go.models.ts",
+      "bytes": 819,
+      "sha256": "8a0e857ff9593c9f759cfc9890fd7d35506cba5553fb3ac61431a8ee2cbaefe8",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\opencode-go.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/opencode-go.ts",
+      "bytes": 1079,
+      "sha256": "7262ef8f8961f5228e4574780092e7d0ae38d888ced223bbe3ffb53fbda78253",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\opencode-headers.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/opencode-headers.ts",
+      "bytes": 1080,
+      "sha256": "57a97177294665039f40a34cf421514ecd41527d5042f5185639557b6a7d80a1",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\opencode.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/opencode.models.ts",
+      "bytes": 789,
+      "sha256": "05a0207d0c6790342c0e4878c7340f67357f9985a616de7f1ab32542d3335c0d",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\opencode.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/opencode.ts",
+      "bytes": 1525,
+      "sha256": "916c793e3a14e4fcd004e43fcbdd4e0183590f091dfdfc4fdf6c8c7704161076",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\openrouter.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/openrouter.models.ts",
+      "bytes": 809,
+      "sha256": "01b7b1425e626087cc5b44095735c59b630207d38507a9e212a83ae96649a271",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\openrouter.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/openrouter.ts",
+      "bytes": 1539,
+      "sha256": "3131e5f26d6343615780d1e1d3a3d586dc288dcbeafadfcf3c9c4e345bcdc7ef",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\qwen-token-plan-cn.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/qwen-token-plan-cn.models.ts",
+      "bytes": 889,
+      "sha256": "93e6ee372e7d08c9c8ae8fdb11c7b932a4370a462e37e0df9a11de65791f21d1",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\qwen-token-plan-cn.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/qwen-token-plan-cn.ts",
+      "bytes": 692,
+      "sha256": "1869aabbff4baaa12faef00071aab0a5b1b1d38d43f16ce735137fc0e13fa897",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\qwen-token-plan-individual.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/qwen-token-plan-individual.models.ts",
+      "bytes": 969,
+      "sha256": "34e0004faa2a42fdd72788551bb930146423971b34de7f289a0c2d60251828b6",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\qwen-token-plan-individual.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/qwen-token-plan-individual.ts",
+      "bytes": 749,
+      "sha256": "0336ecc9c677d9e295a4832fbc84d9197f58e0468fcd00daff3aec491b896375",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\qwen-token-plan.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/qwen-token-plan.models.ts",
+      "bytes": 859,
+      "sha256": "44e44f591648fe946da54c26766596a888df011032d7f0dee0446606ed2a144c",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\qwen-token-plan.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/qwen-token-plan.ts",
+      "bytes": 673,
+      "sha256": "c26b85ab529779c4c2e61f6dd749592b515ec25b121b49dc81989d8a767d51f5",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\radius-config.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/radius-config.ts",
+      "bytes": 3339,
+      "sha256": "1f82a7db25753be09374792ae0a3cd63417739018fb69b3212ad8b3b9eb11c21",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\radius.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/radius.models.ts",
+      "bytes": 769,
+      "sha256": "4afa23dfdf46d036d241e55bbc688fe69e083ea866a645294e29575ae9831669",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\radius.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/radius.ts",
+      "bytes": 3145,
+      "sha256": "18bb70120329026fe8277d66cacee69a4108a069f2de990396c8ef5c38730379",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\together.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/together.models.ts",
+      "bytes": 789,
+      "sha256": "2f0651a90338e36717b9a24b7bd0fbc6ba816af3cb679eada8707de97eef04bb",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\together.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/together.ts",
+      "bytes": 575,
+      "sha256": "cbf232b1bfe5753bba855f0a95e2c4d180db8155121effcbdffc955fe090738c",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\typesafe.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/typesafe.models.ts",
+      "bytes": 789,
+      "sha256": "f2bd297473c4d82f18c22b3f02253b45d8230fd4dbaae7cc762f76711e403ef2",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\typesafe.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/typesafe.ts",
+      "bytes": 582,
+      "sha256": "24e2b1f19118486e0064e252c3860eba41fade01a2e50147bf7406d00c6f4ba8",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\vercel-ai-gateway.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/vercel-ai-gateway.models.ts",
+      "bytes": 879,
+      "sha256": "53b2d9744dc76a43e758b0715412af7c8f97b67cb2e98337700c809545ebb983",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\vercel-ai-gateway.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/vercel-ai-gateway.ts",
+      "bytes": 981,
+      "sha256": "f469f498e7de52915525d3ac645ae8c73bdb6dee7624e7ab68d139c7e91cc279",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\xai.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/xai.models.ts",
+      "bytes": 739,
+      "sha256": "16cfe33fa457512f2db6104212cac23d68326a63a71e9d4c4f56a181d8c66608",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\xai.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/xai.ts",
+      "bytes": 764,
+      "sha256": "841c361fc5ebb2d91c3f6aa46ce008f354ea287cce36ed2105ae815b7e5e9831",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\xiaomi-token-plan-ams.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/xiaomi-token-plan-ams.models.ts",
+      "bytes": 919,
+      "sha256": "0c9d88803cfec32e3c5dbcf3c6a242f4ad62e5b62243a97107ffdd88cfab84f5",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\xiaomi-token-plan-ams.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/xiaomi-token-plan-ams.ts",
+      "bytes": 690,
+      "sha256": "59d03fc70eca720f8ca9a9f676aedaf241524dac26c179a78e2e30aabe116e0f",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\xiaomi-token-plan-cn.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/xiaomi-token-plan-cn.models.ts",
+      "bytes": 909,
+      "sha256": "ab5ba3bbabd3151d2f49fa6265820acd2c411078a11e29adc37553df055da202",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\xiaomi-token-plan-cn.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/xiaomi-token-plan-cn.ts",
+      "bytes": 681,
+      "sha256": "255528bca12e929f0f683bcbf5a6b8ef0de779bb484b128bdda23bf2fb80caa8",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\xiaomi-token-plan-sgp.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/xiaomi-token-plan-sgp.models.ts",
+      "bytes": 919,
+      "sha256": "563bc158198cd71ee3b7a11f82cede435b6bf8639e8f5d28b991774281bbe29b",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\xiaomi-token-plan-sgp.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/xiaomi-token-plan-sgp.ts",
+      "bytes": 690,
+      "sha256": "536da73a1588741c6a70809b5e94ab5a1ba2b8e81f24116e3ed734d6bc60b5e8",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\xiaomi.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/xiaomi.models.ts",
+      "bytes": 769,
+      "sha256": "48a397a32de798e75848e845bcac2f10ffbbf1071029999065686549611c2100",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\xiaomi.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/xiaomi.ts",
+      "bytes": 562,
+      "sha256": "d0d20dbcbcecca8b02948df1506ffa474461565546f7c24dfce44aebebef2344",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\zai-coding-cn.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/zai-coding-cn.models.ts",
+      "bytes": 839,
+      "sha256": "6a38f8f692f55557ef8652ecc869c299aceeaa4298de3987dcd47cb8c188c29f",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\zai-coding-cn.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/zai-coding-cn.ts",
+      "bytes": 632,
+      "sha256": "89ff82b1f7b1a7e3427498598ce03574d76217f1c38b0d1731be82b6d8ff87a7",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\zai.models.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/zai.models.ts",
+      "bytes": 739,
+      "sha256": "2048e479e6b2e76754b8d8b3c2bf1ced55b5d1d8592c6eee25608a522ba82176",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\providers\\zai.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/providers/zai.ts",
+      "bytes": 546,
+      "sha256": "489a48539c3abc291315dad6f8b7c5554f5f3f9bf8b2a11a60d4ab2cbd3c2f74",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-session-context-oracle-v0.99.1\\upstream\\packages\\ai\\src\\utils\\provider-env.ts",
+      "relative": "2026-09-30/task-2/Pi-session-context-oracle-v0.99.1/upstream/packages/ai/src/utils/provider-env.ts",
+      "bytes": 1718,
+      "sha256": "3829251ae0674cef7ca09800cee9f46d4e305770129b72b822ea2f6f85efe675",
+      "origin": "unchanged canonical2093 checkout"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\.manifest.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/.manifest.json",
+      "bytes": 3779,
+      "sha256": "58698cae7d0a3b270f360072c6106435ca1870a178254bd80d5dbfb4716734e6",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\amazon-bedrock.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/amazon-bedrock.json",
+      "bytes": 90990,
+      "sha256": "c6e1a0105ac45dbf41eba6311562d55ccbed48a5d1ce4c8d9b8e86ff9a572863",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\ant-ling.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/ant-ling.json",
+      "bytes": 1692,
+      "sha256": "628feab3ef6c7d80ce96f75999804e1d9f05fec3851e5302e30fff3b69db90f6",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\anthropic.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/anthropic.json",
+      "bytes": 10901,
+      "sha256": "3ff00b68990382e42626ebd1b65dcc28ae3cad9e6faa8920331ba92f067f1b3a",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\azure-openai-responses.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/azure-openai-responses.json",
+      "bytes": 20456,
+      "sha256": "af60bfc0f822233177c69b63cb9d7aa9e6c99829da729f5e4805023f6e3d96e1",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\baseten.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/baseten.json",
+      "bytes": 17098,
+      "sha256": "883cdb952fd9eb8d8e3605c460744af36802d325f9a38f75998365e2871a5bcc",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\cerebras.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/cerebras.json",
+      "bytes": 1109,
+      "sha256": "c07ed7880030c5c85a89520ec4e0fceaf2b2988356345cb1287538337971badd",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\cloudflare-ai-gateway.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/cloudflare-ai-gateway.json",
+      "bytes": 36059,
+      "sha256": "52decade622d1d25f1af90385b1aec7331dad00d56e010a5e4d15118efae67ce",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\cloudflare-workers-ai.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/cloudflare-workers-ai.json",
+      "bytes": 12659,
+      "sha256": "b9f76cc83756a05920a8a7046c515919a1de918331b860a211f309bb716c4bb0",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\deepseek.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/deepseek.json",
+      "bytes": 1387,
+      "sha256": "10a296fb3e898f7715c80890c8af0af4f5fd58f22dbcd6612fdc5d762157ccdc",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\fireworks.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/fireworks.json",
+      "bytes": 16231,
+      "sha256": "d6144ba451bd7a0617669527bec1898f97a633f7d7ea5035d8e03234550340c0",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\github-copilot.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/github-copilot.json",
+      "bytes": 26521,
+      "sha256": "b5a5defdbb6a351d3764ec542dd2b194c1162a4f6ee977494dcc43e7d6873597",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\google-vertex.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/google-vertex.json",
+      "bytes": 7825,
+      "sha256": "40090c680538bc867f2624d986a449f361be4dfa6ba96d7a27402050f036e009",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\google.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/google.json",
+      "bytes": 13373,
+      "sha256": "c0f5a633e5e5a5044432db3e537f4bc674d4de18df09325c6349547fcc13cabe",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\groq.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/groq.json",
+      "bytes": 3354,
+      "sha256": "910952ad9dad07856983459d63fce0148dba1203edd7b10d801a77c5824f3405",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\huggingface.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/huggingface.json",
+      "bytes": 36433,
+      "sha256": "1b8604bd31a5e05fe43a40ec1ec6dfc1a51a28b0b020151ef057fab43f57c923",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\kimi-coding.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/kimi-coding.json",
+      "bytes": 2282,
+      "sha256": "582250b920454d98940da3e7e99d30b807edbea28f2eb8ac15f658d2ef41e8fc",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\meta.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/meta.json",
+      "bytes": 2819,
+      "sha256": "0c7e9a370a7005c5a89dc94f0f93bc67b8935c3f802de324f11af6ff56fff429",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\minimax-cn.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/minimax-cn.json",
+      "bytes": 1127,
+      "sha256": "f962c20ee6a6a342820f778e9dc363a18a524bf11998f6e2c57f2989915d62e5",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\minimax.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/minimax.json",
+      "bytes": 1112,
+      "sha256": "17a432f80d0ea6dd26eade80a4314250d3a855678601728a5f70dd8fa0d21dd2",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\mistral.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/mistral.json",
+      "bytes": 12596,
+      "sha256": "10f33bff9adf1248f7e6848e5890c265399f1f94e5b42cfdc28c109d547af98d",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\moonshotai-cn.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/moonshotai-cn.json",
+      "bytes": 2882,
+      "sha256": "79c9585dc84ee525ebaebbc78b3c55f3d369ec884d4f943488f1e0b14e3587f5",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\moonshotai.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/moonshotai.json",
+      "bytes": 2870,
+      "sha256": "1da2c4e34f22aef17a07c974d85bdee8e1b68b6dc712e3769c935b3f1e7dadca",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\nvidia.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/nvidia.json",
+      "bytes": 12038,
+      "sha256": "3b4e7b799bf3eaacd1af0491eef77fe33147ea7f72a3a9fa54d77af0e7eacf4c",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\openai-codex.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/openai-codex.json",
+      "bytes": 6476,
+      "sha256": "3cc35a7e122e5c77ee8ec30a9a3bd8bd59629997e85ba2cb3f9e0ed62e9a09c0",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\openai.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/openai.json",
+      "bytes": 28816,
+      "sha256": "ca5ec1028efc512502591bf2562a2a6dc330f26a5f4c4a08c8a149a43c5bd7da",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\opencode-go.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/opencode-go.json",
+      "bytes": 17032,
+      "sha256": "d05b3eb87b81c6e5a94801484e668e660fe60c68f06a972b716d581c3bbd7c25",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\opencode.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/opencode.json",
+      "bytes": 44976,
+      "sha256": "4adb1cfc19a5294a2d9ea5179089b86364ddbfa31485043a3fc278fa8f7e2e73",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\openrouter.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/openrouter.json",
+      "bytes": 267751,
+      "sha256": "b49405ced089750d475945738a91ac669fa00e04d574da7720935bcfe16ba272",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\qwen-token-plan-cn.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/qwen-token-plan-cn.json",
+      "bytes": 12210,
+      "sha256": "2469a4091c474ec3db0a49a9962d8d2726c074ad9065b96bc4e0c87861c4c6c5",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\qwen-token-plan-individual.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/qwen-token-plan-individual.json",
+      "bytes": 5782,
+      "sha256": "0fb7cf64faf39d1a3b0a884210a86c87084b805eda15644f5f39293287b959dd",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\qwen-token-plan.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/qwen-token-plan.json",
+      "bytes": 12230,
+      "sha256": "eff10620cb577142de4ec02698d5961a71fda2fe4f6ae7ea9432bad9d6844176",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\radius.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/radius.json",
+      "bytes": 19164,
+      "sha256": "8e868af981cc64a39da11b135a96252e3eeccb14b92e80d8fbba899ff96f2616",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\together.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/together.json",
+      "bytes": 12930,
+      "sha256": "94ec3839972061405885d64f5fdbde48eb1f29a159be5e607e9770befd54e28e",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\typesafe.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/typesafe.json",
+      "bytes": 291,
+      "sha256": "a4429a2f696d5cc5273969af61a7310bda07d6bdcd27bf9ac9c76c534cc43716",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\vercel-ai-gateway.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/vercel-ai-gateway.json",
+      "bytes": 118194,
+      "sha256": "e64081d4ced20a7e754dab586d5f733eb92f00feab30c76fdcb7ce29ce5111be",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\xai.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/xai.json",
+      "bytes": 2609,
+      "sha256": "879c49b78b663a52a220ac4ee013e726b10c4f50aaa03bc58ee53a4b54c76928",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\xiaomi-token-plan-ams.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/xiaomi-token-plan-ams.json",
+      "bytes": 2156,
+      "sha256": "ca65178f4525d9705bc8d085ed136cecbe149c4080e857ea6a64ae643d2ac00a",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\xiaomi-token-plan-cn.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/xiaomi-token-plan-cn.json",
+      "bytes": 2148,
+      "sha256": "b065326926681c2262084e59c1c19ebdaf146c07107b5242c76b456becf74db0",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\xiaomi-token-plan-sgp.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/xiaomi-token-plan-sgp.json",
+      "bytes": 2156,
+      "sha256": "92c3d6d707f81fd9cd2b6d1fb57dc431d90ba51e10fe49d97bc8806035c23492",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\xiaomi.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/xiaomi.json",
+      "bytes": 3144,
+      "sha256": "b81d01a374f7b558728c78d81f4168efa9c8996e6e2b5618409a8094b083c759",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\zai-coding-cn.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/zai-coding-cn.json",
+      "bytes": 2672,
+      "sha256": "ee5ee705fb6e413a6088db5e3616c27fce802a8ece6c355f1db35490d787f610",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\upstream\\packages\\ai\\src\\providers\\data\\zai.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/upstream/packages/ai/src/providers/data/zai.json",
+      "bytes": 4221,
+      "sha256": "58e6642fdfb736f0b9a4a277c760c536a3cea66a030abbfb2615f7b2851d5c6f",
+      "origin": "publisher v0.99.1 source release; generated data excluded from original Git2093"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-session-compaction-work\\artifacts\\compaction-reference\\supplemental-qualification.json",
+      "relative": "2026-10-02/task/PiSharp-session-compaction-work/artifacts/compaction-reference/supplemental-qualification.json",
+      "bytes": 31953,
+      "sha256": "77984826c6ab2506d7ed8903fa3ee626150b3220e812a1676ba9dcb233796ddd",
+      "origin": "preserved provenance/qualification"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\.pisharp-released-catalog-admitted.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/.pisharp-released-catalog-admitted.json",
+      "bytes": 1887205,
+      "sha256": "2e5fea6e5ed55fdff54dfc507499eb98e0bfba6851a9004d6c5e9b1af09981f4",
+      "origin": "preserved provenance/qualification"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\archives\\released-baseline\\pi-0.99.1-source.tar.gz",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/archives/released-baseline/pi-0.99.1-source.tar.gz",
+      "bytes": 8646242,
+      "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b",
+      "origin": "preserved provenance/qualification"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-session-compaction-work\\fixtures\\pi-v0.99.1\\session-context\\oracle.lock.json",
+      "relative": "2026-10-02/task/PiSharp-session-compaction-work/fixtures/pi-v0.99.1/session-context/oracle.lock.json",
+      "bytes": 153026,
+      "sha256": "b2fbfda80b8aee1bf3cbd1742cfe13c575d0032250d8f316b1503b8c400552f2",
+      "origin": "preserved provenance/qualification"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\archives\\released-baseline\\evidence.lock.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/archives/released-baseline/evidence.lock.json",
+      "bytes": 1263,
+      "sha256": "6fe01c9a77d39505c154b1b20c65d838513a8efba17ea58164aaa38e7b81456c",
+      "origin": "preserved provenance/qualification"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\archives\\released-baseline\\metadata.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/archives/released-baseline/metadata.json",
+      "bytes": 72880,
+      "sha256": "1aafbfc3e2a0610b4066dd4cd94e239a64bc3b08506cd0d67f41cd18a34af789",
+      "origin": "preserved provenance/qualification"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\archives\\released-baseline\\inspection.json",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/archives/released-baseline/inspection.json",
+      "bytes": 41808,
+      "sha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b",
+      "origin": "preserved provenance/qualification"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\archives\\released-baseline\\SHA256SUMS",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/archives/released-baseline/SHA256SUMS",
+      "bytes": 823,
+      "sha256": "1490fbb52c4cbf6f175b1b66147702b5e6584504277fc0c424745c32770bdbba",
+      "origin": "preserved provenance/qualification"
+    },
+    {
+      "original": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-typescript-semantic-released-catalog-v0.99.1\\archives\\released-baseline\\acquire.mjs",
+      "relative": "2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1/archives/released-baseline/acquire.mjs",
+      "bytes": 22861,
+      "sha256": "fa8b32ff4dc22d9be52c3796c353f89983b9ae2aa3720a75eaaf303112f7b517",
+      "origin": "preserved provenance/qualification"
+    }
+  ],
+  "mismatches": 0
+}

@@ -84,13 +84,12 @@ public sealed partial class PersistentAgentSession
         while(true)
         {
             allTurns.AddRange(result.Turns);
-            var recovery=token.IsCancellationRequested?RecoveryDecision.None:await TryRecoveryAsync(result,idle,token,operation,attempted).ConfigureAwait(false);
+            if (!token.IsCancellationRequested && await TryAutomaticRetryAsync(result, idle, token).ConfigureAwait(false))
+            { SetOperationPhase(SessionOperationPhase.Provider); result = await _agent.ContinueAsync(token).ConfigureAwait(false); runs++; continue; }
+            var recovery=token.IsCancellationRequested?RecoveryDecision.None:await RunAutomaticBoundaryAsync(result,idle,token,operation,attempted).ConfigureAwait(false);
             attempted|=recovery.Attempted;
             if(recovery.Retry)
             { SetOperationPhase(SessionOperationPhase.Provider);result=await _agent.ContinueAsync(token).ConfigureAwait(false);runs++;continue; }
-            // Threshold compaction remains separate from explicit failed-attempt recovery.
-            if(!recovery.Handled&&!token.IsCancellationRequested)
-            { SetOperationPhase(SessionOperationPhase.Compaction);await RunConfiguredAutomaticCompactionAsync(idle,token).ConfigureAwait(false); }
             Func<CancellationToken,ValueTask>? boundary;lock(_gate)boundary=_beforeSettlement;
             SetOperationPhase(SessionOperationPhase.BeforeSettlement);
             if(boundary is not null&&!token.IsCancellationRequested)await boundary(token).ConfigureAwait(false);

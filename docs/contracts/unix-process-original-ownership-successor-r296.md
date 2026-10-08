@@ -1,0 +1,11 @@
+# Unix original-operation ownership correction, R296
+
+Separate successor of frozen 52acbcfabe70b4e2c1ac7b81aede21dbc4759a7a. The original leaf commit, bundle, postimages and handoff remain unchanged.
+
+The original callback invocation called a multicast delegate as one function and received only its final ValueTask, abandoning earlier subscribers. The successor expands its invocation list in registration order, awaits each original subscriber task before invoking the next, continues later subscribers after an earlier failure, and signals stop upon each failure. Every started subscriber remains joined through cancellation or failure. All leaf exception objects from the completed original Task.Exception collection remain in UnixProcessOperation.OriginalFaults; synchronous invocation errors also remain present.
+
+Each pipe read now captures its original Task before awaiting it. Failed and canceled original reads remain inspectable in OriginalTasks. A faulted task containing OperationCanceledException remains a fault even after owned cleanup cancellation starts. Suppression requires the original task to actually be canceled and its observed cancellation token to match the owned read token. Channel-write cancellation uses the same task-state and token checks. Successful read tasks are joined directly; they are not accumulated in the evidence list, avoiding an unbounded list of successful read iterations from externally held pipes.
+
+UnixProcessGroupLease retains its original cleanup tasks and collects their complete original fault sets. The runner's cleanup observer also retains all faults from each original cleanup task, rather than only the exception selected by await.
+
+Two new synthetic groups exercise a held earlier multicast subscriber with two original faults followed by a synchronous later fault, and a held faulted original read with a foreign OperationCanceledException plus an independent IO fault released during owned cleanup cancellation. The six total groups are authored and unexecuted. Shared Program registration is still coordinator-owned. No native process, signal, compiler, build, test, network, credential or SDK execution occurred. Production atomic group admission and physical Linux/macOS qualification remain open.

@@ -14,7 +14,8 @@ public sealed record ResponsesTranscriptProjectionOptions(
     int MaximumMessages = 256, int MaximumEntryCharacters = 65_536, int MaximumInputCharacters = 1_048_576,
     int MaximumContentBlocks = 1024, int MaximumJsonDepth = 32,
     int MaximumOutputItems = 1024, int MaximumOutputCharacters = 1_048_576,
-    ResponsesToolDeclarationProjectionOptions? ToolDeclarations = null);
+    ResponsesToolDeclarationProjectionOptions? ToolDeclarations = null,
+    bool SynthesizeMissingToolResults = false);
 
 public enum ResponsesProjectionFailure
 {
@@ -216,7 +217,19 @@ public sealed class ResponsesTranscriptProjector
             var matched = new HashSet<string>(StringComparer.Ordinal); var held = new List<Entry>();
             void Close()
             {
-                if (pending.Keys.Any(id => !matched.Contains(id))) throw Failure(ResponsesProjectionFailure.UnmatchedToolResult);
+                // Pi d86654 transform-messages.ts closes orphaned calls before the next
+                // user/assistant or EOF, then flushes transparent system updates.
+                foreach (var (id, name) in pending)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (matched.Contains(id)) continue;
+                    if (!options.SynthesizeMissingToolResults) throw Failure(ResponsesProjectionFailure.UnmatchedToolResult);
+                    var body = new JsonObject { ["role"] = "toolResult", ["toolCallId"] = id,
+                        ["toolName"] = name, ["content"] = new JsonArray(new JsonObject
+                        { ["type"] = "text", ["text"] = "No result provided" }), ["isError"] = true,
+                        ["timestamp"] = request.Timestamp };
+                    result.Add(new("toolResult", JsonData.Parse(body.ToJsonString(OutputJson))));
+                }
                 pending.Clear(); matched.Clear(); result.AddRange(held); held.Clear();
             }
             foreach (var entry in entries)

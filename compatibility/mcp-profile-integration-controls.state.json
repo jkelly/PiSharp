@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "slice": "ordinary-mcp-profile-integration-controls",
+  "upstreamSource": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "baseCommit": "5971069dce48f295fb2ea6a0f75b3c65990cf76d",
+  "authoredGroups": 5,
+  "executedGroups": 0,
+  "registered": false,
+  "suggestedFilter": "mcp-profile.",
+  "requiredRegistration": ".Concat(McpProfileIntegrationTests.Cases())",
+  "staticChecks": ["git diff --check", "source API and fixture shape inspection"],
+  "scope": [
+    "ordinary create overloads with captured declaration activation and withdrawal",
+    "ordinary resume actual provider declarations and unchanged durable prefix",
+    "actual profile lifecycle replacement generation, catalog and ownership",
+    "native registry and final policy mismatch original cleanup joins and fault identities",
+    "ordinary RPC get_state acknowledgment and explicitly gated EOF cleanup"
+  ],
+  "remainingGates": [
+    "coordinator registration",
+    "independent source review",
+    "exact native build and execution admission",
+    "actual host shutdown and transport retirement qualification",
+    "captured tool execution requires the existing final policy grants"
+  ],
+  "noFullMcpParityClaim": true,
+  "noNativeOrLiveExecution": true
+}

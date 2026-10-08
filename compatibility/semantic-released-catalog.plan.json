@@ -1,0 +1,455 @@
+{
+  "schemaVersion": 1,
+  "kind": "exact-released-source-catalog-inert-semantic-stage-D",
+  "status": "authored; root review and exclusive assembly/admission pending",
+  "oracle": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-released-catalog-v0.99.1",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "origin": {
+    "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-declarations-leaves-v0.99.1",
+    "receipt": ".pisharp-leaf-declarations-admitted.json",
+    "receiptSha256": "0c3bb31d39dd7ed9c63dcefb11b7c3677b05352505a6fa63d418c567f691f1ae",
+    "receiptBytes": 1038729,
+    "payloadFiles": 4538,
+    "sourceFiles": 2093,
+    "canonicalFingerprint": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3",
+    "verifier": "tools/SemanticInventory/full-project-leaves-common.mjs",
+    "metadataPins": [
+      {
+        "path": ".pisharp-leaf-declarations-owner.json",
+        "bytes": 1166,
+        "sha256": "48e770efb28e5de87495192486df88120830a35b9428183bc7bbd84749dc25a6"
+      },
+      {
+        "path": ".pisharp-leaf-declarations-prepared.json",
+        "bytes": 804766,
+        "sha256": "62d43b0c534d26bd3597e23651b42973eb306c3b0497e0f579924b6589a050c9"
+      },
+      {
+        "path": ".pisharp-leaf-declarations-admission-started.json",
+        "bytes": 1154,
+        "sha256": "3d50dcc33db9a5067a7d6064362fc186c55cb829b9bed0452a6ea0fd621d13fa"
+      }
+    ]
+  },
+  "runtime": {
+    "path": "P:/PiSharp/root/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe",
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "dependencies": [
+    {
+      "path": "compatibility/semantic-full-project-leaves.plan.json",
+      "bytes": 9330,
+      "sha256": "d0f277e2f7d9d040f9334b1dc63ecdc0306657a1d6fbe18271e22519ba298f6e"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-leaves-common.mjs",
+      "bytes": 9494,
+      "sha256": "fcb29ed9bfe942ed64ccfa72757215a4076391ddc59268553d0b68f24af0e2a3"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "bytes": 18430,
+      "sha256": "df5b99d591731d56607d4d8eb505bfbdb25581d50a2652c2dbd90cc05dc00eba"
+    },
+    {
+      "path": "tools/SemanticInventory/node-declaration-archive.mjs",
+      "bytes": 6790,
+      "sha256": "baee47b869aab6d2409c0a3906b1e0ea5bf5fe236ca24837fae71aa81d633ffd"
+    },
+    {
+      "path": "tools/CompatibilityReport/raw-json.mjs",
+      "bytes": 3665,
+      "sha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9"
+    }
+  ],
+  "release": {
+    "tag": "v0.99.1",
+    "publishedAt": "2026-09-29T18:27:00Z",
+    "htmlUrl": "https://github.com/earendil-works/pi/releases/tag/v0.99.1",
+    "apiReportedImmutable": false,
+    "archiveUrl": "https://github.com/earendil-works/pi/releases/download/v0.99.1/pi-0.99.1-source.tar.gz",
+    "archiveBytes": 8646242,
+    "archiveSha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b",
+    "checksumFileSha256": "1490fbb52c4cbf6f175b1b66147702b5e6584504277fc0c424745c32770bdbba",
+    "root": "pi-0.99.1",
+    "pins": [
+      {
+        "path": "artifacts/released-baseline/evidence.lock.json",
+        "bytes": 1263,
+        "sha256": "6fe01c9a77d39505c154b1b20c65d838513a8efba17ea58164aaa38e7b81456c"
+      },
+      {
+        "path": "artifacts/released-baseline/acquire.mjs",
+        "bytes": 22861,
+        "sha256": "fa8b32ff4dc22d9be52c3796c353f89983b9ae2aa3720a75eaaf303112f7b517"
+      },
+      {
+        "path": "artifacts/released-baseline/inspection.json",
+        "bytes": 41808,
+        "sha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b"
+      },
+      {
+        "path": "artifacts/released-baseline/metadata.json",
+        "bytes": 72880,
+        "sha256": "1aafbfc3e2a0610b4066dd4cd94e239a64bc3b08506cd0d67f41cd18a34af789"
+      },
+      {
+        "path": "artifacts/released-baseline/SHA256SUMS",
+        "bytes": 823,
+        "sha256": "1490fbb52c4cbf6f175b1b66147702b5e6584504277fc0c424745c32770bdbba"
+      },
+      {
+        "path": "artifacts/released-baseline/pi-0.99.1-source.tar.gz",
+        "bytes": 8646242,
+        "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b"
+      }
+    ],
+    "regularFiles": 2136,
+    "directories": 249,
+    "metadataHeaders": 0,
+    "attributeConversions": [
+      "pi-test.bat",
+      "pi-test.ps1"
+    ],
+    "sourceLicense": {
+      "path": "LICENSE",
+      "bytes": 1069,
+      "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48",
+      "declaration": "MIT",
+      "attribution": "Copyright (c) 2025 Mario Zechner",
+      "fullDependencyAndCatalogLicensingReviewed": false
+    },
+    "sourceArchiveReadOnly": true,
+    "acquisitionScriptImported": false,
+    "canonicalGitEvidence": {
+      "root": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-typescript-semantic-oracle-v0.99.1",
+      "receipt": ".pisharp-semantic-api-oracle.json",
+      "bytes": 1287964,
+      "sha256": "1dd4d68e2702eaa3327bfd3d21b9df052bb0dffd931375974b9891088c67b28d"
+    },
+    "recordedSourceIdentities": [
+      {
+        "path": "pi-test.bat",
+        "mode": "100644",
+        "gitBlob": "048a99db8df91ad4440848c4ae7124ef4e978df8",
+        "bytes": 338,
+        "sha256": "d454a5a0e203d9009283b887720472b022b0853380758b11419c8547a32dbb88",
+        "publisherArchiveAndPriorCheckout": {
+          "bytes": 352,
+          "sha256": "c9d3430a614cabfaae5a9e97259643ab9041629bc8253f58f22579a5b6d9c448"
+        },
+        "relationship": "raw publisher archive already carries recorded checkout CRLF; raw canonical Git blob is LF; temporary comparison only, no old payload rewrite"
+      },
+      {
+        "path": "pi-test.ps1",
+        "mode": "100644",
+        "gitBlob": "dc3625a57c68db8e3d89a93e853bce266aff79ad",
+        "bytes": 1737,
+        "sha256": "9f76d37f75b1d6f03be14d8bce3ca05331c4b09b8003a53329d8e4fe942792ef",
+        "publisherArchiveAndPriorCheckout": {
+          "bytes": 1805,
+          "sha256": "9b97fa3be6582e935f43865599d21bbb216e5ffe2cb1eb198c77e7298490b895"
+        },
+        "relationship": "raw publisher archive already carries recorded checkout CRLF; raw canonical Git blob is LF; temporary comparison only, no old payload rewrite"
+      }
+    ]
+  },
+  "catalog": {
+    "files": [
+      {
+        "path": "packages/ai/src/providers/data/.manifest.json",
+        "bytes": 3779,
+        "sha256": "58698cae7d0a3b270f360072c6106435ca1870a178254bd80d5dbfb4716734e6"
+      },
+      {
+        "path": "packages/ai/src/providers/data/amazon-bedrock.json",
+        "bytes": 90990,
+        "sha256": "c6e1a0105ac45dbf41eba6311562d55ccbed48a5d1ce4c8d9b8e86ff9a572863"
+      },
+      {
+        "path": "packages/ai/src/providers/data/ant-ling.json",
+        "bytes": 1692,
+        "sha256": "628feab3ef6c7d80ce96f75999804e1d9f05fec3851e5302e30fff3b69db90f6"
+      },
+      {
+        "path": "packages/ai/src/providers/data/anthropic.json",
+        "bytes": 10901,
+        "sha256": "3ff00b68990382e42626ebd1b65dcc28ae3cad9e6faa8920331ba92f067f1b3a"
+      },
+      {
+        "path": "packages/ai/src/providers/data/azure-openai-responses.json",
+        "bytes": 20456,
+        "sha256": "af60bfc0f822233177c69b63cb9d7aa9e6c99829da729f5e4805023f6e3d96e1"
+      },
+      {
+        "path": "packages/ai/src/providers/data/baseten.json",
+        "bytes": 17098,
+        "sha256": "883cdb952fd9eb8d8e3605c460744af36802d325f9a38f75998365e2871a5bcc"
+      },
+      {
+        "path": "packages/ai/src/providers/data/cerebras.json",
+        "bytes": 1109,
+        "sha256": "c07ed7880030c5c85a89520ec4e0fceaf2b2988356345cb1287538337971badd"
+      },
+      {
+        "path": "packages/ai/src/providers/data/cloudflare-ai-gateway.json",
+        "bytes": 36059,
+        "sha256": "52decade622d1d25f1af90385b1aec7331dad00d56e010a5e4d15118efae67ce"
+      },
+      {
+        "path": "packages/ai/src/providers/data/cloudflare-workers-ai.json",
+        "bytes": 12659,
+        "sha256": "b9f76cc83756a05920a8a7046c515919a1de918331b860a211f309bb716c4bb0"
+      },
+      {
+        "path": "packages/ai/src/providers/data/deepseek.json",
+        "bytes": 1387,
+        "sha256": "10a296fb3e898f7715c80890c8af0af4f5fd58f22dbcd6612fdc5d762157ccdc"
+      },
+      {
+        "path": "packages/ai/src/providers/data/fireworks.json",
+        "bytes": 16231,
+        "sha256": "d6144ba451bd7a0617669527bec1898f97a633f7d7ea5035d8e03234550340c0"
+      },
+      {
+        "path": "packages/ai/src/providers/data/github-copilot.json",
+        "bytes": 26521,
+        "sha256": "b5a5defdbb6a351d3764ec542dd2b194c1162a4f6ee977494dcc43e7d6873597"
+      },
+      {
+        "path": "packages/ai/src/providers/data/google-vertex.json",
+        "bytes": 7825,
+        "sha256": "40090c680538bc867f2624d986a449f361be4dfa6ba96d7a27402050f036e009"
+      },
+      {
+        "path": "packages/ai/src/providers/data/google.json",
+        "bytes": 13373,
+        "sha256": "c0f5a633e5e5a5044432db3e537f4bc674d4de18df09325c6349547fcc13cabe"
+      },
+      {
+        "path": "packages/ai/src/providers/data/groq.json",
+        "bytes": 3354,
+        "sha256": "910952ad9dad07856983459d63fce0148dba1203edd7b10d801a77c5824f3405"
+      },
+      {
+        "path": "packages/ai/src/providers/data/huggingface.json",
+        "bytes": 36433,
+        "sha256": "1b8604bd31a5e05fe43a40ec1ec6dfc1a51a28b0b020151ef057fab43f57c923"
+      },
+      {
+        "path": "packages/ai/src/providers/data/kimi-coding.json",
+        "bytes": 2282,
+        "sha256": "582250b920454d98940da3e7e99d30b807edbea28f2eb8ac15f658d2ef41e8fc"
+      },
+      {
+        "path": "packages/ai/src/providers/data/meta.json",
+        "bytes": 2819,
+        "sha256": "0c7e9a370a7005c5a89dc94f0f93bc67b8935c3f802de324f11af6ff56fff429"
+      },
+      {
+        "path": "packages/ai/src/providers/data/minimax-cn.json",
+        "bytes": 1127,
+        "sha256": "f962c20ee6a6a342820f778e9dc363a18a524bf11998f6e2c57f2989915d62e5"
+      },
+      {
+        "path": "packages/ai/src/providers/data/minimax.json",
+        "bytes": 1112,
+        "sha256": "17a432f80d0ea6dd26eade80a4314250d3a855678601728a5f70dd8fa0d21dd2"
+      },
+      {
+        "path": "packages/ai/src/providers/data/mistral.json",
+        "bytes": 12596,
+        "sha256": "10f33bff9adf1248f7e6848e5890c265399f1f94e5b42cfdc28c109d547af98d"
+      },
+      {
+        "path": "packages/ai/src/providers/data/moonshotai-cn.json",
+        "bytes": 2882,
+        "sha256": "79c9585dc84ee525ebaebbc78b3c55f3d369ec884d4f943488f1e0b14e3587f5"
+      },
+      {
+        "path": "packages/ai/src/providers/data/moonshotai.json",
+        "bytes": 2870,
+        "sha256": "1da2c4e34f22aef17a07c974d85bdee8e1b68b6dc712e3769c935b3f1e7dadca"
+      },
+      {
+        "path": "packages/ai/src/providers/data/nvidia.json",
+        "bytes": 12038,
+        "sha256": "3b4e7b799bf3eaacd1af0491eef77fe33147ea7f72a3a9fa54d77af0e7eacf4c"
+      },
+      {
+        "path": "packages/ai/src/providers/data/openai-codex.json",
+        "bytes": 6476,
+        "sha256": "3cc35a7e122e5c77ee8ec30a9a3bd8bd59629997e85ba2cb3f9e0ed62e9a09c0"
+      },
+      {
+        "path": "packages/ai/src/providers/data/openai.json",
+        "bytes": 28816,
+        "sha256": "ca5ec1028efc512502591bf2562a2a6dc330f26a5f4c4a08c8a149a43c5bd7da"
+      },
+      {
+        "path": "packages/ai/src/providers/data/opencode-go.json",
+        "bytes": 17032,
+        "sha256": "d05b3eb87b81c6e5a94801484e668e660fe60c68f06a972b716d581c3bbd7c25"
+      },
+      {
+        "path": "packages/ai/src/providers/data/opencode.json",
+        "bytes": 44976,
+        "sha256": "4adb1cfc19a5294a2d9ea5179089b86364ddbfa31485043a3fc278fa8f7e2e73"
+      },
+      {
+        "path": "packages/ai/src/providers/data/openrouter.json",
+        "bytes": 267751,
+        "sha256": "b49405ced089750d475945738a91ac669fa00e04d574da7720935bcfe16ba272"
+      },
+      {
+        "path": "packages/ai/src/providers/data/qwen-token-plan-cn.json",
+        "bytes": 12210,
+        "sha256": "2469a4091c474ec3db0a49a9962d8d2726c074ad9065b96bc4e0c87861c4c6c5"
+      },
+      {
+        "path": "packages/ai/src/providers/data/qwen-token-plan-individual.json",
+        "bytes": 5782,
+        "sha256": "0fb7cf64faf39d1a3b0a884210a86c87084b805eda15644f5f39293287b959dd"
+      },
+      {
+        "path": "packages/ai/src/providers/data/qwen-token-plan.json",
+        "bytes": 12230,
+        "sha256": "eff10620cb577142de4ec02698d5961a71fda2fe4f6ae7ea9432bad9d6844176"
+      },
+      {
+        "path": "packages/ai/src/providers/data/radius.json",
+        "bytes": 19164,
+        "sha256": "8e868af981cc64a39da11b135a96252e3eeccb14b92e80d8fbba899ff96f2616"
+      },
+      {
+        "path": "packages/ai/src/providers/data/together.json",
+        "bytes": 12930,
+        "sha256": "94ec3839972061405885d64f5fdbde48eb1f29a159be5e607e9770befd54e28e"
+      },
+      {
+        "path": "packages/ai/src/providers/data/typesafe.json",
+        "bytes": 291,
+        "sha256": "a4429a2f696d5cc5273969af61a7310bda07d6bdcd27bf9ac9c76c534cc43716"
+      },
+      {
+        "path": "packages/ai/src/providers/data/vercel-ai-gateway.json",
+        "bytes": 118194,
+        "sha256": "e64081d4ced20a7e754dab586d5f733eb92f00feab30c76fdcb7ce29ce5111be"
+      },
+      {
+        "path": "packages/ai/src/providers/data/xai.json",
+        "bytes": 2609,
+        "sha256": "879c49b78b663a52a220ac4ee013e726b10c4f50aaa03bc58ee53a4b54c76928"
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi-token-plan-ams.json",
+        "bytes": 2156,
+        "sha256": "ca65178f4525d9705bc8d085ed136cecbe149c4080e857ea6a64ae643d2ac00a"
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi-token-plan-cn.json",
+        "bytes": 2148,
+        "sha256": "b065326926681c2262084e59c1c19ebdaf146c07107b5242c76b456becf74db0"
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi-token-plan-sgp.json",
+        "bytes": 2156,
+        "sha256": "92c3d6d707f81fd9cd2b6d1fb57dc431d90ba51e10fe49d97bc8806035c23492"
+      },
+      {
+        "path": "packages/ai/src/providers/data/xiaomi.json",
+        "bytes": 3144,
+        "sha256": "b81d01a374f7b558728c78d81f4168efa9c8996e6e2b5618409a8094b083c759"
+      },
+      {
+        "path": "packages/ai/src/providers/data/zai-coding-cn.json",
+        "bytes": 2672,
+        "sha256": "ee5ee705fb6e413a6088db5e3616c27fce802a8ece6c355f1db35490d787f610"
+      },
+      {
+        "path": "packages/ai/src/providers/data/zai.json",
+        "bytes": 4221,
+        "sha256": "58e6642fdfb736f0b9a4a277c760c536a3cea66a030abbfb2615f7b2851d5c6f"
+      }
+    ],
+    "filesCount": 43,
+    "totalBytes": 902551,
+    "providers": 42,
+    "models": 1592,
+    "manifest": {
+      "path": "packages/ai/src/providers/data/.manifest.json",
+      "bytes": 3779,
+      "sha256": "58698cae7d0a3b270f360072c6106435ca1870a178254bd80d5dbfb4716734e6",
+      "schemaVersion": 6,
+      "generatedAt": "2026-09-29T18:07:44.679Z",
+      "structureHash": "58511a57fb2db5e984ee62857d8079aec6ff800e19226c327c118e7f57ea916b"
+    },
+    "rawPayloadsUnchanged": true,
+    "sourcePublisherManifestRetained": true,
+    "npmManifestSubstituted": false,
+    "reconstructed": false
+  },
+  "baseline": {
+    "pins": [
+      {
+        "path": "fixtures/semantic-full-project-leaves/expected.json",
+        "bytes": 11900399,
+        "sha256": "9688c7ab648cab659fc12b93cf39d817f9fd398145ed23185c1439790d7a5d28"
+      },
+      {
+        "path": "fixtures/semantic-full-project-leaves/manifest.json",
+        "bytes": 2680,
+        "sha256": "b5c26efdc8c6e15210879712aaf438c488db870cffcba79f3844bf1a57bef606"
+      }
+    ],
+    "snapshotSha256": "9688c7ab648cab659fc12b93cf39d817f9fd398145ed23185c1439790d7a5d28",
+    "rootFiles": 1661,
+    "programSourceFiles": 2400,
+    "unresolvedRecords": 711,
+    "mandatoryLockInstances": 34,
+    "originalSpecifierGroups": 43,
+    "entrypointConditions": 150,
+    "diagnosticCounts": {
+      "getConfigFileParsingDiagnostics": 0,
+      "getGlobalDiagnostics": 0,
+      "getProgramDiagnostics": 0,
+      "getSyntacticDiagnostics": 0,
+      "getBindDiagnostics": 0,
+      "getSemanticDiagnostics": 2259,
+      "getSuggestionDiagnostics": 832,
+      "getDeclarationDiagnostics": 0
+    }
+  },
+  "policy": {
+    "copiedPayloadFiles": 4538,
+    "addedPayloadFiles": 43,
+    "wholePayloadFiles": 4581,
+    "newDeclarations": 0,
+    "network": false,
+    "npm": false,
+    "packageRuntimeImported": false,
+    "compilerImported": false,
+    "nativeExecuted": false,
+    "binLinks": false,
+    "onlySelectedDataExtracted": true,
+    "uncertainRetryAllowed": false,
+    "diagnosticReductionPromised": false
+  },
+  "limits": {
+    "compressedBytes": 10485760,
+    "expandedBytes": 134217728,
+    "compressionRatio": 64,
+    "members": 8192,
+    "memberBytes": 33554432,
+    "pathUtf8Bytes": 1024,
+    "componentUtf8Bytes": 255,
+    "depth": 32,
+    "paxBytes": 131072,
+    "originFileBytes": 33554432,
+    "originTotalBytes": 536870912,
+    "noticeBytes": 65536
+  },
+  "semanticPublicClosure": false,
+  "phaseGatesPassed": []
+}

@@ -1,0 +1,78 @@
+{
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "purpose": "Original P5-08 keyboard-only editor behavior: shifted text and non-Latin base layout bindings through Source Kitty alternate fields; not an expansion into associated-text support.",
+  "cases": [
+    {
+      "id": "shifted-alternate-typing-and-backspace",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[97:65;2u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[98:66;2u"
+        },
+        {
+          "kind": "input",
+          "raw": ""
+        }
+      ]
+    },
+    {
+      "id": "cyrillic-base-layout-line-start-and-insert",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~alpha beta\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[1092::97;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "Z"
+        }
+      ]
+    },
+    {
+      "id": "cyrillic-base-layout-delete-word-and-undo",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~one two\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[1094::119;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        }
+      ]
+    },
+    {
+      "id": "latin-codepoint-authoritative-over-conflicting-base",
+      "cluster": "",
+      "steps": [
+        {
+          "kind": "input",
+          "raw": "\u001b[200~one two\u001b[201~"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[119::97;5u"
+        },
+        {
+          "kind": "input",
+          "raw": "\u001b[45;5u"
+        }
+      ]
+    }
+  ]
+}

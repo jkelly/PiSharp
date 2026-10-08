@@ -12,6 +12,10 @@ public sealed record SessionToolActivationSelection(long Revision, ImmutableArra
 
 public sealed partial class PersistentAgentSession
 {
+    private ImmutableArray<string> RecordedActiveToolNames(SessionContextProjection context, CancellationToken token)
+        => new SessionSystemReplay().Replay(context.Messages, token).Tools
+            .Select(tool => tool.Value.GetProperty("name").GetString()!).ToImmutableArray();
+    internal PiSharp.CodingAgent.ToolSelection.AllowedToolSelection? LifetimeToolSelection => _registry?.LifetimeToolSelection;
     private long _activationEpoch;
     private readonly AsyncLocal<bool> _activationPreparation = new();
     private PendingActivation? _pendingActivation;
@@ -27,7 +31,8 @@ public sealed partial class PersistentAgentSession
     /// <summary>Accept a bounded logical selection. The next request publishes its matching durable loadout and scheduler.</summary>
     public SessionToolActivationSelection ScheduleToolActivation(ImmutableArray<string> names, CancellationToken cancellationToken = default)
     {
-        if (_activationPreparation.Value) throw new InvalidOperationException("Loadout preparation cannot reenter activation.");
+        if (_activationPreparation.Value || _inLoadoutDiagnosticDrain.Value) throw new InvalidOperationException("Loadout preparation or diagnostic reporting cannot reenter activation.");
+        using var preparation = ReserveSynchronousLoadoutWork();
         SessionRuntimeRegistry registry; AgentConfiguration configuration; SessionContextProjection context;
         long epoch; ImmutableArray<string> previous;
         lock (_gate)
@@ -50,7 +55,7 @@ public sealed partial class PersistentAgentSession
         try
         {
             presentation = delta is null ? null : registry.PrepareActiveLoadout(normalized, cancellationToken);
-            if (delta is not null) _ = registry.Resolve(configuration.Model, context.LlmMessages.Add(delta), cancellationToken: cancellationToken,
+            if (delta is not null) _ = registry.Resolve(configuration.Model, context.LlmMessages.Add(delta), configuration.ThinkingLevel, cancellationToken: cancellationToken,
                 prepareLoadout: false, preparedLoadout: presentation);
         }
         finally { _activationPreparation.Value = false; }
@@ -68,7 +73,7 @@ public sealed partial class PersistentAgentSession
 
     private void ThrowActivationAvailable()
     {
-        ThrowAvailable(); _closing.Token.ThrowIfCancellationRequested();
+        ThrowAvailable(); if (_active is null) ThrowUserBashMutationLocked(); _closing.Token.ThrowIfCancellationRequested();
         if (_configuring || _compacting || _editingContext || _appendingExtensionEntry || _activationPublishing)
             throw new InvalidOperationException("Activation cannot race a selected-state transaction.");
         if (_registry?.RequiresInvocationOwner == true && _invocationLifetime is null)
@@ -84,27 +89,35 @@ public sealed partial class PersistentAgentSession
         return () => { _activationEpoch = next; _pendingActivation = null; };
     }
 
-    private ValueTask<AgentRequestPreparation?> PrepareActivationRequestAsync(AgentRequestBoundary boundary, CancellationToken token)
+    private async ValueTask<AgentRequestPreparation?> PrepareActivationRequestAsync(AgentRequestBoundary boundary, CancellationToken token)
     {
+        await DrainLoadoutDiagnosticsAsync(token).ConfigureAwait(false);
         PendingActivation? pending; SessionLogStoreSnapshot log; SessionContextProjection context;
-        TaskCompletionSource operation; long epoch; SessionRuntimeRegistry registry;
+        TaskCompletionSource operation; long epoch; SessionRuntimeRegistry registry; object? priorPromptRevision;
         lock (_gate)
         {
             ThrowAvailable(); token.ThrowIfCancellationRequested();
             pending = _pendingActivation;
-            if (pending is null) return ValueTask.FromResult<AgentRequestPreparation?>(null);
+            if (pending is null && _registry?.HasPromptSectionPreparation != true) return null;
             operation = _active ?? throw new InvalidOperationException("Activation publication requires an owned run.");
             registry = _registry!; log = _acknowledgedLog; context = _context; epoch = _activationEpoch;
+            priorPromptRevision = _acknowledgedPromptRevision;
         }
-        var delta = registry.CreateActivationMessage(pending.Names, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), _clock(), token)
-            ?? throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
+        var names = pending?.Names ?? _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+        var delta = pending is null ? null : registry.CreateActivationMessage(names,
+            _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), _clock(), token);
+        SessionPromptSectionPreparation? promptPreparation;
+        _activationPreparation.Value = true;
+        try { (delta, promptPreparation) = registry.PreparePromptSectionMessage(names, context.Messages, delta, _clock(), token); }
+        finally { _activationPreparation.Value = false; }
+        if (delta is null) { promptPreparation?.ValidateSource(); token.ThrowIfCancellationRequested(); return null; }
         var entry = Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,
             writer => { writer.WritePropertyName("message"); writer.WriteRawValue(delta.WireBody.Value.GetRawText()); });
         var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, token);
-        var verified = registry.Resolve(_configuration.Model, prospective.LlmMessages, cancellationToken: token, prepareLoadout: false,
-            preparedLoadout: pending.Presentation);
+        var verified = registry.Resolve(_configuration.Model, prospective.LlmMessages, _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false,
+            preparedLoadout: pending?.Presentation);
         ValidateRuntimeContext(prospective, verified.Configuration);
-        if (!verified.Configuration.Tools.Select(tool => tool.Name).SequenceEqual(pending.Names, StringComparer.Ordinal))
+        if (!verified.Configuration.Tools.Select(tool => tool.Name).SequenceEqual(names, StringComparer.Ordinal))
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
         var projectedInputs = boundary.PendingInputs.Select(message =>
         {
@@ -114,8 +127,8 @@ public sealed partial class PersistentAgentSession
                 .ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
             return new TranscriptEntry("system", JsonData.Parse(JsonSerializer.Serialize(fields)));
         }).ToImmutableArray();
-        return ValueTask.FromResult<AgentRequestPreparation?>(new(RecoveryConfiguration(verified.Configuration), [delta], Publish)
-            { ProjectedPendingInputs = projectedInputs });
+        return new(RecoveryConfiguration(verified.Configuration), [delta], Publish)
+            { ProjectedPendingInputs = projectedInputs };
 
         async ValueTask Publish(Action publishAgent, CancellationToken cancellation)
         {
@@ -123,11 +136,13 @@ public sealed partial class PersistentAgentSession
             var writeAdmitted = false;
             try
             {
+                promptPreparation?.ValidateSource();
                 lock (_gate)
                 {
                     ThrowAvailable(); cancellation.ThrowIfCancellationRequested();
                     if (_activationEpoch != epoch || !ReferenceEquals(_pendingActivation, pending) || !ReferenceEquals(_active, operation) ||
-                        !ReferenceEquals(_context, context) || !ReferenceEquals(_acknowledgedLog, log))
+                        !ReferenceEquals(_context, context) || !ReferenceEquals(_acknowledgedLog, log) ||
+                        !ReferenceEquals(_registry, registry) || !ReferenceEquals(_acknowledgedPromptRevision, priorPromptRevision))
                         throw new AgentRequestBoundaryStaleException();
                     _activationPublishing = true; writeAdmitted = true;
                 }
@@ -138,6 +153,7 @@ public sealed partial class PersistentAgentSession
                 {
                     // No trusted callbacks/output/cancellation checks between acknowledgment and matching publication.
                     _configuration = verified.Configuration; _context = prospective; _acknowledgedLog = acknowledged.Snapshot;
+                    _acknowledgedPromptRevision = promptPreparation?.Revision ?? _acknowledgedPromptRevision;
                     if (_activationEpoch == epoch && ReferenceEquals(_pendingActivation, pending)) _pendingActivation = null;
                     publishAgent();
                 }

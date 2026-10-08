@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 2,
+  "runtime": {
+    "version": "v24.19.0",
+    "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+    "platform": "win32",
+    "arch": "x64",
+    "v8": "13.6.233.17-node.51"
+  },
+  "harnessPins": [
+    {
+      "path": "tools/ReferenceOracle/capture-ecmascript-json-boundary.mjs",
+      "bytes": 17421,
+      "sha256": "9876f5ae33f5a46b99ba378cb92a5074b1515d2b74f17d150aea000035e98a13"
+    },
+    {
+      "path": "tools/ReferenceOracle/ecmascript-json-boundary-driver.mjs",
+      "bytes": 10812,
+      "sha256": "f295e12b3f8c10ceb9f67147ac829ea905f3c7187d25023d1252e0baafa41cb5"
+    },
+    {
+      "path": "tools/PiReferenceRunner/offline-guard.mjs",
+      "bytes": 784,
+      "sha256": "ae3741bdce496451bd04afcf8628df6ddc5bc5cfad8af6ee5e52cbc7b065a094"
+    }
+  ],
+  "input": {
+    "path": "fixtures/reference/ecmascript-json-boundary/input.json.gz",
+    "encodedBytes": 1237354,
+    "encodedSha256": "ae3bd38e3c5992e3ae3dfd11c9aca3420720acb3ed67402c95cb87fda1c37e64",
+    "decodedBytes": 7609961,
+    "decodedSha256": "a3fcdfbcba4da5f9412027ced81e54ebbbc906a3488cd60a9de60429b6acea52"
+  },
+  "expected": {
+    "path": "fixtures/reference/ecmascript-json-boundary/expected.json.gz",
+    "encodedBytes": 1405918,
+    "encodedSha256": "4980e8158215b0f27b47abe7070e72566ade1774ea809f003bc21d24d7230deb",
+    "decodedBytes": 11206543,
+    "decodedSha256": "a98384918bb7e1abf8ded0c1e2d1448ac186292d32f013a85fd15c5adee27027"
+  },
+  "inputSha256": "a3fcdfbcba4da5f9412027ced81e54ebbbc906a3488cd60a9de60429b6acea52",
+  "expectedSha256": "a98384918bb7e1abf8ded0c1e2d1448ac186292d32f013a85fd15c5adee27027",
+  "encoding": {
+    "kind": "single deterministic gzip member",
+    "level": 9,
+    "headerHex": "1f8b080000000000020a",
+    "crc32AndIsizeVerified": true,
+    "consumedDeflateBytesVerified": true,
+    "encodedMaximumBytes": 8388608,
+    "inputDecodedMaximumBytes": 10485760,
+    "expectedDecodedMaximumBytes": 16777216
+  },
+  "history": {
+    "originalRawPins": {
+      "input.json": "a3fcdfbcba4da5f9412027ced81e54ebbbc906a3488cd60a9de60429b6acea52",
+      "expected.json": "a98384918bb7e1abf8ded0c1e2d1448ac186292d32f013a85fd15c5adee27027",
+      "manifest.json": "77277907e39c8e5a8d6c381ca242ec7ad158358e3dd12034c72c674840548da9",
+      "ecmascript-json-boundary.lock.json": "748fc0caccac67393eab036b7f60145db0e25b8d49115e9311022eb040fa676a",
+      "capture-ecmascript-json-boundary.mjs": "58b49fe66403ccc8d0a82e7c4b88caf1172cdb6bf3859af4f360d23be42b309a",
+      "ecmascript-json-boundary-driver.mjs": "f295e12b3f8c10ceb9f67147ac829ea905f3c7187d25023d1252e0baafa41cb5",
+      "ecmascript-json-boundary-reference.md": "895b30778c6889fe9c07ac2274c3ca0829121e8aaf859c972b079a736a2a9834"
+    },
+    "originalRawCaptureRepeats": 2,
+    "originalRawDefaultRepeats": 2,
+    "nativeFirstGate": "Root reported457/457 Node-absent; immutable6881c9f9d2d643d13ffd6f72a7665f6e42aa60ae; independent acceptance separate"
+  },
+  "gzipControls": {
+    "validRoundTrip": true,
+    "rejectedControls": 8,
+    "trailingAndConcatenatedMembersRejected": true,
+    "crcAndIsizeChecked": true,
+    "declaredAndForgedBombsRejectedWithinOutputCap": true
+  },
+  "observations": {
+    "originalRawRepeats": 2,
+    "originalRawByteIdentical": true,
+    "decodedBytesChangedByPackaging": false,
+    "builtinOnly": true,
+    "noUpstreamSourceQualification": true
+  },
+  "limits": {
+    "childTimeoutMilliseconds": 20000,
+    "childMaximumOldSpaceMiB": 256,
+    "childOutputBytes": 33554432,
+    "inputBytes": 10485760,
+    "goldenBytes": 16777216,
+    "encodedFileBytes": 8388608,
+    "cases": 20000,
+    "caseUtf16Units": 4096
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "kind": "genuine-unchanged-upstream-config-TypeBox-declaration-semantic-diagnostics-reference",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "receiptSha256": "dbd3e3d68465198231ee13f786b0e6b64e171cbb10d7c8b6f7e0eb98c3ec951b",
+  "baselineSnapshotSha256": "48ad3042aed5c1365a470bb885b3500c114044987ceb7c619fadf7eab215ef92",
+  "harness": [
+    {
+      "path": "compatibility/semantic-full-project-typebox.plan.json",
+      "bytes": 7592,
+      "sha256": "09d0e904f54371e1d8a90938840c2a9916816078f53fa3c497df4af340ba033b"
+    },
+    {
+      "path": "docs/compatibility/semantic-full-project-typebox.md",
+      "bytes": 10613,
+      "sha256": "d7a3d6df752622be0901bc5a380d80df3bb6a7e02e482eafcd990c70e187bfdf"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-typebox-common.mjs",
+      "bytes": 18430,
+      "sha256": "df5b99d591731d56607d4d8eb505bfbdb25581d50a2652c2dbd90cc05dc00eba"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-typebox-driver.mjs",
+      "bytes": 10438,
+      "sha256": "b4140990542bf0a74f87419af0fe283b771bd206d68b12e8dfecc4b5f3fb6c05"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-typebox-preload.mjs",
+      "bytes": 8586,
+      "sha256": "62bee8ca085b7d9c0602bd7641bd301e9985851b59d0acbba4638be970dbab29"
+    },
+    {
+      "path": "tools/SemanticInventory/full-project-typebox.test.mjs",
+      "bytes": 20222,
+      "sha256": "866ac40a7ef5312b93e05c1dab733ab2ea81fabfdcc1f941b321bb698274594a"
+    },
+    {
+      "path": "tools/SemanticInventory/run-full-project-typebox.mjs",
+      "bytes": 7003,
+      "sha256": "28be2769e8bfe4fd7118dc86e4d2558da0859dc9962ba83be6bfa19cbbb88c0d"
+    }
+  ],
+  "expected": {
+    "path": "fixtures/semantic-full-project-typebox/expected.json",
+    "bytes": 11827290,
+    "sha256": "003975cf270e49b4bef18b0111fd4a37fa057f818d9867ead0bf94b73f56d73f"
+  },
+  "rawProvenance": [
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-semantic-full-project-typebox-first\\first.json.provenance.json",
+      "sha256": "f830ac26e039fc3a2258d61230ccf19d64ca31fbf95b2d52f2ffd53405cd4079"
+    },
+    {
+      "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-semantic-full-project-typebox-first\\second.json.provenance.json",
+      "sha256": "0cb1b545267f0bbadf89f2a1069fcad0fea6c8e0853f4046f8f3d241d35b9e91"
+    }
+  ],
+  "originalConfigOpenedUnchanged": true,
+  "admittedPackageFiles": 1499,
+  "admittedDeclarationFiles": 799,
+  "newTypeBoxPackageFiles": 1385,
+  "newTypeBoxDeclarationFiles": 691,
+  "diagnosticFiltering": false,
+  "pathNormalization": false,
+  "semanticPublicClosure": false,
+  "phaseGatesPassed": []
+}

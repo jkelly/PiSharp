@@ -1,0 +1,30 @@
+<Project>
+  <!-- Opt-in through CustomAfterMicrosoftCommonTargets; shared projects unchanged. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'PiSharp.Contracts' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Abstractions' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Runtime'">
+    <IsPackable>true</IsPackable>
+    <PackageId>$(MSBuildProjectName)</PackageId>
+    <Version>$(PiSharpReleaseVersion)</Version>
+    <PackageVersion>$(PiSharpReleaseVersion)</PackageVersion>
+    <Authors>PiSharp contributors</Authors>
+    <Description>Native .NET extension contracts and runtime for PiSharp. Compatibility is limited to recorded acceptance evidence.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryCommit>$(PiSharpSourceCommit)</RepositoryCommit>
+    <IncludeSymbols>false</IncludeSymbols>
+    <IncludeSource>false</IncludeSource>
+    <SuppressDependenciesWhenPacking>false</SuppressDependenciesWhenPacking>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'PiSharp.Contracts' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Abstractions' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Runtime'">
+    <None Include="$(MSBuildThisFileDirectory)../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="$(MSBuildThisFileDirectory)../../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="/" />
+    <None Include="$(MSBuildThisFileDirectory)../../README.md" Pack="true" PackagePath="/" />
+    <None Include="$(PiSharpProvenanceFile)" Condition="'$(PiSharpProvenanceFile)' != ''" Pack="true" PackagePath="/provenance.json" />
+  </ItemGroup>
+  <Target Name="ValidatePiSharpNativeSdkPackageInputs" BeforeTargets="Pack" Condition="'$(MSBuildProjectName)' == 'PiSharp.Contracts' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Abstractions' Or '$(MSBuildProjectName)' == 'PiSharp.Extensions.Runtime'">
+    <Error Condition="'$(PiSharpReleaseVersion)' == ''" Text="Explicit private SDK version required." />
+    <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(PiSharpSourceCommit)', '^[0-9a-f]{40}$')) != 'True'" Text="Exact source commit required." />
+    <Error Condition="'$(PiSharpProvenanceFile)' == '' Or !Exists('$(PiSharpProvenanceFile)')" Text="Admitted native SDK provenance required." />
+    <Error Condition="'$(TargetFramework)' != 'net10.0'" Text="Only the reviewed net10.0 public native SDK profile is admitted." />
+  </Target>
+</Project>

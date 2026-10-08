@@ -1,0 +1,397 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "interleaved-thinking-tool",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "authored-synthetic-contract",
+  "scenario": "Indexed interleaved text/thinking/tool frames with final arguments and opaque signatures",
+  "requirementIds": [
+    "stream.indexed-events",
+    "stream.terminal-settlement"
+  ],
+  "clock": {
+    "unixMilliseconds": 1700000000000
+  },
+  "seed": "none",
+  "normalizerVersion": "object-key-order-v1",
+  "provenance": {
+    "kind": "authored-synthetic-contract",
+    "origin": "Newly authored PiSharp fixture; frame shape sourced from pinned public types; expected reduction not captured from upstream",
+    "upstreamOutput": false
+  },
+  "frames": [
+    {
+      "type": "start",
+      "partial": {
+        "role": "assistant",
+        "content": [],
+        "api": "openai-responses",
+        "provider": "authored-synthetic",
+        "model": "fixture-model",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 0,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "pending",
+        "timestamp": 1700000000000
+      }
+    },
+    {
+      "type": "thinking_start",
+      "contentIndex": 0,
+      "content": {
+        "type": "thinking",
+        "thinking": ""
+      }
+    },
+    {
+      "type": "text_start",
+      "contentIndex": 1,
+      "content": {
+        "type": "text",
+        "text": ""
+      }
+    },
+    {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "reason "
+    },
+    {
+      "type": "toolcall_start",
+      "contentIndex": 2,
+      "toolCall": {
+        "type": "toolCall",
+        "id": "call-1",
+        "name": "read",
+        "arguments": {}
+      }
+    },
+    {
+      "type": "text_delta",
+      "contentIndex": 1,
+      "delta": "Opening"
+    },
+    {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": "{\"path\":\"C:"
+    },
+    {
+      "type": "thinking_delta",
+      "contentIndex": 0,
+      "delta": "π"
+    },
+    {
+      "type": "text_end",
+      "contentIndex": 1,
+      "content": "Opening"
+    },
+    {
+      "type": "toolcall_delta",
+      "contentIndex": 2,
+      "delta": "\\\\temp\\\\π\"}"
+    },
+    {
+      "type": "thinking_end",
+      "contentIndex": 0,
+      "content": "reason π",
+      "thinkingSignature": "opaque-thinking=="
+    },
+    {
+      "type": "toolcall_end",
+      "contentIndex": 2,
+      "id": "call-1",
+      "name": "read",
+      "arguments": {
+        "path": "C:\\temp\\π",
+        "options": {
+          "preserve": null,
+          "order": [
+            "b",
+            "a"
+          ]
+        }
+      },
+      "thoughtSignature": "opaque-tool==",
+      "namespace": "fs"
+    }
+  ],
+  "terminal": {
+    "type": "done",
+    "reason": "toolUse",
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "reason π",
+          "thinkingSignature": "opaque-thinking=="
+        },
+        {
+          "type": "text",
+          "text": "Opening"
+        },
+        {
+          "type": "toolCall",
+          "id": "call-1",
+          "name": "read",
+          "arguments": {
+            "path": "C:\\temp\\π",
+            "options": {
+              "preserve": null,
+              "order": [
+                "b",
+                "a"
+              ]
+            }
+          },
+          "thoughtSignature": "opaque-tool==",
+          "namespace": "fs"
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "authored-synthetic",
+      "model": "fixture-model",
+      "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 0,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1700000000000
+    }
+  },
+  "expected": {
+    "events": [
+      {
+        "type": "start",
+        "partial": {
+          "role": "assistant",
+          "content": [],
+          "api": "openai-responses",
+          "provider": "authored-synthetic",
+          "model": "fixture-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "pending",
+          "timestamp": 1700000000000
+        }
+      },
+      {
+        "type": "thinking_start",
+        "contentIndex": 0,
+        "content": {
+          "type": "thinking",
+          "thinking": ""
+        }
+      },
+      {
+        "type": "text_start",
+        "contentIndex": 1,
+        "content": {
+          "type": "text",
+          "text": ""
+        }
+      },
+      {
+        "type": "thinking_delta",
+        "contentIndex": 0,
+        "delta": "reason "
+      },
+      {
+        "type": "toolcall_start",
+        "contentIndex": 2,
+        "toolCall": {
+          "type": "toolCall",
+          "id": "call-1",
+          "name": "read",
+          "arguments": {}
+        }
+      },
+      {
+        "type": "text_delta",
+        "contentIndex": 1,
+        "delta": "Opening"
+      },
+      {
+        "type": "toolcall_delta",
+        "contentIndex": 2,
+        "delta": "{\"path\":\"C:"
+      },
+      {
+        "type": "thinking_delta",
+        "contentIndex": 0,
+        "delta": "π"
+      },
+      {
+        "type": "text_end",
+        "contentIndex": 1,
+        "content": "Opening"
+      },
+      {
+        "type": "toolcall_delta",
+        "contentIndex": 2,
+        "delta": "\\\\temp\\\\π\"}"
+      },
+      {
+        "type": "thinking_end",
+        "contentIndex": 0,
+        "content": "reason π",
+        "thinkingSignature": "opaque-thinking=="
+      },
+      {
+        "type": "toolcall_end",
+        "contentIndex": 2,
+        "id": "call-1",
+        "name": "read",
+        "arguments": {
+          "path": "C:\\temp\\π",
+          "options": {
+            "preserve": null,
+            "order": [
+              "b",
+              "a"
+            ]
+          }
+        },
+        "thoughtSignature": "opaque-tool==",
+        "namespace": "fs"
+      },
+      {
+        "type": "done",
+        "reason": "toolUse",
+        "message": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "thinking",
+              "thinking": "reason π",
+              "thinkingSignature": "opaque-thinking=="
+            },
+            {
+              "type": "text",
+              "text": "Opening"
+            },
+            {
+              "type": "toolCall",
+              "id": "call-1",
+              "name": "read",
+              "arguments": {
+                "path": "C:\\temp\\π",
+                "options": {
+                  "preserve": null,
+                  "order": [
+                    "b",
+                    "a"
+                  ]
+                }
+              },
+              "thoughtSignature": "opaque-tool==",
+              "namespace": "fs"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "authored-synthetic",
+          "model": "fixture-model",
+          "usage": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "totalTokens": 0,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "toolUse",
+          "timestamp": 1700000000000
+        }
+      }
+    ],
+    "result": {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "reason π",
+          "thinkingSignature": "opaque-thinking=="
+        },
+        {
+          "type": "text",
+          "text": "Opening"
+        },
+        {
+          "type": "toolCall",
+          "id": "call-1",
+          "name": "read",
+          "arguments": {
+            "path": "C:\\temp\\π",
+            "options": {
+              "preserve": null,
+              "order": [
+                "b",
+                "a"
+              ]
+            }
+          },
+          "thoughtSignature": "opaque-tool==",
+          "namespace": "fs"
+        }
+      ],
+      "api": "openai-responses",
+      "provider": "authored-synthetic",
+      "model": "fixture-model",
+      "usage": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 0,
+        "cost": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0
+        }
+      },
+      "stopReason": "toolUse",
+      "timestamp": 1700000000000
+    }
+  }
+}

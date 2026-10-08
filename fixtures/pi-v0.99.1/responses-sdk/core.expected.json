@@ -1,0 +1,1799 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "responses-sdk-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "captured-unchanged-responses-wrapper-sdk-oracle",
+  "observations": {
+    "cases": [
+      {
+        "caseId": "max-tokens-positive-floor",
+        "payloadSnapshots": [
+          {
+            "params": {
+              "model": "synthetic-sdk-model",
+              "input": [
+                {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "input_text",
+                      "text": "Say hello to pi: π\r\nsecond line"
+                    }
+                  ]
+                }
+              ],
+              "stream": true,
+              "prompt_cache_key": "pisharp-sdk-session",
+              "store": false,
+              "max_output_tokens": 16,
+              "temperature": 0
+            },
+            "ownUndefinedPaths": [
+              "/prompt_cache_retention",
+              "/prompt_cache_options"
+            ]
+          }
+        ],
+        "fetchRequests": [
+          {
+            "url": "https://pisharp-oracle.invalid/v1/responses",
+            "method": "POST",
+            "headers": [
+              [
+                "accept",
+                "application/json"
+              ],
+              [
+                "authorization",
+                "Bearer sk-pisharp-oracle-inert-noncredential"
+              ],
+              [
+                "content-type",
+                "application/json"
+              ],
+              [
+                "session_id",
+                "pisharp-sdk-session"
+              ],
+              [
+                "user-agent",
+                "PiSharp-genuine-wrapper-oracle/1"
+              ],
+              [
+                "x-client-request-id",
+                "pisharp-sdk-request"
+              ],
+              [
+                "x-fixture",
+                "fixed"
+              ],
+              [
+                "x-model",
+                "model-owned"
+              ],
+              [
+                "x-stainless-arch",
+                "x64"
+              ],
+              [
+                "x-stainless-lang",
+                "js"
+              ],
+              [
+                "x-stainless-os",
+                "Windows"
+              ],
+              [
+                "x-stainless-package-version",
+                "7.19.0"
+              ],
+              [
+                "x-stainless-retry-count",
+                "0"
+              ],
+              [
+                "x-stainless-runtime",
+                "node"
+              ],
+              [
+                "x-stainless-runtime-version",
+                "v24.19.0"
+              ],
+              [
+                "x-stainless-timeout",
+                "5"
+              ]
+            ],
+            "body": "{\"model\":\"synthetic-sdk-model\",\"input\":[{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"Say hello to pi: π\\r\\nsecond line\"}]}],\"stream\":true,\"prompt_cache_key\":\"pisharp-sdk-session\",\"store\":false,\"max_output_tokens\":16,\"temperature\":0}",
+            "bodyUtf8Sha256": "c3bbf2f38bf568570c6672c2cc1fa1d76c33d5fc7393cff369a11eab251cdcb9",
+            "bodyJson": {
+              "model": "synthetic-sdk-model",
+              "input": [
+                {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "input_text",
+                      "text": "Say hello to pi: π\r\nsecond line"
+                    }
+                  ]
+                }
+              ],
+              "stream": true,
+              "prompt_cache_key": "pisharp-sdk-session",
+              "store": false,
+              "max_output_tokens": 16,
+              "temperature": 0
+            },
+            "initOwnKeys": [
+              "signal",
+              "method",
+              "headers",
+              "body"
+            ],
+            "signalAborted": false
+          }
+        ],
+        "responseHooks": [
+          {
+            "status": 200,
+            "headers": {
+              "content-type": "text/event-stream",
+              "x-fixture-response": "fixed",
+              "x-request-id": "pisharp-sdk-response"
+            }
+          }
+        ],
+        "providerEvents": [
+          {
+            "type": "response.created",
+            "sequence_number": 0,
+            "response": {
+              "id": "resp_sdk"
+            },
+            "fixture_opaque": {
+              "preserve": null,
+              "ordered": [
+                "b",
+                "a"
+              ]
+            }
+          },
+          {
+            "type": "response.output_item.added",
+            "sequence_number": 1,
+            "output_index": 3,
+            "item": {
+              "type": "message",
+              "id": "msg_sdk",
+              "role": "assistant",
+              "status": "in_progress",
+              "content": []
+            }
+          },
+          {
+            "type": "response.output_text.delta",
+            "sequence_number": 2,
+            "output_index": 3,
+            "item_id": "msg_sdk",
+            "content_index": 0,
+            "delta": "Hello π\r\n"
+          },
+          {
+            "type": "response.output_item.done",
+            "sequence_number": 3,
+            "output_index": 3,
+            "item": {
+              "type": "message",
+              "id": "msg_sdk",
+              "role": "assistant",
+              "status": "completed",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Hello π\r\n",
+                  "annotations": []
+                }
+              ]
+            }
+          },
+          {
+            "type": "response.completed",
+            "sequence_number": 4,
+            "response": {
+              "id": "resp_sdk",
+              "status": "completed",
+              "output": [],
+              "usage": {
+                "input_tokens": 4,
+                "output_tokens": 2,
+                "total_tokens": 6,
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 0
+                }
+              }
+            }
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk",
+              "rawStopReason": "completed"
+            }
+          }
+        ],
+        "drainedFrames": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk",
+              "rawStopReason": "completed"
+            }
+          }
+        ],
+        "finalResult": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hello π\r\n",
+              "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "openai",
+          "model": "synthetic-sdk-model",
+          "usage": {
+            "input": 4,
+            "output": 2,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 0,
+            "totalTokens": 6,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000000,
+          "responseId": "resp_sdk",
+          "rawStopReason": "completed"
+        },
+        "trace": [
+          "onPayload",
+          "fetch",
+          "onResponse",
+          "emit:start",
+          "provider:response.created",
+          "provider:response.output_item.added",
+          "emit:text_start",
+          "provider:response.output_text.delta",
+          "emit:text_delta",
+          "provider:response.output_item.done",
+          "emit:text_end",
+          "provider:response.completed",
+          "emit:done"
+        ]
+      },
+      {
+        "caseId": "max-tokens-zero",
+        "payloadSnapshots": [
+          {
+            "params": {
+              "model": "synthetic-sdk-model",
+              "input": [
+                {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "input_text",
+                      "text": "Say hello to pi: π\r\nsecond line"
+                    }
+                  ]
+                }
+              ],
+              "stream": true,
+              "prompt_cache_key": "pisharp-sdk-session",
+              "store": false,
+              "temperature": 0
+            },
+            "ownUndefinedPaths": [
+              "/prompt_cache_retention",
+              "/prompt_cache_options"
+            ]
+          }
+        ],
+        "fetchRequests": [
+          {
+            "url": "https://pisharp-oracle.invalid/v1/responses",
+            "method": "POST",
+            "headers": [
+              [
+                "accept",
+                "application/json"
+              ],
+              [
+                "authorization",
+                "Bearer sk-pisharp-oracle-inert-noncredential"
+              ],
+              [
+                "content-type",
+                "application/json"
+              ],
+              [
+                "session_id",
+                "pisharp-sdk-session"
+              ],
+              [
+                "user-agent",
+                "PiSharp-genuine-wrapper-oracle/1"
+              ],
+              [
+                "x-client-request-id",
+                "pisharp-sdk-request"
+              ],
+              [
+                "x-fixture",
+                "fixed"
+              ],
+              [
+                "x-model",
+                "model-owned"
+              ],
+              [
+                "x-stainless-arch",
+                "x64"
+              ],
+              [
+                "x-stainless-lang",
+                "js"
+              ],
+              [
+                "x-stainless-os",
+                "Windows"
+              ],
+              [
+                "x-stainless-package-version",
+                "7.19.0"
+              ],
+              [
+                "x-stainless-retry-count",
+                "0"
+              ],
+              [
+                "x-stainless-runtime",
+                "node"
+              ],
+              [
+                "x-stainless-runtime-version",
+                "v24.19.0"
+              ],
+              [
+                "x-stainless-timeout",
+                "5"
+              ]
+            ],
+            "body": "{\"model\":\"synthetic-sdk-model\",\"input\":[{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"Say hello to pi: π\\r\\nsecond line\"}]}],\"stream\":true,\"prompt_cache_key\":\"pisharp-sdk-session\",\"store\":false,\"temperature\":0}",
+            "bodyUtf8Sha256": "7a7f8427b55ee34f98833c33615a697a446150c5f4d2ebfbf4b3a541b4102563",
+            "bodyJson": {
+              "model": "synthetic-sdk-model",
+              "input": [
+                {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "input_text",
+                      "text": "Say hello to pi: π\r\nsecond line"
+                    }
+                  ]
+                }
+              ],
+              "stream": true,
+              "prompt_cache_key": "pisharp-sdk-session",
+              "store": false,
+              "temperature": 0
+            },
+            "initOwnKeys": [
+              "signal",
+              "method",
+              "headers",
+              "body"
+            ],
+            "signalAborted": false
+          }
+        ],
+        "responseHooks": [
+          {
+            "status": 200,
+            "headers": {
+              "content-type": "text/event-stream",
+              "x-fixture-response": "fixed",
+              "x-request-id": "pisharp-sdk-response"
+            }
+          }
+        ],
+        "providerEvents": [
+          {
+            "type": "response.created",
+            "sequence_number": 0,
+            "response": {
+              "id": "resp_sdk"
+            },
+            "fixture_opaque": {
+              "preserve": null,
+              "ordered": [
+                "b",
+                "a"
+              ]
+            }
+          },
+          {
+            "type": "response.output_item.added",
+            "sequence_number": 1,
+            "output_index": 3,
+            "item": {
+              "type": "message",
+              "id": "msg_sdk",
+              "role": "assistant",
+              "status": "in_progress",
+              "content": []
+            }
+          },
+          {
+            "type": "response.output_text.delta",
+            "sequence_number": 2,
+            "output_index": 3,
+            "item_id": "msg_sdk",
+            "content_index": 0,
+            "delta": "Hello π\r\n"
+          },
+          {
+            "type": "response.output_item.done",
+            "sequence_number": 3,
+            "output_index": 3,
+            "item": {
+              "type": "message",
+              "id": "msg_sdk",
+              "role": "assistant",
+              "status": "completed",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Hello π\r\n",
+                  "annotations": []
+                }
+              ]
+            }
+          },
+          {
+            "type": "response.completed",
+            "sequence_number": 4,
+            "response": {
+              "id": "resp_sdk",
+              "status": "completed",
+              "output": [],
+              "usage": {
+                "input_tokens": 4,
+                "output_tokens": 2,
+                "total_tokens": 6,
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 0
+                }
+              }
+            }
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk",
+              "rawStopReason": "completed"
+            }
+          }
+        ],
+        "drainedFrames": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk",
+              "rawStopReason": "completed"
+            }
+          }
+        ],
+        "finalResult": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hello π\r\n",
+              "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "openai",
+          "model": "synthetic-sdk-model",
+          "usage": {
+            "input": 4,
+            "output": 2,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 0,
+            "totalTokens": 6,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000000,
+          "responseId": "resp_sdk",
+          "rawStopReason": "completed"
+        },
+        "trace": [
+          "onPayload",
+          "fetch",
+          "onResponse",
+          "emit:start",
+          "provider:response.created",
+          "provider:response.output_item.added",
+          "emit:text_start",
+          "provider:response.output_text.delta",
+          "emit:text_delta",
+          "provider:response.output_item.done",
+          "emit:text_end",
+          "provider:response.completed",
+          "emit:done"
+        ]
+      },
+      {
+        "caseId": "max-tokens-negative",
+        "payloadSnapshots": [
+          {
+            "params": {
+              "model": "synthetic-sdk-model",
+              "input": [
+                {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "input_text",
+                      "text": "Say hello to pi: π\r\nsecond line"
+                    }
+                  ]
+                }
+              ],
+              "stream": true,
+              "prompt_cache_key": "pisharp-sdk-session",
+              "store": false,
+              "max_output_tokens": 16,
+              "temperature": 0
+            },
+            "ownUndefinedPaths": [
+              "/prompt_cache_retention",
+              "/prompt_cache_options"
+            ]
+          }
+        ],
+        "fetchRequests": [
+          {
+            "url": "https://pisharp-oracle.invalid/v1/responses",
+            "method": "POST",
+            "headers": [
+              [
+                "accept",
+                "application/json"
+              ],
+              [
+                "authorization",
+                "Bearer sk-pisharp-oracle-inert-noncredential"
+              ],
+              [
+                "content-type",
+                "application/json"
+              ],
+              [
+                "session_id",
+                "pisharp-sdk-session"
+              ],
+              [
+                "user-agent",
+                "PiSharp-genuine-wrapper-oracle/1"
+              ],
+              [
+                "x-client-request-id",
+                "pisharp-sdk-request"
+              ],
+              [
+                "x-fixture",
+                "fixed"
+              ],
+              [
+                "x-model",
+                "model-owned"
+              ],
+              [
+                "x-stainless-arch",
+                "x64"
+              ],
+              [
+                "x-stainless-lang",
+                "js"
+              ],
+              [
+                "x-stainless-os",
+                "Windows"
+              ],
+              [
+                "x-stainless-package-version",
+                "7.19.0"
+              ],
+              [
+                "x-stainless-retry-count",
+                "0"
+              ],
+              [
+                "x-stainless-runtime",
+                "node"
+              ],
+              [
+                "x-stainless-runtime-version",
+                "v24.19.0"
+              ],
+              [
+                "x-stainless-timeout",
+                "5"
+              ]
+            ],
+            "body": "{\"model\":\"synthetic-sdk-model\",\"input\":[{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"Say hello to pi: π\\r\\nsecond line\"}]}],\"stream\":true,\"prompt_cache_key\":\"pisharp-sdk-session\",\"store\":false,\"max_output_tokens\":16,\"temperature\":0}",
+            "bodyUtf8Sha256": "c3bbf2f38bf568570c6672c2cc1fa1d76c33d5fc7393cff369a11eab251cdcb9",
+            "bodyJson": {
+              "model": "synthetic-sdk-model",
+              "input": [
+                {
+                  "role": "user",
+                  "content": [
+                    {
+                      "type": "input_text",
+                      "text": "Say hello to pi: π\r\nsecond line"
+                    }
+                  ]
+                }
+              ],
+              "stream": true,
+              "prompt_cache_key": "pisharp-sdk-session",
+              "store": false,
+              "max_output_tokens": 16,
+              "temperature": 0
+            },
+            "initOwnKeys": [
+              "signal",
+              "method",
+              "headers",
+              "body"
+            ],
+            "signalAborted": false
+          }
+        ],
+        "responseHooks": [
+          {
+            "status": 200,
+            "headers": {
+              "content-type": "text/event-stream",
+              "x-fixture-response": "fixed",
+              "x-request-id": "pisharp-sdk-response"
+            }
+          }
+        ],
+        "providerEvents": [
+          {
+            "type": "response.created",
+            "sequence_number": 0,
+            "response": {
+              "id": "resp_sdk"
+            },
+            "fixture_opaque": {
+              "preserve": null,
+              "ordered": [
+                "b",
+                "a"
+              ]
+            }
+          },
+          {
+            "type": "response.output_item.added",
+            "sequence_number": 1,
+            "output_index": 3,
+            "item": {
+              "type": "message",
+              "id": "msg_sdk",
+              "role": "assistant",
+              "status": "in_progress",
+              "content": []
+            }
+          },
+          {
+            "type": "response.output_text.delta",
+            "sequence_number": 2,
+            "output_index": 3,
+            "item_id": "msg_sdk",
+            "content_index": 0,
+            "delta": "Hello π\r\n"
+          },
+          {
+            "type": "response.output_item.done",
+            "sequence_number": 3,
+            "output_index": 3,
+            "item": {
+              "type": "message",
+              "id": "msg_sdk",
+              "role": "assistant",
+              "status": "completed",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Hello π\r\n",
+                  "annotations": []
+                }
+              ]
+            }
+          },
+          {
+            "type": "response.completed",
+            "sequence_number": 4,
+            "response": {
+              "id": "resp_sdk",
+              "status": "completed",
+              "output": [],
+              "usage": {
+                "input_tokens": 4,
+                "output_tokens": 2,
+                "total_tokens": 6,
+                "input_tokens_details": {
+                  "cached_tokens": 0
+                },
+                "output_tokens_details": {
+                  "reasoning_tokens": 0
+                }
+              }
+            }
+          }
+        ],
+        "emissionSnapshots": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk",
+              "rawStopReason": "completed"
+            }
+          }
+        ],
+        "drainedFrames": [
+          {
+            "type": "start",
+            "partial": {
+              "role": "assistant",
+              "content": [],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000
+            }
+          },
+          {
+            "type": "text_start",
+            "contentIndex": 0,
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": ""
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_delta",
+            "contentIndex": 0,
+            "delta": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "text_end",
+            "contentIndex": 0,
+            "content": "Hello π\r\n",
+            "partial": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk"
+            }
+          },
+          {
+            "type": "done",
+            "reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Hello π\r\n",
+                  "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+                }
+              ],
+              "api": "openai-responses",
+              "provider": "openai",
+              "model": "synthetic-sdk-model",
+              "usage": {
+                "input": 4,
+                "output": 2,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "reasoning": 0,
+                "totalTokens": 6,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "stop",
+              "timestamp": 1700000000000,
+              "responseId": "resp_sdk",
+              "rawStopReason": "completed"
+            }
+          }
+        ],
+        "finalResult": {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "Hello π\r\n",
+              "textSignature": "{\"v\":1,\"id\":\"msg_sdk\"}"
+            }
+          ],
+          "api": "openai-responses",
+          "provider": "openai",
+          "model": "synthetic-sdk-model",
+          "usage": {
+            "input": 4,
+            "output": 2,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "reasoning": 0,
+            "totalTokens": 6,
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "total": 0
+            }
+          },
+          "stopReason": "stop",
+          "timestamp": 1700000000000,
+          "responseId": "resp_sdk",
+          "rawStopReason": "completed"
+        },
+        "trace": [
+          "onPayload",
+          "fetch",
+          "onResponse",
+          "emit:start",
+          "provider:response.created",
+          "provider:response.output_item.added",
+          "emit:text_start",
+          "provider:response.output_text.delta",
+          "emit:text_delta",
+          "provider:response.output_item.done",
+          "emit:text_end",
+          "provider:response.completed",
+          "emit:done"
+        ]
+      }
+    ],
+    "responseWire": {
+      "utf8Sha256": "c7697f9c3cea195b1cf860ff7451bbee1a887602dc3c03a018b69e671dd7beaf",
+      "bytes": 1156,
+      "chunkBytes": 17
+    },
+    "checks": {
+      "caseCount": 3,
+      "fakeFetchCalls": 3,
+      "sourceSeam": "Unchanged exported stream; private builder/client internally executed; real SDK create/serialize/SSE decode; supported fake fetch",
+      "noSourceTransformOrSdkShim": true,
+      "networkAndProcessesBlocked": true
+    }
+  }
+}

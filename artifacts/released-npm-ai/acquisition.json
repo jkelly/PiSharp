@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "mode": "anonymous-read-only",
+  "url": "https://registry.npmjs.org/@earendil-works/pi-ai/-/pi-ai-0.99.1.tgz",
+  "fetchedAt": "2026-09-30T22:40:45.103Z",
+  "status": 200,
+  "headers": {
+    "content-type": "application/octet-stream",
+    "etag": "\"c8af44cf34d6ad97c5f4c2f09606e275\"",
+    "last-modified": "Tue, 29 Sep 2026 18:20:03 GMT"
+  },
+  "bytes": 760966,
+  "sha256": "f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3",
+  "integrity": "sha512-4nV9JKc94iPX8bwdGPc2nTuVPKIPsffhnp3WoN9NYCNqbtoOF8LhYcIs/+Sn/alroqJK/5QRu6/Z6Ck+n0hyBA==",
+  "shasum": "2945bf014fbb314bd37b919e83317560e0a8fa1d",
+  "metadataSha256": "ba57282ebb3656598d5a3e36de21b09f6a985fc98691412f042b83039566c864",
+  "installed": false,
+  "extracted": false,
+  "executed": false
+}

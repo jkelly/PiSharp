@@ -1,0 +1,6076 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "rpc-jsonl-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "kind": "captured-whole-rpc-jsonl-oracle",
+  "observations": {
+    "readerCases": [
+      {
+        "caseId": "empty-stream",
+        "probes": [
+          {
+            "probeId": "whole-buffer",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": ""
+              }
+            ],
+            "callbacks": [],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "empty-lines",
+        "probes": [
+          {
+            "probeId": "every-byte",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "",
+                "lineUtf8Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "",
+                "lineUtf8Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              {
+                "index": 2,
+                "phase": "data",
+                "chunkIndex": 3,
+                "line": "",
+                "lineUtf8Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              },
+              {
+                "chunkIndex": 3,
+                "deliveredKind": "buffer",
+                "callbackCount": 3
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "lf-every-split",
+        "probes": [
+          {
+            "probeId": "split-0",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": ""
+              },
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0a7b2262223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-1",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b"
+              },
+              {
+                "kind": "buffer",
+                "hex": "2261223a317d0a7b2262223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-2",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61223a317d0a7b2262223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-3",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261"
+              },
+              {
+                "kind": "buffer",
+                "hex": "223a317d0a7b2262223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-4",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b226122"
+              },
+              {
+                "kind": "buffer",
+                "hex": "3a317d0a7b2262223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-5",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "317d0a7b2262223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-6",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a31"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7d0a7b2262223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-7",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a7b2262223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-8",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7b2262223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-9",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0a7b"
+              },
+              {
+                "kind": "buffer",
+                "hex": "2262223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-10",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0a7b22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "62223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-11",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0a7b2262"
+              },
+              {
+                "kind": "buffer",
+                "hex": "223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-12",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0a7b226222"
+              },
+              {
+                "kind": "buffer",
+                "hex": "3a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-13",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0a7b2262223a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-14",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0a7b2262223a32"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-15",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0a7b2262223a327d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-16",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0a7b2262223a327d0a"
+              },
+              {
+                "kind": "buffer",
+                "hex": ""
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "crlf-every-split",
+        "probes": [
+          {
+            "probeId": "split-0",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": ""
+              },
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d0a7b2262223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-1",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b"
+              },
+              {
+                "kind": "buffer",
+                "hex": "2261223a317d0d0a7b2262223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-2",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61223a317d0d0a7b2262223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-3",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261"
+              },
+              {
+                "kind": "buffer",
+                "hex": "223a317d0d0a7b2262223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-4",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b226122"
+              },
+              {
+                "kind": "buffer",
+                "hex": "3a317d0d0a7b2262223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-5",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "317d0d0a7b2262223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-6",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a31"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7d0d0a7b2262223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-7",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0d0a7b2262223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-8",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a7b2262223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-9",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d0a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7b2262223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-10",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d0a7b"
+              },
+              {
+                "kind": "buffer",
+                "hex": "2262223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-11",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d0a7b22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "62223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-12",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d0a7b2262"
+              },
+              {
+                "kind": "buffer",
+                "hex": "223a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-13",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d0a7b226222"
+              },
+              {
+                "kind": "buffer",
+                "hex": "3a327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-14",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d0a7b2262223a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "327d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-15",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d0a7b2262223a32"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7d0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-16",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d0a7b2262223a327d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-17",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d0a7b2262223a327d0d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-18",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a317d0d0a7b2262223a327d0d0a"
+              },
+              {
+                "kind": "buffer",
+                "hex": ""
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1}",
+                "lineUtf8Sha256": "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"b\":2}",
+                "lineUtf8Sha256": "0ab1a6d394cd30195f0642b67ae1180c375ffadf5dd7f39c390668b5fdb6da93"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "bare-cr-and-double-cr",
+        "probes": [
+          {
+            "probeId": "every-byte",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "61"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6c"
+              },
+              {
+                "kind": "buffer",
+                "hex": "70"
+              },
+              {
+                "kind": "buffer",
+                "hex": "68"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "62"
+              },
+              {
+                "kind": "buffer",
+                "hex": "65"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "67"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 11,
+                "line": "alpha\rbeta",
+                "lineUtf8Sha256": "630777dbacbc99352e4be7dfc6a9e094737d160727dfb3b7e9ad8a61b11e68d0"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 19,
+                "line": "gamma\r",
+                "lineUtf8Sha256": "ba143a6ea541034e4148fc121eb87b929d4bf24c6f82fa7af301decc399b0c17"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 3,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 4,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 5,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 6,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 7,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 8,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 9,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 10,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 11,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 12,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 13,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 14,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 15,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 16,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 17,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 18,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 19,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "final-complete-cr",
+        "probes": [
+          {
+            "probeId": "every-byte",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61"
+              },
+              {
+                "kind": "buffer",
+                "hex": "69"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6c"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "3a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74"
+              },
+              {
+                "kind": "buffer",
+                "hex": "72"
+              },
+              {
+                "kind": "buffer",
+                "hex": "75"
+              },
+              {
+                "kind": "buffer",
+                "hex": "65"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0d"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "end",
+                "chunkIndex": null,
+                "line": "{\"tail\":true}",
+                "lineUtf8Sha256": "eca7b72652b668aba240e2a6af8d5d1b95a97b49e4d7ea7c3c67e1eab6c69b50"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 3,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 4,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 5,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 6,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 7,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 8,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 9,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 10,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 11,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 12,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 13,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "final-incomplete",
+        "probes": [
+          {
+            "probeId": "whole-buffer",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b22696e636f6d706c657465223a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "end",
+                "chunkIndex": null,
+                "line": "{\"incomplete\":",
+                "lineUtf8Sha256": "f505862f6c151daf0f53ec480001af4b0a1bbb3da93315e014b8faab1b302600"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "unicode-every-split",
+        "probes": [
+          {
+            "probeId": "split-0",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": ""
+              },
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-1",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b"
+              },
+              {
+                "kind": "buffer",
+                "hex": "2274657874223a2261e280a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-2",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74657874223a2261e280a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-3",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274"
+              },
+              {
+                "kind": "buffer",
+                "hex": "657874223a2261e280a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-4",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b227465"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7874223a2261e280a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-5",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b22746578"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74223a2261e280a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-6",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874"
+              },
+              {
+                "kind": "buffer",
+                "hex": "223a2261e280a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-7",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b227465787422"
+              },
+              {
+                "kind": "buffer",
+                "hex": "3a2261e280a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-8",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "2261e280a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-9",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61e280a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-10",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261"
+              },
+              {
+                "kind": "buffer",
+                "hex": "e280a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-11",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e2"
+              },
+              {
+                "kind": "buffer",
+                "hex": "80a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-12",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280"
+              },
+              {
+                "kind": "buffer",
+                "hex": "a862e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-13",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a8"
+              },
+              {
+                "kind": "buffer",
+                "hex": "62e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-14",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862"
+              },
+              {
+                "kind": "buffer",
+                "hex": "e280a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-15",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e2"
+              },
+              {
+                "kind": "buffer",
+                "hex": "80a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-16",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280"
+              },
+              {
+                "kind": "buffer",
+                "hex": "a963f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-17",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a9"
+              },
+              {
+                "kind": "buffer",
+                "hex": "63f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-18",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a963"
+              },
+              {
+                "kind": "buffer",
+                "hex": "f09f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-19",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a963f0"
+              },
+              {
+                "kind": "buffer",
+                "hex": "9f9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-20",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a963f09f"
+              },
+              {
+                "kind": "buffer",
+                "hex": "9880cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-21",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a963f09f98"
+              },
+              {
+                "kind": "buffer",
+                "hex": "80cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-22",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a963f09f9880"
+              },
+              {
+                "kind": "buffer",
+                "hex": "cf80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-23",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a963f09f9880cf"
+              },
+              {
+                "kind": "buffer",
+                "hex": "80227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-24",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a963f09f9880cf80"
+              },
+              {
+                "kind": "buffer",
+                "hex": "227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-25",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a963f09f9880cf8022"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-26",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a963f09f9880cf80227d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 1,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          },
+          {
+            "probeId": "split-27",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a2261e280a862e280a963f09f9880cf80227d0a"
+              },
+              {
+                "kind": "buffer",
+                "hex": ""
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "unicode-every-byte",
+        "probes": [
+          {
+            "probeId": "every-byte",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74"
+              },
+              {
+                "kind": "buffer",
+                "hex": "65"
+              },
+              {
+                "kind": "buffer",
+                "hex": "78"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "3a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61"
+              },
+              {
+                "kind": "buffer",
+                "hex": "e2"
+              },
+              {
+                "kind": "buffer",
+                "hex": "80"
+              },
+              {
+                "kind": "buffer",
+                "hex": "a8"
+              },
+              {
+                "kind": "buffer",
+                "hex": "62"
+              },
+              {
+                "kind": "buffer",
+                "hex": "e2"
+              },
+              {
+                "kind": "buffer",
+                "hex": "80"
+              },
+              {
+                "kind": "buffer",
+                "hex": "a9"
+              },
+              {
+                "kind": "buffer",
+                "hex": "63"
+              },
+              {
+                "kind": "buffer",
+                "hex": "f0"
+              },
+              {
+                "kind": "buffer",
+                "hex": "9f"
+              },
+              {
+                "kind": "buffer",
+                "hex": "98"
+              },
+              {
+                "kind": "buffer",
+                "hex": "80"
+              },
+              {
+                "kind": "buffer",
+                "hex": "cf"
+              },
+              {
+                "kind": "buffer",
+                "hex": "80"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 26,
+                "line": "{\"text\":\"a b c😀π\"}",
+                "lineUtf8Sha256": "c1592c3b8d53d48e326e19bff98c45b8f25d9c42ce8f290935a0733ae8715504"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 3,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 4,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 5,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 6,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 7,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 8,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 9,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 10,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 11,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 12,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 13,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 14,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 15,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 16,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 17,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 18,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 19,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 20,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 21,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 22,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 23,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 24,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 25,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 26,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "escaped-newlines",
+        "probes": [
+          {
+            "probeId": "every-byte",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74"
+              },
+              {
+                "kind": "buffer",
+                "hex": "65"
+              },
+              {
+                "kind": "buffer",
+                "hex": "78"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "3a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "66"
+              },
+              {
+                "kind": "buffer",
+                "hex": "69"
+              },
+              {
+                "kind": "buffer",
+                "hex": "72"
+              },
+              {
+                "kind": "buffer",
+                "hex": "73"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74"
+              },
+              {
+                "kind": "buffer",
+                "hex": "5c"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6e"
+              },
+              {
+                "kind": "buffer",
+                "hex": "73"
+              },
+              {
+                "kind": "buffer",
+                "hex": "65"
+              },
+              {
+                "kind": "buffer",
+                "hex": "63"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6f"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6e"
+              },
+              {
+                "kind": "buffer",
+                "hex": "64"
+              },
+              {
+                "kind": "buffer",
+                "hex": "5c"
+              },
+              {
+                "kind": "buffer",
+                "hex": "72"
+              },
+              {
+                "kind": "buffer",
+                "hex": "5c"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6e"
+              },
+              {
+                "kind": "buffer",
+                "hex": "65"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6e"
+              },
+              {
+                "kind": "buffer",
+                "hex": "64"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 31,
+                "line": "{\"text\":\"first\\nsecond\\r\\nend\"}",
+                "lineUtf8Sha256": "613c037b736f632075e304bf9059fc6b9e1761e4e26d188360f9a8f63bfbb3b7"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 3,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 4,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 5,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 6,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 7,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 8,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 9,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 10,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 11,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 12,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 13,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 14,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 15,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 16,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 17,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 18,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 19,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 20,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 21,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 22,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 23,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 24,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 25,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 26,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 27,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 28,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 29,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 30,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 31,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "raw-lf-in-string",
+        "probes": [
+          {
+            "probeId": "every-byte",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74"
+              },
+              {
+                "kind": "buffer",
+                "hex": "65"
+              },
+              {
+                "kind": "buffer",
+                "hex": "78"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "3a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "66"
+              },
+              {
+                "kind": "buffer",
+                "hex": "69"
+              },
+              {
+                "kind": "buffer",
+                "hex": "72"
+              },
+              {
+                "kind": "buffer",
+                "hex": "73"
+              },
+              {
+                "kind": "buffer",
+                "hex": "74"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              },
+              {
+                "kind": "buffer",
+                "hex": "73"
+              },
+              {
+                "kind": "buffer",
+                "hex": "65"
+              },
+              {
+                "kind": "buffer",
+                "hex": "63"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6f"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6e"
+              },
+              {
+                "kind": "buffer",
+                "hex": "64"
+              },
+              {
+                "kind": "buffer",
+                "hex": "22"
+              },
+              {
+                "kind": "buffer",
+                "hex": "7d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 14,
+                "line": "{\"text\":\"first",
+                "lineUtf8Sha256": "b9461bef22ab426fef7c6772a592ae88cd53950bdee4534d0b226368b2a610fc"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 23,
+                "line": "second\"}",
+                "lineUtf8Sha256": "47c9372ff3f94bfd3ff4a5b71ccc77456e20ee9f42650631c660be6a2e3d81c8"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 3,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 4,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 5,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 6,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 7,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 8,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 9,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 10,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 11,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 12,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 13,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 14,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 15,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 16,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 17,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 18,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 19,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 20,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 21,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 22,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 23,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "bom-text",
+        "probes": [
+          {
+            "probeId": "whole-buffer",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "efbbbf7b2261223a317d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "﻿{\"a\":1}",
+                "lineUtf8Sha256": "e3170108e7583c4ad52e05763a606c1dceef76c81a8e1503dde511b5ca764f81"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "duplicate-keys",
+        "probes": [
+          {
+            "probeId": "whole-buffer",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2261223a312c2261223a327d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1,\"a\":2}",
+                "lineUtf8Sha256": "1c53ee0df7b12fd4d65b976120c7fa6b847dc41dffd7f0331c3237a1ceab1756"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "escaped-lone-surrogate",
+        "probes": [
+          {
+            "probeId": "whole-buffer",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "7b2274657874223a225c7564383030227d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"text\":\"\\ud800\"}",
+                "lineUtf8Sha256": "7d38e2388498cec03881027e7753b07826c5af2d61dd589b4c1caaab14ec2cc4"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "invalid-utf8",
+        "probes": [
+          {
+            "probeId": "every-byte",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "ff"
+              },
+              {
+                "kind": "buffer",
+                "hex": "fe"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61"
+              },
+              {
+                "kind": "buffer",
+                "hex": "c3"
+              },
+              {
+                "kind": "buffer",
+                "hex": "28"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 5,
+                "line": "��a�(",
+                "lineUtf8Sha256": "c1ec0d059a2645ecea6888dc866dac220c463b19f53e52a2276dedd742a02e74"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 3,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 4,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 5,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "incomplete-utf8-eof",
+        "probes": [
+          {
+            "probeId": "every-byte",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "61"
+              },
+              {
+                "kind": "buffer",
+                "hex": "f0"
+              },
+              {
+                "kind": "buffer",
+                "hex": "9f"
+              },
+              {
+                "kind": "buffer",
+                "hex": "92"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "end",
+                "chunkIndex": null,
+                "line": "a�",
+                "lineUtf8Sha256": "51d277510ba4bf97b25f12d38513c1b620a2a33fc83b3beeeb0dd971bf429e6d"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 3,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "mixed-buffer-string",
+        "probes": [
+          {
+            "probeId": "explicit-chunks",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "f09f"
+              },
+              {
+                "kind": "string",
+                "text": "M"
+              },
+              {
+                "kind": "buffer",
+                "hex": "98800a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 2,
+                "line": "M😀",
+                "lineUtf8Sha256": "d0fb89195a373ae58b5533a8dc6e2adf1268a70927ce3da52845255c0f99aab8"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "string",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "string-chunks",
+        "probes": [
+          {
+            "probeId": "explicit-chunks",
+            "authoredChunks": [
+              {
+                "kind": "string",
+                "text": "a"
+              },
+              {
+                "kind": "string",
+                "text": " b"
+              },
+              {
+                "kind": "string",
+                "text": " c\r"
+              },
+              {
+                "kind": "string",
+                "text": "\n"
+              },
+              {
+                "kind": "string",
+                "text": "tail"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 3,
+                "line": "a b c",
+                "lineUtf8Sha256": "f697df1f62230dd3adc456189e505808442665173789316624f2b00133b4d679"
+              },
+              {
+                "index": 1,
+                "phase": "end",
+                "chunkIndex": null,
+                "line": "tail",
+                "lineUtf8Sha256": "0c62f876ef1dea830de9f32c2f4b46dd6d74d50d15896e09ef5a2fcd4ac7e1d7"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "string",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "string",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "string",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 3,
+                "deliveredKind": "string",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 4,
+                "deliveredKind": "string",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "final-cr-only",
+        "probes": [
+          {
+            "probeId": "whole-buffer",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "0d"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "end",
+                "chunkIndex": null,
+                "line": "",
+                "lineUtf8Sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "final-double-cr",
+        "probes": [
+          {
+            "probeId": "every-byte",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "0d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61"
+              },
+              {
+                "kind": "buffer",
+                "hex": "6c"
+              },
+              {
+                "kind": "buffer",
+                "hex": "70"
+              },
+              {
+                "kind": "buffer",
+                "hex": "68"
+              },
+              {
+                "kind": "buffer",
+                "hex": "61"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0d"
+              },
+              {
+                "kind": "buffer",
+                "hex": "0d"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "end",
+                "chunkIndex": null,
+                "line": "\r\ralpha\r",
+                "lineUtf8Sha256": "8775e66e03f7543f0f5b8462ebf87450444b30b5c2f2aa32f1ab683d06e4b25b"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 3,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 4,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 5,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 6,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 7,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              },
+              {
+                "chunkIndex": 8,
+                "deliveredKind": "buffer",
+                "callbackCount": 0
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "non-json-lines",
+        "probes": [
+          {
+            "probeId": "whole-buffer",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "23636f6d6d656e740a7b2261223a312c7d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "#comment",
+                "lineUtf8Sha256": "447a190608a33c49695f80e29a21b24811fb041373097836ffc20847ba2d71d4"
+              },
+              {
+                "index": 1,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "{\"a\":1,}",
+                "lineUtf8Sha256": "aa99a5ce3eb0dd8355f0bfb15376ea1d862ad75d0d278af1f8c280ca8c02c640"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 2
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "raw-scalars-and-whitespace",
+        "probes": [
+          {
+            "probeId": "whole-buffer",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "207b202277696465223a20393030373139393235343734303939332c2022646563696d616c223a20312e302c20227a65726f223a202d302c20226e756c6c223a206e756c6c207d0a"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": " { \"wide\": 9007199254740993, \"decimal\": 1.0, \"zero\": -0, \"null\": null }",
+                "lineUtf8Sha256": "1a1e78b22317763332a7fa55ef617b41a2963e68b47ea8bd3dedf935a5b3e9ba"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [],
+              "beforeCleanup": {
+                "data": 3,
+                "end": 1
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "detach-after-first-chunk",
+        "probes": [
+          {
+            "probeId": "explicit-chunks",
+            "authoredChunks": [
+              {
+                "kind": "buffer",
+                "hex": "66697273740a6275666665726564"
+              },
+              {
+                "kind": "string",
+                "text": "ignored\n"
+              },
+              {
+                "kind": "string",
+                "text": "tail"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "first",
+                "lineUtf8Sha256": "a7937b64b8caa58f03721bb6bacf5c78cb235febe0e70b1b84cd99541461a08e"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "buffer",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 1,
+                "deliveredKind": "string",
+                "callbackCount": 1
+              },
+              {
+                "chunkIndex": 2,
+                "deliveredKind": "string",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [
+                {
+                  "at": "authored-data-boundary",
+                  "chunkIndex": 0,
+                  "before": {
+                    "data": 3,
+                    "end": 3
+                  },
+                  "after": {
+                    "data": 2,
+                    "end": 2
+                  },
+                  "afterSecondCall": {
+                    "data": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "beforeCleanup": {
+                "data": 2,
+                "end": 0
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      },
+      {
+        "caseId": "detach-before-final-eof",
+        "probes": [
+          {
+            "probeId": "explicit-chunks",
+            "authoredChunks": [
+              {
+                "kind": "string",
+                "text": "before\npartial"
+              }
+            ],
+            "callbacks": [
+              {
+                "index": 0,
+                "phase": "data",
+                "chunkIndex": 0,
+                "line": "before",
+                "lineUtf8Sha256": "6db7d803e74f1ffa7d8f5adc0bf95b3e15bf4c8373fffadf546227cc6c6742cb"
+              }
+            ],
+            "chunkSnapshots": [
+              {
+                "chunkIndex": 0,
+                "deliveredKind": "string",
+                "callbackCount": 1
+              }
+            ],
+            "listenerObservations": {
+              "beforeAttach": {
+                "data": 1,
+                "end": 1
+              },
+              "afterAttach": {
+                "data": 2,
+                "end": 2
+              },
+              "detachSnapshots": [
+                {
+                  "at": "authored-data-boundary",
+                  "chunkIndex": 0,
+                  "before": {
+                    "data": 3,
+                    "end": 3
+                  },
+                  "after": {
+                    "data": 2,
+                    "end": 2
+                  },
+                  "afterSecondCall": {
+                    "data": 2,
+                    "end": 2
+                  }
+                }
+              ],
+              "beforeCleanup": {
+                "data": 2,
+                "end": 0
+              },
+              "afterCleanup": {
+                "data": 2,
+                "end": 0
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "serializerCases": [
+      {
+        "caseId": "object-unicode-controls",
+        "serialized": "{\"text\":\"a b c😀π\\n\\r\\n\",\"keep\":null,\"ordered\":[\"b\",\"a\"]}\n",
+        "utf8Hex": "7b2274657874223a2261e280a862e280a963f09f9880cf805c6e5c725c6e222c226b656570223a6e756c6c2c226f726465726564223a5b2262222c2261225d7d0a",
+        "bytes": 65,
+        "utf8Sha256": "d59e89f74730a001e6e78a6fdc12f15a588d43178fb4421850dca353359158c4"
+      },
+      {
+        "caseId": "empty-object",
+        "serialized": "{}\n",
+        "utf8Hex": "7b7d0a",
+        "bytes": 3,
+        "utf8Sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+      },
+      {
+        "caseId": "array-values",
+        "serialized": "[null,false,1.25,\"x\"]\n",
+        "utf8Hex": "5b6e756c6c2c66616c73652c312e32352c2278225d0a",
+        "bytes": 22,
+        "utf8Sha256": "1862d985f991c0a4b48f22f70e91ad4385a7ff2e6d6986a86b40fc2c4cfd18f9"
+      },
+      {
+        "caseId": "top-level-string",
+        "serialized": "\"literal\\nline paragraph \"\n",
+        "utf8Hex": "226c69746572616c5c6e6c696e65e280a8706172616772617068e280a9220a",
+        "bytes": 31,
+        "utf8Sha256": "590c9ee2e5c688801724e43ca542fa4cd3d480f75387d1929d062cdae5652d8d"
+      },
+      {
+        "caseId": "top-level-null",
+        "serialized": "null\n",
+        "utf8Hex": "6e756c6c0a",
+        "bytes": 5,
+        "utf8Sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+      },
+      {
+        "caseId": "integer-property-order",
+        "serialized": "{\"1\":\"one\",\"2\":\"two\",\"z\":null,\"a\":false}\n",
+        "utf8Hex": "7b2231223a226f6e65222c2232223a2274776f222c227a223a6e756c6c2c2261223a66616c73657d0a",
+        "bytes": 41,
+        "utf8Sha256": "756dfd8df2bcff556fe421ccd4ec1cc4664a9ab33557f1c4bdbd2c02d8f0a330"
+      }
+    ],
+    "checks": {
+      "readerCaseCount": 24,
+      "readerProbeCount": 85,
+      "callbackCount": 126,
+      "serializerCaseCount": 6,
+      "unchangedWholeModule": true,
+      "publicExports": [
+        "attachJsonlLineReader",
+        "serializeJsonLine"
+      ],
+      "externalPackagesLoaded": 0,
+      "networkAndChildProcessesBlocked": true,
+      "jsonAdmissionInvoked": false,
+      "clockOrRngOverride": false
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "kind": "genuine-unchanged-session-manager-lifecycle-reference",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "caseCount": 8,
+  "checkpointCount": 26,
+  "captureBytes": 1112034,
+  "captureSha256": "9f578c1c2e9518b959995c1288cd7cf0f558638317c0e90809b61354615bdb7b",
+  "contractSha256": "ab8596e297bb726b6af39f53759507e738b6ff1acf2f131b53f1f4e4494d70dc",
+  "environmentPins": {
+    "bytes": 7774,
+    "sha256": "ec151d984f4b2be4ed63724dda23226feeab6a2b4e98fddaa7dd0e797ccd46c4"
+  },
+  "originReport": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-session-lifecycle-closure-work\\artifacts\\session-lifecycle-reference\\closure-second\\report.json",
+    "bytes": 5368,
+    "sha256": "66d8ed3ac577978f9e9225380ff3a1af6ee6a223e1796134f483ce0c97254d93"
+  },
+  "comparisonPolicy": {
+    "version": 1,
+    "raw": "Full own enumerable observations and exact physical UTF-8/base64 bytes are retained. Own undefined fields are separately enumerated. No raw ID, clock, cwd, parent link, record or path is replaced.",
+    "contract": "A separately named derivation projects checkpoint counts, ordered entry types, runtime/LLM roles and text, model/thinking settings, full custom state and hidden-message payloads; it also evaluates declared within-run identity, ancestry, parent-file and byte-preservation relations.",
+    "omittedFromCrossRunContract": [
+      "actual generated IDs",
+      "actual timestamp values",
+      "actual absolute scratch/cwd/file paths",
+      "raw byte hashes",
+      "filesystem call counts"
+    ],
+    "omittedFieldsRetainedAt": "cases[].rawObservations (and the retained scratch JSONL files); omissions affect only explicit cross-run contract comparison.",
+    "repeatRule": "Two fresh runs must have equal derived contracts and loaded module pins. Raw observations may differ because real clocks, random identifiers and fresh paths are used.",
+    "modelInputs": "No provider execution. Ordinary user/assistant inputs and custom payloads are finite authored data. Custom state is raw session data; display:false custom messages contribute to context and public convertToLlm.",
+    "scope": "Eight concrete SessionManager lifecycle schedules; no original package, full phase, provider, compaction or native parity closure claim."
+  },
+  "children": [
+    {
+      "repeat": 1,
+      "scratch": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-session-lifecycle-closure-work\\artifacts\\session-lifecycle-reference\\closure-second\\scratch\\capture-CxA6gP",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 587304,
+      "stderrBytes": 0,
+      "boundedTimeoutMilliseconds": 20000,
+      "maxBufferBytes": 8388608
+    },
+    {
+      "repeat": 2,
+      "scratch": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-session-lifecycle-closure-work\\artifacts\\session-lifecycle-reference\\closure-second\\scratch\\capture-r3xh18",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 587304,
+      "stderrBytes": 0,
+      "boundedTimeoutMilliseconds": 20000,
+      "maxBufferBytes": 8388608
+    }
+  ],
+  "priorReadOnlyPreflightTimeout": {
+    "path": "artifacts/session-lifecycle-reference-first.log",
+    "bytes": 1163,
+    "sha256": "622d2befb296d77d46f4e02ac71bf9a288037eba3ba7e65dfb6700bd4dd761cf",
+    "sourceCasesExecuted": false,
+    "deadlineMilliseconds": 20000
+  },
+  "allSourceAndDependencyPinsVerified": true,
+  "clocksOrRngOverridden": false,
+  "rawFieldsReplaced": false,
+  "originalGoldensAltered": false,
+  "originalPackageAcceptance": false
+}

@@ -1,0 +1,16 @@
+# Automatic Bash boundary: clean source contract
+
+This implementation was authored independently from the intended ownership behavior and authorized PiSharp base f36c61ef8cca61834c4618a975601ed9900e2e81. The reference inspected is local Pi v0.99.1 d86654abb8862e201933517d6f1fce9f88dd117f, packages/coding-agent/src/core/agent-session.ts: executeBash, pending Bash messages and finalized-context refresh. No quarantined source, patch, checkout or bundle was read, copied, applied or compared during this clean task. Earlier acquisition incidents remain documented in parent history; this work supplies no retroactive clearance.
+
+Automatic work acquires a separate admission lease after the actual provider loop has joined. The lease checks the exact coordinator operation owner and rejects an active provider. It fences new Bash before capturing the admitted composite completion tasks. Each task includes its executor, progress and admitted result persistence, as supplied by the clean Bash owner. Every captured original is awaited even when another fails. There is no cancellation-token wrapper around these joins. Reference-distinct original failure leaves are retained; any failure prevents flush and planning from this boundary.
+
+Only after successful original settlement does the boundary await the actual pending-message flush. The Bash owner dequeues its captured batch after checkpoint acknowledgement and finalized-context refresh. Threshold estimation and overflow context selection/omission therefore read acknowledged Bash state. The admission lease spans automatic planning, generation, checkpoint and observation, independently of the existing summary reservation. It is released before a retry provider or before-settlement callback runs. Manual compaction and sessions without configured automatic compaction retain their existing control path.
+
+Composition seams:
+
+- Clean Bash partial supplies CaptureUserBashCompletionsLocked and FlushPendingUserBashMessagesAsync, and calls ThrowAutomaticBashBoundaryLocked during command admission.
+- Root coordinator final settlement calls BeginUserBashBoundaryAsync(idle) while it still owns _active, before SessionOperationSettled. Close must begin Bash cancellation before awaiting a provider owner that may be joining Bash.
+- Root retains the original run failure if final flush/cleanup also fails. The clean helper retains received original exceptions; underlying pre-existing SessionLogStore error translation remains unchanged.
+- Root registers AutomaticBashBoundaryTests.Cases() once and directly awaits the `automatic Bash boundary ` prefix.
+
+Seven authored cases cover threshold output changing the decision, overflow executor cleanup and one retry, cancellation while original progress remains held, callback reentry, body/progress/cleanup failure references plus a second held original, held acknowledged flush, failed flush retaining pending messages, and manual/non-Bash controls. Cleanup releases observations and joins each original executor/progress, command, provider owner and disposal; body and unexpected cleanup faults are aggregated by reference. Cases are UNEXECUTED. No compiler, test, Node, native process, live API, package, credential, security or trust operation was run in this lane.

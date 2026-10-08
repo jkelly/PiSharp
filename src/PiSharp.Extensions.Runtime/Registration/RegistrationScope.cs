@@ -3,7 +3,7 @@ namespace PiSharp.Extensions.Runtime;
 internal enum RegistrationScopeState { Initializing, Active, Quiescing, Quiescent, Closing, Disposed }
 
 /// <summary>A single extension generation. Concurrent disposal shares the actual cleanup settlement.</summary>
-public sealed class RegistrationScope : IExtensionSessionCreationRegistry, IAsyncDisposable
+public sealed partial class RegistrationScope : IExtensionSessionCreationRegistry, IExtensionEventBusRegistry, IExtensionSessionTreeLifecycleRegistry, IAsyncDisposable
 {
     public string OwnerId { get; }
     public long OwnerGeneration { get; }
@@ -11,7 +11,7 @@ public sealed class RegistrationScope : IExtensionSessionCreationRegistry, IAsyn
     public System.Collections.Immutable.ImmutableArray<string> Features => Registry.AvailableFeatures;
     public CancellationToken ExtensionLifetimeCancellationToken { get; }
     internal ExtensionRegistry Registry { get; }
-    internal StagedRegistrationSet Staged { get; } = new();
+    internal StagedRegistrationSet Staged { get; set; } = new();
     internal RegistrationScopeState State { get; set; } = RegistrationScopeState.Initializing;
     internal int ChargedRegistrations { get; set; }
     internal int ActiveCallbacks { get; set; }

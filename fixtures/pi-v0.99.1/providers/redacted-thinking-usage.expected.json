@@ -1,0 +1,132 @@
+{
+  "events": [
+    {
+      "type": "start",
+      "partial": {
+        "role": "assistant",
+        "content": [],
+        "api": "openai-responses",
+        "provider": "authored-synthetic",
+        "model": "fixture-model",
+        "usage": {
+          "input": 0,
+          "output": 0,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 0,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0
+          }
+        },
+        "stopReason": "pending",
+        "timestamp": 1700000000000
+      }
+    },
+    {
+      "type": "thinking_start",
+      "contentIndex": 0,
+      "content": {
+        "type": "thinking",
+        "thinking": ""
+      }
+    },
+    {
+      "type": "thinking_end",
+      "contentIndex": 0,
+      "content": "",
+      "thinkingSignature": "encrypted==",
+      "redacted": true
+    },
+    {
+      "type": "text_start",
+      "contentIndex": 1,
+      "content": {
+        "type": "text",
+        "text": ""
+      }
+    },
+    {
+      "type": "text_end",
+      "contentIndex": 1,
+      "content": "Ready"
+    },
+    {
+      "type": "done",
+      "reason": "stop",
+      "message": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "",
+            "thinkingSignature": "encrypted==",
+            "redacted": true
+          },
+          {
+            "type": "text",
+            "text": "Ready"
+          }
+        ],
+        "api": "openai-responses",
+        "provider": "authored-synthetic",
+        "model": "fixture-model",
+        "usage": {
+          "input": 2,
+          "output": 3,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "totalTokens": 5,
+          "cost": {
+            "input": 0.000001,
+            "output": 0.000003,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.000004
+          },
+          "reasoning": 0
+        },
+        "stopReason": "stop",
+        "timestamp": 1700000000000
+      }
+    }
+  ],
+  "result": {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "",
+        "thinkingSignature": "encrypted==",
+        "redacted": true
+      },
+      {
+        "type": "text",
+        "text": "Ready"
+      }
+    ],
+    "api": "openai-responses",
+    "provider": "authored-synthetic",
+    "model": "fixture-model",
+    "usage": {
+      "input": 2,
+      "output": 3,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "totalTokens": 5,
+      "cost": {
+        "input": 0.000001,
+        "output": 0.000003,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "total": 0.000004
+      },
+      "reasoning": 0
+    },
+    "stopReason": "stop",
+    "timestamp": 1700000000000
+  }
+}

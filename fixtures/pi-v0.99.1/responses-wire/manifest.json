@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "normalizerVersion": "object-key-order-v1",
+  "scope": "Genuine unchanged parsed Responses event mapping; HTTP/SSE, SDK wrappers, authentication and catalog prices excluded",
+  "fixtures": [
+    {
+      "fixtureId": "responses-core",
+      "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "requirementIds": [
+        "api.openai-responses",
+        "stream.indexed-events",
+        "stream.terminal-settlement"
+      ],
+      "scenario": "Interleaved text/tool completion, EOF-before-terminal and completed unfinished tool",
+      "clock": {
+        "unixMilliseconds": 1700000000000,
+        "mechanism": "Explicit initial output timestamps; helper invokes no clock"
+      },
+      "seed": "none; explicit case/response/item/call IDs",
+      "environment": {
+        "platform": "win32",
+        "architecture": "x64",
+        "credentials": "not inherited",
+        "network": "disabled",
+        "workspace": "isolated home/workspace"
+      },
+      "input": {
+        "path": "fixtures/pi-v0.99.1/responses-wire/core.input.json",
+        "sha256": "87b6d02b821774c2ace59d8a011973a38b95731c1c8c5c271bf358ebe8554361"
+      },
+      "expected": {
+        "path": "fixtures/pi-v0.99.1/responses-wire/core.expected.json",
+        "sha256": "7b9b2aeeaefe6d62b2c9e0ad9f042dbc938a47fe41dc59a3a66d2cc5893703d6"
+      },
+      "provenance": {
+        "kind": "captured-upstream-responses-oracle",
+        "inputKind": "authored-synthetic-input",
+        "source": "Unmodified pinned processResponsesStream with authored parsed-wire DTOs and rates",
+        "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+        "dependencyLock": "tools/PiReferenceRunner/responses-lock.json",
+        "capturedAt": "2026-09-30",
+        "captureCommand": "node tools/PiReferenceRunner/responses-run.mjs --capture-new",
+        "nativeProjection": false,
+        "providerWireTraffic": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,2204 @@
+{
+  "schemaVersion": 1,
+  "kind": "P1-02-artifact-and-license-evidence-matrix",
+  "recordedOn": "2026-10-01",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "implementationOwner": {
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "xhigh"
+  },
+  "gate": {
+    "requirementId": "P1-02",
+    "status": "HOLD",
+    "legalApproval": false,
+    "redistributionLicenseClosure": false,
+    "allEightPhaseClosureClaimed": false,
+    "reason": "Evidence consolidated; notice delivery, native/generated/vendored scope, signatures and distribution decisions remain open."
+  },
+  "evidenceLevels": [
+    {
+      "id": "declared-metadata-only",
+      "meaning": "Manifest/lock/registry license declaration; no complete grant text."
+    },
+    {
+      "id": "packaged-notice-bytes",
+      "meaning": "Named complete notice bytes retained from exact SRI-qualified archive; no automatic distribution approval."
+    },
+    {
+      "id": "source-notice-at-registry-reported-commit",
+      "meaning": "Commit-addressed complete source notice, matching manifest and API blob identity; attestation/legal scope separate."
+    },
+    {
+      "id": "canonical-pi-source-notice",
+      "meaning": "Pinned Pi Git blob and identical official release-source LICENSE bytes."
+    }
+  ],
+  "evidenceFiles": [
+    {
+      "id": "baseline",
+      "path": "compatibility/baseline.lock.json",
+      "bytes": 59384,
+      "sha256": "3d39afb8a23079ae35a123b66dee1bbd291cdf16c2bf30b16ecb3ca923338a1a"
+    },
+    {
+      "id": "release-lock",
+      "path": "artifacts/released-baseline/evidence.lock.json",
+      "bytes": 1263,
+      "sha256": "6fe01c9a77d39505c154b1b20c65d838513a8efba17ea58164aaa38e7b81456c"
+    },
+    {
+      "id": "release-inspection",
+      "path": "artifacts/released-baseline/inspection.json",
+      "bytes": 41808,
+      "sha256": "c99a5a5db625fc4ee8dbcb2b69b6e803bd3c88943105d6c4a64ae6df757c490b"
+    },
+    {
+      "id": "release-metadata",
+      "path": "artifacts/released-baseline/metadata.json",
+      "bytes": 72880,
+      "sha256": "1aafbfc3e2a0610b4066dd4cd94e239a64bc3b08506cd0d67f41cd18a34af789"
+    },
+    {
+      "id": "release-archive",
+      "path": "artifacts/released-baseline/pi-0.99.1-source.tar.gz",
+      "bytes": 8646242,
+      "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b"
+    },
+    {
+      "id": "release-checksums",
+      "path": "artifacts/released-baseline/SHA256SUMS",
+      "bytes": 823,
+      "sha256": "1490fbb52c4cbf6f175b1b66147702b5e6584504277fc0c424745c32770bdbba"
+    },
+    {
+      "id": "ai-lock",
+      "path": "artifacts/released-npm-ai/evidence.lock.json",
+      "bytes": 1532,
+      "sha256": "35fe3e5e8713163c4277fa72747de1ad38a2f842ea7543d00f567f3865ee0d94"
+    },
+    {
+      "id": "ai-inspection",
+      "path": "artifacts/released-npm-ai/inspection.json",
+      "bytes": 157841,
+      "sha256": "0c385e57ebdc3a01e0a7a50748af231a6fbefdea91b643356d6d0e239ebf6168"
+    },
+    {
+      "id": "ai-archive",
+      "path": "artifacts/released-npm-ai/pi-ai-0.99.1.tgz",
+      "bytes": 760966,
+      "sha256": "f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3"
+    },
+    {
+      "id": "archive-inspector",
+      "path": "tools/PiReferenceRunner/setup-responses-sdk-oracle.mjs",
+      "bytes": 34806,
+      "sha256": "1da4ce53bf9b7ccc462bad540294353fd7ab42ba35ca171d3921916409d2b513"
+    },
+    {
+      "id": "edit-plan",
+      "path": "compatibility/edit-oracle-plan.json",
+      "bytes": 30815,
+      "sha256": "b9127920b5db8b1b0cdf2ed24babfa943fe7bc79d3e842a2f28bbde6d91dffb3"
+    },
+    {
+      "id": "edit-receipt",
+      "path": "compatibility/edit-oracle-setup.json",
+      "bytes": 27373,
+      "sha256": "2c1a92e8cc89f344aa397a12cd2708e2909792ad81ec402a3570b7863e110bea"
+    },
+    {
+      "id": "anthropic-sdk-plan",
+      "path": "tools/PiReferenceRunner/anthropic-sdk-install-plan.json",
+      "bytes": 27122,
+      "sha256": "8e3a8908257832f2b736680f676160f60f52c77c9c10f790160ffbb431684682"
+    },
+    {
+      "id": "anthropic-sdk-receipt",
+      "path": "compatibility/anthropic-oracle-setup.json",
+      "bytes": 21806,
+      "sha256": "e11d383b6a5ecb736c89523c065d96e540b2392108b1c23ffa315113bc28c1c9"
+    },
+    {
+      "id": "responses-sdk-plan",
+      "path": "tools/PiReferenceRunner/responses-sdk-install-plan.json",
+      "bytes": 13046,
+      "sha256": "0d19249ca9e105602abf304de9c3710e67157bab7209ef67645fd70f77307f22"
+    },
+    {
+      "id": "responses-sdk-receipt",
+      "path": "compatibility/responses-sdk-oracle-setup.json",
+      "bytes": 43422,
+      "sha256": "e3e8f2eb4c0f5df31408f65aa800c385197b9dde63212171581ad30fe3965934"
+    }
+  ],
+  "dependencyProfiles": [
+    {
+      "profileId": "edit",
+      "planEvidenceId": "edit-plan",
+      "receiptEvidenceId": "edit-receipt",
+      "oracle": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-edit-oracle-v0.99.1",
+      "packages": 13,
+      "installedFiles": 1997,
+      "packageIds": [
+        "chalk@6.0.0",
+        "cross-spawn@7.0.6",
+        "diff@8.0.4",
+        "get-east-asian-width@1.6.0",
+        "highlight.js@10.7.3",
+        "isexe@2.0.0",
+        "marked@18.0.11",
+        "partial-json@0.1.7",
+        "path-key@3.1.1",
+        "shebang-command@2.0.0",
+        "shebang-regex@3.0.0",
+        "typebox@1.3.27",
+        "which@2.0.2"
+      ],
+      "sourceFingerprint": {
+        "canonicalGit": {
+          "files": 2093,
+          "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+        },
+        "acquiredCheckout": {
+          "files": 2093,
+          "sha256": "676a5df7a526ab0fb6a78f734b57093bb7571913fc17251d02cb0c84527dcf21"
+        },
+        "declaredCheckoutConversions": [
+          {
+            "path": "pi-test.bat",
+            "eol": "crlf",
+            "canonicalSha256": "d454a5a0e203d9009283b887720472b022b0853380758b11419c8547a32dbb88",
+            "checkoutSha256": "c9d3430a614cabfaae5a9e97259643ab9041629bc8253f58f22579a5b6d9c448"
+          },
+          {
+            "path": "pi-test.ps1",
+            "eol": "crlf",
+            "canonicalSha256": "9f76d37f75b1d6f03be14d8bce3ca05331c4b09b8003a53329d8e4fe942792ef",
+            "checkoutSha256": "9b97fa3be6582e935f43865599d21bbb216e5ffe2cb1eb198c77e7298490b895"
+          }
+        ]
+      },
+      "historicalReceiptStatus": "thirteen exact dependencies installed; whole edit module qualification pending",
+      "developmentOnly": true,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "profileId": "anthropic-sdk",
+      "planEvidenceId": "anthropic-sdk-plan",
+      "receiptEvidenceId": "anthropic-sdk-receipt",
+      "oracle": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-anthropic-sdk-oracle-v0.99.1-reviewed",
+      "packages": 8,
+      "installedFiles": 2393,
+      "packageIds": [
+        "@anthropic-ai/sdk@0.124.0",
+        "@babel/runtime@7.29.2",
+        "@stablelib/base64@1.0.1",
+        "fast-sha256@1.3.0",
+        "json-schema-to-ts@3.1.1",
+        "partial-json@0.1.7",
+        "standardwebhooks@1.1.1",
+        "ts-algebra@2.0.0"
+      ],
+      "sourceFingerprint": {
+        "canonicalGit": {
+          "files": 2093,
+          "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+        },
+        "acquiredCheckout": {
+          "files": 2093,
+          "sha256": "676a5df7a526ab0fb6a78f734b57093bb7571913fc17251d02cb0c84527dcf21"
+        },
+        "declaredCheckoutConversions": [
+          {
+            "path": "pi-test.bat",
+            "eol": "crlf",
+            "canonicalSha256": "d454a5a0e203d9009283b887720472b022b0853380758b11419c8547a32dbb88",
+            "checkoutSha256": "c9d3430a614cabfaae5a9e97259643ab9041629bc8253f58f22579a5b6d9c448"
+          },
+          {
+            "path": "pi-test.ps1",
+            "eol": "crlf",
+            "canonicalSha256": "9f76d37f75b1d6f03be14d8bce3ca05331c4b09b8003a53329d8e4fe942792ef",
+            "checkoutSha256": "9b97fa3be6582e935f43865599d21bbb216e5ffe2cb1eb198c77e7298490b895"
+          }
+        ]
+      },
+      "historicalReceiptStatus": "eight exact dependencies installed; whole Anthropic wrapper qualification pending",
+      "developmentOnly": true,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "profileId": "responses-sdk",
+      "planEvidenceId": "responses-sdk-plan",
+      "receiptEvidenceId": "responses-sdk-receipt",
+      "oracle": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-responses-sdk-oracle-v0.99.1",
+      "packages": 3,
+      "installedFiles": 4942,
+      "packageIds": [
+        "openai@7.19.0",
+        "partial-json@0.1.7",
+        "typebox@1.3.27"
+      ],
+      "sourceFingerprint": {
+        "canonicalGit": {
+          "files": 2093,
+          "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+        },
+        "acquiredCheckout": {
+          "files": 2093,
+          "sha256": "676a5df7a526ab0fb6a78f734b57093bb7571913fc17251d02cb0c84527dcf21"
+        },
+        "declaredCheckoutConversions": [
+          {
+            "path": "pi-test.bat",
+            "eol": "crlf",
+            "canonicalSha256": "d454a5a0e203d9009283b887720472b022b0853380758b11419c8547a32dbb88",
+            "checkoutSha256": "c9d3430a614cabfaae5a9e97259643ab9041629bc8253f58f22579a5b6d9c448"
+          },
+          {
+            "path": "pi-test.ps1",
+            "eol": "crlf",
+            "canonicalSha256": "9f76d37f75b1d6f03be14d8bce3ca05331c4b09b8003a53329d8e4fe942792ef",
+            "checkoutSha256": "9b97fa3be6582e935f43865599d21bbb216e5ffe2cb1eb198c77e7298490b895"
+          }
+        ]
+      },
+      "historicalReceiptStatus": "three dependencies installed; wrapper qualification pending",
+      "developmentOnly": true,
+      "redistributionLicenseClosure": false
+    }
+  ],
+  "packages": [
+    {
+      "id": "@anthropic-ai/sdk@0.124.0",
+      "name": "@anthropic-ai/sdk",
+      "version": "0.124.0",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/@anthropic-ai/sdk/-/sdk-0.124.0.tgz",
+      "archiveIntegrity": "sha512-cN5O8i9UVxHeOQAzj/XjshWXG8KiibJDw9OGpH2Z/eR3n/RBxdoLxDJOcfqAJWvjaMDFfHTBADU04hWRJVkDyA==",
+      "archiveSha256": "a9d9894658fc4e4ca44e982eb603b59945d01c24a5510965c067e1c94fdaaeb2",
+      "manifestSha256": "e9692cceae09a61d4168fca1fd47c1dd66b3798891b4cbe74cd21c331c20708a",
+      "installedFingerprint": {
+        "files": 1735,
+        "sha256": "36567957c4382a811f1cc2cb64b0f99715569ccf974aa4ae3c11bf2e4b9f3ed3"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1056,
+          "sha256": "8bf96984ff8bcfae7e48cae76a529e8a25317ba9e02abf7fd3cc64fdf95657a6",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/0/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        },
+        {
+          "path": "src/internal/qs/LICENSE.md",
+          "bytes": 1588,
+          "sha256": "d8c77eaffed7f1f874b97f66ee47a557ae24fd59bae8ae14f9b1b84f26a94d2f",
+          "observedTextFamily": "BSD-3-Clause",
+          "evidence": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/0/licenses/1"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "anthropic-sdk",
+          "plan": {
+            "fileId": "anthropic-sdk-plan",
+            "jsonPointer": "/packages/0/lockEntry"
+          },
+          "receipt": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/0"
+          },
+          "sourceLockPath": "node_modules/@anthropic-ai/sdk"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "@babel/runtime@7.29.2",
+      "name": "@babel/runtime",
+      "version": "7.29.2",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.2.tgz",
+      "archiveIntegrity": "sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g==",
+      "archiveSha256": "91d6dda69e8514cca05e8bda7f6fe19b80f9a405fbd88c21e4eccc54f10f87e5",
+      "manifestSha256": "a34bfb8ab99545a10b211e8918e4a58cc66740366644298cb8efa3b766537ee0",
+      "installedFingerprint": {
+        "files": 249,
+        "sha256": "b5a0ead572dacff9184ad5be4f720abaaa4137741fd8d3861b5151f086fc484a"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1106,
+          "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/1/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "anthropic-sdk",
+          "plan": {
+            "fileId": "anthropic-sdk-plan",
+            "jsonPointer": "/packages/1/lockEntry"
+          },
+          "receipt": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/1"
+          },
+          "sourceLockPath": "node_modules/@babel/runtime"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "@stablelib/base64@1.0.1",
+      "name": "@stablelib/base64",
+      "version": "1.0.1",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/@stablelib/base64/-/base64-1.0.1.tgz",
+      "archiveIntegrity": "sha512-1bnPQqSxSuc3Ii6MhBysoWCg58j97aUjuCSZrGSmDxNqtytIi0k8utUenAwTZN4V5mXXYGsVUI9zeBqy+jBOSQ==",
+      "archiveSha256": "0130711d2e0d3f87436c7825db1f35bd6134fba2eda64b0df43d781f9b6a596a",
+      "manifestSha256": "7821116cc9ab0fb2542c1407ac5e34ff78bcc70b2d1295b753a9ea16134b3df7",
+      "installedFingerprint": {
+        "files": 15,
+        "sha256": "2320b911e9b77d2ade070cd674de1188ff7165f933de49847ddfd204bb4b1f98"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1110,
+          "sha256": "1605b77bebe018db1fc27bd22fbcdeed1335c617937a124299a8b042b42b0fb6",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/2/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "anthropic-sdk",
+          "plan": {
+            "fileId": "anthropic-sdk-plan",
+            "jsonPointer": "/packages/2/lockEntry"
+          },
+          "receipt": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/2"
+          },
+          "sourceLockPath": "node_modules/@stablelib/base64"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "chalk@6.0.0",
+      "name": "chalk",
+      "version": "6.0.0",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/chalk/-/chalk-6.0.0.tgz",
+      "archiveIntegrity": "sha512-2uNTXIuTTxk7ciZgAU1BQcgnchcG0xXnrs6jzkQfj9SsRa9M2s5zE8WT96hS6KmG4MzWHSrvH43DF1m4XRkrFg==",
+      "archiveSha256": "85d0ce26b8a6098d3826d9ec17cf16c7a9326dfce3f2545ecc1133581c981399",
+      "manifestSha256": "5a853fc6dc0c529bc126f97645989e9d60d06a2e9b20f66a6b48b0e8ef9da3ef",
+      "installedFingerprint": {
+        "files": 12,
+        "sha256": "ddbf61ceb3de9e2de347ebd30bab70aeae044ff0f524fde35697dbaf2e47d9cf"
+      },
+      "packagedNotices": [
+        {
+          "path": "license",
+          "bytes": 1117,
+          "sha256": "5c932d88256b4ab958f64a856fa48e8bd1f55bc1d96b8149c65689e0c61789d3",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/0/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/0/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/0"
+          },
+          "sourceLockPath": "node_modules/chalk"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "cross-spawn@7.0.6",
+      "name": "cross-spawn",
+      "version": "7.0.6",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/cross-spawn/-/cross-spawn-7.0.6.tgz",
+      "archiveIntegrity": "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==",
+      "archiveSha256": "188c320cdc413adfec03098fda72af7a9b02152ba13d3a8f87f172d93ced38ea",
+      "manifestSha256": "2e106cd9b4ae4e34ead35218371a0d4e172da72515a4f8f97d69a2e1fe3dee82",
+      "installedFingerprint": {
+        "files": 9,
+        "sha256": "ba72b9234e47f979c9938a5fe3e0bc95d6e26b91efdca9c1eb43b82aebb48d8a"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1105,
+          "sha256": "aaa78451b6fecd1b9c4594c796c133c0e90cad100372ff8bc6de615e9ef9adf1",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/1/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/1/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/1"
+          },
+          "sourceLockPath": "node_modules/cross-spawn"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "diff@8.0.4",
+      "name": "diff",
+      "version": "8.0.4",
+      "declaredLicense": "BSD-3-Clause",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/diff/-/diff-8.0.4.tgz",
+      "archiveIntegrity": "sha512-DPi0FmjiSU5EvQV0++GFDOJ9ASQUVFh5kD+OzOnYdi7n3Wpm9hWWGfB/O2blfHcMVTL5WkQXSnRiK9makhrcnw==",
+      "archiveSha256": "ef51327ad58243cf533326219f5ebaa5029280bd0fafcc11f7c23156639593d6",
+      "manifestSha256": "372a1ad33bcaded0234d5d327d1164c18968ee3f2e9f362ddd22e4489e91e369",
+      "installedFingerprint": {
+        "files": 136,
+        "sha256": "03e243b82824379aa5616accd6f7fb2fe0d49b11c58f7121832bf169efb212ef"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1546,
+          "sha256": "eda81a415869e67809f6a9f3fd6056062cb83a462118e07eec5e92b2e0c40ce9",
+          "observedTextFamily": "BSD-3-Clause",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/2/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/2/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/2"
+          },
+          "sourceLockPath": "node_modules/diff"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "fast-sha256@1.3.0",
+      "name": "fast-sha256",
+      "version": "1.3.0",
+      "declaredLicense": "Unlicense",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/fast-sha256/-/fast-sha256-1.3.0.tgz",
+      "archiveIntegrity": "sha512-n11RGP/lrWEFI/bWdygLxhI+pVeo1ZYIVwvvPkW7azl/rOy+F3HYRZ2K5zeE9mmkhQppyv9sQFx0JM9UabnpPQ==",
+      "archiveSha256": "4f897ea2594dc9cfb1250e7d4d0f65b4f105952a802fff2d06990bf1dc2c84f6",
+      "manifestSha256": "d312f1993364bfb4f217f820ff7f9e0a6b1d87930bfc2605138ab660e8d29806",
+      "installedFingerprint": {
+        "files": 6,
+        "sha256": "66727f88b0cb099464e8e9ecd9e737cb1ba16d57fd0eb16af7c601d776e4686a"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1210,
+          "sha256": "88d9b4eb60579c191ec391ca04c16130572d7eedc4a86daa58bf28c6e14c9bcd",
+          "observedTextFamily": "Unlicense",
+          "evidence": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/3/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "anthropic-sdk",
+          "plan": {
+            "fileId": "anthropic-sdk-plan",
+            "jsonPointer": "/packages/3/lockEntry"
+          },
+          "receipt": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/3"
+          },
+          "sourceLockPath": "node_modules/fast-sha256"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "get-east-asian-width@1.6.0",
+      "name": "get-east-asian-width",
+      "version": "1.6.0",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/get-east-asian-width/-/get-east-asian-width-1.6.0.tgz",
+      "archiveIntegrity": "sha512-QRbvDIbx6YklUe6RxeTeleMR0yv3cYH6PsPZHcnVn7xv7zO1BHN8r0XETu8n6Ye3Q+ahtSarc3WgtNWmehIBfA==",
+      "archiveSha256": "4451f58e2f5a4ef27ae8b4ba25b64be97d3a8413dc8614a4321a10d418eee6d7",
+      "manifestSha256": "d263e50dd1a43aee9acda4d7f066e66b0d0bde1f2852ea6e7153750a5e3a3e52",
+      "installedFingerprint": {
+        "files": 8,
+        "sha256": "9800c6c7cda83befc60bc600853ebfaddd18812ea86ea441629dbbad3b10da1c"
+      },
+      "packagedNotices": [
+        {
+          "path": "license",
+          "bytes": 1117,
+          "sha256": "5c932d88256b4ab958f64a856fa48e8bd1f55bc1d96b8149c65689e0c61789d3",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/3/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/3/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/3"
+          },
+          "sourceLockPath": "node_modules/get-east-asian-width"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "highlight.js@10.7.3",
+      "name": "highlight.js",
+      "version": "10.7.3",
+      "declaredLicense": "BSD-3-Clause",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/highlight.js/-/highlight.js-10.7.3.tgz",
+      "archiveIntegrity": "sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==",
+      "archiveSha256": "292968c31d106f910fdd2e4d73a98d9bdf621e5f6e0244d9f3fbfc3572bea91e",
+      "manifestSha256": "4f657beb931cb9613e5173414855b2a01e698696c0661d21973bfbbd50e184cf",
+      "installedFingerprint": {
+        "files": 398,
+        "sha256": "1aa41c1f4214e17cc870844e661976501c2fdfe57d1f0ec8496014ddc7a8e1fc"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1514,
+          "sha256": "6c081431591d9df696c82dc598fe1423765b8a299b200ed00b281afd0f64c490",
+          "observedTextFamily": "BSD-3-Clause",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/4/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/4/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/4"
+          },
+          "sourceLockPath": "node_modules/highlight.js"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "isexe@2.0.0",
+      "name": "isexe",
+      "version": "2.0.0",
+      "declaredLicense": "ISC",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/isexe/-/isexe-2.0.0.tgz",
+      "archiveIntegrity": "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==",
+      "archiveSha256": "47cfe872e088e28c53b736fef305324b57cc1cfc9f72a9b0f769f92731cb8359",
+      "manifestSha256": "395c2af9abeeaafe7391974c1eacfb2a2bdeef187f21c3f5582c49e0368e59bf",
+      "installedFingerprint": {
+        "files": 8,
+        "sha256": "b7667089801bc4b1e8c039f04e0c5e57780d91386eb91035cad2f64931caff9e"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 765,
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b",
+          "observedTextFamily": "ISC",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/5/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/5/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/5"
+          },
+          "sourceLockPath": "node_modules/isexe"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "json-schema-to-ts@3.1.1",
+      "name": "json-schema-to-ts",
+      "version": "3.1.1",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/json-schema-to-ts/-/json-schema-to-ts-3.1.1.tgz",
+      "archiveIntegrity": "sha512-+DWg8jCJG2TEnpy7kOm/7/AxaYoaRbjVB4LFZLySZlWn8exGs3A4OLJR966cVvU26N7X9TWxl+Jsw7dzAqKT6g==",
+      "archiveSha256": "f6f34e4e453aca8753e9f644ad4fa297ae7011030bfff9e909bf34e31c4cc364",
+      "manifestSha256": "9439fa620a0f7a930950239ec4445d902c7d29590cddf0985a83bea531b2e81e",
+      "installedFingerprint": {
+        "files": 267,
+        "sha256": "5bb4712de7619bc9b8b7078f50f3e69a8c48774da81666d5c7e3820e89e15b51"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1071,
+          "sha256": "18a2bfd070b08bd1cc538c90f59989a9523e070e72fe9a9068593c3e82f44fa7",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/4/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "anthropic-sdk",
+          "plan": {
+            "fileId": "anthropic-sdk-plan",
+            "jsonPointer": "/packages/4/lockEntry"
+          },
+          "receipt": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/4"
+          },
+          "sourceLockPath": "node_modules/json-schema-to-ts"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "marked@18.0.11",
+      "name": "marked",
+      "version": "18.0.11",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/marked/-/marked-18.0.11.tgz",
+      "archiveIntegrity": "sha512-HnslJfsZkRPBDJRHvVtAaWlZHEpSu7u8LgQuJCELjRKuWR+hpq4A7sLq3p8HaI9ypVoXDXxV34CsQJEe1+J5Aw==",
+      "archiveSha256": "cef55476c7551e73e1a89118fa69fee9f7eef9960e9c774ad266e22ee966b994",
+      "manifestSha256": "5a43adf708c24038a44ecd5f642bc55e3226f9e8e7997fca20272f32037970e3",
+      "installedFingerprint": {
+        "files": 12,
+        "sha256": "21023e880a5b04891f41a80e05561deb733a33876afe405f3dd44030dc7f3c94"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 2942,
+          "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/6/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/6/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/6"
+          },
+          "sourceLockPath": "node_modules/marked"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "openai@7.19.0",
+      "name": "openai",
+      "version": "7.19.0",
+      "declaredLicense": "Apache-2.0",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/openai/-/openai-7.19.0.tgz",
+      "archiveIntegrity": "sha512-MX2s3u2L5racTO0CC/SWpCOasJQBCJrqLKXK+l82cAhdeF8mPMBEe/gxMm0ZFa2xpKpOFLRjxv5afYEZbBXmbQ==",
+      "archiveSha256": "597532dcb9051ee8aa5edadedb57b798b42add68cc5aec1d67e994d0cfad07f1",
+      "manifestSha256": "8a855f81669a434ce894e2d1ae2f18e9050e93c57d14091f155cd543056bdc30",
+      "installedFingerprint": {
+        "files": 3548,
+        "sha256": "bbeea009f26c7ca4d268d364e89ada8da1617d2d63aa0d89ad9b48eb09b8e55a"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 11336,
+          "sha256": "636eb7d79da9bb6d515a4b3fd417aa26679eb3cf16396ddab4bc55fa74e616e4",
+          "observedTextFamily": "Apache-2.0",
+          "evidence": {
+            "fileId": "responses-sdk-receipt",
+            "jsonPointer": "/restoration/installed/0/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        },
+        {
+          "path": "src/_vendor/partial-json-parser/LICENSE",
+          "bytes": 1075,
+          "sha256": "cd519ad3d7e012427f978dfb2e3b92ee403d189d7b859ba6bf68fd7e12ca456f",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "responses-sdk-receipt",
+            "jsonPointer": "/restoration/installed/0/licenses/1"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        },
+        {
+          "path": "src/_vendor/zod-to-json-schema/LICENSE",
+          "bytes": 746,
+          "sha256": "7beaa85b57d7211f6684af6c1d97e6d9ef7ec1851f779152043a47a8700306a9",
+          "observedTextFamily": "ISC",
+          "evidence": {
+            "fileId": "responses-sdk-receipt",
+            "jsonPointer": "/restoration/installed/0/licenses/2"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        },
+        {
+          "path": "src/internal/qs/LICENSE.md",
+          "bytes": 1588,
+          "sha256": "d8c77eaffed7f1f874b97f66ee47a557ae24fd59bae8ae14f9b1b84f26a94d2f",
+          "observedTextFamily": "BSD-3-Clause",
+          "evidence": {
+            "fileId": "responses-sdk-receipt",
+            "jsonPointer": "/restoration/installed/0/licenses/3"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "responses-sdk",
+          "plan": {
+            "fileId": "responses-sdk-plan",
+            "jsonPointer": "/packages/0/lockEntry"
+          },
+          "receipt": {
+            "fileId": "responses-sdk-receipt",
+            "jsonPointer": "/restoration/installed/0"
+          },
+          "sourceLockPath": "packages/ai/node_modules/openai"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "partial-json@0.1.7",
+      "name": "partial-json",
+      "version": "0.1.7",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/partial-json/-/partial-json-0.1.7.tgz",
+      "archiveIntegrity": "sha512-Njv/59hHaokb/hRUjce3Hdv12wd60MtM9Z5Olmn+nehe0QDAsRtRbJPvJ0Z91TusF0SuZRIvnM+S4l6EIP8leA==",
+      "archiveSha256": "30eafeed6fdc25fb2ca24f34c37796d9f98f0bf5e156452b98a2c356762f6322",
+      "manifestSha256": "42b3ae6c99ec959249f8eb4d3da7fdb44ec1f96ec627fa7f9ca5487a4e80963f",
+      "installedFingerprint": {
+        "files": 9,
+        "sha256": "b1c730b893ef274e6d457f23eebc9c39162cd6aaf777247942b9ad0cc1f1cb8e"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1075,
+          "sha256": "cd519ad3d7e012427f978dfb2e3b92ee403d189d7b859ba6bf68fd7e12ca456f",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/7/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/7/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/7"
+          },
+          "sourceLockPath": "node_modules/partial-json"
+        },
+        {
+          "profileId": "anthropic-sdk",
+          "plan": {
+            "fileId": "anthropic-sdk-plan",
+            "jsonPointer": "/packages/5/lockEntry"
+          },
+          "receipt": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/5"
+          },
+          "sourceLockPath": "node_modules/partial-json"
+        },
+        {
+          "profileId": "responses-sdk",
+          "plan": {
+            "fileId": "responses-sdk-plan",
+            "jsonPointer": "/packages/1/lockEntry"
+          },
+          "receipt": {
+            "fileId": "responses-sdk-receipt",
+            "jsonPointer": "/restoration/installed/1"
+          },
+          "sourceLockPath": "node_modules/partial-json"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "path-key@3.1.1",
+      "name": "path-key",
+      "version": "3.1.1",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/path-key/-/path-key-3.1.1.tgz",
+      "archiveIntegrity": "sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q==",
+      "archiveSha256": "4b8999acb914830edcd3c5b8fec632b32c6bc759ac3edc86336f5a9e08ba7b92",
+      "manifestSha256": "25594dab72681c910d9cc919263a4daf27d77a75e0d2c26a4d958d6d6b798f86",
+      "installedFingerprint": {
+        "files": 5,
+        "sha256": "6ac2c1a195bff17fbb5d24d5f4abddcccda3acdef5327234dd85d10a7f7420c7"
+      },
+      "packagedNotices": [
+        {
+          "path": "license",
+          "bytes": 1109,
+          "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/8/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/8/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/8"
+          },
+          "sourceLockPath": "node_modules/path-key"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "shebang-command@2.0.0",
+      "name": "shebang-command",
+      "version": "2.0.0",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/shebang-command/-/shebang-command-2.0.0.tgz",
+      "archiveIntegrity": "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==",
+      "archiveSha256": "9acba5bd18a51e9cdf5898380e4df63f803e1844def64ae1a46f88cff86d556e",
+      "manifestSha256": "44de390ae5ed6c5f9758b8b9c90b93fa53977d5361731600429f1de08f4b3f30",
+      "installedFingerprint": {
+        "files": 4,
+        "sha256": "f002dd6b9045846243d11a2512bfcccf0de1ab6144fa75280ee7fecd87f73902"
+      },
+      "packagedNotices": [
+        {
+          "path": "license",
+          "bytes": 1116,
+          "sha256": "69dee148a2cc470554dfa7142e830662062394d0fe67cddd379aba90dc60d6b3",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/9/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/9/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/9"
+          },
+          "sourceLockPath": "node_modules/shebang-command"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "shebang-regex@3.0.0",
+      "name": "shebang-regex",
+      "version": "3.0.0",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/shebang-regex/-/shebang-regex-3.0.0.tgz",
+      "archiveIntegrity": "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==",
+      "archiveSha256": "fedbabaa6db26c6be0183f82777dfa852d59a62f8885de93bd32ebc28758958f",
+      "manifestSha256": "b8018c6b8cc9900dfd1ac18a54956ba34c453fdc2da5e5fe555ee8f04133a1c5",
+      "installedFingerprint": {
+        "files": 5,
+        "sha256": "5e14378a819f5ec437cba4c696f38fcae5b6e120dbe929ca3219f44a24ca5c39"
+      },
+      "packagedNotices": [
+        {
+          "path": "license",
+          "bytes": 1109,
+          "sha256": "48da2f39e100d4085767e94966b43f4fa95ff6a0698fba57ed460914e35f94a0",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/10/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/10/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/10"
+          },
+          "sourceLockPath": "node_modules/shebang-regex"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "standardwebhooks@1.1.1",
+      "name": "standardwebhooks",
+      "version": "1.1.1",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/standardwebhooks/-/standardwebhooks-1.1.1.tgz",
+      "archiveIntegrity": "sha512-bCbX9ZEyFkWPsRz7Bl3NuQUJohmwGSev/yhr7vhaGPlc4AfIrspIRa6cPTBuI1ItmrTDJ4d/S2hCsfe4+vQGnQ==",
+      "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+      "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+      "installedFingerprint": {
+        "files": 8,
+        "sha256": "03977b2aa436611587ee6acf684c1d68b1fc348d7f301f7c06ed293c50be9f9b"
+      },
+      "packagedNotices": [],
+      "packagedRootNoticePresent": false,
+      "evidenceLevel": "declared-metadata-only",
+      "profileEvidence": [
+        {
+          "profileId": "anthropic-sdk",
+          "plan": {
+            "fileId": "anthropic-sdk-plan",
+            "jsonPointer": "/packages/6/lockEntry"
+          },
+          "receipt": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/6"
+          },
+          "sourceLockPath": "node_modules/standardwebhooks"
+        }
+      ],
+      "sourceAuthority": {
+        "evidenceLevel": "source-notice-at-registry-reported-commit",
+        "registryMetadataRead": 0,
+        "registryReportedGitHead": "b4d2c14fc5b4ccff3ff271e3b087dff812254c59",
+        "sourceManifestRead": 2,
+        "sourceManifestExactlyMatchesPackagedManifest": true,
+        "libraryLicenseRead": 5,
+        "libraryLicensePath": "libraries/LICENSE",
+        "libraryLicenseGitBlob": "55b14b3a3ce649a2f1b05428dcc9c6db95b37c04",
+        "libraryLicenseSha256": "5ec8c7b26b64d881a6706617bed25c049f97f2f35de034c756de8546fd6dbe27",
+        "libraryLicenseBytes": 1088,
+        "libraryLicenseTextFamily": "MIT",
+        "libraryCopyright": "Copyright (c) 2023 Svix (https://www.svix.com)",
+        "repositoryRootLicenseRead": 1,
+        "repositoryRootLicenseTextFamily": "Apache-2.0",
+        "legalScopeApproved": false,
+        "distinction": "Root Apache text and parent libraries MIT text are separate scoped source evidence. The npm package notice remains absent. Source association is not a verified publication attestation or legal-scope decision."
+      },
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SW-PACKAGED-NOTICE",
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "ts-algebra@2.0.0",
+      "name": "ts-algebra",
+      "version": "2.0.0",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/ts-algebra/-/ts-algebra-2.0.0.tgz",
+      "archiveIntegrity": "sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw==",
+      "archiveSha256": "f4c3968fd81eb7952e94860eb233558c820397d999149b6e2c689abaa34bc65c",
+      "manifestSha256": "6c6f692e1a3ad9943c77b5fa4eb04b0f63cb708353c67dcc5d86b35b2f7e5c30",
+      "installedFingerprint": {
+        "files": 104,
+        "sha256": "de3fa195eec4e650f9798665843d8243cb341df9a256d99752ac9357cdfe005a"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 1071,
+          "sha256": "18a2bfd070b08bd1cc538c90f59989a9523e070e72fe9a9068593c3e82f44fa7",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/7/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "anthropic-sdk",
+          "plan": {
+            "fileId": "anthropic-sdk-plan",
+            "jsonPointer": "/packages/7/lockEntry"
+          },
+          "receipt": {
+            "fileId": "anthropic-sdk-receipt",
+            "jsonPointer": "/installed/7"
+          },
+          "sourceLockPath": "node_modules/ts-algebra"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "typebox@1.3.27",
+      "name": "typebox",
+      "version": "1.3.27",
+      "declaredLicense": "MIT",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/typebox/-/typebox-1.3.27.tgz",
+      "archiveIntegrity": "sha512-zu+jc1pcy4UiNThxikUr36f0Rybk9PEeCg/NE6adeWr/SKsdNO4EzZHYRDlv2YCVAfj3Odq3dESSo/jNyoBXzA==",
+      "archiveSha256": "5a288bcd3d68f44567de84b185e04d205ef7d5b53602846bc3db30fdd219dda3",
+      "manifestSha256": "c59ddfd977ce941f1e8ee8b0a0b14396c332fa27cc5fa6fa165227ffd5a3992f",
+      "installedFingerprint": {
+        "files": 1385,
+        "sha256": "9762e85e6a6e12cc6593cee73c1ffcc85857ba4c7f6d2ab52feeb4b28954ed25"
+      },
+      "packagedNotices": [
+        {
+          "path": "license",
+          "bytes": 1094,
+          "sha256": "e8a7cc256941a26ba8234f04390165243a4d42f74fd6491934140605bf7eae2d",
+          "observedTextFamily": "MIT",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/11/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/11/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/11"
+          },
+          "sourceLockPath": "node_modules/typebox"
+        },
+        {
+          "profileId": "responses-sdk",
+          "plan": {
+            "fileId": "responses-sdk-plan",
+            "jsonPointer": "/packages/2/lockEntry"
+          },
+          "receipt": {
+            "fileId": "responses-sdk-receipt",
+            "jsonPointer": "/restoration/installed/2"
+          },
+          "sourceLockPath": "node_modules/typebox"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    },
+    {
+      "id": "which@2.0.2",
+      "name": "which",
+      "version": "2.0.2",
+      "declaredLicense": "ISC",
+      "declaredLicenseAuthority": "Pinned upstream lock; restored archive/manifest evidence",
+      "officialArchiveUrl": "https://registry.npmjs.org/which/-/which-2.0.2.tgz",
+      "archiveIntegrity": "sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==",
+      "archiveSha256": "a13adf5fddeb769655edce551e81fbb11904b9c9be76d95e41da8c4c499d4edc",
+      "manifestSha256": "43010039ed5e89f7186960be682b3cb5cda5ab6cdfb06cbfd4f081cf0e7b4260",
+      "installedFingerprint": {
+        "files": 6,
+        "sha256": "1ba286268b83272bf342d7374558066d12020123159aa508100dce289b2a6b63"
+      },
+      "packagedNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 765,
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b",
+          "observedTextFamily": "ISC",
+          "evidence": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/12/licenses/0"
+          },
+          "fullTextRetainedInEvidence": true,
+          "packaged": true
+        }
+      ],
+      "packagedRootNoticePresent": true,
+      "evidenceLevel": "packaged-notice-bytes",
+      "profileEvidence": [
+        {
+          "profileId": "edit",
+          "plan": {
+            "fileId": "edit-plan",
+            "jsonPointer": "/packages/12/lockEntry"
+          },
+          "receipt": {
+            "fileId": "edit-receipt",
+            "jsonPointer": "/installed/12"
+          },
+          "sourceLockPath": "node_modules/which"
+        }
+      ],
+      "sourceAuthority": null,
+      "developmentOnly": true,
+      "nativeRuntimeDependency": false,
+      "redistributionLicenseClosure": false,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "gapIds": [
+        "SIGNATURE-ATTESTATION",
+        "DISTRIBUTION-SCOPE"
+      ]
+    }
+  ],
+  "standardWebhooksSourceEvidence": {
+    "reads": [
+      {
+        "url": "https://registry.npmjs.org/standardwebhooks/1.1.1",
+        "status": 200,
+        "bytes": 2282,
+        "sha256": "99d04c194edcd30c91b31b8a10e983bed938f27d1becbf45af4a9eb3e84cc27c",
+        "rawUtf8": "{\"bugs\":{\"url\":\"https://github.com/standard-webhooks/standard-webhooks/issues\"},\"dist\":{\"shasum\":\"25b98fa2bbe4edad7b42778135c923563e3d5e2f\",\"tarball\":\"https://registry.npmjs.org/standardwebhooks/-/standardwebhooks-1.1.1.tgz\",\"fileCount\":8,\"integrity\":\"sha512-bCbX9ZEyFkWPsRz7Bl3NuQUJohmwGSev/yhr7vhaGPlc4AfIrspIRa6cPTBuI1ItmrTDJ4d/S2hCsfe4+vQGnQ==\",\"signatures\":[{\"sig\":\"MEYCIQCVzV4h+tDbIwBpI3U5ac2ruiGBspXtDpZ0v30fEIuxrwIhAOBaxkjPXFaLgUGB6XRAGBxaXoLHiD0uVwdgyrP6Rotz\",\"keyid\":\"SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U\"},{\"sig\":\"MEYCIQD7E8KvUUyfpEra9Yui+KoWG/WMkAgQXMmQmuoDqtmMLwIhAPU2OhXY8eHreTiEwyb9PB/9mgdcQHlykqjDddRVZY2P\",\"keyid\":\"SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U\"}],\"attestations\":{\"url\":\"https://registry.npmjs.org/-/npm/v1/attestations/standardwebhooks@1.1.1\",\"provenance\":{\"predicateType\":\"https://slsa.dev/provenance/v1\"}},\"unpackedSize\":13402},\"main\":\"./dist/index.js\",\"name\":\"standardwebhooks\",\"type\":\"commonjs\",\"author\":{\"name\":\"Standard Webhooks\"},\"gitHead\":\"b4d2c14fc5b4ccff3ff271e3b087dff812254c59\",\"license\":\"MIT\",\"scripts\":{\"fmt\":\"biome format --write\",\"test\":\"tsc && node --test dist/*.test.js\",\"build\":\"tsc\",\"check\":\"biome check\",\"prepare\":\"npm run build\",\"check:fix\":\"biome check --write\",\"prepublishOnly\":\"biome check\"},\"typings\":\"./dist/index.d.ts\",\"_npmUser\":{\"name\":\"GitHub Actions\",\"email\":\"npm-oidc-no-reply@github.com\",\"trustedPublisher\":{\"id\":\"github\",\"oidcConfigId\":\"oidc:d8d4fa18-82fe-4ae7-bc43-695276ab86f7\"}},\"homepage\":\"https://github.com/standard-webhooks/standard-webhooks/tree/main/libraries/javascript\",\"keywords\":[\"webhooks\",\"typescript\"],\"repository\":{\"url\":\"git+https://github.com/standard-webhooks/standard-webhooks.git\",\"type\":\"git\"},\"_npmVersion\":\"11.17.0\",\"description\":\"Standard Webhooks for TypeScript\",\"directories\":{},\"maintainers\":[{\"name\":\"tasn\",\"email\":\"npm@stosb.com\"}],\"_nodeVersion\":\"24.19.0\",\"dependencies\":{\"fast-sha256\":\"^1.3.0\",\"@stablelib/base64\":\"^1.0.0\"},\"_hasShrinkwrap\":false,\"devDependencies\":{\"typescript\":\"^5.3.3\",\"@types/node\":\"^26.1.0\",\"@biomejs/biome\":\"2.2.4\",\"@stablelib/utf8\":\"^2.0.0\"},\"_npmOperationalInternal\":{\"tmp\":\"tmp/standardwebhooks_1.1.1_1787949857796_0.5624990602932318\",\"host\":\"s3://npm-registry-packages-npm-production\"},\"_id\":\"standardwebhooks@1.1.1\",\"version\":\"1.1.1\"}"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/standard-webhooks/standard-webhooks/b4d2c14fc5b4ccff3ff271e3b087dff812254c59/LICENSE",
+        "status": 200,
+        "bytes": 11357,
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "rawUtf8": "                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS\n\n   APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n   Copyright [yyyy] [name of copyright owner]\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.\n"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/standard-webhooks/standard-webhooks/b4d2c14fc5b4ccff3ff271e3b087dff812254c59/libraries/javascript/package.json",
+        "status": 200,
+        "bytes": 1033,
+        "sha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+        "rawUtf8": "{\n  \"name\": \"standardwebhooks\",\n  \"version\": \"1.1.1\",\n  \"description\": \"Standard Webhooks for TypeScript\",\n  \"author\": \"Standard Webhooks\",\n  \"repository\": \"https://github.com/standard-webhooks/standard-webhooks\",\n  \"homepage\": \"https://github.com/standard-webhooks/standard-webhooks/tree/main/libraries/javascript\",\n  \"type\": \"commonjs\",\n  \"keywords\": [\n    \"webhooks\",\n    \"typescript\"\n  ],\n  \"license\": \"MIT\",\n  \"main\": \"./dist/index.js\",\n  \"typings\": \"./dist/index.d.ts\",\n  \"files\": [\n    \"dist/**/*\",\n    \"!dist/**/*.test.*\"\n  ],\n  \"scripts\": {\n    \"build\": \"tsc\",\n    \"prepare\": \"npm run build\",\n    \"test\": \"tsc && node --test dist/*.test.js\",\n    \"prepublishOnly\": \"biome check\",\n    \"check\": \"biome check\",\n    \"check:fix\": \"biome check --write\",\n    \"fmt\": \"biome format --write\"\n  },\n  \"dependencies\": {\n    \"@stablelib/base64\": \"^1.0.0\",\n    \"fast-sha256\": \"^1.3.0\"\n  },\n  \"devDependencies\": {\n    \"@biomejs/biome\": \"2.2.4\",\n    \"@stablelib/utf8\": \"^2.0.0\",\n    \"@types/node\": \"^26.1.0\",\n    \"typescript\": \"^5.3.3\"\n  }\n}\n"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/standard-webhooks/standard-webhooks/b4d2c14fc5b4ccff3ff271e3b087dff812254c59/libraries/javascript/README.md",
+        "status": 200,
+        "bytes": 497,
+        "sha256": "d904d315274ae461f19d32dc96e3da1f0dc567ede4075258dc57a465ddb8f1a8",
+        "rawUtf8": "Typescript/Javascript library for Standard Webhooks \n\n# Example\n\nVerifying a webhook payload:\n\n```javascript\nimport { Webhook } from \"standardwebhooks\"\n\nconst wh = new Webhook(base64_secret);\nwh.verify(webhook_payload, webhook_headers);\n```\n\n# Development\n\n## Requirements\n\n - node\n - npm\n\n## Building the library\n```sh\nnpm install\nnpm run build\n```\n\n## Contributing\n\nBefore opening a PR be sure to format your code!\n\n```sh\nnpm run check:fix\n```\n\n## Running Tests\n\nSimply run:\n\n```sh\nnpm test\n```\n"
+      },
+      {
+        "url": "https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/b4d2c14fc5b4ccff3ff271e3b087dff812254c59?recursive=1",
+        "status": 200,
+        "bytes": 45536,
+        "sha256": "88c50dce8faadc44a3d13c840c8caaaebd1663cea7ddd77f3dafd94f2843a49f",
+        "rawUtf8": "{\"sha\":\"b4d2c14fc5b4ccff3ff271e3b087dff812254c59\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/b4d2c14fc5b4ccff3ff271e3b087dff812254c59\",\"tree\":[{\"path\":\".github\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"ad35cb04cd6733a3244a0f32386134f915712bc7\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/ad35cb04cd6733a3244a0f32386134f915712bc7\"},{\"path\":\".github/CODEOWNERS\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"ddf21d7753aedb7c7b242b29d91e0a11748a2114\",\"size\":50,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/ddf21d7753aedb7c7b242b29d91e0a11748a2114\"},{\"path\":\".github/dependabot.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"e7b9ceee4e9dbea3a7d449638cce92176c354037\",\"size\":1955,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/e7b9ceee4e9dbea3a7d449638cce92176c354037\"},{\"path\":\".github/workflows\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"bc3dacf47e913b1804953023b4276d4b7e6508eb\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/bc3dacf47e913b1804953023b4276d4b7e6508eb\"},{\"path\":\".github/workflows/csharp-lint.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"3900cc199275d539ae0685d789648bb0d98d9499\",\"size\":624,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/3900cc199275d539ae0685d789648bb0d98d9499\"},{\"path\":\".github/workflows/csharp-release.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"2cc862c6a545400098577abf00969b9fd3d8cb4a\",\"size\":1102,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/2cc862c6a545400098577abf00969b9fd3d8cb4a\"},{\"path\":\".github/workflows/elixir-lint.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"9c3971897864c909d0754f96b55ab0327424ffdb\",\"size\":1113,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/9c3971897864c909d0754f96b55ab0327424ffdb\"},{\"path\":\".github/workflows/elixir-release.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"e34c605a6e467abf5c22485915e0d85ac04015f5\",\"size\":938,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/e34c605a6e467abf5c22485915e0d85ac04015f5\"},{\"path\":\".github/workflows/go-lint.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"2d3749e621268b6693e5ed84c50d2f7ac5630d06\",\"size\":663,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/2d3749e621268b6693e5ed84c50d2f7ac5630d06\"},{\"path\":\".github/workflows/java-lint.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"3ac7420a8a6c4110b8c3e3e8166c35cc5b9b7e98\",\"size\":520,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/3ac7420a8a6c4110b8c3e3e8166c35cc5b9b7e98\"},{\"path\":\".github/workflows/java-release.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"33ee6c380a1ad14a89ce58ae2be6b1ebfa6886bc\",\"size\":1321,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/33ee6c380a1ad14a89ce58ae2be6b1ebfa6886bc\"},{\"path\":\".github/workflows/javascript-lint.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"278eeac451ec900d1049887a80384e3faf44361a\",\"size\":651,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/278eeac451ec900d1049887a80384e3faf44361a\"},{\"path\":\".github/workflows/javascript-release.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"30c7b052c60fa37549ecca3e8ee2e1294d4d31d4\",\"size\":605,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/30c7b052c60fa37549ecca3e8ee2e1294d4d31d4\"},{\"path\":\".github/workflows/php-lint.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"240046671a86da75199c1c42e1464564eeed448f\",\"size\":778,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/240046671a86da75199c1c42e1464564eeed448f\"},{\"path\":\".github/workflows/php-release.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"6ba39a69a829d1c1296704804e5da16bb66df4c3\",\"size\":600,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/6ba39a69a829d1c1296704804e5da16bb66df4c3\"},{\"path\":\".github/workflows/python-lint.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"cdcd568cdb49618056a57ee27ef2ddac28cb98bd\",\"size\":1924,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/cdcd568cdb49618056a57ee27ef2ddac28cb98bd\"},{\"path\":\".github/workflows/python-release.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"8ba99a2b98c3325898aed0cb3a30b54a9a2f85c4\",\"size\":580,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/8ba99a2b98c3325898aed0cb3a30b54a9a2f85c4\"},{\"path\":\".github/workflows/ruby-lint.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"07c6bbea193dc41c2e58d2bc3b8363e2342bfe5e\",\"size\":575,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/07c6bbea193dc41c2e58d2bc3b8363e2342bfe5e\"},{\"path\":\".github/workflows/ruby-release.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"53a8a0bcf6f382b4872c366f490eadd5de04a36e\",\"size\":804,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/53a8a0bcf6f382b4872c366f490eadd5de04a36e\"},{\"path\":\".github/workflows/rust-lint.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"299d595fb6ad26094b6e5664eb9b770080f5620f\",\"size\":985,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/299d595fb6ad26094b6e5664eb9b770080f5620f\"},{\"path\":\".github/workflows/rust-release.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"418ed6199da53a6f071366a83a7381174ca4a489\",\"size\":865,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/418ed6199da53a6f071366a83a7381174ca4a489\"},{\"path\":\".github/workflows/rust-security.yml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"e13828689b9cce6495f7baf5fd4cc1e9ee860176\",\"size\":563,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/e13828689b9cce6495f7baf5fd4cc1e9ee860176\"},{\"path\":\".gitignore\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"4bc3d328cd6351257473e117aca6d7163b1bc13b\",\"size\":141,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/4bc3d328cd6351257473e117aca6d7163b1bc13b\"},{\"path\":\"CODE_OF_CONDUCT.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"107af9d5a97ea884aff60191cd17c0654cdf3303\",\"size\":3346,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/107af9d5a97ea884aff60191cd17c0654cdf3303\"},{\"path\":\"CONTRIBUTING.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"7c85f293ed25cc2cac6e038b376a18501f386f37\",\"size\":10250,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/7c85f293ed25cc2cac6e038b376a18501f386f37\"},{\"path\":\"LICENSE\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64\",\"size\":11357,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64\"},{\"path\":\"README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"1b9253237f66b5eeb9f5f8f772fdbd7b5d8af5b5\",\"size\":7673,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/1b9253237f66b5eeb9f5f8f772fdbd7b5d8af5b5\"},{\"path\":\"assets\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"5547acb4470133d1ee471ddba8b883901ed9a393\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/5547acb4470133d1ee471ddba8b883901ed9a393\"},{\"path\":\"assets/brand.svg\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"d2d484db4b76979e32067e50319f93dd8d25ab46\",\"size\":7503,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/d2d484db4b76979e32067e50319f93dd8d25ab46\"},{\"path\":\"assets/logo.svg\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"5623a2ef4d4867aa9e47720cc716a8f50b4d538f\",\"size\":1248,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/5623a2ef4d4867aa9e47720cc716a8f50b4d538f\"},{\"path\":\"composer.json\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"3d0bb90f859952eb34a2a9501eb912d68f3b2b39\",\"size\":760,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/3d0bb90f859952eb34a2a9501eb912d68f3b2b39\"},{\"path\":\"libraries\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"60ed20a0457ad700b0a86a7be35908b88f1e743f\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/60ed20a0457ad700b0a86a7be35908b88f1e743f\"},{\"path\":\"libraries/LICENSE\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"55b14b3a3ce649a2f1b05428dcc9c6db95b37c04\",\"size\":1088,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/55b14b3a3ce649a2f1b05428dcc9c6db95b37c04\"},{\"path\":\"libraries/README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"f68a63e27dadc80ef3b266aac3e1c4b8243b4f12\",\"size\":80,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/f68a63e27dadc80ef3b266aac3e1c4b8243b4f12\"},{\"path\":\"libraries/composer.json\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"d4d864b69dfc93d8b7e6d4aaa0839b39d3a5df63\",\"size\":850,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/d4d864b69dfc93d8b7e6d4aaa0839b39d3a5df63\"},{\"path\":\"libraries/csharp\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"ec38614c7036929aedbb389ee55e182f52d1d0f2\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/ec38614c7036929aedbb389ee55e182f52d1d0f2\"},{\"path\":\"libraries/csharp/.gitignore\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"a437a65301378f13c402a78d61b6e56ff5727acb\",\"size\":341,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/a437a65301378f13c402a78d61b6e56ff5727acb\"},{\"path\":\"libraries/csharp/README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"4ce8e816b9275a9ec89dc45dc18ae9b86b0c8ff6\",\"size\":559,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/4ce8e816b9275a9ec89dc45dc18ae9b86b0c8ff6\"},{\"path\":\"libraries/csharp/StandardWebhooks.Tests\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"9552260864f4af8454f6f2ab96e66387f23354dd\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/9552260864f4af8454f6f2ab96e66387f23354dd\"},{\"path\":\"libraries/csharp/StandardWebhooks.Tests/StandardWebhooks.Tests.csproj\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"c943d465dd144fdc72bb75aa40725fca88e55613\",\"size\":972,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/c943d465dd144fdc72bb75aa40725fca88e55613\"},{\"path\":\"libraries/csharp/StandardWebhooks.Tests/WebhookTest.cs\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"945596060b4f3b78eb6b99a74cbd00d4211c1855\",\"size\":7201,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/945596060b4f3b78eb6b99a74cbd00d4211c1855\"},{\"path\":\"libraries/csharp/StandardWebhooks\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"257fb441e001a9a4bdc3263996544002b3476974\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/257fb441e001a9a4bdc3263996544002b3476974\"},{\"path\":\"libraries/csharp/StandardWebhooks/Exceptions\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"8ccd7586211bd70b2609ab74b4664dd1a5b50de3\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/8ccd7586211bd70b2609ab74b4664dd1a5b50de3\"},{\"path\":\"libraries/csharp/StandardWebhooks/Exceptions/EmptyWebhookSecretException.cs\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"92ab5a9e889a751b69b14269733cfbda1a9da4e8\",\"size\":579,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/92ab5a9e889a751b69b14269733cfbda1a9da4e8\"},{\"path\":\"libraries/csharp/StandardWebhooks/Exceptions/WebhookVerificationException.cs\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"4943e769bc8261fc27be2da78e4e5c2925724339\",\"size\":584,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/4943e769bc8261fc27be2da78e4e5c2925724339\"},{\"path\":\"libraries/csharp/StandardWebhooks/StandardWebhooks.csproj\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"f0469bb129d2ed74f78cc6e9a8d54d37785b87ea\",\"size\":1078,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/f0469bb129d2ed74f78cc6e9a8d54d37785b87ea\"},{\"path\":\"libraries/csharp/StandardWebhooks/Utils.cs\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"1593c4858ded898b51c92069a64ee85e9aedb94e\",\"size\":1039,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/1593c4858ded898b51c92069a64ee85e9aedb94e\"},{\"path\":\"libraries/csharp/StandardWebhooks/Webhook.cs\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"0fef76936644bbb440201ace870b3cb61e5515a2\",\"size\":4096,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/0fef76936644bbb440201ace870b3cb61e5515a2\"},{\"path\":\"libraries/csharp/standardwebhooks.sln\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"40de7710ccc9dacbfc3e8844b0ee12d46ae9696c\",\"size\":2917,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/40de7710ccc9dacbfc3e8844b0ee12d46ae9696c\"},{\"path\":\"libraries/deny.toml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"0f19df8f955c65f2dc727823582fb085818f550b\",\"size\":692,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/0f19df8f955c65f2dc727823582fb085818f550b\"},{\"path\":\"libraries/elixir\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"4f1c8f020342e97f40a1d536dea3008ba52b256b\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/4f1c8f020342e97f40a1d536dea3008ba52b256b\"},{\"path\":\"libraries/elixir/.formatter.exs\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"d2cda26eddc9110057ce9e8002585682217542cc\",\"size\":97,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/d2cda26eddc9110057ce9e8002585682217542cc\"},{\"path\":\"libraries/elixir/.gitignore\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"073e27cd80280f65373c798561f07d13e620347a\",\"size\":639,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/073e27cd80280f65373c798561f07d13e620347a\"},{\"path\":\"libraries/elixir/.tool-versions\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"989b51f84d9ebf86ee35d3591c4dddd98e54ec49\",\"size\":34,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/989b51f84d9ebf86ee35d3591c4dddd98e54ec49\"},{\"path\":\"libraries/elixir/README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"2185e5cfe672cb7c68181255a6441e010d550401\",\"size\":780,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/2185e5cfe672cb7c68181255a6441e010d550401\"},{\"path\":\"libraries/elixir/lib\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"94a1adda24a9aabfd31b74163320c2ba2c43e0bc\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/94a1adda24a9aabfd31b74163320c2ba2c43e0bc\"},{\"path\":\"libraries/elixir/lib/standard_webhooks.ex\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"27d85986b831d8e9b14c1334f3ec3dff1e992f21\",\"size\":4006,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/27d85986b831d8e9b14c1334f3ec3dff1e992f21\"},{\"path\":\"libraries/elixir/mix.exs\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"29b92a7f72afcc045556facc004d64c9a394ca47\",\"size\":1800,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/29b92a7f72afcc045556facc004d64c9a394ca47\"},{\"path\":\"libraries/elixir/mix.lock\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"74dd8a23b18b1c29227df7cf56ee2cb9dcc577ba\",\"size\":4644,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/74dd8a23b18b1c29227df7cf56ee2cb9dcc577ba\"},{\"path\":\"libraries/elixir/test\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"16cb664097c7f7c026899680d72a61ea8bdd1b8c\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/16cb664097c7f7c026899680d72a61ea8bdd1b8c\"},{\"path\":\"libraries/elixir/test/standard_webhooks_test.exs\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"f10daff840052313d351f9100cd7ae670a2e447b\",\"size\":4425,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/f10daff840052313d351f9100cd7ae670a2e447b\"},{\"path\":\"libraries/elixir/test/test_helper.exs\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"869559e709ea1905fbc9d169faa289b529a5ad6e\",\"size\":15,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/869559e709ea1905fbc9d169faa289b529a5ad6e\"},{\"path\":\"libraries/go.mod\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"d539cf95162cc41915c26351ab4949101d67d8f3\",\"size\":75,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/d539cf95162cc41915c26351ab4949101d67d8f3\"},{\"path\":\"libraries/go\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"98e47596e159a07f678eb7860f55d717bfa55258\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/98e47596e159a07f678eb7860f55d717bfa55258\"},{\"path\":\"libraries/go/README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"54d28971ebab2d7fb8541311cadf3eb5a9b5dd3a\",\"size\":578,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/54d28971ebab2d7fb8541311cadf3eb5a9b5dd3a\"},{\"path\":\"libraries/go/example_webhook_test.go\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"2185a2af842f17898b6e13eaaa44adf310771a5a\",\"size\":1240,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/2185a2af842f17898b6e13eaaa44adf310771a5a\"},{\"path\":\"libraries/go/webhook.go\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"bfd2c95f48ff73c877054812f609790d44dc7199\",\"size\":4577,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/bfd2c95f48ff73c877054812f609790d44dc7199\"},{\"path\":\"libraries/go/webhook_test.go\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"91a3e22f7ce4d58f348fed7d85af011c26e33589\",\"size\":6298,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/91a3e22f7ce4d58f348fed7d85af011c26e33589\"},{\"path\":\"libraries/java\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"a7fb2ec4e2cbbf85e79bb5e7c2d679bac6b4476d\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/a7fb2ec4e2cbbf85e79bb5e7c2d679bac6b4476d\"},{\"path\":\"libraries/java/.gitignore\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"a1af056301c86d49964d1ea326f3606547affdd9\",\"size\":389,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/a1af056301c86d49964d1ea326f3606547affdd9\"},{\"path\":\"libraries/java/README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"ec950180c4a1a9739da528db46cee5769e0979e3\",\"size\":489,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/ec950180c4a1a9739da528db46cee5769e0979e3\"},{\"path\":\"libraries/java/pom.xml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"9e4dae1387e481c1681aef62c415a18561542ecc\",\"size\":14367,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/9e4dae1387e481c1681aef62c415a18561542ecc\"},{\"path\":\"libraries/java/src\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"08a941bbcce4ecd69550b4a8153970ce323b7e8b\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/08a941bbcce4ecd69550b4a8153970ce323b7e8b\"},{\"path\":\"libraries/java/src/main\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"53f04d2280432e8c23023ae320d384e99599885f\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/53f04d2280432e8c23023ae320d384e99599885f\"},{\"path\":\"libraries/java/src/main/java\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"dd0458e9d068928ea660af2a2ad64f8daf980494\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/dd0458e9d068928ea660af2a2ad64f8daf980494\"},{\"path\":\"libraries/java/src/main/java/com\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"5f08ccc5c4dbf42b4ca0378ab6c240ddf356f813\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/5f08ccc5c4dbf42b4ca0378ab6c240ddf356f813\"},{\"path\":\"libraries/java/src/main/java/com/standardwebhooks\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"d01dcf753c68f8030d90ac9e06e4baf556f92b0d\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/d01dcf753c68f8030d90ac9e06e4baf556f92b0d\"},{\"path\":\"libraries/java/src/main/java/com/standardwebhooks/Webhook.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"20b5e0030cd95485f154da0a91bf4b805e3c2076\",\"size\":410,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/20b5e0030cd95485f154da0a91bf4b805e3c2076\"},{\"path\":\"libraries/java/src/main/java/com/standardwebhooks/WebhookBase.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"92a9dcad9c2d77dae5cce42b7f31d65023304dc3\",\"size\":5137,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/92a9dcad9c2d77dae5cce42b7f31d65023304dc3\"},{\"path\":\"libraries/java/src/main/java/com/standardwebhooks/exceptions\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"bec820ffd1e0e3b90ca34c2806d6bc0fe5e43369\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/bec820ffd1e0e3b90ca34c2806d6bc0fe5e43369\"},{\"path\":\"libraries/java/src/main/java/com/standardwebhooks/exceptions/EmptyWebhookSecretException.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"444dc21d317ddea625c56be2386f2434b56809a8\",\"size\":187,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/444dc21d317ddea625c56be2386f2434b56809a8\"},{\"path\":\"libraries/java/src/main/java/com/standardwebhooks/exceptions/WebhookSigningException.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"d795e730c79db7854a330e467641129ba19ad45d\",\"size\":179,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/d795e730c79db7854a330e467641129ba19ad45d\"},{\"path\":\"libraries/java/src/main/java/com/standardwebhooks/exceptions/WebhookVerificationException.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"48ff5d7237021b69a7b2e85e4b8db2bc3619c3b9\",\"size\":189,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/48ff5d7237021b69a7b2e85e4b8db2bc3619c3b9\"},{\"path\":\"libraries/java/src/main/java11\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"206b5166c39b9e7353d21fac4404d575c14279ae\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/206b5166c39b9e7353d21fac4404d575c14279ae\"},{\"path\":\"libraries/java/src/main/java11/com\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"f7c12b6b20bdfd2b6a26690a38b00b24ed7e7213\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/f7c12b6b20bdfd2b6a26690a38b00b24ed7e7213\"},{\"path\":\"libraries/java/src/main/java11/com/standardwebhooks\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"98958213a66ee5ba55ca715aa47a949b7ea7e4ab\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/98958213a66ee5ba55ca715aa47a949b7ea7e4ab\"},{\"path\":\"libraries/java/src/main/java11/com/standardwebhooks/Webhook.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"dc9460549b8e35c24bb2bd9908bb68b8f9dd17c6\",\"size\":949,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/dc9460549b8e35c24bb2bd9908bb68b8f9dd17c6\"},{\"path\":\"libraries/java/src/main/java11/module-info.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"71547efc9a0e022a4028c2de8420c953e0c56907\",\"size\":443,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/71547efc9a0e022a4028c2de8420c953e0c56907\"},{\"path\":\"libraries/java/src/main/java9\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"32ca8a3e37ac512cb500219dc08b0c531b332ab9\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/32ca8a3e37ac512cb500219dc08b0c531b332ab9\"},{\"path\":\"libraries/java/src/main/java9/module-info.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"51b06c7eca2be556c9c36206fc651ddf83789e82\",\"size\":337,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/51b06c7eca2be556c9c36206fc651ddf83789e82\"},{\"path\":\"libraries/java/src/test\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"545fae94563da91da43b6916903c86840a9430e8\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/545fae94563da91da43b6916903c86840a9430e8\"},{\"path\":\"libraries/java/src/test/java\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"2d7a600162e918cb62521184061f5ceed934752a\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/2d7a600162e918cb62521184061f5ceed934752a\"},{\"path\":\"libraries/java/src/test/java/com\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"c740d087f00fcdcbe5f6072a2d329438afdec8f3\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/c740d087f00fcdcbe5f6072a2d329438afdec8f3\"},{\"path\":\"libraries/java/src/test/java/com/standardwebhooks\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"e0230616c66bbea693a8e1bae10898331c471b88\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/e0230616c66bbea693a8e1bae10898331c471b88\"},{\"path\":\"libraries/java/src/test/java/com/standardwebhooks/TestScenario.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"ba78bced62a3a5224ae91dc90b94d28cc476d4bb\",\"size\":6645,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/ba78bced62a3a5224ae91dc90b94d28cc476d4bb\"},{\"path\":\"libraries/java/src/test/java/com/standardwebhooks/WebhookTest.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"56207e6401d8df9139ec3eadb2d70e6c6970e332\",\"size\":4893,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/56207e6401d8df9139ec3eadb2d70e6c6970e332\"},{\"path\":\"libraries/java/src/test/java11\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"c7983c32100c3a38062877c454bde5a08c486d85\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/c7983c32100c3a38062877c454bde5a08c486d85\"},{\"path\":\"libraries/java/src/test/java11/com\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"dce7019ef971f93a91c0868fe84812f045e81b62\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/dce7019ef971f93a91c0868fe84812f045e81b62\"},{\"path\":\"libraries/java/src/test/java11/com/standardwebhooks\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"40ebec5791f8fa172131e00d6657970954a019c2\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/40ebec5791f8fa172131e00d6657970954a019c2\"},{\"path\":\"libraries/java/src/test/java11/com/standardwebhooks/TestPayloadJava11.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"644343ab5c5eeac524826623a5c638f316a79897\",\"size\":1243,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/644343ab5c5eeac524826623a5c638f316a79897\"},{\"path\":\"libraries/java/src/test/java11/com/standardwebhooks/WebhookJava11IntegrationTest.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"205522cbf2c8c3b40e1540c84965545edc91d082\",\"size\":1184,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/205522cbf2c8c3b40e1540c84965545edc91d082\"},{\"path\":\"libraries/java/src/test/java8\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"48f2fcac26dee23aedc5b212af693f226470f6ef\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/48f2fcac26dee23aedc5b212af693f226470f6ef\"},{\"path\":\"libraries/java/src/test/java8/com\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"afb6bed34add760bc4bd9f87d6a6a5d99b118a90\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/afb6bed34add760bc4bd9f87d6a6a5d99b118a90\"},{\"path\":\"libraries/java/src/test/java8/com/standardwebhooks\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"bdfef037cd31e1ef819750bc96e55018f03efc2f\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/bdfef037cd31e1ef819750bc96e55018f03efc2f\"},{\"path\":\"libraries/java/src/test/java8/com/standardwebhooks/WebhookJava8IntegrationTest.java\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"4627fcbf7bda4b66512c3007deae809b96b5e1d6\",\"size\":1126,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/4627fcbf7bda4b66512c3007deae809b96b5e1d6\"},{\"path\":\"libraries/javascript\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"b2d59822156cf398e923dac750addb7086f72dfe\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/b2d59822156cf398e923dac750addb7086f72dfe\"},{\"path\":\"libraries/javascript/.gitignore\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"b5e0d8c61d61811e7e5d94f639e5e8f55d829a11\",\"size\":33,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/b5e0d8c61d61811e7e5d94f639e5e8f55d829a11\"},{\"path\":\"libraries/javascript/README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"72316b1f1e4733e6bb438c6912beeda78210fd79\",\"size\":497,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/72316b1f1e4733e6bb438c6912beeda78210fd79\"},{\"path\":\"libraries/javascript/biome.json\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"18ef616eb484ef1cb54b08cd44baa040848a7cd3\",\"size\":480,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/18ef616eb484ef1cb54b08cd44baa040848a7cd3\"},{\"path\":\"libraries/javascript/package-lock.json\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"459e6ecc8e96a516961610da0c0d8e22a2bd93c1\",\"size\":7775,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/459e6ecc8e96a516961610da0c0d8e22a2bd93c1\"},{\"path\":\"libraries/javascript/package.json\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"27c2606c7f0871af5f9be6f1f8c6f979fb171229\",\"size\":1033,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/27c2606c7f0871af5f9be6f1f8c6f979fb171229\"},{\"path\":\"libraries/javascript/src\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"9280291da80771b334533abfcb2965fa4a19ea0f\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/9280291da80771b334533abfcb2965fa4a19ea0f\"},{\"path\":\"libraries/javascript/src/index.ts\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"a39b594a8d87aaf2d491646fa70d24debeae5e71\",\"size\":5019,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/a39b594a8d87aaf2d491646fa70d24debeae5e71\"},{\"path\":\"libraries/javascript/src/timing_safe_equal.ts\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"2d660305fed1cf031e4f777647c28a46428b93a2\",\"size\":1064,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/2d660305fed1cf031e4f777647c28a46428b93a2\"},{\"path\":\"libraries/javascript/src/webhook.test.ts\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"9c9180d03540c931dd939b91c914ed44a87a918d\",\"size\":7184,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/9c9180d03540c931dd939b91c914ed44a87a918d\"},{\"path\":\"libraries/javascript/tsconfig.json\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"d72513753fc9fa6586a149f6f311ac421d2fc7da\",\"size\":872,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/d72513753fc9fa6586a149f6f311ac421d2fc7da\"},{\"path\":\"libraries/php\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"44b3343178f7c74b0cf3863f5fef4d59f3229818\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/44b3343178f7c74b0cf3863f5fef4d59f3229818\"},{\"path\":\"libraries/php/.gitignore\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"55940e57cc81bf5950363d7cb7a6a0fd9198bd52\",\"size\":22,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/55940e57cc81bf5950363d7cb7a6a0fd9198bd52\"},{\"path\":\"libraries/php/README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"20edf3e857ae5e0e6624be7f52d091bb6c30e315\",\"size\":866,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/20edf3e857ae5e0e6624be7f52d091bb6c30e315\"},{\"path\":\"libraries/php/init.php\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"b2ba3bbf03d6fa69ca99b9afdf60b5ff97e19dee\",\"size\":114,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/b2ba3bbf03d6fa69ca99b9afdf60b5ff97e19dee\"},{\"path\":\"libraries/php/src\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"e818a93e031928ca9e114e2742ba141fd5106f9d\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/e818a93e031928ca9e114e2742ba141fd5106f9d\"},{\"path\":\"libraries/php/src/Exception\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"fdc31b94d24cfbb51594c4cd27a2bc4c4e56ea7e\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/fdc31b94d24cfbb51594c4cd27a2bc4c4e56ea7e\"},{\"path\":\"libraries/php/src/Exception/EmptyWebhookSecretException.php\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"12de4010eba35f1bb398b011ee115d7405a73479\",\"size\":255,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/12de4010eba35f1bb398b011ee115d7405a73479\"},{\"path\":\"libraries/php/src/Exception/WebhookSigningException.php\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"20fed2a50553e4aaa16dd9b2b28f6325f2b7ad5b\",\"size\":251,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/20fed2a50553e4aaa16dd9b2b28f6325f2b7ad5b\"},{\"path\":\"libraries/php/src/Exception/WebhookVerificationException.php\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"84f98f63bf9712311269e0dd67da99976dbbaf2a\",\"size\":256,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/84f98f63bf9712311269e0dd67da99976dbbaf2a\"},{\"path\":\"libraries/php/src/Webhook.php\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"9c73d80d963e8a0521a8a7b3f4cf3f1941fd0882\",\"size\":3286,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/9c73d80d963e8a0521a8a7b3f4cf3f1941fd0882\"},{\"path\":\"libraries/php/tests\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"f2185435301ede37335c15c1a98f7c31fcfb60b9\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/f2185435301ede37335c15c1a98f7c31fcfb60b9\"},{\"path\":\"libraries/php/tests/TestPayload.php\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"5faa4bf5cb326de410a55e2c0c54a81eaa29b8a9\",\"size\":976,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/5faa4bf5cb326de410a55e2c0c54a81eaa29b8a9\"},{\"path\":\"libraries/php/tests/WebhookTest.php\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"8285169890a4ac48900df35974a51433e545f11e\",\"size\":7716,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/8285169890a4ac48900df35974a51433e545f11e\"},{\"path\":\"libraries/php/tests/bootstrap.php\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"4e9dcfc640eab054a8cdfd22660789e3a92b3869\",\"size\":46,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/4e9dcfc640eab054a8cdfd22660789e3a92b3869\"},{\"path\":\"libraries/phpunit.xml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"d2005f538b0fac8c52f7dfcd5ac10b7ae6b5048d\",\"size\":352,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/d2005f538b0fac8c52f7dfcd5ac10b7ae6b5048d\"},{\"path\":\"libraries/python\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"311ceb41753fe37fad5601e36b2c33daa23728bb\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/311ceb41753fe37fad5601e36b2c33daa23728bb\"},{\"path\":\"libraries/python/.gitignore\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"65b06b9554009236a64e09d90167ddf5649f146c\",\"size\":808,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/65b06b9554009236a64e09d90167ddf5649f146c\"},{\"path\":\"libraries/python/LICENSE\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"73732814a941cd54b621d6f789ecfaa87eab6267\",\"size\":1078,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/73732814a941cd54b621d6f789ecfaa87eab6267\"},{\"path\":\"libraries/python/README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"2f6c6c753ebdbbfcb9bf3c31b88b4e9be8218877\",\"size\":535,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/2f6c6c753ebdbbfcb9bf3c31b88b4e9be8218877\"},{\"path\":\"libraries/python/pyproject.toml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"90b3b85e732105f5ea64e40b32badeacdcd27e37\",\"size\":2065,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/90b3b85e732105f5ea64e40b32badeacdcd27e37\"},{\"path\":\"libraries/python/scripts\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"33525a6fac5f3513ce13144f2199401093cce622\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/33525a6fac5f3513ce13144f2199401093cce622\"},{\"path\":\"libraries/python/scripts/format.sh\",\"mode\":\"100755\",\"type\":\"blob\",\"sha\":\"1b89714fe78dfb05a79181c1d61f4b08791a7adb\",\"size\":60,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/1b89714fe78dfb05a79181c1d61f4b08791a7adb\"},{\"path\":\"libraries/python/scripts/lint.sh\",\"mode\":\"100755\",\"type\":\"blob\",\"sha\":\"6256e1604a59acca9c1a24bc439914a0c14f3798\",\"size\":101,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/6256e1604a59acca9c1a24bc439914a0c14f3798\"},{\"path\":\"libraries/python/standardwebhooks\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"6316056012da11c48287a052579294653c2cfe37\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/6316056012da11c48287a052579294653c2cfe37\"},{\"path\":\"libraries/python/standardwebhooks/__init__.py\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"05d905556bc30e456b65f8e30c85c1613effa502\",\"size\":141,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/05d905556bc30e456b65f8e30c85c1613effa502\"},{\"path\":\"libraries/python/standardwebhooks/exceptions.py\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"25aba64ee84c2c664215ecab899b2d072428c996\",\"size\":94,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/25aba64ee84c2c664215ecab899b2d072428c996\"},{\"path\":\"libraries/python/standardwebhooks/py.typed\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391\",\"size\":0,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/e69de29bb2d1d6434b8b29ae775ad8c2e48c5391\"},{\"path\":\"libraries/python/standardwebhooks/webhooks.py\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"16cf2dc6a5243582f947b7c56528560c60766c2d\",\"size\":3840,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/16cf2dc6a5243582f947b7c56528560c60766c2d\"},{\"path\":\"libraries/python/tests\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"17ddfa26aec4f39f9731da399289cdaa4e2d82ff\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/17ddfa26aec4f39f9731da399289cdaa4e2d82ff\"},{\"path\":\"libraries/python/tests/__init__.py\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391\",\"size\":0,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/e69de29bb2d1d6434b8b29ae775ad8c2e48c5391\"},{\"path\":\"libraries/python/tests/test_webhooks.py\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"97a834e5c7efbd695108b3231328adfcfc62e3c0\",\"size\":6978,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/97a834e5c7efbd695108b3231328adfcfc62e3c0\"},{\"path\":\"libraries/python/uv.lock\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"9c11feb3ee464680c5e0bffccb162c6cb24ec98f\",\"size\":106266,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/9c11feb3ee464680c5e0bffccb162c6cb24ec98f\"},{\"path\":\"libraries/ruby\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"21143f8cffa3d50711675a396b64556c5351dd18\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/21143f8cffa3d50711675a396b64556c5351dd18\"},{\"path\":\"libraries/ruby/.editorconfig\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"3fec32dc01c7949a4bf74c56d52f5fdbe5c78e77\",\"size\":353,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/3fec32dc01c7949a4bf74c56d52f5fdbe5c78e77\"},{\"path\":\"libraries/ruby/.gitignore\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"f6216f203312c4a85d9343eef61061d158e861d3\",\"size\":79,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/f6216f203312c4a85d9343eef61061d158e861d3\"},{\"path\":\"libraries/ruby/.ruby-version\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"7921bd0c89272351705e94c90dda8c38db8e58c7\",\"size\":6,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/7921bd0c89272351705e94c90dda8c38db8e58c7\"},{\"path\":\"libraries/ruby/Gemfile\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"896d547dca32ef3fe42ec6690772cd4e7b53410f\",\"size\":38,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/896d547dca32ef3fe42ec6690772cd4e7b53410f\"},{\"path\":\"libraries/ruby/Gemfile.lock\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"cc656dcd715ae5ce79154dfbd293e8dbe3c8b880\",\"size\":744,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/cc656dcd715ae5ce79154dfbd293e8dbe3c8b880\"},{\"path\":\"libraries/ruby/README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"ad65431c151a94afd9fe84dfde0c173d913a386a\",\"size\":2994,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/ad65431c151a94afd9fe84dfde0c173d913a386a\"},{\"path\":\"libraries/ruby/Rakefile\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"43022f711e20ed55baf2470278eb8e428a04856f\",\"size\":51,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/43022f711e20ed55baf2470278eb8e428a04856f\"},{\"path\":\"libraries/ruby/lib\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"33509952c90ac89951255d7e5c1aad655e3f5a39\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/33509952c90ac89951255d7e5c1aad655e3f5a39\"},{\"path\":\"libraries/ruby/lib/standardwebhooks.rb\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"c1f85cfbcb55a4f21b98b467257319ebf1929d64\",\"size\":111,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/c1f85cfbcb55a4f21b98b467257319ebf1929d64\"},{\"path\":\"libraries/ruby/lib/standardwebhooks\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"fab8307c1f63852ae471b592303f90f384fcec7c\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/fab8307c1f63852ae471b592303f90f384fcec7c\"},{\"path\":\"libraries/ruby/lib/standardwebhooks/errors.rb\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"98752064548b5749a9591dd363574948b979963e\",\"size\":390,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/98752064548b5749a9591dd363574948b979963e\"},{\"path\":\"libraries/ruby/lib/standardwebhooks/util.rb\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"1db93c5c21374baa0871d6f23725d4e2a2ba74c2\",\"size\":549,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/1db93c5c21374baa0871d6f23725d4e2a2ba74c2\"},{\"path\":\"libraries/ruby/lib/standardwebhooks/webhooks.rb\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"42ee134fca9524ebabd039c1d9d2ede3e0c83795\",\"size\":2351,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/42ee134fca9524ebabd039c1d9d2ede3e0c83795\"},{\"path\":\"libraries/ruby/spec\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"fda049ac9180b686b5a62cd2493056c62f74892a\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/fda049ac9180b686b5a62cd2493056c62f74892a\"},{\"path\":\"libraries/ruby/spec/webhook_spec.rb\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"991671553911b5591375b8ef78f00f7162f69990\",\"size\":5937,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/991671553911b5591375b8ef78f00f7162f69990\"},{\"path\":\"libraries/ruby/standardwebhooks.gemspec\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"f8069635a66982da9dbf099f14bbd9528b75b26d\",\"size\":1070,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/f8069635a66982da9dbf099f14bbd9528b75b26d\"},{\"path\":\"libraries/rust\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"d2970662d694d0853e198340996b76f03851f009\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/d2970662d694d0853e198340996b76f03851f009\"},{\"path\":\"libraries/rust/.gitignore\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"6aa106405a4b4a00d779beab77c90c9473a6d203\",\"size\":31,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/6aa106405a4b4a00d779beab77c90c9473a6d203\"},{\"path\":\"libraries/rust/Cargo.toml\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"4be144dcf18371b02768ea59d3bb7c60bfb52584\",\"size\":572,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/4be144dcf18371b02768ea59d3bb7c60bfb52584\"},{\"path\":\"libraries/rust/README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"5114978dbb465c09595e8c3b85aed0bf4ddd264e\",\"size\":242,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/5114978dbb465c09595e8c3b85aed0bf4ddd264e\"},{\"path\":\"libraries/rust/src\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"c86d52e7d90cd9806d6f227677faafb701472644\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/c86d52e7d90cd9806d6f227677faafb701472644\"},{\"path\":\"libraries/rust/src/lib.rs\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"56c59726982e9de052a56edc10aecf799e9ef63a\",\"size\":11665,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/56c59726982e9de052a56edc10aecf799e9ef63a\"},{\"path\":\"skills\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"57fc2f778a8d76eaac13070c6dadf75a77b74bf0\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/57fc2f778a8d76eaac13070c6dadf75a77b74bf0\"},{\"path\":\"skills/receiving-webhooks\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"7d91624a909519f633cf1bcbb9bdc8631c6f337e\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/7d91624a909519f633cf1bcbb9bdc8631c6f337e\"},{\"path\":\"skills/receiving-webhooks/README.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"c5b6a38ea3d3a0740782078b61fff77c550f55d0\",\"size\":513,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/c5b6a38ea3d3a0740782078b61fff77c550f55d0\"},{\"path\":\"skills/receiving-webhooks/SKILL.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"5808277457565901b5b5a0a19a343351331722d0\",\"size\":6807,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/5808277457565901b5b5a0a19a343351331722d0\"},{\"path\":\"spec\",\"mode\":\"040000\",\"type\":\"tree\",\"sha\":\"b16c3d683949c7423ca4d90d5ebb0afd0236ca81\",\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/trees/b16c3d683949c7423ca4d90d5ebb0afd0236ca81\"},{\"path\":\"spec/standard-webhooks.md\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"a663090f6f0e84d791a49aa0efc8541896c73c2c\",\"size\":28403,\"url\":\"https://api.github.com/repos/standard-webhooks/standard-webhooks/git/blobs/a663090f6f0e84d791a49aa0efc8541896c73c2c\"}],\"truncated\":false}"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/standard-webhooks/standard-webhooks/b4d2c14fc5b4ccff3ff271e3b087dff812254c59/libraries/LICENSE",
+        "status": 200,
+        "bytes": 1088,
+        "sha256": "5ec8c7b26b64d881a6706617bed25c049f97f2f35de034c756de8546fd6dbe27",
+        "rawUtf8": "The MIT License\n\nCopyright (c) 2023 Svix (https://www.svix.com)\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in\nall copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN\nTHE SOFTWARE.\n"
+      }
+    ],
+    "publicReadMode": "Anonymous exact official registry/GitHub reads; applicable executor auto-review accepted; no install/source mutation",
+    "registryReportedGitHead": "b4d2c14fc5b4ccff3ff271e3b087dff812254c59",
+    "packageManifestMatchesSourceAtReportedCommit": true,
+    "treeTruncated": false,
+    "observedNoticePaths": [
+      {
+        "path": "LICENSE",
+        "type": "blob",
+        "gitBlob": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+        "bytes": 11357
+      },
+      {
+        "path": "libraries/LICENSE",
+        "type": "blob",
+        "gitBlob": "55b14b3a3ce649a2f1b05428dcc9c6db95b37c04",
+        "bytes": 1088
+      },
+      {
+        "path": "libraries/python/LICENSE",
+        "type": "blob",
+        "gitBlob": "73732814a941cd54b621d6f789ecfaa87eab6267",
+        "bytes": 1078
+      }
+    ],
+    "parentLibraryNoticeIsSourceEvidenceOnly": true,
+    "packagedRootNoticeStillAbsent": true,
+    "signatureVerified": false,
+    "attestationVerified": false,
+    "sourceAssociation": "Registry GitHead + matching manifest + commit-addressed GitHub blob observations; publication attestation not verified"
+  },
+  "sourceBaseline": {
+    "repository": "https://github.com/earendil-works/pi",
+    "version": "0.99.1",
+    "commit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "tree": "200bd10bb146773516f862a02b8aaebeed163e00",
+    "license": {
+      "path": "LICENSE",
+      "bytes": 1069,
+      "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48",
+      "gitBlob": "b0a8e9b81083294360c69b4ec45d3d39a2b28197",
+      "declaredLicense": "MIT",
+      "observedTextFamily": "MIT",
+      "utf8Text": "MIT License\n\nCopyright (c) 2025 Mario Zechner\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+      "origin": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/LICENSE",
+      "evidenceLevel": "canonical-pi-source-notice",
+      "attribution": "Copyright (c) 2025 Mario Zechner"
+    },
+    "canonicalFingerprint": {
+      "files": 2093,
+      "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+    },
+    "acquiredSourceFingerprint": {
+      "canonicalGit": {
+        "files": 2093,
+        "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+      },
+      "acquiredCheckout": {
+        "files": 2093,
+        "sha256": "676a5df7a526ab0fb6a78f734b57093bb7571913fc17251d02cb0c84527dcf21"
+      },
+      "declaredCheckoutConversions": [
+        {
+          "path": "pi-test.bat",
+          "eol": "crlf",
+          "canonicalSha256": "d454a5a0e203d9009283b887720472b022b0853380758b11419c8547a32dbb88",
+          "checkoutSha256": "c9d3430a614cabfaae5a9e97259643ab9041629bc8253f58f22579a5b6d9c448"
+        },
+        {
+          "path": "pi-test.ps1",
+          "eol": "crlf",
+          "canonicalSha256": "9f76d37f75b1d6f03be14d8bce3ca05331c4b09b8003a53329d8e4fe942792ef",
+          "checkoutSha256": "9b97fa3be6582e935f43865599d21bbb216e5ffe2cb1eb198c77e7298490b895"
+        }
+      ]
+    },
+    "sourceArchive": {
+      "evidenceId": "release-archive",
+      "url": "https://github.com/earendil-works/pi/releases/download/v0.99.1/pi-0.99.1-source.tar.gz",
+      "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b",
+      "bytes": 8646242,
+      "checksumEvidenceId": "release-checksums",
+      "trackedFilesCompared": 2093,
+      "differingTrackedFiles": 0,
+      "generatedCatalogFilesAdded": 43,
+      "releaseApiReportedImmutable": false
+    },
+    "scope": "Pi root MIT grant established; artifact-specific third-party/native/generated scope not inferred from it."
+  },
+  "releasedPackages": [
+    {
+      "id": "@earendil-works/pi-agent-core@0.99.1",
+      "name": "@earendil-works/pi-agent-core",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-agent-core/0.99.1",
+      "metadataBodySha256": "cd845eb2316c70f8cda819aff4cd0aa65002bae99c310d531f1b5426a5e25070",
+      "metadataBodyBytes": 4121,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-agent-core/-/pi-agent-core-0.99.1.tgz",
+      "archiveIntegrity": "sha512-zywvWnj5FujeuFI/x/CJHwwxhcLIQgjqseTA+bQgX4O8gJTcgjRd/I8SZnQDqJvxC9QcV12ujiGLviv6EgwcCg==",
+      "archiveSha1": "e918b147f4d3ae1c8c5d435229a2d56d76a3191c",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/pi-ai@0.99.1",
+      "name": "@earendil-works/pi-ai",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-ai/0.99.1",
+      "metadataBodySha256": "ba57282ebb3656598d5a3e36de21b09f6a985fc98691412f042b83039566c864",
+      "metadataBodyBytes": 3849,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-ai/-/pi-ai-0.99.1.tgz",
+      "archiveIntegrity": "sha512-4nV9JKc94iPX8bwdGPc2nTuVPKIPsffhnp3WoN9NYCNqbtoOF8LhYcIs/+Sn/alroqJK/5QRu6/Z6Ck+n0hyBA==",
+      "archiveSha1": "2945bf014fbb314bd37b919e83317560e0a8fa1d",
+      "archiveAcquired": true,
+      "packagedNoticeStatus": "observed-absent",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/chord@0.99.1",
+      "name": "@earendil-works/chord",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fchord/0.99.1",
+      "metadataBodySha256": "e97cd65ecf3602e12ef917c655cf6662d6563e4e532f06e219042db4d190eec5",
+      "metadataBodyBytes": 2871,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/chord/-/chord-0.99.1.tgz",
+      "archiveIntegrity": "sha512-4xyn0IBzJ+Xu/iOGi2hjXJGAR61QEhEWZsIqTDqr+GmItdquYwBO5jYFnqGiBaTqlY12/EpM7QHoEKSHbyvOug==",
+      "archiveSha1": "7f6ba945b705a5ab48d25dbed39b253afcec68df",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/pi-client@0.99.1",
+      "name": "@earendil-works/pi-client",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-client/0.99.1",
+      "metadataBodySha256": "c8176ec631ca4b3c3d62a67f7afcb4b6176eeb8abc118bd4ef4ddcfc7803a111",
+      "metadataBodyBytes": 2589,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-client/-/pi-client-0.99.1.tgz",
+      "archiveIntegrity": "sha512-0wlRybJZK3mSJagJvKh8CDfVykhDQsoB9Mtn9JekZn/FK9WN1GWWv+gxnYRfBoS1sG9+u1J+ZN9VZsCKfRJm9g==",
+      "archiveSha1": "e37e7d219a8ab47eeee055e4946430c2ea6e40eb",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/pi-codemode@0.99.1",
+      "name": "@earendil-works/pi-codemode",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-codemode/0.99.1",
+      "metadataBodySha256": "3002a5a1d0e28753b6913c3a88214b2a664dddde802584765f422b0be121ee76",
+      "metadataBodyBytes": 2773,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-codemode/-/pi-codemode-0.99.1.tgz",
+      "archiveIntegrity": "sha512-oh8TMsBI3SWTN3xTQtX8u5n+BKhnVXcFagroWumfn6/WWfBnDYL/LmeQtjLb83WRTb9rcu+ZdK8rFa4vggvCJg==",
+      "archiveSha1": "f9965078e21d744fe1b018959359aed1a664f17d",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/pi-coding-agent@0.99.1",
+      "name": "@earendil-works/pi-coding-agent",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-coding-agent/0.99.1",
+      "metadataBodySha256": "7cbdbcaf9dc863ad7ffc100e231fe7662439d920272fb3359edb9ac111f4a4de",
+      "metadataBodyBytes": 5285,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-coding-agent/-/pi-coding-agent-0.99.1.tgz",
+      "archiveIntegrity": "sha512-cWUrTOqA5M73cOYMgsh9PlhDrsBhavd+n5kVY6F7BGbGl1RjqCteVCoeVMVqhngoGACVDyw1tbLjajL8l9jrHg==",
+      "archiveSha1": "00e7e6c668d67d0825fc8814d80097eb07ec44e0",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/pi-durable@0.99.1",
+      "name": "@earendil-works/pi-durable",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-durable/0.99.1",
+      "metadataBodySha256": "52a6001319470c92142f599848bff87930574f20442e659b3b5ffd55727f0d34",
+      "metadataBodyBytes": 3719,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-durable/-/pi-durable-0.99.1.tgz",
+      "archiveIntegrity": "sha512-SpUP6DM3jdpo0f5y+SfTWXk0R4pDKMXoSwiGR/P7k4+B37Ojo4BAR8xLvo8PS2cOgW3drKyosyl4gd/yWEBzhA==",
+      "archiveSha1": "6423d51dce64b292ddac75df813294f7d51a3f36",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/pi-mcp@0.99.1",
+      "name": "@earendil-works/pi-mcp",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-mcp/0.99.1",
+      "metadataBodySha256": "3569b71c2defef12fc5d0eddaa43d0d6510f34226cf0527da869689046cdfd5a",
+      "metadataBodyBytes": 2662,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-mcp/-/pi-mcp-0.99.1.tgz",
+      "archiveIntegrity": "sha512-YCFGPkmDzLwQuIzwfbP6Vuk/g/ukKpZhwTpbcfzomuI1Fkiu6hHRkOGwAqsO3G8cTkZWkM8vmOkFJjStQNC4qA==",
+      "archiveSha1": "c2002b819a5d75d9cfa8091171580f794c205042",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/pi-protocol@0.99.1",
+      "name": "@earendil-works/pi-protocol",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-protocol/0.99.1",
+      "metadataBodySha256": "52f2fa6aabc5faf6712b667a2d23d5669e045761812329acc2c2aec17cd57b96",
+      "metadataBodyBytes": 2409,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-protocol/-/pi-protocol-0.99.1.tgz",
+      "archiveIntegrity": "sha512-BNPwOMNCd/L1IqovKZ0+p1xDydqnHd4tIGHf9uVZNOQJTq9QacLRKXBMzRzgy/Yqv1rPnTDjauDiIcZeOgg2xA==",
+      "archiveSha1": "70843075112dd5a741e4930fa6a42b3101f1b97b",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/pi-server@0.99.1",
+      "name": "@earendil-works/pi-server",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-server/0.99.1",
+      "metadataBodySha256": "d30773fa84be79f0fccb6ab93ea018e0f61d2581fb252c9b21b7ea79780cbdbd",
+      "metadataBodyBytes": 2698,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-server/-/pi-server-0.99.1.tgz",
+      "archiveIntegrity": "sha512-D0clUTMtGDXGIRlHGHvDzX6YnA0fOKk1+Jv3G6gaDQ9lkZpwJrou2lTcuMxM7ufP5KSv31kSvSYR3Jx7F8Y4eQ==",
+      "archiveSha1": "2d777a1c474a796671be584411597d5a9b0fc57f",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/pi-telemetry@0.99.1",
+      "name": "@earendil-works/pi-telemetry",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-telemetry/0.99.1",
+      "metadataBodySha256": "058a94c2ff69a5fb05a02e1355e5b48d402ca1c09a50d411bedfde0f060b81b3",
+      "metadataBodyBytes": 2451,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-telemetry/-/pi-telemetry-0.99.1.tgz",
+      "archiveIntegrity": "sha512-9PBPjGk+TXRtuMianpqBbHBpYpyKusESF6rwdmgD0WTZSTUQXhcKEO0hAINRLuSwy4V7yPvXV+EVV0ONY7mbpQ==",
+      "archiveSha1": "37b1fb0ce8c0ca2fe04363035a4b7aea29a9e8cb",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/pi-tui@0.99.1",
+      "name": "@earendil-works/pi-tui",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-tui/0.99.1",
+      "metadataBodySha256": "ab28b25f5b1bac55cb80cadac05c8b983102fb57314e6711ef89952f47576ced",
+      "metadataBodyBytes": 2600,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-tui/-/pi-tui-0.99.1.tgz",
+      "archiveIntegrity": "sha512-gZp0Guat96Fr1AuC/xqVz5B2lulZakp/PxD1lXx3lSgBdjiqmwYhJbcQ0HRrGAfy0WtMGn9b05RJr5qJf7oIuw==",
+      "archiveSha1": "f6f82a4792fabb4aabf310e082743d87accc90cc",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    },
+    {
+      "id": "@earendil-works/pi-session-backend-sqlite-node@0.99.1",
+      "name": "@earendil-works/pi-session-backend-sqlite-node",
+      "version": "0.99.1",
+      "declaredLicense": "MIT",
+      "metadataUrl": "https://registry.npmjs.org/@earendil-works%2fpi-session-backend-sqlite-node/0.99.1",
+      "metadataBodySha256": "405187fe7a660d6a1a440c7f34c0cca33574cff984a8aa0a3f56c4016ce23b45",
+      "metadataBodyBytes": 2767,
+      "metadataEvidenceId": "release-metadata",
+      "registryReportedGitHead": "d86654abb8862e201933517d6f1fce9f88dd117f",
+      "archiveUrl": "https://registry.npmjs.org/@earendil-works/pi-session-backend-sqlite-node/-/pi-session-backend-sqlite-node-0.99.1.tgz",
+      "archiveIntegrity": "sha512-WXB3R1ZlbQqBansBCLvWD23BpRaJm+s/oGkhRgALwiu6DLd3decRUFZ3i6ssAznFUSsnWQTliDUpKj1sKS84bQ==",
+      "archiveSha1": "66ce8cbf728416c1b55ea5272f5e57106d0c7af7",
+      "archiveAcquired": false,
+      "packagedNoticeStatus": "not-acquired-not-inspected",
+      "signatureDeclared": true,
+      "attestationDeclared": true,
+      "signatureVerified": false,
+      "attestationVerified": false,
+      "redistributionLicenseClosure": false
+    }
+  ],
+  "releasedAiArtifact": {
+    "evidenceId": "ai-archive",
+    "name": "@earendil-works/pi-ai",
+    "version": "0.99.1",
+    "gitHeadDeclaredByRegistry": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "registryMetadataSha256": "ba57282ebb3656598d5a3e36de21b09f6a985fc98691412f042b83039566c864",
+    "url": "https://registry.npmjs.org/@earendil-works/pi-ai/-/pi-ai-0.99.1.tgz",
+    "bytes": 760966,
+    "sha256": "f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3",
+    "integrity": "sha512-4nV9JKc94iPX8bwdGPc2nTuVPKIPsffhnp3WoN9NYCNqbtoOF8LhYcIs/+Sn/alroqJK/5QRu6/Z6Ck+n0hyBA==",
+    "shasum": "2945bf014fbb314bd37b919e83317560e0a8fa1d",
+    "sha512AndSha1Verified": true,
+    "registryReportedFiles": 813,
+    "observedRegularFiles": 813,
+    "registryReportedUnpackedBytes": 3944328,
+    "observedUnpackedBytes": 3944328,
+    "packageJsonBytes": 2636,
+    "packageJsonSha256": "86a8ccb86ce00af196fc7d48417f82e99c6da40c68d8d138ace2a4f0fda4090d",
+    "packageJsonEqualsSourceBytes": true,
+    "signatureVerified": false,
+    "attestationVerified": false,
+    "declaredLicense": "MIT",
+    "packagedNotices": [],
+    "packagedCompleteLicensePresent": false,
+    "readmeMitDeclaration": true,
+    "readmeSha256": "db41abb75b98b28b76ec77bc3f140303083e97bddb0183c30cfd6702976f47f2",
+    "sourceLicenseEvidence": "sourceBaseline.license",
+    "sourceManifestExactlyMatchesPackagedManifest": true,
+    "fullTransitiveLicenseClosure": false,
+    "gapIds": [
+      "PI-AI-PACKAGED-NOTICE",
+      "RELEASED-DEPENDENCY-CLOSURE",
+      "SIGNATURE-ATTESTATION",
+      "DISTRIBUTION-SCOPE"
+    ]
+  },
+  "catalog": {
+    "sourceManifest": {
+      "path": "packages/ai/src/providers/data/.manifest.json",
+      "bytes": 3779,
+      "sha256": "58698cae7d0a3b270f360072c6106435ca1870a178254bd80d5dbfb4716734e6",
+      "generatedAt": "2026-09-29T18:07:44.679Z"
+    },
+    "npmManifest": {
+      "path": "dist/providers/data/.manifest.json",
+      "sha256": "9fbcd337d4bd414a407d7c9f8041ddba2f4d28840eca923013fd8b0636b88b23",
+      "generatedAt": "2026-09-29T18:10:40.924Z"
+    },
+    "providers": 42,
+    "models": 1592,
+    "apiCount": 13,
+    "allProviderDataBytesMatch": true,
+    "wholeCatalogBytesIdentical": false,
+    "rawNumbersPreserved": true,
+    "regenerated": false,
+    "structureHash": "58511a57fb2db5e984ee62857d8079aec6ff800e19226c327c118e7f57ea916b",
+    "licensingReviewed": false,
+    "gapIds": [
+      "GENERATED-DATA-SCOPE"
+    ]
+  },
+  "nativeAssetEvidence": {
+    "trackedNamedLicenseNoticePaths": [
+      "LICENSE"
+    ],
+    "scope": "Named-file inventory, not copyright-header/legal audit",
+    "files": [
+      {
+        "path": "packages/agent/docs/pico/v3/harness-v3.zip",
+        "bytes": 176487,
+        "sha256": "1c69c5c5d923fe1c80200cc5e49ddb3868158e1b6a844efa3e2f03eb24ff5be7",
+        "gitBlob": "d938dc224bda46927114833cc1ed52b89e5fcf7b",
+        "executed": false,
+        "artifactSpecificLicensingReviewed": false
+      },
+      {
+        "path": "packages/coding-agent/examples/extensions/doom-overlay/doom/build/doom.wasm",
+        "bytes": 380169,
+        "sha256": "571d161956593508cf4ade732ae93753f00484bb526667a8676571cca14dec7d",
+        "gitBlob": "fb99ae7cefd8fcc156edd27fe79b9498c64821a4",
+        "executed": false,
+        "artifactSpecificLicensingReviewed": false
+      },
+      {
+        "path": "packages/tui/native/darwin/prebuilds/darwin-arm64/darwin-platform.node",
+        "bytes": 52024,
+        "sha256": "36e909adf35c2734a2a52b3d65b7dbfb83f2278f306d51b7e32c5045516dfb7f",
+        "gitBlob": "3294b6bffd36eaab70d61134e9955992f31f9a8f",
+        "executed": false,
+        "artifactSpecificLicensingReviewed": false
+      },
+      {
+        "path": "packages/tui/native/darwin/prebuilds/darwin-x64/darwin-platform.node",
+        "bytes": 22784,
+        "sha256": "7ec59a02fff9562f6354274ad070ba35f8e0998b3b111eb27ad3de579ffb6c65",
+        "gitBlob": "014383575508654d9f898ee25631b88db8d9740c",
+        "executed": false,
+        "artifactSpecificLicensingReviewed": false
+      },
+      {
+        "path": "packages/tui/native/linux/prebuilds/linux-arm64/linux-platform-x11.node",
+        "bytes": 67240,
+        "sha256": "63d4545349a25b5c97e352ea6d254cea50ff3c14161212ad3ddb3fc28022ddb5",
+        "gitBlob": "6d3abc4e33fe4fc8f9029cda1201a3a2aee5c050",
+        "executed": false,
+        "artifactSpecificLicensingReviewed": false
+      },
+      {
+        "path": "packages/tui/native/linux/prebuilds/linux-x64/linux-platform-x11.node",
+        "bytes": 18008,
+        "sha256": "522d2550f7fa5d0d5bd204f45983f786ce2be9cf80f27f00179640d31d0689d6",
+        "gitBlob": "54fcd629b88533ee6c788a830038aa46cf78c1d7",
+        "executed": false,
+        "artifactSpecificLicensingReviewed": false
+      },
+      {
+        "path": "packages/tui/native/win32/prebuilds/win32-arm64/win32-platform.node",
+        "bytes": 9216,
+        "sha256": "0e5671ab39ef577940483ced58fdf29ecdf5f864f368d90a771eec4aeeae11b8",
+        "gitBlob": "ec330840e70b863b2b0f295437b78378fb8ac84b",
+        "executed": false,
+        "artifactSpecificLicensingReviewed": false
+      },
+      {
+        "path": "packages/tui/native/win32/prebuilds/win32-x64/win32-platform.node",
+        "bytes": 8704,
+        "sha256": "51bee02bcb73b165ab92af75ae15b88aba3f5d99f072e63ef60af92ffdc4d565",
+        "gitBlob": "2d0b749b53a17d6049f3e1629c73a847d3851d04",
+        "executed": false,
+        "artifactSpecificLicensingReviewed": false
+      }
+    ],
+    "artifactSpecificLicensingReviewed": false,
+    "gapIds": [
+      "NATIVE-ASSET-SCOPE"
+    ]
+  },
+  "developerTooling": {
+    "node": {
+      "name": "Node.js",
+      "version": "v24.19.0",
+      "platform": "win32",
+      "architecture": "x64",
+      "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+      "bytes": 92825416,
+      "origin": "Preinstalled Codex execution environment; binary not redistributed",
+      "licenseNoticeAcquiredInThisLane": false,
+      "bundledWithNativeProduct": false
+    },
+    "npm": {
+      "name": "npm",
+      "version": "11.6.2",
+      "declaredLicense": "Artistic-2.0",
+      "archive": {
+        "path": "P:/PiSharp/root/Documents/Codex/2026-09-30/task-2/Pi-reference-oracle-v0.99.1/archives/npm-11.6.2.tgz",
+        "bytes": 2663834,
+        "sha256": "585f95094ee5cb2788ee11d90f2a518a7c9ef6e083fa141d0b63ca3383675a20",
+        "integrity": "sha512-7iKzNfy8lWYs3zq4oFPa8EXZz5xt9gQNKJZau3B1ErLBb6bF7sBJ00x09485DOvRT2l5Gerbl3VlZNT57MxJVA==",
+        "officialUrl": "https://registry.npmjs.org/npm/-/npm-11.6.2.tgz"
+      },
+      "regularFiles": 2133,
+      "observedNamedNoticeFiles": 193,
+      "rootNotices": [
+        {
+          "path": "LICENSE",
+          "bytes": 9742,
+          "sha256": "7610d223851f421d315df5e77974f1c68a04b97e02060e5bbbcf13d95e3ca257",
+          "utf8Text": "The npm application\nCopyright (c) npm, Inc. and Contributors\nLicensed on the terms of The Artistic License 2.0\n\nNode package dependencies of the npm application\nCopyright (c) their respective copyright owners\nLicensed on their respective license terms\n\nThe npm public registry at https://registry.npmjs.org\nand the npm website at https://www.npmjs.com\nOperated by npm, Inc.\nUse governed by terms published on https://www.npmjs.com\n\n\"Node.js\"\nTrademark Joyent, Inc., https://joyent.com\nNeither npm nor npm, Inc. are affiliated with Joyent, Inc.\n\nThe Node.js application\nProject of Node Foundation, https://nodejs.org\n\nThe npm Logo\nCopyright (c) Mathias Pettersson and Brian Hammond\n\n\"Gubblebum Blocky\" typeface\nCopyright (c) Tjarda Koster, https://jelloween.deviantart.com\nUsed with permission\n\n\n--------\n\n\nThe Artistic License 2.0\n\nCopyright (c) 2000-2006, The Perl Foundation.\n\nEveryone is permitted to copy and distribute verbatim copies\nof this license document, but changing it is not allowed.\n\nPreamble\n\nThis license establishes the terms under which a given free software\nPackage may be copied, modified, distributed, and/or redistributed.\nThe intent is that the Copyright Holder maintains some artistic\ncontrol over the development of that Package while still keeping the\nPackage available as open source and free software.\n\nYou are always permitted to make arrangements wholly outside of this\nlicense directly with the Copyright Holder of a given Package.  If the\nterms of this license do not permit the full use that you propose to\nmake of the Package, you should contact the Copyright Holder and seek\na different licensing arrangement.\n\nDefinitions\n\n    \"Copyright Holder\" means the individual(s) or organization(s)\n    named in the copyright notice for the entire Package.\n\n    \"Contributor\" means any party that has contributed code or other\n    material to the Package, in accordance with the Copyright Holder's\n    procedures.\n\n    \"You\" and \"your\" means any person who would like to copy,\n    distribute, or modify the Package.\n\n    \"Package\" means the collection of files distributed by the\n    Copyright Holder, and derivatives of that collection and/or of\n    those files. A given Package may consist of either the Standard\n    Version, or a Modified Version.\n\n    \"Distribute\" means providing a copy of the Package or making it\n    accessible to anyone else, or in the case of a company or\n    organization, to others outside of your company or organization.\n\n    \"Distributor Fee\" means any fee that you charge for Distributing\n    this Package or providing support for this Package to another\n    party.  It does not mean licensing fees.\n\n    \"Standard Version\" refers to the Package if it has not been\n    modified, or has been modified only in ways explicitly requested\n    by the Copyright Holder.\n\n    \"Modified Version\" means the Package, if it has been changed, and\n    such changes were not explicitly requested by the Copyright\n    Holder.\n\n    \"Original License\" means this Artistic License as Distributed with\n    the Standard Version of the Package, in its current version or as\n    it may be modified by The Perl Foundation in the future.\n\n    \"Source\" form means the source code, documentation source, and\n    configuration files for the Package.\n\n    \"Compiled\" form means the compiled bytecode, object code, binary,\n    or any other form resulting from mechanical transformation or\n    translation of the Source form.\n\n\nPermission for Use and Modification Without Distribution\n\n(1)  You are permitted to use the Standard Version and create and use\nModified Versions for any purpose without restriction, provided that\nyou do not Distribute the Modified Version.\n\n\nPermissions for Redistribution of the Standard Version\n\n(2)  You may Distribute verbatim copies of the Source form of the\nStandard Version of this Package in any medium without restriction,\neither gratis or for a Distributor Fee, provided that you duplicate\nall of the original copyright notices and associated disclaimers.  At\nyour discretion, such verbatim copies may or may not include a\nCompiled form of the Package.\n\n(3)  You may apply any bug fixes, portability changes, and other\nmodifications made available from the Copyright Holder.  The resulting\nPackage will still be considered the Standard Version, and as such\nwill be subject to the Original License.\n\n\nDistribution of Modified Versions of the Package as Source\n\n(4)  You may Distribute your Modified Version as Source (either gratis\nor for a Distributor Fee, and with or without a Compiled form of the\nModified Version) provided that you clearly document how it differs\nfrom the Standard Version, including, but not limited to, documenting\nany non-standard features, executables, or modules, and provided that\nyou do at least ONE of the following:\n\n    (a)  make the Modified Version available to the Copyright Holder\n    of the Standard Version, under the Original License, so that the\n    Copyright Holder may include your modifications in the Standard\n    Version.\n\n    (b)  ensure that installation of your Modified Version does not\n    prevent the user installing or running the Standard Version. In\n    addition, the Modified Version must bear a name that is different\n    from the name of the Standard Version.\n\n    (c)  allow anyone who receives a copy of the Modified Version to\n    make the Source form of the Modified Version available to others\n    under\n\n        (i)  the Original License or\n\n        (ii)  a license that permits the licensee to freely copy,\n        modify and redistribute the Modified Version using the same\n        licensing terms that apply to the copy that the licensee\n        received, and requires that the Source form of the Modified\n        Version, and of any works derived from it, be made freely\n        available in that license fees are prohibited but Distributor\n        Fees are allowed.\n\n\nDistribution of Compiled Forms of the Standard Version\nor Modified Versions without the Source\n\n(5)  You may Distribute Compiled forms of the Standard Version without\nthe Source, provided that you include complete instructions on how to\nget the Source of the Standard Version.  Such instructions must be\nvalid at the time of your distribution.  If these instructions, at any\ntime while you are carrying out such distribution, become invalid, you\nmust provide new instructions on demand or cease further distribution.\nIf you provide valid instructions or cease distribution within thirty\ndays after you become aware that the instructions are invalid, then\nyou do not forfeit any of your rights under this license.\n\n(6)  You may Distribute a Modified Version in Compiled form without\nthe Source, provided that you comply with Section 4 with respect to\nthe Source of the Modified Version.\n\n\nAggregating or Linking the Package\n\n(7)  You may aggregate the Package (either the Standard Version or\nModified Version) with other packages and Distribute the resulting\naggregation provided that you do not charge a licensing fee for the\nPackage.  Distributor Fees are permitted, and licensing fees for other\ncomponents in the aggregation are permitted. The terms of this license\napply to the use and Distribution of the Standard or Modified Versions\nas included in the aggregation.\n\n(8) You are permitted to link Modified and Standard Versions with\nother works, to embed the Package in a larger work of your own, or to\nbuild stand-alone binary or bytecode versions of applications that\ninclude the Package, and Distribute the result without restriction,\nprovided the result does not expose a direct interface to the Package.\n\n\nItems That are Not Considered Part of a Modified Version\n\n(9) Works (including, but not limited to, modules and scripts) that\nmerely extend or make use of the Package, do not, by themselves, cause\nthe Package to be a Modified Version.  In addition, such works are not\nconsidered parts of the Package itself, and are not subject to the\nterms of this license.\n\n\nGeneral Provisions\n\n(10)  Any use, modification, and distribution of the Standard or\nModified Versions is governed by this Artistic License. By using,\nmodifying or distributing the Package, you accept this license. Do not\nuse, modify, or distribute the Package, if you do not accept this\nlicense.\n\n(11)  If your Modified Version has been derived from a Modified\nVersion made by someone other than you, you are nevertheless required\nto ensure that your Modified Version complies with the requirements of\nthis license.\n\n(12)  This license does not grant you the right to use any trademark,\nservice mark, tradename, or logo of the Copyright Holder.\n\n(13)  This license includes the non-exclusive, worldwide,\nfree-of-charge patent license to make, have made, use, offer to sell,\nsell, import and otherwise transfer the Package with respect to any\npatent claims licensable by the Copyright Holder that are necessarily\ninfringed by the Package. If you institute patent litigation\n(including a cross-claim or counterclaim) against any party alleging\nthat the Package constitutes direct or contributory patent\ninfringement, then this Artistic License to you shall terminate on the\ndate that such litigation is filed.\n\n(14)  Disclaimer of Warranty:\nTHE PACKAGE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS \"AS\nIS' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES. THE IMPLIED\nWARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR\nNON-INFRINGEMENT ARE DISCLAIMED TO THE EXTENT PERMITTED BY YOUR LOCAL\nLAW. UNLESS REQUIRED BY LAW, NO COPYRIGHT HOLDER OR CONTRIBUTOR WILL\nBE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL\nDAMAGES ARISING IN ANY WAY OUT OF THE USE OF THE PACKAGE, EVEN IF\nADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\n\n--------\n"
+        }
+      ],
+      "vendoredLicenseClosureReviewed": false,
+      "invokedInThisLane": false
+    },
+    "productClaim": "Existing notices state no npm/SDK/Node bundled; this lane does not inspect a published native distribution."
+  },
+  "existingNoticeReview": {
+    "documents": [
+      {
+        "path": "THIRD-PARTY-NOTICES.md",
+        "bytes": 11338,
+        "sha256": "0ca2678fe2d126d045fc6d92a20a866c555da7b05c94e2ddfda4b3b212877191",
+        "meaning": "Historical review snapshot; future root notice edits permitted"
+      },
+      {
+        "path": "compatibility/provenance.json",
+        "bytes": 27022,
+        "sha256": "ea720a0417e202b0d137e946a98922fd3c42e76a43c06da4f35a3ce785d01124",
+        "meaning": "Historical review snapshot; future root notice edits permitted"
+      },
+      {
+        "path": "docs/compatibility/anthropic-sdk-reference-setup.md",
+        "bytes": 13225,
+        "sha256": "eb45dde112446b747fd71ed0d98311fe3a6f37cc8615abcb1c70783d12f77ac2",
+        "meaning": "Historical review snapshot; future root notice edits permitted"
+      },
+      {
+        "path": "docs/compatibility/responses-sdk-reference-setup.md",
+        "bytes": 10192,
+        "sha256": "142073860544f8cf07a32997cd841f1980ac92255506fb16141d052543ff37b6",
+        "meaning": "Historical review snapshot; future root notice edits permitted"
+      },
+      {
+        "path": "docs/compatibility/released-ai-package.md",
+        "bytes": 7345,
+        "sha256": "1d29a1008f2b023c9d98b05b0d75ad6efc1a96889f99bf9383ca1bff777bdef8",
+        "meaning": "Historical review snapshot; future root notice edits permitted"
+      }
+    ],
+    "piCompleteMitTextRetained": true,
+    "incorrectPiApacheAttributionFound": false,
+    "reviewScope": "All Apache lines in docs and compatibility JSON concern standard-webhooks or OpenAI SDK",
+    "updatesReservedForRoot": true
+  },
+  "gaps": [
+    {
+      "id": "SW-PACKAGED-NOTICE",
+      "scope": "standardwebhooks1.1.1",
+      "status": "OPEN",
+      "evidenceProgress": "Exact parent libraries MIT notice now retained at registry-reported GitHead; archive notice absence remains.",
+      "action": "Root reviews scoped source grant/version association and notice delivery. Preserve immutable original receipt. Root Apache text is separate from the MIT notice."
+    },
+    {
+      "id": "PI-AI-PACKAGED-NOTICE",
+      "scope": "pi-ai0.99.1",
+      "status": "OPEN",
+      "action": "Review intended archive redistribution and delivery of pinned complete Pi MIT notice; README/metadata declarations contain no complete grant."
+    },
+    {
+      "id": "RELEASED-DEPENDENCY-CLOSURE",
+      "scope": "Released13Pi packages and full dependency graph",
+      "status": "OPEN",
+      "action": "12otherPi tarballs and full provider/native transitive graph are not acquired here. Determine intended artifacts and inventory exact archives/notices."
+    },
+    {
+      "id": "GENERATED-DATA-SCOPE",
+      "scope": "42providers/1592models",
+      "status": "OPEN",
+      "action": "Review generator inputs and dataset/provider terms against frozen publisher data; artifact equality is not a separate data-license review."
+    },
+    {
+      "id": "NATIVE-ASSET-SCOPE",
+      "scope": "Pinned .node/Wasm/ZIP assets",
+      "status": "OPEN",
+      "action": "Establish asset source/build/dependency notices and distribution scope; no asset executed or admitted to native runtime here."
+    },
+    {
+      "id": "SIGNATURE-ATTESTATION",
+      "scope": "Official artifact publisher metadata",
+      "status": "OPEN",
+      "action": "SRI/SHA matches exact observed bytes. Verify declared signatures/provenance separately if required; none verified here."
+    },
+    {
+      "id": "DISTRIBUTION-SCOPE",
+      "scope": "Native ports, evidence archives and packaged product",
+      "status": "OPEN",
+      "action": "Review actual release contents/notices, including SDK vendored BSD/ISC/MIT texts and native ports; root/gate owner decides legal/redistribution closure."
+    }
+  ],
+  "summary": {
+    "distinctDevelopmentPackages": 21,
+    "distinctInstalledFiles": 7929,
+    "packagesWithPackagedRootNotice": 20,
+    "packagesWithoutPackagedRootNotice": [
+      "standardwebhooks@1.1.1"
+    ],
+    "packagedNamedNoticeFiles": 24,
+    "releasedPackageMetadataRows": 13,
+    "releasedNpmArchivesAcquired": 1,
+    "newPublicReads": 6,
+    "newDependenciesInstalled": 0,
+    "newProviderCalls": 0
+  },
+  "limitations": [
+    "Evidence classification is not legal approval.",
+    "Historical qualification-pending receipts retained unchanged; later runtime captures have separate locks.",
+    "Only acquired dependency profiles inventoried, not whole npm/provider ecosystem.",
+    "No existing baseline/golden/source/SDK/notice changes.",
+    "P1-02 and eight phase gate decisions remain root-owned."
+  ]
+}

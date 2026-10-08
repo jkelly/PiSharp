@@ -1,0 +1,1339 @@
+{
+  "schemaVersion": 1,
+  "environmentPins": {
+    "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "sourceFingerprint": {
+      "canonicalGit": {
+        "files": 2093,
+        "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+      },
+      "acquiredCheckout": {
+        "files": 2093,
+        "sha256": "676a5df7a526ab0fb6a78f734b57093bb7571913fc17251d02cb0c84527dcf21"
+      },
+      "declaredCheckoutConversions": [
+        {
+          "path": "pi-test.bat",
+          "eol": "crlf",
+          "canonicalSha256": "d454a5a0e203d9009283b887720472b022b0853380758b11419c8547a32dbb88",
+          "checkoutSha256": "c9d3430a614cabfaae5a9e97259643ab9041629bc8253f58f22579a5b6d9c448"
+        },
+        {
+          "path": "pi-test.ps1",
+          "eol": "crlf",
+          "canonicalSha256": "9f76d37f75b1d6f03be14d8bce3ca05331c4b09b8003a53329d8e4fe942792ef",
+          "checkoutSha256": "9b97fa3be6582e935f43865599d21bbb216e5ffe2cb1eb198c77e7298490b895"
+        }
+      ]
+    },
+    "approvedOracle": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-anthropic-sdk-oracle-v0.99.1-reviewed",
+    "runtime": {
+      "version": "v24.19.0",
+      "absoluteExecutable": "P:\\PiSharp\\root\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe",
+      "sha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+      "reuseExisting": true,
+      "sourceExecution": "Node native TypeScript stripping; unchanged whole packages/ai/src/api/anthropic-messages.ts and canonical experimental source resolver"
+    },
+    "nodeVersions": {
+      "node": "24.19.0",
+      "openssl": "3.5.7",
+      "v8": "13.6.233.17-node.51",
+      "uv": "1.52.1",
+      "unicode": "17.0",
+      "icu": "78.3"
+    },
+    "os": {
+      "platform": "win32",
+      "release": "10.0.26200",
+      "architecture": "x64",
+      "version": "Windows 11 Pro"
+    },
+    "setupReceipt": {
+      "path": ".pisharp-anthropic-sdk-restored.json",
+      "bytes": 21806,
+      "sha256": "e11d383b6a5ecb736c89523c065d96e540b2392108b1c23ffa315113bc28c1c9"
+    },
+    "publicSetupReceipt": {
+      "path": "compatibility/anthropic-oracle-setup.json",
+      "bytes": 21806,
+      "sha256": "e11d383b6a5ecb736c89523c065d96e540b2392108b1c23ffa315113bc28c1c9",
+      "rule": "Root publishes verbatim actual restored receipt; no recomposed license closure"
+    },
+    "preparedReceipt": {
+      "path": ".pisharp-anthropic-sdk-prepared.json",
+      "bytes": 2876,
+      "sha256": "02c7e9c302f2b784302c954db98cb6a7ea3e84e6d8e9b74f682ef72c233b11f7"
+    },
+    "projectionManifestSha256": "40a2ff61ad07ba6f20b4d2abf16fb22feba1a7c0f98c426b5c758d1db46ef707",
+    "projectionLockSha256": "f5f66beb935473476041d6b94010f9a7e717b272731ec3620503c54efbdf0a8b",
+    "installedPackages": [
+      {
+        "name": "@anthropic-ai/sdk",
+        "version": "0.124.0",
+        "files": {
+          "files": 1735,
+          "sha256": "36567957c4382a811f1cc2cb64b0f99715569ccf974aa4ae3c11bf2e4b9f3ed3"
+        },
+        "archiveSha256": "a9d9894658fc4e4ca44e982eb603b59945d01c24a5510965c067e1c94fdaaeb2",
+        "manifestSha256": "e9692cceae09a61d4168fca1fd47c1dd66b3798891b4cbe74cd21c331c20708a",
+        "dependencyDeclarations": {
+          "standardwebhooks": "^1.0.0",
+          "json-schema-to-ts": "^3.1.1"
+        },
+        "peerDependencies": {
+          "zod": "^3.25.0 || ^4.0.0"
+        },
+        "peerDependenciesMeta": {
+          "zod": {
+            "optional": true
+          }
+        },
+        "binDeclarations": {
+          "anthropic-ai-sdk": "bin/cli"
+        },
+        "licenses": [
+          {
+            "path": "LICENSE",
+            "bytes": 1056,
+            "sha256": "8bf96984ff8bcfae7e48cae76a529e8a25317ba9e02abf7fd3cc64fdf95657a6",
+            "utf8Text": "Copyright 2023 Anthropic, PBC.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\n"
+          },
+          {
+            "path": "src/internal/qs/LICENSE.md",
+            "bytes": 1588,
+            "sha256": "d8c77eaffed7f1f874b97f66ee47a557ae24fd59bae8ae14f9b1b84f26a94d2f",
+            "utf8Text": "BSD 3-Clause License\n\nCopyright (c) 2014, Nathan LaFreniere and other [contributors](https://github.com/puruvj/neoqs/graphs/contributors) All rights reserved.\n\nRedistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:\n\n1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.\n\n2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.\n\n3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
+          }
+        ],
+        "licenseEvidence": "packaged-root-license-text",
+        "packagedRootLicenseVerified": true,
+        "redistributionLicenseClosure": false,
+        "licenseReviewStatus": "P1-02 HOLD",
+        "developmentOnlyLicenseAdmission": null,
+        "integrity": "sha512-cN5O8i9UVxHeOQAzj/XjshWXG8KiibJDw9OGpH2Z/eR3n/RBxdoLxDJOcfqAJWvjaMDFfHTBADU04hWRJVkDyA==",
+        "archiveFile": "anthropic-ai-sdk-0.124.0.tgz"
+      },
+      {
+        "name": "@babel/runtime",
+        "version": "7.29.2",
+        "files": {
+          "files": 249,
+          "sha256": "b5a0ead572dacff9184ad5be4f720abaaa4137741fd8d3861b5151f086fc484a"
+        },
+        "archiveSha256": "91d6dda69e8514cca05e8bda7f6fe19b80f9a405fbd88c21e4eccc54f10f87e5",
+        "manifestSha256": "a34bfb8ab99545a10b211e8918e4a58cc66740366644298cb8efa3b766537ee0",
+        "dependencyDeclarations": {},
+        "peerDependencies": {},
+        "peerDependenciesMeta": {},
+        "binDeclarations": {},
+        "licenses": [
+          {
+            "path": "LICENSE",
+            "bytes": 1106,
+            "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76",
+            "utf8Text": "MIT License\n\nCopyright (c) 2014-present Sebastian McKenzie and other contributors\n\nPermission is hereby granted, free of charge, to any person obtaining\na copy of this software and associated documentation files (the\n\"Software\"), to deal in the Software without restriction, including\nwithout limitation the rights to use, copy, modify, merge, publish,\ndistribute, sublicense, and/or sell copies of the Software, and to\npermit persons to whom the Software is furnished to do so, subject to\nthe following conditions:\n\nThe above copyright notice and this permission notice shall be\nincluded in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND\nNONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE\nLIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION\nOF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\nWITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n"
+          }
+        ],
+        "licenseEvidence": "packaged-root-license-text",
+        "packagedRootLicenseVerified": true,
+        "redistributionLicenseClosure": false,
+        "licenseReviewStatus": "P1-02 HOLD",
+        "developmentOnlyLicenseAdmission": null,
+        "integrity": "sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g==",
+        "archiveFile": "babel-runtime-7.29.2.tgz"
+      },
+      {
+        "name": "@stablelib/base64",
+        "version": "1.0.1",
+        "files": {
+          "files": 15,
+          "sha256": "2320b911e9b77d2ade070cd674de1188ff7165f933de49847ddfd204bb4b1f98"
+        },
+        "archiveSha256": "0130711d2e0d3f87436c7825db1f35bd6134fba2eda64b0df43d781f9b6a596a",
+        "manifestSha256": "7821116cc9ab0fb2542c1407ac5e34ff78bcc70b2d1295b753a9ea16134b3df7",
+        "dependencyDeclarations": {},
+        "peerDependencies": {},
+        "peerDependenciesMeta": {},
+        "binDeclarations": {},
+        "licenses": [
+          {
+            "path": "LICENSE",
+            "bytes": 1110,
+            "sha256": "1605b77bebe018db1fc27bd22fbcdeed1335c617937a124299a8b042b42b0fb6",
+            "utf8Text": "This software is licensed under the MIT license:\n\nCopyright (C) 2016 Dmitry Chestnykh\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of\nthis software and associated documentation files (the \"Software\"), to deal in\nthe Software without restriction, including without limitation the rights to\nuse, copy, modify, merge, publish, distribute, sublicense, and/or sell copies\nof the Software, and to permit persons to whom the Software is furnished to do\nso, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+          }
+        ],
+        "licenseEvidence": "packaged-root-license-text",
+        "packagedRootLicenseVerified": true,
+        "redistributionLicenseClosure": false,
+        "licenseReviewStatus": "P1-02 HOLD",
+        "developmentOnlyLicenseAdmission": null,
+        "integrity": "sha512-1bnPQqSxSuc3Ii6MhBysoWCg58j97aUjuCSZrGSmDxNqtytIi0k8utUenAwTZN4V5mXXYGsVUI9zeBqy+jBOSQ==",
+        "archiveFile": "stablelib-base64-1.0.1.tgz"
+      },
+      {
+        "name": "fast-sha256",
+        "version": "1.3.0",
+        "files": {
+          "files": 6,
+          "sha256": "66727f88b0cb099464e8e9ecd9e737cb1ba16d57fd0eb16af7c601d776e4686a"
+        },
+        "archiveSha256": "4f897ea2594dc9cfb1250e7d4d0f65b4f105952a802fff2d06990bf1dc2c84f6",
+        "manifestSha256": "d312f1993364bfb4f217f820ff7f9e0a6b1d87930bfc2605138ab660e8d29806",
+        "dependencyDeclarations": {},
+        "peerDependencies": {},
+        "peerDependenciesMeta": {},
+        "binDeclarations": {},
+        "licenses": [
+          {
+            "path": "LICENSE",
+            "bytes": 1210,
+            "sha256": "88d9b4eb60579c191ec391ca04c16130572d7eedc4a86daa58bf28c6e14c9bcd",
+            "utf8Text": "This is free and unencumbered software released into the public domain.\n\nAnyone is free to copy, modify, publish, use, compile, sell, or\ndistribute this software, either in source code form or as a compiled\nbinary, for any purpose, commercial or non-commercial, and by any\nmeans.\n\nIn jurisdictions that recognize copyright laws, the author or authors\nof this software dedicate any and all copyright interest in the\nsoftware to the public domain. We make this dedication for the benefit\nof the public at large and to the detriment of our heirs and\nsuccessors. We intend this dedication to be an overt act of\nrelinquishment in perpetuity of all present and future rights to this\nsoftware under copyright law.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.\nIN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR\nOTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,\nARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR\nOTHER DEALINGS IN THE SOFTWARE.\n\nFor more information, please refer to <http://unlicense.org>\n"
+          }
+        ],
+        "licenseEvidence": "packaged-root-license-text",
+        "packagedRootLicenseVerified": true,
+        "redistributionLicenseClosure": false,
+        "licenseReviewStatus": "P1-02 HOLD",
+        "developmentOnlyLicenseAdmission": null,
+        "integrity": "sha512-n11RGP/lrWEFI/bWdygLxhI+pVeo1ZYIVwvvPkW7azl/rOy+F3HYRZ2K5zeE9mmkhQppyv9sQFx0JM9UabnpPQ==",
+        "archiveFile": "fast-sha256-1.3.0.tgz"
+      },
+      {
+        "name": "json-schema-to-ts",
+        "version": "3.1.1",
+        "files": {
+          "files": 267,
+          "sha256": "5bb4712de7619bc9b8b7078f50f3e69a8c48774da81666d5c7e3820e89e15b51"
+        },
+        "archiveSha256": "f6f34e4e453aca8753e9f644ad4fa297ae7011030bfff9e909bf34e31c4cc364",
+        "manifestSha256": "9439fa620a0f7a930950239ec4445d902c7d29590cddf0985a83bea531b2e81e",
+        "dependencyDeclarations": {
+          "@babel/runtime": "^7.18.3",
+          "ts-algebra": "^2.0.0"
+        },
+        "peerDependencies": {},
+        "peerDependenciesMeta": {},
+        "binDeclarations": {},
+        "licenses": [
+          {
+            "path": "LICENSE",
+            "bytes": 1071,
+            "sha256": "18a2bfd070b08bd1cc538c90f59989a9523e070e72fe9a9068593c3e82f44fa7",
+            "utf8Text": "MIT License\n\nCopyright (c) 2020 Thomas Aribart\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+          }
+        ],
+        "licenseEvidence": "packaged-root-license-text",
+        "packagedRootLicenseVerified": true,
+        "redistributionLicenseClosure": false,
+        "licenseReviewStatus": "P1-02 HOLD",
+        "developmentOnlyLicenseAdmission": null,
+        "integrity": "sha512-+DWg8jCJG2TEnpy7kOm/7/AxaYoaRbjVB4LFZLySZlWn8exGs3A4OLJR966cVvU26N7X9TWxl+Jsw7dzAqKT6g==",
+        "archiveFile": "json-schema-to-ts-3.1.1.tgz"
+      },
+      {
+        "name": "partial-json",
+        "version": "0.1.7",
+        "files": {
+          "files": 9,
+          "sha256": "b1c730b893ef274e6d457f23eebc9c39162cd6aaf777247942b9ad0cc1f1cb8e"
+        },
+        "archiveSha256": "30eafeed6fdc25fb2ca24f34c37796d9f98f0bf5e156452b98a2c356762f6322",
+        "manifestSha256": "42b3ae6c99ec959249f8eb4d3da7fdb44ec1f96ec627fa7f9ca5487a4e80963f",
+        "dependencyDeclarations": {},
+        "peerDependencies": {},
+        "peerDependenciesMeta": {},
+        "binDeclarations": {},
+        "licenses": [
+          {
+            "path": "LICENSE",
+            "bytes": 1075,
+            "sha256": "cd519ad3d7e012427f978dfb2e3b92ee403d189d7b859ba6bf68fd7e12ca456f",
+            "utf8Text": "MIT License\n\nCopyright (c) 2023 Promplate Dev Team\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+          }
+        ],
+        "licenseEvidence": "packaged-root-license-text",
+        "packagedRootLicenseVerified": true,
+        "redistributionLicenseClosure": false,
+        "licenseReviewStatus": "P1-02 HOLD",
+        "developmentOnlyLicenseAdmission": null,
+        "integrity": "sha512-Njv/59hHaokb/hRUjce3Hdv12wd60MtM9Z5Olmn+nehe0QDAsRtRbJPvJ0Z91TusF0SuZRIvnM+S4l6EIP8leA==",
+        "archiveFile": "partial-json-0.1.7.tgz"
+      },
+      {
+        "name": "standardwebhooks",
+        "version": "1.1.1",
+        "files": {
+          "files": 8,
+          "sha256": "03977b2aa436611587ee6acf684c1d68b1fc348d7f301f7c06ed293c50be9f9b"
+        },
+        "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+        "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+        "dependencyDeclarations": {
+          "@stablelib/base64": "^1.0.0",
+          "fast-sha256": "^1.3.0"
+        },
+        "peerDependencies": {},
+        "peerDependenciesMeta": {},
+        "binDeclarations": {},
+        "licenses": [],
+        "licenseEvidence": "declared-MIT-only",
+        "packagedRootLicenseVerified": false,
+        "redistributionLicenseClosure": false,
+        "licenseReviewStatus": "P1-02 HOLD",
+        "developmentOnlyLicenseAdmission": {
+          "name": "standardwebhooks",
+          "version": "1.1.1",
+          "archiveFile": "standardwebhooks-1.1.1.tgz",
+          "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+          "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+          "scope": "task-local-development-only",
+          "declaredLicense": "MIT",
+          "licenseEvidence": "declared-MIT-only",
+          "licenses": [],
+          "packagedRootLicenseVerified": false,
+          "redistributionLicenseClosure": false,
+          "licenseReviewStatus": "P1-02 HOLD"
+        },
+        "integrity": "sha512-bCbX9ZEyFkWPsRz7Bl3NuQUJohmwGSev/yhr7vhaGPlc4AfIrspIRa6cPTBuI1ItmrTDJ4d/S2hCsfe4+vQGnQ==",
+        "archiveFile": "standardwebhooks-1.1.1.tgz"
+      },
+      {
+        "name": "ts-algebra",
+        "version": "2.0.0",
+        "files": {
+          "files": 104,
+          "sha256": "de3fa195eec4e650f9798665843d8243cb341df9a256d99752ac9357cdfe005a"
+        },
+        "archiveSha256": "f4c3968fd81eb7952e94860eb233558c820397d999149b6e2c689abaa34bc65c",
+        "manifestSha256": "6c6f692e1a3ad9943c77b5fa4eb04b0f63cb708353c67dcc5d86b35b2f7e5c30",
+        "dependencyDeclarations": {},
+        "peerDependencies": {},
+        "peerDependenciesMeta": {},
+        "binDeclarations": {},
+        "licenses": [
+          {
+            "path": "LICENSE",
+            "bytes": 1071,
+            "sha256": "18a2bfd070b08bd1cc538c90f59989a9523e070e72fe9a9068593c3e82f44fa7",
+            "utf8Text": "MIT License\n\nCopyright (c) 2020 Thomas Aribart\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+          }
+        ],
+        "licenseEvidence": "packaged-root-license-text",
+        "packagedRootLicenseVerified": true,
+        "redistributionLicenseClosure": false,
+        "licenseReviewStatus": "P1-02 HOLD",
+        "developmentOnlyLicenseAdmission": null,
+        "integrity": "sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw==",
+        "archiveFile": "ts-algebra-2.0.0.tgz"
+      }
+    ],
+    "licenseStatus": {
+      "licenseReviewStatus": "P1-02 HOLD",
+      "redistributionLicenseClosure": false,
+      "developmentOnlyLicenseAdmission": {
+        "name": "standardwebhooks",
+        "version": "1.1.1",
+        "archiveFile": "standardwebhooks-1.1.1.tgz",
+        "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+        "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+        "scope": "task-local-development-only",
+        "declaredLicense": "MIT",
+        "licenseEvidence": "declared-MIT-only",
+        "licenses": [],
+        "packagedRootLicenseVerified": false,
+        "redistributionLicenseClosure": false,
+        "licenseReviewStatus": "P1-02 HOLD"
+      }
+    }
+  },
+  "harnessFiles": [
+    {
+      "path": "tools/PiReferenceRunner/capture-anthropic-sdk.mjs",
+      "bytes": 8410,
+      "sha256": "cb921b0ac5a68f3b3cf9a36040c8467c3d80208ed6c2e444cc84ee20d37efcdd"
+    },
+    {
+      "path": "tools/PiReferenceRunner/run-anthropic-sdk.mjs",
+      "bytes": 19358,
+      "sha256": "0a74f1946bb02fc7d5faec09a64cc703d9c3ca39c03333be2794d256acd23348"
+    },
+    {
+      "path": "tools/PiReferenceRunner/anthropic-sdk-inputs.json",
+      "bytes": 8570,
+      "sha256": "80ab9885440ccca2e01ed421b89a17899f3ecd25f92a558b809ca247921486e4"
+    },
+    {
+      "path": "compatibility/anthropic-sdk-reference.plan.json",
+      "bytes": 25475,
+      "sha256": "a8f0d82ad2a6b5def3e6687198b103c4bc90bb1b9629ae4f009dd1d8f68dadcc"
+    },
+    {
+      "path": "tools/PiReferenceRunner/anthropic-sdk-install-plan.json",
+      "bytes": 27122,
+      "sha256": "8e3a8908257832f2b736680f676160f60f52c77c9c10f790160ffbb431684682"
+    },
+    {
+      "path": "tools/PiReferenceRunner/setup-anthropic-sdk-oracle.mjs",
+      "bytes": 40943,
+      "sha256": "d6098e4f71162da3cf57970856b827735c3817cdb4e6b449ff7884821f9c217e"
+    },
+    {
+      "path": "tools/PiReferenceRunner/setup-responses-sdk-oracle.mjs",
+      "bytes": 34806,
+      "sha256": "1da4ce53bf9b7ccc462bad540294353fd7ab42ba35ca171d3921916409d2b513"
+    },
+    {
+      "path": "tools/PiReferenceRunner/full-preload.mjs",
+      "bytes": 1145,
+      "sha256": "e1f62a2048bc484a162085430a5afb6f88547d78049b6f29b2a0e4f65fcd79e2"
+    },
+    {
+      "path": "tools/PiReferenceRunner/offline-guard.mjs",
+      "bytes": 784,
+      "sha256": "ae3741bdce496451bd04afcf8628df6ddc5bc5cfad8af6ee5e52cbc7b065a094"
+    },
+    {
+      "path": "tools/CompatibilityReport/raw-json.mjs",
+      "bytes": 3665,
+      "sha256": "58c378290d0be114e740dadda934d9a57e16a9321ae05eb8e34320e11d561ee9"
+    }
+  ],
+  "loadedModules": [
+    {
+      "path": "node_modules/@anthropic-ai/sdk/_vendor/partial-json-parser/parser.mjs",
+      "sha256": "717f9403f2d3ee0f2077aeb7f0ca7eaff7cc9bcdbb054ac23c6c0361fa03cd1f",
+      "bytes": 7062
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/client.mjs",
+      "sha256": "f77e2c34b678382b2e55e4b31983068a447db67f5541b2ef7bd9102016df19c6",
+      "bytes": 48728
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/core/api-promise.mjs",
+      "sha256": "4062f80029e688182ef47909d768337c7d5724f4a30c798d35d5827892cb3561",
+      "bytes": 3203
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/core/credentials.mjs",
+      "sha256": "594fdd3a0b1b78447885b3b7e1e5576ba29cd237076a31c85caa4ea08d63d5e7",
+      "bytes": 11327
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/core/error.mjs",
+      "sha256": "26576fa51ed832c6924d23695eb34eec3027e214edb102a05478f62d5c505882",
+      "bytes": 4135
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/core/middleware.mjs",
+      "sha256": "3916bfbf35c16490a7c2d21c86fa04510cd95f4f7cf55f5863aa9532a03a752a",
+      "bytes": 7493
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/core/pagination.mjs",
+      "sha256": "1eb9e4645d2a180692335447de30417ea76dd37d25f475f9ffc26b2fab7618bb",
+      "bytes": 5964
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/core/resource.mjs",
+      "sha256": "6e772adc3a84765cdee51b5a769f89a3b7d6a6d4783006e5073dd5436a4a1741",
+      "bytes": 216
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/core/streaming.mjs",
+      "sha256": "610ce160954b42b5bb48dbacb2f793c43b90c9f05335df146b03fd610a7a446a",
+      "bytes": 13982
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/core/uploads.mjs",
+      "sha256": "71090a38986a8675fb200b78d8328864b8ec51ba6c732df3ae75d8da08695f43",
+      "bytes": 86
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/error.mjs",
+      "sha256": "29df7955955213e97efc6f3c51f5fd27d8872515561c8dab6bf38456bb6cc09f",
+      "bytes": 120
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/index.mjs",
+      "sha256": "1445c7db2b082175e415bef0547bfc4a185b943d784a4d7f4c6dbb40378d89e3",
+      "bytes": 796
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/constants.mjs",
+      "sha256": "275830709167860200f8a5e909b4665cbea8e76c1be891c00c035f1a352b7b50",
+      "bytes": 320
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/decoders/jsonl.mjs",
+      "sha256": "b8351c44149e0c9764a376fd1b4ad7190b9c3f7f7951938a452a5436ccff4408",
+      "bytes": 1411
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/decoders/line.mjs",
+      "sha256": "cadc186f2fe6e2afca03a5d73d6a2ed85385bce20352dcdfcacfd9e52876e668",
+      "bytes": 5181
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/detect-platform.mjs",
+      "sha256": "a601a63b032e017f9fd42cc1afeb33cfb798a8e7023c1aaf16149630d0e98cd1",
+      "bytes": 5936
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/errors.mjs",
+      "sha256": "22ceebfbe35ccb629b3b62a60865a09b8c769a5c1c88e09720af5bfbd5906e84",
+      "bytes": 1545
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/headers.mjs",
+      "sha256": "0f888783e5c89f92c731aa13469e6de318c6dfd5f15e1d289ffaf9d09ba19ad9",
+      "bytes": 4223
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/message-stream-utils.mjs",
+      "sha256": "2d638bb0098c809e8720887e0c0ca38d9a2bf2e480ec7e7432e9e93b1de9cff3",
+      "bytes": 995
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/parse.mjs",
+      "sha256": "128556af202033d663dbd13eda8414f641eba70407568619d70f63709ef4038a",
+      "bytes": 2876
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/qs/formats.mjs",
+      "sha256": "af5322285f5150c90c40369da3ad611f8410b960f8a432a25a3caefe3eb5613f",
+      "bytes": 311
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/qs/stringify.mjs",
+      "sha256": "4f99f4c8b5cffbcf708929bd595526a789ef2e86ff952d8981102c695010e9a3",
+      "bytes": 11308
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/qs/utils.mjs",
+      "sha256": "fea97e491a986692f349f1965e990f2812ade5917f63370a9baa1d65b36d3c99",
+      "bytes": 7110
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/request-options.mjs",
+      "sha256": "aa71d70710b1efd486a42c3d8da7ec5232458e93bd989c6de334a881db533ac3",
+      "bytes": 741
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/request-signal.mjs",
+      "sha256": "a12a285ba86a7cb662ad2e1438e0d171d2b6e28a5a7e45ca3ac231cd5530d97e",
+      "bytes": 2230
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/shims.mjs",
+      "sha256": "a9d1e6b053122d3e5958fb708524fcdf56a82bb786dcbb8f23cb1c7eb062a0a8",
+      "bytes": 3128
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/stainless-helper-header.mjs",
+      "sha256": "43e13bfbfff27217b8c2010f42c358a7a17cdfc85bac04336a4da9f5b267cb39",
+      "bytes": 3169
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/to-file.mjs",
+      "sha256": "8c95eecd6eebe2dc45d916f3175913201be6129cb23027a295adce1eebd35b19",
+      "bytes": 3786
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/tslib.mjs",
+      "sha256": "52ada32386fe604ab3c2fce595fa10524097f1b2029012f6ecc2e3d61904bc64",
+      "bytes": 1080
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/uploads.mjs",
+      "sha256": "a68b0cf6d705d0f344fedd4456bb95d7e68bdf30df48ebdc3ea5d9fa913f3034",
+      "bytes": 6261
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils.mjs",
+      "sha256": "a97864924387d64be359fe70b6f3870c3f90415dd373913abdeef107e915ae96",
+      "bytes": 363
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/abort.mjs",
+      "sha256": "9cdecac20d32d1ed15673fec476367220a56cf8ebc5dd52c52929bc7adf9f701",
+      "bytes": 916
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/async-queue.mjs",
+      "sha256": "6047af2b3a1137df381a8af1fbe2f75bfb5c2c7646a51849bd1ec5e87a9bfbc5",
+      "bytes": 3347
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/backoff.mjs",
+      "sha256": "38aa44e81342dad42135945869a2f263ed7fcc913b2d19331d7193a749d2c960",
+      "bytes": 1554
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/base64.mjs",
+      "sha256": "f7f0c00183ee575d2c6f3b927c7c17bf5a0ffd92677f4ef768ee6b5972500ae8",
+      "bytes": 1281
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/bytes.mjs",
+      "sha256": "63f10e3469d0bf8fca5dbce75660819ad958b8a97c5c5685120003d6ffdadf9d",
+      "bytes": 766
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/env.mjs",
+      "sha256": "528c56aef7b4b936db60b96bae662a39968a6f27c36b59342a0a35a9d4878686",
+      "bytes": 610
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/log.mjs",
+      "sha256": "b33036440eaf257a0660d56e379648ec959e7d628cd7ae9fc9144a0febae34ce",
+      "bytes": 3621
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/path.mjs",
+      "sha256": "8d8555a8ec7a524f84593252a71707f94b97219abc50d5ddeb9a313e0ebcd851",
+      "bytes": 3302
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/promise.mjs",
+      "sha256": "b4de6a560896fc8f9daade77f0ab0338049fa447237e9788bb9be1280159f18b",
+      "bytes": 430
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/query.mjs",
+      "sha256": "2ab1927d898345a5f54ff02b3f7e6a553e2f78c22d0a4765f0e3077ac9380b7b",
+      "bytes": 267
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/sleep.mjs",
+      "sha256": "e4bac63ab3265181b31e27c9499db988d021707309a7f7a8e433f55aee0d93b2",
+      "bytes": 949
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/time.mjs",
+      "sha256": "19c4ac4cbb0eb1dffe4519ae97e0db81dff7c4d3ede1be8595ce1bdc717f7338",
+      "bytes": 153
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/uuid.mjs",
+      "sha256": "1b6a812f51ee1a4b42627539b133c0bcdc3a46da9d1657a9d0f3da04d2be7f99",
+      "bytes": 630
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/internal/utils/values.mjs",
+      "sha256": "7ccf449e86e2a75c331b15a8d009059c5a536d0ac8e639df0eeea7f69b3c94d1",
+      "bytes": 3383
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/BetaMessageStream.mjs",
+      "sha256": "ed420a691192f815f05360257bdc0d03c01c8e633f7d29f661fbb24b78229963",
+      "bytes": 33572
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/MessageStream.mjs",
+      "sha256": "54ac9d904fc4b98351feb816d3016ad3c4a71fa2f173cb05a7a3ac23ebea9e61",
+      "bytes": 29826
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/beta-parser.mjs",
+      "sha256": "c20fe2c65223b5a1284b90c0f12d951d935ccc1bfc8562fd484255f158fdc670",
+      "bytes": 2796
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/credentials/credential-chain.mjs",
+      "sha256": "b5b0c7d941d60ccff60b96032f93c9a8f0048ac3352c4179c512550ba73b0d33",
+      "bytes": 10188
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/credentials/identity-token.mjs",
+      "sha256": "d1d433dd7ca51d7b9e423e41debf8a14da1200f82bb302ec5b53f9ec965427b8",
+      "bytes": 1118
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/credentials/oidc-federation.mjs",
+      "sha256": "076aedf8993c689ea2898b75f15518b6ff2ee79012420dc6281b45b0cf114146",
+      "bytes": 4185
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/credentials/token-cache.mjs",
+      "sha256": "0fc4caef05b3e656188c2991dde2de560ababdd868d91c75e8c2364d5176191c",
+      "bytes": 4164
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/credentials/types.mjs",
+      "sha256": "611b406723f6c5965b1ec832c7aff49850cac8f6b3bf0c0eb2b8711f52772394",
+      "bytes": 8927
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/credentials/user-oauth.mjs",
+      "sha256": "749608265e11f7b9ececc0254631fd347e53e0f007301564db348e9c6df93950",
+      "bytes": 4765
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/environments/poller.mjs",
+      "sha256": "33619b31667d6d3ce095e7e8a77a5d9a12d56b55d737acf17a46f3d78f681061",
+      "bytes": 12482
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/environments/worker.mjs",
+      "sha256": "c9b403c77ceef4ab54ae43cda1a17984029322f4898328726d44879ea4dc9d10",
+      "bytes": 28936
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/helper-client.mjs",
+      "sha256": "bb17f2f177ccaabcbb7e2fc155a5ff862f5d983e6e00dd430cef97f95512edd7",
+      "bytes": 2781
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/middleware.mjs",
+      "sha256": "e4766d62d80b3ee8ebf04d462057732b3eda4de6f59ce626012daa1b7622f485",
+      "bytes": 35317
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/parser.mjs",
+      "sha256": "d2e19ceb1abe3109243014eb6bf81ebf30dab22c293699beecad64225cc8014b",
+      "bytes": 2012
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/tools/BetaRunnableTool.mjs",
+      "sha256": "2d85195871a2db7e26a4ce4bf3e6f2c78d8b5ea2749563b0e9c0870b078ab8a6",
+      "bytes": 1097
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/tools/BetaToolRunner.mjs",
+      "sha256": "9ddf0ae3386be673fba347ce80dc34be6fa28a1574cd1cac1078db7d5b9a024c",
+      "bytes": 24719
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/tools/CompactionControl.mjs",
+      "sha256": "22771a5ec94530183fe165523e7ceecdb5761b01cfb71d4ba61757bd6cf7c8a8",
+      "bytes": 1460
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/tools/SessionToolRunner.mjs",
+      "sha256": "c85cc45ec9232cebf0ff4c647365a2f9edab1e2ae427a652a388fbbca732153a",
+      "bytes": 42016
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/lib/tools/ToolError.mjs",
+      "sha256": "8be0e3c0a95d98d75761986c3c1d6a6be5424555de924f932ba003375cd9934c",
+      "bytes": 1117
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/agents/agents.mjs",
+      "sha256": "de2d90514cc9acfc617e0d2357f3eb6a44d07ce5a9a5a22c08521607707b21e0",
+      "bytes": 4594
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/agents/versions.mjs",
+      "sha256": "ba40f4434074e0d8e86ee4397dee2f38eec7ffe86d780b4ed95d430d43fd2da8",
+      "bytes": 1310
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/beta.mjs",
+      "sha256": "e796e55efe37b144f64b89a5a60df2681ef6742e662dd78ccf44c345a37aab8d",
+      "bytes": 3446
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/deployment-runs.mjs",
+      "sha256": "872df10ea2ef45366853a59eed41b4799f8e6e6772ff060d45f63fffc20e2435",
+      "bytes": 2040
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/deployments.mjs",
+      "sha256": "a346a446e1b0020731546bdf15af1a6d00faccbd7c68be82f86d1118932a9111",
+      "bytes": 7089
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/dreams.mjs",
+      "sha256": "79d8057d4fc1c947a71e7e844f1559927fdeaeffc0bea9164cbc3b88fe71895b",
+      "bytes": 4088
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/environments/environments.mjs",
+      "sha256": "7f5a8bf31e6289f59e46cf681a05a352339e1507fb5e1f7baf278916f4ec8413",
+      "bytes": 5607
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/environments/work.mjs",
+      "sha256": "66f6b02ed4981438ad4ea31214cea4181ad6982cb299cf31405596f179f8b4a6",
+      "bytes": 10328
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/files.mjs",
+      "sha256": "36c9d5009ffd1580ce99caa036d5566a39ff96a59dc83b9ed014398b40cd27f0",
+      "bytes": 4556
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/memory-stores/memories.mjs",
+      "sha256": "080190cc887233b28e01f1208c8dd506c5bd5994be32289d28ce702a8d977cf8",
+      "bytes": 4937
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/memory-stores/memory-stores.mjs",
+      "sha256": "fb4c2346a5d507bb5a1bfe5e2c545076d4f18855de95210f47a0111f52fb655a",
+      "bytes": 5569
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/memory-stores/memory-versions.mjs",
+      "sha256": "bacedf5b62419ff66412920d7c353bb6c63574008bec4c5a1008141f9156832b",
+      "bytes": 3194
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/messages/batches.mjs",
+      "sha256": "f961a78390b6663da1d79414f43d7ae8671dcd94bb17c6588bacbd98e50188d1",
+      "bytes": 8574
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/messages/messages.mjs",
+      "sha256": "80a25b14fec809d4d78452f7c933a833688a4c8e7867b9ded621f1544a2e2abd",
+      "bytes": 6910
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/models.mjs",
+      "sha256": "d13f84cf452abca6db7507ed79a7c93a03c36e81579c822b06f56788152a2437",
+      "bytes": 2236
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/api-keys.mjs",
+      "sha256": "494664d706b37666afaf1a2bc403d1e75b47d2f9d759a212bc5fc0c85f6dc8f4",
+      "bytes": 1466
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/compliance-settings.mjs",
+      "sha256": "efdabebe71e5a982c95dabb76759f07a89f305de7792727ef4204ef3e0e9faf7",
+      "bytes": 2129
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/external-keys.mjs",
+      "sha256": "3f4215cea038ded2923dd787e20e9a4eb36a18c0ee2a1f9518e561c3d612842b",
+      "bytes": 3877
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/federation/federation.mjs",
+      "sha256": "f5029c92c83fa6fb50b0db7773264efc9f0634886c7e63e37ecf3c0a04acec41",
+      "bytes": 640
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/federation/issuers.mjs",
+      "sha256": "ed57a4142e373001de4af5ef2d74588b5664a0b15d5a9d57e8233d6eebddeb7c",
+      "bytes": 6770
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/federation/rules/rules.mjs",
+      "sha256": "ec4aacae8571028d86e5092f99236b6bcb37b00f81c15ca0c8c1f4ef72f15390",
+      "bytes": 8520
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/federation/rules/workspaces.mjs",
+      "sha256": "20aa083fc1a6418512206ee0a3cb849467562407b0a9517d8b8373499c03c7de",
+      "bytes": 4894
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/invites.mjs",
+      "sha256": "0f222621696840f98eba9c8ae310eb3a8d25985e99ee6f2096ba90bd16e54b4b",
+      "bytes": 2231
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/organization.mjs",
+      "sha256": "9f39b7905b5882ff9a14cade38d2b8792cd471076ec5dd3e755e4acc08572060",
+      "bytes": 2631
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/rate-limits.mjs",
+      "sha256": "2759221e0f3dc3f4c25eb3bb9b2730d4ba2767ad211056aac50766a62ab0c531",
+      "bytes": 1158
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/service-accounts/service-accounts.mjs",
+      "sha256": "c995a731847f639f706a92c8304365edde4528c4469b8f5e4220e981b21b7a66",
+      "bytes": 6914
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/service-accounts/workspaces.mjs",
+      "sha256": "0249810622e2c5a0152e0fe81aed52ae2462697e8094a7ca5204a92b1d20c1da",
+      "bytes": 5638
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/users.mjs",
+      "sha256": "073050abeb06d0ba6f7f9e99513339dc26b953e697494b317193ffc8359f2bbe",
+      "bytes": 1871
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/workspaces/members.mjs",
+      "sha256": "d6cf034b835fc92a0993949ec0ab64aeea94f8c40a4c51045c102c8edee4c7dc",
+      "bytes": 2977
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/workspaces/rate-limits.mjs",
+      "sha256": "467450b8078493ae343cea989a17862529c30b19b474f2b8604427c9f9de18e0",
+      "bytes": 1325
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/workspaces/service-accounts.mjs",
+      "sha256": "5a7eae4d0175f0d842cf05f543adb3c235c862351eca0d26b4595e51133c0c05",
+      "bytes": 8217
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/organization/workspaces/workspaces.mjs",
+      "sha256": "71e43ad7a21af0cd225af8dc7510acf3f748ca9eae45620aa61f573bae1806b7",
+      "bytes": 3300
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/sessions/events.mjs",
+      "sha256": "c5b3c2db0eaedaba6d382409bfc1f09f974dcb4585f3bd618c9239318462be9a",
+      "bytes": 4460
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/sessions/resources.mjs",
+      "sha256": "bd91496438979e6b578663e3d1ad37141181e5deeca793622f436b5fc420125a",
+      "bytes": 4982
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/sessions/sessions.mjs",
+      "sha256": "937652df9caeed2aa517afffe86c96aada2c261201fb00ab48d289e96fcbc01f",
+      "bytes": 5798
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/sessions/threads/events.mjs",
+      "sha256": "aaa91fe491889e43138f2cc9ce407f6d58271ad8dd54d33bc3fa4dd290a6a588",
+      "bytes": 2382
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/sessions/threads/threads.mjs",
+      "sha256": "e1993993dbe380f42032855ae83a0c04ece18c0ea980c47443f6c2ea033e3379",
+      "bytes": 3325
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/skills/skills.mjs",
+      "sha256": "755863ce0d7a9a98e6dabefe11e214b01a9a11b09ca3e31965d26cfcefb6feda",
+      "bytes": 3760
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/skills/versions.mjs",
+      "sha256": "d4608786dd3abe1993c7c46689ddd293a6445ee5dff89f65cd5de532bc6e56c0",
+      "bytes": 4857
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/tunnels/certificates.mjs",
+      "sha256": "a31484af7950f9eb00162a83c8b6a166d83b9eeb80e094da2cfd9b0fb135b095",
+      "bytes": 5628
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/tunnels/tunnels.mjs",
+      "sha256": "3eb5346046c7792127aec30f1c3e0238e7e1ea86d039aca758e22958fc7cae72",
+      "bytes": 7987
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/user-profiles.mjs",
+      "sha256": "e91977cb2750d4d175e1652633d0822b3e45e5271daa0735c5f635b9eedcf003",
+      "bytes": 3574
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/vaults/credentials.mjs",
+      "sha256": "68c4626f393c457d86c543a64d789ada7a864ac307f9afdb15c4b1809f4801fa",
+      "bytes": 6832
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/vaults/vaults.mjs",
+      "sha256": "98efc88fd3c774c39afae8aab8147362db986fed8ef19d427a402d30f2738ec4",
+      "bytes": 5287
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/beta/webhooks.mjs",
+      "sha256": "e0f7ab0b5383d40e287f0fe68ba7ccdeb626a52f67b0c943e09926ecc5651e69",
+      "bytes": 1279
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/completions.mjs",
+      "sha256": "ba4af46b6412ac53a015574fe4d3009462c26a1bce4f0b49acff437455e9cbc9",
+      "bytes": 921
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/files.mjs",
+      "sha256": "da7c0243eeb3460bb7df7004e73a5a547748148fd553a7570c54fab5facdaddb",
+      "bytes": 3706
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/index.mjs",
+      "sha256": "45f59b76d4c7247ccd6dfda009710e29c383a36e0fb486316fe1b51e7771d0d4",
+      "bytes": 420
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/messages/batches.mjs",
+      "sha256": "8a29ad8c67368e886203dae759169c8c74480008f608fc4c3988b1bd03acec1a",
+      "bytes": 7561
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/messages/messages.mjs",
+      "sha256": "0371a86142881b364bda736ed15bc3db2c9ca53fe17f6fe044d315fb4b5431cb",
+      "bytes": 5650
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/models.mjs",
+      "sha256": "70d2f35dccec41093def8e4b5a4dd99defe793d30ce50fdc88d10e059885f445",
+      "bytes": 2167
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/shared.mjs",
+      "sha256": "5e22a7dc438e9503fdb8832f89d9ac510b289fa3d972af4b285a3f5b09490fe9",
+      "bytes": 133
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/skills/skills.mjs",
+      "sha256": "08250c466d3ae96da2b65b47bfd4d025f7660aa42cec7309553ec22f45badc99",
+      "bytes": 3031
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/resources/skills/versions.mjs",
+      "sha256": "5ce77f61e076fea1f3b3c1105357cc142bd4391b5864183910497fc40d2f8379",
+      "bytes": 3161
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/streaming.mjs",
+      "sha256": "83c608ff69779a4d52a2ce631f417d66914f4dc4a7aeeaf5fcb3e301472594f1",
+      "bytes": 132
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/tools/agent-toolset/sync-interval.mjs",
+      "sha256": "ac096f106764ec84ac3288882333c8ee7d8dc7c80d67d7557087974cfe0d6119",
+      "bytes": 1140
+    },
+    {
+      "path": "node_modules/@anthropic-ai/sdk/version.mjs",
+      "sha256": "86d9ef4e53ca9536c1f84b751f24d613582217fc9737c641598a139a6148246c",
+      "bytes": 98
+    },
+    {
+      "path": "node_modules/@stablelib/base64/lib/base64.js",
+      "sha256": "e6fbabe53d8926cfd3baa4057493493f24d8c51ece428d97d7dbb68d5f001160",
+      "bytes": 10907
+    },
+    {
+      "path": "node_modules/fast-sha256/sha256.js",
+      "sha256": "08abbd6528bcc26760f49399b9064b87199b9245ad22eea283f30fcffd79c8b3",
+      "bytes": 14722
+    },
+    {
+      "path": "node_modules/partial-json/dist/index.js",
+      "sha256": "23f750aa1170c830b7ef180135852317886cc58ce7d2597e5eeee044539072c7",
+      "bytes": 8376
+    },
+    {
+      "path": "node_modules/partial-json/dist/options.js",
+      "sha256": "779b2aded6d4e2ec6171ea9d5d5d97551e8c3258b6e78a01d2e9fc6235865b36",
+      "bytes": 2849
+    },
+    {
+      "path": "node_modules/standardwebhooks/dist/index.js",
+      "sha256": "7dc47b591774d44680060e16473041c449329fa1e5c7264666a37d4aea461437",
+      "bytes": 4801
+    },
+    {
+      "path": "node_modules/standardwebhooks/dist/timing_safe_equal.js",
+      "sha256": "ce12efbf5a53a8bc985879ed2e413b9cb4d0f90b2b931603a05fb121a183b0ba",
+      "bytes": 807
+    },
+    {
+      "path": "upstream/packages/ai/src/api/anthropic-messages.ts",
+      "sha256": "b3f7b44f85b46fa4bee89a5f6e82240a6f40c014c4c64d3c64132090fc66572a",
+      "bytes": 51170
+    },
+    {
+      "path": "upstream/packages/ai/src/api/constrained-sampling.ts",
+      "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb",
+      "bytes": 9295
+    },
+    {
+      "path": "upstream/packages/ai/src/api/github-copilot-headers.ts",
+      "sha256": "32d154965223d746140957ca6754f69955f1c631ed5e8445dcf2be11bb4b5180",
+      "bytes": 1184
+    },
+    {
+      "path": "upstream/packages/ai/src/api/lazy.ts",
+      "sha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a",
+      "bytes": 3203
+    },
+    {
+      "path": "upstream/packages/ai/src/api/simple-options.ts",
+      "sha256": "8bb50ff92c1759434ead59d1b4111826b6be47d13f744b8cc3b775c684536d46",
+      "bytes": 3256
+    },
+    {
+      "path": "upstream/packages/ai/src/api/transform-messages.ts",
+      "sha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669",
+      "bytes": 7666
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/context.ts",
+      "sha256": "03101bfa711fad214af111e25328b6f607d6b0a7ebfe289af58a89cd55baf639",
+      "bytes": 1345
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/credential-store.ts",
+      "sha256": "50ebde56b80b5862025e031719006ea303edd9aa80fec780fbc64319bb9e2847",
+      "bytes": 2353
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/resolve.ts",
+      "sha256": "d03ed5bf0abcbdc482df879f209156f18f8bfdc381869db77301a8273f990007",
+      "bytes": 6110
+    },
+    {
+      "path": "upstream/packages/ai/src/models-store.ts",
+      "sha256": "34ee433ca1501e98d19f31e0e5adf8d1721902e9f35e46c270626e32d7f711cc",
+      "bytes": 1698
+    },
+    {
+      "path": "upstream/packages/ai/src/models.ts",
+      "sha256": "4739010c7e4f7596607b1dd495b9d5ab6cd921e29f55c5c331259a04b7253269",
+      "bytes": 46331
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/abort.ts",
+      "sha256": "e81dc16de331e82d7f15759b27e38c7d0a3d28955693e0cf157dd52dadea7035",
+      "bytes": 1374
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/diagnostics.ts",
+      "sha256": "06fcbc2347f65a43938078094a7118036b5f12e73147affb5c73cd72753443f0",
+      "bytes": 1399
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/estimate.ts",
+      "sha256": "8df2512ca8c3e71eea5574b3d56c3569963e1fdabaef4bd17baaba86186c1840",
+      "bytes": 4270
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/event-stream.ts",
+      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "bytes": 2878
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/headers.ts",
+      "sha256": "423ded49de35ee755f62229ccd64bed6448739c78c6111226ff8e4a201cf9732",
+      "bytes": 783
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/json-parse.ts",
+      "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "bytes": 2774
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/model-operations.ts",
+      "sha256": "d024c049a08df73498362f297ca10c45a401fb5a3364c0a4d7890ec92a3c4763",
+      "bytes": 2070
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/models-error.ts",
+      "sha256": "f35f82bd86123be7ef05e86036f18e8d3d5df14f394f558b22c38b23d122c12c",
+      "bytes": 794
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/pi-user-agent.ts",
+      "sha256": "c60d2777f4362985b74f7d7cfadf35a47ae2c6f8b5cc0b809efbb4c546579b8e",
+      "bytes": 682
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/provider-env.ts",
+      "sha256": "3829251ae0674cef7ca09800cee9f46d4e305770129b72b822ea2f6f85efe675",
+      "bytes": 1718
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/provider-retry.ts",
+      "sha256": "d0f68cfe9fe6a5d4be778eaefedc0b453021f89026810691dcd1479371dca699",
+      "bytes": 4034
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/sanitize-unicode.ts",
+      "sha256": "f8ef2c957f9f13a77df45ebf344f1b852dfe8f2e3d164d815127ea7290c12e22",
+      "bytes": 1167
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/text.ts",
+      "sha256": "d37c1825855c7fc71669a545b5b266810242c1c7e58d57228c0c143f29c1c544",
+      "bytes": 1560
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/transcript.ts",
+      "sha256": "cad0c126cdfadc1b4f430cc5a95b1c9285ecd1ee9957642d7773b1357bbc9ac5",
+      "bytes": 9403
+    },
+    {
+      "path": "upstream/packages/coding-agent/src/experimental/source-resolver.ts",
+      "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6",
+      "bytes": 3592
+    }
+  ],
+  "sourceHashes": [
+    {
+      "path": "upstream/packages/ai/src/api/anthropic-messages.ts",
+      "sha256": "b3f7b44f85b46fa4bee89a5f6e82240a6f40c014c4c64d3c64132090fc66572a",
+      "bytes": 51170,
+      "canonicalGitBlobSha256": "b3f7b44f85b46fa4bee89a5f6e82240a6f40c014c4c64d3c64132090fc66572a"
+    },
+    {
+      "path": "upstream/packages/ai/src/api/constrained-sampling.ts",
+      "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb",
+      "bytes": 9295,
+      "canonicalGitBlobSha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb"
+    },
+    {
+      "path": "upstream/packages/ai/src/api/github-copilot-headers.ts",
+      "sha256": "32d154965223d746140957ca6754f69955f1c631ed5e8445dcf2be11bb4b5180",
+      "bytes": 1184,
+      "canonicalGitBlobSha256": "32d154965223d746140957ca6754f69955f1c631ed5e8445dcf2be11bb4b5180"
+    },
+    {
+      "path": "upstream/packages/ai/src/api/lazy.ts",
+      "sha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a",
+      "bytes": 3203,
+      "canonicalGitBlobSha256": "ff4ce241fb72cdd1900d56865a6295815d8d073b321c2ed20435639ed74bf39a"
+    },
+    {
+      "path": "upstream/packages/ai/src/api/simple-options.ts",
+      "sha256": "8bb50ff92c1759434ead59d1b4111826b6be47d13f744b8cc3b775c684536d46",
+      "bytes": 3256,
+      "canonicalGitBlobSha256": "8bb50ff92c1759434ead59d1b4111826b6be47d13f744b8cc3b775c684536d46"
+    },
+    {
+      "path": "upstream/packages/ai/src/api/transform-messages.ts",
+      "sha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669",
+      "bytes": 7666,
+      "canonicalGitBlobSha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669"
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/context.ts",
+      "sha256": "03101bfa711fad214af111e25328b6f607d6b0a7ebfe289af58a89cd55baf639",
+      "bytes": 1345,
+      "canonicalGitBlobSha256": "03101bfa711fad214af111e25328b6f607d6b0a7ebfe289af58a89cd55baf639"
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/credential-store.ts",
+      "sha256": "50ebde56b80b5862025e031719006ea303edd9aa80fec780fbc64319bb9e2847",
+      "bytes": 2353,
+      "canonicalGitBlobSha256": "50ebde56b80b5862025e031719006ea303edd9aa80fec780fbc64319bb9e2847"
+    },
+    {
+      "path": "upstream/packages/ai/src/auth/resolve.ts",
+      "sha256": "d03ed5bf0abcbdc482df879f209156f18f8bfdc381869db77301a8273f990007",
+      "bytes": 6110,
+      "canonicalGitBlobSha256": "d03ed5bf0abcbdc482df879f209156f18f8bfdc381869db77301a8273f990007"
+    },
+    {
+      "path": "upstream/packages/ai/src/models-store.ts",
+      "sha256": "34ee433ca1501e98d19f31e0e5adf8d1721902e9f35e46c270626e32d7f711cc",
+      "bytes": 1698,
+      "canonicalGitBlobSha256": "34ee433ca1501e98d19f31e0e5adf8d1721902e9f35e46c270626e32d7f711cc"
+    },
+    {
+      "path": "upstream/packages/ai/src/models.ts",
+      "sha256": "4739010c7e4f7596607b1dd495b9d5ab6cd921e29f55c5c331259a04b7253269",
+      "bytes": 46331,
+      "canonicalGitBlobSha256": "4739010c7e4f7596607b1dd495b9d5ab6cd921e29f55c5c331259a04b7253269"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/abort.ts",
+      "sha256": "e81dc16de331e82d7f15759b27e38c7d0a3d28955693e0cf157dd52dadea7035",
+      "bytes": 1374,
+      "canonicalGitBlobSha256": "e81dc16de331e82d7f15759b27e38c7d0a3d28955693e0cf157dd52dadea7035"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/diagnostics.ts",
+      "sha256": "06fcbc2347f65a43938078094a7118036b5f12e73147affb5c73cd72753443f0",
+      "bytes": 1399,
+      "canonicalGitBlobSha256": "06fcbc2347f65a43938078094a7118036b5f12e73147affb5c73cd72753443f0"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/estimate.ts",
+      "sha256": "8df2512ca8c3e71eea5574b3d56c3569963e1fdabaef4bd17baaba86186c1840",
+      "bytes": 4270,
+      "canonicalGitBlobSha256": "8df2512ca8c3e71eea5574b3d56c3569963e1fdabaef4bd17baaba86186c1840"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/event-stream.ts",
+      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "bytes": 2878,
+      "canonicalGitBlobSha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/headers.ts",
+      "sha256": "423ded49de35ee755f62229ccd64bed6448739c78c6111226ff8e4a201cf9732",
+      "bytes": 783,
+      "canonicalGitBlobSha256": "423ded49de35ee755f62229ccd64bed6448739c78c6111226ff8e4a201cf9732"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/json-parse.ts",
+      "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "bytes": 2774,
+      "canonicalGitBlobSha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/model-operations.ts",
+      "sha256": "d024c049a08df73498362f297ca10c45a401fb5a3364c0a4d7890ec92a3c4763",
+      "bytes": 2070,
+      "canonicalGitBlobSha256": "d024c049a08df73498362f297ca10c45a401fb5a3364c0a4d7890ec92a3c4763"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/models-error.ts",
+      "sha256": "f35f82bd86123be7ef05e86036f18e8d3d5df14f394f558b22c38b23d122c12c",
+      "bytes": 794,
+      "canonicalGitBlobSha256": "f35f82bd86123be7ef05e86036f18e8d3d5df14f394f558b22c38b23d122c12c"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/pi-user-agent.ts",
+      "sha256": "c60d2777f4362985b74f7d7cfadf35a47ae2c6f8b5cc0b809efbb4c546579b8e",
+      "bytes": 682,
+      "canonicalGitBlobSha256": "c60d2777f4362985b74f7d7cfadf35a47ae2c6f8b5cc0b809efbb4c546579b8e"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/provider-env.ts",
+      "sha256": "3829251ae0674cef7ca09800cee9f46d4e305770129b72b822ea2f6f85efe675",
+      "bytes": 1718,
+      "canonicalGitBlobSha256": "3829251ae0674cef7ca09800cee9f46d4e305770129b72b822ea2f6f85efe675"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/provider-retry.ts",
+      "sha256": "d0f68cfe9fe6a5d4be778eaefedc0b453021f89026810691dcd1479371dca699",
+      "bytes": 4034,
+      "canonicalGitBlobSha256": "d0f68cfe9fe6a5d4be778eaefedc0b453021f89026810691dcd1479371dca699"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/sanitize-unicode.ts",
+      "sha256": "f8ef2c957f9f13a77df45ebf344f1b852dfe8f2e3d164d815127ea7290c12e22",
+      "bytes": 1167,
+      "canonicalGitBlobSha256": "f8ef2c957f9f13a77df45ebf344f1b852dfe8f2e3d164d815127ea7290c12e22"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/text.ts",
+      "sha256": "d37c1825855c7fc71669a545b5b266810242c1c7e58d57228c0c143f29c1c544",
+      "bytes": 1560,
+      "canonicalGitBlobSha256": "d37c1825855c7fc71669a545b5b266810242c1c7e58d57228c0c143f29c1c544"
+    },
+    {
+      "path": "upstream/packages/ai/src/utils/transcript.ts",
+      "sha256": "cad0c126cdfadc1b4f430cc5a95b1c9285ecd1ee9957642d7773b1357bbc9ac5",
+      "bytes": 9403,
+      "canonicalGitBlobSha256": "cad0c126cdfadc1b4f430cc5a95b1c9285ecd1ee9957642d7773b1357bbc9ac5"
+    },
+    {
+      "path": "upstream/packages/coding-agent/src/experimental/source-resolver.ts",
+      "sha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6",
+      "bytes": 3592,
+      "canonicalGitBlobSha256": "c584d52fb68860c0c6ae5dfbbcb6052fa104d6e34c7ef231b9e6eb7e0ec5b2a6"
+    }
+  ],
+  "captureHistory": [
+    {
+      "kind": "initial genuine whole-module capture",
+      "goldenSha256": "eedd5bb2658f13fc8b722a17912e704c33a5bf5001f54689f5aadb49be511bb9",
+      "sourceAndSdkBytesChanged": false,
+      "childDateNowOverride": {
+        "unixMilliseconds": 1700000000000,
+        "mechanism": "Capture child explicitly replaces Date.now for output timestamps; source/SDK unchanged; actual OS/runtime/headers and crypto are not replaced."
+      }
+    }
+  ]
+}

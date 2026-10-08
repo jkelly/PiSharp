@@ -1,0 +1,342 @@
+{
+  "status": "eight exact dependencies installed; whole Anthropic wrapper qualification pending",
+  "owner": {
+    "schemaVersion": 1,
+    "owner": "PiSharp-anthropic-sdk-oracle-v1",
+    "oracle": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-anthropic-sdk-oracle-v0.99.1-reviewed",
+    "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+    "planSha256": "8e3a8908257832f2b736680f676160f60f52c77c9c10f790160ffbb431684682",
+    "helperSha256": "d6098e4f71162da3cf57970856b827735c3817cdb4e6b449ff7884821f9c217e",
+    "archiveInspectorSha256": "1da4ce53bf9b7ccc462bad540294353fd7ab42ba35ca171d3921916409d2b513"
+  },
+  "installed": [
+    {
+      "name": "@anthropic-ai/sdk",
+      "version": "0.124.0",
+      "files": {
+        "files": 1735,
+        "sha256": "36567957c4382a811f1cc2cb64b0f99715569ccf974aa4ae3c11bf2e4b9f3ed3"
+      },
+      "archiveSha256": "a9d9894658fc4e4ca44e982eb603b59945d01c24a5510965c067e1c94fdaaeb2",
+      "manifestSha256": "e9692cceae09a61d4168fca1fd47c1dd66b3798891b4cbe74cd21c331c20708a",
+      "dependencyDeclarations": {
+        "standardwebhooks": "^1.0.0",
+        "json-schema-to-ts": "^3.1.1"
+      },
+      "peerDependencies": {
+        "zod": "^3.25.0 || ^4.0.0"
+      },
+      "peerDependenciesMeta": {
+        "zod": {
+          "optional": true
+        }
+      },
+      "binDeclarations": {
+        "anthropic-ai-sdk": "bin/cli"
+      },
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 1056,
+          "sha256": "8bf96984ff8bcfae7e48cae76a529e8a25317ba9e02abf7fd3cc64fdf95657a6",
+          "utf8Text": "Copyright 2023 Anthropic, PBC.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\n"
+        },
+        {
+          "path": "src/internal/qs/LICENSE.md",
+          "bytes": 1588,
+          "sha256": "d8c77eaffed7f1f874b97f66ee47a557ae24fd59bae8ae14f9b1b84f26a94d2f",
+          "utf8Text": "BSD 3-Clause License\n\nCopyright (c) 2014, Nathan LaFreniere and other [contributors](https://github.com/puruvj/neoqs/graphs/contributors) All rights reserved.\n\nRedistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:\n\n1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.\n\n2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.\n\n3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
+        }
+      ],
+      "licenseEvidence": "packaged-root-license-text",
+      "packagedRootLicenseVerified": true,
+      "redistributionLicenseClosure": false,
+      "licenseReviewStatus": "P1-02 HOLD",
+      "developmentOnlyLicenseAdmission": null
+    },
+    {
+      "name": "@babel/runtime",
+      "version": "7.29.2",
+      "files": {
+        "files": 249,
+        "sha256": "b5a0ead572dacff9184ad5be4f720abaaa4137741fd8d3861b5151f086fc484a"
+      },
+      "archiveSha256": "91d6dda69e8514cca05e8bda7f6fe19b80f9a405fbd88c21e4eccc54f10f87e5",
+      "manifestSha256": "a34bfb8ab99545a10b211e8918e4a58cc66740366644298cb8efa3b766537ee0",
+      "dependencyDeclarations": {},
+      "peerDependencies": {},
+      "peerDependenciesMeta": {},
+      "binDeclarations": {},
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 1106,
+          "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76",
+          "utf8Text": "MIT License\n\nCopyright (c) 2014-present Sebastian McKenzie and other contributors\n\nPermission is hereby granted, free of charge, to any person obtaining\na copy of this software and associated documentation files (the\n\"Software\"), to deal in the Software without restriction, including\nwithout limitation the rights to use, copy, modify, merge, publish,\ndistribute, sublicense, and/or sell copies of the Software, and to\npermit persons to whom the Software is furnished to do so, subject to\nthe following conditions:\n\nThe above copyright notice and this permission notice shall be\nincluded in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND\nNONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE\nLIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION\nOF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\nWITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n"
+        }
+      ],
+      "licenseEvidence": "packaged-root-license-text",
+      "packagedRootLicenseVerified": true,
+      "redistributionLicenseClosure": false,
+      "licenseReviewStatus": "P1-02 HOLD",
+      "developmentOnlyLicenseAdmission": null
+    },
+    {
+      "name": "@stablelib/base64",
+      "version": "1.0.1",
+      "files": {
+        "files": 15,
+        "sha256": "2320b911e9b77d2ade070cd674de1188ff7165f933de49847ddfd204bb4b1f98"
+      },
+      "archiveSha256": "0130711d2e0d3f87436c7825db1f35bd6134fba2eda64b0df43d781f9b6a596a",
+      "manifestSha256": "7821116cc9ab0fb2542c1407ac5e34ff78bcc70b2d1295b753a9ea16134b3df7",
+      "dependencyDeclarations": {},
+      "peerDependencies": {},
+      "peerDependenciesMeta": {},
+      "binDeclarations": {},
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 1110,
+          "sha256": "1605b77bebe018db1fc27bd22fbcdeed1335c617937a124299a8b042b42b0fb6",
+          "utf8Text": "This software is licensed under the MIT license:\n\nCopyright (C) 2016 Dmitry Chestnykh\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of\nthis software and associated documentation files (the \"Software\"), to deal in\nthe Software without restriction, including without limitation the rights to\nuse, copy, modify, merge, publish, distribute, sublicense, and/or sell copies\nof the Software, and to permit persons to whom the Software is furnished to do\nso, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+        }
+      ],
+      "licenseEvidence": "packaged-root-license-text",
+      "packagedRootLicenseVerified": true,
+      "redistributionLicenseClosure": false,
+      "licenseReviewStatus": "P1-02 HOLD",
+      "developmentOnlyLicenseAdmission": null
+    },
+    {
+      "name": "fast-sha256",
+      "version": "1.3.0",
+      "files": {
+        "files": 6,
+        "sha256": "66727f88b0cb099464e8e9ecd9e737cb1ba16d57fd0eb16af7c601d776e4686a"
+      },
+      "archiveSha256": "4f897ea2594dc9cfb1250e7d4d0f65b4f105952a802fff2d06990bf1dc2c84f6",
+      "manifestSha256": "d312f1993364bfb4f217f820ff7f9e0a6b1d87930bfc2605138ab660e8d29806",
+      "dependencyDeclarations": {},
+      "peerDependencies": {},
+      "peerDependenciesMeta": {},
+      "binDeclarations": {},
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 1210,
+          "sha256": "88d9b4eb60579c191ec391ca04c16130572d7eedc4a86daa58bf28c6e14c9bcd",
+          "utf8Text": "This is free and unencumbered software released into the public domain.\n\nAnyone is free to copy, modify, publish, use, compile, sell, or\ndistribute this software, either in source code form or as a compiled\nbinary, for any purpose, commercial or non-commercial, and by any\nmeans.\n\nIn jurisdictions that recognize copyright laws, the author or authors\nof this software dedicate any and all copyright interest in the\nsoftware to the public domain. We make this dedication for the benefit\nof the public at large and to the detriment of our heirs and\nsuccessors. We intend this dedication to be an overt act of\nrelinquishment in perpetuity of all present and future rights to this\nsoftware under copyright law.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.\nIN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR\nOTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,\nARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR\nOTHER DEALINGS IN THE SOFTWARE.\n\nFor more information, please refer to <http://unlicense.org>\n"
+        }
+      ],
+      "licenseEvidence": "packaged-root-license-text",
+      "packagedRootLicenseVerified": true,
+      "redistributionLicenseClosure": false,
+      "licenseReviewStatus": "P1-02 HOLD",
+      "developmentOnlyLicenseAdmission": null
+    },
+    {
+      "name": "json-schema-to-ts",
+      "version": "3.1.1",
+      "files": {
+        "files": 267,
+        "sha256": "5bb4712de7619bc9b8b7078f50f3e69a8c48774da81666d5c7e3820e89e15b51"
+      },
+      "archiveSha256": "f6f34e4e453aca8753e9f644ad4fa297ae7011030bfff9e909bf34e31c4cc364",
+      "manifestSha256": "9439fa620a0f7a930950239ec4445d902c7d29590cddf0985a83bea531b2e81e",
+      "dependencyDeclarations": {
+        "@babel/runtime": "^7.18.3",
+        "ts-algebra": "^2.0.0"
+      },
+      "peerDependencies": {},
+      "peerDependenciesMeta": {},
+      "binDeclarations": {},
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 1071,
+          "sha256": "18a2bfd070b08bd1cc538c90f59989a9523e070e72fe9a9068593c3e82f44fa7",
+          "utf8Text": "MIT License\n\nCopyright (c) 2020 Thomas Aribart\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+        }
+      ],
+      "licenseEvidence": "packaged-root-license-text",
+      "packagedRootLicenseVerified": true,
+      "redistributionLicenseClosure": false,
+      "licenseReviewStatus": "P1-02 HOLD",
+      "developmentOnlyLicenseAdmission": null
+    },
+    {
+      "name": "partial-json",
+      "version": "0.1.7",
+      "files": {
+        "files": 9,
+        "sha256": "b1c730b893ef274e6d457f23eebc9c39162cd6aaf777247942b9ad0cc1f1cb8e"
+      },
+      "archiveSha256": "30eafeed6fdc25fb2ca24f34c37796d9f98f0bf5e156452b98a2c356762f6322",
+      "manifestSha256": "42b3ae6c99ec959249f8eb4d3da7fdb44ec1f96ec627fa7f9ca5487a4e80963f",
+      "dependencyDeclarations": {},
+      "peerDependencies": {},
+      "peerDependenciesMeta": {},
+      "binDeclarations": {},
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 1075,
+          "sha256": "cd519ad3d7e012427f978dfb2e3b92ee403d189d7b859ba6bf68fd7e12ca456f",
+          "utf8Text": "MIT License\n\nCopyright (c) 2023 Promplate Dev Team\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+        }
+      ],
+      "licenseEvidence": "packaged-root-license-text",
+      "packagedRootLicenseVerified": true,
+      "redistributionLicenseClosure": false,
+      "licenseReviewStatus": "P1-02 HOLD",
+      "developmentOnlyLicenseAdmission": null
+    },
+    {
+      "name": "standardwebhooks",
+      "version": "1.1.1",
+      "files": {
+        "files": 8,
+        "sha256": "03977b2aa436611587ee6acf684c1d68b1fc348d7f301f7c06ed293c50be9f9b"
+      },
+      "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+      "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+      "dependencyDeclarations": {
+        "@stablelib/base64": "^1.0.0",
+        "fast-sha256": "^1.3.0"
+      },
+      "peerDependencies": {},
+      "peerDependenciesMeta": {},
+      "binDeclarations": {},
+      "licenses": [],
+      "licenseEvidence": "declared-MIT-only",
+      "packagedRootLicenseVerified": false,
+      "redistributionLicenseClosure": false,
+      "licenseReviewStatus": "P1-02 HOLD",
+      "developmentOnlyLicenseAdmission": {
+        "name": "standardwebhooks",
+        "version": "1.1.1",
+        "archiveFile": "standardwebhooks-1.1.1.tgz",
+        "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+        "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+        "scope": "task-local-development-only",
+        "declaredLicense": "MIT",
+        "licenseEvidence": "declared-MIT-only",
+        "licenses": [],
+        "packagedRootLicenseVerified": false,
+        "redistributionLicenseClosure": false,
+        "licenseReviewStatus": "P1-02 HOLD"
+      }
+    },
+    {
+      "name": "ts-algebra",
+      "version": "2.0.0",
+      "files": {
+        "files": 104,
+        "sha256": "de3fa195eec4e650f9798665843d8243cb341df9a256d99752ac9357cdfe005a"
+      },
+      "archiveSha256": "f4c3968fd81eb7952e94860eb233558c820397d999149b6e2c689abaa34bc65c",
+      "manifestSha256": "6c6f692e1a3ad9943c77b5fa4eb04b0f63cb708353c67dcc5d86b35b2f7e5c30",
+      "dependencyDeclarations": {},
+      "peerDependencies": {},
+      "peerDependenciesMeta": {},
+      "binDeclarations": {},
+      "licenses": [
+        {
+          "path": "LICENSE",
+          "bytes": 1071,
+          "sha256": "18a2bfd070b08bd1cc538c90f59989a9523e070e72fe9a9068593c3e82f44fa7",
+          "utf8Text": "MIT License\n\nCopyright (c) 2020 Thomas Aribart\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+        }
+      ],
+      "licenseEvidence": "packaged-root-license-text",
+      "packagedRootLicenseVerified": true,
+      "redistributionLicenseClosure": false,
+      "licenseReviewStatus": "P1-02 HOLD",
+      "developmentOnlyLicenseAdmission": null
+    }
+  ],
+  "sourceFingerprint": {
+    "canonicalGit": {
+      "files": 2093,
+      "sha256": "2d65bfaee0e2556cb82ae7e0425de68560ecc3be4451f69ceff3bcc9c6144aa3"
+    },
+    "acquiredCheckout": {
+      "files": 2093,
+      "sha256": "676a5df7a526ab0fb6a78f734b57093bb7571913fc17251d02cb0c84527dcf21"
+    },
+    "declaredCheckoutConversions": [
+      {
+        "path": "pi-test.bat",
+        "eol": "crlf",
+        "canonicalSha256": "d454a5a0e203d9009283b887720472b022b0853380758b11419c8547a32dbb88",
+        "checkoutSha256": "c9d3430a614cabfaae5a9e97259643ab9041629bc8253f58f22579a5b6d9c448"
+      },
+      {
+        "path": "pi-test.ps1",
+        "eol": "crlf",
+        "canonicalSha256": "9f76d37f75b1d6f03be14d8bce3ca05331c4b09b8003a53329d8e4fe942792ef",
+        "checkoutSha256": "9b97fa3be6582e935f43865599d21bbb216e5ffe2cb1eb198c77e7298490b895"
+      }
+    ]
+  },
+  "networkScope": "Exact eight official registry lock URLs only; seven newly required archive URLs; no provider endpoints",
+  "lifecycleScripts": false,
+  "lifecycleScriptsExecuted": false,
+  "disabledLifecycleAdmission": {
+    "name": "standardwebhooks",
+    "version": "1.1.1",
+    "archiveFile": "standardwebhooks-1.1.1.tgz",
+    "archiveBytes": 4109,
+    "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+    "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+    "scriptDeclarations": {
+      "build": "tsc",
+      "prepare": "npm run build",
+      "test": "tsc && node --test dist/*.test.js",
+      "prepublishOnly": "biome check",
+      "check": "biome check",
+      "check:fix": "biome check --write",
+      "fmt": "biome format --write"
+    },
+    "disabledScripts": {
+      "prepare": "npm run build",
+      "build": "tsc"
+    },
+    "disabledBy": "--ignore-scripts",
+    "scriptsExecuted": false,
+    "packagedFiles": [
+      "README.md",
+      "dist/index.d.ts",
+      "dist/index.js",
+      "dist/index.js.map",
+      "dist/timing_safe_equal.d.ts",
+      "dist/timing_safe_equal.js",
+      "dist/timing_safe_equal.js.map",
+      "package.json"
+    ]
+  },
+  "developmentOnlyLicenseAdmission": {
+    "name": "standardwebhooks",
+    "version": "1.1.1",
+    "archiveFile": "standardwebhooks-1.1.1.tgz",
+    "archiveSha256": "d0bc8fec280c9e30ea3cbc876f44fe71d56f443aeca2bd2bdf745718308d4aed",
+    "manifestSha256": "686397f0f0202e0b693cfd3f6241d7a8da3df326f9642867a484fbbd295690b6",
+    "scope": "task-local-development-only",
+    "declaredLicense": "MIT",
+    "licenseEvidence": "declared-MIT-only",
+    "licenses": [],
+    "packagedRootLicenseVerified": false,
+    "redistributionLicenseClosure": false,
+    "licenseReviewStatus": "P1-02 HOLD"
+  },
+  "redistributionLicenseClosure": false,
+  "licenseReviewStatus": "P1-02 HOLD",
+  "optionalPeers": [],
+  "binLinks": false,
+  "nativeAddons": false,
+  "apiCredentials": false,
+  "providerCalls": false,
+  "sourceTransformOrModuleReplacement": false,
+  "loadedModuleClosureQualified": false
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "6170379555cc9d817cdf3a360857a319ab8ba31b",
+  "baseTree": "8405c976f4ded93746e6ff88532e26d6a4ce0cfc",
+  "oracleCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "status": "source-only-projector-authored-not-integrated",
+  "originalStart": "compaction_start",
+  "originalEnd": "compaction_end",
+  "reasons": ["manual", "threshold", "overflow"],
+  "authoredGroups": 6,
+  "registeredGroups": 0,
+  "executedGroups": 0,
+  "builds": 0,
+  "acceptedParity": false,
+  "remaining": ["root runner registration", "source review", "session lifecycle inputs", "dispatcher integration", "authorized pinned runtime qualification"]
+}

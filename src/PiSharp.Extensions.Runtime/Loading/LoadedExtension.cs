@@ -11,6 +11,7 @@ public sealed class LoadedExtension : IAsyncDisposable
     private PluginPackageSnapshot? snapshot;
     private PluginLoadContext? context;
     private Task? disposal;
+    private readonly Func<RegistrationScope, Task>? retireOwner;
     public string OwnerId => reservation.OwnerId;
     public long OwnerGeneration { get; }
     public string ContractProfile => "experimental-published-fixture-0";
@@ -20,10 +21,12 @@ public sealed class LoadedExtension : IAsyncDisposable
     public bool UnloadRequested { get; private set; }
 
     internal LoadedExtension(PluginAssemblyLoader loader, PluginReservation reservation, RegistrationScope? scope,
-        OwnedPluginInstance? instance, PluginPackageSnapshot? snapshot, PluginLoadContext? context, Exception? failedCleanup = null)
+        OwnedPluginInstance? instance, PluginPackageSnapshot? snapshot, PluginLoadContext? context, Exception? failedCleanup = null,
+        Func<RegistrationScope, Task>? retireOwner = null)
     {
         this.loader = loader; this.reservation = reservation; this.scope = scope; this.instance = instance;
         this.snapshot = snapshot; this.context = context;
+        this.retireOwner = retireOwner;
         OwnerGeneration = scope?.OwnerGeneration ?? 0;
         SnapshotDirectory = snapshot?.DirectoryPath;
         LoadContextReference = context is null ? null : new(context);
@@ -65,18 +68,25 @@ public sealed class LoadedExtension : IAsyncDisposable
     {
         try
         {
-            if (scope is not null) await scope.DisposeAsync().ConfigureAwait(false);
-            if (instance is not null) await instance.DisposeAsync().ConfigureAwait(false);
+            if (scope is not null) await JoinOriginalAsync(() => PluginAssemblyLoader.RetireScopeAsync(scope, retireOwner)).ConfigureAwait(false);
+            if (instance is not null) await JoinOriginalAsync(() => instance.DisposeAsync().AsTask()).ConfigureAwait(false);
             context?.ReleaseRootsAndRequestUnload();
             UnloadRequested = context is not null;
             context = null; instance = null; scope = null;
-            if (snapshot is not null) await snapshot.DisposeAsync().ConfigureAwait(false);
+            if (snapshot is not null) await JoinOriginalAsync(() => snapshot.DisposeAsync().AsTask()).ConfigureAwait(false);
             snapshot = null;
             loader.Release(reservation);
             settlement.TrySetResult();
         }
         catch (Exception error)
         { settlement.TrySetException(PluginAssemblyLoader.Failure(PluginLoadFailure.CleanupFailed, OwnerId, "dispose", error)); }
+    }
+    private static async Task JoinOriginalAsync(Func<Task> invoke)
+    {
+        Task? original = null;
+        try { original = invoke() ?? throw new InvalidOperationException("Retirement returned no original."); await original.ConfigureAwait(false); }
+        catch (Exception error) when (original?.IsFaulted == true)
+        { throw new AggregateException("Loaded owner retirement original.", original.Exception!, error); }
     }
 }
 
@@ -102,7 +112,9 @@ internal sealed class OwnedPluginInstance(IPiSharpExtension extension) : IPiShar
     }
     private async Task CloseAsync(TaskCompletionSource settlement)
     {
-        try { await inner!.DisposeAsync().ConfigureAwait(false); inner = null; settlement.TrySetResult(); }
-        catch (Exception error) { settlement.TrySetException(error); }
+        Task? original = null;
+        try { original = inner!.DisposeAsync().AsTask(); await original.ConfigureAwait(false); inner = null; settlement.TrySetResult(); }
+        catch (Exception error)
+        { settlement.TrySetException(original?.Exception is { } aggregate ? new AggregateException("Actual plugin cleanup original.", aggregate, error) : error); }
     }
 }

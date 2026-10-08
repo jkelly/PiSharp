@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text;
 using PiSharp.Contracts;
+using PiSharp.Extensions.Facade.Context;
+using PiSharp.Extensions.Runtime.Facade.Context;
 
 namespace PiSharp.Extensions.Runtime;
 
@@ -44,7 +46,7 @@ public sealed class ExtensionRegistrySnapshot
         RegistryIdentity = identity;
         Revision = revision;
         Entries = entries;
-        Registrations = entries.Select(entry => new ExtensionRegistrationInfo(entry.OwnerId,
+        Registrations = entries.Where(entry => entry.Kind != RegistrationKind.EventBus).Select(entry => new ExtensionRegistrationInfo(entry.OwnerId,
             entry.OwnerGeneration, entry.RegistrationId, entry.Kind.ToString(), entry.Name)).ToImmutableArray();
         BeforeAgentStartHandlers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.BeforeAgentStartHandler)).ToImmutableArray();
         ContextHandlers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.ContextHandler)).ToImmutableArray();
@@ -346,10 +348,34 @@ internal sealed class ExtensionToolInvocationContext(RegistrationScope scope, Ca
     }
 }
 
-internal sealed class ExtensionCommandContext(RegistrationScope scope, CancellationToken operation, CancellationToken session,
+internal sealed partial class ExtensionCommandContext(RegistrationScope scope, CancellationToken operation, CancellationToken session,
     ExtensionRegistrySnapshot captured)
-    : ExtensionContext(scope, operation, session), IExtensionCommandCatalogContext, IExtensionSessionCatalogCommandContext
+    : ExtensionContext(scope, operation, session), IExtensionCommandCatalogContext, IExtensionSessionCatalogCommandContext, IExtensionFacadeHostContext, IExtensionSessionTreeCommandContext
 {
+    private readonly CallbackFrame? facadeCallback = CallbackFrame.Capture(scope);
+    private IExtensionContextReadHost? facadeReadHost;
+    public IExtensionContextReadHost FacadeHost
+    {
+        get
+        {
+            var configured = GetFacadeHostForAdapter();
+            return facadeReadHost ??= new AdmittedContextReadHost(this, configured, ValidateFacadeAccess);
+        }
+    }
+    internal IExtensionContextReadHost GetFacadeHostForAdapter()
+    {
+        ValidateFacadeAccess();
+        return Scope.Registry.FacadeHost ?? throw new NotSupportedException("This native host has not supplied facade bindings.");
+    }
+    internal void ValidateFacadeInvocation() => ValidateFacadeAccess();
+    private void ValidateFacadeAccess()
+    {
+        if (facadeCallback is null || !CallbackFrame.IsExecuting(facadeCallback))
+            throw new InvalidOperationException("Facade host access belongs to the exact active originating native callback.");
+        OperationCancellationToken.ThrowIfCancellationRequested();
+        SessionCancellationToken.ThrowIfCancellationRequested();
+        ExtensionLifetimeCancellationToken.ThrowIfCancellationRequested();
+    }
     internal ExtensionRegistrySnapshot Captured { get; } = captured;
     internal Func<IExtensionSessionActionScope, ValueTask<IExtensionSessionCommandContext>>? CreateFreshContext { get; set; }
     internal Func<ExtensionSessionSnapshot, CancellationToken, ValueTask>? ValidateCreatedSnapshot { get; set; }
@@ -426,9 +452,13 @@ internal sealed class CallbackFrame : IDisposable
     }
 
     internal static bool IsExecuting(RegistrationScope scope) =>
-        Frames().Any(frame => frame.scopes.Any(candidate => ReferenceEquals(candidate, scope)));
+        TerminalInputRegistryCleanupFrame.IsExecuting(scope) || Frames().Any(frame => frame.scopes.Any(candidate => ReferenceEquals(candidate, scope)));
     internal static bool IsExecuting(ExtensionRegistry registry) =>
-        Frames().Any(frame => frame.scopes.Any(scope => ReferenceEquals(scope.Registry, registry)));
+        TerminalInputRegistryCleanupFrame.IsExecuting(registry) || Frames().Any(frame => frame.scopes.Any(scope => ReferenceEquals(scope.Registry, registry)));
+
+    internal static CallbackFrame? Capture(RegistrationScope scope) =>
+        Frames().FirstOrDefault(frame => frame.scopes.Any(candidate => ReferenceEquals(candidate, scope)));
+    internal static bool IsExecuting(CallbackFrame captured) => Frames().Any(frame => ReferenceEquals(frame, captured));
 
     private static IEnumerable<CallbackFrame> Frames()
     {

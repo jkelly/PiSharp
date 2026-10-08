@@ -1,0 +1,209 @@
+{
+  "baseCommit": "a54840b36360b70cbfae16e36f831ddc642f3b1c",
+  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "implementationFilesAdded": [
+    "src/PiSharp.AI/Protocols/MistralConversations/MistralTextOptions.cs",
+    "src/PiSharp.AI/Protocols/MistralConversations/MistralTextHttpSseTransport.cs",
+    "src/PiSharp.AI/Protocols/MistralConversations/TextState.cs"
+  ],
+  "extrasImplemented": false,
+  "authoredRunnableTests": 23,
+  "nativeContractAndOwnershipFiles": [
+    {
+      "path": "src/PiSharp.AI/Abstractions/IChatTransport.cs",
+      "sha256": "92dc12ab7db6eb1735f23645fcb3fbae46f2f2b69cb8db16c813dd5342390cc3",
+      "bytes": 715
+    },
+    {
+      "path": "src/PiSharp.AI/Providers/ModelTransportRegistry.cs",
+      "sha256": "65904fa440fe78aa22e62eb80e33ef9365c833e4b5001cb6e6d6119abe4c4a1d",
+      "bytes": 2695
+    },
+    {
+      "path": "src/PiSharp.AI/Transports/SseDecoder.cs",
+      "sha256": "5db0a3a3ac64a160d78e35964a652a66db3c879f0f74007b508478c854e21097",
+      "bytes": 10514
+    },
+    {
+      "path": "src/PiSharp.AI/Transports/HttpSseTransport.cs",
+      "sha256": "113d4a12c5779bb911185380b6ff8388024dd957e36896dafa45396019348233",
+      "bytes": 6037
+    },
+    {
+      "path": "src/PiSharp.AI/Streaming/AssistantStreamReducer.cs",
+      "sha256": "d28bb5bf102e5b55e1d82c54ae3ad4738e559a5602ed04eea0d95850500bf8e9",
+      "bytes": 16448
+    },
+    {
+      "path": "src/PiSharp.AI/Streaming/ChatRun.cs",
+      "sha256": "92f41b8df5d23d76d1516bb170715354100249d5dd697cf38c100161d37098d8",
+      "bytes": 27695
+    },
+    {
+      "path": "src/PiSharp.AI/Protocols/PiMessages/PiMessagesHttpSseTransport.cs",
+      "sha256": "6679a290aab8bc4ac681aa1673410c7ec24f7f3e3917a7fcdfeabb809c078947",
+      "bytes": 9588
+    },
+    {
+      "path": "src/PiSharp.AI/Protocols/PiMessages/PiMessagesOptions.cs",
+      "sha256": "754abec0b0e42d5795556ff8ce394331cfb54a9d2f4dcd6ca6faddfb5c16637a",
+      "bytes": 6758
+    },
+    {
+      "path": "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsHttpSseTransport.cs",
+      "sha256": "842f9fec74a14796fc22c66524e3ecf97f2a568216189c7a99a424d01c58e7ea",
+      "bytes": 28461
+    },
+    {
+      "path": "src/PiSharp.Contracts/Streaming/StreamEvents.cs",
+      "sha256": "da6aed50cc09f24ae800a62d2f928fe947808407f947f30bcf86b6aeb0d86f4a",
+      "bytes": 4316
+    },
+    {
+      "path": "src/PiSharp.Contracts/Streaming/NativeChatDiagnostic.cs",
+      "sha256": "f28ac557a79af342a2f97b3f5bd570406469678565c9a247a235fd79e90dfac6",
+      "bytes": 753
+    },
+    {
+      "path": "src/PiSharp.Contracts/Messages/AssistantMessage.cs",
+      "sha256": "50f6c42b6abab908195d2ce88894a6ec4200b6251cb21d064347d29a4591cab4",
+      "bytes": 1676
+    }
+  ],
+  "nativeBuildRun": false,
+  "httpCalls": 0,
+  "originalSourceExecuted": false,
+  "wholeProviderQualified": false,
+  "status": "AUTHORED_OFFLINE_TEXT_IMPLEMENTATION_REVIEW_REQUIRED",
+  "schemaVersion": 1,
+  "sourceFiles": [
+    {
+      "sha256": "5f6123383887a1b4ee8fb46fbd645b088e5da77984066497521d86661dde0fcd",
+      "path": "packages/ai/src/api/mistral-conversations.ts",
+      "bytes": 30832
+    },
+    {
+      "sha256": "74267bc430c0c2562d166e4ae9d05966634e91b226bc564010b2b199db52dd86",
+      "path": "packages/ai/src/api/mistral-conversations.lazy.ts",
+      "bytes": 205
+    },
+    {
+      "sha256": "dfcd087d7317d6a6cd1acf701547567435f5eaf0c1cc1d8eb89eed7e977c2fb3",
+      "path": "packages/ai/src/providers/mistral.ts",
+      "bytes": 575
+    },
+    {
+      "sha256": "ee4a9fecb37c77d0933442ccf42320e4ca8cb29920a8109ab931f1104820542a",
+      "path": "packages/ai/src/providers/mistral.models.ts",
+      "bytes": 779
+    },
+    {
+      "sha256": "37b4c7f8048f09a54363607fa91bb1c265ddfe0790067de3c3220c1f06485b90",
+      "path": "packages/ai/src/auth/helpers.ts",
+      "bytes": 2061
+    },
+    {
+      "sha256": "8fb9acd4c998502826b22df2d88bcded441cc473a606c5b7bdf21271afd1a74a",
+      "path": "packages/ai/src/auth/types.ts",
+      "bytes": 8661
+    },
+    {
+      "sha256": "b511a61d0353ced580019476ed506f4f078284cd16407acda8558a587819d057",
+      "path": "packages/ai/src/env-api-keys.ts",
+      "bytes": 7616
+    },
+    {
+      "sha256": "4739010c7e4f7596607b1dd495b9d5ab6cd921e29f55c5c331259a04b7253269",
+      "path": "packages/ai/src/models.ts",
+      "bytes": 46331
+    },
+    {
+      "sha256": "567b559600439eac5e6c341658bb45b149c5e8a22e34624a54ad5a06f5a92885",
+      "path": "packages/ai/src/model-catalog.ts",
+      "bytes": 2706
+    },
+    {
+      "sha256": "7ac401b31a7679a77469037091093c4c25d3719d7c9e9078378fece509fa8e8d",
+      "path": "packages/ai/src/types.ts",
+      "bytes": 48466
+    },
+    {
+      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "path": "packages/ai/src/utils/event-stream.ts",
+      "bytes": 2878
+    },
+    {
+      "sha256": "2cdfce4af41810d1a92c7f0a55c78637a3173041038aafd85b378be345761ed8",
+      "path": "packages/ai/src/utils/hash.ts",
+      "bytes": 540
+    },
+    {
+      "sha256": "423ded49de35ee755f62229ccd64bed6448739c78c6111226ff8e4a201cf9732",
+      "path": "packages/ai/src/utils/headers.ts",
+      "bytes": 783
+    },
+    {
+      "sha256": "828440b19a64773f696ced9461166913ddaddd8479697fbde32d3f298872b153",
+      "path": "packages/ai/src/utils/json-parse.ts",
+      "bytes": 2774
+    },
+    {
+      "sha256": "c60d2777f4362985b74f7d7cfadf35a47ae2c6f8b5cc0b809efbb4c546579b8e",
+      "path": "packages/ai/src/utils/pi-user-agent.ts",
+      "bytes": 682
+    },
+    {
+      "sha256": "f8ef2c957f9f13a77df45ebf344f1b852dfe8f2e3d164d815127ea7290c12e22",
+      "path": "packages/ai/src/utils/sanitize-unicode.ts",
+      "bytes": 1167
+    },
+    {
+      "sha256": "d37c1825855c7fc71669a545b5b266810242c1c7e58d57228c0c143f29c1c544",
+      "path": "packages/ai/src/utils/text.ts",
+      "bytes": 1560
+    },
+    {
+      "sha256": "cad0c126cdfadc1b4f430cc5a95b1c9285ecd1ee9957642d7773b1357bbc9ac5",
+      "path": "packages/ai/src/utils/transcript.ts",
+      "bytes": 9403
+    },
+    {
+      "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb",
+      "path": "packages/ai/src/api/constrained-sampling.ts",
+      "bytes": 9295
+    },
+    {
+      "sha256": "8bb50ff92c1759434ead59d1b4111826b6be47d13f744b8cc3b775c684536d46",
+      "path": "packages/ai/src/api/simple-options.ts",
+      "bytes": 3256
+    },
+    {
+      "sha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669",
+      "path": "packages/ai/src/api/transform-messages.ts",
+      "bytes": 7666
+    }
+  ],
+  "sourceRoot": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1\\upstream",
+  "proposedContractFile": null,
+  "sourceTag": "v0.99.1",
+  "sourceInventoryScope": "Primary Mistral source, all its direct source imports, provider/auth/catalog evidence; not a sealed executable transitive-module admission",
+  "proposedOfflineCases": 12,
+  "dependenciesAdded": [],
+  "testsRun": false,
+  "crossLanePrerequisites": [
+    "Independent static review and separate native build/test assignment",
+    "Original fake-fetch capture for source differential; not a prerequisite for authored code",
+    "Catalog data admission and durable session diagnostic qualification remain open"
+  ],
+  "missingGeneratedCatalog": {
+    "presentInPinnedGitTree": false,
+    "path": "packages/ai/src/providers/data/mistral.json",
+    "presentInReferenceOracle": false,
+    "action": "Do not fabricate or download. Text capture uses explicit injected model metadata; full catalog needs independently admitted source data."
+  },
+  "reviewCorrections": [
+    "Atomic chunk rollback of all unpublished state",
+    "Owned admission classification separated from foreign callback/send/read failures",
+    "Raw and ChatClient failure controls; held disposal/callback joins; split-byte UTF-8"
+  ]
+}

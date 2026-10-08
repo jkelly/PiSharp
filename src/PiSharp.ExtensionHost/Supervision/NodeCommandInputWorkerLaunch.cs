@@ -6,10 +6,10 @@ namespace PiSharp.ExtensionHost.Supervision;
 /// <summary>Closed whole Commands/Input successor; immutable predecessor qualification is composed read-only.</summary>
 public sealed class NodeCommandInputWorkerLaunch
 {
-    public const string AdmissionRevision = "bounded-tier-a-namespace-metadata-1";
+    public const string AdmissionRevision = "bounded-original-suppliers-1";
     public const string EntryRelativePath = "tools/NodeCommandInputBridge/worker.mjs";
-    public const string EntrySha256 = "1e3ac9ab26bdb36e8dc471913dcb73443adb9bc34a108dabe732b6f83d625a9a";
-    public const string PlanSha256 = "fde6bae32f17a92d4abc3130772a31d91abeab8bb3c2440ad2196c5d26924d11";
+    public const string EntrySha256 = "61ed16f4f4b7001ff3c0e2153e9df9e9e1d46855b4eb0ea9da0f397e085bb03c";
+    public const string PlanSha256 = "b2927bd5329bf0ce495e0fd08012a76b5c7f490bf1b65165f20cb5b07e7228f9";
     public const string SourceReferencePlanSha256 = "7eae052f5eb4447ccb2c15c2140684f6bb6260a9e1c28a8437d29dce5de759f4";
     public const string SourceReferenceManifestSha256 = "5619550b6b561596dcdb253106879eb976554d6c9daa8c8a5fb189d95a825900";
     public const string SourceReferenceExpectedSha256 = "d74d53610906cb41ec6c2ad8a10f57d242c2a2846631a0ec4901ef5a3225930d";
@@ -60,6 +60,13 @@ public sealed class NodeCommandInputWorkerLaunch
             value.GetProperty("sourceReferenceExpectedSha256").GetString() != SourceReferenceExpectedSha256)
             throw new IOException("Closed Commands/Input profile identity differs.");
         foreach (var row in value.GetProperty("helpers").EnumerateArray()) CheckRow(RepositoryRoot, row);
+        var supplier = value.GetProperty("originalNamespaceInjection");
+        if (supplier.GetProperty("profile").GetString() != AdmissionRevision ||
+            supplier.GetProperty("provider").GetString() != "tools/NodeCompatibility/OriginalPluginMapping/live-original-virtual-modules.mjs" ||
+            supplier.GetProperty("boundedSuppliedSpecifiers").GetInt32() != 12 ||
+            !supplier.GetProperty("rendererTransportImplemented").GetBoolean() || supplier.GetProperty("wholeNamespaceParity").GetBoolean())
+            throw new IOException("Closed original namespace supplier identity differs.");
+        foreach (var row in supplier.GetProperty("sourcePins").EnumerateArray()) CheckRow(Path.Combine(OracleRoot, "upstream"), row);
         foreach (var row in value.GetProperty("sourceReference").EnumerateArray()) CheckRow(CommandInputReferenceRoot, row);
         using var manifest = Read(Path.Combine(CommandInputReferenceRoot, "fixtures/reference/node-command-input/manifest.json"));
         foreach (var row in manifest.RootElement.GetProperty("inputs").GetProperty("harness").EnumerateArray()) CheckRow(CommandInputReferenceRoot, row);

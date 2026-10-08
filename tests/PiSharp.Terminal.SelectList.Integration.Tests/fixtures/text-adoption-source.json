@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "expectationKind": "authored-from-static-pinned-source-not-captured",
+  "callSite": "packages/coding-agent/src/modes/interactive/components/extension-selector.ts:48,92",
+  "callSiteBlob": "ed49c04a875e83b42f2483aa7313a7f72a6f5f3b",
+  "callSiteSha256": "d83767b09d73264eb0cb9af54b6f13e0e9c15a429a6dd7b9c8e7498e013b7704",
+  "textComponentBlob": "7a50e2721028d544f641ab5f66ef1b752ff6d1f7",
+  "textComponentSha256": "3042e09dd8dcb870c23506e6fafb2dfcc095e7e375adad2fb62e447da17e5e3b",
+  "utilsBlob": "f537ad7e37dcf35db1259aa05d43f1b45bdef7c7",
+  "utilsSha256": "5ecbc6c9b4850e78bf19de1fe8859b99b9c4c5f8a6384728d255a8e7e8a610ee",
+  "profile": "Text(title,1,0) plus Text(selected-prefix+canonical-option,1,0); theme ANSI omitted; native controls projected before wrapping",
+  "vectors": [
+    {
+      "id": "word-wrap-title-and-option",
+      "title": "pick one",
+      "options": ["alpha beta", "two"],
+      "columns": 12,
+      "viewportRows": 6,
+      "sourceHeadingRows": [" pick one   "],
+      "sourceOptionRows": [[" → alpha    ", " beta       "], ["   two      "]],
+      "nativeRows": [" pick one   ", " → alpha    ", " beta       ", "   two      ", "", ""]
+    },
+    {
+      "id": "long-word-grapheme-break-with-prefix",
+      "title": "Long title",
+      "options": ["abcdefghijkl"],
+      "columns": 10,
+      "viewportRows": 6,
+      "sourceHeadingRows": [" Long     ", " title    "],
+      "sourceOptionRows": [[" →        ", " abcdefgh ", " ijkl     "]],
+      "nativeRows": [" Long     ", " title    ", " →        ", " abcdefgh ", " ijkl     ", ""]
+    },
+    {
+      "id": "canonical-newlines-are-wrapped-child-lines",
+      "title": "pick\nnow",
+      "options": ["line1\r\nline2", "other"],
+      "columns": 12,
+      "viewportRows": 6,
+      "sourceHeadingRows": [" pick       ", " now        "],
+      "sourceOptionRows": [[" → line1    ", " line2      "], ["   other    "]],
+      "nativeRows": [" pick       ", " now        ", " → line1    ", " line2      ", "   other    ", ""]
+    },
+    {
+      "id": "cjk-emoji-and-combining-cells",
+      "title": "中文 notice",
+      "options": ["🙂 x", "é"],
+      "columns": 12,
+      "viewportRows": 6,
+      "sourceHeadingRows": [" 中文       ", " notice     "],
+      "sourceOptionRows": [[" → 🙂 x     "], ["   é        "]],
+      "nativeRows": [" 中文       ", " notice     ", " → 🙂 x     ", "   é        ", "", ""]
+    },
+    {
+      "id": "ansi-remains-inert-canonical-data",
+      "title": "pick\u001b[31m",
+      "options": ["ok\u0000", "other"],
+      "columns": 20,
+      "viewportRows": 5,
+      "sourceHeadingRows": [" pick\u001b[31m               "],
+      "sourceOptionRows": [[" → ok\u0000               "], ["   other            "]],
+      "nativeRows": [" pick\\u001b[31m     ", " → ok\\u0000         ", "   other            ", "", ""],
+      "approvedDeviation": "Untrusted controls are displayed as inert escape text before Text geometry; theme/background ANSI is omitted."
+    }
+  ]
+}

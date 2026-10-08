@@ -1,0 +1,11 @@
+# Reviewed terminal shutdown integration
+
+Source merge `70ce909cd892b3a363cd2a800e5572b9e8c153a1` combines preserved host correction `9dd7341571519a2fa851a4158e53fb1d93b58ae5` with exact reviewed terminal `9985d2e8f22d73ae80026efbbba1fa84aef76f27`, including interrupt `bc62530e9b079b35ddaebccbb4374c713d6a4602`. Base combined `da218c24759bee49ba6744a7b2823fdf6994319e` remains preserved. Lead reports exact terminal static review closed, including physical joins and fault precedence. Active input-drain successor remains excluded.
+
+The sole merge conflict was RPC Program.cs. Its direct-await union retains held queue publication, restoration, interrupt and both provider checkpoint cases. All lane registrations survive. Every other terminal delta blob exactly matches the reviewed tip. Host correction files and corrected AtomicQueueTakeTests match their preserved predecessors exactly at this source merge. No authored tests or assertions were removed.
+
+The terminal's reviewed held-I/O declaration and both migration records are imported exactly. Current fourteen source pins match physical bytes. Historical before-interrupt/before-graceful declarations remain retained; no historical execution evidence is replaced. The original held-I/O scenario source remains unchanged. This source migration is distinct from runtime qualification.
+
+The next offline workload still comprises 24 preparation steps (four SDK/solution steps plus ten fixture restore/publish pairs), ten core runners and 26 companions. Existing full RPC and terminal select-dialog companion now include interrupt/shutdown cases without a new target. The reviewed terminal consumer plan has 77 authored units, unexecuted. It includes seven new public entry-point graceful shutdown cases and one changed observed case. No source/test process has been launched here. The host correction adds ten authored PowerShell admission controls, also unexecuted and requiring their own authorized execution.
+
+Independent review of the host correction and final RPC union, runtime authorization, and fresh exact-candidate manifest/actual prepared-product receipt remain pending. The batch guide uses this checkout and final successor candidate; historical seals are not reusable admission. There is no acceptance or guaranteed wall-clock claim.

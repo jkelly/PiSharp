@@ -23,10 +23,10 @@ internal sealed class NativeReplacementSessionStartBinding(ExtensionRegistry reg
                 "resume" or "new" or "fork" => replacement.Reason,
                 _ => throw new InvalidOperationException("Replacement observation reason is invalid.")
             };
-            var observation = JsonData.Parse(JsonSerializer.Serialize(new
-            {
-                type = "session_start", reason, previousSessionFile = replacement.Previous.Session.SessionFile
-            }));
+            var fields = new Dictionary<string, object?> { ["type"] = "session_start", ["reason"] = reason };
+            if (replacement.Previous.Session.SessionFile is { } previousSessionFile)
+                fields.Add("previousSessionFile", previousSessionFile);
+            var observation = JsonData.Parse(JsonSerializer.Serialize(fields));
             await registry.DispatchReplacementSessionStartAsync(captured, observation, report).ConfigureAwait(false);
         }
         catch (Exception)

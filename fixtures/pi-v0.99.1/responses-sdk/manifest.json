@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "responses-sdk-core",
+  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "requirementIds": [
+    "api.openai-responses",
+    "stream.indexed-events",
+    "stream.terminal-settlement"
+  ],
+  "clock": {
+    "unixMilliseconds": 1700000000000,
+    "mechanism": "Harness fixes Date.now; wrapper has no clock option; source and SDK files unchanged"
+  },
+  "seed": "Explicit session/request/response/message IDs; no RNG replacement",
+  "normalizerVersion": "object-key-order-v1; raw-body-and-headers-retained",
+  "input": {
+    "path": "fixtures/pi-v0.99.1/responses-sdk/core.input.json",
+    "sha256": "3d4431739bcce4b2218d13a71dba4bf273fe47aab8937f36d3177eb984bf9633",
+    "kind": "authored-offline-full-wrapper-input"
+  },
+  "expected": {
+    "path": "fixtures/pi-v0.99.1/responses-sdk/core.expected.json",
+    "sha256": "ef37cbb6ee02d38642597339986b4d73de424ab4fcfd81d9eee4b0a8109bc098",
+    "kind": "captured-unchanged-responses-wrapper-sdk-oracle"
+  },
+  "lock": {
+    "path": "fixtures/pi-v0.99.1/responses-sdk/oracle.lock.json",
+    "sha256": "f91c09ed8617b00279ac71092d63a09d41a8128e57ec2de9ccb3dc235f04eef6"
+  },
+  "provenance": {
+    "source": "Unchanged exported packages/ai/src/api/openai-responses.ts stream",
+    "sdk": "Unchanged upstream-locked openai7.19.0 installed archive bytes",
+    "sourceResolver": "Unchanged pinned experimental/source-resolver.ts",
+    "observations": "onPayload returning undefined; real SDK fetch serialization/SSE decoding; emission/result snapshots",
+    "wireInput": "authored in-memory SSE; no provider network",
+    "credentials": "inert authored marker only; credential-free subprocess environment",
+    "repeatRuns": 2,
+    "byteIdentical": true,
+    "captureCommand": "node tools/PiReferenceRunner/capture-responses-sdk.mjs --capture-new"
+  },
+  "scope": "Three non-reasoning synthetic text cases; full wrapper request boundary observed, no native parity/full provider/auth/phase closure"
+}

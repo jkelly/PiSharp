@@ -1,0 +1,63 @@
+{
+  "kind": "SOURCE INPUT IDENTITIES AND AUTHORED CONTRACT INVENTORY; NO EXECUTED SOURCE CAPTURES",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "tree": "200bd10bb146773516f862a02b8aaebeed163e00",
+  "version": "0.99.1",
+  "archive": {
+    "relative": "artifacts/released-baseline/pi-0.99.1-source.tar.gz",
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task\\PiSharp-source-admission-loaddefault-work\\artifacts\\released-baseline\\pi-0.99.1-source.tar.gz",
+    "bytes": 8646242,
+    "sha256": "4d99d3c9ed6db41f88ce7ba36d478b06a9386f4e81fa0c1ea3f93e681c99e83b"
+  },
+  "referenceManifest": {
+    "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\source-manifest.json",
+    "bytes": 969151,
+    "sha256": "772c23326a8a341cc40235a95366639ea28cca1823089969cee1c5deb58b4048"
+  },
+  "files": [
+    {
+      "relative": "packages/tui/src/components/select-list.ts",
+      "bytes": 9385,
+      "sha256": "0fc369801e745eff15567d72829bf67887f5efec8bc6816aaf1ee65338618373",
+      "gitBlob": "f4f4354dd850939e2e84ea8ce8a755206d3e8e43"
+    },
+    {
+      "relative": "packages/tui/src/keybindings.ts",
+      "bytes": 10125,
+      "sha256": "eea5e3fe258ad50337595bb5320955a6d97bac0c8f6c0a838f988d75079bcf38",
+      "gitBlob": "d6afb5ec39642c098b7d95e10ab6b57568e514b4"
+    },
+    {
+      "relative": "packages/tui/src/keys.ts",
+      "bytes": 44954,
+      "sha256": "b972facce4233a4623239fc38029e28cae15d0fb326558c0c09dc02cf4345fa7",
+      "gitBlob": "8b6f8a0a708cc9a1c9b795ff1ec9766c4209114b"
+    },
+    {
+      "relative": "packages/tui/src/utils.ts",
+      "bytes": 38919,
+      "sha256": "5ecbc6c9b4850e78bf19de1fe8859b99b9c4c5f8a6384728d255a8e7e8a610ee",
+      "gitBlob": "f537ad7e37dcf35db1259aa05d43f1b45bdef7c7"
+    },
+    {
+      "relative": "packages/tui/src/tui.ts",
+      "bytes": 49604,
+      "sha256": "92dcb7f5f9a3a9575421d8de366be5cc78890be8df38d86c4ed3c0d77c7f88a4",
+      "gitBlob": "7968a9e792375b9e8701ca4dbe89d18735aa387b"
+    },
+    {
+      "relative": "LICENSE",
+      "bytes": 1069,
+      "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48",
+      "gitBlob": "b0a8e9b81083294360c69b4ec45d3d39a2b28197"
+    }
+  ],
+  "sourceCaptures": 0,
+  "sourceExecutions": 0,
+  "assumptions": [
+    "Integer bounded native dimensions and immutable item copies",
+    "Canonical Source-style rows are comparison data, not transport",
+    "Native adapter escapes controls before width layout; theme ANSI remains data",
+    "Exhaustive runtime Unicode case/width/version parity unqualified"
+  ]
+}

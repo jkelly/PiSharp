@@ -1,0 +1,11 @@
+{
+  "name": "pisharp-public-reference-deps",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.6.2",
+  "dependencies": {
+    "partial-json": "0.1.7",
+    "typebox": "1.3.27"
+  }
+}

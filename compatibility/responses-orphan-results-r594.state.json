@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "status": "SOURCE_ONLY_PENDING_ROOT_SERIAL_QUALIFICATION",
+  "base": "1089735509799375ff81599f76f7f4e094f96683",
+  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "transformBlob": "94bf539ccb0c7aa47013f073cd7e77b5e8eb5f1b",
+  "sharedResponsesBlob": "54abbdc8fef34bd7227b046dc574bb87737d61df",
+  "transformCheckoutSha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669",
+  "defaultEnabled": false,
+  "focusedGroups": 10,
+  "expectedAdditionalTelemetryRecords": 3,
+  "newNativeOperations": 0,
+  "liveApiCalls": 0,
+  "nodeCapture": false,
+  "fullOriginalProviderParity": false,
+  "deadlineUtc": "2026-10-06T13:30:00Z"
+}

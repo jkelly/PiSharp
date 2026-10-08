@@ -12,6 +12,12 @@ using PiSharp.Sessions.Storage;
 using PiSharp.Sessions.Lifecycle;
 using PiSharp.Cli.Output;
 using PiSharp.Cli.Extensions;
+using PiSharp.Cli.Prompts;
+using PiSharp.Cli.Settings;
+using PiSharp.Cli.Skills;
+using PiSharp.CodingAgent.Resources.Skills;
+using PiSharp.CodingAgent.Configuration;
+using PiSharp.CodingAgent.Resources;
 using PiSharp.Extensions;
 using PiSharp.Extensions.Runtime;
 
@@ -46,26 +52,33 @@ public static class SessionCommands
         "[--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
         "[--output report|print|json] " +
         "[--bash-executable <absolute file> --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]]; " +
-        NativeExtensionConfiguration.Flags + "; session inspect|tree|history --session <JSONL> [--leaf <id>|--root]";
+        NativeExtensionConfiguration.Flags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags +
+        " (startup settings/tools apply to create, prompt and resume); session inspect|tree|history --session <JSONL> [--leaf <id>|--root]";
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private static readonly SessionLogReaderOptions ReaderBounds = new(MaximumInputBytes: 8_388_608, MaximumLines: 10_000, MaximumRecords: 10_000);
     private sealed record Arguments(string Command, string Session, string? Workspace, string? Script, string? Message,
         bool Latest, string? Leaf, ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi,
-        OfflineBashAuthorization? Bash, bool Print, bool Json, NativeExtensionConfiguration? Extension, bool SupportsImages);
+        OfflineBashAuthorization? Bash, bool Print, bool Json, NativeExtensionConfiguration? Extension, bool SupportsImages,
+        PromptTemplateCliConfiguration Prompts, StartupSettingsRequest? Settings, ToolSelectionCliOptions Tools, SkillCliConfiguration Skills);
 
-    public static Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr, CancellationToken cancellationToken = default) =>
-        RunCoreAsync(args, stdout, stderr, new(), cancellationToken);
+    public static Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr, CancellationToken cancellationToken = default,
+        PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
+        Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null) =>
+        RunCoreAsync(args, stdout, stderr, new(), cancellationToken, mcpAdmission, persistRetryEnabledOriginal);
 
     /// <summary>Explicit trusted native JSON delivery limits; other output modes keep their existing profile.</summary>
     public static Task<int> RunAsync(string[] args, TextWriter stdout, TextWriter stderr,
-        SessionJsonEventOutputOptions jsonOutputOptions, CancellationToken cancellationToken = default)
+        SessionJsonEventOutputOptions jsonOutputOptions, CancellationToken cancellationToken = default,
+        PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
+        Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null)
     {
         ArgumentNullException.ThrowIfNull(jsonOutputOptions); jsonOutputOptions.Validate();
-        return RunCoreAsync(args, stdout, stderr, jsonOutputOptions, cancellationToken);
+        return RunCoreAsync(args, stdout, stderr, jsonOutputOptions, cancellationToken, mcpAdmission, persistRetryEnabledOriginal);
     }
 
     private static async Task<int> RunCoreAsync(string[] args, TextWriter stdout, TextWriter stderr,
-        SessionJsonEventOutputOptions jsonOutputOptions, CancellationToken cancellationToken)
+        SessionJsonEventOutputOptions jsonOutputOptions, CancellationToken cancellationToken, PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission,
+        Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal)
     {
         ArgumentNullException.ThrowIfNull(stdout); ArgumentNullException.ThrowIfNull(stderr);
         var modifying = false;
@@ -76,7 +89,7 @@ public static class SessionCommands
             cancellationToken.ThrowIfCancellationRequested();
             var (report, exitCode, lastMessage) = parsed.Command is "inspect" or "tree" or "history" ?
                 await InspectAsync(parsed, cancellationToken).ConfigureAwait(false) :
-                await ModifyAsync(parsed, stdout, jsonOutputOptions, cancellationToken).ConfigureAwait(false);
+                await ModifyAsync(parsed, stdout, stderr, jsonOutputOptions, cancellationToken, mcpAdmission, persistRetryEnabledOriginal).ConfigureAwait(false);
             if (!parsed.Print && !parsed.Json) await WriteAsync(stdout, report).ConfigureAwait(false);
             else if (parsed.Print)
             {
@@ -133,19 +146,26 @@ public static class SessionCommands
             args[1] is not ("create" or "prompt" or "resume" or "inspect" or "tree" or "history"))
             throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        var tools = new ToolSelectionCliOptions();
+        var skills = ImmutableArray.CreateBuilder<SkillPathSelection>();
         var reads = ImmutableArray.CreateBuilder<string>(); var writes = ImmutableArray.CreateBuilder<string>();
         var bashCommands = ImmutableArray.CreateBuilder<string>();
         var extensionTools = ImmutableArray.CreateBuilder<string>();
         var deniedExtensionTools = ImmutableArray.CreateBuilder<string>();
         var extensionCommands = ImmutableArray.CreateBuilder<string>();
+        var prompts = ImmutableArray.CreateBuilder<PromptTemplatePathSelection>();
         var root = false;
         for (var index = 2; index < args.Length; index++)
         {
+            if (SkillCliConfiguration.TryConsume(args, ref index, skills)) continue;
+            if (PromptTemplateCliConfiguration.TryConsume(args, ref index, prompts)) continue;
+            if (ToolSelectionCliConfiguration.TryConsume(args, ref index, ref tools)) continue;
             var key = args[index];
             if (key == "--root") { if (root) throw Invalid(); root = true; continue; }
             if (key is not ("--session" or "--workspace" or "--offline-script" or "--offline-api" or "--offline-images" or "--message" or "--leaf" or "--allow-read" or "--allow-write" or "--output" or
                 "--bash-executable" or "--bash-spill-root" or "--allow-bash-command" or "--bash-timeout" or
-                "--extension-package" or "--extension-manifest" or "--extension-approval" or "--extension-snapshot-root" or "--enable-extension-tool" or "--deny-extension-tool" or "--enable-extension-command") ||
+                "--extension-package" or "--extension-manifest" or "--extension-approval" or "--extension-snapshot-root" or "--enable-extension-tool" or "--deny-extension-tool" or "--enable-extension-command" or
+                "--user-settings" or "--project-settings" or "--steering-mode" or "--follow-up-mode") ||
                 ++index >= args.Length) throw Invalid();
             var value = args[index];
             if (key == "--allow-read") reads.Add(Absolute(value));
@@ -174,7 +194,9 @@ public static class SessionCommands
         values.TryGetValue("--extension-package", out var extensionPackage); values.TryGetValue("--extension-manifest", out var extensionManifest);
         values.TryGetValue("--extension-approval", out var extensionApproval); values.TryGetValue("--extension-snapshot-root", out var extensionSnapshots);
         var extension = NativeExtensionConfiguration.Optional(extensionPackage, extensionManifest, extensionApproval, extensionSnapshots, extensionTools.ToImmutable(), deniedExtensionTools.ToImmutable(), extensionCommands.ToImmutable());
-        if (writing && (workspace is null || script is null || string.IsNullOrWhiteSpace(message)) ||
+        var settings = SettingsStartupConfiguration.FromOptions(values);
+        if ((command is "inspect" or "tree" or "history") && (tools.IsSpecified || skills.Count != 0 || settings is not null)) throw Invalid();
+        if (!writing && prompts.Count != 0 || writing && (workspace is null || script is null || string.IsNullOrWhiteSpace(message)) ||
             command == "create" && (workspace is null || script is not null || message is not null || root || leaf is not null || reads.Count != 0 || writes.Count != 0) ||
             (command is "inspect" or "tree" or "history") && (workspace is not null || script is not null || offlineApi is not null || imageInput is not null || message is not null || reads.Count != 0 || writes.Count != 0 || bash is not null || extension is not null) ||
             leaf is { Length: 0 } || leaf?.Length > 4096 || message?.Length > 65_536 ||
@@ -182,7 +204,7 @@ public static class SessionCommands
             throw Invalid();
         return new(command, Absolute(session), workspace is null ? null : Absolute(workspace),
             script is null ? null : Absolute(script), message, !root && leaf is null, leaf, reads.ToImmutable(), writes.ToImmutable(), model.Api, bash,
-            output == "print", output == "json", extension, imageInput == "true");
+            output == "print", output == "json", extension, imageInput == "true", new(prompts.ToImmutable()), settings, tools, new(skills.ToImmutable()));
         static SessionCommandException Invalid() => new(SessionCommandFailure.InvalidArguments);
     }
 
@@ -199,56 +221,73 @@ public static class SessionCommands
         { throw new SessionCommandException(SessionCommandFailure.InvalidPath); }
     }
 
-    private static async Task<(JsonData Report, int ExitCode, TranscriptEntry? LastMessage)> ModifyAsync(Arguments args, TextWriter stdout,
-        SessionJsonEventOutputOptions jsonOutputOptions, CancellationToken token)
+    private static async Task<(JsonData Report, int ExitCode, TranscriptEntry? LastMessage)> ModifyAsync(Arguments args, TextWriter stdout, TextWriter stderr,
+        SessionJsonEventOutputOptions jsonOutputOptions, CancellationToken token, PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission,
+        Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal)
     {
         if (!Directory.Exists(args.Workspace)) throw new SessionCommandException(SessionCommandFailure.WorkspaceMissing);
+        var settings = await SettingsStartupConfiguration.LoadAsync(args.Settings, stderr, null, token).ConfigureAwait(false);
         var turns = args.Script is null ? ImmutableArray<JsonData>.Empty : await ScriptAsync(args.Script, token).ConfigureAwait(false);
         await using var profile = await OfflineSessionProfile.CreateAsync(args.Workspace!, args.Session, args.Script, turns, args.Reads, args.Writes, token,
             offlineApi: args.OfflineApi, bash: args.Bash, extension: args.Extension,
             extensionUi: new UnavailableExtensionUiProvider(args.Json ? ExtensionUiMode.Json : ExtensionUiMode.Print),
-            modelSupportsImages: args.SupportsImages).ConfigureAwait(false);
+            modelSupportsImages: args.SupportsImages, toolSelection: ToolSelectionCliConfiguration.ResolveOptions(args.Tools, settings), mcpAdmission: mcpAdmission).ConfigureAwait(false);
+        profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
+        profile.ConfigureEffectiveSettings(settings);
+        profile.BindSettingsThinkingReads();
+        await profile.LoadPromptTemplatesAsync(args.Prompts, stderr, token).ConfigureAwait(false);
+        await profile.LoadSkillsAsync(args.Skills, stderr, token).ConfigureAwait(false);
         var options = new PersistentAgentSessionOptions(UseLatestLeaf: args.Latest, SelectedLeafId: args.Leaf,
             AgentOptions: new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024)),
             SessionLogStoreOptions: new(ReaderOptions: ReaderBounds));
         var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); long sequence = 0;
         long Clock() => startTime + Interlocked.Increment(ref sequence);
         string NextId() => "cli-" + Guid.NewGuid().ToString("N");
-        var lifecycle = new PersistentSessionLifecycle(profile.Registry, Clock, NextId, options,
+        var lifecycle = profile.CreateLifecycle(Clock, NextId, options,
             catalog: new SessionCatalog([new("session-directory", Path.GetDirectoryName(args.Session)!)]));
         PersistentAgentSessionSnapshot snapshot;
         var finalSessionPath = args.Session;
         AgentLoopResult? result = null; string? previousLeaf = null; SubmittedInputDisposition? inputDisposition = null;
+        TranscriptEntry? operationLastMessage = null;
         if (args.Command == "create")
         {
             var header = new SessionEntryCodec().Parse(JsonSerializer.Serialize(new { type = "session", version = 3, id = NextId(),
                 timestamp = DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("O", CultureInfo.InvariantCulture), cwd = profile.Workspace }));
-            await using (var session = await lifecycle.CreateAsync(args.Session, header, profile.SelectedModel, token).ConfigureAwait(false))
+            var session = await lifecycle.CreateAsync(args.Session, header, profile.SelectedModel, token).ConfigureAwait(false);
+            try
             {
                 await session.ConfigureAsync(new(SystemMessage: new("system", profile.InitialSystem)), token).ConfigureAwait(false);
-                profile.AttachOwner(session, options, Clock, NextId, lifecycle: lifecycle);
+                await profile.AttachOwnerAsync(session, options, Clock, NextId, lifecycle: lifecycle).ConfigureAwait(false);
+                await profile.ApplyInitialToolSelectionAsync(session, token).ConfigureAwait(false);
+                if (settings is not null) { session.SteeringMode = settings.SteeringMode; session.FollowUpMode = settings.FollowUpMode; }
                 await profile.StartLifecycleAsync("new", token).ConfigureAwait(false);
                 await profile.Sessions!.Current.Session.WaitForIdleAsync().ConfigureAwait(false);
-                finalSessionPath = profile.Sessions.Current.Session.Path;
-                snapshot = profile.Sessions.Current.Session.Snapshot;
+                operationLastMessage = profile.Sessions.Current.Session.Snapshot.Agent.Messages.LastOrDefault();
             }
+            finally { await profile.CloseSessionOwnerAsync(session).ConfigureAwait(false); }
         }
         else
         {
-            await using (var session = await lifecycle.OpenAsync(new(args.Session, args.Latest, args.Leaf), profile.SelectedModel, token).ConfigureAwait(false))
+            var session = await lifecycle.OpenAsync(new(args.Session, args.Latest, args.Leaf), profile.SelectedModel, token).ConfigureAwait(false);
+            try
             {
                 if (!string.Equals(Absolute(session.WorkingDirectory), profile.Workspace,
                     OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                     throw new SessionCommandException(SessionCommandFailure.WorkspaceMismatch);
                 previousLeaf = session.Snapshot.Context.LeafId;
-                profile.AttachOwner(session, options, Clock, NextId, lifecycle: lifecycle);
+                await profile.ApplySkillsAsync(session, token).ConfigureAwait(false);
+                await profile.AttachOwnerAsync(session, options, Clock, NextId, lifecycle: lifecycle).ConfigureAwait(false);
+                await profile.ApplyInitialToolSelectionAsync(session, token).ConfigureAwait(false);
+                if (settings is not null) { session.SteeringMode = settings.SteeringMode; session.FollowUpMode = settings.FollowUpMode; }
                 await profile.StartLifecycleAsync("resume", token).ConfigureAwait(false);
+                profile.ConfigureLifecycleModeStop(() => null); // One-shot intent; existing finally owns actual cleanup.
                 async Task<AgentLoopResult?> SubmitAsync()
                 {
-                    if (profile.InputAdmission is null)
+                    var admission = profile.SelectOneShotInputAdmission(args.Message!);
+                    if (admission is null)
                         return await session.PromptAsync(new TranscriptEntry("user", JsonData.Parse(JsonSerializer.Serialize(new
                             { role = "user", content = args.Message, timestamp = Clock() }))), token).ConfigureAwait(false);
-                    var submitted = await session.SubmitInputAsync(new(args.Message!), profile.InputAdmission,
+                    var submitted = await session.SubmitInputAsync(new(args.Message!), admission,
                         cancellationToken: token).ConfigureAwait(false);
                     inputDisposition = submitted.Disposition;
                     return submitted.Run;
@@ -273,12 +312,15 @@ public static class SessionCommands
                 else result = await SubmitAsync().ConfigureAwait(false);
                 await session.WaitForIdleAsync().ConfigureAwait(false);
                 await profile.Sessions!.Current.Session.WaitForIdleAsync().ConfigureAwait(false);
-                finalSessionPath = profile.Sessions.Current.Session.Path;
-                snapshot = profile.Sessions.Current.Session.Snapshot;
+                await profile.DrainLifecycleHandoffsAsync(session).ConfigureAwait(false);
+                operationLastMessage = profile.Sessions.Current.Session.Snapshot.Agent.Messages.LastOrDefault();
             }
+            finally { await profile.CloseSessionOwnerAsync(session).ConfigureAwait(false); }
         }
         // The attachment may have changed within a handled native command. Close all owned writers before reopening or reporting.
         await profile.Sessions!.DisposeAsync().ConfigureAwait(false);
+        finalSessionPath = profile.Sessions.Current.Session.Path;
+        snapshot = profile.Sessions.Current.Session.Snapshot;
         // Success is reported after the owned coordinator and writer have settled and closed.
         var bytes = new FileInfo(finalSessionPath).Length;
         if (snapshot.Fault is not null || bytes != snapshot.Log.CommittedByteLength)
@@ -297,7 +339,7 @@ public static class SessionCommands
         var failed = result is not null && result.Reason != AgentLoopStopReason.Completed || toolErrors ||
             result is not null && profile.UsedTurns != profile.ScriptTurns;
         var final = result?.Transcript.LastOrDefault(entry => entry.Role == "assistant")?.WireBody;
-        var lastMessage = inputDisposition == SubmittedInputDisposition.Handled ? null : snapshot.Agent.Messages.LastOrDefault();
+        var lastMessage = inputDisposition == SubmittedInputDisposition.Handled ? null : operationLastMessage;
         if (args.Json) return (JsonData.EmptyObject, failed ? 1 : 0, lastMessage);
         var report = JsonData.Parse(JsonSerializer.Serialize(new
         {

@@ -85,7 +85,9 @@ public sealed class AssistantStreamReducer
                 if (done.Reason is StopReason.Pending or StopReason.Error or StopReason.Aborted || done.Message.StopReason != done.Reason)
                     throw new StreamProtocolException("Done terminal has an inconsistent reason.");
                 CheckTerminalBounds(done.Message);
-                if (_blocks.Any(block => !block.Ended))
+                if (_blocks.Any(block => !block.Ended) &&
+                    !(done.Reason == StopReason.Length && _start!.Api == "openai-responses" &&
+                      _blocks.Where(block => !block.Ended).All(block => block.Content is TextContent)))
                     throw new StreamProtocolException("Successful terminal has an unfinished content block.");
                 var snapshot = Snapshot();
                 if (done.Message.Api != snapshot.Api || done.Message.Provider != snapshot.Provider || done.Message.Model != snapshot.Model)

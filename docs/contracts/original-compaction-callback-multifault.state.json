@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "9de08f67a5ac16e867a1460219f492ebeda076da",
+  "baseTree": "d05057d54186002b9d2528267d7ea9a35e26bb42",
+  "baseStatus": "historical-blocked-single-observer-sibling-fault-loss",
+  "status": "source-only-original-task-fault-inventory-correction",
+  "newGroups": 1,
+  "totalAuthoredLifecycleGroups": 10,
+  "registeredNewGroups": 0,
+  "executedNewGroups": 0,
+  "compilers": 0,
+  "builds": 0,
+  "acceptedParity": false,
+  "remaining": ["independent source review", "coordinator runner registration", "authorized exact-producer runtime qualification"]
+}
