@@ -8,7 +8,8 @@ using PiSharp.AI.Authentication;
 
 namespace PiSharp.AI.Protocols.AnthropicMessages;
 
-/// <summary>Actual configured Anthropic key/header-bearer/OAuth request construction. Explicit injected auth only; no ambient acquisition, SDK, send or retry. Existing key-only factory remains separate.</summary>
+/// <summary>Actual configured Anthropic key/header-bearer/OAuth/workload-identity request construction. Explicit injected auth only; no ambient acquisition, SDK, send or retry. Existing key-only factory remains separate.
+/// A federation request carries no credential: its client's <see cref="AnthropicFederationHandler"/> applies the Bearer token and OAuth beta.</summary>
 public sealed class AnthropicMessagesAuthenticatedRequestFactory
 {
     private readonly Uri _endpoint;
@@ -18,14 +19,20 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
     private readonly ImmutableArray<KeyValuePair<string, string?>> _headers;
     private readonly AnthropicInjectedAuthenticationBinding _authentication;
 
+    /// <summary>Non-null when requests rely on workload identity federation (Pi abe508e1 anthropic-messages.ts getAnthropicFederation):
+    /// a federation resolution whose request headers own no authorization, x-api-key or cf-aig-authorization value.</summary>
+    public AnthropicFederationConfiguration? Federation { get; }
+
     public AnthropicMessagesAuthenticatedRequestFactory(Uri baseUri, ModelDescriptor expectedModel,
         AnthropicMessagesRequestOptions projectionOptions, AnthropicInjectedAuthenticationBinding authentication,
         AnthropicMessagesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
         ArgumentNullException.ThrowIfNull(authentication); _authentication = authentication;
-        if (authentication.Authentication.Secret.Length is < 1 or > 4096 ||
-            authentication.Kind is not (AuthenticationKind.ApiKey or AuthenticationKind.BearerToken)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
+        if (authentication.Kind == AuthenticationKind.WorkloadIdentityFederation
+                ? authentication.Authentication.Secret.Length != 0 || authentication.Federation is null
+                : authentication.Authentication.Secret.Length is < 1 or > 4096 || authentication.Kind is not (AuthenticationKind.ApiKey or AuthenticationKind.BearerToken))
+            throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);
         if (baseUri is null || expectedModel is null || projectionOptions is null ||
             !double.IsFinite(_options.MaximumTokenMagnitude) || _options.MaximumTokenMagnitude <= 0 ||
             _options.MaxTokens is { } tokens && !double.IsFinite(tokens) || _options.MaximumKeyCharacters <= 0 || _options.MaximumBaseUriCharacters <= 0 ||
@@ -66,6 +73,13 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         ReadHeaders(_options.ModelHeaders, configured, ref supplied);
         foreach (var header in authentication.Headers) configured[header.Key] = header.Value;
         ReadHeaders(_options.Headers, configured, ref supplied);
+        if (authentication.Federation is { } federation)
+        {
+            // hasRequestAuth(apiKey, options.headers): option-owned auth wins over federation, as upstream.
+            var requestHeaders = new Dictionary<string, string?>(StringComparer.Ordinal); long ignored = 0;
+            ReadHeaders(_options.Headers, requestHeaders, ref ignored);
+            if (!AnthropicWorkloadIdentityFederation.HasRequestAuth(null, requestHeaders)) Federation = federation;
+        }
         var betaFeatures = projectionOptions.BetaFeatures;
         foreach (var header in configured)
             if (header.Key.Equals("anthropic-beta", StringComparison.OrdinalIgnoreCase))
@@ -161,7 +175,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         headers["content-type"] = "application/json"; // SDK's JSON encoder body headers override client defaults.
         if (projected.Value.TryGetProperty("betas", out var betas))
             headers["anthropic-beta"] = string.Join(',', betas.EnumerateArray().Select(value => value.GetString()));
-        if (!(headers.TryGetValue("x-api-key", out var admittedKey) && admittedKey.Length != 0) &&
+        if (Federation is null && !(headers.TryGetValue("x-api-key", out var admittedKey) && admittedKey.Length != 0) &&
             !(headers.TryGetValue("authorization", out var admittedBearer) && admittedBearer.Length != 0) && removedAuth.Count == 0)
             throw Fail(AnthropicMessagesKeyAuthRequestFailure.UnsupportedOptions);
         CheckHeaders(headers);

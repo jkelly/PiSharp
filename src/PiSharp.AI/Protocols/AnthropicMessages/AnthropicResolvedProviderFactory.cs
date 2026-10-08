@@ -14,8 +14,9 @@ public static class AnthropicResolvedProviderFactory
         JsonData? modelMetadata = null)
     {
         ArgumentNullException.ThrowIfNull(authentication);
-        // Existing fixed endpoint/model/key admission remains authoritative and unchanged.
-        Validate(model, endpoint, authentication.Authentication.Secret, "anthropic", "anthropic-messages", "https://api.anthropic.com/");
+        // Existing fixed endpoint/model/key admission remains authoritative and unchanged. Federation has no key.
+        Validate(model, endpoint, authentication.Kind == AuthenticationKind.WorkloadIdentityFederation ? null : authentication.Authentication.Secret,
+            "anthropic", "anthropic-messages", "https://api.anthropic.com/");
         var factory = new AnthropicMessagesAuthenticatedRequestFactory(endpoint, model, projectionOptions, authentication, requestOptions);
         var maximum = requestOptions?.MaxTokens ?? projectionOptions.MaximumTokens;
         if (modelMetadata is not null && (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue))
@@ -24,7 +25,7 @@ public static class AnthropicResolvedProviderFactory
         var responseOptions = new AnthropicMessagesOptions(OAuthToolNames: authentication.UseOAuthProjection,
             MaximumToolDeclarations: projectionOptions.MaximumDeclarations, MaximumActiveTools: projectionOptions.MaximumActiveTools,
             MaximumInputCharacters: projectionOptions.MaximumInputCharacters);
-        return Bind(model, handler, client =>
+        return Bind(model, handler, factory.Federation is { } federation ? (endpoint, federation) : null, client =>
         {
             IChatTransport Create(AnthropicMessagesAuthenticatedRequestFactory bound) => new AnthropicMessagesHttpSseTransport(client,
                 (request, token) => bound.Create(request, token), messagesOptions: responseOptions);
@@ -39,7 +40,7 @@ public static class AnthropicResolvedProviderFactory
                     authentication, (requestOptions ?? new()) with { MaxTokens = maximum })));
         });
     }
-    private static void Validate(ModelDescriptor model, Uri endpoint, string key, string provider, string api, string address)
+    private static void Validate(ModelDescriptor model, Uri endpoint, string? key, string provider, string api, string address)
     {
         ArgumentNullException.ThrowIfNull(model);
         // Fixed diagnostics intentionally exclude keys, supplied identities, endpoints and request content.
@@ -48,17 +49,21 @@ public static class AnthropicResolvedProviderFactory
             !endpoint.IsAbsoluteUri || endpoint.UserInfo.Length != 0 || endpoint.Fragment.Length != 0 ||
             endpoint.Query.Length != 0 || endpoint != new Uri(address))
             throw new ArgumentException("Unsupported native model or endpoint selection.");
-        if (string.IsNullOrEmpty(key) || key.Length > 4096 || key.Any(value => value is < '!' or > '~'))
+        if (key is not null && (key.Length is 0 or > 4096 || key.Any(value => value is < '!' or > '~')))
             throw new ArgumentException("Invalid explicit native API key.");
     }
 
     private static NativeHttpModelProvider Bind(ModelDescriptor model, HttpMessageHandler? handler,
-        Func<HttpClient, IChatTransport> create)
+        (Uri BaseUri, AnthropicFederationConfiguration Configuration)? federation, Func<HttpClient, IChatTransport> create)
     {
         // Caller-injected handlers are trusted offline seams and remain caller-owned.
-        var client = handler is null
-            ? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
-            : new HttpClient(handler, disposeHandler: false);
+        HttpMessageHandler inner = handler ?? new HttpClientHandler { AllowAutoRedirect = false };
+        // Pi keeps one federation SDK client so the token cache is shared; here one federation handler (and cache)
+        // serves every request of this provider client, and the exchange uses the same inner handler (the SDK's fetch).
+        HttpMessageHandler? outer = null;
+        try { if (federation is { } selected) outer = new AnthropicFederationHandler(selected.BaseUri, selected.Configuration, inner); }
+        catch { if (handler is null) inner.Dispose(); throw; }
+        var client = new HttpClient(outer ?? inner, disposeHandler: handler is null);
         // Cancellation controls SSE bodies; a fixed client timeout must not truncate a long answer.
         client.Timeout = Timeout.InfiniteTimeSpan;
         try { return new(model, client, create(client)); }

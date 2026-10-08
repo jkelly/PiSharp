@@ -15,11 +15,19 @@ public sealed class AnthropicInjectedAuthenticationBinding
     public AuthenticationKind Kind => Authentication.Kind;
     public AuthenticationOrigin Origin => Authentication.Origin;
     public bool UseOAuthProjection { get; }
+    /// <summary>Workload identity federation ids (no secret) for a federation resolution; otherwise null.</summary>
+    public AnthropicFederationConfiguration? Federation { get; }
 
     internal AnthropicInjectedAuthenticationBinding(ResolvedAuthentication authentication)
     {
         Authentication = authentication;
-        if (authentication.Kind == AuthenticationKind.ApiKey)
+        if (authentication.Kind == AuthenticationKind.WorkloadIdentityFederation)
+        {
+            // Pi abe508e1 anthropic-messages.ts getAnthropicFederation: the ids travel in the resolved env.
+            Headers = ImmutableDictionary<string, string>.Empty;
+            Federation = AnthropicWorkloadIdentityFederation.Configure("anthropic", null, null, authentication.CredentialEnvironment ?? new());
+        }
+        else if (authentication.Kind == AuthenticationKind.ApiKey)
         {
             ApiKey = authentication.Secret;
             Headers = ImmutableDictionary<string, string>.Empty;
@@ -69,11 +77,13 @@ public static class AnthropicInjectedTransportAdapter
         if (model.Provider != "anthropic" || model.Api != "anthropic-messages" || string.IsNullOrWhiteSpace(model.Id) ||
             model.Id.Length > 1024 || model.Id.Any(char.IsControl)) throw new ArgumentException("Unsupported Anthropic model identity.", nameof(model));
         if (resolution.Diagnostic != AuthenticationDiagnostic.Resolved || resolution.Authentication is not { } authentication ||
-            authentication.Kind is not (AuthenticationKind.ApiKey or AuthenticationKind.BearerToken) ||
-            authentication.Secret.Length is < 1 or > 4096)
+            (authentication.Kind == AuthenticationKind.WorkloadIdentityFederation ? authentication.Secret.Length != 0
+                : authentication.Kind is not (AuthenticationKind.ApiKey or AuthenticationKind.BearerToken) || authentication.Secret.Length is < 1 or > 4096))
             throw new ArgumentException("An admitted bounded authentication value is required.", nameof(resolution));
         cancellationToken.ThrowIfCancellationRequested();
         var binding = new AnthropicInjectedAuthenticationBinding(authentication);
+        if (authentication.Kind == AuthenticationKind.WorkloadIdentityFederation && binding.Federation is null)
+            throw new ArgumentException("Workload identity federation requires its rule, organization and identity token file.", nameof(resolution));
         Task<AnthropicTransportAdmission> original;
         try { original = acquire(model, binding, cancellationToken).AsTask(); }
         catch (Exception error) { throw new AnthropicAuthenticationOriginalFailure("acquisition", null, error); }
