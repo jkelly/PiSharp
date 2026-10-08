@@ -13,9 +13,11 @@ namespace PiSharp.Cli.Extensions;
 public sealed partial class NativeExtensionContextFacadeHost : IExtensionModelOperationsHost
 {
     // Upstream every session has a model registry. Without an explicit binding the host uses the process-wide CLI
-    // registry over the embedded catalogs, the process environment and the default auth.json, built on first use.
+    // registry over the embedded catalogs, the process environment and the default auth.json (stored OAuth refreshed as Pi does),
+    // built on first use.
     private static readonly Lazy<NativeExtensionModelOperations> DefaultModelOperations = new(() => new(
-        NativeExtensionModelOperations.CreateDefaultRegistry(LiveSessionRuntime.Default.ReadEnvironment, LiveSessionRuntime.Default.AuthPath)));
+        NativeExtensionModelOperations.CreateDefaultRegistry(LiveSessionRuntime.Default.ReadEnvironment, LiveSessionRuntime.Default.AuthPath,
+            LiveSessionRuntime.Default.CreateAuthHttp, LiveSessionRuntime.Default.Time)));
     private NativeExtensionModelOperations? modelOperations;
 
     /// <summary>Binds this host's model registry once, before its first use. Only application composition binds it;
