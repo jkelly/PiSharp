@@ -371,8 +371,10 @@ internal static class McpOAuthDiscoveryRefreshTests
             try
             {
                 var original = Adapter(store, exchange).CreateAuthentication().OnUnauthorized!(context, default).AsTask(); var error = await Join(original);
-                Expected(original.IsFaulted && ExactProtocolOutcome(error, leaf => leaf is McpOAuthProtocolException protocol && protocol.Code == "metadata_invalid") &&
-                    store.Saves == 1 && store.Current?.Tokens?.RefreshToken == "synthetic-refresh" && store.Current?.Tokens?.AccessToken == "synthetic-old", error);
+                // Pi v1.1.0 (packages/mcp/src/oauth/types.ts): servers send `""` for optional fields they have no value
+                // for, so an empty optional token field is absent rather than malformed (v0.99.1 rejected it).
+                Expected(error is null && !original.IsFaulted && store.Saves == 2 && store.Current?.Tokens?.AccessToken == "synthetic-new" &&
+                    store.Current?.Tokens?.RefreshToken == "synthetic-refresh" && store.Current?.Tokens?.Scope is null && store.Current?.Tokens?.IdToken is null, error);
             }
             catch (Exception error) { errors.Add(error); }
             finally { await exchange.Cleanup(errors); try { context.Response.Dispose(); } catch (Exception error) { errors.Add(error); } }
@@ -381,7 +383,8 @@ internal static class McpOAuthDiscoveryRefreshTests
     }
     private static async Task AdditionalTokenContracts()
     {
-        foreach (var row in new[] { (Json: "null", Seconds: 0d), (Json: "\"0x10\"", Seconds: 16d), (Json: "[\"2\"]", Seconds: 2d) })
+        // Pi v1.1.0: `expires_in: null` is absent (no expiry); v0.99.1 coerced it to 0, an immediately expired token.
+        foreach (var row in new[] { (Json: "null", Seconds: (double?)null), (Json: "\"0x10\"", Seconds: 16d), (Json: "[\"2\"]", Seconds: 2d) })
         {
             var store = new Store(); var exchange = new Exchange(); var context = Context(); var errors = new List<Exception>();
             exchange.Override = request => Task.FromResult(new McpOAuthExchangeResponse(200, request.Purpose switch

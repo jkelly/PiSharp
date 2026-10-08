@@ -115,6 +115,7 @@ public sealed class McpRegistrationCatalog
                     !names.Add(server.Name) || Find(server.Name) >= 0)
                     throw new InvalidOperationException("Initializer batch duplicates or replaces a foreign row.");
                 var copy = CopyConfiguration(server.Name, server.Config.Raw);
+                ThrowIfConflicting(next, server.Name);
                 next = next.Add(new(owner, new(server.Name, copy, extensionPath)));
             }
             if (!staged.IsEmpty) Commit(owner, next); // All validation/allocation precedes one publication.
@@ -142,6 +143,7 @@ public sealed class McpRegistrationCatalog
             var index = Find(name);
             if (index >= 0 && !ReferenceEquals(entries[index].Owner, owner))
                 throw new InvalidOperationException($"MCP server \"{name}\" is already registered by extension \"{entries[index].Server.ExtensionPath}\".");
+            ThrowIfConflicting(entries, name);
             var row = new Entry(owner, new McpRegisteredServer(name, copy, path));
             var next = index < 0 ? entries.Add(row) : entries.SetItem(index, row);
             Commit(owner, next);
@@ -164,6 +166,15 @@ public sealed class McpRegistrationCatalog
     private ImmutableArray<McpRegisteredServer> List(IExtensionRegistry owner)
     {
         lock (gate) { CheckOwner(owner); return Snapshot(entries); }
+    }
+
+    // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/extensions/loader.ts registerMcpServer.
+    // Names that differ only in `-` and `_` would share a namespace.
+    private static void ThrowIfConflicting(ImmutableArray<Entry> rows, string name)
+    {
+        foreach (var row in rows)
+            if (!StringComparer.Ordinal.Equals(row.Server.Name, name) && McpCatalogPlanner.Namespace(row.Server.Name) == McpCatalogPlanner.Namespace(name))
+                throw new InvalidOperationException($"MCP server \"{name}\" conflicts with registered server \"{row.Server.Name}\"");
     }
 
     private int Find(string name)
