@@ -73,7 +73,7 @@ public sealed class AzureResponsesTransport : IChatTransport
                                 throw new StreamLimitException("Azure Responses response headers exceed configured limits.");
                             headers[header.Key] = value;
                         }
-                        await inspect(new((int)borrowed.StatusCode, headers.ToImmutable()), _factory.Model, ct).ConfigureAwait(false);
+                        await Callback(() => inspect(new((int)borrowed.StatusCode, headers.ToImmutable()), _factory.Model, ct), ct).ConfigureAwait(false);
                     }, token).ConfigureAwait(false);
                 token.ThrowIfCancellationRequested();
                 var transferred = owner!;
@@ -125,6 +125,7 @@ public sealed class AzureResponsesTransport : IChatTransport
         {
             AzureHttpFailure http => http.Message,
             AzureSettledFailure settledFailure => settledFailure.Message,
+            AzureCallbackFailure => "Azure Responses request failed.",
             OperationCanceledException when cancelled => "Request was aborted",
             OperationCanceledException => "Azure Responses request timed out.",
             StreamLimitException or AzureResponsesException { Failure: AzureResponsesFailure.ResourceLimit } => "Azure Responses input exceeds configured limits.",
@@ -161,7 +162,7 @@ public sealed class AzureResponsesTransport : IChatTransport
                     using var document = JsonDocument.Parse(data, new JsonDocumentOptions { MaxDepth = limits.MaximumJsonDepth });
                     if (document.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException();
                     dto = JsonData.FromElement(document.RootElement);
-                    if (_options.Hooks.OnProviderStreamEvent is { } hook) await hook(dto, _factory.Model, token).ConfigureAwait(false);
+                    if (_options.Hooks.OnProviderStreamEvent is { } hook) await Callback(() => hook(dto, _factory.Model, token), token).ConfigureAwait(false);
                     token.ThrowIfCancellationRequested();
                 }
                 catch (SseDecodeException error)
@@ -213,6 +214,17 @@ public sealed class AzureResponsesTransport : IChatTransport
     private static string Truncate(string text) => text.Length <= 4000 ? text : text[..4000] + $"... [truncated {text.Length - 4000} chars]";
     private static bool Truthy(JsonElement value) => value.ValueKind switch
     { JsonValueKind.Null or JsonValueKind.False => false, JsonValueKind.String => !string.IsNullOrEmpty(value.GetString()), JsonValueKind.Number => value.GetDouble() != 0, _ => true };
+    // Caller callbacks can throw any exception type, including ones that overlap transport failures
+    // (JsonException, limits, cancellation). Wrap them so classification never mistakes a callback
+    // fault for a malformed, over-limit or timed-out stream. Cancellation of the operation's own
+    // token stays a cancellation.
+    private static async ValueTask Callback(Func<ValueTask> invoke, CancellationToken token)
+    {
+        try { await invoke().ConfigureAwait(false); }
+        catch (Exception error) when (!(error is OperationCanceledException && token.IsCancellationRequested))
+        { throw new AzureCallbackFailure(error); }
+    }
     private sealed class AzureHttpFailure(string message) : Exception(message);
     private sealed class AzureSettledFailure(string message) : Exception(message);
+    private sealed class AzureCallbackFailure(Exception inner) : Exception("Azure Responses callback failed.", inner);
 }
