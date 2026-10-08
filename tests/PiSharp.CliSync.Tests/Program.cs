@@ -46,7 +46,10 @@ internal static partial class Program
             ("osc7501.query-and-reply-detection", Sync(Replies)),
             ("osc7501.channel-override-negotiation-and-restart", Sync(Channel)),
             ("osc7501.reporter-run-dialog-and-compaction-lifecycle", Sync(Reporter)),
-            ("osc7501.terminal-view-start-report-and-stop", TerminalView)
+            ("osc7501.terminal-view-start-report-and-stop", TerminalView),
+            ("wire.agent-settled.json-mode-record-with-aborted", JsonModeAgentSettled),
+            ("wire.agent-settled.native-extension-observation-and-reported-failure", ExtensionAgentSettled),
+            ("wire.rpc-bash.interactive-bang-commands-abort-and-bounded-deltas", InteractiveUserBash)
         };
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)

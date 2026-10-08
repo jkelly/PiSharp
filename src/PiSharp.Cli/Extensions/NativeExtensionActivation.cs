@@ -182,12 +182,15 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         compaction.Attach(owner, owner.Current);
         var metadata = new NativeSessionInfoChangedBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         metadata.Attach(owner, owner.Current);
+        var settled = new NativeAgentSettledObservationBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
+        settled.Attach(owner, owner.Current);
         var replacementStart = new NativeReplacementSessionStartBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         _sessionViews.BeforeSwitch = new NativeSessionBeforeSwitchBinding(_registry, Binding.Snapshot, _closing.Token).BeforeSwitchAsync;
         _sessionViews.AfterSwitch = async replacement =>
         {
             compaction.Attach(owner, replacement.Current);
             metadata.Attach(owner, replacement.Current);
+            settled.Attach(owner, replacement.Current);
             await replacementStart.PublishAsync(owner, replacement).ConfigureAwait(false);
         };
         owner.BeforeReplacement = _sessionViews.BeforeSwitch;
