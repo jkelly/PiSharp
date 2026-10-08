@@ -16,7 +16,7 @@ namespace PiSharp.Cli.Commands;
 /// <summary>The live route's effects: the process environment reader (read once per name for the session), the provider HTTP
 /// handler, and the <c>auth.json</c> path (null: no stored credentials) with the client and clock its OAuth refresh uses.</summary>
 internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment, Func<HttpMessageHandler?> CreateHttpHandler,
-    string? AuthPath = null, Func<HttpMessageInvoker>? CreateAuthHttp = null, TimeProvider? Time = null)
+    string? AuthPath = null, Func<HttpMessageInvoker>? CreateAuthHttp = null, TimeProvider? Time = null, string? ModelsPath = null)
 {
     /// <summary>Provider variables read when the session starts (env-api-keys.ts, anthropic.ts and azure-openai-config.ts).</summary>
     internal static readonly ImmutableArray<string> ProviderVariables =
@@ -31,8 +31,37 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
 
     // A stored auth.json credential (written by /login) owns the Anthropic provider; the environment is read only without one.
     internal static LiveSessionRuntime Default => DefaultRuntime.Value;
-    private static readonly Lazy<LiveSessionRuntime> DefaultRuntime = new(() => new(Environment.GetEnvironmentVariable, () => null,
-        PiSharp.Cli.Authentication.AuthJsonCredentialStore.CreateDefault().AuthPath));
+    private static readonly Lazy<LiveSessionRuntime> DefaultRuntime = new(() =>
+    {
+        var authPath = PiSharp.Cli.Authentication.AuthJsonCredentialStore.CreateDefault().AuthPath;
+        // model-runtime.ts: models.json (and models-store.json) live in the agent directory next to auth.json.
+        return new(Environment.GetEnvironmentVariable, () => null, authPath, ModelsPath: Path.Combine(Path.GetDirectoryName(authPath)!, "models.json"));
+    });
+
+    /// <summary>The session's model registry (model-runtime.ts create): built-in shards, the runtime's models.json, persisted catalogs
+    /// restored without network, the stored <c>auth.json</c> credentials, and a lazily read environment (each name read once).</summary>
+    internal async Task<PiSharp.Cli.Models.ModelRegistry> CreateModelRegistryAsync(CancellationToken cancellationToken)
+    {
+        var environment = new PiSharp.Cli.Authentication.LiveProcessEnvironment(ReadEnvironment, []);
+        var stored = new Dictionary<string, ProviderStoredCredential>(StringComparer.Ordinal);
+        if (AuthPath is not null && File.Exists(AuthPath))
+        {
+            var store = new PiSharp.Cli.Authentication.AuthJsonCredentialStore(AuthPath, Time);
+            try
+            {
+                foreach (var (provider, _) in await store.ListAsync(cancellationToken).ConfigureAwait(false))
+                    if (await store.ReadEntryAsync(provider, cancellationToken).ConfigureAwait(false) is { } entry)
+                        stored[provider] = new(entry.Type, entry.Key, entry.Environment);
+            }
+            catch (Exception error) when (error is InvalidDataException or IOException or UnauthorizedAccessException or PiSharp.AI.Authentication.OAuth.OAuthLifecycleException)
+            { stored.Clear(); } // An unreadable store leaves the environment as the only credential source, as for availability upstream.
+        }
+        return await PiSharp.Cli.Models.ModelRegistry.CreateAsync(new()
+        {
+            ModelsPath = ModelsPath, Environment = environment.Get, StoredCredentials = stored,
+            ModelsStore = ModelsPath is null ? null : new PiSharp.Cli.Models.FileModelsStore(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(ModelsPath))!, "models-store.json"))
+        }, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>The session's environment, built once from <see cref="ReadEnvironment"/>.</summary>
     internal PiSharp.Cli.Authentication.LiveProcessEnvironment CreateEnvironment() => new(ReadEnvironment, ProviderVariables);
@@ -44,47 +73,76 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
 internal sealed class LiveSessionException(string code, string message) : Exception(message)
 { internal string Code { get; } = code; }
 
-/// <summary>Explicit caller selection from byte-pinned released metadata; parsing never acquires credentials or sends.</summary>
+/// <summary>Explicit caller selection from byte-pinned released metadata, models.json or a restored catalog; parsing never acquires
+/// credentials or sends.</summary>
 internal sealed class LiveSessionSelection
 {
-    private static readonly ImmutableDictionary<string, string> CatalogHashes = new Dictionary<string, string>
+    /// <summary>The providers whose fixed native factories predate the catalog routes; their unmodified pinned models keep those factories.</summary>
+    private static readonly ImmutableHashSet<string> FixedRouteProviders = ["anthropic", "openai", "mistral", "openrouter", "azure"];
+
+    /// <summary>Whether a chat model's API has a native live route. anthropic, azure and mistral keep their provider routes; openai-codex,
+    /// github-copilot, amazon-bedrock and the Cloudflare providers need their own auth (IMPL-A1), and google-vertex needs ADC or an API-key
+    /// transport mode; everything else streams through the catalog route of its API.</summary>
+    internal static bool SupportedApi(string provider, string api) => provider switch
     {
-        ["anthropic"] = "aa4342dfb96feb1619794113619d6630088d6ac544c547a4f9899a0a7f26419b",
-        ["openai"] = "f4c1ac9f8f84cb9f2a952b0ceec51c90a38b31b4cdf33200e018ece9d408e95f",
-        ["mistral"] = "fcd37c7b178416f86954efdacbb45726d10f102fd1211062792691e62fcf327c",
-        ["openrouter"] = "c86aa3b95d412465dac54cb902402cbdb40f47a1fe33f12b002913834724d8f0",
-        ["azure"] = "46c4e25b84463c6475e706c581196d2735c35feb9612d2efca0ab932c917d727"
-    }.ToImmutableDictionary(StringComparer.Ordinal);
-    /// <summary>The live APIs per provider; azure (providers/azure.ts) serves both of its catalog APIs.</summary>
-    private static bool SupportedApi(string provider, string api) => provider switch
-    {
-        "anthropic" => api == "anthropic-messages", "openai" => api == "openai-responses", "mistral" => api == "mistral-conversations",
-        "azure" => api is "azure-openai-responses" or "openai-completions", _ => api == "openai-completions"
+        "anthropic" => api == "anthropic-messages", "mistral" => api == "mistral-conversations",
+        "azure" => api is "azure-openai-responses" or "openai-completions",
+        "openai-codex" or "github-copilot" or "amazon-bedrock" or "cloudflare-workers-ai" or "cloudflare-ai-gateway" => false,
+        _ => api is "openai-completions" or "openai-responses" or "anthropic-messages" or "google-generative-ai" or "pi-messages" or "mistral-conversations"
     };
     internal FrozenCatalogModel Definition { get; }
     internal ModelDescriptor Model { get; }
     internal int MaximumOutputTokens { get; }
+    /// <summary>The registry entry the selection came from, and the registry that resolves its request auth (null: legacy pinned parse).</summary>
+    internal PiSharp.Cli.Models.RegistryModel? Entry { get; private init; }
+    internal PiSharp.Cli.Models.ModelRegistry? Registry { get; private init; }
+    /// <summary>The thinking level a <c>--model pattern:level</c> or scoped pattern named (cliThinkingFromModel).</summary>
+    internal string? PatternThinkingLevel { get; set; }
+    internal ImmutableArray<string> Warnings { get; set; } = [];
+    internal ImmutableArray<PiSharp.Cli.Models.ScopedModel> ScopedModels { get; set; } = [];
+    /// <summary>True when the unmodified pinned row of a fixed-route provider is selected (the pre-catalog factories serve it).</summary>
+    internal bool FixedRoute => FixedRouteProviders.Contains(Model.Provider) && (Entry is null || Entry.Pinned is not null);
     private LiveSessionSelection(FrozenCatalogModel definition, int maximumOutputTokens)
     { Definition = definition; Model = new(definition.Id, definition.DeclaredApi, definition.Provider); MaximumOutputTokens = maximumOutputTokens; }
-    internal static LiveSessionSelection Parse(string? provider, string? model, string? maximumTokens)
+
+    internal static int ParseMaximumTokens(string? maximumTokens)
     {
-        if (provider is null || !CatalogHashes.ContainsKey(provider) || string.IsNullOrWhiteSpace(model) ||
-            model.Length > 1024 || model.Any(char.IsControl)) throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
         var tokens = 1024;
         if (maximumTokens is not null && (!int.TryParse(maximumTokens, System.Globalization.NumberStyles.None,
             System.Globalization.CultureInfo.InvariantCulture, out tokens) || tokens is < 1 or > 8192))
             throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
-        using var resource = typeof(LiveSessionSelection).Assembly.GetManifestResourceStream("PiSharp.Cli.Models." + provider + ".json")
-            ?? throw new LiveSessionException("LiveCatalogUnavailable", "The pinned live model catalog is unavailable.");
-        using var buffer = new MemoryStream(); resource.CopyTo(buffer); var bytes = buffer.ToArray();
-        if (Convert.ToHexStringLower(SHA256.HashData(bytes)) != CatalogHashes[provider])
-            throw new LiveSessionException("LiveCatalogMismatch", "The pinned live model catalog hash differs.");
-        var catalog = FrozenModelCatalog.ReadProviderJson(provider, bytes);
+        return tokens;
+    }
+
+    /// <summary>An exact pinned id of a built-in provider (no models.json, no pattern matching, no environment).</summary>
+    internal static LiveSessionSelection Parse(string? provider, string? model, string? maximumTokens)
+    {
+        if (provider is null || !PiSharp.Cli.Models.BuiltinModelCatalog.Has(provider) || string.IsNullOrWhiteSpace(model) ||
+            model.Length > 1024 || model.Any(char.IsControl)) throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
+        var tokens = ParseMaximumTokens(maximumTokens);
+        FrozenModelCatalog catalog;
+        try { catalog = PiSharp.Cli.Models.BuiltinModelCatalog.Get(provider); }
+        catch (PiSharp.Cli.Models.BuiltinCatalogException error) { throw new LiveSessionException(error.Code, error.Message); }
         if (!catalog.TryGetModel(CatalogModelType.Chat, model, out var definition) || !SupportedApi(provider, definition.DeclaredApi))
             throw new LiveSessionException("UnknownLiveModel", "Select a chat model from the pinned provider catalog for the supported live API.");
         var modelLimit = definition.Raw.Value.GetProperty("maxTokens").GetDouble();
         if (tokens > modelLimit) throw new LiveSessionException("LiveOutputLimit", "The requested output limit exceeds the selected model metadata.");
         return new(definition, tokens);
+    }
+
+    /// <summary>A resolved registry entry (any provider, models.json custom model or fallback id) for its live route.</summary>
+    internal static LiveSessionSelection FromEntry(PiSharp.Cli.Models.RegistryModel entry, PiSharp.Cli.Models.ModelRegistry? registry, string? maximumTokens)
+    {
+        var tokens = ParseMaximumTokens(maximumTokens);
+        if (entry.Type != CatalogModelType.Chat || PiSharp.Cli.Models.VirtualModels.IsVirtual(entry) || !SupportedApi(entry.Provider, entry.Api))
+            throw new LiveSessionException("LiveApiUnavailable",
+                $"Model \"{entry.Provider}/{entry.Id}\" uses the {(entry.Api.Length == 0 ? "unknown" : entry.Api)} API, which has no live route in PiSharp yet.");
+        FrozenCatalogModel definition;
+        try { definition = entry.ToDefinition(); }
+        catch (CatalogReadException) { throw new LiveSessionException("UnknownLiveModel", $"Model \"{entry.Provider}/{entry.Id}\" lacks the catalog metadata its live route needs."); }
+        if (tokens > definition.Raw.Value.GetProperty("maxTokens").GetDouble())
+            throw new LiveSessionException("LiveOutputLimit", "The requested output limit exceeds the selected model metadata.");
+        return new(definition, tokens) { Entry = entry, Registry = registry };
     }
     /// <param name="reresolve">The provider's auth resolution, run again before every request (model-runtime prepareRequest); null keeps
     /// the explicit admitted <paramref name="authentication"/> for the whole session.</param>
@@ -122,11 +180,30 @@ internal sealed class LiveSessionSelection
     {
         runtime ??= LiveSessionRuntime.Default;
         var environment = runtime.CreateEnvironment();
-        var variable = Model.Provider switch { "openai" => "OPENAI_API_KEY", "openrouter" => "OPENROUTER_API_KEY", "mistral" => "MISTRAL_API_KEY",
-            "azure" => "AZURE_OPENAI_API_KEY", _ => "ANTHROPIC_API_KEY" };
-        var key = environment.Get(variable);
-        if (string.IsNullOrWhiteSpace(key) || key.Length > 4096 || key.Any(char.IsControl))
-            throw new LiveSessionException("MissingLiveApiKey", "Set the existing " + variable + " environment variable before launching the live session.");
+        string? key; IReadOnlyDictionary<string, string>? headers = null;
+        if (Registry is null && FixedRouteProviders.Contains(Model.Provider))
+        {
+            var variable = Model.Provider switch { "openai" => "OPENAI_API_KEY", "openrouter" => "OPENROUTER_API_KEY", "mistral" => "MISTRAL_API_KEY",
+                "azure" => "AZURE_OPENAI_API_KEY", _ => "ANTHROPIC_API_KEY" };
+            key = environment.Get(variable);
+            if (string.IsNullOrWhiteSpace(key) || key.Length > 4096 || key.Any(char.IsControl))
+                throw new LiveSessionException("MissingLiveApiKey", "Set the existing " + variable + " environment variable before launching the live session.");
+        }
+        else
+        {
+            // model-registry.ts getApiKeyAndHeaders: stored api_key, models.json apiKey, the provider's variable; then configured headers.
+            var registry = Registry ?? PiSharp.Cli.Models.ModelRegistry.Create(new() { Environment = environment.Get });
+            var auth = registry.ResolveRequestAuth(Entry ?? PiSharp.Cli.Models.RegistryModel.FromCatalog(Definition), out var error);
+            key = auth?.ApiKey;
+            if (string.IsNullOrWhiteSpace(key) || key.Length > 4096 || key.Any(char.IsControl))
+            {
+                var variables = ProviderEnvironmentKeys.GetApiKeyVariables(Model.Provider);
+                throw new LiveSessionException("MissingLiveApiKey", error ?? (variables is [var single]
+                    ? "Set the existing " + single + " environment variable before launching the live session."
+                    : $"No API key found for \"{Model.Provider}\". Set its API key in models.json, auth.json or the environment before launching the live session."));
+            }
+            headers = auth!.Headers;
+        }
         AzureEndpointOptions? azure = null;
         if (Model.Provider == "azure")
         {
@@ -136,7 +213,7 @@ internal sealed class LiveSessionSelection
             catch (ArgumentException error) { throw new LiveSessionException("LiveAzureEndpoint", error.Message); }
         }
         // The profile joins Agent/session work before disposing factory-owned providers. Injected handlers remain caller-owned.
-        return new(this, runtime.CreateHttpHandler(), key) { Azure = azure };
+        return new(this, runtime.CreateHttpHandler(), key) { Azure = azure, RequestHeaders = headers };
     }
 }
 
@@ -193,6 +270,8 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     private readonly List<AnthropicInjectedTransportLease> _replacedMains = [];
     /// <summary>Azure endpoint/deployment configuration (the session's AZURE_OPENAI_* values) for provider azure.</summary>
     internal AzureEndpointOptions? Azure { get; init; }
+    /// <summary>Resolved models.json provider/model headers and <c>authHeader</c> (getApiKeyAndHeaders), sent with every request.</summary>
+    internal IReadOnlyDictionary<string, string>? RequestHeaders { get; init; }
     internal static async ValueTask<LiveSessionConnection> ConnectResolvedAsync(LiveSessionSelection selected,
         AuthenticationResolution authentication, HttpMessageHandler? handler, CancellationToken token,
         Func<CancellationToken, ValueTask<AuthenticationResolution>>? reresolve = null)
@@ -292,6 +371,8 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         var model = selection.Model; var definition = selection.Definition;
         var maximum = outputTokens ?? MaximumOutputTokens;
         var reasoning = definition.Raw.Value.GetProperty("reasoning").GetBoolean();
+        if (model.Provider is not ("azure" or "anthropic") && !(selection.FixedRoute && RequestHeaders is null))
+            return Own(CreateCatalogProvider(maximum, reasoning, summary));
         if (model.Api == "mistral-conversations")
         {
             var endpoint = new Uri(definition.BaseUrl);
@@ -347,6 +428,52 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     }
     private IChatTransport Own(NativeHttpModelProvider provider)
     { _providers.Add(provider); return provider.Transport; }
+
+    /// <summary>models.ts createProvider: the provider's API implementation at the model's own base URL with the session key and
+    /// the resolved configured headers. The summary binding is metadata-free and uncached, as on the fixed routes.</summary>
+    private NativeHttpModelProvider CreateCatalogProvider(int maximum, bool reasoning, bool summary)
+    {
+        var model = selection.Model; var definition = selection.Definition;
+        var headers = RequestHeaders is null ? null : JsonData.Parse(System.Text.Json.JsonSerializer.Serialize(RequestHeaders));
+        switch (model.Api)
+        {
+            case "openai-completions":
+                return NativeProviderFactory.CreateCatalogCompletions(model, definition.BaseUrl, credential,
+                    new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
+                        ToolDeclarations: new(MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576)) { ModelSupportsImages = definition.DeclaresImageInput },
+                    new(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
+                        MaximumPayloadBytes: 1_048_576) { Headers = headers }, definition.Raw, handler, thinkingProfile: !summary);
+            case "openai-responses":
+                return NativeProviderFactory.CreateCatalogResponses(model, definition.BaseUrl, credential,
+                    new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576),
+                    new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: 1_048_576) { Headers = headers },
+                    definition.Raw, handler, thinkingProfile: !summary);
+            case "anthropic-messages":
+                return NativeProviderFactory.CreateCatalogAnthropic(model, definition.BaseUrl, credential,
+                    AnthropicThinkingCompat(new(MaximumTokens: maximum, ModelReasoning: reasoning, ModelSupportsImages: definition.DeclaresImageInput,
+                        ThinkingEnabled: false, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
+                        CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw, summary),
+                    new(MaxTokens: maximum, Headers: headers, MaximumPayloadBytes: 1_048_576), definition.Raw, handler, thinkingProfile: !summary);
+            case "google-generative-ai":
+                return NativeProviderFactory.CreateCatalogGoogle(model, credential, definition.Raw,
+                    new PiSharp.AI.Protocols.GoogleGenerativeAI.GoogleGenerativeAIOptions(definition.Raw) { MaxTokens = maximum, Headers = headers }, handler);
+            case "pi-messages":
+                return NativeProviderFactory.CreateCatalogPiMessages(model, credential, definition.Raw,
+                    new PiSharp.AI.Protocols.PiMessages.PiMessagesOptions(definition.Raw)
+                    { MaxTokens = maximum, Headers = headers, CacheRetention = summary ? "none" : null }, handler);
+            case "mistral-conversations":
+            {
+                var endpoint = new Uri(definition.BaseUrl);
+                var costs = definition.Raw.Value.GetProperty("cost");
+                var options = new MistralTextOptions(endpoint, SupportsText: true,
+                    new(costs.GetProperty("input").GetDouble(), costs.GetProperty("output").GetDouble(),
+                        costs.GetProperty("cacheRead").GetDouble(), costs.GetProperty("cacheWrite").GetDouble()), "PiSharp")
+                    { MaxTokens = maximum, Reasoning = !summary && reasoning, CachePrompt = !summary, SupportsImages = definition.DeclaresImageInput };
+                return NativeProviderFactory.CreateCatalogMistral(model, definition.BaseUrl, credential, definition.Raw, options, simple: !summary, handler);
+            }
+            default: throw new LiveSessionException("LiveApiUnavailable", $"The {model.Api} API has no live route in PiSharp yet.");
+        }
+    }
     public void Dispose()
     {
         if (_resolvedMain is not null) throw new InvalidOperationException("Resolved connections require awaited DisposeAsync.");
