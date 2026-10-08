@@ -176,7 +176,6 @@ public sealed partial class OpenAIChatGPTOAuth(HttpMessageInvoker http, Func<str
     public const string Resource = "https://api.openai.com/v1";
     public const string DirectTokenScope = "chatgpt.tokens.use.direct";
     public const string Scope = "openid profile email offline_access resource.invoke " + DirectTokenScope;
-    private const long ExpiryMarginMilliseconds = 3 * 60 * 1000;
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private string RedirectUri => $"http://127.0.0.1:{callbackPort}/auth/callback";
     private string TokenUrl => authBaseUrl + "/api/accounts/oauth/token";
@@ -267,28 +266,12 @@ public sealed partial class OpenAIChatGPTOAuth(HttpMessageInvoker http, Func<str
         return response.Json() ?? throw new InvalidOperationException("OpenAI OAuth token response must be an object");
     }
 
-    private OAuthCredentialSnapshot Credential(JsonObject token, string clientId)
-    {
-        string Required(string field) => OAuthFlows.OptionalText(token, field) is { } value && value.Trim().Length != 0 ? value
-            : throw new InvalidOperationException($"OpenAI OAuth token response has invalid {field}");
-        var access = Required("access_token"); var refresh = Required("refresh_token"); var scope = Required("scope");
-        if (OAuthFlows.Number(token, "expires_in") is not { } expiresIn || expiresIn <= 0) throw new InvalidOperationException("OpenAI OAuth token response has invalid expires_in");
-        var scopes = scope.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        if (!scopes.Contains(DirectTokenScope)) throw new InvalidOperationException($"OpenAI OAuth grant did not include {DirectTokenScope}");
-        return new(access, refresh, (long)(_time.GetUtcNow().ToUnixTimeMilliseconds() + expiresIn * 1000 - ExpiryMarginMilliseconds),
-            new Dictionary<string, string> { ["clientId"] = clientId },
-            new Dictionary<string, JsonData> { ["scopes"] = JsonData.Parse(JsonSerializer.Serialize(scopes)) });
-    }
+    private OAuthCredentialSnapshot Credential(JsonObject token, string clientId) =>
+        OpenAIChatGPTOAuthRefresh.CredentialFromTokenResponse(JsonSerializer.SerializeToElement(token), clientId, _time.GetUtcNow().ToUnixTimeMilliseconds());
 
-    public async Task<OAuthCredentialSnapshot> RefreshAsync(string provider, OAuthCredentialSnapshot current, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(current);
-        if (!current.ProviderData.TryGetValue("clientId", out var clientId) || clientId.Trim().Length == 0)
-            throw new InvalidOperationException("Stored OpenAI OAuth credential does not contain an issued client ID; reconnect ChatGPT");
-        var token = await RequestTokenAsync(OAuthFlows.Form(("grant_type", "refresh_token"), ("client_id", clientId), ("refresh_token", current.Refresh),
-            ("resource", Resource)), cancellationToken, login: false).ConfigureAwait(false);
-        return Credential(token, clientId);
-    }
+    /// <summary>Refreshes through the shared <see cref="OpenAIChatGPTOAuthRefresh"/> (one ChatGPT refresh implementation).</summary>
+    public Task<OAuthCredentialSnapshot> RefreshAsync(string provider, OAuthCredentialSnapshot current, CancellationToken cancellationToken) =>
+        new OpenAIChatGPTOAuthRefresh(http, _time, TokenUrl).RefreshAsync(provider, current, cancellationToken);
 
     public ProviderModelAuth ToAuth(OAuthCredentialSnapshot credential) => new(credential.Access);
 

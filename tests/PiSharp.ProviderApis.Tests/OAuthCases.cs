@@ -110,8 +110,13 @@ internal static partial class Program
         var exchange = http.All.Single().Body;
         Check(exchange.StartsWith("grant_type=authorization_code&client_id=client-xyz&code=c1&code_verifier=", StringComparison.Ordinal) &&
             exchange.EndsWith($"&redirect_uri=http%3A%2F%2F127.0.0.1%3A{port}%2Fauth%2Fcallback&resource=https%3A%2F%2Fapi.openai.com%2Fv1", StringComparison.Ordinal), "exchange " + exchange);
-        await oauth.RefreshAsync("openai", credential, default);
+        var refreshed = await oauth.RefreshAsync("openai", credential, default);
         Equal("grant_type=refresh_token&client_id=client-xyz&refresh_token=chatgpt-refresh&resource=https%3A%2F%2Fapi.openai.com%2Fv1", http.All.Last().Body, "refresh");
+        Equal("https://auth.example/api/accounts/oauth/token", http.All.Last().Url, "refresh url");
+        Check(refreshed.ProviderData["clientId"] == "client-xyz" && refreshed.ProviderJson.ContainsKey("scopes"), "refreshed credential keeps clientId and scopes");
+        // One refresh registry: every upstream OAuth provider refreshes a stored credential (auth/oauth/load.ts).
+        var registered = PiSharp.Cli.Extensions.NativeExtensionModelOperations.DefaultOAuthRefreshes(NoEnvironment, () => new HttpClient(), time);
+        Equal("anthropic,github-copilot,kimi-coding,meta,openai,openai-codex,openrouter,radius,xai", string.Join(",", registered.Keys.Order(StringComparer.Ordinal)), "registered refreshes");
         Equal("Stored OpenAI OAuth credential does not contain an issued client ID; reconnect ChatGPT",
             (await Throws<InvalidOperationException>(() => oauth.RefreshAsync("openai", new("a", "r", 1), default))).Message, "no client id");
     }
