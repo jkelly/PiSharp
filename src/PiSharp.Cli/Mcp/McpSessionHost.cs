@@ -205,7 +205,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                         grants.AdmitExact(McpCodemode.Name, $"{scope.OwnerId}/{scope.OwnerGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture)}/{McpCodemode.RegistrationId}");
                 }
                 manager = new McpServerManager(configured, configErrors, trustedProject, new(Bind, resources, credentials, CreateClient,
-                    Resolve, OpenUrl ?? PiSharp.Cli.Commands.McpCommand.OpenBrowser, AgentDirectory));
+                    Resolve, OpenUrl ?? PiSharp.Cli.Commands.McpCommand.OpenBrowser, AgentDirectory) { AutoEnableCodemode = autoEnableCodemode });
                 return new McpSessionRuntimeAdmission(nativeRegistry, owned, discovery, exactPolicy, new McpServerCatalog(admitted, []), [],
                     autoEnableCodemode, prepare)
                 {

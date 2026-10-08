@@ -98,6 +98,8 @@ public sealed class McpServerManager
     {
         /// <summary>Saves a change to the mcp.json that defines the server (its project override when set).</summary>
         public Action<McpServerEntry, bool?, McpExposure?, bool>? UpdateConfig { get; init; }
+        /// <summary>autoEnableCodemode of the configuration: whether `codemode` servers activate the codemode tool.</summary>
+        public bool AutoEnableCodemode { get; init; } = true;
     }
 
     private readonly object gate = new();
@@ -296,8 +298,17 @@ public sealed class McpServerManager
         if (slot is null) return $"No MCP server named \"{name}\".";
         if (!IsEnabled(slot) || slot.Server is null) return $"MCP server \"{name}\" is disabled.";
         await ReconnectCoreAsync(slot, token).ConfigureAwait(false);
-        lock (gate) return slot.State == ConnectionState.Failed ? slot.Error : null;
+        EnsureDiscoveryActive();
+        lock (gate) return ReconnectFailure(slot);
     }
+
+    /// <summary>What reconnect reports when the connection failed: runtime.ts connectFailed or signInRequiredMessage.</summary>
+    private static string? ReconnectFailure(Slot slot) => slot.State switch
+    {
+        ConnectionState.Failed => $"MCP server \"{slot.Entry.Name}\" failed to connect: {slot.Error}",
+        ConnectionState.NeedsAuth => McpProviderTokenAuthentication.SignInRequiredMessage(slot.Entry),
+        _ => null
+    };
 
     private async Task ReconnectCoreAsync(Slot slot, CancellationToken token)
     {
@@ -427,6 +438,7 @@ public sealed class McpServerManager
             return null;
         }
         if (slot.Server is null) await StartAsync(slot, token).ConfigureAwait(false);
+        EnsureDiscoveryActive();
         return null;
     }
 
@@ -450,8 +462,28 @@ public sealed class McpServerManager
                 if (kept.Length != active.Length) session.Attachment.Session.ScheduleToolActivation(kept, token);
             }
         }
+        EnsureDiscoveryActive();
         Changed();
         return null;
+    }
+
+    /// <summary>ensureDiscoveryActive after a change: activate codemode for enabled `codemode` servers (unless autoEnableCodemode is
+    /// false) and tool_search for `deferred` ones, when the session registers them and they are not active yet.</summary>
+    private void EnsureDiscoveryActive()
+    {
+        if (Session() is not { } session) return;
+        HashSet<McpExposure> exposures;
+        lock (gate) exposures = [.. servers.Where(IsEnabled).SelectMany(slot => McpConfigurationReader.ConfiguredExposures(slot.Entry.Config))];
+        var registered = session.Attachment.Session.CaptureToolCatalogRegistry().RegisteredTools.Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
+        var active = session.Attachment.Session.GetToolActivationSelection().Names;
+        var activate = new List<string>();
+        if (exposures.Contains(McpExposure.Codemode) && dependencies.AutoEnableCodemode && registered.Contains(McpCodemode.Name) && !active.Contains(McpCodemode.Name))
+            activate.Add(McpCodemode.Name);
+        if (exposures.Contains(McpExposure.Deferred) && registered.Contains(McpToolSearch.Name) && !active.Contains(McpToolSearch.Name))
+            activate.Add(McpToolSearch.Name);
+        if (activate.Count == 0) return;
+        try { session.Attachment.Session.ScheduleToolActivation([.. active, .. activate]); }
+        catch (InvalidOperationException) { /* A run started meanwhile; the next change activates them. */ }
     }
 
     /// <summary>The registered tools of a server: those in its namespace.</summary>
@@ -483,6 +515,7 @@ public sealed class McpServerManager
         // The challenge that asked for this sign-in is answered.
         lock (gate) slot.TokensAtSignIn = null;
         await ReconnectCoreAsync(slot, cancel).ConfigureAwait(false);
+        EnsureDiscoveryActive();
         lock (gate) return slot.State is ConnectionState.Failed or ConnectionState.NeedsAuth
             ? "Signed in, but " + (slot.State == ConnectionState.NeedsAuth ? $"MCP server \"{name}\" requires sign-in. Run /mcp to sign in." : slot.Error) : null;
     }
@@ -746,7 +779,7 @@ public sealed class McpServerManager
                 if (await PickAsync(name, ui, slot => IsEnabled(slot) && slot.Server is not null,
                     slot => StateName(slot) is "failed" or "disconnected", "No enabled MCP server to reconnect.", token).ConfigureAwait(false) is not { } server) return;
                 await ReconnectCoreAsync(server, token).ConfigureAwait(false);
-                string? failure; lock (gate) failure = server.State == ConnectionState.Failed ? server.Error : null;
+                string? failure; lock (gate) failure = ReconnectFailure(server);
                 if (failure is not null) ui.Notify(failure, "error");
                 else { string state; lock (gate) state = DescribeState(server); ui.Notify($"Reconnected to MCP server \"{server.Entry.Name}\" ({state}).", "info"); }
                 return;
