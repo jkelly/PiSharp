@@ -1,0 +1,56 @@
+{
+  "$comment": "Status per area: ported | partial | planned | wont-port | unknown. Notes and evidence are optional; evidence is a URL.",
+  "promises": [
+    {
+      "id": "behavior",
+      "label": "Behavioral parity",
+      "blurb": "Does PiSharp do what Pi does? Same prompts, tools, ordering and results for the same inputs.",
+      "rows": [
+        { "area": "Agent loop, steering and follow-ups", "status": "unknown" },
+        { "area": "Built-in tools: read, write, edit, bash", "status": "unknown" },
+        { "area": "Providers and model selection", "status": "unknown" },
+        { "area": "Sessions and branching", "status": "unknown" },
+        { "area": "Compaction", "status": "unknown" },
+        { "area": "Slash commands", "status": "unknown" },
+        { "area": "Skills and prompt templates", "status": "unknown" },
+        { "area": "Themes and keybindings", "status": "unknown" },
+        { "area": "MCP and codemode", "status": "unknown" }
+      ]
+    },
+    {
+      "id": "wire",
+      "label": "Session & RPC compatibility",
+      "blurb": "Can PiSharp read and write the same files and speak the same protocol, so tools built for Pi keep working?",
+      "rows": [
+        { "area": "Session file format: read", "status": "unknown" },
+        { "area": "Session file format: write", "status": "unknown" },
+        { "area": "Legacy session import", "status": "unknown" },
+        { "area": "JSON event stream", "status": "unknown" },
+        { "area": "RPC commands", "status": "unknown" },
+        { "area": "RPC extension UI", "status": "unknown" }
+      ]
+    },
+    {
+      "id": "ts",
+      "label": "TypeScript extension compatibility",
+      "blurb": "Which Pi extension APIs run unchanged through the optional Node bridge?",
+      "rows": [
+        { "area": "Tools", "status": "unknown" },
+        { "area": "Commands and shortcuts", "status": "unknown" },
+        { "area": "Event hooks", "status": "unknown" },
+        { "area": "Custom TUI components", "status": "unknown" },
+        { "area": "Package install from npm", "status": "unknown" }
+      ]
+    }
+  ],
+  "phases": [
+    { "title": "Freeze the compatibility target", "status": "unknown" },
+    { "title": "Provider layer", "status": "unknown" },
+    { "title": "Agent loop and tools", "status": "unknown" },
+    { "title": "Sessions", "status": "unknown" },
+    { "title": "Headless RPC, then terminal UI", "status": "unknown" },
+    { "title": "Native extension SDK", "status": "unknown" },
+    { "title": "Optional Node bridge", "status": "unknown" },
+    { "title": "Hardening and packaging", "status": "unknown" }
+  ]
+}

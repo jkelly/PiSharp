@@ -1,0 +1,152 @@
+---
+import { render } from 'astro:content';
+import SitePage from '../../components/SitePage.astro';
+import { getReleases } from '../../data/changelog';
+import { links } from '../../data/site';
+
+const releases = await Promise.all(
+	(await getReleases()).map(async (entry) => ({ entry, Content: (await render(entry)).Content })),
+);
+const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: 'UTC' });
+---
+
+<SitePage title="Changelog" description="PiSharp release notes: Pi syncs and C#-only patches.">
+	<div class="log">
+		<div class="head">
+			<div>
+				<div class="ps-eyebrow">Changelog</div>
+				<h1 class="ps-h1" style="margin-bottom: 0">Release notes</h1>
+			</div>
+			<a href="/changelog/rss.xml" class="ps-button ps-ghost">RSS feed</a>
+		</div>
+		<p class="ps-lede" style="margin-top: 1rem">
+			PiSharp's version is the Pi release it matches. <strong>Pi syncs</strong> move the baseline; <strong>C# patches</strong> add a fourth number and leave it unchanged.
+		</p>
+
+		<div role="group" aria-label="Filter releases" class="filters">
+			<button class="ps-toggle" data-filter="all" aria-pressed="true">All releases</button>
+			<button class="ps-toggle" data-filter="sync" aria-pressed="false">Pi syncs</button>
+			<button class="ps-toggle" data-filter="patch" aria-pressed="false">C# patches</button>
+		</div>
+
+		<div class="timeline">
+			{
+				releases.map(({ entry, Content }) => (
+					<section class="entry" data-kind={entry.data.kind} id={`v${entry.data.version}`}>
+						<span class="dot" data-kind={entry.data.kind} data-status={entry.data.status} aria-hidden="true" />
+						<div class="entry-head">
+							<h2 class="ps-mono">{entry.data.version}</h2>
+							<span class="ps-chip" data-tone={entry.data.kind}>{entry.data.kind === 'sync' ? 'Pi sync' : 'C# patch'}</span>
+							{entry.data.status === 'in-progress' && <span class="ps-chip">In progress</span>}
+							{entry.data.labels.map((l) => <span class="ps-chip" data-tone="ported">{l}</span>)}
+							{entry.data.date && <span class="ps-mono date">{dateFormat.format(entry.data.date)}</span>}
+						</div>
+						<p class="ps-muted baseline">
+							{entry.data.kind === 'patch' ? `Baseline unchanged: Pi ${entry.data.baseline}.` : `Matches Pi ${entry.data.baseline}.`}
+							{entry.data.kind === 'sync' && <> <a href={links.piChangelog}>Pi's release notes ↗</a></>}
+						</p>
+						<div class="body sl-markdown-content">
+							<Content />
+						</div>
+					</section>
+				))
+			}
+			<p class="ps-muted" id="no-releases" hidden>No releases of this kind yet.</p>
+		</div>
+	</div>
+</SitePage>
+
+<script>
+	const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-filter]'));
+	const entries = Array.from(document.querySelectorAll<HTMLElement>('.entry'));
+	for (const button of buttons) {
+		button.addEventListener('click', () => {
+			const filter = button.dataset.filter;
+			for (const b of buttons) b.setAttribute('aria-pressed', String(b === button));
+			for (const e of entries) e.hidden = filter !== 'all' && e.dataset.kind !== filter;
+			const empty = document.getElementById('no-releases');
+			if (empty) empty.hidden = entries.some((e) => !e.hidden);
+		});
+	}
+</script>
+
+<style>
+	.log {
+		max-width: 52rem;
+		margin: 0 auto;
+		padding-top: 3rem;
+	}
+	.head {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		align-items: end;
+		gap: 1rem;
+	}
+	.filters {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-bottom: 2.5rem;
+	}
+	.filters .ps-toggle {
+		border-radius: 999px;
+	}
+	.timeline {
+		border-inline-start: 1px solid var(--sl-color-gray-5);
+		padding-inline-start: 2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 3.5rem;
+		margin-bottom: 4rem;
+	}
+	.entry {
+		position: relative;
+	}
+	.dot {
+		position: absolute;
+		inset-inline-start: calc(-2rem - 6px);
+		top: 0.75rem;
+		width: 11px;
+		height: 11px;
+		border-radius: 50%;
+		background: var(--ps-blue);
+	}
+	.dot[data-kind='patch'] {
+		background: var(--ps-link);
+	}
+	.dot[data-status='in-progress'] {
+		background: var(--sl-color-black);
+		border: 2px dashed var(--ps-blue);
+	}
+	.entry-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.entry-head h2 {
+		font-size: 1.7rem;
+		margin: 0;
+		color: var(--sl-color-white);
+	}
+	.date {
+		font-size: 0.8rem;
+		color: var(--sl-color-gray-3);
+	}
+	.baseline {
+		margin: 0.5rem 0 0;
+	}
+	.body {
+		margin-top: 0.75rem;
+	}
+	.body :global(h3) {
+		font-family: var(--sl-font-mono);
+		font-size: 0.75rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--sl-color-gray-3);
+		font-weight: 400;
+		margin: 1.4rem 0 0.4rem;
+	}
+</style>

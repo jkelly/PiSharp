@@ -1,0 +1,22 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { nav } from '../data/site';
+
+interface Props {
+	title: string;
+	description?: string;
+}
+
+const { title, description } = Astro.props;
+const path = Astro.url.pathname;
+---
+
+<StarlightPage frontmatter={{ title, description, template: 'splash', editUrl: false, prev: false, next: false }}>
+	<div class="ps-page not-content">
+		<nav class="ps-mobilenav" aria-label="Site">
+			<a href="/" aria-current={path === '/' ? 'page' : undefined}>Home</a>
+			{nav.map((item) => <a href={item.href} aria-current={path.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>)}
+		</nav>
+		<slot />
+	</div>
+</StarlightPage>

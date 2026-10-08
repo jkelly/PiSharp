@@ -1,0 +1,195 @@
+---
+import SitePage from '../components/SitePage.astro';
+import { links, versions, inSync } from '../data/site';
+import parity from '../data/parity.json';
+
+const statusLabel: Record<string, string> = {
+	ported: 'Ported',
+	partial: 'Partial',
+	planned: 'Planned',
+	'wont-port': "Won't port",
+	unknown: 'Not yet assessed',
+};
+---
+
+<SitePage title="Parity" description="How close PiSharp is to Pi, across three separate compatibility promises.">
+	<div style="padding-top: 3rem">
+		<div class="ps-eyebrow">Parity</div>
+		<h1 class="ps-h1">How close to <em>Pi</em> are we?</h1>
+		<p class="ps-lede">PiSharp makes three separate promises and tracks each one separately. The baseline below is read from the port's pinned compatibility lock file.</p>
+	</div>
+
+	<div class="strip">
+		<div><div class="ps-mono k">PISHARP</div><div class="ps-mono v">{versions.pisharp}</div></div>
+		<div>
+			<div class="ps-mono k">BASELINE</div>
+			<div class="ps-mono v"><a href={versions.baselineUrl}>Pi {versions.baseline}</a></div>
+		</div>
+		<div><div class="ps-mono k">LATEST PI</div><div class="ps-mono v">{versions.latestPi}</div></div>
+		<div class="info">
+			<strong>{inSync ? 'In sync with the latest Pi' : `Sync to Pi ${versions.latestPi} in progress`}</strong>
+			<span>PiSharp's version always names the Pi release it matches. A fourth number (such as {versions.pisharp}.2) is a C#-only patch. <a href="/docs/versioning/">How versions work</a></span>
+		</div>
+	</div>
+
+	<div role="tablist" aria-label="Compatibility promise" class="tabs">
+		{
+			parity.promises.map((p, i) => (
+				<button role="tab" class="ps-toggle" id={`tab-${p.id}`} aria-controls={`panel-${p.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>
+					{p.label}
+				</button>
+			))
+		}
+	</div>
+
+	<div class="legend">
+		<span class="ps-mono" style="font-size: 0.7rem; letter-spacing: 0.14em; color: var(--sl-color-gray-3)">LEGEND</span>
+		{Object.entries(statusLabel).map(([tone, label]) => <span class="ps-chip" data-tone={tone}>{label}</span>)}
+	</div>
+
+	{
+		parity.promises.map((p, i) => (
+			<div role="tabpanel" id={`panel-${p.id}`} aria-labelledby={`tab-${p.id}`} hidden={i !== 0}>
+				<p class="ps-muted" style="max-width: 48rem">{p.blurb}</p>
+				<div class="ps-table-wrap">
+					<table>
+						<thead>
+							<tr><th>Area</th><th>Status</th><th>Notes</th></tr>
+						</thead>
+						<tbody>
+							{p.rows.map((row: { area: string; status: string; notes?: string; evidence?: string }) => (
+								<tr>
+									<td style="font-weight: 500">{row.area}</td>
+									<td><span class="ps-chip" data-tone={row.status}>{statusLabel[row.status] ?? row.status}</span></td>
+									<td class="ps-muted" style="font-size: 0.95rem">
+										{row.notes ?? ''}
+										{row.evidence && <a href={row.evidence}> Evidence ↗</a>}
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		))
+	}
+
+	<section class="ps-section" style="margin-top: 6rem">
+		<div class="road-head">
+			<h2 class="ps-h2" style="margin: 0">Roadmap</h2>
+			<a href={links.plans} class="ps-link-mono">Full plans on GitHub ↗</a>
+		</div>
+		<ol class="phases">
+			{
+				parity.phases.map((ph, i) => (
+					<li class="ps-card">
+						<span class="ps-mono" style="font-size: 0.75rem; letter-spacing: 0.14em; color: var(--ps-blue)">PHASE {i + 1}</span>
+						<span style="font-weight: 600; color: var(--sl-color-white)">{ph.title}</span>
+						<span class="ps-chip" data-tone={ph.status} style="align-self: flex-start">{statusLabel[ph.status] ?? ph.status}</span>
+					</li>
+				))
+			}
+		</ol>
+	</section>
+</SitePage>
+
+<script>
+	const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+	const select = (tab: HTMLButtonElement) => {
+		for (const t of tabs) {
+			const on = t === tab;
+			t.setAttribute('aria-selected', String(on));
+			t.tabIndex = on ? 0 : -1;
+			const panel = document.getElementById(t.getAttribute('aria-controls') ?? '');
+			if (panel) panel.hidden = !on;
+		}
+	};
+	tabs.forEach((tab, i) => {
+		tab.addEventListener('click', () => select(tab));
+		tab.addEventListener('keydown', (e) => {
+			const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+			if (!step) return;
+			const next = tabs[(i + step + tabs.length) % tabs.length];
+			select(next);
+			next.focus();
+		});
+	});
+</script>
+
+<style>
+	.strip {
+		display: flex;
+		flex-wrap: wrap;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 12px;
+		overflow: hidden;
+		margin-bottom: 3.5rem;
+	}
+	.strip > div {
+		flex: 1 1 12rem;
+		padding: 1.3rem 1.6rem;
+		background: var(--ps-surface);
+		border-inline-start: 1px solid var(--sl-color-gray-5);
+	}
+	.strip > div:first-child {
+		border-inline-start: 0;
+	}
+	.strip .k {
+		font-size: 0.7rem;
+		letter-spacing: 0.16em;
+		color: var(--sl-color-gray-3);
+	}
+	.strip .v {
+		font-size: 1.8rem;
+		font-weight: 700;
+		color: var(--sl-color-white);
+	}
+	.strip .info {
+		flex: 2 1 18rem;
+		background: var(--ps-info-bg);
+		border-inline-start-color: var(--ps-info-border);
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		font-size: 0.95rem;
+		color: var(--sl-color-gray-2);
+	}
+	.strip .info strong {
+		color: var(--sl-color-white);
+	}
+	.tabs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+	}
+	.legend {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem 1rem;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+	.road-head {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		align-items: end;
+		gap: 1rem;
+		margin-bottom: 1.5rem;
+	}
+	.phases {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+		gap: 0.9rem;
+	}
+	.phases li {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		margin: 0;
+	}
+</style>

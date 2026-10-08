@@ -1,0 +1,13 @@
+---
+import Default from '@astrojs/starlight/components/SiteTitle.astro';
+import { nav } from '../../data/site';
+
+const path = Astro.url.pathname;
+---
+
+<div class="sl-flex" style="align-items: center">
+	<Default />
+	<nav class="ps-topnav" aria-label="Site">
+		{nav.map((item) => <a href={item.href} aria-current={path.startsWith(item.href) ? 'page' : undefined}>{item.label}</a>)}
+	</nav>
+</div>
