@@ -149,11 +149,8 @@ public sealed class CodemodeSandbox : IAsyncDisposable
 
         public void Start()
         {
-            if (timeoutMs is { } timeout && double.IsFinite(timeout))
-            {
-                var due = TimeSpan.FromMilliseconds(Math.Clamp(timeout, 0, int.MaxValue));
-                timer = new Timer(_ => Finish(new(CodemodeErrorKind.Timeout, $"Execution timed out after {Js.Number(timeout)} ms")), null, due, Timeout.InfiniteTimeSpan);
-            }
+            // Until the engine reports that the script starts, a watchdog bounds the worker's start-up; the deadline then starts.
+            timer = new Timer(_ => Finish(new(CodemodeErrorKind.Sandbox, $"Worker did not start within {StartupLimit.TotalMilliseconds} ms")), null, StartupLimit, Timeout.InfiniteTimeSpan);
             if (cancellationToken.IsCancellationRequested) { Finish(new(CodemodeErrorKind.Aborted, AbortMessage)); return; }
             abortRegistration = cancellationToken.Register(() => Finish(new(CodemodeErrorKind.Aborted, AbortMessage)));
             try
@@ -163,6 +160,23 @@ public sealed class CodemodeSandbox : IAsyncDisposable
                     error => Finish(error is FormatException format ? Bridge(format.Message) : new(CodemodeErrorKind.Sandbox, $"Sandbox host failed: {error.Message}")));
             }
             catch (Exception error) { Finish(new(CodemodeErrorKind.Sandbox, "Failed to start worker: " + error.Message)); }
+        }
+
+        private static readonly TimeSpan StartupLimit = TimeSpan.FromSeconds(60);
+
+        /// <summary>host.ts arms the deadline when the execution starts; PiSharp arms it when the script starts in its engine.</summary>
+        private void ArmDeadline()
+        {
+            lock (gate)
+            {
+                if (finished) return;
+                timer?.Dispose(); timer = null;
+                if (timeoutMs is { } timeout && double.IsFinite(timeout))
+                {
+                    var due = TimeSpan.FromMilliseconds(Math.Clamp(timeout, 0, int.MaxValue));
+                    timer = new Timer(_ => Finish(new(CodemodeErrorKind.Timeout, $"Execution timed out after {Js.Number(timeout)} ms")), null, due, Timeout.InfiniteTimeSpan);
+                }
+            }
         }
 
         public Task<CodemodeResult> AbortAsync(string message) { Finish(new(CodemodeErrorKind.Aborted, message)); return result.Task; }
@@ -181,6 +195,7 @@ public sealed class CodemodeSandbox : IAsyncDisposable
                     case CodemodeCallMessage call: HandleCall(call.Id, call.Tool, call.Name, call.Arguments); break;
                     case CodemodeDoneMessage done: HandleDone(done); break;
                     case CodemodeCrashMessage crash: Finish(new(CodemodeErrorKind.Sandbox, crash.Message)); break;
+                    case CodemodeReadyMessage: ArmDeadline(); break;
                 }
             }
             catch (BridgeException error) { Finish(Bridge(error.Message)); }

@@ -47,6 +47,9 @@ internal static partial class Program
             var wait = new CodemodeTool("wait", async (_, token) => { await Task.Delay(300, token); return Parse("\"late\""); });
             Ok(await Run("return await tools.wait()", [wait], timeoutMs: 5_000), "\"late\"", "within the deadline");
             Ok(await Run("return await tools.wait()", [wait], timeoutMs: double.PositiveInfinity), "\"late\"", "no deadline");
+            // No warm spare: the worker process starts (and compiles the engine) inside this run, which takes longer than the
+            // deadline. The deadline counts from the start of the script, so the call is still made and then cancelled.
+            await CodemodeProcessWorker.DiscardSparesAsync();
             var timedOut = await Run("return await tools.wait()", [wait], timeoutMs: 100);
             Failed(timedOut, CodemodeErrorKind.Timeout, "past the deadline", message: "Execution timed out after 100 ms");
             Names(["wait:Cancelled"], timedOut.Calls.Select(call => call.Name + ":" + call.Status), "pending call cancelled");
