@@ -108,8 +108,12 @@ internal static class PiCommand
 
         var cwd = host.Cwd; var home = host.Home;
         var agentDir = PiPaths.AgentDirectory(host.GetEnvironment, home);
+        // Source isPlainRuntimeMetadataCommand/takeOverStdout: outside interactive mode (and plain --help/--list-models) console output
+        // goes to stderr, so the mode's stdout stays clean.
+        var plainMetadata = !parsed.Print && parsed.Mode is null && (parsed.Help || parsed.ListModels is not null);
+        var console = appMode == PiAppMode.Interactive || plainMetadata ? host.Stdout : err;
         var migrations = PiMigrations.Run(cwd, agentDir);
-        foreach (var message in migrations.Messages) await Line(err, message).ConfigureAwait(false);
+        foreach (var message in migrations.Messages) await Line(console, message).ConfigureAwait(false);
         // Source startupSettingsManager: SettingsManager.create(cwd, agentDir) reads the project layer (projectTrusted defaults to true).
         var startupSettings = PiSettings.Load(cwd, agentDir, projectTrusted: true);
         var startupDiagnostics = startupSettings.DrainDiagnostics();
@@ -121,16 +125,16 @@ internal static class PiCommand
         if (parsed.Help)
         {
             await Report(startupDiagnostics).ConfigureAwait(false);
-            await host.Stdout.WriteAsync((PiHelp.Text(color: color) + "\n").AsMemory(), token).ConfigureAwait(false);
-            await host.Stdout.FlushAsync(token).ConfigureAwait(false);
+            await console.WriteAsync((PiHelp.Text(color: color) + "\n").AsMemory(), token).ConfigureAwait(false);
+            await console.FlushAsync(token).ConfigureAwait(false);
             return 0;
         }
         if (parsed.ListModels is { } search)
         {
             await Report(startupDiagnostics).ConfigureAwait(false);
             var registry = await host.LiveRuntime.CreateModelRegistryAsync(token).ConfigureAwait(false);
-            await PiSharp.Cli.Models.ModelListing.ListAsync(registry, search.Length == 0 ? null : search, host.Stdout, err, cancellationToken: token).ConfigureAwait(false);
-            await host.Stdout.FlushAsync(token).ConfigureAwait(false);
+            await PiSharp.Cli.Models.ModelListing.ListAsync(registry, search.Length == 0 ? null : search, console, err, cancellationToken: token).ConfigureAwait(false);
+            await console.FlushAsync(token).ConfigureAwait(false);
             return 0;
         }
         if (appMode == PiAppMode.Interactive && parsed.UseTheme is not null) startupSettings.ApplyOverrides(new JsonObject { ["theme"] = parsed.UseTheme });
@@ -201,6 +205,13 @@ internal static class PiCommand
                 runtime = WithRuntimeApiKey(runtime, selection.Model.Provider, apiKey);
                 selection = await ResolveModelAsync(parsed, startupSnapshot, runtime, plan.HasMessages, [], token).ConfigureAwait(false);
             }
+        }
+        catch (LiveSessionException) when (parsed.ApiKey is not null && parsed.Model is null && parsed.Models is null)
+        {
+            // Source: --api-key without a resolved model.
+            runtimeDiagnostics.Add(new("error", "--api-key requires a model to be specified via --model, --provider/--model, or --models"));
+            await Report(Deduplicate([.. startupDiagnostics, .. runtimeDiagnostics])).ConfigureAwait(false);
+            return 1;
         }
         catch (LiveSessionException error) when (error.Code is "NoLiveModel")
         {

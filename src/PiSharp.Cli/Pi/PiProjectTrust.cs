@@ -181,6 +181,20 @@ internal static class PiProjectTrust
         return selected.Trusted;
     }
 
+    /// <summary>A non-interactive trust check for hosts outside the Pi entry (the explicit <c>session</c> verbs, MCP project config):
+    /// the stored decision, else the global <c>defaultProjectTrust</c>, for directories with trust-requiring project resources;
+    /// directories without them are trusted, as upstream resolves them. The run's own entry uses <see cref="PiEntryOptions.ProjectTrusted"/>.</summary>
+    internal static Func<string, bool> CreateResolver(string agentDir, string home)
+    {
+        var store = new ProjectTrustStore(agentDir, home);
+        var defaults = PiSettings.Load(home, agentDir, projectTrusted: false).DefaultProjectTrust;
+        return cwd =>
+        {
+            try { return ResolveAsync(cwd, home, store, null, defaults, null, CancellationToken.None).GetAwaiter().GetResult(); }
+            catch (InvalidDataException) { return false; }
+        };
+    }
+
     /// <summary>The seam for project-local resources owned elsewhere (IMPL-H <c>.pi/mcp.json</c>, IMPL-E project extensions): true
     /// when the run trusts that directory's project files. The CLI resolves it once per cwd before the session starts.</summary>
     internal static Func<string, bool> Seam(IReadOnlyDictionary<string, bool> resolved) =>

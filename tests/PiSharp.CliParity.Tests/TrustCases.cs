@@ -76,6 +76,11 @@ internal static partial class Program
             Names(["Trust", $"Trust parent folder ({parent})", "Trust (this session only)", "Do not trust", "Do not trust (this session only)"], labels!, "options");
             Equal(true, store.Get(sandbox.Cwd), "the parent decision was saved");
             Equal(true, await Resolve(null, "never"), "a stored decision wins over defaultProjectTrust");
+            Equal(true, PiProjectTrust.CreateResolver(sandbox.AgentDir, sandbox.Home)(sandbox.Cwd), "the non-interactive resolver seam reads the store");
+            Equal(true, PiProjectTrust.CreateResolver(sandbox.AgentDir, sandbox.Home)(Path.Combine(sandbox.Root, "sibling")), "the trusted parent covers its other children");
+            using var stranger = new Sandbox("trust-stranger", trusted: false);
+            Directory.CreateDirectory(Path.Combine(stranger.Cwd, ".pi")); File.WriteAllText(Path.Combine(stranger.Cwd, ".pi", "mcp.json"), "{}");
+            Equal(false, PiProjectTrust.CreateResolver(sandbox.AgentDir, sandbox.Home)(stranger.Cwd), "an undecided project with .pi/mcp.json is untrusted");
         }),
         ("trust.untrusted-project-ignores-project-files-and-falls-back-to-explicit-tools", async () =>
         {

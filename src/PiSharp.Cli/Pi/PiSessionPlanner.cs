@@ -38,6 +38,8 @@ internal static class PiSessionPlanner
     internal static async Task<PiSessionPlan> PlanAsync(PiArgs parsed, string cwd, string? sessionDir, string agentDir, string home, PiAppMode mode,
         PiHost host, CancellationToken token)
     {
+        // output-guard.ts: outside interactive mode stdout belongs to the mode, so console.log text (and readline) goes to stderr.
+        var console = mode == PiAppMode.Interactive ? host.Stdout : host.Stderr;
         if (parsed.NoSession)
         {
             var (memoryPath, memoryId, memoryTime) = PiSessions.NewSessionFile(Path.TrimEndingDirectorySeparator(Path.GetTempPath()), parsed.SessionId, host.Now());
@@ -69,10 +71,10 @@ internal static class PiSessionPlanner
                 case Local local: return Open(local.Path, sessionDir, cwd, host);
                 case Global global:
                 {
-                    await PiCommand.Line(host.Stdout, host.Color ? PiCommand.Yellow + $"Session found in different project: {global.Cwd}\u001b[39m" : $"Session found in different project: {global.Cwd}").ConfigureAwait(false);
+                    await PiCommand.Line(console, host.Color ? PiCommand.Yellow + $"Session found in different project: {global.Cwd}\u001b[39m" : $"Session found in different project: {global.Cwd}").ConfigureAwait(false);
                     if (!await ConfirmAsync("Fork this session into current directory?").ConfigureAwait(false))
                     {
-                        await PiCommand.Line(host.Stdout, host.Color ? PiCommand.Dim + "Aborted.\u001b[22m" : "Aborted.").ConfigureAwait(false);
+                        await PiCommand.Line(console, host.Color ? PiCommand.Dim + "Aborted.\u001b[22m" : "Aborted.").ConfigureAwait(false);
                         throw new PiExit(0);
                     }
                     try { return Open(PiSessions.ForkFrom(global.Path, cwd, sessionDir, agentDir, null, host.Now()), sessionDir, cwd, host); }
@@ -88,7 +90,7 @@ internal static class PiSessionPlanner
             var selected = await selector(current, () => PiSessions.ListAll(sessionDir, agentDir), token).ConfigureAwait(false);
             if (selected is null)
             {
-                await PiCommand.Line(host.Stdout, host.Color ? PiCommand.Dim + "No session selected\u001b[22m" : "No session selected").ConfigureAwait(false);
+                await PiCommand.Line(console, host.Color ? PiCommand.Dim + "No session selected\u001b[22m" : "No session selected").ConfigureAwait(false);
                 throw new PiExit(0);
             }
             return Open(selected, sessionDir, cwd, host);
@@ -115,8 +117,8 @@ internal static class PiSessionPlanner
         async Task<bool> ConfirmAsync(string message)
         {
             if (host.Confirm is not null) return await host.Confirm(message, token).ConfigureAwait(false);
-            await host.Stdout.WriteAsync($"{message} [y/N] ".AsMemory(), token).ConfigureAwait(false);
-            await host.Stdout.FlushAsync(token).ConfigureAwait(false);
+            await console.WriteAsync($"{message} [y/N] ".AsMemory(), token).ConfigureAwait(false);
+            await console.FlushAsync(token).ConfigureAwait(false);
             var answer = (await host.Stdin.ReadLineAsync(token).ConfigureAwait(false) ?? "").ToLowerInvariant();
             return answer is "y" or "yes";
         }

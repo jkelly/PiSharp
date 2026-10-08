@@ -41,11 +41,13 @@ internal static partial class Program
             sandbox.Write(Path.Combine(sandbox.AgentDir, "commands", "x.md"), "old command");
             var (code, stdout, stderr) = await sandbox.Run("--list-models", "claude-sonnet-4-5");
             Equal(0, code, "exit; " + stderr);
-            Check(stdout.StartsWith("provider", StringComparison.Ordinal) && stdout.Contains("claude-sonnet-4-5", StringComparison.Ordinal), "listing: " + stdout);
+            // Plain --list-models keeps stdout (isPlainRuntimeMetadataCommand), so migration messages print there before the table.
+            Check(stdout.StartsWith("Migrated Global commands/ ", StringComparison.Ordinal) && stdout.Contains("\nprovider   model", StringComparison.Ordinal) &&
+                stdout.Contains("claude-sonnet-4-5", StringComparison.Ordinal), "listing: " + stdout);
             Check(File.Exists(Path.Combine(sandbox.AgentDir, "oauth.json.migrated")) && File.ReadAllText(Path.Combine(sandbox.AgentDir, "auth.json")).Contains("\"type\": \"oauth\"", StringComparison.Ordinal),
                 "oauth.json migrated to auth.json");
             Check(File.Exists(Path.Combine(sandbox.AgentDir, "prompts", "x.md")), "commands/ renamed to prompts/");
-            Check(stderr.Contains("Migrated Global commands/ ", StringComparison.Ordinal), "migration message: " + stderr);
+            Equal("", stderr, "nothing on stderr");
         }),
     ];
 }

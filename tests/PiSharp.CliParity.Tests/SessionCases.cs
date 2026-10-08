@@ -93,6 +93,18 @@ internal static partial class Program
             Equal(0, (await sandbox.Run(["-p", "--session", fresh, .. model, "x"])).Code, "a missing --session path becomes a new session there");
             Check(File.Exists(fresh) && JsonNode.Parse(File.ReadLines(fresh).First())!["type"]!.GetValue<string>() == "session", "new session at the explicit path");
         }),
+        ("sessions.resume-without-a-picker-and-console-output-goes-to-stderr", async () =>
+        {
+            using var sandbox = new Sandbox("resume");
+            var (code, stdout, stderr) = await sandbox.RunWith("", "-p", "-r", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "x");
+            Check(code == 0 && stdout == "" && stderr == "No session selected\n", "print mode console text on stderr: " + stderr);
+            Equal(0, sandbox.Requests.Count, "no prompt sent");
+            using var interactiveOut = new StringWriter(); using var interactiveErr = new StringWriter();
+            var selected = Path.Combine(sandbox.Root, "picked.jsonl");
+            var host = sandbox.Host(interactiveOut, interactiveErr, null, interactive: true, runInteractive: (args, _, _) => Task.FromResult(args.Contains(selected) ? 0 : 3))
+                with { SelectSession = (current, all, _) => Task.FromResult<string?>(selected) };
+            Equal(0, await PiCommand.RunAsync(["-r", "--provider", "anthropic", "--model", "claude-sonnet-4-5"], host, CancellationToken.None), "the selector's session is used");
+        }),
         ("sessions.missing-session-cwd-stops-non-interactive-runs", async () =>
         {
             using var sandbox = new Sandbox("missing-cwd");
