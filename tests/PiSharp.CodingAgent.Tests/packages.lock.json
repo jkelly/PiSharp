@@ -2,6 +2,19 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "Acornima": {
+        "type": "Transitive",
+        "resolved": "1.7.0",
+        "contentHash": "a2I4O4qkuAdB0oSaGz6/k0n/bXxMbGcLBra5dNTTVSLmTwM7uORA8ebpOrNMmDfFWOMwvuaRL6gPprRV4HTV0w=="
+      },
+      "Jint": {
+        "type": "Transitive",
+        "resolved": "4.16.3",
+        "contentHash": "QRO8CtC9rB/FRgchClX0DEHsBmUSDehIxxEv5QX5qlmujB2HMmOIUMruysKnQA0v+0QtU9cwp0XbiPbpJ3eiwA==",
+        "dependencies": {
+          "Acornima": "1.7.0"
+        }
+      },
       "YamlDotNet": {
         "type": "Transitive",
         "resolved": "16.3.0",
@@ -23,6 +36,7 @@
       "pisharp.cli": {
         "type": "Project",
         "dependencies": {
+          "PiSharp.Codemode": "[1.0.0, )",
           "PiSharp.CodingAgent": "[1.0.0, )",
           "PiSharp.Extensions.Agent": "[1.0.0, )",
           "PiSharp.Extensions.Runtime": "[1.0.0, )",
@@ -30,6 +44,14 @@
           "PiSharp.Rpc": "[1.0.0, )",
           "PiSharp.Tools": "[1.0.0, )",
           "PiSharp.Tui": "[1.0.0, )"
+        }
+      },
+      "pisharp.codemode": {
+        "type": "Project",
+        "dependencies": {
+          "Jint": "[4.16.3, 4.16.3]",
+          "PiSharp.Contracts": "[1.0.0, )",
+          "PiSharp.Extensions.Abstractions": "[1.0.0, )"
         }
       },
       "pisharp.codingagent": {

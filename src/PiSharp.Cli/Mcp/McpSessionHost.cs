@@ -33,8 +33,8 @@ namespace PiSharp.Cli.Mcp;
 /// the process environment; HTTP servers that use OAuth read and refresh their tokens in the durable <c>mcp-auth.json</c> store.
 /// The project <c>.pi/mcp.json</c> is not read: PiSharp has no project-trust store. Servers with `deferred` tools connect in the
 /// background and the built-in <c>tool_search</c> (<see cref="McpToolSearch"/>) loads their tools. Servers whose tools are
-/// reached through codemode need the codemode tool PiSharp does not implement yet; without <see cref="Discovery"/> they are
-/// reported and not connected.
+/// reached through codemode connect in the background too; the built-in <c>codemode</c> tool (<see cref="McpCodemode"/>, a
+/// Jint sandbox) is registered for them, active unless autoEnableCodemode is false and the tool selection does not name it.
 /// </summary>
 internal sealed record McpSessionHost(string AgentDirectory, string HomeDirectory, Func<IEnumerable<KeyValuePair<string, string>>> ProcessEnvironment)
 {
@@ -47,12 +47,20 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     public IMcpOAuthCredentialBackend? Credentials { get; init; }
     /// <summary>A replacement channel for a server (tests); null keeps the stdio or HTTP channel of its config.</summary>
     public Func<McpServerEntry, McpAdmittedChannelFactory?>? CreateChannel { get; init; }
-    /// <summary>Executable codemode/tool_search definitions for one generation (tests); null: PiSharp has no codemode, so servers that
-    /// need it are skipped. The built-in tool_search is added when a server has `deferred` tools and none is supplied here.</summary>
+    /// <summary>Executable codemode/tool_search definitions for one generation (tests). The built-in codemode is added when a server
+    /// has `codemode` tools and the built-in tool_search when a server has `deferred` tools, unless supplied here.</summary>
     public Func<long, ImmutableArray<McpDiscoveryExecutableDefinition>>? Discovery { get; init; }
     public Func<double> UnixMilliseconds { get; init; } = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     /// <summary>Each background connection once it connected (its tools published) or failed.</summary>
     public Action<McpBackgroundConnectionReport>? ObserveBackgroundConnection { get; init; }
+    /// <summary>The model registry codemode scripts reach as <c>models</c>; defaults to the CLI registry (embedded catalogs, the
+    /// environment and auth.json), built on first use.</summary>
+    public Func<PiSharp.Codemode.ICodemodeModelRuntime?>? CodemodeModels { get; init; }
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<McpProfileRuntimeAdmission, TaskCompletionSource> hostStarts = new();
+
+    /// <summary>The host started dispatching on the session the admission opened: its background servers may connect now.</summary>
+    internal void HostStarted(McpProfileRuntimeAdmission admission)
+    { if (hostStarts.TryGetValue(admission, out var started)) started.TrySetResult(); }
 
     /// <summary>The agent directory from PI_CODING_AGENT_DIR or <c>~/.pi/agent</c>, and the real process environment.</summary>
     internal static McpSessionHost CreateDefault()
@@ -67,7 +75,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
 
     /// <summary>Reads the global mcp.json and returns the profile admission, or null when no server is enabled. Configuration
     /// errors, the ignored project file and skipped servers are written to <paramref name="diagnostics"/>.</summary>
-    internal McpProfileRuntimeAdmission? CreateAdmission(string cwd, TextWriter diagnostics)
+    internal McpProfileRuntimeAdmission? CreateAdmission(string cwd, TextWriter diagnostics, JsonData? settings = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(cwd); ArgumentNullException.ThrowIfNull(diagnostics);
         var reporter = new Reporter(diagnostics);
@@ -83,8 +91,6 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         var admitted = ImmutableArray.CreateBuilder<McpServerEntry>();
         foreach (var entry in loaded.Servers.Where(entry => entry.Config.Enabled))
         {
-            if (Discovery is null && McpConfigurationReader.ConfiguredExposures(entry.Config).Contains(McpExposure.Codemode))
-            { problems.Add($"{entry.Name}: not connected: its codemode tools need the codemode tool, which PiSharp does not implement yet; set \"exposure\": \"deferred\" or \"direct\" to use it"); continue; }
             if (entry.Config.AuthProvider is not null)
             { problems.Add($"{entry.Name}: not connected: auth.provider is not supported by PiSharp"); continue; }
             admitted.Add(entry);
@@ -92,7 +98,10 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         if (admitted.Count == 0) { reporter.Problems(problems); return null; }
         var catalog = new McpServerCatalog(admitted.ToImmutable(), []);
         var autoEnableCodemode = loaded.EffectiveAutoEnableCodemode;
-        return async (currentCwd, generation, nativeRegistry, exactPolicy, token) =>
+        var (codemodeMode, inlineBudget) = PiSharp.Codemode.CodemodeToolDefinition.ReadSettings(settings?.Value);
+        var codemodeModels = CodemodeModels ?? (() => McpCodemode.ModelRuntime.CreateDefault());
+        var hostStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        McpProfileRuntimeAdmission admission = async (currentCwd, generation, nativeRegistry, exactPolicy, token) =>
         {
             var generationProblems = generation == 1 ? new List<string>(problems) : [];
             var owned = new OwnedResources(CreateClient); IAsyncDisposable discovery = new Disposer(() => ValueTask.CompletedTask);
@@ -130,15 +139,27 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     })).ToImmutableArray();
                 McpDiscoveryCatalogPreparation prepare = (_, registry) => new(registry, []);
                 var definitions = Discovery?.Invoke(generation) is { IsDefault: false } supplied ? supplied : [];
+                var exposures = catalog.Servers.SelectMany(entry => McpConfigurationReader.ConfiguredExposures(entry.Config)).ToHashSet();
+                var selection = nativeRegistry.LifetimeToolSelection;
+                // The original registers codemode (inactive) with every session and the MCP extension activates it for `codemode`
+                // servers unless autoEnableCodemode is false; here it is registered (active) for them when the tool selection allows
+                // it and either autoEnableCodemode holds or the selection names codemode.
+                var codemodeOff = false;
+                if (exposures.Contains(McpExposure.Codemode) && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode))
+                {
+                    if (selection?.IsAllowed(McpCodemode.Name) != false && (autoEnableCodemode || selection?.IsNamed(McpCodemode.Name) == true ||
+                        selection?.InitialNames.Contains(McpCodemode.Name) == true))
+                        definitions = definitions.Add(McpCodemode.Create(codemodeMode, inlineBudget, codemodeModels));
+                    else codemodeOff = !autoEnableCodemode && selection?.IsAllowed(McpCodemode.Name) != false;
+                }
                 // The original registers tool_search with every session and the MCP extension activates it for `deferred` servers;
                 // here it is registered (active) for them. A tool selection that leaves tool_search out leaves their tools unreachable.
-                if (catalog.Servers.Any(entry => McpConfigurationReader.ConfiguredExposures(entry.Config).Contains(McpExposure.Deferred)) &&
-                    !definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch))
-                {
-                    if (nativeRegistry.LifetimeToolSelection?.IsAllowed(McpToolSearch.Name) != false) definitions = definitions.Add(McpToolSearch.Create());
-                    else if (generation == 1 && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode))
-                        reporter.Notice("MCP tools are only reachable from the codemode or tool_search tool, but neither is active; they cannot be called.");
-                }
+                if (exposures.Contains(McpExposure.Deferred) && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch) &&
+                    selection?.IsAllowed(McpToolSearch.Name) != false)
+                    definitions = definitions.Add(McpToolSearch.Create());
+                // ensureDiscoveryActive: tools that are not declared need codemode or tool_search; warn once when neither is there.
+                if (generation == 1 && (exposures.Contains(McpExposure.Codemode) || exposures.Contains(McpExposure.Deferred)) && definitions.IsEmpty)
+                    reporter.Notice($"MCP tools are only reachable from the codemode or tool_search tool, but neither is active{(codemodeOff ? " (autoEnableCodemode is false)" : "")}; they cannot be called.");
                 if (!definitions.IsEmpty)
                 {
                     var discoveryRegistry = new ExtensionRegistry();
@@ -149,6 +170,9 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     // The built-in tool_search is host code that only changes the session's tool selection: the profile admits its exact action.
                     if (definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch && definition.Descriptor.RegistrationId == McpToolSearch.RegistrationId))
                         grants.AdmitExact(McpToolSearch.Name, $"{scope.OwnerId}/{scope.OwnerGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture)}/{McpToolSearch.RegistrationId}");
+                    // The built-in codemode runs scripts whose nested calls each pass the session's own final-action policy.
+                    if (definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode && definition.Descriptor.RegistrationId == McpCodemode.RegistrationId))
+                        grants.AdmitExact(McpCodemode.Name, $"{scope.OwnerId}/{scope.OwnerGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture)}/{McpCodemode.RegistrationId}");
                 }
                 reporter.Problems(generationProblems);
                 var included = preOpen.Select(row => row.Entry).Concat(background.Select(row => catalog.Servers.Single(entry => entry.Name == row.Name)))
@@ -160,6 +184,9 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     autoEnableCodemode, prepare)
                 {
                     BackgroundServers = background, CallGrants = grants,
+                    // The first generation's background servers wait until the host started dispatching; later generations (reload)
+                    // open on a running host.
+                    ConnectAfter = generation == 1 ? hostStarted.Task : null,
                     ServersPromptSource = new McpServersPromptSource(),
                     ReportBackgroundConnection = report =>
                     {
@@ -174,6 +201,8 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                 throw;
             }
         };
+        hostStarts.Add(admission, hostStarted);
+        return admission;
     }
 
     private Dictionary<string, string> InheritedEnvironment()

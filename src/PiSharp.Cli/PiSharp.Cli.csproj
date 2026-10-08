@@ -12,6 +12,7 @@
     <InternalsVisibleTo Include="PiSharp.CliSync.Tests" />
     <InternalsVisibleTo Include="PiSharp.McpSync.Tests" />
     <InternalsVisibleTo Include="PiSharp.ToolSearch.Tests" />
+    <InternalsVisibleTo Include="PiSharp.Codemode.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
@@ -21,6 +22,7 @@
     <ProjectReference Include="../PiSharp.Tui/PiSharp.Tui.csproj" />
     <ProjectReference Include="../PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
     <ProjectReference Include="../PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
+    <ProjectReference Include="../PiSharp.Codemode/PiSharp.Codemode.csproj" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Models/*.json" LogicalName="PiSharp.Cli.Models.%(Filename)%(Extension)" />
