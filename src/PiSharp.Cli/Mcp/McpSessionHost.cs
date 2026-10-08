@@ -96,6 +96,8 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         {
             var generationProblems = generation == 1 ? new List<string>(problems) : [];
             var owned = new OwnedResources(CreateClient); IAsyncDisposable discovery = new Disposer(() => ValueTask.CompletedTask);
+            // Pi trusts the servers of mcp.json: the profile's final-action policy admits the tools of this generation's servers.
+            var grants = new McpCallGrants();
             try
             {
                 var options = new McpRuntimeOptions(generation, ClientVersion, Roots(currentCwd));
@@ -113,6 +115,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                         var capture = await McpPreOpenServerCapture.AcquireAsync(entry, registry, scope, current, exactPolicy, ValidateArguments,
                             Channels(entry), options, ComposeHooks, token).ConfigureAwait(false);
                         preOpen.Add((entry, owned.Hold(capture, current))); current = capture.Registry;
+                        grants.AdmitServer(scope);
                     }
                     catch (Exception error) when (!token.IsCancellationRequested) { generationProblems.Add($"{entry.Name}: {Describe(entry, error)}"); }
                 }
@@ -121,6 +124,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     {
                         var registry = owned.Track(new ExtensionRegistry());
                         var scope = await registry.ActivateAsync("mcp-" + actual.Name, new EmptyExtension(), cancellation).ConfigureAwait(false);
+                        grants.AdmitServer(scope);
                         return new McpPreparedServer(actual, registry, scope, owner, exactPolicy, ValidateArguments, Channels(actual),
                             new McpRuntimeOptions(attachment.Generation, ClientVersion, Roots(currentCwd)), ComposeHooks);
                     })).ToImmutableArray();
@@ -135,7 +139,6 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     else if (generation == 1 && !definitions.Any(definition => definition.Kind == McpDiscoveryKind.Codemode))
                         reporter.Notice("MCP tools are only reachable from the codemode or tool_search tool, but neither is active; they cannot be called.");
                 }
-                ImmutableArray<(string, string)> hostTargets = [];
                 if (!definitions.IsEmpty)
                 {
                     var discoveryRegistry = new ExtensionRegistry();
@@ -145,7 +148,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                         ValidateArguments, ComposeHooks).Prepare;
                     // The built-in tool_search is host code that only changes the session's tool selection: the profile admits its exact action.
                     if (definitions.Any(definition => definition.Kind == McpDiscoveryKind.ToolSearch && definition.Descriptor.RegistrationId == McpToolSearch.RegistrationId))
-                        hostTargets = [(McpToolSearch.Name, $"{scope.OwnerId}/{scope.OwnerGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture)}/{McpToolSearch.RegistrationId}")];
+                        grants.AdmitExact(McpToolSearch.Name, $"{scope.OwnerId}/{scope.OwnerGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture)}/{McpToolSearch.RegistrationId}");
                 }
                 reporter.Problems(generationProblems);
                 var included = preOpen.Select(row => row.Entry).Concat(background.Select(row => catalog.Servers.Single(entry => entry.Name == row.Name)))
@@ -156,7 +159,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                         (actual, registry, _) => Task.FromResult(owned.Release(row.Capture, registry))))],
                     autoEnableCodemode, prepare)
                 {
-                    BackgroundServers = background, HostDiscoveryTargets = hostTargets,
+                    BackgroundServers = background, CallGrants = grants,
                     ServersPromptSource = new McpServersPromptSource(),
                     ReportBackgroundConnection = report =>
                     {
