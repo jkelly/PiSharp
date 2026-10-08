@@ -102,6 +102,17 @@ internal static partial class Program
         var codex = Codex();
         codex.Http.OnUrl("https://", _ => Sse("""{"type":"response.completed","response":{"status":"completed","output":[]}}"""));
         Check((await Collect(codex.Transport, new(codex.Model, Big(), 1)))[^1] is StreamDone && codex.Http.All.Single().BodyBytes.Length > 6_000_000, "codex carries the image");
+        var vertexRow = CatalogRow("google-vertex", "gemini-2.5-flash"); var vertexHttp = new FakeHttp();
+        vertexHttp.OnUrl("https://", _ => Json("""{"error":{"message":"fake peer refuses"}}""", HttpStatusCode.BadRequest));
+        using (var vertex = NativeProviderFactory.CreateGoogleVertexRoute(Descriptor(vertexRow), vertexRow.Raw, _ => ValueTask.FromResult(new GoogleVertexRequestAuth(
+            new("https://aiplatform.googleapis.com/v1beta1/publishers/google/models/gemini-2.5-flash:streamGenerateContent?alt=sse"), "vertex-key", true, "-", "-")), 512, false, vertexHttp))
+        {
+            var small = await Collect(vertex, new(Descriptor(vertexRow), UserTurn(true), 1));
+            Check(vertexHttp.All.Count == 1, "small vertex " + ErrorMessage(small[^1]) + " " + ((StreamTerminalEvent)small[^1]).NativeSourceException);
+            vertexHttp.Requests.Clear();
+            var events = await Collect(vertex, new(Descriptor(vertexRow), Big(), 1));
+            Check(vertexHttp.All.Count == 1 && vertexHttp.All.Single().BodyBytes.Length > 6_000_000, "vertex carries the image: " + ErrorMessage(events[^1]) + " requests=" + vertexHttp.All.Count + " " + string.Join(",", vertexHttp.All.Select(item => item.BodyBytes.Length)));
+        }
     }
 
     private static void OpenCodeHeaders()

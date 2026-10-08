@@ -23,7 +23,7 @@ public static partial class NativeProviderFactory
         ArgumentNullException.ThrowIfNull(model); ArgumentNullException.ThrowIfNull(modelMetadata); ArgumentNullException.ThrowIfNull(auth);
         if (model.Provider != "google-vertex" || model.Api != "google-vertex") throw new ArgumentException("Unsupported native model or endpoint selection.");
         GoogleVertexSimpleTransport Transport(HttpClient client, GoogleVertexRequestAuth resolved, string? level) => new(client, model,
-            new(new(resolved.Endpoint, resolved.Token, new GoogleGenerativeAIOptions(modelMetadata) { MaxTokens = maxTokens }) { ApiKeyMode = resolved.ApiKeyMode },
+            new(new(resolved.Endpoint, resolved.Token, new GoogleGenerativeAIOptions(modelMetadata) { MaxTokens = maxTokens, MaximumPayloadBytes = MaximumGooglePayloadBytes }) { ApiKeyMode = resolved.ApiKeyMode },
                 resolved.Project, resolved.Location, level));
         return Bind(model, handler, client =>
         {
@@ -33,6 +33,9 @@ public static partial class NativeProviderFactory
                 Transport(client, await auth(token).ConfigureAwait(false), summary ? null : request.ThinkingLevel));
         });
     }
+
+    /// <summary>The Google transport's largest request body, its validated maximum (Pi sends ~4.5 MB images; upstream has no cap).</summary>
+    private const int MaximumGooglePayloadBytes = 8_388_608;
 
     private sealed class VertexRouteTransport(ModelDescriptor model, ImmutableArray<string> levels,
         Func<ChatRequest, CancellationToken, ValueTask<IChatTransport>> create) : IChatTransport, IThinkingLevelTransport
