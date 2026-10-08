@@ -63,6 +63,11 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, IIn
     }
     internal TextWriter Diagnostics { get; }
     internal string DiagnosticText => ((DiagnosticWriter)Diagnostics).Text;
+    /// <summary>OSC 7501 state of this lease. The console profile sends no DA1 negotiation, so only
+    /// <see cref="ProgramStatusOverride"/> <c>1</c> (<c>PI_PROGRAM_STATUS=1</c>) enables reports.</summary>
+    internal TerminalProgramStatusChannel? ProgramStatus { get; init; }
+    internal string? ProgramStatusOverride { get; init; }
+    internal bool IsClosing { get { lock (gate) return closing is not null; } }
 
     internal ValueTask StartAsync(CancellationToken token) => Run(async () =>
     {
@@ -71,8 +76,17 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, IIn
         // Mark ownership before the write: partial/faulted entry still requires an awaited leave attempt.
         entered = true;
         await terminal.WriteAsync("\u001b[?1049h\u001b[?2004h".AsMemory(), token).ConfigureAwait(false);
+        if (ProgramStatus?.Start(ProgramStatusOverride) is { Length: > 0 } status)
+            await terminal.WriteAsync(status.AsMemory(), token).ConfigureAwait(false);
         renderer.Invalidate(); Append("PiSharp terminal session\n");
         // The input owner's first captured layout supplies the first editor frame.
+    }, token);
+
+    /// <summary>Compute and write the next program status in this view's write order. No-op before start or without a channel.</summary>
+    internal ValueTask ReportProgramStatusAsync(Func<TerminalProgramStatus?> next, CancellationToken token) => Run(async () =>
+    {
+        if (!entered || ProgramStatus is not { } channel || next() is not { } status) return;
+        if (channel.Set(status) is { Length: > 0 } write) await terminal.WriteAsync(write.AsMemory(), token).ConfigureAwait(false);
     }, token);
 
     public ValueTask PresentAsync(string displayText, CancellationToken token) => Run(async () =>
@@ -431,7 +445,8 @@ internal sealed class TerminalSessionView : IInteractiveSessionPresentation, IIn
         await drained.Task.ConfigureAwait(false);
         try { await renderer.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failure = error; }
         if (entered)
-            try { await terminal.WriteAsync("\u001b[?2004l\u001b[?1049l".AsMemory(), CancellationToken.None).ConfigureAwait(false); }
+            // Remove the program status while stopped, as upstream ProcessTerminal.stop() does before leaving paste mode.
+            try { await terminal.WriteAsync(((ProgramStatus?.Stop() ?? "") + "\u001b[?2004l\u001b[?1049l").AsMemory(), CancellationToken.None).ConfigureAwait(false); }
             catch (Exception error) { failure ??= error; }
         display.Clear(); toolComponents.Clear(); retained = 0; draft = new("", 0); draftReceived = false; selectList = null; selectTitle = "";
         pendingQueue = TerminalPendingQueueSnapshot.Empty(1);

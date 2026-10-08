@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using PiSharp.CodingAgent;
 using PiSharp.CodingAgent.Configuration;
+using PiSharp.CodingAgent.ToolSelection;
+using PiSharp.Contracts;
 using PiSharp.Extensions.Abstractions.Reloading;
 using PiSharp.Extensions.Runtime.Reloading;
 
@@ -133,10 +135,22 @@ public sealed class NativeHostReloadCoordinator
             SessionStartAsync = operations.SessionStartAsync,
             ReportUnhandledMcpServersAsync = operations.ReportUnhandledMcpServersAsync,
             ExtendResourcesAsync = operations.ExtendResourcesAsync
-        }, hostLifetime, policy?.AllowedNames, policy?.ExcludedNames);
+        }, hostLifetime, selectActiveTools: (previous, staged, active, tools) =>
+            // Pi agent-session.ts reload(): tools newly added to defaultTools activate; patterns and MCP rules apply.
+            AllowedToolSelection.SelectReloaded(policy, active,
+                tools.Select(tool => new ToolSelectionDescriptor(tool.Name, Exposure(tool.Exposure), tool.DefaultActive, tool.IsExtension)).ToImmutableArray(),
+                previous.Settings is { } before ? StartupToolSelection.Resolve(before.Values) : null,
+                staged.Settings is { } after ? StartupToolSelection.Resolve(after.Values) : null));
         var receipt = await planner.ReloadAsync().ConfigureAwait(false);
         return new(attachment, reservation.IsPublished ? reservation.Candidate : null, receipt);
     }
+
+    private static ToolExposure Exposure(HostReloadToolExposure exposure) => exposure switch
+    {
+        HostReloadToolExposure.Direct => ToolExposure.Direct, HostReloadToolExposure.ModelOnly => ToolExposure.ModelOnly,
+        HostReloadToolExposure.Codemode => ToolExposure.Codemode, HostReloadToolExposure.Deferred => ToolExposure.Deferred,
+        _ => ToolExposure.Hidden
+    };
 
     private static async ValueTask Join(ValueTask operation)
     {

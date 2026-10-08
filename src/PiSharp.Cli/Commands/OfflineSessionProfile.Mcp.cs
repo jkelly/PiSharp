@@ -111,7 +111,7 @@ internal sealed partial class OfflineSessionProfile
                     if (prepare is null || prepare.GetInvocationList().Length != 1)
                         throw new ArgumentException("One discovery preparation is required.");
                     var prepared = prepare(plan, current) ?? throw new InvalidOperationException("Discovery returned no catalog.");
-                    foreach (var name in requested)
+                    foreach (var name in requested.Where(name => !name.Contains('*'))) // Patterns may match nothing.
                         if (!prepared.Registry.RegisteredTools.Any(tool => tool.Adapter.Name == name))
                             throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
                     return prepared;

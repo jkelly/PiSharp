@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "YamlDotNet": {
+        "type": "Transitive",
+        "resolved": "16.3.0",
+        "contentHash": "SgMOdxbz8X65z8hraIs6hOEdnkH6hESTAIUa7viEngHOYaH+6q5XJmwr1+yb9vJpNQ19hCQY69xbFsLtXpobQA=="
+      },
+      "pisharp.agent": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.AI": "[1.1.0, )",
+          "PiSharp.Contracts": "[1.1.0, )"
+        }
+      },
+      "pisharp.ai": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.1.0, )"
+        }
+      },
+      "pisharp.cli": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.CodingAgent": "[1.1.0, )",
+          "PiSharp.Extensions.Agent": "[1.1.0, )",
+          "PiSharp.Extensions.Runtime": "[1.1.0, )",
+          "PiSharp.PromptTemplates.Yaml": "[1.1.0, )",
+          "PiSharp.Rpc": "[1.1.0, )",
+          "PiSharp.Tools": "[1.1.0, )",
+          "PiSharp.Tui": "[1.1.0, )"
+        }
+      },
+      "pisharp.codingagent": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Agent": "[1.1.0, )",
+          "PiSharp.Sessions": "[1.1.0, )"
+        }
+      },
+      "pisharp.contracts": {
+        "type": "Project"
+      },
+      "pisharp.extensions.abstractions": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.1.0, )"
+        }
+      },
+      "pisharp.extensions.agent": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Agent": "[1.1.0, )",
+          "PiSharp.Extensions.Runtime": "[1.1.0, )"
+        }
+      },
+      "pisharp.extensions.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Extensions.Abstractions": "[1.1.0, )"
+        }
+      },
+      "pisharp.prompttemplates.yaml": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.CodingAgent": "[1.1.0, )",
+          "YamlDotNet": "[16.3.0, 16.3.0]"
+        }
+      },
+      "pisharp.rpc": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.CodingAgent": "[1.1.0, )",
+          "PiSharp.Contracts": "[1.1.0, )",
+          "PiSharp.Extensions.Abstractions": "[1.1.0, )"
+        }
+      },
+      "pisharp.sessions": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.1.0, )"
+        }
+      },
+      "pisharp.tools": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Agent": "[1.1.0, )",
+          "PiSharp.Contracts": "[1.1.0, )"
+        }
+      },
+      "pisharp.tui": {
+        "type": "Project"
+      }
+    }
+  }
+}

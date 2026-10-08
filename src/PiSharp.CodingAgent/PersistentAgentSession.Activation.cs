@@ -108,7 +108,7 @@ public sealed partial class PersistentAgentSession
             _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), _clock(), token);
         SessionPromptSectionPreparation? promptPreparation;
         _activationPreparation.Value = true;
-        try { (delta, promptPreparation) = registry.PreparePromptSectionMessage(names, context.Messages, delta, _clock(), token); }
+        try { (delta, promptPreparation) = registry.PreparePromptSectionMessage(names, context.Messages, delta, _clock(), token, pending?.Presentation); }
         finally { _activationPreparation.Value = false; }
         if (delta is null) { promptPreparation?.ValidateSource(); token.ThrowIfCancellationRequested(); return null; }
         var entry = Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,

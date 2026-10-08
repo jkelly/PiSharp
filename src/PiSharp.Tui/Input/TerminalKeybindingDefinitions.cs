@@ -1,10 +1,11 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/keybindings.ts.
 namespace PiSharp.Tui.Input;
 
 // Defaults/descriptions adapted from Mario Zechner's MIT-licensed Pi.
 // Copyright (c) 2025 Mario Zechner; full notice: tests/PiSharp.Tui.Keybindings.Tests/UPSTREAM-LICENSE.
 /// <summary>
-/// Pi v0.99.1 TUI defaults, in upstream definition order. Agent and platform defaults are separate.
-/// Source: d86654abb8862e201933517d6f1fce9f88dd117f/packages/tui/src/keybindings.ts.
+/// Pi v1.1.0 TUI defaults, in upstream definition order. Agent and platform defaults are separate.
+/// Home/End belong to the editor; transcript top/bottom use Ctrl+Home/Ctrl+End (v1.0.3).
 /// </summary>
 public static class TerminalKeybindingDefinitions
 {
@@ -19,8 +20,8 @@ public static class TerminalKeybindingDefinitions
             Define("tui.editor.cursorRight", ["right", "ctrl+f"], "Move cursor right"),
             Define("tui.editor.cursorWordLeft", ["alt+left", "ctrl+left", "alt+b"], "Move cursor word left"),
             Define("tui.editor.cursorWordRight", ["alt+right", "ctrl+right", "alt+f"], "Move cursor word right"),
-            Define("tui.editor.cursorLineStart", ["home", "ctrl+home", "ctrl+a"], "Move to line start"),
-            Define("tui.editor.cursorLineEnd", ["end", "ctrl+end", "ctrl+e"], "Move to line end"),
+            Define("tui.editor.cursorLineStart", ["home", "ctrl+a"], "Move to line start"),
+            Define("tui.editor.cursorLineEnd", ["end", "ctrl+e"], "Move to line end"),
             Define("tui.editor.jumpForward", "ctrl+]", "Jump forward to character"),
             Define("tui.editor.jumpBackward", "ctrl+alt+]", "Jump backward to character"),
             Define("tui.editor.pageUp", ["pageUp", "ctrl+pageUp"], "Page up"),
@@ -56,8 +57,8 @@ public static class TerminalKeybindingDefinitions
             Define("tui.altScreen.searchNext", ["enter", "ctrl+g"], "Select the next search match"),
             Define("tui.altScreen.searchPrevious", ["shift+enter", "ctrl+shift+g"], "Select the previous search match"),
             Define("tui.altScreen.searchClose", "escape", "Close transcript search"),
-            Define("tui.altScreen.top", "home", "Scroll viewport to top"),
-            Define("tui.altScreen.bottom", "end", "Scroll viewport to bottom")
+            Define("tui.altScreen.top", "ctrl+home", "Scroll viewport to top"),
+            Define("tui.altScreen.bottom", "ctrl+end", "Scroll viewport to bottom")
         });
 
     private static KeyValuePair<string, TerminalKeybindingDefinition> Define(string id, string key, string description) =>

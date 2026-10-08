@@ -3,4 +3,7 @@
     <ProjectReference Include="../PiSharp.Agent/PiSharp.Agent.csproj" />
     <ProjectReference Include="../PiSharp.Sessions/PiSharp.Sessions.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PiSharp.CliSync.Tests" />
+  </ItemGroup>
 </Project>
