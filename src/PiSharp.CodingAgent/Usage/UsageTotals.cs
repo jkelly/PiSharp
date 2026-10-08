@@ -33,6 +33,16 @@ public static class UsageTotalsCalculator
         totals.Cost += (double)usage.Cost.Total;
     }
 
+    /// <summary><see cref="AddUsageToTotals(UsageTotals, TokenUsage)"/> for a usage object as stored in a session entry
+    /// (<c>entry.usage</c> or <c>entry.message.usage</c>), read with JavaScript number semantics.</summary>
+    public static void AddWireUsageToTotals(UsageTotals totals, JsonElement usage)
+    {
+        ArgumentNullException.ThrowIfNull(totals);
+        totals.Input += UsageWire.Number(usage, "input"); totals.Output += UsageWire.Number(usage, "output");
+        totals.CacheRead += UsageWire.Number(usage, "cacheRead"); totals.CacheWrite += UsageWire.Number(usage, "cacheWrite");
+        totals.Cost += usage.ValueKind == JsonValueKind.Object ? UsageWire.CostTotal(usage) : 0;
+    }
+
     /// <summary>Sum of two usages, keeping the optional token splits (<c>cacheWrite1h</c>, <c>reasoning</c>) when either side
     /// reports them. Like the source, the result carries no other extra usage or cost fields.</summary>
     public static TokenUsage CombineUsage(TokenUsage first, TokenUsage second)
@@ -62,10 +72,7 @@ public static class UsageTotalsCalculator
         {
             if (!TryAttribute(entry, out var key, out var usage)) continue;
             if (!index.TryGetValue(key, out var position)) { position = totalsByKey.Count; index[key] = position; totalsByKey.Add((key, new())); }
-            var totals = totalsByKey[position].Totals;
-            totals.Input += UsageWire.Number(usage, "input"); totals.Output += UsageWire.Number(usage, "output");
-            totals.CacheRead += UsageWire.Number(usage, "cacheRead"); totals.CacheWrite += UsageWire.Number(usage, "cacheWrite");
-            totals.Cost += UsageWire.CostTotal(usage);
+            AddWireUsageToTotals(totalsByKey[position].Totals, usage);
         }
         return [.. totalsByKey.Select(item => new UsageCostBreakdownEntry(item.Key, item.Totals.Cost,
                 item.Totals.Input + item.Totals.Output + item.Totals.CacheRead + item.Totals.CacheWrite))

@@ -42,6 +42,8 @@ internal static partial class Program
             UsageTotalsCalculator.AddUsageToTotals(totals, new(10, 20, 30, 40, 100, new(0.1m, 0.2m, 0.3m, 0.4m, 1m)));
             UsageTotalsCalculator.AddUsageToTotals(totals, new(1, 2, 3, 4, 10, new(0, 0, 0, 0, 0.5m)));
             Equal((11d, 22d, 33d, 44d, 1.5), (totals.Input, totals.Output, totals.CacheRead, totals.CacheWrite, totals.Cost), "totals");
+            UsageTotalsCalculator.AddWireUsageToTotals(totals, JsonDocument.Parse(UsageJson(1, 1, 1, 1, costTotal: 0.25)).RootElement);
+            Equal((12d, 23d, 34d, 45d, 1.75), (totals.Input, totals.Output, totals.CacheRead, totals.CacheWrite, totals.Cost), "wire usage");
             var split = JsonFields.Empty.Set("cacheWrite1h", JsonData.Parse("7")).Set("other", JsonData.Parse("1"));
             var combined = UsageTotalsCalculator.CombineUsage(new(1, 2, 3, 10, 16, new(1, 2, 3, 4, 10), split), new(1, 1, 1, 1, 4, new(1, 1, 1, 1, 4)));
             Equal((2L, 3L, 4L, 11L, 20L), (combined.Input, combined.Output, combined.CacheRead, combined.CacheWrite, combined.TotalTokens), "combined tokens");
