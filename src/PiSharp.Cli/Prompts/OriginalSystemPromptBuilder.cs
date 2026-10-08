@@ -44,6 +44,18 @@ internal static class OriginalSystemPromptBuilder
         return new(frozen, cwd, Copy(selected), literal);
     }
 
+    /// <summary>A prompt-start contribution, like a before_agent_start handler editing `systemPromptOptions.sections`:
+    /// sets section <paramref name="name"/> to <paramref name="content"/> (in place when present, else last), or deletes it when null.</summary>
+    internal static OriginalSystemPromptSnapshot WithSection(OriginalSystemPromptSnapshot snapshot, string name, string? content)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (name is null || !SectionName.IsMatch(name) || name == "preamble") throw new ArgumentException("Invalid system prompt section name.", nameof(name));
+        var sections = snapshot.Input.Sections; var index = sections.Select(row => row.Key).ToList().IndexOf(name);
+        var next = content is null ? index < 0 ? sections : sections.RemoveAt(index)
+            : index < 0 ? sections.Add(KeyValuePair.Create(name, content)) : sections.SetItem(index, KeyValuePair.Create(name, content));
+        return next == sections ? snapshot : snapshot with { Input = snapshot.Input with { Sections = next } };
+    }
+
     internal static JsonData Options(OriginalSystemPromptSnapshot snapshot)
     {
         var input = snapshot.Input;

@@ -13,7 +13,7 @@ using PiSharp.Extensions.Runtime.Mcp.Authentication;
 // Authored offline expectations for the Pi v1.1.0 MCP sync (names, exposure/prompt, OAuth). They are derived from the
 // pinned upstream source and its tests by reading, never captured from an upstream run. Fake authorization and token
 // servers answer in process; credential stores are in memory; no network or live credentials are used.
-internal static class Program
+internal static partial class Program
 {
     private static int requests;
 
@@ -40,6 +40,7 @@ internal static class Program
             ("oauth.auth-server-metadata-url-replaces-discovery", MetadataUrl),
             ("oauth.client-id-metadata-document-and-application-type", ClientMetadataDocument)
         };
+        cases.AddRange(CompletionCases());
         // Linked existing contract cases (tests/PiSharp.Extensions.ContractTests/McpConfigurationTests.cs).
         cases.AddRange(McpConfigurationTests.Cases().Select(item => ("linked." + item.Name, item.Run)));
         var results = new List<object>(); var failures = 0;

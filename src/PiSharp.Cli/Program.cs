@@ -5,11 +5,12 @@ namespace PiSharp.Cli;
 
 internal static class Program
 {
-    private const string Usage = "Usage: PiSharp.Cli --offline-demo --workspace <new absolute directory> --session <new absolute JSONL file in workspace>; " + Commands.SessionCommands.Usage + "; " + Commands.RpcSessionCommand.Usage + "; " + Commands.InteractiveSessionCommand.Usage + "; " + Commands.TerminalSessionCommand.Usage + "; " + Commands.SessionCopyCommand.Usage + "; " + Commands.SessionCatalogCommand.Usage + "; " + Commands.SessionContextEditCommand.Usage;
+    private const string Usage = "Usage: PiSharp.Cli --offline-demo --workspace <new absolute directory> --session <new absolute JSONL file in workspace>; " + Commands.SessionCommands.Usage + "; " + Commands.RpcSessionCommand.Usage + "; " + Commands.InteractiveSessionCommand.Usage + "; " + Commands.TerminalSessionCommand.Usage + "; " + Commands.SessionCopyCommand.Usage + "; " + Commands.SessionCatalogCommand.Usage + "; " + Commands.SessionContextEditCommand.Usage + "; " + Commands.McpCommand.Usage;
 
     private static async Task<int> Main(string[] args)
     {
         if (args.Length > 0 && args[0] == "session") return await RunSessionAsync(args).ConfigureAwait(false);
+        if (args.Length > 0 && args[0] == "mcp") return await RunMcpAsync(args[1..]).ConfigureAwait(false);
         Stream standardOutput;
         try { standardOutput = StandardOutputStream.Open(); }
         catch (Exception) { return Fail("StandardOutputUnavailable", "Standard output could not be opened.", 1); }
@@ -49,6 +50,25 @@ internal static class Program
         { return Fail("Canceled", "Offline demo canceled after settling owned work; inspect the new workspace for completed effects.", 1); }
         catch (Exception)
         { return Fail("OfflineDemoFailed", "Offline demo failed; inspect the newly created workspace and session before retrying with new paths.", 1); }
+        finally { Console.CancelKeyPress -= cancel; }
+    }
+
+    private static async Task<int> RunMcpAsync(string[] args)
+    {
+        Stream standardOutput;
+        try { standardOutput = StandardOutputStream.Open(); }
+        catch (Exception) { return Fail("StandardOutputUnavailable", "Standard output could not be opened.", 1); }
+        await using var ownedOutput = standardOutput;
+        await using var output = new Utf8StreamTextWriter(standardOutput);
+        using var cancellation = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, observation) => { observation.Cancel = true; cancellation.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        try
+        {
+            var result = await Commands.McpCommand.RunAsync(args, output, Console.Error, Commands.McpCommand.DefaultOptions(), cancellation.Token).ConfigureAwait(false);
+            await output.FlushAsync().ConfigureAwait(false);
+            return result;
+        }
         finally { Console.CancelKeyPress -= cancel; }
     }
 
