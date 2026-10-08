@@ -84,7 +84,9 @@ internal static class SessionTreeNavigationTests
         Equal("right-assistant", result.LeafId); Equal(null, result.EditorText);
         result = await Select(f, "root-user");
         Equal(null, result.LeafId); Equal("first", result.EditorText); Equal(0, result.Context.Ancestry.Length);
-        Equal(0, result.Agent.Messages.Length); Equal(0, f.Session.GetActiveTools().Length);
+        // Pi 1.1.0 navigateTree: a target with no system message keeps the current tools (right-system's write) as the
+        // logical selection; nothing is written.
+        Equal(0, result.Agent.Messages.Length); Check(f.Session.GetActiveTools().SequenceEqual(["write"]), "Root navigation dropped the current tools.");
         var root = await Select(f, null); Check(root.NoOp && root.EditorText is null, "Root no-op guessed a physical leaf.");
         result = await Select(f, "right-tail");
         Equal("right-tail", result.LeafId); Equal(null, result.EditorText); Equal(B, result.Agent.Model);

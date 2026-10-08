@@ -144,4 +144,114 @@ internal static partial class Program
         }
         finally { Directory.Delete(directory, recursive: true); }
     }
+
+    // _restoreToolsFromTranscript restores by name and _applyToolLoadout declares the current registry's tool, so a recorded
+    // declaration that changed since (an MCP server that updated its schema) is replaced, and a now-hidden tool is skipped.
+    private static SessionRegisteredTool Changed(string name, ToolExposure exposure = ToolExposure.Direct) =>
+        new(JsonData.Parse(JsonSerializer.Serialize(new { name, description = name + " tool, updated", parameters = new { type = "object", properties = new { query = new { type = "string" } } } })),
+            new NoAdapter(name)) { Exposure = exposure, IsExtension = true };
+
+    private static string Description(JsonElement message, string tool) =>
+        message.GetProperty("toolsAdded").EnumerateArray().Single(declaration => declaration.GetProperty("name").GetString() == tool).GetProperty("description").GetString()!;
+
+    private static async Task<SessionTreeNavigationReceipt> NavigateTo(ReplaceableAgentSession owner, string target)
+    {
+        var view = owner.CaptureTree(owner.Current);
+        var receipt = await owner.NavigateTreeAsync(view.Attachment, new(target, view.Revision));
+        Equal(SessionTreeNavigationDisposition.Selected, receipt.Disposition, "navigation to " + target);
+        return receipt;
+    }
+
+    private static async Task OpenReplacesChangedDeclarations()
+    {
+        var path = await RecordedSession([Tool("read"), Tool(DocsTool)], ["read", DocsTool]);
+        try
+        {
+            // The docs server now reports a changed schema: the tool is restored with it instead of DeclarationMismatch.
+            var reopened = await Reopen(path, RestoredRegistry([Tool("read"), Changed(DocsTool)]));
+            await using var owner = new ReplaceableAgentSession(reopened, (_, _) => throw new InvalidOperationException("No replacement expected."));
+            Names(["read", DocsTool], reopened.GetActiveTools(), "changed declaration restored by name");
+            Check(reopened.PendingToolNames.IsEmpty, "a registered tool became pending");
+            var record = reopened.Snapshot.Log.Entries[^1].WireBody.Value.GetProperty("message");
+            Equal(DocsTool + " tool, updated", Description(record, DocsTool), "restored loadout records the current declaration");
+            Names(["read", DocsTool], SystemTools(record, "toolsRemoved"), "recorded declarations replaced");
+        }
+        finally { Directory.Delete(Path.GetDirectoryName(path)!, recursive: true); }
+
+        // Tree navigation to a branch recorded with the old declaration restores it with the current one.
+        var (session, directory) = await PendingSession([Tool("read"), Tool(DocsTool)]);
+        try
+        {
+            await session.SetActiveToolsAsync(["read", DocsTool]); var withDocs = session.Snapshot.Context.LeafId!;
+            await session.SetActiveToolsAsync(["read"]);
+            await Publish(session, [Tool("read"), Changed(DocsTool)], restoring: false);
+            await using var owner = new ReplaceableAgentSession(session, (_, _) => throw new InvalidOperationException("No replacement expected."));
+            var restored = await NavigateTo(owner, withDocs);
+            Names(["read", DocsTool], session.GetActiveTools(), "navigation restores the changed declaration by name");
+            var record = restored.Context.Ancestry[^1];
+            Equal(withDocs, record.ParentId, "current declaration recorded on the target branch");
+            Equal(DocsTool + " tool, updated", Description(record.WireBody.Value.GetProperty("message"), DocsTool), "navigation records the current declaration");
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    private static async Task RestoreSkipsHiddenTools()
+    {
+        var path = await RecordedSession([Tool("read"), Tool(DocsTool)], ["read", DocsTool]);
+        try
+        {
+            // The docs tool is now hidden: it is skipped silently instead of UnsupportedDeclaration, and stays pending like
+            // every restored name that was not applied, so it activates if its exposure becomes declarable again.
+            var reopened = await Reopen(path, RestoredRegistry([Tool("read"), Tool(DocsTool, ToolExposure.Hidden)]));
+            await using var owner = new ReplaceableAgentSession(reopened, (_, _) => throw new InvalidOperationException("No replacement expected."));
+            Names(["read"], reopened.GetActiveTools(), "hidden tool skipped");
+            Names([DocsTool], reopened.PendingToolNames, "skipped hidden tool pending");
+            Names(["read"], SystemTools(reopened.Snapshot.Log.Entries[^1].WireBody.Value.GetProperty("message"), "toolsAdded"), "recorded without the hidden tool");
+            await ConnectDocs(owner, Tool(DocsTool));
+            Names(["read", DocsTool], owner.Current.Session.GetActiveTools(), "tool activates once it is declarable again");
+        }
+        finally { Directory.Delete(Path.GetDirectoryName(path)!, recursive: true); }
+
+        var (session, directory) = await PendingSession([Tool("read"), Tool(DocsTool)]);
+        try
+        {
+            await session.SetActiveToolsAsync(["read", DocsTool]); var withDocs = session.Snapshot.Context.LeafId!;
+            await session.SetActiveToolsAsync(["read"]);
+            await Publish(session, [Tool("read"), Tool(DocsTool, ToolExposure.Hidden)], restoring: false);
+            await using var owner = new ReplaceableAgentSession(session, (_, _) => throw new InvalidOperationException("No replacement expected."));
+            await NavigateTo(owner, withDocs);
+            Names(["read"], session.GetActiveTools(), "navigation skips the hidden tool");
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    private static async Task NavigationWithoutSystemMessageKeepsTools()
+    {
+        var (session, directory) = await PendingSession([Tool("read"), Tool("grep"), Tool(DocsTool)]);
+        try
+        {
+            // Session creation records the model and thinking level but no system message.
+            var start = session.Snapshot.Context.LeafId!;
+            Check(!session.Snapshot.Context.LlmMessages.Any(message => message.Role == "system"), "fixture start declares a system message");
+            await session.SetActiveToolsAsync(["read", "grep", DocsTool]); var withDocs = session.Snapshot.Context.LeafId!;
+            await session.SetActiveToolsAsync(["read", "grep"]);
+            await Publish(session, [Tool("read"), Tool("grep")], restoring: false);
+            await using var owner = new ReplaceableAgentSession(session, (_, _) => throw new InvalidOperationException("No replacement expected."));
+            await NavigateTo(owner, withDocs);
+            Names([DocsTool], session.PendingToolNames, "pending before the navigation");
+            // The target branch has no system message: the current tools are kept and pending tools are dropped. Nothing is
+            // written by the navigation; the next request records the kept tools before it is sent.
+            var kept = await NavigateTo(owner, start);
+            Equal(start, kept.LeafId, "navigation wrote a record");
+            Names(["read", "grep"], session.GetActiveTools(), "current tools kept on a branch without a system message");
+            Check(session.PendingToolNames.IsEmpty, "navigation kept pending tools");
+            await session.PromptAsync(SettledUser("go")); await session.WaitForIdleAsync();
+            Names(["read", "grep"], session.Snapshot.Agent.Tools.Select(tool => tool.Name), "kept tools declared to the request");
+            var record = session.Snapshot.Context.LlmMessages.Last(message => message.Role == "system").WireBody.Value;
+            Names(["read", "grep"], SystemTools(record, "toolsAdded"), "kept tools recorded at the next request");
+            await ConnectDocs(owner, Tool(DocsTool));
+            Names(["read", "grep"], owner.Current.Session.GetActiveTools(), "dropped pending tool activated");
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
 }
