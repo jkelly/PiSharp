@@ -245,11 +245,11 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         AuthenticationResolution authentication, HttpMessageHandler? handler, int maximum, bool summary, CancellationToken token)
     {
         var definition = selected.Definition;
-        var projection = new AnthropicMessagesRequestOptions(MaximumTokens: maximum,
+        var projection = AnthropicThinkingCompat(new AnthropicMessagesRequestOptions(MaximumTokens: maximum,
             ModelReasoning: definition.Raw.Value.GetProperty("reasoning").GetBoolean(),
             ModelSupportsImages: definition.DeclaresImageInput, ThinkingEnabled: false,
             MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
-            CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short);
+            CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw);
         var options = new AnthropicMessagesKeyAuthRequestOptions(MaxTokens: maximum, MaximumPayloadBytes: 1_048_576);
         return summary
             ? AnthropicResolvedTransports.AcquireSummaryAsync(selected.Model, new Uri(definition.BaseUrl), authentication,
@@ -257,6 +257,12 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             : AnthropicResolvedTransports.AcquireMainAsync(selected.Model, new Uri(definition.BaseUrl), authentication,
                 projection, options, definition.Raw, handler, token);
     }
+    /// <summary>Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT) anthropic-messages.ts buildParams: a
+    /// <c>compat.supportsMidConvoEffort</c> model always sends managed adaptive thinking with its effort markers, including on the
+    /// summary route, which carries no level metadata and would otherwise send disabled thinking the model cannot accept.</summary>
+    private static AnthropicMessagesRequestOptions AnthropicThinkingCompat(AnthropicMessagesRequestOptions projection, JsonData raw) =>
+        projection with { SupportsMidConversationEffort = raw.Value.TryGetProperty("compat", out var compat) && compat.ValueKind == System.Text.Json.JsonValueKind.Object &&
+            compat.TryGetProperty("supportsMidConvoEffort", out var mid) && mid.ValueKind == System.Text.Json.JsonValueKind.True };
     internal int MaximumOutputTokens => selection.MaximumOutputTokens;
     internal IChatTransport CreateTransport(int? outputTokens = null, bool summary = false)
     {
@@ -292,9 +298,9 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         if (model.Api == "anthropic-messages")
         {
             var provider = NativeProviderFactory.CreateAnthropic(model, new Uri(definition.BaseUrl), credential,
-                new(MaximumTokens: maximum, ModelReasoning: reasoning, ModelSupportsImages: definition.DeclaresImageInput,
+                AnthropicThinkingCompat(new(MaximumTokens: maximum, ModelReasoning: reasoning, ModelSupportsImages: definition.DeclaresImageInput,
                     ThinkingEnabled: false, MaximumMessages: 1024, MaximumEntryCharacters: 1_048_576,
-                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short),
+                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw),
                 new(MaxTokens: maximum, MaximumPayloadBytes: 1_048_576), handler, summary ? null : definition.Raw);
             return Own(provider);
         }

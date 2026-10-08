@@ -85,6 +85,19 @@ internal static partial class Program
                 else if (type == "agent_settled" && responded) return;
             }
         }
+        /// <summary>Sends one command and returns its successful response's data (undefined when the response has none).</summary>
+        public async Task<JsonElement> Command(string id, object command)
+        {
+            var node = JsonSerializer.SerializeToNode(command)!.AsObject(); node["id"] = id;
+            await connection.SendAsync(JsonData.Parse(node.ToJsonString()), deadline.Token);
+            while (true)
+            {
+                var record = await Next(id); Events.Add(record);
+                if (record.Value.GetProperty("type").GetString() != "response" || record.Value.GetProperty("id").GetString() != id) continue;
+                Check(record.Value.GetProperty("success").GetBoolean(), "command refused: " + record);
+                return record.Value.TryGetProperty("data", out var data) ? data.Clone() : default;
+            }
+        }
         public async Task<int> Finish()
         {
             finished = true; connection.CompleteInput();

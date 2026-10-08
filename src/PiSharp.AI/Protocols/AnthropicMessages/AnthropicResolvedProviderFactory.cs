@@ -1,3 +1,5 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/anthropic-messages.ts (level and
+// compat.supportsMidConvoEffort selection over resolved authentication).
 using PiSharp.AI;
 using PiSharp.AI.Authentication;
 using PiSharp.AI.Providers;
@@ -22,22 +24,24 @@ public static class AnthropicResolvedProviderFactory
         if (modelMetadata is not null && (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue))
             throw new ArgumentException("Unsupported native thinking token cap.");
         var profile = modelMetadata is null ? null : new NativeThinkingProfile(model, modelMetadata, projectionOptions.ModelReasoning, (int)maximum);
+        // Pi abe508 buildParams: compat.supportsMidConvoEffort alone selects managed effort, whatever the requested level.
+        if (profile is not null && profile.MidConversationEffort != projectionOptions.SupportsMidConversationEffort)
+            factory = new(endpoint, model, projectionOptions = projectionOptions with { SupportsMidConversationEffort = profile.MidConversationEffort }, authentication, requestOptions);
         var responseOptions = NativeProviderFactory.AnthropicMessagesOptionsForModel(modelMetadata, new AnthropicMessagesOptions(OAuthToolNames: authentication.UseOAuthProjection,
             MaximumToolDeclarations: projectionOptions.MaximumDeclarations, MaximumActiveTools: projectionOptions.MaximumActiveTools,
             MaximumInputCharacters: projectionOptions.MaximumInputCharacters));
         return Bind(model, handler, factory.Federation is { } federation ? (endpoint, federation) : null, client =>
         {
-            IChatTransport Create(AnthropicMessagesAuthenticatedRequestFactory bound) => new AnthropicMessagesHttpSseTransport(client,
-                (request, token) => bound.Create(request, token), messagesOptions: responseOptions);
+            IChatTransport Create(AnthropicMessagesAuthenticatedRequestFactory bound, AnthropicMessagesRequestOptions projection) => new AnthropicMessagesHttpSseTransport(client,
+                (request, token) => bound.Create(request, token), messagesOptions: NativeProviderFactory.WithThinkingLevel(responseOptions, projection));
             if (profile is null && projectionOptions.ModelReasoning && !projectionOptions.SupportsThinkingOff)
                 throw new ArgumentException("Native thinking off is unsupported by the configured profile.");
-            return new NativeThinkingTransport(model, profile?.Levels ?? ["off"], level => level is null
-                ? Create(factory) : Create(new(endpoint, model, projectionOptions with
-                { MaximumTokens = profile is null ? projectionOptions.MaximumTokens : (int)maximum, ThinkingEnabled = level != "off", ForceAdaptiveThinking = profile?.Adaptive ?? false,
-                    SupportsThinkingOff = profile?.SupportsOff ?? projectionOptions.SupportsThinkingOff,
-                    Effort = level != "off" && profile?.Adaptive == true ? profile.AnthropicEffort(level) : null,
-                    ThinkingBudgetTokens = level == "off" || profile?.Adaptive == true ? 0 : NativeThinkingProfile.AnthropicBudget(level, (int)maximum) },
-                    authentication, (requestOptions ?? new()) with { MaxTokens = maximum })));
+            return new NativeThinkingTransport(model, profile?.Levels ?? ["off"], level =>
+            {
+                if (level is null) return Create(factory, projectionOptions);
+                var selected = NativeProviderFactory.AnthropicLevel(projectionOptions, profile, level, maximum);
+                return Create(new(endpoint, model, selected, authentication, (requestOptions ?? new()) with { MaxTokens = maximum }), selected);
+            });
         });
     }
     private static void Validate(ModelDescriptor model, Uri endpoint, string? key, string provider, string api, string address)

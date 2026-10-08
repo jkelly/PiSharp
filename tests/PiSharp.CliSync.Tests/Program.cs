@@ -63,6 +63,7 @@ internal static partial class Program
             ("auth.logout-selects-and-removes-stored-credentials", LogoutRemovesStoredCredentials),
             ("auth.anthropic.live-route-stored-oauth-refreshes-mid-session-and-logout-falls-back", LiveStoredOAuthRefreshesMidSession),
             ("auth.anthropic.live-route-stored-key-env-precedence-and-federation", LiveAnthropicPrecedenceAndFederation),
+            ("provider.anthropic.live-route-managed-effort-levels-markers-and-recorded-effort", LiveManagedEffortLevels),
             ("provider.azure.live-route-responses-completions-and-endpoint-errors", LiveAzureRoutes),
             ("mcp.session.global-config-direct-background-failure-report-and-no-mcp", McpProductionSession),
             ("mcp.session.oauth-server-sends-stored-mcp-auth-token", McpOAuthServerUsesStoredTokens),

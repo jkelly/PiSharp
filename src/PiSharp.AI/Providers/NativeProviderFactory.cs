@@ -1,3 +1,5 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/anthropic-messages.ts (CreateAnthropic level and
+// compat.supportsMidConvoEffort selection); the other compositions are native.
 using PiSharp.AI.Protocols.AnthropicMessages;
 using PiSharp.AI.Protocols.OpenAICompletions;
 using PiSharp.AI.Protocols.OpenAIResponses;
@@ -81,22 +83,37 @@ public static partial class NativeProviderFactory
         if (modelMetadata is not null && (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue))
             throw new ArgumentException("Unsupported native thinking token cap.");
         var profile = modelMetadata is null ? null : new NativeThinkingProfile(model, modelMetadata, projectionOptions.ModelReasoning, (int)maximum);
+        // Pi abe508 buildParams: compat.supportsMidConvoEffort alone selects managed effort, whatever the requested level.
+        if (profile is not null && profile.MidConversationEffort != projectionOptions.SupportsMidConversationEffort)
+            factory = new(endpoint, model, projectionOptions = projectionOptions with { SupportsMidConversationEffort = profile.MidConversationEffort }, requestOptions);
         var messagesOptions = AnthropicMessagesOptionsForModel(modelMetadata);
         return Bind(model, handler, client =>
         {
-            IChatTransport Create(AnthropicMessagesKeyAuthRequestFactory bound) => new AnthropicMessagesHttpSseTransport(client,
-                (request, token) => bound.Create(request, explicitApiKey, token), messagesOptions: messagesOptions, hooks: hooks);
+            IChatTransport Create(AnthropicMessagesKeyAuthRequestFactory bound, AnthropicMessagesRequestOptions projection) => new AnthropicMessagesHttpSseTransport(client,
+                (request, token) => bound.Create(request, explicitApiKey, token), messagesOptions: WithThinkingLevel(messagesOptions, projection), hooks: hooks);
             if (profile is null && projectionOptions.ModelReasoning && !projectionOptions.SupportsThinkingOff)
                 throw new ArgumentException("Native thinking off is unsupported by the configured profile.");
-            return new NativeThinkingTransport(model, profile?.Levels ?? ["off"], level => level is null
-                ? Create(factory) : Create(new(endpoint, model, projectionOptions with
-                { MaximumTokens = profile is null ? projectionOptions.MaximumTokens : (int)maximum, ThinkingEnabled = level != "off", ForceAdaptiveThinking = profile?.Adaptive ?? false,
-                    SupportsThinkingOff = profile?.SupportsOff ?? projectionOptions.SupportsThinkingOff,
-                    Effort = level != "off" && profile?.Adaptive == true ? profile.AnthropicEffort(level) : null,
-                    ThinkingBudgetTokens = level == "off" || profile?.Adaptive == true ? 0 : NativeThinkingProfile.AnthropicBudget(level, (int)maximum) },
-                    (requestOptions ?? new()) with { MaxTokens = maximum })));
+            return new NativeThinkingTransport(model, profile?.Levels ?? ["off"], level =>
+            {
+                if (level is null) return Create(factory, projectionOptions);
+                var selected = AnthropicLevel(projectionOptions, profile, level, maximum);
+                return Create(new(endpoint, model, selected, (requestOptions ?? new()) with { MaxTokens = maximum }), selected);
+            });
         });
     }
+
+    /// <summary>The per-level Anthropic projection: adaptive models send the mapped effort, others a capped budget.</summary>
+    internal static AnthropicMessagesRequestOptions AnthropicLevel(AnthropicMessagesRequestOptions projection, NativeThinkingProfile? profile, string level, double maximum) => projection with
+    {
+        MaximumTokens = profile is null ? projection.MaximumTokens : (int)maximum, ThinkingEnabled = level != "off", ForceAdaptiveThinking = profile?.Adaptive ?? false,
+        SupportsThinkingOff = profile?.SupportsOff ?? projection.SupportsThinkingOff,
+        Effort = level != "off" && profile?.Adaptive == true ? profile.AnthropicEffort(level) : null,
+        ThinkingBudgetTokens = level == "off" || profile?.Adaptive == true ? 0 : NativeThinkingProfile.AnthropicBudget(level, (int)maximum)
+    };
+
+    /// <summary>Managed effort responses record the exact effort their request carried (upstream stream()).</summary>
+    internal static AnthropicMessagesOptions? WithThinkingLevel(AnthropicMessagesOptions? options, AnthropicMessagesRequestOptions projection) =>
+        projection.ProviderThinkingLevel is { } level ? (options ?? new()) with { ProviderThinkingLevel = level } : options;
 
     private static void Validate(ModelDescriptor model, Uri endpoint, string key, string provider, string api, string address)
     {
