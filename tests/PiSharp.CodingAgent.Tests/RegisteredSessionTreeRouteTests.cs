@@ -27,7 +27,7 @@ internal static class RegisteredSessionTreeRouteTests
             var views=new NativeSessionSnapshotProvider();views.Attach(f.Owner);
             var reads=new NativeExtensionContextFacadeHost();reads.Attach(f.Owner);
             registry=new(null,null,views,reads);var actualRegistry=registry;var generator=new Generator(f);
-            ExtensionTreeFacadeResult? returned=null;var beforeCalls=0;var afterCalls=0;
+            ExtensionTreeFacadeResult? returned=null;string? returnedLeaf=null;var beforeCalls=0;var afterCalls=0;
             async Task<ExtensionBeforeTreeResult?> Before(ExtensionBeforeTreeEvent proposal)
             {
                 beforeCalls++;SessionBoundaryFixture.Check(proposal.Options.Summarize&&proposal.TargetId=="left"&&proposal.EntriesToSummarize.Any(entry=>entry.Value.GetProperty("id").GetString()=="right"),"Registered before-tree options/actual abandoned entries lost.");
@@ -41,7 +41,8 @@ internal static class RegisteredSessionTreeRouteTests
             {
                 var original=f.Keep(((IExtensionTreeCommandFacade)context).NavigateTreeAsync(new("left",Summarize:true,
                     CustomInstructions:"original instructions",ReplaceInstructions:false),token).AsTask());
-                returned=await original;
+                // The fresh facade is readable only while the originating command callback is active.
+                returned=await original;if(returned.Disposition=="Selected")returnedLeaf=returned.Context.LeafId;
             }
             var command=ExtensionCommandFacade.CreateCommand("tree","tree","tree",reads,
                 (arguments,context,token)=>new(f.Keep(Command(context,token))));
@@ -85,7 +86,7 @@ internal static class RegisteredSessionTreeRouteTests
             else
             {
                 SessionBoundaryFixture.Check(returned!.Disposition=="Selected"&&afterCalls==1&&returned.Checkpoint is not null&&
-                    returned.Context.LeafId==f.Session.Snapshot.Context.LeafId,"Registered result is not actual acknowledged current context.");
+                    returnedLeaf==f.Session.Snapshot.Context.LeafId,"Registered result is not actual acknowledged current context.");
                 foreach(var row in returned.Originals)f.Retain(new("tree-route",row.Original,row.Fault,row.Direct));
                 if(mode==3)SessionBoundaryFixture.Check(generator.Calls==1&&generator.Request!.Prompt.EndsWith("replacement instructions",StringComparison.Ordinal),"Replace/custom instructions lost before actual generator.");
                 else SessionBoundaryFixture.Check(generator.Calls==0,"Provided summary invoked generator.");

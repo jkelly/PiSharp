@@ -24,7 +24,14 @@ public sealed class SessionCompactionException(SessionCompactionFailure failure)
     SessionCompactionFailure.StaleSelection => "Summary result no longer owns the selected session context.",
     SessionCompactionFailure.SummaryFailed => "Summary generation failed; no summary checkpoint was appended.",
     _ => "Summary planning requires supported canonical context and a valid selected boundary."
-}) { public SessionCompactionFailure Failure { get; } = failure; }
+})
+{
+    public SessionCompactionFailure Failure { get; } = failure;
+    /// <summary>The summarization response's provider error text, when generation failed with a provider error response.</summary>
+    public string? ProviderErrorMessage { get; init; }
+    /// <summary>True when the summarization response was aborted rather than failed.</summary>
+    public bool ProviderAborted { get; init; }
+}
 public sealed record SessionContextUsageEstimate(double Tokens, double UsageTokens, double TrailingTokens, int? LastUsageIndex);
 public sealed record SessionFileOperations(ImmutableArray<string> Read, ImmutableArray<string> Written, ImmutableArray<string> Edited)
 {

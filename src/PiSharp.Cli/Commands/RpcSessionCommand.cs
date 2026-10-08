@@ -41,9 +41,10 @@ public static class RpcSessionCommand
         RunCoreAsync(args, stdin, stdout, stderr, null, cancellationToken, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission);
 
     /// <summary>The production entry: the session's MCP servers come from <paramref name="mcpHost"/> (the global mcp.json).</summary>
+    /// <param name="userShutdown">True when the cancellation is a requested shutdown (Pi SIGTERM/SIGHUP), not a failure.</param>
     internal static Task<int> RunHostedAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
-        PiSharp.Cli.Mcp.McpSessionHost mcpHost, CancellationToken cancellationToken = default) =>
-        RunCoreAsync(args, stdin, stdout, stderr, null, cancellationToken, mcpHost: mcpHost ?? throw new ArgumentNullException(nameof(mcpHost)));
+        PiSharp.Cli.Mcp.McpSessionHost mcpHost, CancellationToken cancellationToken = default, Func<bool>? userShutdown = null) =>
+        RunCoreAsync(args, stdin, stdout, stderr, null, cancellationToken, userShutdown, mcpHost: mcpHost ?? throw new ArgumentNullException(nameof(mcpHost)));
 
     /// <summary>Same host lifecycle with injected reads for explicitly selected settings files.</summary>
     public static Task<int> RunWithSettingsAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
@@ -113,6 +114,9 @@ public static class RpcSessionCommand
                         eventName = diagnostic.EventName, ownerId = diagnostic.OwnerId, ownerGeneration = diagnostic.OwnerGeneration,
                         registrationId = diagnostic.RegistrationId, failure = diagnostic.Failure.ToString() }) + "\n").AsMemory(), token).ConfigureAwait(false);
                     await stderr.FlushAsync(token).ConfigureAwait(false);
+                    // Source RPC onError: an extension_error record on stdout once the dispatcher owns the output.
+                    if (dispatcher is { } rpc) await rpc.PublishExtensionErrorAsync(parsed.Extension?.Package ?? diagnostic.OwnerId,
+                        diagnostic.EventName, diagnostic.ErrorText).ConfigureAwait(false);
                 }, modelSupportsImages: parsed.SupportsImages, liveSelection: liveSelection, liveRuntime: liveRuntime,
                 toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings), mcpAdmission: parsed.Tools.NoMcp && !hostAdmission ? null : mcpAdmission,
                 toolSettings: PiSharp.Tools.BuiltinToolSettings.FromSettings(settings?.Values)).ConfigureAwait(false);

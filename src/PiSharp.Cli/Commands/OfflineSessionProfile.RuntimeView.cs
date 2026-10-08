@@ -175,6 +175,7 @@ internal sealed partial class OfflineSessionProfile
                 view.Extension.BindLifecycleHandoffs(this);
                 BindOriginalPromptReads(view.Extension);
                 BindProfileSessionBehaviors(view.Extension, view);
+                BindSessionEventSeams(view.Extension);
                 view.Extension.AttachOwner(owner);
                 profileHooks = new(owner);
             }

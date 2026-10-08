@@ -39,6 +39,8 @@ public sealed partial class PersistentAgentSession
             var acknowledged = await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
             if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             lock (_gate) { _acknowledgedLog = acknowledged.Snapshot; _context = next; }
+            // Source appendEntry emits entry_appended after the append; a listener failure cannot undo the committed entry.
+            writeAdmitted = false; await PublishAppendedAsync(acknowledged.Entries).ConfigureAwait(false);
             return new(acknowledged.Entries.Single());
         }
         catch (SessionLogStoreException storage)

@@ -77,7 +77,9 @@ internal static class RpcCommandCodec
                 throw new RpcCommandException(id, name, "Queue restoration requires a captured positive integer generation.");
             return new(id, name, Message: Required("currentText", 65_536), ExpectedGeneration: expected);
         }
-        if (name == "export_html") return new(id, name, Message: Optional("outputPath", Math.Min(options.MaximumPromptCharacters, 4096)));
+        // Pi: an absent, null or empty outputPath selects the default file name.
+        if (name == "export_html") return new(id, name, Message: body.TryGetProperty("outputPath", out var output) && output.ValueKind == JsonValueKind.Null
+            ? null : Optional("outputPath", Math.Min(options.MaximumPromptCharacters, 4096)));
         if (name == "compact") return new(id, name,
             Compaction: new(SummaryOptions: new(CustomInstructions: Optional("customInstructions", Math.Min(options.MaximumPromptCharacters, 65_536)))));
         if (name is "set_auto_compaction" or "set_auto_retry")
@@ -251,6 +253,14 @@ internal static class RpcCommandCodec
     {
         var bytes = new BoundedBuffer(maximum);
         using (var writer = new Utf8JsonWriter(bytes)) { writer.WriteStartObject(); fields(writer); writer.WriteEndObject(); }
+        return JsonData.Parse(Encoding.UTF8.GetString(bytes.WrittenSpan));
+    }
+    /// <summary>Source JSON.stringify text escaping (quotes as \", non-ASCII and HTML characters unescaped) for session event records.</summary>
+    internal static JsonData SourceEvent(string type, Action<Utf8JsonWriter>? fields, RpcDispatchOptions options)
+    {
+        var bytes = new BoundedBuffer(options.MaximumOutputBytes);
+        using (var writer = new Utf8JsonWriter(bytes, new JsonWriterOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
+        { writer.WriteStartObject(); writer.WriteString("type", type); fields?.Invoke(writer); writer.WriteEndObject(); }
         return JsonData.Parse(Encoding.UTF8.GetString(bytes.WrittenSpan));
     }
     internal static void Raw(Utf8JsonWriter writer, string field, JsonData value)

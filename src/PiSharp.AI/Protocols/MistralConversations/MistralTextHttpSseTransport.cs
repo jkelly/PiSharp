@@ -148,8 +148,7 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
                 continue;
             }
             if (entry.Role is not ("system" or "user")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral replay role.");
-            foreach (var property in value.EnumerateObject()) if (property.Name is not ("role" or "content" or "timestamp") &&
-                !(entry.Role == "system" && property.Name is "toolsAdded" or "toolsRemoved" or "sections")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral request field.");
+            // Pi v1.1.0 maps only role and content; other stored fields (such as a system message's "offlineApi") are ignored.
             if (value.TryGetProperty("role", out var role) && role.GetString() != entry.Role) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Mistral transcript role mismatch.");
             var content = value.GetProperty("content"); JsonNode? node;
             if (content.ValueKind == JsonValueKind.String) node = JsonValue.Create(Sanitize(content.GetString()!));

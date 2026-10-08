@@ -17,6 +17,8 @@ public sealed record BuiltinToolRegistration(JsonData Declaration, IPreparedTool
 public sealed class BuiltinToolCatalog
 {
     private readonly FileMutationQueue _mutations;
+    private readonly string _workingDirectory, _homeDirectory;
+    private readonly IDirectoryFileOperations _files;
     public ImmutableArray<BuiltinToolRegistration> Registered { get; }
     public FileMutationQueueSnapshot MutationSnapshot => _mutations.Snapshot;
 
@@ -26,6 +28,7 @@ public sealed class BuiltinToolCatalog
         IGrepContextReader? grepContextReader = null)
     {
         var files = operations ?? new LocalFileOperations();
+        _workingDirectory = workingDirectory; _homeDirectory = homeDirectory; _files = files;
         var readOptions = readWriteOptions ?? new(); var editProfile = editOptions ?? new();
         _mutations = new(async (path, token) =>
         {
@@ -70,6 +73,10 @@ public sealed class BuiltinToolCatalog
         }
         return selected.ToImmutable();
     }
+
+    /// <summary>A write adapter with its own content bounds sharing this catalog's write/edit queue (the HTML export writer).</summary>
+    public IPreparedToolAdapter CreateWriteAdapter(ReadWriteToolOptions options) =>
+        new ReadWriteTools(_workingDirectory, _homeDirectory, _files, options, _mutations).Adapters[1];
 
     // Preserve pinned factory order. These complete factories reject a missing borrowed capability.
     public ImmutableArray<BuiltinToolRegistration> CodingTools() => Select(["read", "bash", "edit", "write"]);

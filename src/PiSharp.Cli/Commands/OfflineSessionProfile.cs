@@ -190,7 +190,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         SelectedModelDefinition = modelDefinition;
         _live = live; _client = live is null ? new HttpClient(handler) : null;
         IChatTransport transport;
-        if (live is not null) transport = live.CreateTransport();
+        if (live is not null) transport = WithCacheWarming(live.CreateTransport(), live, modelDefinition.Raw);
         else if (model.Api == "anthropic-messages")
         {
             var factory = new AnthropicMessagesKeyAuthRequestFactory(AnthropicBase, model,
@@ -269,7 +269,10 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                     if (!selected.Contains(registration.Adapter.Name)) selected.Add(registration.Adapter.Name);
             _initialActiveTools = selected.ToImmutable();
         }
-        ExportHtmlWriter = new([tools.Select(["write"])[0].Adapter], policy, options: invokerOptions);
+        // Pi writes the whole export page (template, vendored scripts and the session as base64): the export writer keeps the final
+        // write policy and the shared write queue, with content bounds sized for the page instead of the model write tool's.
+        ExportHtmlWriter = new([tools.CreateWriteAdapter(new(MaximumWriteBytes: 64 * 1024 * 1024, MaximumArgumentCharacters: 8 * 1024 * 1024))], policy,
+            options: invokerOptions with { MaximumArgumentCharacters = 8 * 1024 * 1024, MaximumActionCharacters = 8 * 1024 * 1024 + 16_384 });
         var lifetimeSelection = toolSelection?.LifetimePolicy;
         if (deferCatalogValidation && toolSelection is not null && lifetimeSelection is null)
             lifetimeSelection = PiSharp.CodingAgent.ToolSelection.AllowedToolSelection.Create(configuredDefaults: toolSelection.Names);
@@ -280,7 +283,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         startupOriginalPrompt = OriginalSystemPromptBuilder.Capture(originalSystemPrompt ?? new() { CustomPrompt = literalSystem },
             workspace, initialTools, literal: originalSystemPrompt is null);
         _startupRegistry = new([DecorateOriginalPromptBinding(new(model, transport, ExecutionMode: ToolExecutionMode.Sequential, Hooks: extension?.Binding.ContextHooks))], registrations, policy,
-            new SessionRuntimeRegistryOptions(MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = extension?.Binding.PreparedHooks,
+            new SessionRuntimeRegistryOptions(MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
                 LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
                 BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
                 DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync,
@@ -515,6 +518,12 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         {
             if (extensionPreflight is not null) activation = await NativeExtensionActivation.LoadAsync(extensionPreflight, token, extensionUi, reportInputDiagnostic,
                 configuredInitializerInstallation: configuredInitializerInstallation, configuredExecInstallation: configuredExecInstallation).ConfigureAwait(false);
+            // Pi provider request hooks (before_provider_request/headers, after_provider_response, provider_stream_event).
+            if (liveSelection is not null && activation?.ProviderHttpHooks(liveSelection.Model) is { } providerHooks)
+            {
+                var hooked = liveRuntime ?? LiveSessionRuntime.Default;
+                liveRuntime = hooked with { CreateHttpHandler = () => providerHooks(hooked.CreateHttpHandler()) };
+            }
             if (resolvedAnthropicAuthentication is null && liveSelection is { Model.Provider: "anthropic" })
             {
                 var (anthropic, anthropicHandler, reresolve) = await liveSelection.ResolveAnthropicAsync(liveRuntime, token).ConfigureAwait(false);
@@ -537,7 +546,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup, connection, toolSelection,
                 deferCatalogValidation: mcpAdmission is not null || registeredMcpAdmission is not null || readApplicationHost is not null,
                 originalSystemPrompt: originalSystemPrompt);
-            profile.UserBash = userBash; bashOwner = profile;
+            profile.UserBash = userBash; bashOwner = profile; profile.ImageSettings = toolSettings;
             if (readApplicationHost is not null) profile.ConfigureMcpRegistrationRuntime(readApplicationHost().CreateRegisteredAdmission());
             else if (registeredMcpAdmission is not null) profile.ConfigureMcpRegistrationRuntime(registeredMcpAdmission);
             else if (mcpAdmission is not null) profile.ConfigureMcpRuntime(mcpAdmission);

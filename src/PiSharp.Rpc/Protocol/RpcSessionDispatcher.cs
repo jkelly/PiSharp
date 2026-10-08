@@ -116,7 +116,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     private readonly IRpcExtensionCommandCatalog? _commandCatalog;
     private readonly ISessionSummaryGenerator? _summaryGenerator;
     private readonly ToolInvoker? _exportHtmlWriter;
-    private readonly PiSharp.CodingAgent.Export.SessionHtmlRenderer _htmlRenderer;
+    private readonly PiSharp.CodingAgent.Export.SessionHtmlExportHost _htmlExport;
     private readonly double? _recoveryDesiredMaxOutput;
     private readonly RpcExtensionUiCoordinator? _ui;
     private readonly Queue<DeferredFrame> _deferred = new();
@@ -172,7 +172,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         ReplaceableAgentSession? sessionOwner = null, Func<CancellationToken, ValueTask>? sessionStartup = null,
         ISessionSummaryGenerator? summaryGenerator = null, double? recoveryDesiredMaxOutput = null,
         Func<string, IPromptInputAdmission>? inputAdmissionSelector = null,
-        ToolInvoker? exportHtmlWriter = null, PiSharp.CodingAgent.Export.SessionHtmlRenderer? htmlRenderer = null,
+        ToolInvoker? exportHtmlWriter = null, PiSharp.CodingAgent.Export.SessionHtmlExportHost? htmlExport = null,
         Func<SessionTreeNavigationReceipt, string?, ValueTask>? selectedTreePublisher = null,
         Func<PersistentAgentSession, Task>? postInputSettlement = null,
         Func<PersistentAgentSession, Task>? postRunSettlement = null,
@@ -189,7 +189,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         _ui = extensionUi;
         _commandCatalog = extensionCommandCatalog;
         _summaryGenerator = summaryGenerator;
-        _exportHtmlWriter = exportHtmlWriter; _htmlRenderer = htmlRenderer ?? new();
+        _exportHtmlWriter = exportHtmlWriter; _htmlExport = htmlExport ?? PiSharp.CodingAgent.Export.SessionHtmlExportHost.CreateDefault();
         _recoveryDesiredMaxOutput = recoveryDesiredMaxOutput;
         _sessionOwner = sessionOwner; _sessionStartup = sessionStartup;
         _selectedTreePublisher = selectedTreePublisher;
@@ -1082,7 +1082,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             await run.Ready.Task.ConfigureAwait(false);
             lock (_gate) if (_fatal is not null) throw _fatal;
             if (observation is AgentLoopInputMessageStarted) await PublishQueueAsync(force: false).ConfigureAwait(false);
-            var projected = _events.Project(observation, _session.Snapshot, run.HistoryLength);
+            var projected = _events.Project(observation, _session.Snapshot, run.HistoryLength,
+                observation is AgentLoopEnded ended && _session.WillRetryAfterAgentEnd(ended.Result));
             foreach (var record in projected) await WriteAsync(record).ConfigureAwait(false);
         }
         catch (Exception error) { SignalFatal(error is RpcDispatchException dispatch ? dispatch.Failure : RpcDispatchFailure.SessionRunFailed, error); throw; }

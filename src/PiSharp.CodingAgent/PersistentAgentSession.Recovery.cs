@@ -191,6 +191,8 @@ public sealed partial class PersistentAgentSession
             token.ThrowIfCancellationRequested();admitted=true;var acknowledgment=await _store.AppendAsync(edits.ToImmutable(),token).ConfigureAwait(false);
             if(!acknowledgment.CheckpointAcknowledged)throw Error(PersistentAgentSessionFailure.InvalidCommit);
             lock(_gate){_agent.ConfigureAndReplaceMessages(RecoveryConfiguration(_configuration),SessionContextProjector.AgentMessages(prospective));_acknowledgedLog=acknowledgment.Snapshot;_context=prospective;}
+            // Source _omitRecoveryAttempt emits entry_appended for each context edit it appends.
+            admitted=false;await PublishAppendedAsync(acknowledgment.Entries).ConfigureAwait(false);
         }
         catch(SessionLogStoreException storage)
         {if(storage.MayHaveWritten||_store.IsPoisoned)lock(_gate)_fault??=new(PersistentAgentSessionFailure.AppendFailed,storage.Failure,storage.MayHaveWritten,storage.DurableFlushCompleted);throw;}
