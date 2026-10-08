@@ -1,3 +1,6 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/anthropic-messages.ts (buildParams/convertMessages/convertTools,
+// getBetaFeatures and insertThinkingLevelMessages for compat.supportsMidConvoEffort)
+// and packages/ai/src/api/constrained-sampling.ts (strict conversion with Anthropic's unsupported keywords).
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -39,7 +42,11 @@ public sealed record AnthropicMessagesRequestOptions(
     int MaximumContentBlocks = 1024, int MaximumDeclarations = 1024, int MaximumActiveTools = 128,
     int MaximumProjectedMessages = 1024, int MaximumJsonDepth = 32,
     int MaximumOutputCharacters = 1_048_576, int MaximumOutputBytes = 1_048_576,
-    bool SupportsMidConversationToolChanges = false);
+    bool SupportsMidConversationToolChanges = false, bool SupportsMidConversationEffort = false)
+{
+    /// <summary>Upstream stream(): the effort a managed (compat.supportsMidConvoEffort) response records as providerThinkingLevel.</summary>
+    public string? ProviderThinkingLevel => SupportsMidConversationEffort ? Effort ?? "high" : null;
+}
 
 /// <summary>Pure owned transcript-to-request projection. No network, credential, clock or execution authority.</summary>
 public sealed class AnthropicMessagesRequestProjector
@@ -50,6 +57,10 @@ public sealed class AnthropicMessagesRequestProjector
         "EnterPlanMode", "ExitPlanMode", "KillShell", "NotebookEdit", "Skill", "Task", "TaskOutput", "TodoWrite", "WebFetch", "WebSearch"];
     private static readonly string[] UnsupportedStrictKeys = ["$ref", "$defs", "definitions", "allOf", "oneOf", "patternProperties",
         "dependentSchemas", "dependencies", "unevaluatedProperties", "propertyNames", "contains", "prefixItems", "not", "if", "then", "else"];
+    // Keywords Anthropic strict tool use rejects for the whole request; such "prefer" tools are sent non-strict.
+    private static readonly string[] AnthropicStrictUnsupportedKeywords = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
+        "multipleOf", "maxItems", "uniqueItems", "minContains", "maxContains", "minProperties", "maxProperties"];
+    private static readonly string[] AnthropicStrictStringFormats = ["date-time", "time", "date", "duration", "email", "hostname", "uri", "ipv4", "ipv6", "uuid"];
     public AnthropicMessagesRequestProjector(AnthropicMessagesRequestOptions options)
     {
         ArgumentNullException.ThrowIfNull(options); _options = options;
@@ -75,6 +86,7 @@ public sealed class AnthropicMessagesRequestProjector
         private readonly List<Entry> _entries = [];
         private readonly JsonArray _messages = [];
         private readonly List<JsonObject> _pendingSystems = [];
+        private readonly Dictionary<int, string> _assistantLevels = [];
         private readonly Dictionary<string, JsonElement> _tools = new(StringComparer.Ordinal);
         private readonly List<string> _toolOrder = [];
         private readonly Dictionary<string, string> _idMap = new(StringComparer.Ordinal);
@@ -87,7 +99,6 @@ public sealed class AnthropicMessagesRequestProjector
         private const string DeferredPlaceholderName = "__pi_deferred_placeholder__";
         private readonly List<JsonElement> _nativeDeclarations = [];
         private bool _nativeToolChanges;
-        private int _initialToolCount;
         private bool _lastWasToolResults;
         private long _retainedCharacters;
         private long _retainedBytes;
@@ -119,15 +130,7 @@ public sealed class AnthropicMessagesRequestProjector
                         var text = RenderUpdate(entry.Body.Value);
                         var blocks = new JsonArray();
                         if (text.Length > 0) blocks.Add(TextBlock(text));
-                        if (_nativeToolChanges)
-                            foreach (var (property, kind) in new[] { ("toolsRemoved", "tool_removal"), ("toolsAdded", "tool_addition") })
-                                if (entry.Body.Value.TryGetProperty(property, out var updates))
-                                    foreach (var tool in Array(updates))
-                                    {
-                                        token.ThrowIfCancellationRequested();
-                                        blocks.Add(new JsonObject { ["type"] = kind,
-                                            ["tool"] = new JsonObject { ["type"] = "tool_reference", ["name"] = ToolName(String(tool, "name")) } });
-                                    }
+                        if (_nativeToolChanges) AddToolChanges(entry.Body.Value, blocks);
                         if (blocks.Count > 0)
                         {
                             if (_pendingSystems.Count >= options.MaximumProjectedMessages) throw Fail(AnthropicRequestFailure.ResourceLimit);
@@ -183,7 +186,12 @@ public sealed class AnthropicMessagesRequestProjector
                         }
                         else throw Fail(AnthropicRequestFailure.UnsupportedContent);
                     }
-                    if (blocks.Count > 0) AddMessage("assistant", blocks);
+                    if (blocks.Count == 0) continue;
+                    var at = _messages.Count; AddMessage("assistant", blocks);
+                    // convertMessages: only exact Anthropic Messages responses of this provider replay their recorded effort.
+                    if (options.SupportsMidConversationEffort && assistant.Api == "anthropic-messages" && assistant.Provider == request.Model.Provider &&
+                        assistant.ExtraProperties?.TryGet("providerThinkingLevel", out var recorded) == true && recorded!.Value.ValueKind == JsonValueKind.String &&
+                        recorded.Value.GetString() is "low" or "medium" or "high" or "xhigh" or "max") _assistantLevels[at] = recorded.Value.GetString()!;
                 }
                 else if (entry.Role == "toolResult")
                 {
@@ -197,16 +205,24 @@ public sealed class AnthropicMessagesRequestProjector
                 }
             }
             CloseCalls(); FlushSystems(); AttachLastCache();
+            if (options.SupportsMidConversationEffort) InsertEffortMessages();
             var root = new JsonObject { ["model"] = request.Model.Id, ["messages"] = _messages, ["max_tokens"] = options.MaximumTokens, ["stream"] = true };
             var system = options.SupportsMidConversationSystemMessages ? InitialSystem() : FoldedSystem();
             var systemBlocks = new JsonArray();
             if (options.OAuthProjection) systemBlocks.Add(CacheText("You are Claude Code, Anthropic's official CLI for Claude."));
             if (system.Length > 0) systemBlocks.Add(CacheText(system));
             if (systemBlocks.Count > 0) root["system"] = systemBlocks;
-            if (options.Temperature is { } temperature && options.ThinkingEnabled != true && options.SupportsTemperature) root["temperature"] = JsonNode.Parse(Number((double)temperature));
+            if (options.Temperature is { } temperature && options.ThinkingEnabled != true && !options.SupportsMidConversationEffort && options.SupportsTemperature) root["temperature"] = JsonNode.Parse(Number((double)temperature));
             var tools = ConvertTools(); if (tools.Count > 0) root["tools"] = tools;
             var betas = Betas(); if (betas.Count > 0) root["betas"] = betas;
-            if (options.ModelReasoning && options.ThinkingEnabled == true)
+            // Managed effort models always use adaptive thinking so prefix mismatches are dropped; per-turn effort rides the markers.
+            if (options.SupportsMidConversationEffort)
+            {
+                root["thinking"] = new JsonObject { ["type"] = "adaptive", ["display"] = options.ThinkingDisplay,
+                    ["block_binding"] = new JsonObject { ["prefix_mismatch_behavior"] = "drop_block" } };
+                root["output_config"] = new JsonObject { ["effort"] = "high" };
+            }
+            else if (options.ModelReasoning && options.ThinkingEnabled == true)
             {
                 root["thinking"] = options.ForceAdaptiveThinking
                     ? new JsonObject { ["type"] = "adaptive", ["display"] = options.ThinkingDisplay }
@@ -295,26 +311,32 @@ public sealed class AnthropicMessagesRequestProjector
             if (!options.SupportsMidConversationSystemMessages || !options.SupportsMidConversationToolChanges ||
                 _entries.Count == 0 || _entries[0].Role != "system" ||
                 !_entries[0].Body.Value.TryGetProperty("toolsAdded", out var initial) || initial.GetArrayLength() == 0) return;
-            var declared = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-            var declarations = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var entry in _entries.Where(entry => entry.Role == "system"))
-                if (entry.Body.Value.TryGetProperty("toolsAdded", out var added))
-                    foreach (var tool in Array(added))
-                    {
-                        token.ThrowIfCancellationRequested(); var name = String(tool, "name");
-                        // Match declarationsEqual: selected declaration fields, JS key order and Number projection.
-                        var normalized = new JsonObject { ["name"] = name, ["description"] = String(tool, "description"),
-                            ["parameters"] = Node(tool.GetProperty("parameters")) };
-                        if (tool.TryGetProperty("constrainedSampling", out var sampling)) normalized["constrainedSampling"] = Node(sampling);
-                        var identity = normalized.ToJsonString(OutputJson);
-                        if (declarations.TryGetValue(name, out var previous) && previous != identity) return;
-                        declarations[name] = identity; declared[name] = tool;
-                    }
-            if (declared.Count >= options.MaximumActiveTools) throw Fail(AnthropicRequestFailure.ResourceLimit);
-            _nativeDeclarations.AddRange(Array(initial)); _initialToolCount = _nativeDeclarations.Count;
-            var initialNames = _nativeDeclarations.Select(tool => String(tool, "name")).ToHashSet(StringComparer.Ordinal);
-            _nativeDeclarations.AddRange(declared.Where(pair => !initialNames.Contains(pair.Key)).Select(pair => pair.Value));
+            // inline-tools-2026-09-15: the request-level list stays the initial tools plus the placeholder. Every later
+            // declaration, including a same-name redefinition, is defined by value in its own tool_addition block.
+            _nativeDeclarations.AddRange(Array(initial));
+            if (_nativeDeclarations.Count >= options.MaximumActiveTools) throw Fail(AnthropicRequestFailure.ResourceLimit);
             _nativeToolChanges = true;
+        }
+        private void AddToolChanges(JsonElement body, JsonArray blocks)
+        {
+            var added = body.TryGetProperty("toolsAdded", out var additions) ? Array(additions).ToArray() : [];
+            var redefined = added.Select(tool => String(tool, "name")).ToHashSet(StringComparer.Ordinal);
+            if (body.TryGetProperty("toolsRemoved", out var removals))
+                foreach (var tool in Array(removals))
+                {
+                    token.ThrowIfCancellationRequested(); var name = String(tool, "name");
+                    // A new definition under the same name replaces the old one, so no removal is needed.
+                    if (redefined.Contains(name)) continue;
+                    blocks.Add(new JsonObject { ["type"] = "tool_removal", ["tool"] = new JsonObject { ["type"] = "tool_reference", ["name"] = ToolName(name) } });
+                }
+            // Native hardening: one record cannot define the reserved placeholder or two tools under one projected name.
+            var defined = new HashSet<string>(StringComparer.Ordinal) { DeferredPlaceholderName };
+            foreach (var tool in added)
+            {
+                token.ThrowIfCancellationRequested(); var name = ToolName(String(tool, "name"));
+                if (!defined.Add(name)) throw Fail(AnthropicRequestFailure.IdentityCollision);
+                blocks.Add(new JsonObject { ["type"] = "tool_addition", ["tool"] = new JsonObject { ["type"] = "tool_definition", ["definition"] = ConvertTool(tool, name) } });
+            }
         }
         private void CheckOptionSizes()
         {
@@ -415,6 +437,15 @@ public sealed class AnthropicMessagesRequestProjector
             }
             else { AddMessage("user", new JsonArray(block), charge: false); _lastWasToolResults = true; }
         }
+        // insertThinkingLevelMessages: a marker before each recorded assistant turn, then the active effort last (after the cache breakpoint).
+        private void InsertEffortMessages()
+        {
+            static JsonObject Marker(string effort) => new() { ["role"] = "system", ["content"] = new JsonArray(), ["output_config"] = new JsonObject { ["effort"] = effort } };
+            if (_messages.Count + _assistantLevels.Count + 1 > options.MaximumProjectedMessages) throw Fail(AnthropicRequestFailure.ResourceLimit);
+            foreach (var (index, effort) in _assistantLevels.OrderByDescending(pair => pair.Key))
+            { token.ThrowIfCancellationRequested(); var marker = Marker(effort); Charge(marker); _messages.Insert(index, marker); }
+            var active = Marker(options.Effort ?? "high"); Charge(active); _messages.Add(active);
+        }
         private void FlushSystems() { foreach (var system in _pendingSystems) AddMessage("system", system["content"]!.DeepClone()); _pendingSystems.Clear(); }
         private void AddMessage(string role, JsonNode content, bool charge = true)
         {
@@ -434,50 +465,53 @@ public sealed class AnthropicMessagesRequestProjector
             var result = new JsonArray(); var names = new HashSet<string>(StringComparer.Ordinal);
             if (_nativeToolChanges) names.Add(DeferredPlaceholderName);
             var declarations = _nativeToolChanges ? _nativeDeclarations : _toolOrder.Select(key => _tools[key]).ToList();
-            var position = 0;
-            foreach (var declaration in declarations)
+            for (var position = 0; position < declarations.Count; position++)
             {
-                token.ThrowIfCancellationRequested(); var name = ToolName(String(declaration, "name"));
+                token.ThrowIfCancellationRequested(); var name = ToolName(String(declarations[position], "name"));
                 if (!names.Add(name)) throw Fail(AnthropicRequestFailure.IdentityCollision);
-                var parameters = declaration.GetProperty("parameters"); if (parameters.ValueKind != JsonValueKind.Object) throw Fail(AnthropicRequestFailure.UnsupportedContent);
-                var schema = Node(parameters)!.AsObject(); var strict = false;
-                if (declaration.TryGetProperty("constrainedSampling", out var config) && config.ValueKind is not (JsonValueKind.False or JsonValueKind.Null))
-                {
-                    var kind = String(config, "type");
-                    if (kind == "json_schema")
-                    {
-                        var preference = String(config, "strict"); if (preference is not ("prefer" or "require")) throw Fail(AnthropicRequestFailure.UnsupportedContent);
-                        if (options.SupportsStrictTools)
-                        {
-                            try { var candidate = schema.DeepClone().AsObject(); MakeStrict(candidate); if (!IsType(candidate, "object")) throw new StrictSchemaException(); schema = candidate; strict = true; }
-                            catch (StrictSchemaException) { if (preference == "require") throw Fail(AnthropicRequestFailure.UnsupportedStrictSchema); }
-                        }
-                        else if (preference == "require") throw Fail(AnthropicRequestFailure.UnsupportedStrictSchema);
-                    }
-                    else if (kind != "grammar") throw Fail(AnthropicRequestFailure.UnsupportedContent);
-                }
-                if (schema["properties"] is not (null or JsonObject) || schema["required"] is not (null or JsonArray) ||
-                    schema["required"] is JsonArray required && required.Any(item => item is not JsonValue value || !value.TryGetValue<string>(out _)))
-                    throw Fail(AnthropicRequestFailure.UnsupportedContent);
-                var input = strict ? schema.DeepClone().AsObject() : new JsonObject();
-                input["type"] = "object"; input["properties"] = schema["properties"]?.DeepClone() ?? new JsonObject(); input["required"] = schema["required"]?.DeepClone() ?? new JsonArray();
-                var tool = new JsonObject { ["name"] = name, ["description"] = String(declaration, "description"), ["input_schema"] = input };
-                if (options.SupportsEagerToolInputStreaming) tool["eager_input_streaming"] = true;
-                if (strict) tool["strict"] = true;
-                if (_nativeToolChanges && position >= _initialToolCount) tool["defer_loading"] = true;
-                if (options.SupportsCacheControlOnTools && position == (_nativeToolChanges ? _initialToolCount : declarations.Count) - 1 && Cache is { } cache) tool["cache_control"] = cache;
+                var tool = ConvertTool(declarations[position], name);
+                // Native changes keep the breakpoint on the last initial tool; the placeholder follows uncached.
+                if (options.SupportsCacheControlOnTools && position == declarations.Count - 1 && Cache is { } cache) tool["cache_control"] = cache;
                 Charge(tool); result.Add(tool);
-                position++;
-                if (_nativeToolChanges && position == _initialToolCount)
-                {
-                    var placeholder = new JsonObject { ["name"] = DeferredPlaceholderName,
-                        ["description"] = "Reserved placeholder. Never available. Never call this.",
-                        ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject(), ["required"] = new JsonArray() },
-                        ["defer_loading"] = true };
-                    Charge(placeholder); result.Add(placeholder);
-                }
+            }
+            if (_nativeToolChanges)
+            {
+                var placeholder = new JsonObject { ["name"] = DeferredPlaceholderName,
+                    ["description"] = "Reserved placeholder. Never available. Never call this.",
+                    ["input_schema"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject(), ["required"] = new JsonArray() },
+                    ["defer_loading"] = true };
+                Charge(placeholder); result.Add(placeholder);
             }
             return result;
+        }
+        private JsonObject ConvertTool(JsonElement declaration, string name)
+        {
+            var parameters = declaration.GetProperty("parameters"); if (parameters.ValueKind != JsonValueKind.Object) throw Fail(AnthropicRequestFailure.UnsupportedContent);
+            var schema = Node(parameters)!.AsObject(); var strict = false;
+            if (declaration.TryGetProperty("constrainedSampling", out var config) && config.ValueKind is not (JsonValueKind.False or JsonValueKind.Null))
+            {
+                var kind = String(config, "type");
+                if (kind == "json_schema")
+                {
+                    var preference = String(config, "strict"); if (preference is not ("prefer" or "require")) throw Fail(AnthropicRequestFailure.UnsupportedContent);
+                    if (options.SupportsStrictTools)
+                    {
+                        try { var candidate = schema.DeepClone().AsObject(); MakeStrict(candidate); if (!IsType(candidate, "object")) throw new StrictSchemaException(); schema = candidate; strict = true; }
+                        catch (StrictSchemaException) { if (preference == "require") throw Fail(AnthropicRequestFailure.UnsupportedStrictSchema); }
+                    }
+                    else if (preference == "require") throw Fail(AnthropicRequestFailure.UnsupportedStrictSchema);
+                }
+                else if (kind != "grammar") throw Fail(AnthropicRequestFailure.UnsupportedContent);
+            }
+            if (schema["properties"] is not (null or JsonObject) || schema["required"] is not (null or JsonArray) ||
+                schema["required"] is JsonArray required && required.Any(item => item is not JsonValue value || !value.TryGetValue<string>(out _)))
+                throw Fail(AnthropicRequestFailure.UnsupportedContent);
+            var input = strict ? schema.DeepClone().AsObject() : new JsonObject();
+            input["type"] = "object"; input["properties"] = schema["properties"]?.DeepClone() ?? new JsonObject(); input["required"] = schema["required"]?.DeepClone() ?? new JsonArray();
+            var tool = new JsonObject { ["name"] = name, ["description"] = String(declaration, "description"), ["input_schema"] = input };
+            if (options.SupportsEagerToolInputStreaming) tool["eager_input_streaming"] = true;
+            if (strict) tool["strict"] = true;
+            return tool;
         }
         private JsonArray Betas()
         {
@@ -493,7 +527,8 @@ public sealed class AnthropicMessagesRequestProjector
                 if (_tools.Count > 0 && !options.SupportsEagerToolInputStreaming) values.Add("fine-grained-tool-streaming-2025-05-14");
                 if (options.ModelReasoning && options.ThinkingEnabled == true && options.InterleavedThinking && !options.ForceAdaptiveThinking) values.Add("interleaved-thinking-2025-05-14");
                 if (!options.AllowedFallbackModels.IsDefaultOrEmpty) values.Add("server-side-fallback-2026-07-01");
-                if (_nativeToolChanges) values.Add("mid-conversation-tool-changes-2026-07-01");
+                if (options.SupportsMidConversationEffort) values.AddRange(["mid-conversation-output-config-2026-07-01", "thinking-binding-controls-2026-08-01"]);
+                if (_nativeToolChanges) values.Add("inline-tools-2026-09-15");
             }
             return new JsonArray(values.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray());
         }
@@ -505,7 +540,8 @@ public sealed class AnthropicMessagesRequestProjector
         private void MakeStrict(JsonNode? node)
         {
             token.ThrowIfCancellationRequested();
-            if (node is not JsonObject schema || UnsupportedStrictKeys.Any(schema.ContainsKey)) throw new StrictSchemaException();
+            if (node is not JsonObject schema || UnsupportedStrictKeys.Any(schema.ContainsKey) ||
+                schema.Any(pair => AnthropicStrictUnsupported(pair.Key, pair.Value))) throw new StrictSchemaException();
             if (schema.ContainsKey("anyOf"))
             {
                 if (schema["anyOf"] is not JsonArray variants || variants.Count == 0) throw new StrictSchemaException();
@@ -574,6 +610,9 @@ public sealed class AnthropicMessagesRequestProjector
         var power = position - 1;
         return prefix + digits[0] + (digits.Length > 1 ? "." + digits[1..] : "") + "e" + (power >= 0 ? "+" : "") + power.ToString(CultureInfo.InvariantCulture);
     }
+    private static bool AnthropicStrictUnsupported(string key, JsonNode? value) => AnthropicStrictUnsupportedKeywords.Contains(key, StringComparer.Ordinal) ||
+        key == "minItems" && !(value is JsonValue count && count.GetValueKind() == JsonValueKind.Number && count.GetValue<double>() is 0 or 1) ||
+        key == "format" && !(value is JsonValue format && format.TryGetValue<string>(out var text) && AnthropicStrictStringFormats.Contains(text, StringComparer.Ordinal));
     private static bool IsType(JsonObject value, string type) => value["type"] is JsonValue node && node.TryGetValue<string>(out var actual) && actual == type;
     private static bool AllowsNull(JsonNode? node) => node is JsonObject schema && (IsType(schema, "null") ||
         schema["type"] is JsonArray types && types.Any(value => value?.ToJsonString() == "\"null\"") ||

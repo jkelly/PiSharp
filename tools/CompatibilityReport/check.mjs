@@ -1070,7 +1070,12 @@ function git(...gitArgs) {
 }
 
 try {
-  const baseline = read("compatibility/baseline.lock.json");
+  // Two locks (docs/decisions/0002-pi-1.1.0-sync.md): target.lock.json pins the current upstream source;
+  // baseline.lock.json is the v0.99.1 evidence lock that historical fixtures and captures stay validated against.
+  const target = read("compatibility/target.lock.json");
+  const baseline = read(target.previousBaseline.lock);
+  const targetSha = target.source.commit;
+  requireCondition(target.previousBaseline.commit === baseline.source.commit && target.previousBaseline.tag === baseline.source.tag, "Target lock names the preserved evidence lock");
   const surfaces = read("compatibility/surfaces.json");
   const parity = read("compatibility/parity.json");
   const provenance = read("compatibility/provenance.json");
@@ -1078,8 +1083,9 @@ try {
   const manifestPaths = discoverManifests();
   const manifests = manifestPaths.map(path => ({ path, document: read(path) }));
   const sha = baseline.source.commit;
-  requireCondition(sha === "d86654abb8862e201933517d6f1fce9f88dd117f", "Pinned upstream SHA");
-  for (const document of [surfaces, parity, provenance, manifest]) requireCondition(document.sourceSha === sha, "Manifest source SHA matches baseline");
+  requireCondition(sha === "d86654abb8862e201933517d6f1fce9f88dd117f", "Pinned evidence SHA");
+  for (const document of [surfaces, parity]) requireCondition(document.sourceSha === targetSha, "Inventory source SHA matches target baseline");
+  for (const document of [provenance, manifest]) requireCondition(document.sourceSha === sha, "Provenance and fixture manifest match evidence baseline");
   const requirementIds = new Set(surfaces.requirements.map(row => row.id));
   requireCondition(requirementIds.size === surfaces.requirements.length, "Unique requirement IDs");
   const parityIds = new Set(parity.rows.map(row => row.requirementId));
@@ -1087,6 +1093,9 @@ try {
   const sourceArtifacts = baseline.artifacts.filter(artifact => artifact.kind === "source-file");
   const sourcePaths = new Set(sourceArtifacts.map(artifact => artifact.path));
   requireCondition(sourcePaths.size === sourceArtifacts.length, "Unique locked source files");
+  const targetArtifacts = target.artifacts.filter(artifact => artifact.kind === "source-file");
+  const targetPaths = new Set(targetArtifacts.map(artifact => artifact.path));
+  requireCondition(targetPaths.size === targetArtifacts.length, "Unique target source files");
   requireCondition(surfaces.requirements.filter(row => row.family === "chat-api").length === 10, "All ten chat API IDs are seeded");
   for (const family of surfaces.requiredFamilies) requireCondition(surfaces.requirements.some(row => row.family === family), `Surface family ${family} is seeded`);
   const fixtures = [];
@@ -1103,8 +1112,8 @@ try {
   const fixtureIds = new Set(fixtures.map(row => row.fixture.fixtureId));
   requireCondition(fixtureIds.size === fixtures.length, "Unique fixture IDs across all manifests");
   for (const row of surfaces.requirements) {
-    requireCondition(row.source.sha === sha && row.source.url === `https://github.com/earendil-works/pi/blob/${sha}/${row.source.path}`, `Pinned source link ${row.id}`);
-    requireCondition(sourcePaths.has(row.source.path), `Source hash exists for ${row.id}`);
+    requireCondition(row.source.sha === targetSha && row.source.url === `https://github.com/earendil-works/pi/blob/${targetSha}/${row.source.path}`, `Pinned source link ${row.id}`);
+    requireCondition(targetPaths.has(row.source.path), `Source hash exists for ${row.id}`);
     requireCondition(row.owner && row.testId && Number.isInteger(row.targetPhase) && row.targetPhase >= 1 && row.targetPhase <= 8, `Owner/test/phase metadata for ${row.id}`);
     const parityRow = parity.rows.find(candidate => candidate.requirementId === row.id);
     requireCondition(parityRow.status === row.status && parityRow.mandatory === row.mandatory, `Parity classification for ${row.id}`);
@@ -1198,21 +1207,21 @@ try {
   let verifiedSourceFiles = 0;
   let sourceArchiveVerified = false;
   if (upstream) {
-    requireCondition(git("rev-parse", "HEAD").toString().trim() === sha && git("status", "--porcelain", "--untracked-files=all").toString().trim() === "", "Unmodified upstream checkout at pinned SHA");
-    requireCondition(git("rev-parse", `${sha}^{tree}`).toString().trim() === baseline.source.tree && git("rev-parse", "v0.99.1^{commit}").toString().trim() === sha, "Tree and tag resolve to locked source");
-    for (const artifact of sourceArtifacts) {
-      const blob = git("show", `${sha}:${artifact.path}`);
+    requireCondition(git("rev-parse", "HEAD").toString().trim() === targetSha && git("status", "--porcelain", "--untracked-files=all").toString().trim() === "", "Unmodified upstream checkout at pinned SHA");
+    requireCondition(git("rev-parse", `${targetSha}^{tree}`).toString().trim() === target.source.tree && git("rev-parse", `${target.source.tag}^{commit}`).toString().trim() === targetSha, "Tree and tag resolve to locked source");
+    for (const artifact of targetArtifacts) {
+      const blob = git("show", `${targetSha}:${artifact.path}`);
       const checkout = readFileSync(resolve(upstream, artifact.path));
       requireCondition(hash(blob) === artifact.sha256 && blob.length === artifact.bytes && hash(checkout) === artifact.checkoutSha256 && checkout.length === artifact.checkoutBytes, `Canonical blob and checkout bytes ${artifact.path}`);
       verifiedSourceFiles++;
     }
-    const archive = git("archive", "--format=tar", sha);
-    const lockedArchive = baseline.artifacts.find(artifact => artifact.kind === "source-archive");
+    const archive = git("archive", "--format=tar", targetSha);
+    const lockedArchive = target.artifacts.find(artifact => artifact.kind === "source-archive");
     sourceArchiveVerified = hash(archive) === lockedArchive.sha256 && archive.length === lockedArchive.bytes;
     requireCondition(sourceArchiveVerified, "Reproduced canonical source tar SHA256");
   }
   const mandatoryDeferred = parity.rows.filter(row => row.mandatory && row.status === "Deferred").length;
-  const report = { publicDerivativeVerification: publicDerivativeVerificationScope, schemaVersion: 1, sourceSha: sha, scope: "Fixture-group byte/metadata integrity only; no capture re-execution or behavioral/native parity qualification", checksPassed: checks.length, requirementCount: requirementIds.size, mandatoryDeferred, fixtureCount: fixtureIds.size, fixtureManifestCount: manifests.length, fixtureManifests: manifests.map(family => ({ path: family.path, fixtureGroups: family.fixtureGroups })), authoredFixtures: kindCounts.get("authored-synthetic-contract") ?? 0, upstreamQueueOracles: kindCounts.get("captured-upstream-oracle") ?? 0, evidenceKindCounts: Object.fromEntries([...kindCounts].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)), dependencyLockFilesReferenced: dependencyLocks.size, sdkOracleLockFilesReferenced: sdkOracleLocks.size, fileQueueOracleLockFilesReferenced: fileQueueOracleLocks.size, sessionOracleLockFilesReferenced: sessionOracleLocks.size, rpcOracleLockFilesReferenced: rpcOracleLocks.size, editOracleLockFilesReferenced: editOracleLocks.size, nonInventoryFixtureLabels: [...recordedNonInventoryLabels].sort(), verifiedSourceFiles, sourceArchiveVerified, fullNativeParity: "blocked", phase1Gate: "open", baselineGapIds: baseline.gaps.map(gap => gap.id) };
+  const report = { publicDerivativeVerification: publicDerivativeVerificationScope, schemaVersion: 1, sourceSha: targetSha, evidenceSourceSha: sha, scope: "Fixture-group byte/metadata integrity only; no capture re-execution or behavioral/native parity qualification", checksPassed: checks.length, requirementCount: requirementIds.size, mandatoryDeferred, fixtureCount: fixtureIds.size, fixtureManifestCount: manifests.length, fixtureManifests: manifests.map(family => ({ path: family.path, fixtureGroups: family.fixtureGroups })), authoredFixtures: kindCounts.get("authored-synthetic-contract") ?? 0, upstreamQueueOracles: kindCounts.get("captured-upstream-oracle") ?? 0, evidenceKindCounts: Object.fromEntries([...kindCounts].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)), dependencyLockFilesReferenced: dependencyLocks.size, sdkOracleLockFilesReferenced: sdkOracleLocks.size, fileQueueOracleLockFilesReferenced: fileQueueOracleLocks.size, sessionOracleLockFilesReferenced: sessionOracleLocks.size, rpcOracleLockFilesReferenced: rpcOracleLocks.size, editOracleLockFilesReferenced: editOracleLocks.size, nonInventoryFixtureLabels: [...recordedNonInventoryLabels].sort(), verifiedSourceFiles, sourceArchiveVerified, fullNativeParity: "blocked", phase1Gate: "open", baselineGapIds: target.gaps.map(gap => gap.id) };
   report.anthropicOracleLockFilesReferenced = anthropicOracleLocks.size;
   report.agentProgressOracleLockFilesReferenced = agentProgressOracleLocks.size;
   if (output) writeFileSync(resolve(output), `${JSON.stringify(report, null, 2)}\n`);

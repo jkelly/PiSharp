@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/docs/json.md (agent_settled).
 using System.Text;
 using System.Text.Json;
 using PiSharp.Agent;
@@ -37,7 +38,7 @@ public sealed class SessionJsonEventOutputException : IOException
 }
 
 /// <summary>Awaited bounded JSONL subscription over a borrowed idle session and borrowed writer.</summary>
-public sealed class SessionJsonEventOutput : IAgentEventSink, IAsyncDisposable
+public sealed class SessionJsonEventOutput : IAgentEventSink, ISessionOperationEventSink, IAsyncDisposable
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly object _gate = new();
@@ -50,7 +51,7 @@ public sealed class SessionJsonEventOutput : IAgentEventSink, IAsyncDisposable
     private readonly SessionJsonEventOutputOptions _options;
     private readonly RpcAgentEventProjector _projector;
     private readonly JsonlTransportOptions _framing;
-    private IDisposable _subscription;
+    private IDisposable _subscription, _operationSubscription;
     private readonly JsonData _header;
     private int _historyLength;
     private TaskCompletionSource? _idle;
@@ -79,6 +80,8 @@ public sealed class SessionJsonEventOutput : IAgentEventSink, IAsyncDisposable
         _framing = new(MaximumFrameBytes: _options.MaximumRecordBytes - 1, MaximumJsonDepth: _options.MaximumJsonDepth);
         // The command owns exclusive prompt submission. Subscribe before the opening header and before that submission.
         _subscription = session.Subscribe(this);
+        try { _operationSubscription = session.SubscribeOperationEvents(this); }
+        catch { _subscription.Dispose(); throw; }
         _sessionOwner = sessionOwner;
         if (sessionOwner is not null) sessionOwner.AttachmentChanged = _replacementCallback = ReplaceAsync;
     }
@@ -149,6 +152,37 @@ public sealed class SessionJsonEventOutput : IAgentEventSink, IAsyncDisposable
         finally { Leave(); _inside.Value = prior; }
     }
 
+    /// <summary>Source json mode: <c>agent_settled</c> with <c>aborted</c> once a session-level run has no automatic work left.</summary>
+    public async ValueTask EmitAsync(SessionOperationEvent observation, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(observation);
+        if (observation is not SessionOperationSettled settled) return;
+        try
+        {
+            if (_inside.Value) throw new SessionJsonEventOutputException(SessionJsonEventOutputFailure.InvalidState);
+            lock (_gate)
+            {
+                ThrowOpen();
+                if (!_started) throw new SessionJsonEventOutputException(SessionJsonEventOutputFailure.InvalidState);
+                Admit();
+            }
+        }
+        catch (SessionJsonEventOutputException error) { throw Poison(error.Failure); }
+        var prior = _inside.Value; _inside.Value = true;
+        try
+        {
+            await _wire.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                ThrowIfFailed();
+                await WriteAsync(JsonData.Parse(settled.Aborted ? """{"type":"agent_settled","aborted":true}""" :
+                    """{"type":"agent_settled","aborted":false}"""), cancellationToken).ConfigureAwait(false);
+            }
+            finally { _wire.Release(); }
+        }
+        finally { Leave(); _inside.Value = prior; }
+    }
+
     private async ValueTask ReplaceAsync(AgentSessionReplacement replacement)
     {
         if (_inside.Value) throw new SessionJsonEventOutputException(SessionJsonEventOutputFailure.InvalidState);
@@ -160,9 +194,12 @@ public sealed class SessionJsonEventOutput : IAgentEventSink, IAsyncDisposable
             try
             {
                 ThrowIfFailed();
-                var session = replacement.Current.Session; var next = session.Subscribe(this); var previous = _subscription;
-                _session = session; _subscription = next; _historyLength = session.Snapshot.Agent.Messages.Length;
-                previous.Dispose();
+                var session = replacement.Current.Session; var next = session.Subscribe(this); IDisposable nextOperation;
+                try { nextOperation = session.SubscribeOperationEvents(this); }
+                catch { next.Dispose(); throw; }
+                var previous = _subscription; var previousOperation = _operationSubscription;
+                _session = session; _subscription = next; _operationSubscription = nextOperation; _historyLength = session.Snapshot.Agent.Messages.Length;
+                previous.Dispose(); previousOperation.Dispose();
                 await WriteAsync(JsonData.Parse(JsonSerializer.Serialize(new
                 {
                     type = "session_switched", sessionFile = session.Path, sessionId = session.Snapshot.Log.Header.Id,
@@ -251,7 +288,7 @@ public sealed class SessionJsonEventOutput : IAgentEventSink, IAsyncDisposable
         {
             if (_sessionOwner is not null && _sessionOwner.AttachmentChanged == _replacementCallback) _sessionOwner.AttachmentChanged = null;
             await idle.ConfigureAwait(false);
-            try { _subscription.Dispose(); }
+            try { _subscription.Dispose(); _operationSubscription.Dispose(); }
             finally { _wire.Dispose(); }
             completion.TrySetResult();
         }

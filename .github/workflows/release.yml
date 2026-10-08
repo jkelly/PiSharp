@@ -1,6 +1,6 @@
 name: Release
 
-# Push a version tag (v0.99.1, or v0.99.1.1 for a C#-only patch) to build, validate,
+# Push a version tag (v1.1.0, or v1.1.0.1 for a C#-only patch) to build, validate,
 # publish every package to NuGet with trusted publishing, and create the GitHub release.
 # Run manually to do a dry run: it builds and validates the packages but publishes nothing.
 on:
@@ -11,9 +11,9 @@ on:
       version:
         description: Version to build and validate (dry run, nothing is published)
         required: true
-        default: '0.99.1'
+        default: '1.1.0'
       skip_tests:
-        description: Skip the offline provider tests (dry runs only; tag releases always run them)
+        description: Skip the offline tests (dry runs only; tag releases always run them)
         type: boolean
         default: false
 
@@ -49,10 +49,10 @@ jobs:
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
-      - name: Run offline provider tests
+      - name: Run offline tests
         if: github.event_name == 'push' || !inputs.skip_tests
         run: |
-          for t in PiSharp.AzureResponses.Tests PiSharp.MistralConversations.Tests; do
+          for t in PiSharp.AzureResponses.Tests PiSharp.MistralConversations.Tests PiSharp.AnthropicAuthSync.Tests PiSharp.McpSync.Tests PiSharp.ProviderSync.Tests PiSharp.WireSync.Tests PiSharp.CliSync.Tests; do
             dotnet run --project "tests/$t/$t.csproj" -c Release \
               -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false
           done

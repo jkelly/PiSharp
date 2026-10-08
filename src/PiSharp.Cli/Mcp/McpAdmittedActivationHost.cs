@@ -30,6 +30,8 @@ public sealed class McpAdmittedActivationHost : IAsyncDisposable
     private Task? close;
     public SessionRuntimeRegistry Registry { get; }
     public McpToolCatalogPlan CatalogPlan { get; }
+    /// <summary>What each pre-open server reported when it connected, including its instructions.</summary>
+    public ImmutableArray<McpServerToolSnapshot> ServerSnapshots => captures.Select(capture => capture.CatalogSnapshot).ToImmutableArray();
     private McpAdmittedActivationHost(ImmutableArray<McpPreOpenServerCapture> captures,
         SessionRuntimeRegistry registry, McpToolCatalogPlan plan, ImmutableArray<McpPreparedDiscoveryIdentity> identities,
         McpAdmittedResourceRegistration? resources)
@@ -37,11 +39,14 @@ public sealed class McpAdmittedActivationHost : IAsyncDisposable
 
     /// <summary>All enabled entries validate before the first factory call. Each factory must transfer
     /// a fresh capture and clean up allocations before throwing. Discovery validation must use opaque
-    /// prepared semantic identities against the supplied final registry before historical resolution.</summary>
+    /// prepared semantic identities against the supplied final registry before historical resolution.
+    /// <paramref name="backgroundServers"/> connect after open (Pi 1.1.0): they are not in <paramref name="catalog"/>, but
+    /// like the original, the discovery tools their configured exposures need are required from the config.</summary>
     public static async Task<McpAdmittedActivationHost> AcquireAsync(McpServerCatalog catalog,
         ImmutableArray<McpServerActivationAdmission> admissions, SessionRuntimeRegistry baseRegistry,
         bool autoEnableCodemode, IToolActionPolicy exactPolicy, McpDiscoveryCatalogPreparation prepareDiscovery,
-        CancellationToken token = default, McpAdmittedResourceRegistration? resourceRegistration = null)
+        CancellationToken token = default, McpAdmittedResourceRegistration? resourceRegistration = null,
+        ImmutableArray<McpServerEntry> backgroundServers = default)
     {
         ArgumentNullException.ThrowIfNull(catalog); ArgumentNullException.ThrowIfNull(baseRegistry);
         ArgumentNullException.ThrowIfNull(exactPolicy); ArgumentNullException.ThrowIfNull(prepareDiscovery);
@@ -86,6 +91,13 @@ public sealed class McpAdmittedActivationHost : IAsyncDisposable
             if (rows.Select(capture => capture.ReservedGeneration).Distinct().Count() > 1)
                 throw new InvalidOperationException("Composed MCP captures belong to different reserved generations.");
             var plan = McpCatalogPlanner.Plan(rows.Select(capture => capture.CatalogSnapshot), autoEnableCodemode);
+            if (!backgroundServers.IsDefaultOrEmpty)
+            {
+                var configured = backgroundServers.Where(entry => entry.Config.Enabled)
+                    .SelectMany(entry => McpConfigurationReader.ConfiguredExposures(entry.Config)).ToHashSet();
+                plan = plan with { NeedsCodemode = plan.NeedsCodemode || configured.Contains(McpExposure.Codemode),
+                    NeedsToolSearch = plan.NeedsToolSearch || configured.Contains(McpExposure.Deferred) };
+            }
             // Resource adapters enter the ordinary catalog first. Genuine code/search receipts
             // therefore capture the final metadata snapshot, including those resource bindings.
             if (resourceRegistration is not null) current = resourceRegistration.Prepare(plan, current, rows, exactPolicy);

@@ -46,7 +46,7 @@ public sealed partial class PersistentAgentSession
         if (previous.SequenceEqual(normalized, StringComparer.Ordinal))
         { lock (_gate) { ThrowActivationAvailable(); cancellationToken.ThrowIfCancellationRequested();
             if (_activationEpoch != epoch) throw new InvalidOperationException("Activation selection changed during preparation.");
-            return new(epoch, normalized); } }
+            SelectPendingToolsLocked(previous, normalized); return new(epoch, normalized); } }
         if (normalized.Length > (_agentOptions?.MaximumTools ?? 128)) throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
         var nextEpoch = checked(epoch + 1);
         var delta = registry.CreateActivationMessage(normalized, configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), 0, cancellationToken);
@@ -67,6 +67,7 @@ public sealed partial class PersistentAgentSession
                 throw new InvalidOperationException("Activation selection changed during preparation.");
             _activationEpoch = nextEpoch;
             _pendingActivation = delta is null ? null : new(nextEpoch, normalized, presentation);
+            SelectPendingToolsLocked(previous, normalized);
             return new(nextEpoch, normalized);
         }
     }
@@ -108,7 +109,7 @@ public sealed partial class PersistentAgentSession
             _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), _clock(), token);
         SessionPromptSectionPreparation? promptPreparation;
         _activationPreparation.Value = true;
-        try { (delta, promptPreparation) = registry.PreparePromptSectionMessage(names, context.Messages, delta, _clock(), token); }
+        try { (delta, promptPreparation) = registry.PreparePromptSectionMessage(names, context.Messages, delta, _clock(), token, pending?.Presentation); }
         finally { _activationPreparation.Value = false; }
         if (delta is null) { promptPreparation?.ValidateSource(); token.ThrowIfCancellationRequested(); return null; }
         var entry = Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,

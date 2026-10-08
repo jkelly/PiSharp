@@ -4,7 +4,9 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.MistralConversations;
 
-public sealed record MistralTokenCosts(double Input, double Output, double CacheRead, double CacheWrite);
+public sealed record MistralTokenCostTier(double InputTokensAbove, double Input, double Output, double CacheRead, double CacheWrite);
+public sealed record MistralTokenCosts(double Input, double Output, double CacheRead, double CacheWrite)
+{ public ImmutableArray<MistralTokenCostTier> Tiers { get; init; } = []; }
 public sealed record MistralTextOptions(Uri BaseUrl, bool SupportsText, MistralTokenCosts Costs, string UserAgent)
 {
     [JsonIgnore] public string? ApiKey { get; init; }
@@ -53,6 +55,7 @@ public sealed record MistralTextOptions(Uri BaseUrl, bool SupportsText, MistralT
             throw new MistralTextException(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral reasoning/cache configuration.");
         if (BaseUrl is null || !BaseUrl.IsAbsoluteUri || BaseUrl.Scheme is not ("http" or "https") || BaseUrl.UserInfo.Length != 0 || BaseUrl.Query.Length != 0 || BaseUrl.Fragment.Length != 0 ||
             BaseUrl.AbsoluteUri.Length > 8192 || !SupportsText || Costs is null || new[] { Costs.Input, Costs.Output, Costs.CacheRead, Costs.CacheWrite }.Any(x => !double.IsFinite(x) || x < 0) ||
+            Costs.Tiers.IsDefault || Costs.Tiers.Any(tier => tier is null || double.IsNaN(tier.InputTokensAbove) || new[] { tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite }.Any(x => !double.IsFinite(x) || x < 0)) ||
             string.IsNullOrWhiteSpace(UserAgent) || UserAgent.Length > MaximumHeaderCharacters || UserAgent.Contains('\r') || UserAgent.Contains('\n') ||
             Temperature is { } t && !double.IsFinite(t) || MaxTokens is { } m && !double.IsFinite(m) ||
             TimeoutMilliseconds is < 1 or > 3_600_000 || MaximumPayloadBytes is < 1 or > 8_388_608 || MaximumFrameCharacters is < 1 or > 8_388_608 ||

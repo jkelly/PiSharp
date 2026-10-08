@@ -34,7 +34,7 @@ public sealed class GoogleVertexRequestFactory
         var bytes = Encoding.UTF8.GetBytes(EcmaScriptJsonProjection.Project(body));
         if (bytes.Length > projection.MaximumPayloadBytes) throw GoogleData.Fail(GoogleFailure.ResourceLimit);
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        { ["User-Agent"] = "pi/0.99.1", ["Accept"] = "text/event-stream" };
+        { ["User-Agent"] = "pi/1.1.0", ["Accept"] = "text/event-stream" };
         void Merge(JsonElement value)
         {
             if (value.ValueKind != JsonValueKind.Object) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);

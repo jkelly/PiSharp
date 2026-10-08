@@ -134,13 +134,9 @@ internal sealed class GoogleEventMapper
             var inputTokens = checked(Count(usage, "promptTokenCount") - cached);
             var outputTokens = checked(Count(usage, "candidatesTokenCount") + thought);
             var total = Count(usage, "totalTokenCount"); var costs = _options.ModelMetadata.Value.GetProperty("cost");
-            var threshold = -1d; var allInput = checked(inputTokens + cached);
-            if (costs.TryGetProperty("tiers", out var tiers))
-                foreach (var tier in tiers.EnumerateArray())
-                {
-                    var above = tier.GetProperty("inputTokensAbove").GetDouble();
-                    if (allInput > above && above > threshold) { costs = tier; threshold = above; }
-                }
+            // Pi abe508 models.ts calculateCost through the shared tier selection; Google reports no cache writes.
+            if (costs.TryGetProperty("tiers", out var tiers) && tiers.ValueKind != JsonValueKind.Null && PromptLengthPricing.TrySelect(tiers.EnumerateArray(),
+                candidate => candidate.GetProperty("inputTokensAbove").GetDouble(), (double)inputTokens, cached, 0d, out var tier)) costs = tier;
             var i = Cost(costs, "input", inputTokens); var o = Cost(costs, "output", outputTokens);
             var r = Cost(costs, "cacheRead", cached); var w = Cost(costs, "cacheWrite", 0);
             var sum = i + o + r + w; if (!double.IsFinite(sum)) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);

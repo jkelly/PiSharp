@@ -19,6 +19,7 @@ public sealed record ExtensionToolRegistrationInfo(string OwnerId, long OwnerGen
     public ToolNamespace? Namespace { get; init; }
     public bool DefaultActive { get; init; } = true;
     public bool HasLoadoutPreparation { get; init; }
+    public ImmutableArray<string> PromptGuidelines { get; init; } = [];
 }
 
 public sealed record ExtensionCommandRegistrationInfo(string OwnerId, long OwnerGeneration,
@@ -38,6 +39,8 @@ public sealed class ExtensionRegistrySnapshot
     public ImmutableArray<ExtensionRegistrationInfo> InputHandlers { get; }
     public ImmutableArray<ExtensionRegistrationInfo> ToolCallHandlers { get; }
     public ImmutableArray<ExtensionRegistrationInfo> ToolResultHandlers { get; }
+    /// <summary>Tool renderer resolvers in consultation order (extension load order, then registration order).</summary>
+    public ImmutableArray<ExtensionRegistrationInfo> ToolRenderers { get; }
     internal object RegistryIdentity { get; }
     internal ImmutableArray<RegistrationEntry> Entries { get; }
 
@@ -73,8 +76,9 @@ public sealed class ExtensionRegistrySnapshot
                 entry.RegistrationId, entry.Name, descriptor.Description, descriptor.Parameters)
                 { HasInitialArgumentPreparation = descriptor.PrepareInitialArgumentsAsync is not null,
                     Exposure = descriptor.Exposure, Namespace = descriptor.Namespace, DefaultActive = descriptor.DefaultActive,
-                    HasLoadoutPreparation = descriptor.PrepareLoadout is not null };
+                    HasLoadoutPreparation = descriptor.PrepareLoadout is not null, PromptGuidelines = descriptor.PromptGuidelines };
         }).ToImmutableArray();
+        ToolRenderers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.ToolRenderer)).ToImmutableArray();
     }
 }
 

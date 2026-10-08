@@ -181,7 +181,7 @@ internal static class NativeExtensionSettingsThinkingReadTests
                 try { original = entry.Invoke(); }
                 catch (Exception error) { AddDirect(entry.Phase, error, cleanup: true); continue; }
                 if (original is null) continue; // Ownership transferred; no close Task was started.
-                Track(original, entry.Phase, cleanup: true);
+                _ = Track(original, entry.Phase, cleanup: true);
                 Exception? direct = null;
                 try { await original; } catch (Exception error) { direct = error; }
                 CaptureJoined(original, direct);
@@ -389,7 +389,7 @@ internal static class NativeExtensionSettingsThinkingReadTests
         Check(missing.GetThinkingLevel(current) == attached.Session.Snapshot.Context.ThinkingLevel);
         var absent = new NativeExtensionContextFacadeHost(); absent.ConfigureSettingsThinkingReads(_ => null); absent.Attach(fixture.Owner);
         Throws<NotSupportedException>(() => absent.GetSettings(current));
-        var legacy = new ExtensionRegistry(facadeHost: new LegacyHost()); ledger.OwnAsync("legacy.registry.close", () => legacy.DisposeAsync().AsTask());
+        var legacy = new ExtensionRegistry(null, null, null, facadeHost: new LegacyHost()); ledger.OwnAsync("legacy.registry.close", () => legacy.DisposeAsync().AsTask());
         var providers = new ExtensionProviderRegistrationHost(legacy, [], new NoProvider()); ledger.Own("legacy.providers.close", providers.Dispose);
         await ledger.Track(legacy.ActivateAsync("legacy", new Plugin(ExtensionRegistrationCommands.Create("legacy", "legacy", "legacy", providers,
             (_, actions, _, _) =>

@@ -19,6 +19,8 @@ public sealed record SessionRegisteredTool(JsonData Declaration, IPreparedToolAd
     /// <summary>Catalog origin for default-extension initial selection; never inferred from the tool name.</summary>
     public bool IsExtension { get; init; }
     public Func<ToolLoadout, ToolLoadoutChanges?>? PrepareLoadout { get; init; }
+    /// <summary>Source promptGuidelines, reported to loadout preparation by ToolLoadout.GetPromptGuidelines.</summary>
+    public ImmutableArray<string> PromptGuidelines { get; init; } = [];
 }
 public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int MaximumTools = 128,
     int MaximumMessages = 1024, int MaximumDeclarations = 4096, int MaximumCharacters = 1_048_576,
@@ -42,11 +44,15 @@ public sealed record SessionRuntimeSelection(AgentConfiguration Configuration, I
     public ImmutableArray<ToolLoadoutDiagnostic> LoadoutDiagnostics { get; init; } = [];
     public long ModelCatalogRevision { get; init; }
 }
+/// <summary>A loadout restored from the transcript: tools left out that stay pending, and whether it differs from the record.</summary>
+internal sealed record SessionRestoredLoadout(SessionRuntimeSelection Selection, ImmutableArray<string> Pending, bool RequiresRecord);
 public sealed record SessionRuntimeUpdate(ModelDescriptor? Model = null, string? ThinkingLevel = null,
     TranscriptEntry? SystemMessage = null)
 {
     /// <summary>Exact ordered model-active selection, committed at the existing durable idle boundary.</summary>
     public ImmutableArray<string>? ActiveToolNames { get; init; }
+    /// <summary>Record <see cref="ActiveToolNames"/> even when the names are unchanged, replacing recorded declarations.</summary>
+    internal bool ReplaceDeclarations { get; init; }
 }
 public enum SessionRuntimeRegistryFailure
 {
@@ -205,18 +211,24 @@ public sealed partial class SessionRuntimeRegistry
                 throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
             nameCharacters += name.Length;
             if (!Identity(name)) throw Error(SessionRuntimeRegistryFailure.InvalidRegistration);
-            if (_options.LifetimeToolSelection?.IsAllowed(name) == false) throw Error(SessionRuntimeRegistryFailure.UnknownTool);
-            if (seen.Add(name) && _tools.TryGetValue(name, out var tool) && tool.Exposure != ToolExposure.Hidden)
+            // Source setActiveToolsByName/_applyToolLoadout: unknown names, hidden tools and names --tools/--exclude-tools keep
+            // out of the registry are ignored (not rejected, not pending). Unnamed MCP tools kept by a --tools allowlist are
+            // declared only when tool_search can load them.
+            if (_options.LifetimeToolSelection?.IsAllowed(name) == false) continue;
+            if (seen.Add(name) && _tools.TryGetValue(name, out var tool) && tool.Exposure != ToolExposure.Hidden &&
+                _options.LifetimeToolSelection?.IsActivatable(name, tool.Exposure, _tools.ContainsKey("tool_search")) != false)
                 selected.Add(name);
         }
         return selected.ToImmutable();
     }
 
+    /// <summary>With <paramref name="replaceDeclarations"/> an unchanged name list is still recorded, replacing declarations
+    /// that a restored loadout took from the current bindings.</summary>
     internal TranscriptEntry? CreateActivationMessage(ImmutableArray<string> names, ImmutableArray<string> previous,
-        long timestamp, CancellationToken cancellationToken)
+        long timestamp, CancellationToken cancellationToken, bool replaceDeclarations = false)
     {
         var selected = NormalizeActiveTools(names, cancellationToken);
-        if (previous.SequenceEqual(selected, StringComparer.Ordinal)) return null;
+        if (!replaceDeclarations && previous.SequenceEqual(selected, StringComparer.Ordinal)) return null;
         var body = JsonData.Parse(JsonSerializer.Serialize(new { role = "system", content = "", timestamp,
             toolsRemoved = previous.Select(name => new { name }),
             toolsAdded = selected.Select(name => _tools[name].Declaration.Value) }));
@@ -224,7 +236,7 @@ public sealed partial class SessionRuntimeRegistry
         return new("system", body);
     }
 
-    internal ToolLoadoutPresentation? PrepareActiveLoadout(ImmutableArray<string> names, CancellationToken token)
+    internal ToolLoadoutPresentation? PrepareActiveLoadout(ImmutableArray<string> names, CancellationToken token, bool report = true)
     {
         if (!_registeredTools.Any(tool => tool.PrepareLoadout is not null)) return null;
         var activeNames = names.ToImmutableHashSet(StringComparer.Ordinal);
@@ -232,8 +244,9 @@ public sealed partial class SessionRuntimeRegistry
             _registeredTools.Where(tool => ToolExposureSemantics.IsCallable(tool.Exposure, activeNames.Contains(Name(tool.Declaration.Value))))
                 .Select(Metadata).ToImmutableArray(), _registeredTools.Select(Metadata).ToImmutableArray());
         return ToolLoadoutPresentation.Prepare(loadout, (name, original) => _tools[name].PrepareLoadout?.Invoke(original),
-            _options.ReportLoadoutDiagnostic, _options.MaximumCharacters, token);
-        static ToolLoadoutTool Metadata(SessionRegisteredTool tool) => new(tool.Declaration, tool.Exposure) { Namespace = tool.Namespace };
+            report ? _options.ReportLoadoutDiagnostic : null, _options.MaximumCharacters, token);
+        static ToolLoadoutTool Metadata(SessionRegisteredTool tool) => new(tool.Declaration, tool.Exposure)
+            { Namespace = tool.Namespace, PromptGuidelines = tool.PromptGuidelines.IsDefault ? [] : tool.PromptGuidelines };
     }
 
     public SessionRuntimeSelection Resolve(SessionContextProjection context, ModelDescriptor? fallbackModel = null,
@@ -257,9 +270,39 @@ public sealed partial class SessionRuntimeRegistry
         ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null)
         => ResolveCatalog(_modelCatalog.Read(), model, messages, thinkingLevel, cancellationToken, prepareLoadout, preparedLoadout, initialActiveToolNames);
 
+    /// <summary>
+    /// Source _restoreToolsFromTranscript and _applyToolLoadout (session open, tree navigation): the recorded loadout is
+    /// restored by name with the current bindings. A recorded tool with no binding, or one that is now hidden, is left out
+    /// instead of rejected, and a recorded declaration that differs from its binding is replaced by the binding's. Left-out
+    /// tools the lifetime selection allows stay pending (source _isAllowedTool). <see cref="SessionRestoredLoadout.RequiresRecord"/>
+    /// tells the caller to record the restored loadout before use, so later transcript resolutions see only bound declarations.
+    /// </summary>
+    internal SessionRestoredLoadout ResolveRestored(SessionContextProjection context, ModelDescriptor? fallbackModel,
+        CancellationToken cancellationToken, ImmutableArray<string>? initialActiveToolNames = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+        var catalog = _modelCatalog.Read();
+        SessionModelBinding model;
+        if (context.Model is { } selected)
+        {
+            if (!catalog.Models.TryGetValue((selected.Provider, selected.ModelId), out model!))
+                throw Error(SessionRuntimeRegistryFailure.UnknownModel);
+        }
+        else model = Model(fallbackModel, catalog);
+        var restore = new RestoreLog();
+        var selection = ResolveCatalog(catalog, model.Model, context.LlmMessages, context.ThinkingLevel, cancellationToken,
+            initialActiveToolNames: initialActiveToolNames, restore: restore);
+        // Source _isAllowedTool: names that --tools/--exclude-tools keep out of the catalog never become pending.
+        return new(selection, [.. restore.Skipped.Where(name => _options.LifetimeToolSelection?.IsAllowed(name) != false)],
+            restore.Skipped.Count != 0 || restore.Replaced);
+    }
+
+    private sealed class RestoreLog { public readonly List<string> Skipped = []; public bool Replaced; }
+
     private SessionRuntimeSelection ResolveCatalog(ModelCatalog catalog, ModelDescriptor model, ImmutableArray<TranscriptEntry> messages,
         string thinkingLevel = "off", CancellationToken cancellationToken = default, bool prepareLoadout = true,
-        ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null)
+        ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null, RestoreLog? restore = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var binding = Model(model, catalog);
@@ -309,25 +352,38 @@ public sealed partial class SessionRuntimeRegistry
                 if (name is null || !Identity(name)) throw Error(SessionRuntimeRegistryFailure.InvalidRegistration);
                 if (name.Length > _options.MaximumCharacters - initialCharacters) throw Error(SessionRuntimeRegistryFailure.ResourceLimit);
                 initialCharacters += name.Length;
-                if (_options.LifetimeToolSelection?.IsAllowed(name) == false) continue;
-                if (!_tools.TryGetValue(name, out var tool)) throw Error(SessionRuntimeRegistryFailure.UnknownTool);
+                // Source constructor/_buildRuntime: initial names that are not registered are dropped by _applyToolLoadout,
+                // and they do not become pending (only restored and reloaded loadouts do).
+                if (_options.LifetimeToolSelection?.IsAllowed(name) == false || !_tools.TryGetValue(name, out var tool)) continue;
                 if (tool.Exposure is not (ToolExposure.Direct or ToolExposure.ModelOnly)) continue;
-                // A recorded declaration that remains selected still has to match its current admitted binding.
+                // A recorded declaration that remains selected must match its binding, unless a restored loadout replaces it.
                 if (active.TryGetValue(name, out var recorded) && !Same(recorded.Value, tool.Declaration.Value, cancellationToken))
-                    throw Error(SessionRuntimeRegistryFailure.DeclarationMismatch);
+                {
+                    if (restore is null) throw Error(SessionRuntimeRegistryFailure.DeclarationMismatch);
+                    restore.Replaced = true;
+                }
                 if (effective.TryAdd(name, tool.Declaration)) effectiveOrder.Add(name);
             }
             active = effective; order = effectiveOrder;
         }
         var resolved = ImmutableArray.CreateBuilder<SessionRegisteredTool>();
         var rawDeclarations = ImmutableArray.CreateBuilder<JsonData>();
-        foreach (var name in order)
+        foreach (var name in order.ToArray())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!_tools.TryGetValue(name, out var tool)) throw Error(SessionRuntimeRegistryFailure.UnknownTool);
-            if (tool.Exposure == ToolExposure.Hidden) throw Error(SessionRuntimeRegistryFailure.UnsupportedDeclaration);
+            // Only a restored loadout leaves an unbound or hidden tool out and takes a changed declaration from its binding;
+            // every other resolution still rejects them.
+            var unbound = !_tools.TryGetValue(name, out var tool);
+            if (unbound || tool!.Exposure == ToolExposure.Hidden)
+            {
+                if (restore is null) throw Error(unbound ? SessionRuntimeRegistryFailure.UnknownTool : SessionRuntimeRegistryFailure.UnsupportedDeclaration);
+                restore.Skipped.Add(name); order.Remove(name); continue;
+            }
             if (!Same(active[name].Value, tool.Declaration.Value, cancellationToken))
-                throw Error(SessionRuntimeRegistryFailure.DeclarationMismatch);
+            {
+                if (restore is null) throw Error(SessionRuntimeRegistryFailure.DeclarationMismatch);
+                restore.Replaced = true; active[name] = tool.Declaration;
+            }
             resolved.Add(tool); rawDeclarations.Add(active[name]);
         }
         var activeNames = order.ToImmutableHashSet(StringComparer.Ordinal);

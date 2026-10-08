@@ -42,6 +42,8 @@ internal static class NativeExtensionExecInstalledEntryTests
     private sealed class Runner : ISeparatedProcessRunner
     {
         internal int Calls;
+        public ValueTask<ProcessRunResult> RunAsync(ProcessRequest request, ProcessOutputCallback? onUpdate = null,
+            CancellationToken cancellationToken = default) => throw new InvalidOperationException("Only separated runs are admitted.");
         public ValueTask<SeparatedProcessRunResult> RunSeparatedAsync(ProcessRequest request, CancellationToken token = default)
         {
             Calls++; token.ThrowIfCancellationRequested();

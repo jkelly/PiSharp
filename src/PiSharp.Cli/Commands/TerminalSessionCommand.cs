@@ -43,7 +43,7 @@ public static class TerminalSessionCommand
             return (null, exception.Failure == NativeExtensionFailure.CleanupFailed ? 1 : 2);
         }
     }
-    public const string LiveUsage = "session terminal --live --provider openai|openrouter|anthropic --model <pinned model id> --session <absolute JSONL> --workspace <existing absolute directory> [--session-mode open|new-lazy|new-memory] [--max-output-tokens 1..8192] [existing exact tool grants]";
+    public const string LiveUsage = "session terminal --live --provider openai|openrouter|anthropic|mistral|azure --model <pinned model id> --session <absolute JSONL> --workspace <existing absolute directory> [--session-mode open|new-lazy|new-memory] [--max-output-tokens 1..8192] [existing exact tool grants]";
     public const string Usage = "session terminal --terminal-preview --session <existing absolute JSONL> --workspace <existing absolute directory> --offline-script <absolute JSON> [existing rpc options]; Windows terminal editor displays Unicode with inert controls; " + LiveUsage;
     public static Task<int> RunAsync(string[] args, IConsoleTerminal terminal, ITerminalViewportSource viewport,
         TextWriter error, CancellationToken token = default) =>
@@ -54,9 +54,10 @@ public static class TerminalSessionCommand
         RunOwnedAsync(args, terminal, viewport, error, null, null, token, null, kittyProtocolActive: false, liveRuntime: runtime);
     internal static Task<int> RunWithTerminalRestoreAsync(string[] args, IConsoleTerminal terminal,
         ITerminalViewportSource viewport, TextWriter error, Func<ValueTask> restoreTerminalAndJoin,
-        CancellationToken token = default, TerminalKeybindingConfiguration? keybindingConfiguration = null, LiveSessionRuntime? liveRuntime = null) =>
+        CancellationToken token = default, TerminalKeybindingConfiguration? keybindingConfiguration = null, LiveSessionRuntime? liveRuntime = null,
+        PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null) =>
         RunOwnedAsync(args, terminal, viewport, error, null, null, token, keybindingConfiguration, kittyProtocolActive: false,
-            restoreTerminalAndJoin: restoreTerminalAndJoin, liveRuntime: liveRuntime);
+            restoreTerminalAndJoin: restoreTerminalAndJoin, liveRuntime: liveRuntime, mcpHost: mcpHost);
 
     public static Task<int> RunConfiguredAsync(string[] args, IConsoleTerminal terminal, ITerminalViewportSource viewport,
         TextWriter error, TerminalKeybindingConfiguration keybindingConfiguration, CancellationToken token = default)
@@ -98,7 +99,7 @@ public static class TerminalSessionCommand
         TerminalKeybindingConfiguration? keybindingConfiguration, bool kittyProtocolActive, TimeProvider? shutdownTimeProvider = null,
         Func<ValueTask>? restoreTerminalAndJoin = null, Action<RpcSessionShutdownSettlement>? shutdownObserver = null,
         Action<TerminalInputEvent>? observeInputCompletion = null, Action<TerminalSessionFailureObservation>? observeFailure = null,
-        LiveSessionRuntime? liveRuntime = null, TerminalExtensionInputAdmission? terminalInputAdmission = null)
+        LiveSessionRuntime? liveRuntime = null, TerminalExtensionInputAdmission? terminalInputAdmission = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null)
     {
         ArgumentNullException.ThrowIfNull(args); ArgumentNullException.ThrowIfNull(terminal);
         ArgumentNullException.ThrowIfNull(viewport); ArgumentNullException.ThrowIfNull(error);
@@ -119,9 +120,14 @@ public static class TerminalSessionCommand
         using var inputCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
         using var resizeCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
         var focusOwner = new TerminalEditorFocusOwner(initiallyFocused: true);
-        var view = new TerminalSessionView(terminal, viewport, observeSourceFrame: null, focusOwner: focusOwner, keybindings: keybindings);
+        // OSC 7501 (Pi 1.1.0): without DA1 negotiation on this console profile, PI_PROGRAM_STATUS=1 alone enables reports.
+        var programStatusOverride = Environment.GetEnvironmentVariable("PI_PROGRAM_STATUS");
+        var view = new TerminalSessionView(terminal, viewport, observeSourceFrame: null, focusOwner: focusOwner, keybindings: keybindings)
+        { ProgramStatus = programStatusOverride == "1" ? new() : null, ProgramStatusOverride = programStatusOverride };
+        var programStatus = view.ProgramStatus is null ? null : new ProgramStatusReporter();
         var receipts = new TerminalSubmissionReceipts();
         using var frontend = new InteractiveSessionFrontend(view, nativePresentation: true, submissionReceipts: receipts);
+        frontend.BindLogin(PiSharp.Cli.Authentication.ProviderLoginHost.CreateDefault());
         var selectList = new TerminalSelectListDialogController(frontend, view, keybindings);
         var selectRouter = new TerminalSelectListInputRouter(frontend, selectList, focusOwner); frontend.BindSelectList(selectRouter);
         var beginInput = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -136,10 +142,12 @@ public static class TerminalSessionCommand
         try
         {
             await view.StartAsync(token).ConfigureAwait(false);
+            if (programStatus is not null) await view.ReportProgramStatusAsync(programStatus.Report, token).ConfigureAwait(false);
             // Attach the existing input/focus owner before startup extensions can publish UI.
             reading = ReadTerminalAsync();
             var presentation = presentationObserver is null ? (IRpcExtensionUiPresentationObserver)frontend :
                 new ObservedPresentation(frontend, presentationObserver);
+            if (programStatus is not null) presentation = new ProgramStatusPresentation(presentation, programStatus, view);
             host = RunHostAsync(presentation);
             await frontend.StartAsync(inputCancellation.Token).ConfigureAwait(false);
             beginInput.TrySetResult();
@@ -224,7 +232,7 @@ public static class TerminalSessionCommand
                     try { shutdownObserver?.Invoke(settlement); } catch (Exception errorValue) { RecordFailure(errorValue); }
                     var cleanupFailures = await StopTerminalAndJoin().ConfigureAwait(false);
                     return settlement.AcknowledgeTerminalStopped(cleanupFailures);
-                }, liveRuntime: liveRuntime, terminalInputAdmission: terminalInputAdmission,
+                }, liveRuntime: liveRuntime, terminalInputAdmission: terminalInputAdmission, mcpHost: mcpHost,
                 decorateTerminalUi: inner => new TerminalCustomComponentUiProvider(inner, view, terminalInputAdmission!,
                     frontend.CaptureSessionGeneration)).ConfigureAwait(false); }
             finally { receipts.Complete(); } // Actual host and its awaited output callbacks have settled.
@@ -307,6 +315,8 @@ public static class TerminalSessionCommand
         async ValueTask ObserveRecord(JsonData record, CancellationToken observedToken)
         {
             await frontend.ObserveAsync(record, observedToken).ConfigureAwait(false);
+            if (programStatus is not null && ProgramStatusReporter.Observes(record.Value))
+                await view.ReportProgramStatusAsync(() => programStatus.HandleEvent(record.Value), observedToken).ConfigureAwait(false);
             if (observer is not null) await observer(record, observedToken).ConfigureAwait(false);
         }
     }
@@ -323,6 +333,29 @@ public static class TerminalSessionCommand
             await frontend.RetiredAsync(retirement, token).ConfigureAwait(false);
             await observer.RetiredAsync(retirement, token).ConfigureAwait(false);
         }
+    }
+    // Pi interactive-mode.ts reports open extension dialogs as blocked: confirm waits for permission, the
+    // others for an answer, each with its title. Queued dialogs are keyed by request; the latest open one wins.
+    private sealed class ProgramStatusPresentation(IRpcExtensionUiPresentationObserver inner,
+        ProgramStatusReporter reporter, TerminalSessionView view) : IRpcExtensionUiPresentationObserver
+    {
+        public async ValueTask PublishedAsync(RpcExtensionUiPresentation presentation, CancellationToken token)
+        {
+            await inner.PublishedAsync(presentation, token).ConfigureAwait(false);
+            var request = presentation.Request.Value;
+            if (request.TryGetProperty("method", out var method) && method.GetString() is "select" or "confirm" or "input" or "editor")
+                await view.ReportProgramStatusAsync(() => reporter.SetBlocked(Source(presentation.Identity), new(
+                    method.GetString() == "confirm" ? Tui.Rendering.TerminalProgramBlockedKind.Permission : Tui.Rendering.TerminalProgramBlockedKind.Question,
+                    request.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String ? title.GetString()! : "")), token).ConfigureAwait(false);
+        }
+        public async ValueTask RetiredAsync(RpcExtensionUiRetirement retirement, CancellationToken token)
+        {
+            await inner.RetiredAsync(retirement, token).ConfigureAwait(false);
+            // Retirement may follow terminal stop, whose cleanup already cleared the status.
+            if (!view.IsClosing) await view.ReportProgramStatusAsync(() => reporter.SetBlocked(Source(retirement.Identity), null), token).ConfigureAwait(false);
+        }
+        private static string Source(RpcExtensionUiPresentationIdentity identity) =>
+            $"extension-dialog:{identity.SessionGeneration}:{identity.RequestId}";
     }
     // Only the actual receipt owner and contributors captured at its local wait may classify this cancellation.
     internal static bool IsOwnedReceiptWaitCancellation(Exception error, TerminalSubmissionReceipts owner, CancellationToken inputOwnerToken) =>

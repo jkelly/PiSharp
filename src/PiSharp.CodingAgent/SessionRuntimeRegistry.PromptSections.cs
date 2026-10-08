@@ -27,14 +27,18 @@ public sealed partial class SessionRuntimeRegistry
 
     internal (TranscriptEntry? Message, SessionPromptSectionPreparation? Preparation) PreparePromptSectionMessage(
         ImmutableArray<string> names, ImmutableArray<TranscriptEntry> prior, TranscriptEntry? toolDelta,
-        long timestamp, CancellationToken token)
+        long timestamp, CancellationToken token, ToolLoadoutPresentation? presentation = null)
     {
         if (_options.PreparePromptSections is not { } provider) return (toolDelta, null);
         if (provider.GetInvocationList().Length != 1) throw new ArgumentException("One pure prompt admission required.");
         token.ThrowIfCancellationRequested();
         var normalized = NormalizeActiveTools(names, token);
         var system = new SessionSystemReplay().Replay(prior, token).CurrentMessage;
-        var prepared = provider(new(normalized, system?.WireBody));
+        // Pi 1.0.4: the tool list, rules and skills hint match the declarations the request carries. A loadout the
+        // request already prepared is reused; otherwise its diagnostics are not reported again here.
+        var hidden = (presentation ?? PrepareActiveLoadout(normalized, token, report: false))?.HiddenDeclarations;
+        var prepared = provider(new(normalized, system?.WireBody) { HiddenTools = hidden is null || hidden.IsEmpty ? [] :
+            _registeredTools.Select(tool => Name(tool.Declaration.Value)).Where(hidden.Contains).ToImmutableArray() });
         if (prepared is null) return (toolDelta, null);
         ArgumentNullException.ThrowIfNull(prepared.Revision); ArgumentNullException.ThrowIfNull(prepared.ValidateSource);
         if (prepared.Sections.IsDefault || prepared.Sections.Length > 128 || prepared.ValidateSource.GetInvocationList().Length != 1)

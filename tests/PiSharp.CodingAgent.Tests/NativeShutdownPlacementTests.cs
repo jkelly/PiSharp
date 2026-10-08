@@ -113,15 +113,16 @@ internal static class NativeShutdownPlacementTests
         }
     }
 
-    // Called by the existing unknown-startup case, so the bounded diagnostic lane
-    // covers both empty and real extension-bearing startup views.
+    // Called by the rejected-startup case with an admission whose discovered catalog is rejected, so the bounded
+    // diagnostic lane covers both empty and real extension-bearing startup views. (An unknown --tools name no longer
+    // rejects startup: Pi 1.1.0 ignores it.)
     internal static Task RejectedStartup(PiSharp.Cli.Mcp.McpProfileRuntimeAdmission admission,
         Task closing, Action release, Action assertClosed) => WithFiles(async files =>
     {
         await files.Publish(false);
         using var input = new MemoryStream(); using var output = new MemoryStream();
         using var errors = new StringWriter();
-        var original = RpcSessionCommand.RunAsync([.. files.Args(false), "--tools", "mcp__profile__missing"],
+        var original = RpcSessionCommand.RunAsync(files.Args(false),
             input, output, errors, mcpAdmission: admission);
         Exception? assertion = null;
         try
@@ -147,7 +148,7 @@ internal static class NativeShutdownPlacementTests
         var invalid = error.RootElement.GetProperty("code").GetString() == "InvalidArguments";
         var cleanupCount = error.RootElement.GetProperty("cleanupFailureCount").GetInt32();
         Console.Error.WriteLine("DIAGNOSTIC " + JsonSerializer.Serialize(new
-        { source = "mcp-profile-review.unknown-startup", variant = "rpc-extension", exitCode = code,
+        { source = "mcp-profile-review.rejected-startup", variant = "rpc-extension", exitCode = code,
             publicCode = invalid ? "InvalidArguments" : "other", cleanupCount, frameBytes = output.Length,
             disposeCount = markers.Count(value => value == "dispose"), shutdownCount = markers.Count(value => value == "shutdown") }));
         Check(markers.SequenceEqual(new[] { "dispose" }) && !File.Exists(files.View),

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceSha": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceSha": "abe508e1b89912adde45528136c3221eb69acdd7",
   "completeness": "seed; family representatives and all ten KnownApi IDs only, not exhaustive public surface inventory",
   "requiredFamilies": [
     "commands",
@@ -32,8 +32,8 @@
       "observable": "Built-in slash commands and mode-specific command outcomes",
       "source": {
         "path": "packages/coding-agent/src/core/slash-commands.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/slash-commands.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/slash-commands.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 5,
       "owner": "experience",
@@ -50,8 +50,8 @@
       "observable": "CLI argument names, accepted values, mode conflicts and help",
       "source": {
         "path": "packages/coding-agent/src/cli/args.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/cli/args.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/cli/args.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 5,
       "owner": "experience",
@@ -68,8 +68,8 @@
       "observable": "Startup, configuration and mode failure process exit outcomes",
       "source": {
         "path": "packages/coding-agent/src/main.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/main.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/main.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 5,
       "owner": "experience",
@@ -86,8 +86,8 @@
       "observable": "User/project settings merge and precedence",
       "source": {
         "path": "packages/coding-agent/src/core/settings-manager.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/settings-manager.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/settings-manager.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 5,
       "owner": "composition",
@@ -104,8 +104,8 @@
       "observable": "Agent/session home environment and asset roots",
       "source": {
         "path": "packages/coding-agent/src/config.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/config.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/config.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 5,
       "owner": "composition",
@@ -122,8 +122,8 @@
       "observable": "read schema, results, errors, cancellation and filesystem/process effects",
       "source": {
         "path": "packages/coding-agent/src/core/tools/read.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/read.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/tools/read.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "tools",
@@ -140,8 +140,8 @@
       "observable": "bash schema, results, errors, cancellation and filesystem/process effects",
       "source": {
         "path": "packages/coding-agent/src/core/tools/bash.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/bash.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/tools/bash.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "tools",
@@ -158,8 +158,8 @@
       "observable": "powershell schema, results, errors, cancellation and filesystem/process effects",
       "source": {
         "path": "packages/coding-agent/src/core/tools/powershell.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/powershell.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/tools/powershell.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "tools",
@@ -176,8 +176,8 @@
       "observable": "edit schema, results, errors, cancellation and filesystem/process effects",
       "source": {
         "path": "packages/coding-agent/src/core/tools/edit.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/edit.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/tools/edit.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "tools",
@@ -194,8 +194,8 @@
       "observable": "write schema, results, errors, cancellation and filesystem/process effects",
       "source": {
         "path": "packages/coding-agent/src/core/tools/write.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/write.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/tools/write.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "tools",
@@ -212,8 +212,8 @@
       "observable": "grep schema, results, errors, cancellation and filesystem/process effects",
       "source": {
         "path": "packages/coding-agent/src/core/tools/grep.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/grep.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/tools/grep.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "tools",
@@ -230,8 +230,8 @@
       "observable": "find schema, results, errors, cancellation and filesystem/process effects",
       "source": {
         "path": "packages/coding-agent/src/core/tools/find.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/find.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/tools/find.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "tools",
@@ -248,8 +248,8 @@
       "observable": "ls schema, results, errors, cancellation and filesystem/process effects",
       "source": {
         "path": "packages/coding-agent/src/core/tools/ls.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/ls.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/tools/ls.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "tools",
@@ -266,8 +266,8 @@
       "observable": "Shared 2000-line and 50 KiB truncation behavior",
       "source": {
         "path": "packages/coding-agent/src/core/tools/truncate.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/tools/truncate.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/tools/truncate.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "tools",
@@ -284,8 +284,8 @@
       "observable": "Agent lifecycle and ordered tool/turn events",
       "source": {
         "path": "packages/agent/src/types.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/agent/src/types.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/agent/src/types.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "agent",
@@ -302,8 +302,8 @@
       "observable": "Indexed text, thinking and tool-call frame reduction",
       "source": {
         "path": "packages/ai/src/utils/assistant-message-frame.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/utils/assistant-message-frame.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/utils/assistant-message-frame.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -324,8 +324,8 @@
       "observable": "Success/error terminal result including error before start",
       "source": {
         "path": "packages/ai/src/utils/event-stream.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/utils/event-stream.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/utils/event-stream.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -350,8 +350,8 @@
       "observable": "Stable coding-agent package root SDK exports",
       "source": {
         "path": "packages/coding-agent/src/index.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/index.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/index.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 4,
       "owner": "composition",
@@ -368,8 +368,8 @@
       "observable": "JSONL v3 entry tree, branch/context projection and unknown fields",
       "source": {
         "path": "packages/coding-agent/src/core/session-manager.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/session-manager.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/session-manager.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 4,
       "owner": "sessions",
@@ -386,8 +386,8 @@
       "observable": "Legacy v1/v2 session migrations without destroying original",
       "source": {
         "path": "packages/coding-agent/src/core/session-manager.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/session-manager.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/session-manager.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 4,
       "owner": "sessions",
@@ -404,8 +404,8 @@
       "observable": "Compaction checkpoint selection, summaries and retained context",
       "source": {
         "path": "packages/coding-agent/src/core/compaction/compaction.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/compaction/compaction.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/compaction/compaction.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 4,
       "owner": "sessions",
@@ -422,8 +422,8 @@
       "observable": "Command/response correlation and lifecycle",
       "source": {
         "path": "packages/coding-agent/src/modes/rpc/rpc-types.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/modes/rpc/rpc-types.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/modes/rpc/rpc-types.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 5,
       "owner": "rpc",
@@ -440,8 +440,8 @@
       "observable": "LF JSONL framing, malformed records and EOF disposal",
       "source": {
         "path": "packages/coding-agent/src/modes/rpc/rpc-mode.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/modes/rpc/rpc-mode.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/modes/rpc/rpc-mode.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 5,
       "owner": "rpc",
@@ -458,8 +458,8 @@
       "observable": "Per-hook reducers, cancellation and context capabilities",
       "source": {
         "path": "packages/coding-agent/src/core/extensions/runner.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/extensions/runner.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/extensions/runner.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 6,
       "owner": "extensions",
@@ -476,8 +476,8 @@
       "observable": "Registration and context API shapes",
       "source": {
         "path": "packages/coding-agent/src/core/extensions/types.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/extensions/types.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/extensions/types.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 6,
       "owner": "extensions",
@@ -494,8 +494,8 @@
       "observable": "Prompts, skills, context files, themes and extension discovery",
       "source": {
         "path": "packages/coding-agent/src/core/resource-loader.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/resource-loader.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/resource-loader.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 5,
       "owner": "composition",
@@ -512,8 +512,8 @@
       "observable": "Scoped explicit/environment/stored authentication resolution",
       "source": {
         "path": "packages/ai/src/auth/resolve.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/auth/resolve.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/auth/resolve.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -530,8 +530,8 @@
       "observable": "Credential persistence and refresh behavior",
       "source": {
         "path": "packages/coding-agent/src/core/auth-storage.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/auth-storage.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/auth-storage.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 5,
       "owner": "composition",
@@ -548,8 +548,8 @@
       "observable": "Model metadata, costs and capability declarations",
       "source": {
         "path": "packages/ai/src/models.generated.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/models.generated.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/models.generated.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -566,8 +566,8 @@
       "observable": "Transcript system/tool changes and projection",
       "source": {
         "path": "packages/ai/src/utils/transcript.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/utils/transcript.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/utils/transcript.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -584,8 +584,8 @@
       "observable": "Required HTTP/SSE/WebSocket/deferred and cancellation capabilities",
       "source": {
         "path": "packages/ai/src/types.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/types.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/types.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -602,8 +602,8 @@
       "observable": "openai-completions: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
       "source": {
         "path": "packages/ai/src/api/openai-completions.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/openai-completions.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/openai-completions.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -620,8 +620,8 @@
       "observable": "mistral-conversations: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
       "source": {
         "path": "packages/ai/src/api/mistral-conversations.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/mistral-conversations.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/mistral-conversations.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -638,8 +638,8 @@
       "observable": "openai-responses: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
       "source": {
         "path": "packages/ai/src/api/openai-responses.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/openai-responses.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/openai-responses.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -656,8 +656,8 @@
       "observable": "azure-openai-responses: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
       "source": {
         "path": "packages/ai/src/api/azure-openai-responses.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/azure-openai-responses.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/azure-openai-responses.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -674,8 +674,8 @@
       "observable": "openai-codex-responses: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
       "source": {
         "path": "packages/ai/src/api/openai-codex-responses.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/openai-codex-responses.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/openai-codex-responses.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -692,8 +692,8 @@
       "observable": "anthropic-messages: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
       "source": {
         "path": "packages/ai/src/api/anthropic-messages.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/anthropic-messages.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/anthropic-messages.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -710,8 +710,8 @@
       "observable": "bedrock-converse-stream: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
       "source": {
         "path": "packages/ai/src/api/bedrock-converse-stream.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/bedrock-converse-stream.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/bedrock-converse-stream.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -728,8 +728,8 @@
       "observable": "google-generative-ai: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
       "source": {
         "path": "packages/ai/src/api/google-generative-ai.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/google-generative-ai.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/google-generative-ai.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -746,8 +746,8 @@
       "observable": "google-vertex: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
       "source": {
         "path": "packages/ai/src/api/google-vertex.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/google-vertex.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/google-vertex.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -764,8 +764,8 @@
       "observable": "pi-messages: complete mandatory request/response, auth, tools, images, reasoning, usage and fault matrix",
       "source": {
         "path": "packages/ai/src/api/pi-messages.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/ai/src/api/pi-messages.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/ai/src/api/pi-messages.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 2,
       "owner": "ai",
@@ -782,8 +782,8 @@
       "observable": "Required MCP server lifecycle, authentication and tool envelopes",
       "source": {
         "path": "packages/coding-agent/src/core/mcp-servers.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/mcp-servers.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/mcp-servers.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "integrations",
@@ -800,8 +800,8 @@
       "observable": "Required codemode tool declarations, execution and nested calls",
       "source": {
         "path": "packages/coding-agent/src/extensions/codemode/index.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/extensions/codemode/index.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/extensions/codemode/index.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 3,
       "owner": "integrations",
@@ -818,8 +818,8 @@
       "observable": "Input, rendering, terminal modes and screen behavior",
       "source": {
         "path": "packages/tui/src/tui.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/tui/src/tui.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/tui/src/tui.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 5,
       "owner": "experience",
@@ -836,8 +836,8 @@
       "observable": "Kitty/iTerm2 image protocols and fallbacks",
       "source": {
         "path": "packages/tui/src/terminal-image.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/tui/src/terminal-image.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/tui/src/terminal-image.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 5,
       "owner": "experience",
@@ -854,8 +854,8 @@
       "observable": "Optional tested TypeScript extension bridge tiers",
       "source": {
         "path": "packages/coding-agent/src/core/extensions/loader.ts",
-        "url": "https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/packages/coding-agent/src/core/extensions/loader.ts",
-        "sha": "d86654abb8862e201933517d6f1fce9f88dd117f"
+        "url": "https://github.com/earendil-works/pi/blob/abe508e1b89912adde45528136c3221eb69acdd7/packages/coding-agent/src/core/extensions/loader.ts",
+        "sha": "abe508e1b89912adde45528136c3221eb69acdd7"
       },
       "targetPhase": 7,
       "owner": "extensions",

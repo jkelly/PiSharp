@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (durationMs, agent_settled.aborted).
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text;
@@ -282,7 +283,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(runtimeForWorkingDirectory);
         ArgumentNullException.ThrowIfNull(clock); ArgumentNullException.ThrowIfNull(nextEntryId);
-        var configured = options ?? new();
+        var configured = Timed(options);
         if (string.IsNullOrWhiteSpace(path) || !System.IO.Path.IsPathFullyQualified(path) ||
             configured.UseLatestLeaf && configured.SelectedLeafId is not null ||
             configured.AgentOptions?.CancellationBehavior == AgentCancellationBehavior.Propagate)
@@ -305,7 +306,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             acquired.Claim(); runtime = acquired;
             var registry = runtime.Registry.RetainToolSelection(configured.LifetimeToolSelection);
             cancellationToken.ThrowIfCancellationRequested();
-            var selection = await registry.PrepareAndDrainAsync(() => registry.Resolve(context, fallbackModel, cancellationToken, registry.InitialActiveToolNames), cancellationToken).ConfigureAwait(false);
+            // Without initial names the transcript's loadout is restored by name with the current bindings (Pi 0.99.2).
+            var loadout = await registry.PrepareAndDrainAsync(() => registry.ResolveRestored(context, fallbackModel, cancellationToken,
+                registry.InitialActiveToolNames), cancellationToken).ConfigureAwait(false);
+            var selection = loadout.Selection;
             var bridge = new Bridge();
             agent = new(selection.Configuration, clock, bridge, configured.AgentOptions);
             agent.ReplaceMessages(SessionContextProjector.AgentMessages(context));
@@ -313,8 +317,12 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             opened = new(path, store, agent, bridge, projector, codec, context, selection.Configuration, clock, nextEntryId,
                 configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions)
             { _registry = registry, _runtimeLease = runtime };
+            var restored = selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
             if (registry.InitialActiveToolNames is not null)
-                await opened.SetActiveToolsAsync(selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), cancellationToken).ConfigureAwait(false);
+                await opened.ConfigureAsync(new() { ActiveToolNames = restored, ReplaceDeclarations = loadout.RequiresRecord }, cancellationToken).ConfigureAwait(false);
+            // Restored tools that are not registered yet, such as MCP tools whose server is still connecting, stay pending.
+            else if (loadout.RequiresRecord)
+                await opened.RecordRestoredToolsAsync(restored, loadout.Pending, cancellationToken).ConfigureAwait(false);
             return opened;
         }
         catch (Exception admission)
@@ -375,7 +383,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         return GetToolActivationSelection().Names;
     }
 
-    /// <summary>Host-owned activation at the durable idle boundary. Unknown and hidden names are ignored.
+    /// <summary>Host-owned activation at the durable idle boundary. Unknown and hidden names, and names the lifetime
+    /// selection keeps out, are ignored (source setActiveToolsByName); they do not become pending.
     /// An in-flight run, pending input, retired owner or cancelled request cannot publish a new loadout.</summary>
     public Task<PersistentAgentSessionSnapshot> SetActiveToolsAsync(ImmutableArray<string> names,
         CancellationToken cancellationToken = default) => ConfigureAsync(new() { ActiveToolNames = names }, cancellationToken);
@@ -428,7 +437,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             if (update.ThinkingLevel is { } level && level != context.ThinkingLevel)
                 Add("thinking_level_change", writer => writer.WriteString("thinkingLevel", level));
             var systemUpdate = update.ActiveToolNames is { } activeNames
-                ? _registry!.CreateActivationMessage(activeNames, RecordedActiveToolNames(context, work), _clock(), work)
+                ? _registry!.CreateActivationMessage(activeNames, RecordedActiveToolNames(context, work), _clock(), work, update.ReplaceDeclarations)
                 : update.SystemMessage;
             SessionPromptSectionPreparation? promptPreparation = null;
             if (update.SystemMessage is null)
@@ -477,6 +486,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             lock (_gate)
             {
                 _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(prospective));
+                if (update.ActiveToolNames is not null)
+                    SelectPendingToolsLocked(_configuration.Tools.Select(tool => tool.Name).ToImmutableArray(),
+                        selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray());
                 _configuration = selection.Configuration;
                 _acknowledgedLog = acknowledged.Snapshot;
                 _context = prospective;
@@ -833,6 +845,15 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         value is { Length: > 0 } && value.Length <= SessionExtensionEntryLimits.MaximumIdentifierCharacters &&
         value.All(character => character is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' or '.' or '_' or '-');
 
+    /// <summary>The session host times assistant responses and tool executions like the source AgentSession
+    /// (durationMs), with the system clock unless the caller supplied one.</summary>
+    private static PersistentAgentSessionOptions Timed(PersistentAgentSessionOptions? options)
+    {
+        var configured = options ?? new();
+        return configured.AgentOptions?.TimeProvider is not null ? configured :
+            configured with { AgentOptions = (configured.AgentOptions ?? new()) with { TimeProvider = TimeProvider.System } };
+    }
+
     private static (PersistentAgentSessionOptions, SessionContextProjector, SessionEntryCodec, NativeAgent, Bridge)
         Admit(string path, AgentConfiguration configuration, Func<long> clock, Func<string> nextEntryId,
             PersistentAgentSessionOptions? options)
@@ -840,7 +861,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(clock); ArgumentNullException.ThrowIfNull(nextEntryId);
         if (string.IsNullOrWhiteSpace(path) || !System.IO.Path.IsPathFullyQualified(path))
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
-        var configured = options ?? new();
+        var configured = Timed(options);
         if (configured.UseLatestLeaf && configured.SelectedLeafId is not null ||
             configured.AgentOptions?.CancellationBehavior == AgentCancellationBehavior.Propagate)
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -1039,6 +1060,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             token.ThrowIfCancellationRequested();
             if (injectNextTurnCustom) inputs = InjectNextTurnCustomLocked(inputs);
             _operationGeneration = checked(_operationGeneration + 1);
+            // Source _runAgentPrompt: the run records the loadout; restored tools that did not register by now are dropped.
+            _pendingToolNames = [];
             _runCancellation = new(); _operationPhase = SessionOperationPhase.Provider;
             idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle;
         }
@@ -1106,7 +1129,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 Task settingsIdle; lock (_gate) settingsIdle = RetrySettingsIdleLocked();
                 try { await settingsIdle.ConfigureAwait(false); }
                 catch (Exception error) { AddDistinctFailure(failures, error); status = "failed"; }
-                try { await EmitOperationAsync(new SessionOperationSettled(operation, status, settledResult)).ConfigureAwait(false); }
+                // The source flag is set by abort() during an active run; the caller's token is this host's abort path.
+                var aborted = runAbort.Abort.IsCancellationRequested || token.IsCancellationRequested;
+                try { await EmitOperationAsync(new SessionOperationSettled(operation, status, settledResult) { Aborted = aborted }).ConfigureAwait(false); }
                 catch (Exception error)
                 { AddDistinctFailure(failures, error); lock (_gate) _fault ??= new(PersistentAgentSessionFailure.RunFailed); }
             }

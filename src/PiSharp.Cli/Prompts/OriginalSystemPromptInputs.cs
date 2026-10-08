@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/system-prompt.ts.
 using System.Collections.Immutable;
 using PiSharp.Contracts;
 
@@ -14,6 +15,9 @@ internal sealed record OriginalSystemPromptAdmission
     internal string? CustomPrompt { get; init; }
     internal string? ForceSystemPrompt { get; init; }
     internal ImmutableArray<string> SelectedTools { get; init; }
+    /// <summary>Selected tools whose declarations requests leave out (prepareLoadout hidden declarations). They are
+    /// reachable only through another tool, so the tool list, rules and skills hint leave them out too.</summary>
+    internal ImmutableArray<string> HiddenTools { get; init; } = [];
     internal ImmutableArray<KeyValuePair<string, string>> ToolSnippets { get; init; } = [];
     internal ImmutableArray<KeyValuePair<string, ImmutableArray<string>>> ToolGuidelines { get; init; } = [];
     internal ImmutableArray<string> PromptGuidelines { get; init; } = [];

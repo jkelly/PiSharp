@@ -6,7 +6,7 @@ description: What carries over from Pi, what's imported, and what's different.
 PiSharp follows Pi's design closely, so most of what you know carries over. This page covers what's shared, what's imported, and what's different.
 
 :::tip
-These docs describe PiSharp's current baseline, Pi v0.99.1. Features Pi added later aren't covered until the next sync. Check [Parity](/parity/) for details.
+These docs describe PiSharp's current baseline, Pi v1.1.0. Features Pi added later aren't covered until the next sync. Check [Parity](/parity/) for details.
 :::
 
 ## What carries over

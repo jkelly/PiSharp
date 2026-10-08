@@ -20,6 +20,8 @@ public sealed record FinalizedToolExecution(ToolResult Result, bool IsError)
 {
     public PiSharp.Contracts.JsonData? NestedCalls { get; init; }
     public JsonData? NestedUsage { get; init; }
+    /// <summary>Milliseconds the tool's own execution took (monotonic); null when the tool did not run.</summary>
+    public long? DurationMs { get; init; }
 }
 
 /// <summary>Optional executor seam; legacy IToolExecutor implementations retain their existing behavior.</summary>

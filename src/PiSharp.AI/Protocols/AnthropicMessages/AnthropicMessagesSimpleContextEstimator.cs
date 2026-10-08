@@ -1,4 +1,4 @@
-// Pi v0.99.1 d86654abb8862e201933517d6f1fce9f88dd117f (MIT): utils/estimate.ts and utils/text.ts.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/estimate.ts and packages/ai/src/utils/text.ts.
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Contracts;
@@ -8,6 +8,8 @@ namespace PiSharp.AI.Protocols.AnthropicMessages;
 
 internal static class AnthropicMessagesSimpleContextEstimator
 {
+    // Pi 1.1.0 estimate.ts CHARS_PER_TOKEN; session compaction keeps its own four-character estimate.
+    internal const double CharsPerToken = 3.5;
     internal static AnthropicMessagesContextUsageEstimate Estimate(ImmutableArray<TranscriptEntry> messages,
         AnthropicMessagesSimpleOptions options, CancellationToken token)
     {
@@ -81,7 +83,7 @@ internal static class AnthropicMessagesSimpleContextEstimator
                 _ => throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript)
             };
         else throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript);
-        return checked((int)Math.Ceiling(characters / 4d));
+        return checked((int)Math.Ceiling(characters / CharsPerToken));
     }
     private static int Counter(JsonElement usage, string name)
     {
@@ -89,7 +91,7 @@ internal static class AnthropicMessagesSimpleContextEstimator
         if (count < 0) throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript);
         return count;
     }
-    private static int TextTokens(string text) => (int)Math.Ceiling(text.Length / 4d);
+    private static int TextTokens(string text) => (int)Math.Ceiling(text.Length / CharsPerToken);
     private static string JsonText(JsonElement value, AnthropicMessagesSimpleOptions options) => EcmaScriptJsonProjection.Project(JsonData.FromElement(value), new(
         MaximumInputCharacters: options.MaximumContextCharacters, MaximumInputBytes: options.MaximumContextCharacters * 4,
         MaximumOutputCharacters: options.MaximumContextCharacters, MaximumOutputBytes: options.MaximumContextCharacters * 4,

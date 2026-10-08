@@ -57,7 +57,9 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
             {
                 rawStop = reason;
                 Reason = reason switch { "stop" => StopReason.Stop, "length" or "model_length" => StopReason.Length, "tool_calls" => StopReason.ToolUse, _ => StopReason.Error };
-                if (Reason == StopReason.Error) ProviderError = "Provider stopped with: " + reason;
+                // Pi abe508e1 mistral-conversations.ts mapChatStopReason: Mistral reports transient server failures as
+                // "error"; "server error" makes the message retryable.
+                if (Reason == StopReason.Error) ProviderError = reason == "error" ? "Provider stopped with: error (server error)" : "Provider stopped with: " + reason;
             }
         }
         var delta = choice.GetProperty("delta"); if (delta.ValueKind != JsonValueKind.Object) throw Fail(NativeChatFailureCode.MalformedStream, "Invalid Mistral delta.");
@@ -172,7 +174,10 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
         var cache = cached.ValueKind == JsonValueKind.Number && cached.TryGetDouble(out var n) && double.IsFinite(n) ? Math.Clamp(n, 0, prompt) : 0;
         if (cache != Math.Truncate(cache)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Nonintegral Mistral usage unsupported.");
         var input = prompt - (long)cache; if (total == 0) total = checked(input + output + (long)cache);
-        var costs = new[] { (options.Costs.Input / 1_000_000) * input, (options.Costs.Output / 1_000_000) * output, (options.Costs.CacheRead / 1_000_000) * cache, (options.Costs.CacheWrite * 0 + options.Costs.Input * 2 * 0) / 1_000_000 };
+        // Pi abe508 models.ts calculateCost: a prompt-length tier prices the whole request; Mistral reports no cache writes.
+        var rates = PromptLengthPricing.TrySelect(options.Costs.Tiers, candidate => candidate.InputTokensAbove, (double)input, cache, 0d, out var tier)
+            ? new MistralTokenCosts(tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite) : options.Costs;
+        var costs = new[] { (rates.Input / 1_000_000) * input, (rates.Output / 1_000_000) * output, (rates.CacheRead / 1_000_000) * cache, (rates.CacheWrite * 0 + rates.Input * 2 * 0) / 1_000_000 };
         var sum = costs[0] + costs[1] + costs[2] + costs[3]; if (costs.Any(x => !double.IsFinite(x) || x > (double)decimal.MaxValue) || !double.IsFinite(sum) || sum > (double)decimal.MaxValue) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral cost exceeds numeric limits.");
         var binary = JsonData.Parse(JsonSerializer.Serialize(new { input = costs[0], output = costs[1], cacheRead = costs[2], cacheWrite = costs[3], total = sum }));
         // Typed decimals must describe the exact serialized binary64 values used by

@@ -148,7 +148,8 @@ internal static class McpConfigurationTests
             new McpRegisteredServer("new", Config("{\"command\":\"latest\"}", "new"), "extension-c") };
         var catalog = McpCatalogPlanner.ComposeServers(loaded, registered);
         Equal("docs,new", string.Join(',', catalog.Servers.Select(row => row.Name))); Check(!catalog.Servers[0].Config.Enabled);
-        Equal("\"docs\" registered by extension-a is overridden by global", catalog.Overridden.Single());
+        // Pi v1.1.0 names the configured server, which may differ from the registered name by `-`/`_`.
+        Equal("\"docs\" registered by extension-a is overridden by \"docs\" in global", catalog.Overridden.Single());
         Equal("extension-c", catalog.Servers[1].Source); Equal(McpConfigurationScope.Extension, catalog.Servers[1].Scope);
         return Task.CompletedTask;
     }
@@ -167,8 +168,11 @@ internal static class McpConfigurationTests
         Equal(3, plan.Tools.Length); Equal("description", plan.Tools[0].Description); Equal("title", plan.Tools[1].Description);
         Equal("MCP tool hidden from server docs", plan.Tools[2].Description);
         Equal(ToolExposure.Direct, plan.Tools[0].Exposure); Equal(ToolExposure.Deferred, plan.Tools[1].Exposure); Equal(ToolExposure.Hidden, plan.Tools[2].Exposure);
-        Equal(McpExposure.CodemodeDeferred, plan.Tools[1].McpExposure); Check(plan.NeedsCodemode); Check(!plan.NeedsToolSearch);
-        Equal("mcp__docs", plan.Tools[0].Namespace.Name); Equal("Instructions", plan.Tools[0].Namespace.Description);
+        // Pi v1.1.0: `codemode-deferred` is an alias of `codemode`; server instructions are kept apart from the
+        // namespace description, which only a configured `description` sets.
+        Equal(McpExposure.Codemode, plan.Tools[1].McpExposure); Check(plan.NeedsCodemode); Check(!plan.NeedsToolSearch);
+        Equal("mcp__docs", plan.Tools[0].Namespace.Name); Equal<string?>(null, plan.Tools[0].Namespace.Description);
+        Equal("Instructions", plan.Tools[0].NamespaceInstructions);
         Equal("docs/direct", plan.Tools[0].Label); Equal(2500d, plan.Tools[0].TimeoutMilliseconds);
         Equal("object", plan.Tools[0].Parameters.Value.GetProperty("type").GetString());
         Equal(JsonValueKind.Object, plan.Tools[0].Parameters.Value.GetProperty("properties").ValueKind);
@@ -185,17 +189,22 @@ internal static class McpConfigurationTests
         Equal(1, plan.Tools.Length); Equal("docs", plan.Tools[0].Server);
         Check(plan.NeedsToolSearch); Check(!plan.NeedsCodemode); Check(!plan.AutoEnableCodemode); Equal<McpExposure?>(McpExposure.Direct, plan.ResourceToolsExposure);
         var resourceOnly = McpCatalogPlanner.Plan([new(Entry("{\"command\":\"x\",\"exposure\":\"codemode-deferred\"}"), [], HasResources: true)]);
-        Check(resourceOnly.NeedsCodemode); Equal<McpExposure?>(McpExposure.CodemodeDeferred, resourceOnly.ResourceToolsExposure);
+        Check(resourceOnly.NeedsCodemode); Equal<McpExposure?>(McpExposure.Codemode, resourceOnly.ResourceToolsExposure);
         return Task.CompletedTask;
     }
     private static Task Refresh()
     {
         var entry = Entry("{\"command\":\"x\"}");
+        // Pi v1.1.0: every tool whose name sanitizes to a shared name gets the hash suffix, independent of list order.
         var first = McpCatalogPlanner.Plan([new(entry, [Tool("a.b"), Tool("a_b")])]);
-        Equal("mcp__docs__a_b", first.Tools[0].Name); Equal("mcp__docs__a_b_63617bb9", first.Tools[1].Name);
+        Equal("mcp__docs__a_b_" + McpCatalogPlanner.CreateToolName("docs", "a.b", _ => true)[^8..], first.Tools[0].Name);
+        Equal("mcp__docs__a_b_63617bb9", first.Tools[1].Name);
+        // Without the sibling the plain name is free again; owned names stay with their owners across refreshes.
         var refreshed = McpCatalogPlanner.Plan([new(entry, [Tool("a_b")])], previousNameOwners: first.NameOwners);
-        Equal(first.Tools[1].Name, refreshed.Tools.Single().Name); Equal(2, refreshed.NameOwners.Count);
-        Equal(2, first.Tools.Length); Equal("Tools in the mcp__docs namespace.", refreshed.Tools.Single().Namespace.Description);
+        Equal("mcp__docs__a_b", refreshed.Tools.Single().Name); Equal(3, refreshed.NameOwners.Count);
+        var later = McpCatalogPlanner.Plan([new(entry, [Tool("a-b")])], previousNameOwners: refreshed.NameOwners);
+        Check(later.Tools.Single().Name.StartsWith("mcp__docs__a_b_", StringComparison.Ordinal));
+        Equal(2, first.Tools.Length); Equal<string?>(null, refreshed.Tools.Single().Namespace.Description);
         return Task.CompletedTask;
     }
     private static Task Ownership()

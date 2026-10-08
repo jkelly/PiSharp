@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/event-stream.ts.
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using System.Text.Json;
@@ -27,12 +28,16 @@ public sealed class ChatRun : IAsyncDisposable
     private readonly bool _mistralDiagnostics;
     private int _readerClaimed;
     private int _disposed;
+    private readonly TimeProvider? _time;
+    private readonly long _started;
 
     internal ChatRun(IChatTransport transport, ChatRequest request, int capacity, StreamLimits? limits,
         CancellationToken cancellationToken, bool settleAbortedTerminal = false, long? fallbackTimestamp = null,
-        bool detachReader = false)
+        bool detachReader = false, TimeProvider? timeProvider = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
+        _time = timeProvider;
+        _started = timeProvider?.GetTimestamp() ?? 0;
         _completionsDiagnostics = request.Model.Api == "openai-completions";
         _piMessagesDiagnostics = request.Model.Api == "pi-messages";
         _googleDiagnostics = request.Model.Api == "google-generative-ai";
@@ -312,11 +317,24 @@ public sealed class ChatRun : IAsyncDisposable
             if (diagnostic != terminal.NativeDiagnostic || cleanupDiagnostic != terminal.NativeCleanupDiagnostic)
                 terminal = terminal with { NativeDiagnostic = diagnostic, NativeCleanupDiagnostic = cleanupDiagnostic };
             if (failure is not null) failure = failure with { NativeDiagnostic = terminal.NativeDiagnostic };
+            terminal = Timed(terminal, request);
             _terminal.TrySetResult(terminal);
             _completion.TrySetResult(new(terminal.Message, failure)
             { NativeDiagnostic = terminal.NativeDiagnostic, NativeCleanupDiagnostic = terminal.NativeCleanupDiagnostic });
             _progress.Writer.TryComplete();
         }
+    }
+
+    /// <summary>
+    /// With a clock, the final message of a response this run started gets the monotonic time since the run began. A
+    /// message that already has a duration, or whose timestamp predates this request (a response that started
+    /// elsewhere), stays untimed. Native transports stamp the request timestamp, so it is the source's response start.
+    /// </summary>
+    private StreamTerminalEvent Timed(StreamTerminalEvent terminal, ChatRequest request)
+    {
+        if (_time is null || terminal.Message.DurationMs is not null || terminal.Message.Timestamp < request.Timestamp) return terminal;
+        var elapsed = Math.Round(_time.GetElapsedTime(_started).TotalMilliseconds, MidpointRounding.AwayFromZero);
+        return terminal with { Message = terminal.Message with { DurationMs = Math.Max(0, (long)elapsed) } };
     }
 
     private static async IAsyncEnumerable<StreamEvent> ObserveGoogleCleanup(IAsyncEnumerable<StreamEvent> events,
@@ -430,17 +448,21 @@ public sealed class ChatRun : IAsyncDisposable
 
 public sealed class ChatClient(IChatTransport transport, int capacity = 32, StreamLimits? limits = null)
 {
+    /// <summary>Opt-in clock whose monotonic timestamps time each run's final message (durationMs). Null leaves the
+    /// terminal message exactly as reduced, as before durations existed.</summary>
+    public TimeProvider? TimeProvider { get; init; }
+
     public ValueTask<ChatRun> StartAsync(ChatRequest request, CancellationToken cancellationToken = default) =>
-        ValueTask.FromResult(new ChatRun(transport, request, capacity, limits, cancellationToken));
+        ValueTask.FromResult(new ChatRun(transport, request, capacity, limits, cancellationToken, timeProvider: TimeProvider));
 
     /// <summary>Retains a provider's observed bounded Aborted terminal despite work cancellation; drain without a canceled reader token.</summary>
     public ValueTask<ChatRun> StartWithAbortSettlementAsync(ChatRequest request, CancellationToken cancellationToken = default,
         long? fallbackTimestamp = null) =>
-        ValueTask.FromResult(new ChatRun(transport, request, capacity, limits, cancellationToken, true, fallbackTimestamp));
+        ValueTask.FromResult(new ChatRun(transport, request, capacity, limits, cancellationToken, true, fallbackTimestamp, timeProvider: TimeProvider));
 
     /// <summary>Reader return detaches consumption; the run owns a bounded discard drain and the continuing producer. Dispose the run to cancel and join.</summary>
     public ValueTask<ChatRun> StartWithDetachedReaderAsync(ChatRequest request, CancellationToken cancellationToken = default) =>
-        ValueTask.FromResult(new ChatRun(transport, request, capacity, limits, cancellationToken, detachReader: true));
+        ValueTask.FromResult(new ChatRun(transport, request, capacity, limits, cancellationToken, detachReader: true, timeProvider: TimeProvider));
 
     public async Task<ChatResult> CompleteAsync(ChatRequest request, CancellationToken cancellationToken = default)
     {

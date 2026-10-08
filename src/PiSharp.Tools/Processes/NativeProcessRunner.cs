@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/utils/output-files.ts (LocalProcessOutputStorage).
 using System.Collections.Immutable;
 using System.Threading.Channels;
 using PiSharp.Agent.Tools;
@@ -15,7 +16,11 @@ public enum ProcessDiagnostic
 /// <summary>Trusted effect input. This primitive does not authorize commands or enforce a sandbox.</summary>
 public sealed record ProcessRequest(string Executable, ImmutableArray<string> Arguments,
     string WorkingDirectory, ImmutableDictionary<string, string> Environment, string SpillPath,
-    double? TimeoutSeconds = null);
+    double? TimeoutSeconds = null)
+{
+    /// <summary>MCP process launch only: a command line tail used as is instead of the quoted <see cref="Arguments"/>.</summary>
+    public string? VerbatimArguments { get; init; }
+}
 
 public sealed record ProcessRunnerOptions(int MaximumRawBytes = 64 * 1024 * 1024,
     int ModelMaxLines = 2000, int ModelMaxBytes = 50 * 1024,
@@ -31,6 +36,8 @@ public sealed record ProcessRunResult(ProcessRunStatus Status, int? ExitCode, in
     double WallTimeSeconds, ImmutableArray<ProcessDiagnostic> Diagnostics);
 
 public delegate ValueTask ProcessOutputCallback(ProcessOutputSnapshot snapshot);
+/// <summary>Raw stdout/stderr bytes in arrival order (source onData), awaited before the next chunk is collected.</summary>
+public delegate ValueTask ProcessRawOutputCallback(ReadOnlyMemory<byte> chunk);
 public enum ProcessLifecycleStage { BeforeResume, Started, BeforeCleanup, AfterCleanup }
 public sealed record ProcessLifecycleObservation(ProcessLifecycleStage Stage, int ProcessId,
     bool ProcessStarted, bool CleanupConfirmed);
@@ -49,11 +56,25 @@ public interface IProcessOutputStorage
     ValueTask<Stream> CreateNewAsync(string absolutePath);
 }
 
+/// <summary>
+/// Source output files (utils/output-files.ts): output can carry private data, so a spill file is created exclusively
+/// (never following or reusing an existing path or link) and, on Unix, readable and writable by its owner only (0600).
+/// Windows has no POSIX mode: the file inherits the spill directory's ACL, as Node ignores the mode there too.
+/// </summary>
 public sealed class LocalProcessOutputStorage : IProcessOutputStorage
 {
-    public ValueTask<Stream> CreateNewAsync(string absolutePath) => ValueTask.FromResult<Stream>(
-        new FileStream(absolutePath, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 8192,
-            FileOptions.Asynchronous | FileOptions.SequentialScan));
+    public ValueTask<Stream> CreateNewAsync(string absolutePath) => ValueTask.FromResult<Stream>(new FileStream(absolutePath, Options()));
+
+    internal static FileStreamOptions Options()
+    {
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.Read, BufferSize = 8192,
+            Options = FileOptions.Asynchronous | FileOptions.SequentialScan
+        };
+        if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        return options;
+    }
 }
 
 /// <summary>
@@ -85,6 +106,14 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
     public ValueTask<ProcessRunResult> RunAsync(ProcessRequest request, ProcessOutputCallback? onUpdate = null,
         CancellationToken cancellationToken = default) => RunCoreAsync(request, onUpdate, null, cancellationToken);
 
+    /// <summary>Runs like <see cref="RunAsync"/> and also delivers each raw output chunk, for hosts that sanitize streamed text themselves.</summary>
+    public ValueTask<ProcessRunResult> RunStreamingAsync(ProcessRequest request, ProcessRawOutputCallback onData,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(onData);
+        return RunCoreAsync(request, null, null, cancellationToken, onData);
+    }
+
     public async ValueTask<SeparatedProcessRunResult> RunSeparatedAsync(ProcessRequest request, CancellationToken cancellationToken = default)
     {
         using var capture = new SeparatedProcessCapture(_options.StructuredMaxBytes);
@@ -93,7 +122,7 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
     }
 
     private async ValueTask<ProcessRunResult> RunCoreAsync(ProcessRequest request, ProcessOutputCallback? onUpdate,
-        SeparatedProcessCapture? capture, CancellationToken cancellationToken)
+        SeparatedProcessCapture? capture, CancellationToken cancellationToken, ProcessRawOutputCallback? onData = null)
     {
         var began = _clock.GetTimestamp();
         if (cancellationToken.IsCancellationRequested) return Empty(ProcessRunStatus.Canceled, null);
@@ -103,7 +132,7 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
         catch (Exception error) when (error is ArgumentException or NotSupportedException or IOException or UnauthorizedAccessException)
         { invalid = ProcessDiagnostic.InvalidRequest; }
         if (invalid is { } diagnostic) return Empty(ProcessRunStatus.Failed, diagnostic);
-        return await RunOwnedAsync(request, onUpdate, capture, cancellationToken, began).ConfigureAwait(false);
+        return await RunOwnedAsync(request, onUpdate, capture, cancellationToken, began, onData).ConfigureAwait(false);
 
         ProcessRunResult Empty(ProcessRunStatus status, ProcessDiagnostic? diagnostic)
         {
@@ -116,7 +145,7 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
 
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private async ValueTask<ProcessRunResult> RunOwnedAsync(ProcessRequest request, ProcessOutputCallback? onUpdate,
-        SeparatedProcessCapture? capture, CancellationToken caller, long began)
+        SeparatedProcessCapture? capture, CancellationToken caller, long began, ProcessRawOutputCallback? onData)
     {
         var diagnostics = new List<ProcessDiagnostic>();
         var diagnosticGate = new object();
@@ -264,6 +293,12 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
                 { captureComplete = false; Add(ProcessDiagnostic.OutputLimitExceeded); accepting = false; stop.TrySetResult(ProcessRunStatus.Failed); }
                 catch (Exception)
                 { captureComplete = false; Add(ProcessDiagnostic.OutputIoFailed); accepting = false; stop.TrySetResult(ProcessRunStatus.Failed); }
+                if (accepting && onData is not null)
+                {
+                    try { await onData(bytes).ConfigureAwait(false); }
+                    catch (Exception)
+                    { Add(ProcessDiagnostic.ProgressCallbackFailed); accepting = false; stop.TrySetResult(ProcessRunStatus.Failed); }
+                }
                 if (activeCallback is not null)
                 {
                     try { await activeCallback(output.Snapshot()).ConfigureAwait(false); }

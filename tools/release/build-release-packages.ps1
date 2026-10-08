@@ -28,7 +28,7 @@ $versionPrefix = $Matches[1]
 $versionSuffix = if ($Matches.ContainsKey(2)) { $Matches[2] } else { '' }
 
 # PiSharp's version is the Pi version it matches; a fourth segment is a C#-only patch.
-$baseline = Get-Content -LiteralPath (Join-Path $repo 'compatibility/baseline.lock.json') -Raw | ConvertFrom-Json
+$baseline = Get-Content -LiteralPath (Join-Path $repo 'compatibility/target.lock.json') -Raw | ConvertFrom-Json
 $piVersion = ($versionPrefix.Split('.')[0..2]) -join '.'
 if ('v' + $piVersion -cne $baseline.source.tag) {
     throw "Version $Version does not match the pinned Pi baseline $($baseline.source.tag)."

@@ -186,6 +186,14 @@ internal static class RpcCommandCodec
                 throw new RpcCommandException(id, name, "Invalid session branch selection.");
             return new(id, name, Message: path, Mode: root || leaf is not null ? "selected" : "latest", Since: leaf);
         }
+        if (name == "bash")
+        {
+            var shellCommand = Required("command", options.MaximumPromptCharacters);
+            if (!body.TryGetProperty("excludeFromContext", out var excluded)) return new(id, name, Message: shellCommand);
+            if (excluded.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                throw new RpcCommandException(id, name, "Command excludeFromContext must be a boolean when present.");
+            return new(id, name, Message: shellCommand, Mode: excluded.GetBoolean() ? "exclude" : "include");
+        }
         if (name == "set_session_name") return new(id, name, Message: Required("name", Math.Min(options.MaximumPromptCharacters, 65_536)));
         if (name == "set_model")
         {

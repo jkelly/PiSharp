@@ -34,13 +34,14 @@ internal static class VertexSimpleTests
     }
     private static async Task<StreamTerminalEvent> Drain(IChatTransport transport,ChatRequest request,CancellationToken token=default)
     {StreamTerminalEvent? terminal=null;await foreach(var frame in transport.StreamAsync(request,token))if(frame is StreamTerminalEvent end)terminal=end;return terminal??throw new InvalidOperationException("Terminal missing.");}
+    // Pi 1.1.0 estimate.ts: "test" is ceil(4 / 3.5) = 2 tokens, so 10000 - 2 - 4096 = 5902 output tokens (5903 at four).
     internal static Task Resolution()
     {
         using var handler=new Handler();using var client=new HttpClient(handler,false);
         foreach(var (id,level,budget) in new[]{("gemini-2.5-pro","high",32768d),("gemini-2.5-flash-lite","minimal",128d),("other","low",-1d)})
         {
             var model=Model(id);var transport=new GoogleVertexSimpleTransport(client,model,Options(level,id));var resolution=transport.Resolve(Request(model));
-            Check(resolution.MaxTokens==5903&&resolution.Thinking.Enabled&&resolution.Thinking.BudgetTokens==budget);
+            Check(resolution.MaxTokens==5902&&resolution.Thinking.Enabled&&resolution.Thinking.BudgetTokens==budget);
         }
         var modern=Model("gemini-3-flash");var modernTransport=new GoogleVertexSimpleTransport(client,modern,Options("medium",modern.Id));
         Check(modernTransport.Resolve(Request(modern)).Thinking.Level=="MEDIUM");
@@ -56,7 +57,7 @@ internal static class VertexSimpleTests
         var transport=new GoogleVertexSimpleTransport(client,model,options);var result=await Drain(transport,Request(model));
         var capture=handler.Captures.Single();Check(capture.Address==Endpoint&&capture.Authorization=="Bearer SYNTHETIC_TOKEN");
         Check(result.Reason==StopReason.Stop&&result.Message.Api=="google-vertex"&&result.Message.Provider=="google-vertex");
-        var generation=capture.Body.Value.GetProperty("generationConfig");Check(generation.GetProperty("maxOutputTokens").GetInt32()==5903&&generation.GetProperty("thinkingConfig").GetProperty("thinkingBudget").GetInt32()==128);
+        var generation=capture.Body.Value.GetProperty("generationConfig");Check(generation.GetProperty("maxOutputTokens").GetInt32()==5902&&generation.GetProperty("thinkingConfig").GetProperty("thinkingBudget").GetInt32()==128);
         Check(!handler.Disposed);
     }
     internal static async Task Admission()

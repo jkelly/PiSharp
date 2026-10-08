@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (agent_settled).
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Agent;
@@ -174,7 +175,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         ToolInvoker? exportHtmlWriter = null, PiSharp.CodingAgent.Export.SessionHtmlRenderer? htmlRenderer = null,
         Func<SessionTreeNavigationReceipt, string?, ValueTask>? selectedTreePublisher = null,
         Func<PersistentAgentSession, Task>? postInputSettlement = null,
-        Func<PersistentAgentSession, Task>? postRunSettlement = null)
+        Func<PersistentAgentSession, Task>? postRunSettlement = null,
+        PiSharp.CodingAgent.Execution.IUserBashExecutor? userBash = null)
     {
         ArgumentNullException.ThrowIfNull(session); ArgumentNullException.ThrowIfNull(output); ArgumentNullException.ThrowIfNull(clock);
         if (selectedTreePublisher is not null && selectedTreePublisher.GetInvocationList().Length != 1)
@@ -205,6 +207,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         if (session.Snapshot.Agent.IsRunning || session.Snapshot.IsProcessingOperation || session.Snapshot.IsConfiguring || session.Snapshot.IsAdmittingInput || session.Snapshot.IsEditingContext || session.Snapshot.IsCompacting ||
             session.Snapshot.IsDisposed || session.Snapshot.Fault is not null)
             throw new ArgumentException("RPC requires an available idle session under exclusive host ownership.", nameof(session));
+        _userBash = userBash; TryConfigureUserBash(session, required: true);
         _events = new(_options); _publishedQueue = session.GetPendingInputQueueSnapshot();
         _stopInputToken = _stopInput.Token;
         // Ownership transfers only after successful construction; subscription precedes all command acceptance.
@@ -226,6 +229,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             try
             {
                 CheckOpen();
+                TryConfigureUserBash(replacement.Current.Session, required: false);
                 var subscription = replacement.Current.Session.Subscribe(new EventSink(this));
                 IDisposable operationSubscription;
                 try { operationSubscription = replacement.Current.Session.SubscribeOperationEvents(new OperationSink(this)); }
@@ -653,6 +657,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 break;
             }
             case "get_last_assistant_text": data = LastAssistantText(); break;
+            case "bash": case "abort_bash": data = await UserBashAsync(command, token).ConfigureAwait(false); break;
             default:
                 await WriteAsync(RpcCommandCodec.Error(command.Id, command.Type, RpcCommandCodec.IsKnown(command.Type)
                     ? "Command requires unfinished native RPC/session workflow support: " + command.Type
@@ -1011,8 +1016,9 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 finally { _transitions.Release(); _inputCommands.Release(); ready?.TrySetResult(); }
             }
             await PublishQueueAsync(force: false).ConfigureAwait(false);
-            bool fatal; lock (_gate) fatal = _fatal is not null;
-            if (!fatal) await WriteAsync(RpcCommandCodec.Event("agent_settled", null, _options)).ConfigureAwait(false);
+            bool fatal, aborted; lock (_gate) { fatal = _fatal is not null; aborted = run.AbortRequested; }
+            // aborted reports whether this session-level run ended because an abort was requested while it ran.
+            if (!fatal) await WriteAsync(RpcCommandCodec.Event("agent_settled", writer => writer.WriteBoolean("aborted", aborted), _options)).ConfigureAwait(false);
         }
         catch (Exception error) { SignalFatal(error is RpcDispatchException dispatch ? dispatch.Failure : RpcDispatchFailure.SessionRunFailed, error); }
         finally

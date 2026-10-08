@@ -1,4 +1,4 @@
-// Pi d86654abb8862e201933517d6f1fce9f88dd117f (MIT): utils/estimate.ts and utils/text.ts.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/estimate.ts and packages/ai/src/utils/text.ts.
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Contracts;
@@ -8,6 +8,8 @@ namespace PiSharp.AI.Protocols.GoogleGenerativeAI;
 
 internal static class GoogleSimpleContextEstimator
 {
+    // Pi 1.1.0 estimate.ts CHARS_PER_TOKEN; session compaction keeps its own four-character estimate.
+    internal const double CharsPerToken = 3.5;
     internal static GoogleContextUsageEstimate Estimate(ImmutableArray<TranscriptEntry> messages, GoogleSimpleOptions options)
     {
         if (messages.Length > options.MaximumContextMessages) throw GoogleData.Fail(GoogleFailure.ResourceLimit);
@@ -65,7 +67,7 @@ internal static class GoogleSimpleContextEstimator
             var characters = 0d;
             foreach (var block in content.EnumerateArray()) characters += GoogleData.String(block, "type") switch
             { "text" => block.GetProperty("text").GetString()!.Length, "image" => 4800, _ => throw GoogleData.Fail(GoogleFailure.UnsupportedValue) };
-            return Math.Ceiling(characters / 4);
+            return Math.Ceiling(characters / CharsPerToken);
         }
         if (role != "assistant") throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         var assistantCharacters = 0d;
@@ -76,13 +78,13 @@ internal static class GoogleSimpleContextEstimator
             "toolCall" => block.GetProperty("name").GetString()!.Length + JsonText(block.GetProperty("arguments"), options).Length,
             _ => throw GoogleData.Fail(GoogleFailure.UnsupportedValue)
         };
-        return Math.Ceiling(assistantCharacters / 4);
+        return Math.Ceiling(assistantCharacters / CharsPerToken);
     }
     private static string JsonText(JsonElement value, GoogleSimpleOptions options) => EcmaScriptJsonProjection.Project(JsonData.FromElement(value), new(
         MaximumInputCharacters: options.MaximumContextCharacters, MaximumInputBytes: options.MaximumContextCharacters * 4,
         MaximumOutputCharacters: options.MaximumContextCharacters, MaximumOutputBytes: options.MaximumContextCharacters * 4,
         MaximumDepth: 64, MaximumStringCharacters: options.MaximumContextCharacters));
-    private static double TextTokens(string text) => Math.Ceiling(text.Length / 4d);
+    private static double TextTokens(string text) => Math.Ceiling(text.Length / CharsPerToken);
     internal static double Number(JsonElement value, string name)
     {
         if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty(name, out var field) || field.ValueKind != JsonValueKind.Number ||

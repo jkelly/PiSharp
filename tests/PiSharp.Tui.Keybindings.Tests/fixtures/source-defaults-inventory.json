@@ -1,11 +1,11 @@
 {
   "kind": "STATIC SOURCE INVENTORY; NOT EXECUTED SOURCE OR GOLDEN CAPTURE",
-  "upstream": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "upstream": "abe508e1b89912adde45528136c3221eb69acdd7",
   "source": {
     "relative": "packages/tui/src/keybindings.ts",
     "path": "P:\\PiSharp\\root\\Documents\\Codex\\2026-10-02\\task-4\\PiSharp-terminal-grapheme-editor-work\\artifacts\\editor-reference-r2\\upstream\\packages\\tui\\src\\keybindings.ts",
-    "bytes": 10125,
-    "sha256": "eea5e3fe258ad50337595bb5320955a6d97bac0c8f6c0a838f988d75079bcf38"
+    "bytes": 10110,
+    "sha256": "475760dd4e3d02eca46bb5ee8704cd387c397b40d7a1f8967bdac3c481f5f702"
   },
   "definitions": [
     {
@@ -66,7 +66,6 @@
       "id": "tui.editor.cursorLineStart",
       "defaultKeys": [
         "home",
-        "ctrl+home",
         "ctrl+a"
       ],
       "description": "Move to line start"
@@ -75,7 +74,6 @@
       "id": "tui.editor.cursorLineEnd",
       "defaultKeys": [
         "end",
-        "ctrl+end",
         "ctrl+e"
       ],
       "description": "Move to line end"
@@ -290,12 +288,12 @@
     },
     {
       "id": "tui.altScreen.top",
-      "defaultKeys": "home",
+      "defaultKeys": "ctrl+home",
       "description": "Scroll viewport to top"
     },
     {
       "id": "tui.altScreen.bottom",
-      "defaultKeys": "end",
+      "defaultKeys": "ctrl+end",
       "description": "Scroll viewport to bottom"
     }
   ]

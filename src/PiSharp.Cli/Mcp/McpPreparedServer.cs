@@ -211,8 +211,19 @@ public sealed class McpPreparedServer : IAsyncDisposable
                 await transaction.PrepareAndPublishCatalogAsync(Prepare).ConfigureAwait(false);
             }
             else
-                await owner.PrepareAndPublishToolCatalogAsync(attachment,
-                    (expected, cancellation) => Prepare(expected, attachment.Session.GetActiveTools(), cancellation), token).ConfigureAwait(false);
+                for (var attempt = 1; ; attempt++)
+                {
+                    try
+                    {
+                        await owner.PrepareAndPublishToolCatalogAsync(attachment,
+                            (expected, cancellation) => Prepare(expected, attachment.Session.GetActiveTools(), cancellation), token).ConfigureAwait(false);
+                        break;
+                    }
+                    // A run (or another catalog change) can start between the idle wait and the publication; nothing was
+                    // committed, so the catalog is published at the next idle boundary instead, as the original applies it.
+                    catch (InvalidOperationException) when (attempt < 64 && !token.IsCancellationRequested &&
+                        !attachment.LifetimeToken.IsCancellationRequested && ReferenceEquals(owner.Current, attachment)) { }
+                }
             return new(publication.Current.Generation, publication.Current.Revision, true);
         }
         catch (Exception error) { publicationFailure ??= error; throw; }

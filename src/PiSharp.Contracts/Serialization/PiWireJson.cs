@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/types.ts.
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -11,12 +12,17 @@ public static partial class PiWireJson
     {
         JsonData.Validate(value);
         RequireString(value, "role", "assistant");
+        // Only a whole nonnegative duration is typed; any other legacy value stays an opaque extra field.
+        long? duration = value.TryGetProperty("durationMs", out var measured) && measured.ValueKind == JsonValueKind.Number &&
+            measured.TryGetInt64(out var milliseconds) && milliseconds >= 0 ? milliseconds : null;
+        string[] known = ["role", "api", "provider", "model", "timestamp", "content", "usage", "stopReason"];
         return new(
             String(value, "api"), String(value, "provider"), String(value, "model"),
             value.GetProperty("timestamp").GetInt64(),
             value.GetProperty("content").EnumerateArray().Select(ReadContent).ToImmutableArray(),
             ReadUsage(value.GetProperty("usage")), ReadStopReason(String(value, "stopReason")),
-            JsonFields.FromObjectExcept(value, "role", "api", "provider", "model", "timestamp", "content", "usage", "stopReason"));
+            JsonFields.FromObjectExcept(value, duration is null ? known : [.. known, "durationMs"]))
+        { DurationMs = duration };
     }
 
     public static AssistantContent ReadContent(JsonElement value)
@@ -169,6 +175,8 @@ public static partial class PiWireJson
             }
         }
         usage["cost"] = cost; node["usage"] = usage;
+        // The source assigns the duration to the finished message, after its other fields.
+        if (message.DurationMs is { } duration) node["durationMs"] = duration;
         return node;
     }
 

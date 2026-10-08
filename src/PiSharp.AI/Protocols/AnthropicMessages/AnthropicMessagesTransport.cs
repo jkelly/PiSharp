@@ -1,3 +1,5 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/anthropic-messages.ts (stream event mapping,
+// providerThinkingLevel and the anthropic_input_transformations diagnostic).
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -6,7 +8,8 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.AnthropicMessages;
 
-public sealed record AnthropicTokenRates(decimal Input = 0, decimal Output = 0, decimal CacheRead = 0, decimal CacheWrite = 0);
+public sealed record AnthropicTokenRates(decimal Input = 0, decimal Output = 0, decimal CacheRead = 0, decimal CacheWrite = 0)
+{ public ImmutableArray<TokenRateTier> Tiers { get; init; } = []; }
 public sealed record AnthropicFallbackModel(string Provider, string Model, AnthropicTokenRates Rates);
 public sealed record AnthropicMessagesOptions(int MaximumEvents = 4096, int MaximumEventCharacters = 65_536,
     int MaximumInputCharacters = 1_048_576, int MaximumContentSlots = 64, int MaximumContentCharacters = 1_048_576,
@@ -15,6 +18,8 @@ public sealed record AnthropicMessagesOptions(int MaximumEvents = 4096, int Maxi
     int MaximumToolDeclarations = 1024, int MaximumActiveTools = 128)
 {
     public bool CaptureSourceEmissionSnapshots { get; init; }
+    /// <summary>Exact native effort recorded on every message of a managed (compat.supportsMidConvoEffort) request; null when unmanaged.</summary>
+    public string? ProviderThinkingLevel { get; init; }
 }
 public enum AnthropicMessagesFailure { SourceFailed, MalformedStream, UnexpectedEof, ResourceLimit, ProviderError, Cancelled, CleanupFailed }
 
@@ -30,6 +35,8 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         if (_options.MaximumEvents <= 0 || _options.MaximumEventCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
             _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 || _options.MaximumSignatureCharacters <= 0 ||
             _options.MaximumJsonDepth is < 1 or > 64 || _options.MaximumToolDeclarations <= 0 || _options.MaximumActiveTools <= 0) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic stream limits.");
+        if (_options.ProviderThinkingLevel is not (null or "low" or "medium" or "high" or "xhigh" or "max"))
+            throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic provider thinking level.");
         ValidateRates(_options.Rates ?? new());
         if (!_options.AllowedFallbackModels.IsDefaultOrEmpty)
         {
@@ -47,7 +54,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
     }
     private static void ValidateRates(AnthropicTokenRates rates)
     {
-        if (rates.Input < 0 || rates.Output < 0 || rates.CacheRead < 0 || rates.CacheWrite < 0)
+        if (rates.Input < 0 || rates.Output < 0 || rates.CacheRead < 0 || rates.CacheWrite < 0 || !PromptLengthPricing.Valid(rates.Tiers))
             throw new ArgumentOutOfRangeException(nameof(rates), "Anthropic token rates must be nonnegative.");
     }
     private static void ValidateIdentity(string value)
@@ -133,6 +140,8 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         private readonly HashSet<int> _fallbackIndices = [];
         private readonly HashSet<int> _endedFallbackIndices = [];
         private JsonFields _properties = JsonFields.Empty;
+        private JsonElement _transformations;
+        private readonly long _timestamp;
         private TokenUsage _usage = TokenUsage.Zero;
         private long _cacheWrite1h;
         private long? _reasoning;
@@ -151,7 +160,10 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             Unicode(request.Model.Id); Unicode(request.Model.Provider);
             _options = options; _rates = options.Rates ?? new();
             _currentToolNames = options.OAuthToolNames ? CurrentTools(request, options) : [];
-            Start = new(new(request.Model.Api, request.Model.Provider, request.Model.Id, request.Timestamp, [], TokenUsage.Zero, StopReason.Pending));
+            if (options.ProviderThinkingLevel is { } level) _properties = _properties.Set("providerThinkingLevel", TextData(level));
+            _timestamp = request.Timestamp;
+            Start = new(new(request.Model.Api, request.Model.Provider, request.Model.Id, request.Timestamp, [], TokenUsage.Zero, StopReason.Pending,
+                options.ProviderThinkingLevel is null ? null : _properties));
             _reducer = new(Start.Partial, new(options.MaximumContentSlots, options.MaximumContentCharacters)); _reducer.Apply(Start);
         }
         private string ResponseToolName(string wireName)
@@ -339,6 +351,20 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                         slot.Properties.Set("thinkingSignature", TextData(slot.Signature.ToString())));
             var reason = failure is null ? _reason : failure == AnthropicMessagesFailure.Cancelled ? StopReason.Aborted : StopReason.Error;
             var properties = _properties;
+            // Diagnostics are appended only to a completed response, as upstream does after its error checks; the timestamp is the request's.
+            if (failure is null && _transformations.ValueKind == JsonValueKind.Array && _transformations.GetArrayLength() > 0)
+            {
+                var transformations = new System.Text.Json.Nodes.JsonArray();
+                foreach (var item in _transformations.EnumerateArray())
+                {
+                    var projected = new System.Text.Json.Nodes.JsonObject();
+                    foreach (var name in new[] { "type", "path", "reason" }) if (OptionalString(item, name) is { } text) projected[name] = text;
+                    transformations.Add(projected);
+                }
+                var diagnostics = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["type"] = "anthropic_input_transformations",
+                    ["timestamp"] = _timestamp, ["details"] = new System.Text.Json.Nodes.JsonObject { ["transformations"] = transformations } });
+                properties = properties.Set("diagnostics", JsonData.Parse(diagnostics.ToJsonString()));
+            }
             if (failure is not null) properties = properties.Set("errorMessage", TextData(failure == AnthropicMessagesFailure.Cancelled
                 ? "Anthropic stream was cancelled." : failure == AnthropicMessagesFailure.ProviderError && _reason == StopReason.Error && _stopErrorMessage is not null
                     ? _stopErrorMessage : "Anthropic stream did not complete."))
@@ -361,9 +387,11 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 _reasoning = Number(thinking);
             if (_cacheWrite1h > write || _reasoning > output) throw Protocol();
             var total = checked(input + output + read + write);
-            var costInput = checked(_rates.Input / 1_000_000m * input); var costOutput = checked(_rates.Output / 1_000_000m * output);
-            var costRead = checked(_rates.CacheRead / 1_000_000m * read);
-            var costWrite = checked((_rates.CacheWrite * (write - _cacheWrite1h) + _rates.Input * 2 * _cacheWrite1h) / 1_000_000m);
+            // Pi abe508 models.ts calculateCost: prompt-length tiers price the whole request, 1h writes at 2x the tier input.
+            var rates = PromptLengthPricing.Select(_rates.Input, _rates.Output, _rates.CacheRead, _rates.CacheWrite, _rates.Tiers, input, read, write);
+            var costInput = checked(rates.Input / 1_000_000m * input); var costOutput = checked(rates.Output / 1_000_000m * output);
+            var costRead = checked(rates.CacheRead / 1_000_000m * read);
+            var costWrite = checked((rates.CacheWrite * (write - _cacheWrite1h) + rates.Input * 2 * _cacheWrite1h) / 1_000_000m);
             var extras = JsonFields.Empty.Set("cacheWrite1h", JsonData.Parse(_cacheWrite1h.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             if (_reasoning is { } tokens) extras = extras.Set("reasoning", JsonData.Parse(tokens.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             _usage = new(input, output, read, write, total, new(costInput, costOutput, costRead, costWrite,
@@ -372,8 +400,11 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         private void Transformations(JsonElement value)
         {
             if (!value.TryGetProperty("input_transformations", out var transformations) || transformations.ValueKind == JsonValueKind.Null) return;
-            if (transformations.ValueKind != JsonValueKind.Array || transformations.GetArrayLength() != 0) throw Protocol();
-            // Authored diagnostic timestamps/provider-specific binding replay are not synthesized.
+            if (transformations.ValueKind != JsonValueKind.Array) throw Protocol();
+            if (transformations.GetArrayLength() > _options.MaximumContentSlots) throw Limit();
+            // The last array seen (message_start, then message_delta) is reported; entries carry optional string type/path/reason.
+            foreach (var item in transformations.EnumerateArray()) { Object(item); foreach (var name in new[] { "type", "path", "reason" }) _ = OptionalString(item, name); }
+            _transformations = transformations.Clone();
         }
         private void RequireMessage() { if (!_messageStarted) throw Protocol(); }
         private Slot Active(int index) => _slots.TryGetValue(index, out var slot) && !slot.Ended ? slot : throw Protocol();

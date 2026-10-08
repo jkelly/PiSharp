@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/system-prompt.ts and packages/coding-agent/src/core/skills.ts:formatSkillsForPrompt.
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -17,7 +18,7 @@ internal static class OriginalSystemPromptBuilder
         static ImmutableArray<T> Copy<T>(ImmutableArray<T> values) => values.IsDefault ? [] : values.ToArray().ToImmutableArray();
         var frozen = input with
         {
-            SelectedTools = Copy(selected), ToolSnippets = Copy(input.ToolSnippets),
+            SelectedTools = Copy(selected), HiddenTools = Copy(input.HiddenTools), ToolSnippets = Copy(input.ToolSnippets),
             ToolGuidelines = Copy(input.ToolGuidelines).Select(row => KeyValuePair.Create(row.Key, Copy(row.Value))).ToImmutableArray(),
             PromptGuidelines = Copy(input.PromptGuidelines), Sections = Copy(input.Sections),
             ContextFiles = Copy(input.ContextFiles).Select(row => row with { }).ToImmutableArray(),
@@ -33,7 +34,7 @@ internal static class OriginalSystemPromptBuilder
         foreach (var row in frozen.Sections)
             if (!SectionName.IsMatch(row.Key) || row.Key == "preamble" || row.Value is null)
                 throw new ArgumentException("Invalid system prompt section name or content.");
-        if (frozen.AppendSystemPrompt is null || frozen.PromptGuidelines.Any(value => value is null) ||
+        if (frozen.AppendSystemPrompt is null || frozen.PromptGuidelines.Any(value => value is null) || frozen.HiddenTools.Any(value => value is null) ||
             frozen.ToolSnippets.Any(row => row.Value is null) || frozen.ToolGuidelines.Any(row => row.Value.Any(value => value is null)) ||
             frozen.ContextFiles.Any(row => row.Path is null || row.Content is null) ||
             frozen.Skills.Any(row => row.Name is null || row.Description is null || row.FilePath is null || row.BaseDir is null))
@@ -43,12 +44,24 @@ internal static class OriginalSystemPromptBuilder
         return new(frozen, cwd, Copy(selected), literal);
     }
 
+    /// <summary>A prompt-start contribution, like a before_agent_start handler editing `systemPromptOptions.sections`:
+    /// sets section <paramref name="name"/> to <paramref name="content"/> (in place when present, else last), or deletes it when null.</summary>
+    internal static OriginalSystemPromptSnapshot WithSection(OriginalSystemPromptSnapshot snapshot, string name, string? content)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (name is null || !SectionName.IsMatch(name) || name == "preamble") throw new ArgumentException("Invalid system prompt section name.", nameof(name));
+        var sections = snapshot.Input.Sections; var index = sections.Select(row => row.Key).ToList().IndexOf(name);
+        var next = content is null ? index < 0 ? sections : sections.RemoveAt(index)
+            : index < 0 ? sections.Add(KeyValuePair.Create(name, content)) : sections.SetItem(index, KeyValuePair.Create(name, content));
+        return next == sections ? snapshot : snapshot with { Input = snapshot.Input with { Sections = next } };
+    }
+
     internal static JsonData Options(OriginalSystemPromptSnapshot snapshot)
     {
         var input = snapshot.Input;
         var values = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["selectedTools"] = snapshot.SelectedTools, ["toolSnippets"] = input.ToolSnippets.ToDictionary(row => row.Key, row => row.Value),
+            ["selectedTools"] = snapshot.SelectedTools, ["hiddenTools"] = input.HiddenTools, ["toolSnippets"] = input.ToolSnippets.ToDictionary(row => row.Key, row => row.Value),
             ["toolGuidelines"] = input.ToolGuidelines.ToDictionary(row => row.Key, row => row.Value),
             ["promptGuidelines"] = input.PromptGuidelines, ["appendSystemPrompt"] = input.AppendSystemPrompt,
             ["sections"] = input.Sections.ToDictionary(row => row.Key, row => row.Value), ["cwd"] = snapshot.Cwd,
@@ -69,32 +82,37 @@ internal static class OriginalSystemPromptBuilder
             var index = sections.FindIndex(row => row.Key == name);
             if (index < 0) sections.Add(KeyValuePair.Create(name, value)); else sections[index] = KeyValuePair.Create(name, value);
         }
+        // Hidden tools are reachable only through another tool: the tool list and rules match the request's declarations.
+        var declared = snapshot.SelectedTools.Where(name => !input.HiddenTools.Contains(name, StringComparer.Ordinal)).ToArray();
         if (!string.IsNullOrEmpty(input.CustomPrompt)) Put("preamble", input.CustomPrompt);
         else
         {
             Put("preamble", "You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.");
             var snippets = input.ToolSnippets.ToDictionary(row => row.Key, row => row.Value, StringComparer.Ordinal);
-            var visible = snapshot.SelectedTools.Where(name => snippets.TryGetValue(name, out var text) && text.Length != 0).ToArray();
+            var visible = declared.Where(name => snippets.TryGetValue(name, out var text) && text.Length != 0).ToArray();
             Put("tools", (visible.Length == 0 ? "(none)" : string.Join("\n", visible.Select(name => $"- {name}: {snippets[name]}"))) +
                 "\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.");
             var rules = new List<string>(); var seen = new HashSet<string>(StringComparer.Ordinal);
             void Rule(string value) { var trimmed = value.Trim(); if (trimmed.Length != 0 && seen.Add(trimmed)) rules.Add(trimmed); }
-            var bash = snapshot.SelectedTools.Contains("bash"); var ps = snapshot.SelectedTools.Contains("powershell");
-            if ((bash || ps) && !snapshot.SelectedTools.Any(name => name is "grep" or "find" or "ls"))
+            var bash = declared.Contains("bash"); var ps = declared.Contains("powershell");
+            if ((bash || ps) && !declared.Any(name => name is "grep" or "find" or "ls"))
                 Rule(bash && ps ? "Use bash or PowerShell for file operations like listing, searching, and finding files" :
                     ps ? "Use PowerShell for file operations like listing, searching, and finding files" : "Use bash for file operations like ls, rg, find");
             var guidelines = input.ToolGuidelines.ToDictionary(row => row.Key, row => row.Value, StringComparer.Ordinal);
-            foreach (var name in snapshot.SelectedTools) if (guidelines.TryGetValue(name, out var list)) foreach (var rule in list) Rule(rule);
+            foreach (var name in declared) if (guidelines.TryGetValue(name, out var list)) foreach (var rule in list) Rule(rule);
             foreach (var rule in input.PromptGuidelines) Rule(rule);
             Rule("Be concise in your responses"); Rule("Show file paths clearly when working with files");
             Put("rules", string.Join("\n", rules.Select(value => "- " + value)));
             var docs = input.Documentation ?? throw new InvalidOperationException("Admitted documentation paths absent.");
-            Put("docs", $"Pi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: {docs.Readme}\n- Additional docs: {docs.Docs}\n- Examples: {docs.Examples} (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)");
+            Put("docs", $"Pi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\n- Main documentation: {docs.Readme}\n- Additional docs: {docs.Docs}\n- Examples: {docs.Examples} (extensions, custom tools, SDK)\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)");
         }
         if (input.AppendSystemPrompt.Length != 0) Put("addendum", input.AppendSystemPrompt);
         if (input.ContextFiles.Length != 0) Put("project_context", "Project-specific instructions and guidelines:\n\n" +
             string.Join("\n\n", input.ContextFiles.Select(row => $"<project_instructions path=\"{row.Path}\">\n{row.Content}\n</project_instructions>")));
-        var read = new[] { "read", "bash" }.FirstOrDefault(name => snapshot.SelectedTools.Contains(name));
+        // A hidden reader is still reachable through another tool, so skills stay but the hint names no tool.
+        string[] readers = ["read", "bash"];
+        var read = readers.FirstOrDefault(name => declared.Contains(name)) ??
+            (readers.Any(name => snapshot.SelectedTools.Contains(name)) ? "indirect" : null);
         if (read is not null)
         {
             var skills = FormatSkills(input.Skills, read).Trim(); if (skills.Length != 0) Put("skills", skills);
@@ -111,8 +129,9 @@ internal static class OriginalSystemPromptBuilder
         var lines = new List<string>
         {
             "The following skills provide specialized instructions for specific tasks.",
-            read == "bash" ? "Use bash to load a skill's file when the task matches its description." :
-                "Use the read tool to load a skill's file when the task matches its description.",
+            read == "read" ? "Use the read tool to load a skill's file when the task matches its description." :
+                read == "bash" ? "Use bash to load a skill's file when the task matches its description." :
+                "Load a skill's file when the task matches its description.",
             "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.",
             "", "<available_skills>"
         };

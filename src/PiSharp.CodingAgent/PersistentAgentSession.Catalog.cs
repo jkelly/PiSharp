@@ -26,9 +26,15 @@ public sealed partial class PersistentAgentSession
         CancellationToken cancellationToken = default)
         => AdmitToolCatalogPublication(expected, replacement, activeNames, publishPreparedRegistry, cancellationToken, null);
 
+    /// <summary>A catalog replacement that keeps the previously active names pending, as a source reload does.</summary>
+    internal Task<SessionToolCatalogReceipt> PublishRestoringToolCatalogAsync(SessionRuntimeRegistry expected,
+        SessionRuntimeRegistry replacement, ImmutableArray<string> activeNames, Action publishPreparedRegistry,
+        CancellationToken cancellationToken = default)
+        => AdmitToolCatalogPublication(expected, replacement, activeNames, publishPreparedRegistry, cancellationToken, null, restorePrevious: true);
+
     private Task<SessionToolCatalogReceipt> AdmitToolCatalogPublication(SessionRuntimeRegistry expected,
         SessionRuntimeRegistry replacement, ImmutableArray<string> activeNames, Action publishPreparedRegistry,
-        CancellationToken cancellationToken, ReplacementReservation? reservation)
+        CancellationToken cancellationToken, ReplacementReservation? reservation, bool restorePrevious = false)
     {
         ArgumentNullException.ThrowIfNull(expected); ArgumentNullException.ThrowIfNull(replacement);
         ArgumentNullException.ThrowIfNull(publishPreparedRegistry);
@@ -51,12 +57,13 @@ public sealed partial class PersistentAgentSession
                 throw new InvalidOperationException("Catalog publication cannot replace queued input declarations.");
             idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle; _configuring = true;
         }
-        return PublishToolCatalogCoreAsync(expected, replacement, activeNames, publishPreparedRegistry, cancellationToken, idle);
+        // Owned retirement publications (reload, resource withdrawal) keep the previous active names pending.
+        return PublishToolCatalogCoreAsync(expected, replacement, activeNames, publishPreparedRegistry, cancellationToken, idle, restorePrevious || reservation is not null);
     }
 
     private async Task<SessionToolCatalogReceipt> PublishToolCatalogCoreAsync(SessionRuntimeRegistry expected,
         SessionRuntimeRegistry replacement, ImmutableArray<string> activeNames, Action publishPreparedRegistry,
-        CancellationToken token, TaskCompletionSource idle)
+        CancellationToken token, TaskCompletionSource idle, bool restorePrevious)
     {
         var writeAdmitted = false; var commitHeld = false;
         var prior = _configurationCallback.Value; _configurationCallback.Value = idle;
@@ -66,13 +73,16 @@ public sealed partial class PersistentAgentSession
             var work = cancellation.Token;
             await _commits.WaitAsync(work).ConfigureAwait(false); commitHeld = true;
             SessionContextProjection context; SessionLogStoreSnapshot log; AgentConfiguration configuration; long nextActivation;
+            ImmutableArray<string> requested, pendingCandidates;
             lock (_gate)
             {
                 if (!ReferenceEquals(_registry, expected)) throw new InvalidOperationException("Captured registry changed.");
                 context = _context; log = _acknowledgedLog; configuration = _configuration;
                 nextActivation = checked(_activationEpoch + 1);
+                // Source _refreshToolRegistry: pending tools that are registered now become active.
+                (requested, pendingCandidates) = PendingToolRequestLocked(replacement, activeNames, restorePrevious);
             }
-            var selected = replacement.NormalizeActiveTools(activeNames, work);
+            var selected = replacement.NormalizeActiveTools(requested, work);
             // Always replace declarations, including a changed schema under an unchanged name.
             var byName = replacement.RegisteredTools.ToDictionary(tool => tool.Adapter.Name, StringComparer.Ordinal);
             var message = JsonData.Parse(JsonSerializer.Serialize(new { role = "system", content = "", timestamp = _clock(),
@@ -97,6 +107,7 @@ public sealed partial class PersistentAgentSession
                 _registry = replacement; _configuration = selection.Configuration;
                 _acknowledgedLog = acknowledged.Snapshot; _context = prospective;
                 _activationEpoch = nextActivation; _pendingActivation = null;
+                RetirePendingToolsLocked(pendingCandidates, selected);
             }
             return new(Snapshot with { IsConfiguring = false }, replacement);
         }

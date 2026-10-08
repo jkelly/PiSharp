@@ -1,10 +1,12 @@
 # Third-party notices
 
-The CLI's embedded Models/openai.json, openrouter.json and anthropic.json are byte-for-byte provider catalog shards from the already admitted Pi AI 0.99.1 package (SHA256 f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3). The Pi MIT notice below applies. Their provenance and individual hashes are recorded in docs/contracts/native-live-terminal-composition.md; catalog metadata is separate from live provider qualification.
+The CLI's embedded Models/openai.json, openrouter.json, anthropic.json, mistral.json and azure.json are byte-for-byte provider catalog shards from the Pi AI 1.1.0 package `@earendil-works/pi-ai@1.1.0` (SHA256 6caab33cec57480ed02c57fe37428a030a77cc2a0662814b435a5cf8932ad829, npm integrity sha512-1T7LAkc/5Bvc0v6w4vAGVdCrli0o/E0pEmYKTnixu95vSFArBjvbhS/G4ZwI0RUePgf0Imcu0VyqlM4EcXxqfw==); they replace the earlier openai, openrouter and anthropic shards from the Pi AI 0.99.1 package (SHA256 f9f44692157d0bf5679c4a17304a310028231d7daaeaaea3b73252f4b7a264d3) and the earlier mistral.json copied from the v0.99.1 source catalog. The Pi MIT notice below applies. Their provenance and individual hashes are recorded in docs/contracts/native-live-terminal-composition.md; catalog metadata is separate from live provider qualification.
 
 The native parsed Anthropic Messages mapper substantially adapts public Pi `packages/ai/src/api/anthropic-messages.ts`, under the Pi MIT notice below. Authored offline DTO tests establish native behavior separately from genuine provider/SDK reference observations. No Anthropic SDK, Node runtime or network dependency is included in the native mapper.
 
 Native edit matching and replacement substantially adapt public Pi `packages/coding-agent/src/core/tools/edit.ts`, `edit-diff.ts` and `utils/text.ts`, under the Pi MIT notice below. The source hashes are `31a368c14cf5437ecac157765660001b16063302d9bd746303d6d1b1dcb5625d`, `f85a9809eb44b9828236050cf38a8e45933e5cfd583a186e9a0e55a664dd3e8d` and `bb323f9607c499115b532021f4f0163c6df04d834aee9c32c3c77b273bd2d7c6`. Its bounded native Myers formatter is an independently authored algorithm; exact upstream jsdiff formatting remains to be qualified. No Node dependency is bundled with the native edit adapter.
+
+PiSharp's current porting baseline is public Pi version 1.1.0, commit `abe508e1b89912adde45528136c3221eb69acdd7` (see `compatibility/target.lock.json`). The adaptation records in this file name the upstream version and source hashes each adaptation was derived from; a record is updated when its source is re-ported against the current baseline. Records for version 0.99.1 remain accurate for code that has not been re-ported.
 
 PiSharp contracts, assistant stream reduction, parsed Responses text/function mapping, transcript projection, bounded catalog/request construction, append-only loop continuation and tool-batch scheduling substantially adapt public Pi types and behavior from [earendil-works/pi](https://github.com/earendil-works/pi), version 0.99.1, commit `d86654abb8862e201933517d6f1fce9f88dd117f`. Relevant sources are `packages/ai/src/types.ts`, `packages/ai/src/utils/assistant-message-frame.ts`, `packages/ai/src/utils/event-stream.ts`, `packages/ai/src/api/{openai-responses,openai-responses-shared}.ts`, `packages/ai/src/api/transform-messages.ts`, `packages/ai/src/utils/{transcript,text,hash}.ts`, and `packages/agent/src/{agent-loop,types}.ts`. The Responses source SHA-256 is `85db12efcd109d505c98846e34c45cb4a3260edcee88ef28c8afd1db20eac26a`; additional projector source pins are retained in `tools/PiReferenceRunner/responses-replay-lock.json`. The development reference runner imports a separate unmodified public checkout. The following upstream notice is retained for copied or substantially adapted material.
 
@@ -96,6 +98,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Pi v1.1.0 sync adaptations
+
+Native Anthropic workload identity federation (`src/PiSharp.AI/Authentication/AnthropicWorkloadIdentityFederation.cs`) adapts the token exchange, token cache and bearer handling of the Anthropic TypeScript SDK, `@anthropic-ai/sdk` 0.129.0 (`src/lib/credentials/{oidc-federation,token-cache,types,identity-token}.ts` and the token-auth part of `client.ts`), which is distributed under the MIT License by Anthropic, PBC. No SDK code or package is bundled; the adaptation is a native reimplementation covered by authored offline tests.
+
+Native shell output sanitizing (`src/PiSharp.Tools/Processes/ShellAnsiText.cs`) adapts the patterns of `ansi-regex` and `strip-ansi`, MIT License, Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com), as used by Pi `packages/coding-agent/src/utils/ansi.ts`.
+
+Both MIT licenses grant the same permissions, under the same conditions, as the Pi MIT notice above.
 
 ## Anthropic SDK reviewed development oracle
 

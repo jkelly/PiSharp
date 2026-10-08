@@ -140,7 +140,8 @@ internal sealed class McpWindowsProcessLifetime : IAsyncDisposable
             env.Append('\0'); if (request.Environment.Count == 0) env.Append('\0');
             environment = Marshal.StringToHGlobalUni(env.ToString());
             var command = new StringBuilder(Quote(request.Executable));
-            foreach (var argument in request.Arguments) command.Append(' ').Append(Quote(argument));
+            if (request.VerbatimArguments is { } verbatim) command.Append(' ').Append(verbatim);
+            else foreach (var argument in request.Arguments) command.Append(' ').Append(Quote(argument));
             if (command.Length >= 32767) throw new IOException("Command exceeds launch limit.");
             // A bad executable must fail without a loader/error dialog holding the launch.
             // Change only this worker thread, preserving its existing flags and restoring

@@ -30,7 +30,7 @@ function Assert-PiSharpNativeSdkPackage {
     $provenance=Read-PiSharpArchiveText -Path $Package -Entry 'provenance.json'|ConvertFrom-Json -AsHashtable -NoEnumerate
     if($provenance.schemaVersion-ne1-or$provenance.kind-cne'native-sdk'-or$provenance.sourceCommit-cne$SourceCommit-or
        $provenance.version-cne$Version-or$provenance.sdk-cne'10.0.401'-or
-       $provenance.baselineCommit-cne'd86654abb8862e201933517d6f1fce9f88dd117f'){throw 'SDK provenance differs.'}
+       $provenance.baselineCommit-cne(Get-Content -LiteralPath (Join-Path $Repo 'compatibility/target.lock.json') -Raw|ConvertFrom-Json).source.commit){throw 'SDK provenance differs.'}
     $settings=[Xml.XmlReaderSettings]::new();$settings.DtdProcessing=[Xml.DtdProcessing]::Prohibit;$settings.XmlResolver=$null
     $reader=[Xml.XmlReader]::Create([IO.StringReader]::new((Read-PiSharpArchiveText -Path $Package -Entry ($PackageId+'.nuspec'))),$settings)
     $xml=[Xml.XmlDocument]::new();$xml.XmlResolver=$null

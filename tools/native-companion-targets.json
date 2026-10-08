@@ -1057,8 +1057,8 @@
         },
         {
           "path": "tests/PiSharp.Tui.Keybindings.Tests/fixtures/source-defaults-inventory.json",
-          "bytes": 7157,
-          "sha256": "6fab77390760f8e7a6712e87039dbac7bca5cf309cfa34734b367787072742cf"
+          "bytes": 7126,
+          "sha256": "63ab665be91813e5bc6cbed38fd360556297855b80e9756b4cba8ad0c5e9bc3c"
         },
         {
           "path": "tests/PiSharp.Tui.Keybindings.Tests/fixtures/authored-configuration-loading-cases.json",
@@ -1074,8 +1074,8 @@
         },
         {
           "relative": "fixtures/source-defaults-inventory.json",
-          "bytes": 7157,
-          "sha256": "6fab77390760f8e7a6712e87039dbac7bca5cf309cfa34734b367787072742cf"
+          "bytes": 7126,
+          "sha256": "63ab665be91813e5bc6cbed38fd360556297855b80e9756b4cba8ad0c5e9bc3c"
         },
         {
           "relative": "fixtures/authored-configuration-loading-cases.json",
@@ -1260,13 +1260,13 @@
         },
         {
           "path": "tests/PiSharp.GoogleGenerativeAI.Tests/google-retry-cases.json",
-          "bytes": 5528,
-          "sha256": "4138c16968d48ff55bd898174ee44fc93ac6284e9ae54cb6d10df072272f5a9d"
+          "bytes": 5656,
+          "sha256": "975c04a73a89866dff8f1a9f048d738c2cb9011a62a9d4df7cf6508d55d41247"
         },
         {
           "path": "tests/PiSharp.GoogleGenerativeAI.Tests/google-simple-cases.json",
-          "bytes": 12922,
-          "sha256": "75ac4772939743cf70bbf21ad7c651f67f017c0d2dcc7819e778c90ad20e83bf"
+          "bytes": 12921,
+          "sha256": "182b0950b8d78ea4d6275537ab18a1dd06a45dc2986ffd7b9412922a2286f43a"
         }
       ],
       "outputFixturePins": [
@@ -1297,13 +1297,13 @@
         },
         {
           "relative": "google-retry-cases.json",
-          "bytes": 5528,
-          "sha256": "4138c16968d48ff55bd898174ee44fc93ac6284e9ae54cb6d10df072272f5a9d"
+          "bytes": 5656,
+          "sha256": "975c04a73a89866dff8f1a9f048d738c2cb9011a62a9d4df7cf6508d55d41247"
         },
         {
           "relative": "google-simple-cases.json",
-          "bytes": 12922,
-          "sha256": "75ac4772939743cf70bbf21ad7c651f67f017c0d2dcc7819e778c90ad20e83bf"
+          "bytes": 12921,
+          "sha256": "182b0950b8d78ea4d6275537ab18a1dd06a45dc2986ffd7b9412922a2286f43a"
         }
       ],
       "reportName": "google-generative-ai.json",
@@ -1662,9 +1662,9 @@
       ],
       "fixturePins": [
         {
-          "sha256": "7ec09dfcf3a5e7d079143ce5ca9139990cfef7686fd7f536b34ddf85ec19ccc0",
+          "sha256": "6b86896531bb84a040584adf68bf676b83b6dc8b9e0055996c7696bbd6d104f4",
           "path": "tests/PiSharp.AzureResponses.Tests/source-inventory.json",
-          "bytes": 5179
+          "bytes": 5338
         }
       ],
       "outputFixturePins": [],
@@ -1698,9 +1698,9 @@
       ],
       "fixturePins": [
         {
-          "sha256": "b5253689591cc2bc2d95dbfe5c587b72f3aae3ae75ddd0c1b0679dbc12a91663",
+          "sha256": "03c8bcc30506bb106dfb1aa4aee2efb8d62383f5f65ac873f1a2d29f2f641510",
           "path": "src/PiSharp.AI/Protocols/MistralConversations/source-inventory.json",
-          "bytes": 7821
+          "bytes": 7822
         }
       ],
       "outputFixturePins": [],

@@ -169,8 +169,10 @@ public static class AdmittedOAuthOrchestrationControls
             Require(ReferenceEquals(raw.Original, verifierOriginal) && ReferenceEquals(raw.Direct, verifierFault), "Verifier original fault identity absent.");
         });
         var host = new Host { Client = null, Tokens = null, Discovery = new("https://offline.invalid/", JsonData.Parse("{\"client_id_metadata_document_supported\":true}"), null) };
-        await Exercise(host, Options with { ClientMetadataUrl = new("https://offline.invalid/client.json") },
-            (result, _, state) => Require(result?.Outcome == McpOAuthAuthorizationOutcome.Redirect && state.Client?.ClientId == "https://offline.invalid/client.json" && state.Registrations == 0 && state.Calls.IndexOf("save-client") < state.Calls.IndexOf("begin"), "Metadata shortcut registered or failed to persist."));
+        // Pi v1.1.0: a Client ID Metadata Document identifies the client without registration and is not stored
+        // (v0.99.1 saved the metadata URL as client information).
+        await Exercise(host, Options with { ClientMetadataDocument = metadata => new("https://offline.invalid/client.json", "http://127.0.0.1/callback") },
+            (result, _, state) => Require(result?.Outcome == McpOAuthAuthorizationOutcome.Redirect && state.Client is null && state.Registrations == 0 && !state.Calls.Contains("save-client") && state.Calls.Contains("begin"), "Metadata document registered or was persisted."));
         await Exercise(new Host { Client = null }, Options with { AuthorizationCode = "code" },
             (_, record, state) => Require(record.Task is { IsFaulted: true } && state.Registrations == 0 && !state.Calls.Contains("exchange-code"), "Missing-client code exchange had effects."));
     }

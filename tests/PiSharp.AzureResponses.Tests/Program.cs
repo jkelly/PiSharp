@@ -13,7 +13,8 @@ using NativeAgent = PiSharp.Agent.Agent;
 // Authored source-text expectations. No upstream execution or genuine source capture credit.
 internal static class Program
 {
-    private static readonly ModelDescriptor Model = new("catalog-model", "azure-openai-responses", "azure-openai-responses");
+    // Pi 1.0.3 renamed the provider id to "azure"; the api id stays "azure-openai-responses".
+    private static readonly ModelDescriptor Model = new("catalog-model", "azure-openai-responses", "azure");
     private const string Key = "inert-azure-fixture-key";
     private const string DefaultBody = """{"model":"catalog-model","input":[{"role":"user","content":[{"type":"input_text","text":"ask"}]}],"stream":true,"store":false}""";
     private const string Completed = """{"type":"response.completed","response":{"id":"response-azure","status":"completed","output":[],"usage":{"input_tokens":5,"output_tokens":3,"total_tokens":8}}}""";
@@ -34,6 +35,8 @@ internal static class Program
             ("azure.full-bodies-named-options-sampling-reasoning-session", Bodies),
             ("azure.headers-callback-replacement-owned-input-and-admission", HeadersAndAdmission),
             ("azure.same-identity-transcript-replay-and-openai-isolation", ReplayAndIsolation),
+            ("azure.renamed-provider-id-and-legacy-id-foreign-call-normalization", RenamedProvider),
+            ("azure.sampling-params-by-thinking-level-precedence", SamplingByThinkingLevel),
             ("azure.direct-fragmented-http-original-cleanup-barrier", () => Integration("direct")),
             ("azure.chat-http-original-cleanup-barrier", () => Integration("chat")),
             ("azure.agent-http-original-cleanup-barrier", () => Integration("agent")),
@@ -181,6 +184,53 @@ internal static class Program
         var openAiFactory = new ResponsesKeyAuthRequestFactory(new("https://openai.invalid/v1/responses"), openAiModel, new(false));
         using var native = openAiFactory.Create(Request() with { Model = openAiModel }, Key);
         Equal("Bearer", native.Headers.Authorization!.Scheme); Check(!native.Headers.Contains("api-key"), "Azure changed OpenAI auth.");
+        return Task.CompletedTask;
+    }
+
+    // Pi abe508e1 azure-openai-responses.ts: AZURE_TOOL_CALL_PROVIDERS names "azure". The api still serves a model that keeps the
+    // legacy provider id; upstream neither rejects nor maps it, it just stops pairing foreign Responses call ids for it.
+    private static Task RenamedProvider()
+    {
+        var foreign = new AssistantMessage("openai-responses", "openai", "foreign-model", 2,
+            [new ToolCallContent("call-prev|fc_prev", "inspect", JsonData.Parse("{\"x\":1}"))], TokenUsage.Zero, StopReason.ToolUse);
+        ChatRequest Replay(ModelDescriptor model) => new(model, [new("assistant", PiWireJson.WriteMessage(foreign)),
+            new("toolResult", JsonData.Parse("""{"role":"toolResult","toolCallId":"call-prev|fc_prev","toolName":"inspect","content":[{"type":"text","text":"done"}],"isError":false,"timestamp":3}"""))]);
+        string Body(string callId, string item = "") => """{"model":"catalog-model","input":[{"type":"function_call","call_id":"CALL","name":"inspect","arguments":"{\"x\":1}"ITEM},{"type":"function_call_output","call_id":"CALL","output":"done"}],"stream":true,"store":false}"""
+            .Replace("CALL", callId, StringComparison.Ordinal).Replace("ITEM", item, StringComparison.Ordinal);
+        // "azure" pairs the call id with a hashed foreign item id: "fc_" + shortHash("fc_prev") (buildForeignResponsesItemId).
+        BodyEqual(Body("call-prev", ",\"id\":\"fc_n1cvm3dhq11\""), Factory().ProjectPayload(Replay(Model)).ToString());
+        var legacy = Model with { Provider = "azure-openai-responses" };
+        var legacyOptions = Options() with { ModelMetadata = JsonData.Parse(Options().ModelMetadata.ToString().Replace("\"provider\":\"azure\"", "\"provider\":\"azure-openai-responses\"", StringComparison.Ordinal)) };
+        BodyEqual(Body("call-prev_fc_prev"), new AzureResponsesRequestFactory(legacy, legacyOptions).ProjectPayload(Replay(legacy)).ToString());
+        return Task.CompletedTask;
+    }
+
+    private static Task SamplingByThinkingLevel()
+    {
+        // Pi abe508e1 simple-options.ts resolveSamplingParams: model -> clamped level -> request, later keys win.
+        AzureResponsesOptions Leveled(object? map = null) => Options(true, map, sampling: new { top_p = 0.9, temperature = 0.7 }) with
+        {
+            ModelMetadata = JsonData.Parse(Options(true, map, sampling: new { top_p = 0.9, temperature = 0.7 }).ModelMetadata.ToString()[..^1] +
+                ""","samplingParamsByThinkingLevel":{"off":{"temperature":0.2},"high":{"temperature":1,"top_k":40},"xhigh":{"top_k":80},"minimal":null}}""")
+        };
+        BodyEqual(Append("\"reasoning\":{\"effort\":\"high\",\"summary\":\"auto\"},\"include\":[\"reasoning.encrypted_content\"],\"top_p\":0.9,\"temperature\":1,\"top_k\":40"),
+            Factory(Leveled() with { ReasoningEffort = "high" }).ProjectPayload(Request()).ToString());
+        BodyEqual(Append("\"reasoning\":{\"effort\":\"high\",\"summary\":\"auto\"},\"include\":[\"reasoning.encrypted_content\"],\"top_p\":0.5,\"temperature\":1,\"top_k\":40,\"seed\":3"),
+            Factory(Leveled() with { ReasoningEffort = "high", SamplingParams = JsonData.Parse("""{"top_p":0.5,"seed":3}""") }).ProjectPayload(Request()).ToString());
+        // No effort selects "off"; xhigh is unsupported without a map entry and clamps down to high; null and absent entries add nothing.
+        BodyEqual(Append("\"reasoning\":{\"effort\":\"none\"},\"top_p\":0.9,\"temperature\":0.2"), Factory(Leveled()).ProjectPayload(Request()).ToString());
+        BodyEqual(Append("\"reasoning\":{\"effort\":\"xhigh\",\"summary\":\"auto\"},\"include\":[\"reasoning.encrypted_content\"],\"top_p\":0.9,\"temperature\":1,\"top_k\":40"),
+            Factory(Leveled() with { ReasoningEffort = "xhigh" }).ProjectPayload(Request()).ToString());
+        BodyEqual(Append("\"reasoning\":{\"effort\":\"xhigh\",\"summary\":\"auto\"},\"include\":[\"reasoning.encrypted_content\"],\"top_p\":0.9,\"temperature\":0.7,\"top_k\":80"),
+            Factory(Leveled(new { xhigh = "xhigh" }) with { ReasoningEffort = "xhigh" }).ProjectPayload(Request()).ToString());
+        BodyEqual(Append("\"reasoning\":{\"effort\":\"minimal\",\"summary\":\"auto\"},\"include\":[\"reasoning.encrypted_content\"],\"top_p\":0.9,\"temperature\":0.7"),
+            Factory(Leveled() with { ReasoningEffort = "minimal" }).ProjectPayload(Request()).ToString());
+        // A summary without an effort selects "medium", which has no entry here.
+        BodyEqual(Append("\"reasoning\":{\"effort\":\"medium\",\"summary\":\"concise\"},\"include\":[\"reasoning.encrypted_content\"],\"top_p\":0.9,\"temperature\":0.7"),
+            Factory(Leveled() with { ReasoningSummary = "concise" }).ProjectPayload(Request()).ToString());
+        var malformed = Options(true) with { ModelMetadata = JsonData.Parse(Options(true).ModelMetadata.ToString()[..^1] + ""","samplingParamsByThinkingLevel":{"high":3}}""") };
+        var rejected = false; try { _ = Factory(malformed); } catch (AzureResponsesException error) when (error.Failure == AzureResponsesFailure.Configuration) { rejected = true; }
+        Check(rejected, "Malformed samplingParamsByThinkingLevel was admitted.");
         return Task.CompletedTask;
     }
 

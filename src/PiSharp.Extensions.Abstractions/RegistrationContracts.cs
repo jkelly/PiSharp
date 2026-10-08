@@ -85,6 +85,10 @@ public sealed record ExtensionToolDescriptor(
     public bool DefaultActive { get; init; } = true;
     /// <summary>Pure synchronous presentation preparation; called only while this tool is active.</summary>
     public Func<ToolLoadout, ToolLoadoutChanges?>? PrepareLoadout { get; init; }
+    /// <summary>Source promptGuidelines, reported to loadout preparation by ToolLoadout.GetPromptGuidelines.</summary>
+    public ImmutableArray<string> PromptGuidelines { get; init; } = [];
+    /// <summary>The tool's own renderers, consulted after every registered tool renderer resolver.</summary>
+    public ExtensionToolRenderers? Renderers { get; init; }
 }
 
 public sealed record ExtensionCommandDescriptor(

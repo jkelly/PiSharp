@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/types.ts.
 using System.Collections.Immutable;
 
 namespace PiSharp.Contracts;
@@ -27,7 +28,12 @@ public sealed record AssistantMessage(
     ImmutableArray<AssistantContent> Content,
     TokenUsage Usage,
     StopReason StopReason,
-    JsonFields? ExtraProperties = null);
+    JsonFields? ExtraProperties = null)
+{
+    /// <summary>Milliseconds from Timestamp until the response ended, measured with a monotonic clock by the
+    /// chat run that saw the response start. Absent for legacy messages and responses that started elsewhere.</summary>
+    public long? DurationMs { get; init; }
+}
 
 public sealed record ModelDescriptor(string Id, string Api, string Provider);
 

@@ -36,6 +36,14 @@ public sealed record McpSessionRuntimeAdmission(SessionRuntimeRegistry NativeReg
     /// <summary>Optional owning profile binder, invoked on the same admitted attachment lease
     /// after MCP activation binding. Its resources belong to NativeResources.</summary>
     public Action<ReplaceableAgentSession, AgentSessionAttachment>? BindProfileView { get; init; }
+    /// <summary>Pi 1.1.0: enabled servers without `direct` tools named here connect in the background after the session
+    /// opens instead of before it; the others in <see cref="Catalog"/> keep their pre-open <see cref="Servers"/> admission.</summary>
+    public ImmutableArray<McpBackgroundServerAdmission> BackgroundServers { get; init; } = [];
+    /// <summary>Receives every configured server of the acquired generation and their instructions as they connect,
+    /// for the `mcp_servers` prompt section.</summary>
+    public McpServersPromptSource? ServersPromptSource { get; init; }
+    /// <summary>Each background connection that connected or failed, reported once without blocking the session.</summary>
+    public Action<McpBackgroundConnectionReport>? ReportBackgroundConnection { get; init; }
 }
 
 /// <summary>Assembles explicitly admitted native and MCP resources before historical resolution.</summary>
@@ -91,16 +99,23 @@ public sealed class McpSessionRuntimeFactory
                 return prepared;
             }
             if (admission.PrepareDiscovery.GetInvocationList().Length != 1) throw new ArgumentException("One discovery preparation is required.");
-            activation = await McpAdmittedActivationHost.AcquireAsync(admission.Catalog, servers,
+            if (admission.ReportBackgroundConnection?.GetInvocationList().Length > 1) throw new ArgumentException("One background report is required.");
+            ArgumentNullException.ThrowIfNull(admission.Catalog);
+            var (preOpen, background) = McpBackgroundConnections.Partition(admission.Catalog, admission.BackgroundServers);
+            activation = await McpAdmittedActivationHost.AcquireAsync(preOpen, servers,
                 admission.NativeRegistry, admission.AutoEnableCodemode, admission.ExactPolicy, Prepare, token,
-                admission.ResourceRegistration).ConfigureAwait(false);
+                admission.ResourceRegistration, background.Select(row => row.Entry).ToImmutableArray()).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
+            admission.ServersPromptSource?.Publish(generation, admission.Catalog, activation.ServerSnapshots);
+            var connections = background.IsEmpty ? null :
+                new McpBackgroundConnections(background, generation, admission.ServersPromptSource, admission.ReportBackgroundConnection);
             transferred = activation.TransferRuntimeOwnership();
             return new SessionRuntimeLease(activation.Registry.WithInitialToolSelectionFromCatalog(),
                 new Resources(transferred, admission.DiscoveryResources, admission.NativeResources), (owner, attachment) =>
                 {
                     activation.BindOwner(owner, attachment);
                     admission.BindProfileView?.Invoke(owner, attachment);
+                    connections?.Start(owner, attachment);
                 });
         }
         catch (Exception original)

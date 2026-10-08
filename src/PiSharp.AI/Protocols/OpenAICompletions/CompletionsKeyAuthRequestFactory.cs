@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/openai-completions.ts (buildParams sampling merge).
 using System.Collections.Immutable;
 using System.Net.Http.Headers;
 using System.Text;
@@ -30,6 +31,9 @@ public sealed record CompletionsKeyAuthRequestOptions(double? MaxTokens = null, 
     public JsonData? SamplingParams { get; init; }
     /// <summary>Source minimal/low/medium/high token budgets; xhigh and max use the high budget.</summary>
     public JsonData? ThinkingBudgets { get; init; }
+    /// <summary>The body's model field when it differs from the catalog id, as Pi abe508e1 providers/azure.ts withDeploymentName
+    /// sends an Azure deployment name. The model identity, metadata binding and hooks keep the catalog id.</summary>
+    public string? RequestModelId { get; init; }
 }
 
 /// <summary>Pure configured key request construction. No send, environment, clock, credential discovery or retry.</summary>
@@ -53,7 +57,7 @@ public sealed class CompletionsKeyAuthRequestFactory
     private readonly bool _zaiToolStream;
     private readonly CompletionsToolDeclarationProjectionOptions _toolProjectionOptions;
     private readonly string? _cacheControlFormat;
-    private readonly JsonData? _openRouterRouting, _modelSamplingParams, _samplingParams, _priority;
+    private readonly JsonData? _openRouterRouting, _modelSamplingParams, _levelSamplingParams, _samplingParams, _priority;
     /// <summary>Resolved existing wire configuration for this bound model. Callers may clone it to set stream resource limits.</summary>
     public OpenAICompletionsWireOptions ResolvedWireOptions { get; }
 
@@ -73,10 +77,13 @@ public sealed class CompletionsKeyAuthRequestFactory
             !Enum.IsDefined(_options.CacheRetention) || _options.MaxTokensField is not ("max_tokens" or "max_completion_tokens") ||
             _options.SessionAffinityFormat is not ("openai" or "openai-nosession" or "openrouter") ||
             _options.ReasoningFormat is { } format && !Enum.IsDefined(format)) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
+        if (_options.RequestModelId is { } requestModel && !Identity(requestModel)) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
         if (endpoint.AbsoluteUri.Length > _options.MaximumEndpointCharacters || expectedModel.Id.Length > _options.MaximumModelCharacters ||
+            _options.RequestModelId?.Length > _options.MaximumModelCharacters ||
             expectedModel.Provider.Length > _options.MaximumModelCharacters || Math.Abs(_options.MaxTokens ?? 0) > _options.MaximumTokenMagnitude ||
             Math.Abs(_options.Temperature ?? 0) > _options.MaximumTemperatureMagnitude) throw Fail(CompletionsRequestFailure.ResourceLimit);
         CompletionsJson.Unicode(expectedModel.Id); CompletionsJson.Unicode(expectedModel.Provider);
+        if (_options.RequestModelId is { } deployment) CompletionsJson.Unicode(deployment);
         if (_options.ReasoningEffort is not (null or "minimal" or "low" or "medium" or "high" or "xhigh" or "max"))
             throw Fail(CompletionsRequestFailure.UnsupportedContent);
         _endpoint = endpoint; _model = expectedModel;
@@ -91,6 +98,12 @@ public sealed class CompletionsKeyAuthRequestFactory
             _options = binding.Options; _projectionOptions = binding.Projection;
             _cacheControlFormat = binding.CacheControlFormat; _openRouterRouting = binding.Routing;
             _modelSamplingParams = binding.Sampling; _priority = binding.Priority; ResolvedWireOptions = binding.Wire;
+            if (binding.SamplingByLevel is { } byLevel)
+            {
+                if (!ThinkingLevelSampling.TrySelect(byLevel.Value, binding.Projection.Reasoning, binding.Options.ThinkingLevelMap?.Value ?? default,
+                    _options.ReasoningEffort ?? "off", out var selected)) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
+                if (selected.ValueKind == JsonValueKind.Object) _levelSamplingParams = JsonData.FromElement(selected);
+            }
             _thinkingFormat = binding.ThinkingFormat; _thinkingTokenBudgetField = binding.BudgetField;
             _modelMaxTokens = binding.MaxTokens; _chatTemplateKwargs = binding.TemplateKwargs;
             _chatTemplateArgs = binding.TemplateArgs; _zaiToolStream = binding.ToolStream;
@@ -197,7 +210,7 @@ public sealed class CompletionsKeyAuthRequestFactory
             else { fieldIndices.Add(name, fields.Count); fields.Add(new(name, value)); }
         }
         JsonData Text(string text) => JsonData.Parse(JsonSerializer.Serialize(text, CompletionsJson.Output));
-        Add("model", Text(_model.Id)); Add("messages", messages); Add("stream", JsonData.Parse("true"));
+        Add("model", Text(_options.RequestModelId ?? _model.Id)); Add("messages", messages); Add("stream", JsonData.Parse("true"));
         if (_cacheKey is not null && (_endpoint.AbsoluteUri.Contains("api.openai.com", StringComparison.Ordinal) && _options.CacheRetention != CompletionsCacheRetention.None ||
             _options.CacheRetention == CompletionsCacheRetention.Long && _options.SupportsLongCacheRetention)) Add("prompt_cache_key", Text(_cacheKey));
         if (_options.CacheRetention == CompletionsCacheRetention.Long && _options.SupportsLongCacheRetention) Add("prompt_cache_retention", Text("24h"));
@@ -212,7 +225,8 @@ public sealed class CompletionsKeyAuthRequestFactory
         if (_toolChoice is not null) Add("tool_choice", _toolChoice);
         AddThinkingFields(Add, cancellationToken);
         if (_openRouterRouting is not null) Add("provider", _openRouterRouting);
-        foreach (var sampling in new[] { _modelSamplingParams, _samplingParams })
+        // Model defaults, then the effective thinking level's overrides, then request keys; later values win per key.
+        foreach (var sampling in new[] { _modelSamplingParams, _levelSamplingParams, _samplingParams })
             if (sampling is not null) foreach (var property in CompletionsJson.Properties(sampling.Value))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -287,7 +301,8 @@ public sealed class CompletionsKeyAuthRequestFactory
 
     private sealed record BoundModel(CompletionsKeyAuthRequestOptions Options, CompletionsTranscriptProjectionOptions Projection,
         string? CacheControlFormat, JsonData? Routing, JsonData? Sampling, JsonData? Priority, OpenAICompletionsWireOptions Wire,
-        string ThinkingFormat, string? BudgetField, double? MaxTokens, JsonData? TemplateKwargs, JsonData? TemplateArgs, bool ToolStream);
+        string ThinkingFormat, string? BudgetField, double? MaxTokens, JsonData? TemplateKwargs, JsonData? TemplateArgs, bool ToolStream,
+        JsonData? SamplingByLevel = null);
 
     private JsonData? ReadOwnedObject(JsonData? source)
     {
@@ -403,12 +418,25 @@ public sealed class CompletionsKeyAuthRequestFactory
                     { SupportsStrictMode = Flag("supportsStrictMode", false), SupportsOpenAIGrammarTools = grammarTools }
             };
             if (!model.TryGetProperty("cost", out var cost) || cost.ValueKind != JsonValueKind.Object) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
-            decimal Rate(string name)
+            decimal Rate(string name, JsonElement? table = null)
             {
-                if (!cost.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var number) || !double.IsFinite(number) || number < 0)
+                if (!(table ?? cost).TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var number) || !double.IsFinite(number) || number < 0)
                     throw Fail(CompletionsRequestFailure.InvalidConfiguration);
                 if (!value.TryGetDecimal(out var rate) || (double)rate != number) throw Fail(CompletionsRequestFailure.UnsupportedContent);
                 return rate;
+            }
+            // Pi abe508 models.ts calculateCost: source-ordered prompt-length tiers.
+            var tiers = ImmutableArray.CreateBuilder<TokenRateTier>();
+            if (cost.TryGetProperty("tiers", out var declaredTiers) && declaredTiers.ValueKind != JsonValueKind.Null)
+            {
+                if (declaredTiers.ValueKind != JsonValueKind.Array) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
+                foreach (var tier in declaredTiers.EnumerateArray())
+                {
+                    if (tier.ValueKind != JsonValueKind.Object || !tier.TryGetProperty("inputTokensAbove", out var threshold) || threshold.ValueKind != JsonValueKind.Number ||
+                        !threshold.TryGetDouble(out var above) || !double.IsFinite(above)) throw Fail(CompletionsRequestFailure.InvalidConfiguration);
+                    if (!threshold.TryGetDecimal(out var exact) || (double)exact != above) throw Fail(CompletionsRequestFailure.UnsupportedContent);
+                    tiers.Add(new(exact, Rate("input", tier), Rate("output", tier), Rate("cacheRead", tier), Rate("cacheWrite", tier)));
+                }
             }
             JsonData? priority = null;
             if (compat.TryGetProperty("vllmPriority", out var priorityValue))
@@ -417,9 +445,10 @@ public sealed class CompletionsKeyAuthRequestFactory
                 priority = JsonData.FromElement(priorityValue);
             }
             return new(options, projection, cacheFormat, Object(compat, "openRouterRouting"), Object(model, "samplingParams"), priority,
-                new(SupportsFinishReason: Flag("supportsFinishReason", true), Rates: new(Rate("input"), Rate("output"), Rate("cacheRead"), Rate("cacheWrite")))
+                new(SupportsFinishReason: Flag("supportsFinishReason", true), Rates: new(Rate("input"), Rate("output"), Rate("cacheRead"), Rate("cacheWrite")) { Tiers = tiers.ToImmutable() })
                     { SupportsOpenAIGrammarTools = grammarTools }, thinkingFormat, budgetField, modelMaxTokens,
-                Object(compat, "chatTemplateKwargs"), Object(compat, "chatTemplateArgs"), Flag("zaiToolStream", false));
+                Object(compat, "chatTemplateKwargs"), Object(compat, "chatTemplateArgs"), Flag("zaiToolStream", false),
+                Object(model, "samplingParamsByThinkingLevel"));
         }
         catch (CompletionsRequestException error) when (error.Failure is CompletionsRequestFailure.InvalidTranscript or CompletionsRequestFailure.InvalidRequest)
         { throw Fail(CompletionsRequestFailure.InvalidConfiguration); }

@@ -34,7 +34,7 @@ public sealed class GoogleKeyAuthRequestFactory(ModelDescriptor model, GoogleGen
         var headers = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
         {
             ["x-goog-api-key"] = options.ApiKey, ["content-type"] = "application/json", ["accept"] = "text/event-stream",
-            ["user-agent"] = "pi/0.99.1"
+            ["user-agent"] = "pi/1.1.0"
         };
         void Merge(JsonElement value)
         {

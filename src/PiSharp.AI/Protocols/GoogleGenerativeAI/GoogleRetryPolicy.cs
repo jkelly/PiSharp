@@ -1,4 +1,4 @@
-// Pi v0.99.1 utils/provider-retry.ts and api/google-shared.ts (MIT), commit d86654abb8862e201933517d6f1fce9f88dd117f.
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/utils/provider-retry.ts and packages/ai/src/api/google-shared.ts.
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -14,7 +14,8 @@ internal static class GoogleRetryPolicy
     {
         var directive = Header(response, "x-should-retry", options.MaximumHeaderCharacters);
         return directive switch { "true" => true, "false" => false,
-            _ => (int)response.StatusCode is 408 or 409 or 429 || (int)response.StatusCode >= 500 };
+            _ => (int)response.StatusCode is 408 or 409 or 429 || (int)response.StatusCode >= 500 } &&
+            !options.NoRetryStatuses.Contains((int)response.StatusCode);
     }
     private static string? Header(HttpResponseMessage response, string name, int maximumCharacters)
     {
@@ -30,15 +31,16 @@ internal static class GoogleRetryPolicy
     }
     internal static TimeSpan Delay(HttpResponseMessage response, GoogleGenerativeAIOptions options, int retryIndex, string providerErrorMessage)
     {
+        // Only finite server delays apply. Infinite values and unparseable dates fall through to exponential backoff.
         var milliseconds = Header(response, "retry-after-ms", options.MaximumHeaderCharacters);
-        if (!string.IsNullOrEmpty(milliseconds) && TryFloat(milliseconds, out var value)) return ServerDelay(value, options, providerErrorMessage);
+        if (!string.IsNullOrEmpty(milliseconds) && TryFloat(milliseconds, out var value) && double.IsFinite(value)) return ServerDelay(value, options, providerErrorMessage);
         var after = Header(response, "retry-after", options.MaximumHeaderCharacters);
         if (!string.IsNullOrEmpty(after))
         {
             var delay = TryFloat(after, out var seconds) ? seconds * 1000 :
                 DateTimeOffset.TryParse(after, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var date) ?
                     (date - options.RetryTimeProvider.GetUtcNow()).TotalMilliseconds : double.NaN;
-            return ServerDelay(delay, options, providerErrorMessage);
+            if (double.IsFinite(delay)) return ServerDelay(delay, options, providerErrorMessage);
         }
         var jitter = options.RetryJitterSample();
         if (!double.IsFinite(jitter) || jitter is < 0 or >= 1) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);

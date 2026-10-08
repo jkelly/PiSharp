@@ -25,7 +25,7 @@ npm run build    # output in website/dist
 | Latest Pi version, nav and links | `src/data/site.ts` |
 | Theme colors and shared styles | `src/styles/custom.css` |
 
-The Pi baseline shown on the site is read at build time from `../compatibility/baseline.lock.json`.
+The Pi baseline shown on the site is read at build time from `../compatibility/target.lock.json`.
 
 ## Versioning
 

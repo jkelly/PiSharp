@@ -186,13 +186,14 @@ internal static class OAuthLifecycleTests
             using var queued = new CancellationTokenSource();
             var second = owner.ResolveAsync("provider", cancellationToken: queued.Token); queued.Cancel();
             Require(!first.IsCompleted && !second.IsCompleted);
-            finish.SetResult(Credential("late"));
+            var late = Credential("late"); finish.SetResult(late);
             foreach (var operation in new[] { first, second })
             {
                 try { await operation; Require(false); }
                 catch (OperationCanceledException) { }
             }
-            Require(source.Writes == 0 && refresh.Calls == 1);
+            // Pi 1.0.3: a started refresh is persisted despite caller cancellation (rotated refresh tokens).
+            Require(source.Writes == 1 && refresh.Calls == 1 && ReferenceEquals(await source.ReadAsync("provider", default), late));
         });
         await check("oauth-original-refresh-rejection-precedes-late-cancellation", async () =>
         {
@@ -207,19 +208,34 @@ internal static class OAuthLifecycleTests
             catch (OAuthLifecycleException error) { Require(ReferenceEquals(error.OriginalException, fault)); }
             Require(source.Writes == 0);
         });
-        await check("oauth-deadline-keeps-original-joined-and-refuses-late-publication", async () =>
+        // Pi 1.0.3 (resolve.ts refreshStoredOAuthCredential): the 15 s timeout only signals the refresh.
+        // A refresh that ignores it and succeeds late is persisted and returned to the waiting caller.
+        await check("oauth-deadline-keeps-original-joined-and-persists-late-success", async () =>
         {
             var source = new Source(); source.Seed("provider", Credential("old", 0));
             var entered = Signal<bool>(); var finish = Signal<OAuthCredentialSnapshot>();
             CancellationToken refreshToken = default;
             var refresh = new Refresh((_, _, token) => { refreshToken = token; entered.SetResult(true); return finish.Task; });
-            var clock = new Clock(); var operation = new StoredOAuthLifecycle(source, refresh, clock).ResolveAsync("provider");
+            var clock = new Clock(); var owner = new StoredOAuthLifecycle(source, refresh, clock);
+            var operation = owner.ResolveAsync("provider");
             await entered.Task; clock.FireDeadlines();
-            Require(refreshToken.IsCancellationRequested && !operation.IsCompleted);
-            finish.SetResult(Credential("late"));
+            var queued = owner.ResolveAsync("provider");
+            Require(refreshToken.IsCancellationRequested && !operation.IsCompleted && !queued.IsCompleted);
+            var late = Credential("late"); finish.SetResult(late);
+            Require(ReferenceEquals(await operation, late) && ReferenceEquals(await queued, late));
+            Require(source.Writes == 1 && refresh.Calls == 1 && ReferenceEquals(await source.ReadAsync("provider", default), late));
+        });
+        await check("oauth-deadline-honoured-by-refresh-is-refresh-failure-without-publication", async () =>
+        {
+            var source = new Source(); source.Seed("provider", Credential("old", 0));
+            var entered = Signal<bool>(); var clock = new Clock();
+            var refresh = new Refresh(async (_, _, token) =>
+            { entered.SetResult(true); await Task.Delay(Timeout.Infinite, token); return Credential("never"); });
+            var operation = new StoredOAuthLifecycle(source, refresh, clock).ResolveAsync("provider");
+            await entered.Task; clock.FireDeadlines();
             try { await operation; Require(false); }
             catch (OAuthLifecycleException error)
-            { Require(error.Failure == OAuthLifecycleFailure.Refresh && error.OriginalException is TimeoutException); }
+            { Require(error.Failure == OAuthLifecycleFailure.Refresh && error.OriginalException is OperationCanceledException); }
             Require(source.Writes == 0);
         });
         await check("oauth-read-rejection-retains-original-and-no-refresh", async () =>

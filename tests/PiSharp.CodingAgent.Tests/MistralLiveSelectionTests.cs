@@ -26,7 +26,8 @@ internal static class MistralLiveSelectionTests
                 Check(selection.Definition.Raw.Value.GetProperty("cost").GetProperty(field).GetDouble() == value.GetProperty("cost").GetProperty(field).GetDouble());
             Check(selection.Definition.DeclaresImageInput == value.GetProperty("input").EnumerateArray().Any(item => item.GetString() == "image")); count++;
         }
-        Check(count == 32); return Task.CompletedTask;
+        // The @earendil-works/pi-ai@1.1.0 shard has 40 chat rows; the v0.99.1 source catalog had 32.
+        Check(count == 40); return Task.CompletedTask;
     }
     private static async Task Routes()
     {
@@ -53,7 +54,8 @@ internal static class MistralLiveSelectionTests
         Check(((IThinkingLevelTransport)reasoningTransport).GetSupportedThinkingLevels(reasoning.Model).Contains("high"));
         var reasoningRequest = request with { Model = reasoning.Model, ThinkingLevel = "high" };
         Check((await Collect(reasoningTransport.StreamAsync(reasoningRequest)))[^1] is StreamDone);
-        Check(handler.Payloads[^1].Value.GetProperty("prompt_mode").GetString() == "reasoning");
+        // Pi 1.1.0 gives magistral-medium-latest a thinkingLevelMap, and mapped models send reasoning_effort instead of prompt_mode.
+        Check(handler.Payloads[^1].Value.GetProperty("reasoning_effort").GetString() == "high" && !handler.Payloads[^1].Value.TryGetProperty("prompt_mode", out _));
         await ImageRoutes();
     }
     private static async Task ImageRoutes()

@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/mcp-servers.ts, packages/coding-agent/src/extensions/mcp/tools.ts and packages/coding-agent/src/extensions/mcp/index.ts.
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
@@ -11,9 +12,11 @@ public sealed record McpOfferedTool(string Name, JsonData InputSchema, string? D
     string? Title = null, string? AnnotationTitle = null);
 public sealed record McpServerToolSnapshot(McpServerEntry Entry, ImmutableArray<McpOfferedTool> Tools,
     string? Instructions = null, bool Connected = true, bool HasResources = false);
+/// <summary><paramref name="Namespace"/> carries the configured server description. The server's instructions are
+/// longer usage guidance kept out of tool listings, carried as <paramref name="NamespaceInstructions"/>.</summary>
 public sealed record McpPlannedTool(string Server, string OriginalName, string Name, string Label,
     string Description, JsonData Parameters, ToolNamespace Namespace, McpExposure McpExposure, ToolExposure Exposure,
-    double TimeoutMilliseconds);
+    double TimeoutMilliseconds, string? NamespaceInstructions = null);
 public sealed record McpToolCatalogPlan(ImmutableArray<McpPlannedTool> Tools,
     ImmutableDictionary<string, string> NameOwners, bool NeedsCodemode, bool NeedsToolSearch,
     bool AutoEnableCodemode, McpExposure? ResourceToolsExposure);
@@ -31,32 +34,45 @@ public static class McpCatalogPlanner
             var validated = McpConfigurationReader.Validate(entry.Name, entry.Config.Raw.Value);
             if (!validated.IsValid) throw new ArgumentException(validated.Error, nameof(registered));
             if (positions.TryGetValue(entry.Name, out var index)) rows[index] = entry;
-            else { positions.Add(entry.Name, rows.Count); rows.Add(entry); }
+            else
+            {
+                // Names that differ only in `-` and `_` would share a namespace; registration rejects them.
+                if (rows.FirstOrDefault(row => Namespace(row.Name) == Namespace(entry.Name)) is { } clash)
+                    throw new ArgumentException($"MCP server \"{entry.Name}\" conflicts with registered server \"{clash.Name}\"", nameof(registered));
+                positions.Add(entry.Name, rows.Count); rows.Add(entry);
+            }
         }
         foreach (var entry in rows)
         {
-            var config = configured.Servers.FirstOrDefault(server => server.Name == entry.Name);
+            var config = configured.Servers.FirstOrDefault(server => Namespace(server.Name) == Namespace(entry.Name));
             if (config is not null)
-                overridden.Add($"\"{entry.Name}\" registered by {entry.ExtensionPath} is overridden by {config.Source}");
+                overridden.Add($"\"{entry.Name}\" registered by {entry.ExtensionPath} is overridden by \"{config.Name}\" in {config.Source}");
             else result.Add(new(entry.Name, entry.Config, entry.ExtensionPath, McpConfigurationScope.Extension));
         }
         return new(result.ToImmutable(), overridden.ToImmutable());
     }
 
+    /// <summary>Namespace of a server's tools: `mcp__&lt;server&gt;` with `-` replaced by `_`, like the tool names.</summary>
+    public static string Namespace(string server)
+    { ArgumentNullException.ThrowIfNull(server); return "mcp__" + server.Replace('-', '_'); }
+
+    /// <summary>`codemode` and `deferred` both leave tools out of the codemode description; they differ only in
+    /// which discovery tool reaches them.</summary>
     public static ToolExposure ToToolExposure(McpExposure exposure) => exposure switch
     {
-        McpExposure.Codemode => ToolExposure.Codemode,
-        McpExposure.CodemodeDeferred or McpExposure.Deferred => ToolExposure.Deferred,
+        McpExposure.Codemode or McpExposure.Deferred => ToolExposure.Deferred,
         McpExposure.Direct => ToolExposure.Direct,
         McpExposure.Hidden => ToolExposure.Hidden,
         _ => throw new ArgumentOutOfRangeException(nameof(exposure))
     };
 
+    /// <summary>`mcp__&lt;server&gt;__&lt;tool&gt;` with everything but `[A-Za-z0-9_]` replaced by `_`, so the name is also a
+    /// script identifier; shortened with a hash of the raw names when too long or when <paramref name="isTaken"/>.</summary>
     public static string CreateToolName(string server, string tool, Func<string, bool>? isTaken = null)
     {
         ArgumentNullException.ThrowIfNull(server); ArgumentNullException.ThrowIfNull(tool);
         var raw = $"mcp__{server}__{tool}";
-        var name = new string(raw.Select(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' ? character : '_').ToArray());
+        var name = new string(raw.Select(character => char.IsAsciiLetterOrDigit(character) || character == '_' ? character : '_').ToArray());
         if (name.Length <= 64 && !(isTaken?.Invoke(name) ?? false)) return name;
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(server + "\0" + tool))).ToLowerInvariant()[..8];
         return name[..Math.Min(name.Length, 55)] + "_" + hash;
@@ -74,30 +90,36 @@ public static class McpCatalogPlanner
             var entry = snapshot.Entry;
             if (!snapshot.Connected || !entry.Config.Enabled) continue;
             if (snapshot.Tools.IsDefault) throw new ArgumentException("An initialized borrowed tool snapshot is required.", nameof(snapshots));
-            var namespaceName = "mcp__" + entry.Name;
-            var group = new ToolNamespace(namespaceName, snapshot.Instructions ?? $"Tools in the {namespaceName} namespace.");
+            var configured = entry.Config.Description is { } text ? McpJson.JsTrim(text) : null;
+            // Like upstream registerTools: the configured description and the server's connection instructions.
+            var group = new ToolNamespace(Namespace(entry.Name), string.IsNullOrEmpty(configured) ? null : configured)
+                { Instructions = string.IsNullOrEmpty(snapshot.Instructions) ? null : snapshot.Instructions };
             var current = new HashSet<string>(StringComparer.Ordinal);
+            // Like Codex, every tool whose name sanitizes to a shared name gets the hash suffix, so which one
+            // would keep the plain name does not depend on the order of the list.
+            var shared = snapshot.Tools.Select(tool => tool.Name).Distinct(StringComparer.Ordinal)
+                .Select(tool => CreateToolName(entry.Name, tool)).GroupBy(name => name, StringComparer.Ordinal)
+                .Where(names => names.Count() > 1).Select(names => names.Key).ToHashSet(StringComparer.Ordinal);
             if (snapshot.HasResources) { exposures.Add(entry.Config.Exposure); resourceExposures.Add(entry.Config.Exposure); }
             foreach (var tool in snapshot.Tools)
             {
                 var owner = entry.Name + "\0" + tool.Name;
                 var name = CreateToolName(entry.Name, tool.Name, candidate =>
-                    (owners.TryGetValue(candidate, out var existing) && existing != owner) || current.Contains(candidate));
+                    (owners.TryGetValue(candidate, out var existing) && existing != owner) || current.Contains(candidate) || shared.Contains(candidate));
                 owners[name] = owner; current.Add(name);
                 var exposure = McpConfigurationReader.GetToolExposure(entry.Config, tool.Name); exposures.Add(exposure);
-                var description = tool.Description?.Trim(' ', '\t', '\n', '\r', '\v', '\f', '\u00a0', '\u1680',
-                    '\u2000', '\u2001', '\u2002', '\u2003', '\u2004', '\u2005', '\u2006', '\u2007', '\u2008', '\u2009', '\u200a',
-                    '\u2028', '\u2029', '\u202f', '\u205f', '\u3000', '\ufeff');
+                var description = tool.Description is { } offered ? McpJson.JsTrim(offered) : null;
                 if (string.IsNullOrEmpty(description)) description = tool.Title ?? tool.AnnotationTitle;
                 if (string.IsNullOrEmpty(description)) description = $"MCP tool {tool.Name} from server {entry.Name}";
                 tools.Add(new(entry.Name, tool.Name, name, entry.Name + "/" + tool.Name, description,
-                    Parameters(tool.InputSchema), group, exposure, ToToolExposure(exposure), entry.Config.TimeoutSeconds * 1000));
+                    Parameters(tool.InputSchema), group, exposure, ToToolExposure(exposure), entry.Config.TimeoutSeconds * 1000,
+                    snapshot.Instructions));
             }
         }
         McpExposure? resources = null;
-        foreach (var candidate in new[] { McpExposure.Direct, McpExposure.Codemode, McpExposure.CodemodeDeferred, McpExposure.Deferred })
+        foreach (var candidate in new[] { McpExposure.Direct, McpExposure.Codemode, McpExposure.Deferred })
             if (resourceExposures.Contains(candidate)) { resources = candidate; break; }
-        return new(tools.ToImmutable(), owners.ToImmutable(), exposures.Contains(McpExposure.Codemode) || exposures.Contains(McpExposure.CodemodeDeferred),
+        return new(tools.ToImmutable(), owners.ToImmutable(), exposures.Contains(McpExposure.Codemode),
             exposures.Contains(McpExposure.Deferred), autoEnableCodemode, resources);
     }
 

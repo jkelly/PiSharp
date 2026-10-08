@@ -52,6 +52,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     private readonly ToolInvokerOptions _profileInvokerOptions;
     private readonly NativeExtensionActivation? _extension;
     private readonly OwnedProcessCleanup? _processCleanup;
+    /// <summary>User Bash capability, present only with an explicit shell and spill root.</summary>
+    internal PiSharp.CodingAgent.Execution.IUserBashExecutor? UserBash { get; private set; }
     internal ImmutableArray<OwnedProcessCleanupReceipt> ProcessCleanupReceipts => _processCleanup?.Capture() ?? [];
     internal ImmutableArray<Exception> ProcessCleanupFailures => _processCleanup?.CaptureFailures() ?? [];
     private readonly object _disposalGate = new();
@@ -92,7 +94,6 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     internal async ValueTask AttachSessionAsync(PersistentAgentSession session, string reason, CancellationToken token)
     { await AttachOwnerAsync(session).ConfigureAwait(false); await StartLifecycleAsync(reason, token).ConfigureAwait(false); }
     private readonly ImmutableArray<string>? _initialActiveTools;
-    private readonly ImmutableArray<string>? _deferredCatalogNames;
     internal async Task ApplyInitialToolSelectionAsync(PersistentAgentSession session, CancellationToken token)
     {
         if (mcpRuntime is not null)
@@ -234,28 +235,28 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 new SessionRegisteredTool(extension.EnabledDeclarations[index], adapter, ToolExecutionMode.Sequential)
                 { IsExtension = true, Exposure = extension.EnabledRegistrations[index].Exposure, Namespace = extension.EnabledRegistrations[index].Namespace,
                     DefaultActive = extension.EnabledRegistrations[index].DefaultActive,
+                    PromptGuidelines = extension.EnabledRegistrations[index].PromptGuidelines,
                     PrepareLoadout = extension.Binding.GetLoadoutPreparation(adapter.Name) }));
         }
         if (toolSelection is not null)
         {
-            if (deferCatalogValidation && !toolSelection.UseAvailableDefaults) _deferredCatalogNames = toolSelection.Names;
             var selected = ImmutableArray.CreateBuilder<string>();
             foreach (var name in toolSelection.Names)
             {
                 if (name.Length is < 1 or > 64 || name.Any(char.IsControl))
                 { _client?.Dispose(); throw new SessionCommandException(SessionCommandFailure.InvalidArguments); }
-                if (deferCatalogValidation && !registrations.Any(value => value.Adapter.Name == name)) continue;
-                if (toolSelection.UseAvailableDefaults && !registrations.Any(value => value.Adapter.Name == name)) continue;
-                if (toolSelection.LifetimePolicy is not null && registrations.Any(value => value.Adapter.Name == name &&
-                    value.Exposure is not (ToolExposure.Direct or ToolExposure.ModelOnly))) continue;
-                if (name.Length is < 1 or > 64 || !registrations.Any(value => value.Adapter.Name == name &&
-                    value.Exposure is ToolExposure.Direct or ToolExposure.ModelOnly))
-                {
-                    _client?.Dispose();
-                    throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
-                }
+                // Patterns select the matching registrations below. Pi 1.1.0 sdk.ts passes the names as initialActiveToolNames
+                // and _applyToolLoadout drops names that are not registered (or not declarable here) without an error; MCP tools
+                // the allowlist names activate when they register later (_refreshToolRegistry).
+                if (name.Contains('*') || !registrations.Any(value => value.Adapter.Name == name &&
+                    value.Exposure is ToolExposure.Direct or ToolExposure.ModelOnly)) continue;
                 if (!selected.Contains(name)) selected.Add(name);
             }
+            // Naming or matching a tool with --tools activates it even when it is not active by default.
+            if (toolSelection.LifetimePolicy is { AllowedNames: not null } named)
+                foreach (var registration in registrations.Where(value => named.IsNamed(value.Adapter.Name) &&
+                    value.Exposure is ToolExposure.Direct or ToolExposure.ModelOnly))
+                    if (!selected.Contains(registration.Adapter.Name)) selected.Add(registration.Adapter.Name);
             if (toolSelection.IncludeDefaultExtensions && extension is not null)
                 foreach (var registration in registrations.Where(value => (toolSelection.LifetimePolicy?.IsAllowed(value.Adapter.Name) ?? true) &&
                     extension.EnabledAdapters.Any(adapter => adapter.Name == value.Adapter.Name) &&
@@ -394,6 +395,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         if (registeredMcpAdmission is not null && mcpAdmission is not null)
             throw new ArgumentException("Choose one explicit MCP profile admission.");
         // Explicit admitted resolution uses no environment lookup; reject invalid composition before profile effects.
+        // Without it, an Anthropic selection resolves its auth like upstream resolveProviderAuth, at start and per request.
         if (resolvedAnthropicAuthentication is not null &&
             (liveSelection is null || liveSelection.Model.Provider != "anthropic" || liveSelection.Model.Api != "anthropic-messages" ||
              resolvedAnthropicAuthentication.Diagnostic != AuthenticationDiagnostic.Resolved || resolvedAnthropicAuthentication.Authentication is null))
@@ -453,7 +455,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             reserved.Add(extension.ManifestPath); reserved.Add(extension.ApprovalPath);
         }
         var reads = await Targets(readTargets); var writes = await Targets(writeTargets);
-        BashTool? bashTool = null; BashGrant? grant = null;
+        BashTool? bashTool = null; BashGrant? grant = null; UserBashHost? userBash = null;
         OwnedProcessCleanup? processCleanup = null;
         if (bash is not null)
         {
@@ -479,6 +481,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             grant = new(executable, canonicalWorkspace, canonicalSpill, environment, bash.Commands, bash.Timeout, files);
             processCleanup = new(new NativeProcessRunner());
             bashTool = new(processCleanup, new(executable, canonicalWorkspace, environment, canonicalSpill));
+            userBash = new(new(new NativeShellOperations(executable, environment, canonicalSpill), canonicalSpill));
         }
         var policy = new FilePolicy(canonicalWorkspace, reads, writes, reserved, grant, grepHost);
         var grepReader = grepHost is null ? null : new AdmittedGrepContextReader(canonicalWorkspace,
@@ -490,7 +493,13 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         {
             if (extensionPreflight is not null) activation = await NativeExtensionActivation.LoadAsync(extensionPreflight, token, extensionUi, reportInputDiagnostic,
                 configuredInitializerInstallation: configuredInitializerInstallation, configuredExecInstallation: configuredExecInstallation).ConfigureAwait(false);
-            if (resolvedAnthropicAuthentication is null) connection = liveSelection?.Connect(liveRuntime);
+            if (resolvedAnthropicAuthentication is null && liveSelection is { Model.Provider: "anthropic" })
+            {
+                var (anthropic, anthropicHandler, reresolve) = await liveSelection.ResolveAnthropicAsync(liveRuntime, token).ConfigureAwait(false);
+                connectionOriginal = liveSelection.ConnectResolvedAnthropicAsync(anthropic, anthropicHandler, token, reresolve).AsTask();
+                connection = await connectionOriginal.ConfigureAwait(false);
+            }
+            else if (resolvedAnthropicAuthentication is null) connection = liveSelection?.Connect(liveRuntime);
             else
             {
                 connectionOriginal = (liveSelection ?? throw new InvalidOperationException("Validated Anthropic selection is absent."))
@@ -505,6 +514,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup, connection, toolSelection,
                 deferCatalogValidation: mcpAdmission is not null || registeredMcpAdmission is not null || readApplicationHost is not null,
                 originalSystemPrompt: originalSystemPrompt);
+            profile.UserBash = userBash;
             if (readApplicationHost is not null) profile.ConfigureMcpRegistrationRuntime(readApplicationHost().CreateRegisteredAdmission());
             else if (registeredMcpAdmission is not null) profile.ConfigureMcpRegistrationRuntime(registeredMcpAdmission);
             else if (mcpAdmission is not null) profile.ConfigureMcpRuntime(mcpAdmission);

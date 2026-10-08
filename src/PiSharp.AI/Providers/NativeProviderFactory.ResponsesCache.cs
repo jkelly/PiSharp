@@ -16,13 +16,14 @@ public static partial class NativeProviderFactory
             var compat = metadata.Value.TryGetProperty("compat", out var value) ? value : default;
             if (compat.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null or JsonValueKind.Object))
                 throw new InvalidOperationException();
-            var supported = false;
-            if (compat.ValueKind == JsonValueKind.Object && compat.TryGetProperty("supportsStrictMode", out var flag) && flag.ValueKind != JsonValueKind.Null)
+            bool Flag(string name)
             {
-                if (flag.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new InvalidOperationException();
-                supported = flag.GetBoolean();
+                if (compat.ValueKind != JsonValueKind.Object || !compat.TryGetProperty(name, out var flag) || flag.ValueKind == JsonValueKind.Null) return false;
+                return flag.ValueKind is JsonValueKind.True or JsonValueKind.False ? flag.GetBoolean() : throw new InvalidOperationException();
             }
-            return options with { ToolDeclarations = (options.ToolDeclarations ?? new()) with { SupportsStrictMode = supported } };
+            // Pi abe508 openai-responses.ts getCompat: supportsOpenAIGrammarTools defaults to false.
+            return options with { ToolDeclarations = (options.ToolDeclarations ?? new()) with
+                { SupportsStrictMode = Flag("supportsStrictMode"), SupportsOpenAIGrammarTools = Flag("supportsOpenAIGrammarTools") } };
         }
         catch (InvalidOperationException) { throw new ArgumentException("Unsupported native Responses strict compatibility metadata."); }
     }
@@ -51,6 +52,7 @@ public static partial class NativeProviderFactory
             {
                 ModelHeaders = metadata.Value.TryGetProperty("headers", out var headers) ? JsonData.Parse(headers.GetRawText()) : null,
                 ModelSamplingParams = metadata.Value.TryGetProperty("samplingParams", out var sampling) ? JsonData.Parse(sampling.GetRawText()) : null,
+                ModelSamplingParamsByThinkingLevel = metadata.Value.TryGetProperty("samplingParamsByThinkingLevel", out var byLevel) ? JsonData.Parse(byLevel.GetRawText()) : null,
                 SupportsMaxOutputTokens = Flag("supportsMaxOutputTokens", true),
                 SessionAffinityFormat = compat.ValueKind == JsonValueKind.Object && compat.TryGetProperty("sessionAffinityFormat", out var affinity) && affinity.ValueKind != JsonValueKind.Null
                     ? affinity.GetString() ?? "openai" : "openai",

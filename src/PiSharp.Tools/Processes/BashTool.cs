@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/bash.ts (bashOutputSchema).
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Text.Json;
@@ -16,6 +17,14 @@ public sealed class BashTool : IPreparedToolAdapter
     public string Name => "bash";
     public JsonData Declaration { get; } = JsonData.Parse("""
         {"name":"bash","description":"Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"timeout":{"type":"number","description":"Timeout in seconds (optional, no default timeout)"}},"required":["command"],"additionalProperties":false},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}
+        """);
+
+    /// <summary>
+    /// Source bashOutputSchema (1.0.3 shortened descriptions): the structuredContent shape for programmatic callers.
+    /// It is tool metadata, not part of the model-facing declaration. Authored rendering of the TypeBox schema.
+    /// </summary>
+    public static JsonData OutputSchema { get; } = JsonData.Parse("""
+        {"type":"object","properties":{"output":{"type":"string","description":"Combined stdout and stderr, possibly truncated"},"truncated":{"type":"boolean"},"full_output_path":{"type":"string","description":"Full output, when truncated"},"exit_code":{"type":"number"},"wall_time_seconds":{"type":"number"}},"required":["output","truncated","exit_code","wall_time_seconds"]}
         """);
 
     public BashTool(IProcessRunner runner, BashToolOptions options, Func<string>? nextSpillFileName = null)

@@ -188,7 +188,7 @@ public sealed class CompletionsHttpSseTransport : IChatTransport
                 try
                 {
                     _token.ThrowIfCancellationRequested();
-                    if (options is null || retryIndex >= options.MaxRetries || !CompletionsRetryPolicy.Retryable(status,
+                    if (options is null || retryIndex >= options.MaxRetries || !CompletionsRetryPolicy.Retryable(options, status,
                         response is null ? null : CompletionsRetryPolicy.Header(response, "x-should-retry", owner._options.MaximumResponseHeaderCharacters)))
                         throw failure;
                     delay = CompletionsRetryPolicy.Delay(options, retryIndex, response, owner._options.MaximumResponseHeaderCharacters);

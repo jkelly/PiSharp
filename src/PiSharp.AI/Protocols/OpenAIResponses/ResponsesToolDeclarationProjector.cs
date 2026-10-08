@@ -11,7 +11,11 @@ public sealed record ResponsesToolDeclarationProjectionOptions(
     bool SupportsStrictMode = false, bool? Strict = false,
     int MaximumMessages = 256, int MaximumEntryCharacters = 65_536, int MaximumInputCharacters = 1_048_576,
     int MaximumDeclarations = 1024, int MaximumActiveTools = 128, int MaximumJsonDepth = 32,
-    int MaximumOutputCharacters = 1_048_576, int MaximumOutputBytes = 1_048_576);
+    int MaximumOutputCharacters = 1_048_576, int MaximumOutputBytes = 1_048_576)
+{
+    /// <summary>Model compat <c>supportsOpenAIGrammarTools</c>: grammar tools become custom tools and replay as custom tool calls.</summary>
+    public bool SupportsOpenAIGrammarTools { get; init; }
+}
 
 /// <summary>Replays owned system-message tool deltas into standard top-level Responses function tools.</summary>
 public sealed class ResponsesToolDeclarationProjector
@@ -107,10 +111,13 @@ public sealed class ResponsesToolDeclarationProjector
         if (parameters.ValueKind != JsonValueKind.Object) throw Failure(ResponsesProjectionFailure.UnsupportedContent);
         var strict = _options.Strict;
         JsonObject? strictParameters = null;
+        // Pi abe508 openai-responses-shared.ts convertResponsesTools: a supported grammar makes a custom tool.
+        if (ResponsesGrammar.Resolve(declaration, _options.SupportsOpenAIGrammarTools) is { } grammar)
+            return new JsonObject { ["type"] = "custom", ["name"] = name, ["description"] = description, ["format"] = new JsonObject
+                { ["type"] = "grammar", ["syntax"] = grammar.Syntax, ["definition"] = grammar.Definition } };
         if (declaration.TryGetProperty("constrainedSampling", out var sampling) && sampling.ValueKind != JsonValueKind.False)
         {
             // Pi d866 constrained-sampling.ts: grammar is ignored when custom grammar tools are unsupported.
-            // This function-tool profile does not enable custom grammar tools.
             if (sampling.ValueKind != JsonValueKind.Object)
                 throw Failure(ResponsesProjectionFailure.UnsupportedContent);
             var samplingType = Text(sampling.GetProperty("type"));
@@ -242,4 +249,38 @@ public sealed class ResponsesToolDeclarationProjector
     }
     private static ResponsesProjectionException Failure(ResponsesProjectionFailure failure) => new(failure);
     private sealed class StrictSchemaException : Exception { }
+}
+
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/constrained-sampling.ts
+// (createGrammarToolInputProperties, getGrammarToolInput) and packages/ai/src/utils/transcript.ts (getDeclaredTools).
+internal static class ResponsesGrammar
+{
+    internal static OpenAICompletions.CompletionsGrammar? Resolve(JsonElement tool, bool enabled)
+    {
+        try { return OpenAICompletions.CompletionsGrammar.Resolve(tool, enabled); }
+        catch (OpenAICompletions.CompletionsRequestException) { throw new ResponsesProjectionException(ResponsesProjectionFailure.UnsupportedContent); }
+    }
+
+    // Every system toolsAdded definition, removals ignored and the last definition of a name winning, whose grammar is supported.
+    internal static Dictionary<string, string> InputProperties(ChatRequest request, bool enabled, CancellationToken token)
+    {
+        var properties = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (!enabled) return properties;
+        var declared = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        foreach (var entry in request.Messages)
+        {
+            token.ThrowIfCancellationRequested();
+            if (entry.Role == "system" && entry.WireBody.Value.TryGetProperty("toolsAdded", out var added) && added.ValueKind == JsonValueKind.Array)
+                foreach (var tool in added.EnumerateArray())
+                    if (tool.ValueKind == JsonValueKind.Object && tool.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String)
+                        declared[name.GetString()!] = tool;
+        }
+        foreach (var (name, tool) in declared) if (Resolve(tool, true) is { } grammar) properties[name] = grammar.InputProperty;
+        return properties;
+    }
+
+    // getGrammarToolInput: the grammar input property must hold a string.
+    internal static string Input(JsonElement arguments, string property) =>
+        arguments.ValueKind == JsonValueKind.Object && arguments.TryGetProperty(property, out var input) && input.ValueKind == JsonValueKind.String
+            ? input.GetString()! : throw new ResponsesProjectionException(ResponsesProjectionFailure.UnsupportedContent);
 }

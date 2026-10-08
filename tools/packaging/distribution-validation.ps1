@@ -78,8 +78,11 @@ function Assert-PiSharpDistribution {
     # A fourth numeric segment marks a C#-only patch on an unchanged Pi baseline.
     if ($Version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'Explicit SemVer candidate required.' }
     if ($Kind -eq 'standalone' -and -not $Rid) { throw 'Standalone RID required.' }
-    $baseline = Get-Content -LiteralPath (Join-Path $Repo 'compatibility/baseline.lock.json') -Raw | ConvertFrom-Json
-    if ($baseline.source.tag -cne 'v0.99.1' -or $baseline.source.commit -cne 'd86654abb8862e201933517d6f1fce9f88dd117f') { throw 'Pinned Pi baseline changed.' }
+    $baseline = Get-Content -LiteralPath (Join-Path $Repo 'compatibility/target.lock.json') -Raw | ConvertFrom-Json
+    # The target baseline must be a well-formed tagged commit that the release record agrees with.
+    $release = Get-Content -LiteralPath (Join-Path $Repo 'compatibility/public-release.json') -Raw | ConvertFrom-Json
+    if ($baseline.source.tag -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+$' -or $baseline.source.commit -cnotmatch '^[0-9a-f]{40}$' -or
+        $release.upstream.tag -cne $baseline.source.tag -or $release.upstream.commit -cne $baseline.source.commit) { throw 'Pinned Pi baseline changed.' }
     $files = Get-PiSharpArchiveInventory -Path $Path
     $sdk = (Get-Content -LiteralPath (Join-Path $Repo 'global.json') -Raw | ConvertFrom-Json).sdk.version
     $provenance = Read-PiSharpArchiveText -Path $Path -Entry 'provenance.json' | ConvertFrom-Json

@@ -1,3 +1,4 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/oauth/discovery.ts.
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
@@ -10,8 +11,11 @@ namespace PiSharp.Extensions.Runtime.Mcp.Authentication;
 /// to an explicitly admitted exchange; this class supplies no HTTP client or endpoint authority.</summary>
 public static class McpAdmittedOAuthDiscovery
 {
+    /// <summary>With <paramref name="authorizationServerMetadataUrl"/>, that RFC 8414 or OpenID Connect document replaces
+    /// authorization server discovery. It is trusted as configured, so its issuer is not checked against a discovery issuer.</summary>
     public static async Task<McpOAuthDiscoveredServer> DiscoverAsync(Uri server, McpAdmittedOAuthExchange exchange,
-        Uri? resourceMetadataUrl = null, CancellationToken token = default, int maximumBytes = 1_048_576)
+        Uri? resourceMetadataUrl = null, CancellationToken token = default, int maximumBytes = 1_048_576,
+        Uri? authorizationServerMetadataUrl = null)
     {
         ValidateAdmission(server, exchange, maximumBytes); token.ThrowIfCancellationRequested();
         JsonData? resource = null;
@@ -28,6 +32,14 @@ public static class McpAdmittedOAuthDiscovery
         }
         catch (McpOAuthProtocolException error) when (error.Code is "metadata_http" or "metadata_invalid")
         { /* Original server-info discovery tolerates missing/malformed protected-resource metadata. */ }
+        if (authorizationServerMetadataUrl is not null)
+        {
+            var configured = await Fetch(authorizationServerMetadataUrl, McpOAuthExchangePurpose.AuthorizationServerMetadata, exchange, token, maximumBytes).ConfigureAwait(false);
+            if (!Success(configured.Status))
+                throw new McpOAuthProtocolException("metadata_http", $"HTTP {configured.Status} loading authorization server metadata from {authorizationServerMetadataUrl}", configured.Status);
+            var trusted = ParseAuthorization(configured.Body);
+            return new(Text(trusted.Value, "issuer", true)!, trusted, resource);
+        }
         var authorization = resource is { } value && Strings(value.Value, "authorization_servers", false) is { Length: > 0 } servers
             ? servers[0] : AtOrigin(server, "/").AbsoluteUri;
         var metadata = await DiscoverAuthorizationServerAsync(authorization, exchange, token, maximumBytes).ConfigureAwait(false);
@@ -108,6 +120,8 @@ public static class McpAdmittedOAuthDiscovery
     {
         if (!value.TryGetProperty(name, out var field))
         { if (!required) return null; throw new McpOAuthProtocolException("metadata_invalid", "Missing OAuth metadata string: " + name); }
+        // Servers send `null` and `""` for optional fields they have no value for.
+        if (!required && (field.ValueKind == JsonValueKind.Null || field.ValueKind == JsonValueKind.String && field.GetString()!.Length == 0)) return null;
         if (field.ValueKind != JsonValueKind.String || string.IsNullOrEmpty(field.GetString()))
             throw new McpOAuthProtocolException("metadata_invalid", "Invalid OAuth metadata string: " + name);
         return field.GetString();
@@ -116,6 +130,7 @@ public static class McpAdmittedOAuthDiscovery
     {
         if (!value.TryGetProperty(name, out var field))
         { if (!required) return null; throw new McpOAuthProtocolException("metadata_invalid", "Missing OAuth metadata array: " + name); }
+        if (!required && field.ValueKind == JsonValueKind.Null) return null;
         if (field.ValueKind != JsonValueKind.Array) throw new McpOAuthProtocolException("metadata_invalid", "Invalid OAuth metadata array: " + name);
         var result = new List<string>();
         foreach (var item in field.EnumerateArray())

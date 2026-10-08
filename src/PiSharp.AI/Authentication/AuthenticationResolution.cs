@@ -2,8 +2,9 @@ using System.Text.Json.Serialization;
 
 namespace PiSharp.AI.Authentication;
 
-public enum AuthenticationKind { ApiKey, BearerToken }
-public enum AuthenticationOrigin { StoredApiKey, EnvironmentApiKey, AnthropicAuthToken, AnthropicOAuthEnvironmentToken }
+/// <summary>WorkloadIdentityFederation carries no secret: its provider configuration travels in CredentialEnvironment.</summary>
+public enum AuthenticationKind { ApiKey, BearerToken, WorkloadIdentityFederation }
+public enum AuthenticationOrigin { StoredApiKey, EnvironmentApiKey, AnthropicAuthToken, AnthropicOAuthEnvironmentToken, AnthropicWorkloadIdentityFederation }
 public enum AuthenticationDiagnostic { Resolved, Missing, UnknownProvider, AmbientAuthenticationUnsupported, InjectedLookupFailed }
 
 /// <summary>Only an injected api_key credential. Stored OAuth/refresh flows are outside this slice.</summary>

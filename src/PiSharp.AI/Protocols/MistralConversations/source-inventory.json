@@ -1,6 +1,6 @@
 {
   "baseCommit": "a54840b36360b70cbfae16e36f831ddc642f3b1c",
-  "sourceCommit": "d86654abb8862e201933517d6f1fce9f88dd117f",
+  "sourceCommit": "abe508e1b89912adde45528136c3221eb69acdd7",
   "implementationFilesAdded": [
     "src/PiSharp.AI/Protocols/MistralConversations/MistralTextOptions.cs",
     "src/PiSharp.AI/Protocols/MistralConversations/MistralTextHttpSseTransport.cs",
@@ -11,13 +11,13 @@
   "nativeContractAndOwnershipFiles": [
     {
       "path": "src/PiSharp.AI/Abstractions/IChatTransport.cs",
-      "sha256": "92dc12ab7db6eb1735f23645fcb3fbae46f2f2b69cb8db16c813dd5342390cc3",
-      "bytes": 715
+      "sha256": "f82320e6c561f92678b43a7a3e321b10fb792aa3b53e933a9d81c64af7a7c56e",
+      "bytes": 1094
     },
     {
       "path": "src/PiSharp.AI/Providers/ModelTransportRegistry.cs",
-      "sha256": "65904fa440fe78aa22e62eb80e33ef9365c833e4b5001cb6e6d6119abe4c4a1d",
-      "bytes": 2695
+      "sha256": "9716d385eaa657f8e5fb78f494451e7f39f3e07176dcf157528168316489161e",
+      "bytes": 2868
     },
     {
       "path": "src/PiSharp.AI/Transports/SseDecoder.cs",
@@ -26,18 +26,18 @@
     },
     {
       "path": "src/PiSharp.AI/Transports/HttpSseTransport.cs",
-      "sha256": "113d4a12c5779bb911185380b6ff8388024dd957e36896dafa45396019348233",
-      "bytes": 6037
+      "sha256": "43613d9bc48730ed7daac2287d3cb9e22aba3841594ed7ccb086a8c4bd1723d4",
+      "bytes": 6539
     },
     {
       "path": "src/PiSharp.AI/Streaming/AssistantStreamReducer.cs",
-      "sha256": "d28bb5bf102e5b55e1d82c54ae3ad4738e559a5602ed04eea0d95850500bf8e9",
-      "bytes": 16448
+      "sha256": "6091b85fde87ce465c937c648b5e23bbd1c07d413cd03b4f9ba1107b83a70eb8",
+      "bytes": 16649
     },
     {
       "path": "src/PiSharp.AI/Streaming/ChatRun.cs",
-      "sha256": "92f41b8df5d23d76d1516bb170715354100249d5dd697cf38c100161d37098d8",
-      "bytes": 27695
+      "sha256": "11eb6d6bc714b20ec40bbb8815057679f6a134485f9f26fdaa7d7b2c633ca646",
+      "bytes": 29223
     },
     {
       "path": "src/PiSharp.AI/Protocols/PiMessages/PiMessagesHttpSseTransport.cs",
@@ -51,13 +51,13 @@
     },
     {
       "path": "src/PiSharp.AI/Protocols/OpenAICompletions/CompletionsHttpSseTransport.cs",
-      "sha256": "842f9fec74a14796fc22c66524e3ecf97f2a568216189c7a99a424d01c58e7ea",
-      "bytes": 28461
+      "sha256": "5f8fe3f43f6a296ceada951cd9e77fbaf730428faea18186b3e11edfcf8e0e87",
+      "bytes": 28470
     },
     {
       "path": "src/PiSharp.Contracts/Streaming/StreamEvents.cs",
-      "sha256": "da6aed50cc09f24ae800a62d2f928fe947808407f947f30bcf86b6aeb0d86f4a",
-      "bytes": 4316
+      "sha256": "d38d62ee8c5f3e405db1471f3e8645dbad3629ebd551b3790a4ce146c5881793",
+      "bytes": 4840
     },
     {
       "path": "src/PiSharp.Contracts/Streaming/NativeChatDiagnostic.cs",
@@ -66,8 +66,8 @@
     },
     {
       "path": "src/PiSharp.Contracts/Messages/AssistantMessage.cs",
-      "sha256": "50f6c42b6abab908195d2ce88894a6ec4200b6251cb21d064347d29a4591cab4",
-      "bytes": 1676
+      "sha256": "79d3fc941edc09443220bba2dee1cdc34fb801ad43eba3262a6cb9435caf0d1c",
+      "bytes": 2033
     }
   ],
   "nativeBuildRun": false,
@@ -78,9 +78,9 @@
   "schemaVersion": 1,
   "sourceFiles": [
     {
-      "sha256": "5f6123383887a1b4ee8fb46fbd645b088e5da77984066497521d86661dde0fcd",
+      "sha256": "429de961a1bd84ed7feb163c0e0d91eb7096f8dcfefcd30d6f098d1c0cbbd4ab",
       "path": "packages/ai/src/api/mistral-conversations.ts",
-      "bytes": 30832
+      "bytes": 30949
     },
     {
       "sha256": "74267bc430c0c2562d166e4ae9d05966634e91b226bc564010b2b199db52dd86",
@@ -103,19 +103,19 @@
       "bytes": 2061
     },
     {
-      "sha256": "8fb9acd4c998502826b22df2d88bcded441cc473a606c5b7bdf21271afd1a74a",
+      "sha256": "2d14d659f1c62f11cc942b1c2d681f2218c0b671cc37a1df59a5e1a1ee37aef5",
       "path": "packages/ai/src/auth/types.ts",
-      "bytes": 8661
+      "bytes": 8830
     },
     {
-      "sha256": "b511a61d0353ced580019476ed506f4f078284cd16407acda8558a587819d057",
+      "sha256": "0bb1945f280a03b0dcb7cd24b9caa7dd59d4bf25ce7bc92699fb27b2eba05426",
       "path": "packages/ai/src/env-api-keys.ts",
-      "bytes": 7616
+      "bytes": 7981
     },
     {
-      "sha256": "4739010c7e4f7596607b1dd495b9d5ab6cd921e29f55c5c331259a04b7253269",
+      "sha256": "3b48631cdabe885ed846cb29f0a71abe8e3effc682c63d0b612eef648d40e9f5",
       "path": "packages/ai/src/models.ts",
-      "bytes": 46331
+      "bytes": 46494
     },
     {
       "sha256": "567b559600439eac5e6c341658bb45b149c5e8a22e34624a54ad5a06f5a92885",
@@ -123,14 +123,14 @@
       "bytes": 2706
     },
     {
-      "sha256": "7ac401b31a7679a77469037091093c4c25d3719d7c9e9078378fece509fa8e8d",
+      "sha256": "568d1ba5d382d9ef4e8d98040c100545c21d1cacfbc98db6dd749014c3c3a15e",
       "path": "packages/ai/src/types.ts",
-      "bytes": 48466
+      "bytes": 49482
     },
     {
-      "sha256": "147084657f76665ff7d6c8dcd6eb0745149e3aaee3e7b9c272b315a1b5679386",
+      "sha256": "9fd5e33a8e295d88b5911af71d7afbfd437c9620288808d18331f16811e24dac",
       "path": "packages/ai/src/utils/event-stream.ts",
-      "bytes": 2878
+      "bytes": 3971
     },
     {
       "sha256": "2cdfce4af41810d1a92c7f0a55c78637a3173041038aafd85b378be345761ed8",
@@ -163,19 +163,19 @@
       "bytes": 1560
     },
     {
-      "sha256": "cad0c126cdfadc1b4f430cc5a95b1c9285ecd1ee9957642d7773b1357bbc9ac5",
+      "sha256": "e0814f35bdcc93b017fa45589a6920e46b5480b88fba01ef93e5d2d4e815f0f2",
       "path": "packages/ai/src/utils/transcript.ts",
-      "bytes": 9403
+      "bytes": 9602
     },
     {
-      "sha256": "1b869f139e5cd1f09b4ebecb8f7ce9ea44b63e75dc6d6158ac8f5d00f2eaddbb",
+      "sha256": "f795db4afbbdf2918b346a7f260841ca477c29b26bcdb1084e039697a715a22a",
       "path": "packages/ai/src/api/constrained-sampling.ts",
-      "bytes": 9295
+      "bytes": 10231
     },
     {
-      "sha256": "8bb50ff92c1759434ead59d1b4111826b6be47d13f744b8cc3b775c684536d46",
+      "sha256": "f68b3e13a55a72214243b37eb85fa0532b67cfb22ac80ea3434eb5d26ae36616",
       "path": "packages/ai/src/api/simple-options.ts",
-      "bytes": 3256
+      "bytes": 3915
     },
     {
       "sha256": "6d82d11a49213a4193e0d074f36d7af76e8a911b003104c0aa2c22569b2fe669",
@@ -185,7 +185,7 @@
   ],
   "sourceRoot": "P:\\PiSharp\\root\\Documents\\Codex\\2026-09-30\\task-2\\Pi-reference-oracle-v0.99.1\\upstream",
   "proposedContractFile": null,
-  "sourceTag": "v0.99.1",
+  "sourceTag": "v1.1.0",
   "sourceInventoryScope": "Primary Mistral source, all its direct source imports, provider/auth/catalog evidence; not a sealed executable transitive-module admission",
   "proposedOfflineCases": 12,
   "dependenciesAdded": [],

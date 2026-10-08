@@ -29,6 +29,8 @@ public sealed class OAuthCredentialSnapshot
 /// only after the callback completes successfully and the supplied token remains active.
 /// A null callback result means no change; return the authoritative current snapshot in that case.
 /// Cancellation must not release serialization until original callback work settles.
+/// StoredOAuthLifecycle supplies a token that cancels only the serialization wait: it stops
+/// forwarding caller cancellation once the callback starts, so a started refresh is persisted.
 /// This leaf supplies no persistent implementation and must be exercised with synthetic inputs only.
 /// </summary>
 public interface IAdmittedOAuthCredentialSource

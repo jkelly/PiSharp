@@ -36,7 +36,7 @@ internal sealed partial class OfflineSessionProfile
         });
         registeredMcpRefreshAdmitted = true;
         // ConfigureMcpRuntime retains its exact registry/policy checks, independent resource joins,
-        // CaptureInitialRuntimeViewOwnership wrapper, profile binder and deferred catalog validation.
+        // CaptureInitialRuntimeViewOwnership wrapper and profile binder.
     }
 
     // MCP metadata replacement retains the current native profile view. Native extension reload
@@ -60,16 +60,13 @@ internal sealed partial class OfflineSessionProfile
                 { throw new AggregateException(rejected, cleanup?.Exception ?? failure); }
                 throw;
             }
-            var catalog = runtime.Registry.RegisteredTools;
-            var selection = runtime.Registry.LifetimeToolSelection;
-            var active = reservation.ActiveTools.Where(name => catalog.Any(tool => tool.Adapter.Name == name &&
-                tool.Exposure is ToolExposure.Direct or ToolExposure.ModelOnly) && selection?.IsAllowed(name) != false).ToList();
-            if (selection?.IncludeDefaultExtensions != false)
-                foreach (var tool in catalog.Where(tool => tool.IsExtension && tool.DefaultActive &&
-                    tool.Exposure is ToolExposure.Direct or ToolExposure.ModelOnly && selection?.IsAllowed(tool.Adapter.Name) != false))
-                    if (!active.Contains(tool.Adapter.Name, StringComparer.Ordinal)) active.Add(tool.Adapter.Name);
+            // Source _refreshToolRegistry: the active tools still registered, then the tools a --tools allowlist names, including
+            // one that registers only now (a name the initial selection ignored), or without an allowlist default-active extensions.
+            var active = AllowedToolSelection.SelectReloaded(runtime.Registry.LifetimeToolSelection, reservation.ActiveTools,
+                [.. runtime.Registry.RegisteredTools.Select(tool => new ToolSelectionDescriptor(tool.Adapter.Name, tool.Exposure, tool.DefaultActive, tool.IsExtension))],
+                null, null);
             var drain = reservation.InvalidateAndDrainAsync(); await drain.ConfigureAwait(false);
-            var publication = reservation.PublishAsync(runtime, active.ToImmutableArray(), () => { });
+            var publication = reservation.PublishAsync(runtime, active, () => { });
             await publication.ConfigureAwait(false);
             var retirement = reservation.CleanupPreviousRuntimeAsync(); await retirement.ConfigureAwait(false);
             return reservation.Candidate;
@@ -103,19 +100,9 @@ internal sealed partial class OfflineSessionProfile
                 {
                     admittedBinder?.Invoke(owner, attachment);
                     ownership.BindOwner(owner, attachment);
-                }};
-                if (_deferredCatalogNames is not { } requested) return acquired;
-                var prepare = acquired.PrepareDiscovery;
-                return acquired with { PrepareDiscovery = (plan, current) =>
-                {
-                    if (prepare is null || prepare.GetInvocationList().Length != 1)
-                        throw new ArgumentException("One discovery preparation is required.");
-                    var prepared = prepare(plan, current) ?? throw new InvalidOperationException("Discovery returned no catalog.");
-                    foreach (var name in requested)
-                        if (!prepared.Registry.RegisteredTools.Any(tool => tool.Adapter.Name == name))
-                            throw new SessionCommandException(SessionCommandFailure.InvalidArguments);
-                    return prepared;
-                }};
+                }, ServersPromptSource = AdmitMcpServersPromptSource(acquired.ServersPromptSource) };
+                // Pi 1.1.0 ignores selected names the discovered catalog does not register; they are not validated here.
+                return acquired;
             }
             catch (Exception rejected)
             {
