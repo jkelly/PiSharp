@@ -2,7 +2,7 @@
 // getLoginProviderOptions, getLogoutProviderOptions, handleLoginCommand, startProviderLogin, showLoginAuthTypeSelector,
 // showLoginProviderSelector, showOAuthSelector, completeProviderAuthentication, showAmbientAuthDialog, showApiKeyLoginDialog,
 // showAuthSelect, showAuthPrompt, notifyAuthDialog, loginProvider, showLoginDialog, offerRadiusMcpServer). Credentials go through
-// the CLI's ProviderLoginHost (auth.json); secret prompts render masked in the login dialog.
+// the CLI's ProviderLoginHost (auth.json). Secret prompts render unmasked like upstream 1.1.0 (the dialog keeps a masking option).
 using PiSharp.AI.Authentication.OAuth;
 using PiSharp.Cli.Authentication;
 using PiSharp.Cli.Interactive.Mode.Components;
@@ -320,7 +320,7 @@ internal sealed partial class InteractiveMode
     }
 
     /// <summary>showAuthPrompt and notifyAuthDialog: select prompts open a selector; text and secret prompts the dialog's input
-    /// (secret input is masked).</summary>
+    /// (unmasked, as upstream).</summary>
     private sealed class DialogInteraction(InteractiveMode mode, LoginDialogComponent dialog, string providerId) : IProviderAuthInteraction
     {
         public Task<string> PromptAsync(AuthPrompt prompt, CancellationToken cancellationToken) =>
@@ -328,7 +328,6 @@ internal sealed partial class InteractiveMode
             {
                 AuthPromptKind.Select => mode.ShowAuthSelectAsync(dialog, prompt, providerId),
                 AuthPromptKind.ManualCode => dialog.ShowManualInput(prompt.Message),
-                AuthPromptKind.Secret => dialog.ShowPrompt(prompt.Message, prompt.Placeholder, secret: true),
                 _ => dialog.ShowPrompt(prompt.Message, prompt.Placeholder)
             }).Unwrap().WaitAsync(cancellationToken);
 

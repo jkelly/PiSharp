@@ -29,6 +29,9 @@ public sealed class PersistentSessionLifecycle
     public SessionCatalog? Catalog { get; }
     public bool RebindsWorkingDirectory => registryForWorkingDirectory is not null || runtimeForWorkingDirectory is not null || runtimeForAttachment is not null;
     public PersistentAgentSessionOptions Options => options;
+    /// <summary>Configures a session a New creation staged (agent-session-runtime.ts newSession recreates the session through
+    /// createAgentSession, which picks the default thinking level and records it) before it is attached.</summary>
+    public Func<PersistentAgentSession, CancellationToken, ValueTask>? ConfigureNewSession { get; set; }
     public SessionLifecycleReadOnly ReadOnly { get; }
     public PersistentSessionLifecycle(SessionRuntimeRegistry registry, Func<long> clock, Func<string> nextEntryId,
         PersistentAgentSessionOptions? options = null, Func<string>? nextSessionId = null,
@@ -164,6 +167,7 @@ public sealed class PersistentSessionLifecycle
             session = await PersistentAgentSession.OpenWithRuntimeFactoryAsync(path,
                 (cwd, cancellation) => AcquireRuntimeAsync(cwd, generation, cancellation), clock, nextEntryId,
                 options with { UseLatestLeaf = true, SelectedLeafId = null }, state.Agent.Model, token).ConfigureAwait(false);
+            if (request.Kind == AgentSessionCreationKind.New && ConfigureNewSession is { } configure) await configure(session, token).ConfigureAwait(false);
             var prepared = new PreparedCreation(session, file, plan.SelectedText); session = null; file = null;
             return prepared;
         }

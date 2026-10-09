@@ -168,6 +168,26 @@ public static class RpcSessionCommand
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);
             var lifecycle = profile.CreateLifecycle(Clock, NextId, options, catalog: catalog, backend: backend);
+            // sdk.ts createAgentSession for a new session (/new, new_session): the CLI level, else the per-model or global default
+            // the settings files hold now, clamped to the model.
+            lifecycle.ConfigureNewSession = async (created, token) =>
+            {
+                var current = pi?.ReloadSettings is { } reload ? await reload(token).ConfigureAwait(false) : settings;
+                var level = SettingsModelSelection.Thinking(current, created.Snapshot.Agent.Model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel,
+                    false, created.GetSupportedThinkingLevels());
+                if (level is not null && level != created.Snapshot.Context.ThinkingLevel)
+                    await created.ConfigureAsync(new(ThinkingLevel: level), token).ConfigureAwait(false);
+            };
+            // sdk.ts createAgentSession for a new session (/new, new_session): the CLI level, else the per-model or global default
+            // the settings files hold now, clamped to the model.
+            lifecycle.ConfigureNewSession = async (created, token) =>
+            {
+                var current = pi?.ReloadSettings is { } reload ? await reload(token).ConfigureAwait(false) : settings;
+                var level = SettingsModelSelection.Thinking(current, created.Snapshot.Agent.Model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel,
+                    false, created.GetSupportedThinkingLevels());
+                if (level is not null && level != created.Snapshot.Context.ThinkingLevel)
+                    await created.ConfigureAsync(new(ThinkingLevel: level), token).ConfigureAwait(false);
+            };
             session = parsed.SessionMode == "open"
                 ? await lifecycle.OpenAsync(new(parsed.Session, parsed.Latest, parsed.Leaf), profile.SelectedModel, cancellationToken).ConfigureAwait(false)
                 : await lifecycle.CreateAsync(parsed.Session, new PiSharp.Sessions.Serialization.SessionEntryCodec().Parse(JsonSerializer.Serialize(new

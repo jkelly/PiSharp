@@ -349,6 +349,7 @@ internal static class PiCommand
         var options = new PiEntryOptions
         {
             ToolPolicy = toolPolicy, Settings = startupSnapshot, Selection = selection, LiveRuntime = runtime,
+            ReloadSettings = reloadToken => PiSettings.Load(sessionCwd, agentDir, projectTrusted).ToStartupSnapshotAsync(reloadToken),
             SystemPrompt = PiSystemPrompt.Admission(resources, skills?.Resources, host.ApplicationDirectory ?? packageDir),
             HeaderId = plan.HeaderId, HeaderTimestamp = plan.HeaderTimestamp, SessionName = sessionName,
             Skills = skills, PromptTemplates = prompts, ThinkingLevel = parsed.Thinking, ThinkingFromCli = parsed.Thinking is not null,

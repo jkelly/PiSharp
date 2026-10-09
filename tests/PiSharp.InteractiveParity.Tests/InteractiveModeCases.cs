@@ -103,6 +103,27 @@ internal static class InteractiveModeCases
             await pi.WaitFor("✓ New session started");
         }));
 
+        // agent-session-runtime.ts newSession recreates the session through createAgentSession: a new session has no thinking entry,
+        // so it takes the per-model or global default (defaultThinkingLevel, else medium) and records it. /thinking <level> does not
+        // persist, so it does not carry over.
+        foreach (var (id, configured, expected) in new[] { ("default", (string?)null, "medium"), ("settings-default", "low", "low") })
+            yield return ($"e2e.slash.new-session-keeps-default-thinking-{id}", Case("new-thinking", async pi =>
+            {
+                await pi.WaitUntil(text => text.Contains("claude-sonnet-4-5 • " + expected, StringComparison.Ordinal), "startup thinking level");
+                pi.Type("/thinking high");
+                await pi.WaitFor("/thinking high");
+                await Task.Delay(300);
+                pi.Type("\r");
+                await Task.Delay(300);
+                pi.Type("\r");
+                await pi.WaitUntil(text => text.Contains("claude-sonnet-4-5 • high", StringComparison.Ordinal), "footer thinking level");
+                await pi.Submit("/new");
+                await pi.WaitFor("✓ New session started");
+                await pi.WaitUntil(text => text.Contains("claude-sonnet-4-5 • " + expected, StringComparison.Ordinal), "default thinking level after /new");
+            }, setup: pi =>
+            {
+                if (configured is not null) File.WriteAllText(Path.Combine(pi.AgentDir, "settings.json"), $$"""{"defaultThinkingLevel":"{{configured}}"}""");
+            }));
         yield return ("e2e.slash.copy", Case("copy", async pi =>
         {
             await pi.Submit("/copy");
@@ -269,7 +290,7 @@ internal static class InteractiveModeCases
             await pi.WaitUntil(text => !text.Contains("Select authentication method:", StringComparison.Ordinal), "closed");
         }));
 
-        yield return ("e2e.login.api-key-prompt-is-masked", Case("login-mask", async pi =>
+        yield return ("e2e.login.api-key-prompt-is-unmasked-like-upstream", Case("login-mask", async pi =>
         {
             pi.Type("/login anthropic");
             await Task.Delay(300);
@@ -283,8 +304,8 @@ internal static class InteractiveModeCases
             await pi.WaitFor("Enter Anthropic API key");
             await Task.Delay(100);
             pi.Type("sk-secret-value-123");
-            await pi.WaitFor("*******************");
-            Check(!pi.Terminal.Text.Contains("sk-secret-value-123", StringComparison.Ordinal), "secret never shown");
+            await pi.WaitFor("sk-secret-value-123");
+            Check(!pi.Terminal.Text.Contains("*******************", StringComparison.Ordinal), "upstream 1.1.0 does not mask the API key");
             pi.Type("\u001b");
         }, setup: pi => pi.Configure = context => context with { Login = new PiSharp.Cli.Authentication.ProviderLoginHost(
             new PiSharp.Cli.Authentication.AuthJsonCredentialStore(Path.Combine(pi.AgentDir, "auth.json")), () => new HttpClient()) }));

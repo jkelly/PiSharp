@@ -41,6 +41,8 @@ internal sealed record PiEntryOptions
 
     internal required PiToolPolicy ToolPolicy { get; init; }
     internal required StartupSettingsSnapshot Settings { get; init; }
+    /// <summary>Re-reads the settings files (the SettingsManager the session runtime reads when it creates a new session).</summary>
+    internal Func<CancellationToken, Task<StartupSettingsSnapshot>>? ReloadSettings { get; init; }
     internal required OriginalSystemPromptAdmission SystemPrompt { get; init; }
     internal required LiveSessionSelection Selection { get; init; }
     internal required LiveSessionRuntime LiveRuntime { get; init; }
