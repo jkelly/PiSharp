@@ -26,13 +26,21 @@ internal sealed class PiExtensionLoading
         foreach (var source in missing) _diagnostics.Add(new("error", $"Failed to load extension \"{source.Path}\": Extension path does not exist: {source.Path}"));
         var paths = fresh.Except(missing).Select(source => source.Path).ToList();
         if (paths.Count == 0) return;
-        if (Host is null)
+        // Native C# extensions need no Node: a run with only those starts Node once a TypeScript or JavaScript extension loads.
+        var nodePaths = paths.Where(path => !PiNativeExtension.IsManifest(path)).ToList();
+        Host ??= nodePaths.Count == 0 ? PiExtensionHost.CreateWithoutNode(options()) : null;
+        if (Host is null || nodePaths.Count > 0 && !Host.IsRunning)
         {
-            try { Host = await PiExtensionHost.StartAsync(options(), token).ConfigureAwait(false); }
+            try
+            {
+                if (Host is null) Host = await PiExtensionHost.StartAsync(options(), token).ConfigureAwait(false);
+                else await Host.EnsureNodeAsync(token).ConfigureAwait(false);
+            }
             catch (Exception error) when (error is PiExtensionHostUnavailableException or InvalidOperationException or System.ComponentModel.Win32Exception)
             {
-                foreach (var path in paths) _diagnostics.Add(new("error", $"Failed to load extension \"{path}\": {error.Message}"));
-                return;
+                foreach (var path in nodePaths) _diagnostics.Add(new("error", $"Failed to load extension \"{path}\": {error.Message}"));
+                paths = [.. paths.Except(nodePaths)];
+                if (Host is null) { if (paths.Count == 0) return; Host = PiExtensionHost.CreateWithoutNode(options()); }
             }
             if (Host.RuntimeFallback is { } fallback) _diagnostics.Add(new("warning", "Extensions are not running against the Pi " + PiNodeRuntime.PiVersion + " packages: " + fallback));
         }

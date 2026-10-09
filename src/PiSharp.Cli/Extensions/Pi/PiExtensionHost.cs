@@ -118,6 +118,16 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     internal static async Task<PiExtensionHost> StartAsync(PiExtensionHostOptions options, CancellationToken token)
     {
         var host = new PiExtensionHost(options);
+        await host.StartNodeAsync(token).ConfigureAwait(false);
+        return host;
+    }
+
+    /// <summary>A host for native C# extensions only: Node starts when a TypeScript or JavaScript extension loads.</summary>
+    internal static PiExtensionHost CreateWithoutNode(PiExtensionHostOptions options) => new(options);
+
+    private async Task StartNodeAsync(CancellationToken token)
+    {
+        var host = this; var options = _options;
         var node = options.NodeExecutable ?? PiNodeHost.FindNode(options.GetEnvironment)
             ?? throw new PiExtensionHostUnavailableException("TypeScript and JavaScript extensions need Node.js on PATH (or PISHARP_NODE).");
         var script = options.HostScript ?? PiNodeHost.FindHostScript(options.GetEnvironment)
@@ -137,7 +147,6 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         }, token).ConfigureAwait(false);
         host.Modules = init is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty("modules", out var modules) && modules.ValueKind == JsonValueKind.String
             ? modules.GetString()! : "compatibility";
-        return host;
     }
 
     private PiNodeHost Node => _node ?? throw new InvalidOperationException("The Node extension host is not running.");
@@ -146,7 +155,11 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     /// as <c>Failed to load extension: …</c> (or the factory error) and the next path loads.</summary>
     internal async Task LoadAsync(IReadOnlyList<string> paths, CancellationToken token)
     {
+        // Native C# extensions (pisharp-extension.json) load into their own load contexts; the others in Node.
+        LoadNative(paths.Where(PiNativeExtension.IsManifest), 0);
+        paths = [.. paths.Where(path => !PiNativeExtension.IsManifest(path))];
         if (paths.Count == 0) return;
+        if (_node is null) await StartNodeAsync(token).ConfigureAwait(false);
         var result = await Node.RequestAsync("load", new JsonObject { ["paths"] = new JsonArray([.. paths.Select(path => (JsonNode)path)]) }, token).ConfigureAwait(false)
             ?? throw new InvalidOperationException("The Node extension host returned no load result.");
         lock (_extensions)
@@ -169,6 +182,7 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         var order = paths.Select(Path.GetFullPath).ToList();
         lock (_extensions)
         {
+            _order = [.. order];
             var ranked = _extensions.Select((extension, position) => (extension, rank: order.FindIndex(path => PiPaths.Comparer.Equals(path, extension.ResolvedPath)), position))
                 .OrderBy(item => item.rank < 0 ? int.MaxValue : item.rank).ThenBy(item => item.position).Select(item => item.extension).ToList();
             _extensions.Clear(); _extensions.AddRange(ranked);
@@ -224,16 +238,23 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         return Extensions.FirstOrDefault(extension => extension.OwnerId == ownerId)?.Path ?? ownerId;
     }
 
-    /// <summary>Registers every loaded extension as a registry owner, in load order.</summary>
-    internal async Task ActivateAsync(ExtensionRegistry registry, CancellationToken token)
+    /// <summary>Registers every loaded extension (Node and native) as a registry owner, in the final extension path order. The
+    /// session's activation (<paramref name="session"/>) keeps the native owners; a pre-session registry gets its own instances.</summary>
+    internal async Task ActivateAsync(ExtensionRegistry registry, CancellationToken token, bool session = false)
     {
         var names = CommandInvocationNames();
         var owners = new List<PiNodeOwner>();
-        foreach (var extension in Extensions)
+        foreach (var (extension, native) in ActivationOrder())
         {
-            var owner = new PiNodeOwner(this, extension, names);
+            if (native is not null)
+            {
+                var scope = await ActivateNativeAsync(registry, native, token).ConfigureAwait(false);
+                if (session) native.Scope = scope;
+                continue;
+            }
+            var owner = new PiNodeOwner(this, extension!, names);
             owners.Add(owner);
-            lock (_ownerPaths) _ownerPaths[extension.OwnerId] = extension.Path;
+            lock (_ownerPaths) _ownerPaths[extension!.OwnerId] = extension.Path;
             await registry.ActivateAsync(extension.OwnerId, owner, token).ConfigureAwait(false);
         }
         lock (_extensions) _owners = [.. owners];

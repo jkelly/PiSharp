@@ -4,6 +4,19 @@ namespace PiSharp.Extensions.Runtime;
 
 public sealed partial class ExtensionRegistry
 {
+    /// <summary>The owner's current tool registrations (registration id and descriptor) in registration order, for a host that
+    /// publishes an owner activated after its session bound.</summary>
+    public ImmutableArray<(string RegistrationId, ExtensionToolDescriptor Descriptor)> CaptureOwnedTools(RegistrationScope scope)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        lock (gate)
+        {
+            EnsureScope(scope, "capture-owned-tools");
+            return [.. scope.Staged.Entries.Where(entry => entry.Kind == RegistrationKind.Tool)
+                .Select(entry => (entry.RegistrationId, (ExtensionToolDescriptor)entry.Descriptor))];
+        }
+    }
+
     /// <summary>Stages an exact owned tool subset replacement. Preview has future entries and cannot
     /// dispatch until committed. No callbacks, publication or current registration changes occur here.</summary>
     public ToolCatalogReplacementPlan PrepareToolCatalogReplacement(RegistrationScope scope,

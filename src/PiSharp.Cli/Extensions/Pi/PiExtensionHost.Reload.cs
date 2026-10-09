@@ -30,40 +30,56 @@ internal sealed partial class PiExtensionHost
     /// replaced in the session's catalog (_refreshToolRegistry). Returns the load errors.</summary>
     internal async Task<ImmutableArray<PiExtensionLoadError>> ReloadExtensionsAsync(CancellationToken token)
     {
-        var paths = ResolveReloadPaths is { } resolve ? await resolve(token).ConfigureAwait(false) : [.. Extensions.Select(extension => extension.Path)];
+        var paths = ResolveReloadPaths is { } resolve ? await resolve(token).ConfigureAwait(false)
+            : [.. ActivationOrder().Select(item => item.Node?.Path ?? item.Native!.Path)];
         lock (_providers) _providers.Clear();
         lock (_virtualModels) _virtualModels.Clear();
         lock (_mcpServers) _mcpServers.Clear();
-        var result = await Node.RequestAsync("reload", new JsonObject { ["paths"] = new JsonArray([.. paths.Select(path => (JsonNode)path)]) }, token)
+        var nodePaths = paths.Where(path => !PiNativeExtension.IsManifest(path)).ToList();
+        if (_node is null && nodePaths.Count > 0) await StartNodeAsync(token).ConfigureAwait(false);
+        JsonElement? result = _node is null ? null : await Node.RequestAsync("reload", new JsonObject { ["paths"] = new JsonArray([.. nodePaths.Select(path => (JsonNode)path)]) }, token)
             .ConfigureAwait(false) ?? throw new InvalidOperationException("The Node extension host returned no reload result.");
         var errors = ImmutableArray.CreateBuilder<PiExtensionLoadError>();
         ImmutableArray<PiNodeOwner> previous;
+        int generation;
         lock (_extensions)
         {
-            var generation = ++_runtimeGeneration;
+            generation = ++_runtimeGeneration;
             _extensions.Clear(); _errors.Clear();
-            foreach (var item in result.GetProperty("results").EnumerateArray())
+            _order = [.. paths.Select(Path.GetFullPath)];
+            if (result is { } reloaded)
             {
-                var path = item.GetProperty("path").GetString()!;
-                if (item.TryGetProperty("error", out var error)) { var failure = new PiExtensionLoadError(path, error.GetString() ?? "Failed to load extension"); _errors.Add(failure); errors.Add(failure); continue; }
-                var descriptor = JsonNode.Parse(item.GetProperty("extension").GetRawText())!.AsObject();
-                _extensions.Add(new(descriptor["index"]!.GetValue<int>(), path, descriptor["resolvedPath"]!.GetValue<string>()) { Descriptor = descriptor, Generation = generation });
+                foreach (var item in reloaded.GetProperty("results").EnumerateArray())
+                {
+                    var path = item.GetProperty("path").GetString()!;
+                    if (item.TryGetProperty("error", out var error)) { var failure = new PiExtensionLoadError(path, error.GetString() ?? "Failed to load extension"); _errors.Add(failure); errors.Add(failure); continue; }
+                    var descriptor = JsonNode.Parse(item.GetProperty("extension").GetRawText())!.AsObject();
+                    _extensions.Add(new(descriptor["index"]!.GetValue<int>(), path, descriptor["resolvedPath"]!.GetValue<string>()) { Descriptor = descriptor, Generation = generation });
+                }
+                foreach (var flag in reloaded.GetProperty("flagValues").EnumerateObject()) _flagValues[flag.Name] = JsonNode.Parse(flag.Value.GetRawText());
             }
-            foreach (var flag in result.GetProperty("flagValues").EnumerateObject()) _flagValues[flag.Name] = JsonNode.Parse(flag.Value.GetRawText());
             previous = _owners; _owners = [];
         }
         foreach (var error in errors) await ReportAsync(error.Path, "reload", error.Error).ConfigureAwait(false);
-        // The previous runtime's registrations leave at once (its tools with the catalog replacement below).
+        // The previous runtime's registrations leave at once (its tools with the catalog replacement below); native extensions load
+        // again into fresh load contexts.
         foreach (var owner in previous) owner.Retire();
         lock (_retired) _retired.AddRange(previous);
+        await ReloadNativeAsync(paths.Where(PiNativeExtension.IsManifest), generation, token).ConfigureAwait(false);
         if (_activation?.Registry is { } registry)
         {
             var names = CommandInvocationNames();
             var owners = ImmutableArray.CreateBuilder<PiNodeOwner>();
-            foreach (var extension in Extensions)
+            foreach (var (extension, native) in ActivationOrder())
             {
-                var owner = new PiNodeOwner(this, extension, names) { DeferTools = true };
-                lock (_ownerPaths) _ownerPaths[extension.OwnerId] = extension.Path;
+                if (native is not null)
+                {
+                    native.LateActivation = true;
+                    native.Scope = await ActivateNativeAsync(registry, native, token).ConfigureAwait(false);
+                    continue;
+                }
+                var owner = new PiNodeOwner(this, extension!, names) { DeferTools = true };
+                lock (_ownerPaths) _ownerPaths[extension!.OwnerId] = extension.Path;
                 try { await registry.ActivateAsync(extension.OwnerId, owner, token).ConfigureAwait(false); owners.Add(owner); }
                 catch (ExtensionRegistrationException error) { await ReportAsync(extension.Path, "reload", error.Message).ConfigureAwait(false); }
             }

@@ -42,7 +42,8 @@ internal sealed partial class PiExtensionHost
         _eventBus = registry.SharedEventBus;
         _eventBus.Tap = (channel, data) =>
         {
-            if (_deliveringFromNode) return;
+            // Node's own emission is not echoed back to Node; an emission a native listener makes meanwhile is forwarded.
+            if (_deliveringFromNode && channel == _deliveringChannel && ReferenceEquals(data, _deliveringData)) return;
             JsonNode? json;
             try { json = data switch { null => null, JsonData value => JsonNode.Parse(value.ToString()), JsonElement element => JsonNode.Parse(element.GetRawText()),
                 JsonNode node => node.DeepClone(), _ => JsonSerializer.SerializeToNode(data, data.GetType()) }; }
@@ -127,6 +128,7 @@ internal sealed partial class PiExtensionHost
             {
                 // A rebuilt runtime: the previous owners' tools leave first, so the new owners may register the same names.
                 await RetireOwnersAsync(activation, session).ConfigureAwait(false);
+                await SyncNativeToolsAsync(activation, session).ConfigureAwait(false);
                 foreach (var owner in owners.Where(owner => index < 0 || owner.Index == index))
                     await owner.SyncToolsAsync(activation, session, force, CancellationToken.None).ConfigureAwait(false);
             }
@@ -140,16 +142,19 @@ internal sealed partial class PiExtensionHost
         finally { _sync.Release(); }
     }
     [ThreadStatic] private static bool _deliveringFromNode;
+    [ThreadStatic] private static string? _deliveringChannel;
+    [ThreadStatic] private static object? _deliveringData;
 
     /// <summary>A Node extension's pi.events.emit: the native extensions' listeners receive the data as <see cref="JsonData"/>.</summary>
     private void DeliverFromNode(JsonElement parameters)
     {
         if (_eventBus is not { } bus) return;
         var data = parameters.TryGetProperty("data", out var value) && value.ValueKind != JsonValueKind.Null ? JsonData.Parse(value.GetRawText()) : null;
-        _deliveringFromNode = true;
-        try { bus.Emit(parameters.GetProperty("channel").GetString()!, data); }
+        var channel = parameters.GetProperty("channel").GetString()!;
+        _deliveringFromNode = true; _deliveringChannel = channel; _deliveringData = data;
+        try { bus.Emit(channel, data); }
         catch (Exception error) when (error is PiSharp.Extensions.ExtensionEventBusUnhandledErrorException or InvalidOperationException) { }
-        finally { _deliveringFromNode = false; }
+        finally { _deliveringFromNode = false; _deliveringChannel = null; _deliveringData = null; }
     }
 
     /// <summary>The extension statuses set with <c>ctx.ui.setStatus</c> (the footer reads them; IMPL-I).</summary>
@@ -937,6 +942,7 @@ internal sealed partial class PiExtensionHost
 
     private async Task<ImmutableArray<string>?> RenderAsync(string method, JsonObject parameters, CancellationToken token)
     {
+        if (!IsRunning) return null;
         var result = await Node.RequestAsync(method, parameters, token).ConfigureAwait(false);
         if (result is not { ValueKind: JsonValueKind.Object } value || !value.TryGetProperty("handled", out var handled) || handled.ValueKind != JsonValueKind.True) return null;
         return [.. value.GetProperty("lines").EnumerateArray().Select(line => line.GetString() ?? "")];

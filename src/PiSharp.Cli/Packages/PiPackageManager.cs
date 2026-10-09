@@ -1409,6 +1409,9 @@ internal sealed class PiPackageManager
         var indexTs = Path.Join(directory, "index.ts"); var indexJs = Path.Join(directory, "index.js");
         if (Path.Exists(indexTs)) return [indexTs];
         if (Path.Exists(indexJs)) return [indexJs];
+        // PiSharp: a native C# extension's directory holds its pisharp-extension.json manifest (owner decision 10).
+        var native = Path.Join(directory, PiSharp.Cli.Extensions.Pi.PiNativeExtension.ManifestName);
+        if (File.Exists(native)) return [native];
         return null;
     }
 
