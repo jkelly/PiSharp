@@ -66,6 +66,17 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
 
     public ExtensionRegistrySnapshot CaptureSnapshot() => Volatile.Read(ref snapshot);
 
+    /// <summary>Whether dispatches resolve the current registrations (<see cref="ExtensionRegistryOptions.FollowCurrentSnapshot"/>).</summary>
+    public bool FollowsCurrentSnapshot => options.FollowCurrentSnapshot;
+
+    /// <summary>The revision a dispatch over <paramref name="captured"/> resolves: the current one when the registry follows its
+    /// current snapshot (<see cref="ExtensionRegistryOptions.FollowCurrentSnapshot"/>), else the captured one.</summary>
+    public ExtensionRegistrySnapshot Current(ExtensionRegistrySnapshot captured)
+    {
+        ArgumentNullException.ThrowIfNull(captured);
+        return options.FollowCurrentSnapshot && ReferenceEquals(captured.RegistryIdentity, identity) ? CaptureSnapshot() : captured;
+    }
+
     public Task<RegistrationScope> ActivateAsync(string ownerId, IPiSharpExtension extension,
         CancellationToken initializationToken = default)
     {
@@ -137,6 +148,7 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(captured);
         if (!RegistrationPolicy.Description(toolName, options) || toolName.Length == 0)
             throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, "registry", "resolve-tool-renderers");
+        captured = Current(captured);
         var admission = Admit(captured, RegistrationKind.ToolRenderer, ToolRendererTopic, "resolve-tool-renderers", operationToken, default);
         try
         {
@@ -378,6 +390,24 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             RetireEventBusSubscription(entry);
             ReleaseChargeIfRetired(scope, entry);
             if (scope.State == RegistrationScopeState.Active) Publish();
+        }
+    }
+
+    /// <summary>Removes every registration of the owner at once (its tools too unless <paramref name="keepTools"/>), in one publication.</summary>
+    internal void Withdraw(RegistrationScope scope, bool keepTools)
+    {
+        lock (gate)
+        {
+            var removed = false;
+            foreach (var entry in scope.Staged.Entries.ToArray())
+            {
+                if (keepTools && entry.Kind == RegistrationKind.Tool || !scope.Staged.Remove(entry)) continue;
+                entry.Registered = false;
+                RetireEventBusSubscription(entry);
+                ReleaseChargeIfRetired(scope, entry);
+                removed = true;
+            }
+            if (removed && scope.State == RegistrationScopeState.Active) Publish();
         }
     }
 
@@ -866,6 +896,7 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             if (closing) throw Failure(ExtensionRegistrationFailure.InactiveScope, "registry", operation);
             if (!ReferenceEquals(captured.RegistryIdentity, identity))
                 throw Failure(ExtensionRegistrationFailure.StaleSnapshot, "registry", operation);
+            if (options.FollowCurrentSnapshot) captured = snapshot;
             var selected = captured.Entries.Where(entry => entry.Kind == kind && entry.Name == name).ToArray();
             if ((kind is RegistrationKind.Tool or RegistrationKind.Command) && selected.Length != 1)
                 throw Failure(ExtensionRegistrationFailure.StaleSnapshot, "registry", operation);

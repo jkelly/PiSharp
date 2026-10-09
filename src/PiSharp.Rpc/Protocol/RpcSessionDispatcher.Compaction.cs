@@ -114,8 +114,13 @@ public sealed partial class RpcSessionDispatcher
     public async Task<JsonData> CompactForExtensionAsync(SessionCompactionRequest request, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(request);
-        lock (_gate) if (_run is not null) _session.Abort();
-        await WaitForIdleAsync(token).ConfigureAwait(false);
+        // From a command's own input (ctx.compact awaited by the command) the compaction runs within that input; otherwise it aborts a
+        // run and waits for the session to settle.
+        if (_sessionOwner?.Current.Session.IsExecutingInputCallback != true)
+        {
+            lock (_gate) if (_run is not null) _session.Abort();
+            await WaitForIdleAsync(token).ConfigureAwait(false);
+        }
         var command = new RpcCommandEnvelope(null, "compact", Compaction: request);
         return (await SummaryCommandAsync(command, _sessionOwner?.Current, token).ConfigureAwait(false))!;
     }

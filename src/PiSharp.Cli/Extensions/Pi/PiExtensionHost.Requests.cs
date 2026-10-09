@@ -31,6 +31,7 @@ internal sealed partial class PiExtensionHost
     internal void AttachSession(ReplaceableAgentSession owner)
     {
         _owner = owner;
+        InstallInputGate(owner.Current.Session);
         if (IsRunning) _ = Node.RequestAsync("bind", new JsonObject(), CancellationToken.None);
     }
     internal void BindActivation(NativeExtensionActivation activation, ExtensionRegistry registry, NativeExistingSessionRegistrationActions actions,
@@ -67,6 +68,7 @@ internal sealed partial class PiExtensionHost
             {
                 foreach (var owner in owners) owner.RetireStaleCommands(names);
                 foreach (var owner in owners) owner.RegisterMissingCommands(names);
+                foreach (var owner in owners) owner.RegisterMissingHandlers();
             }
             catch (Exception error) when (error is InvalidOperationException or PiSharp.Extensions.Runtime.ExtensionRegistrationException) { }
         }
@@ -88,15 +90,30 @@ internal sealed partial class PiExtensionHost
 
     private readonly List<Task> _pendingSyncs = [];
 
-    /// <summary>Waits (bounded) until the registrations the extensions made so far reached the session: a prompt sees a tool registered
-    /// before it, as upstream's synchronous refreshTools gives.</summary>
+    /// <summary>The session waits for the extensions' pending registrations before it admits idle input (chained with the gates other
+    /// hosts installed), so the prompt's run declares a tool registered before it.</summary>
+    internal void InstallInputGate(PersistentAgentSession session)
+    {
+        var previous = session.BeforeInputAdmission;
+        session.BeforeInputAdmission = async token =>
+        {
+            await WaitForRegistrationsAsync(token).ConfigureAwait(false);
+            if (previous is not null) await previous(token).ConfigureAwait(false);
+        };
+    }
+
+    /// <summary>Waits until the registrations the extensions made so far reached the session: a prompt sees a tool registered before it,
+    /// as upstream's synchronous refreshTools gives. The session runs this before it admits idle input (its input gate), when the
+    /// catalog publication can take the idle session; a failed publication is reported and ends the wait.</summary>
     internal async Task WaitForRegistrationsAsync(CancellationToken token)
     {
-        Task[] pending;
-        lock (_pendingSyncs) pending = [.. _pendingSyncs.Where(task => !task.IsCompleted)];
-        if (pending.Length == 0) return;
-        try { await Task.WhenAll(pending).WaitAsync(TimeSpan.FromSeconds(10), token).ConfigureAwait(false); }
-        catch (TimeoutException) { }
+        while (true)
+        {
+            Task[] pending;
+            lock (_pendingSyncs) pending = [.. _pendingSyncs.Where(task => !task.IsCompleted)];
+            if (pending.Length == 0) return;
+            await Task.WhenAll(pending).WaitAsync(token).ConfigureAwait(false);
+        }
     }
 
     private async Task SyncToolsAsync(int index, bool force)
@@ -106,10 +123,13 @@ internal sealed partial class PiExtensionHost
         {
             ImmutableArray<PiNodeOwner> owners;
             lock (_extensions) owners = _owners;
-            if (owners.IsEmpty) return;
             if (_activation is { } activation && _owner is { } session)
+            {
+                // A rebuilt runtime: the previous owners' tools leave first, so the new owners may register the same names.
+                await RetireOwnersAsync(activation, session).ConfigureAwait(false);
                 foreach (var owner in owners.Where(owner => index < 0 || owner.Index == index))
                     await owner.SyncToolsAsync(activation, session, force, CancellationToken.None).ConfigureAwait(false);
+            }
         }
         catch (Exception error) when (error is InvalidOperationException or PiSharp.Extensions.Runtime.ExtensionRegistrationException or
             PiSharp.CodingAgent.SessionRuntimeRegistryException or OperationCanceledException or ObjectDisposedException)
@@ -169,9 +189,23 @@ internal sealed partial class PiExtensionHost
             case "ctx.executeTool": return await ExecuteToolAsync(p, request, token).ConfigureAwait(false);
             case "ctx.compact":
                 // Source ExtensionContext.compact(): abort, then the session's manual compaction; onComplete gets the CompactionResult.
-                if (Compact is null) throw new NotSupportedException("ctx.compact() needs a session host with compaction (RPC, interactive)");
-                return await Compact(p.TryGetProperty("customInstructions", out var instructions) && instructions.ValueKind == JsonValueKind.String
-                    ? instructions.GetString() : null, token).ConfigureAwait(false);
+                if (Compact is null) throw new NotSupportedException("ctx.compact() needs a session host with compaction (RPC, interactive, print)");
+                var customInstructions = p.TryGetProperty("customInstructions", out var instructions) && instructions.ValueKind == JsonValueKind.String
+                    ? instructions.GetString() : null;
+                // A command awaiting its compaction: the compaction runs as part of the command's input (upstream compacts while the
+                // prompt that runs the command waits for it), not after it.
+                if (FlowOf(p) is { } flow && Attached?.Session is { } inputSession)
+                {
+                    var inInput = false;
+                    ExecutionContext.Run(flow, _ => inInput = inputSession.IsExecutingInputCallback, null);
+                    if (inInput)
+                    {
+                        Task<JsonNode?> compaction = null!;
+                        ExecutionContext.Run(flow, _ => compaction = Compact(customInstructions, token), null);
+                        return await compaction.ConfigureAwait(false);
+                    }
+                }
+                return await Compact(customInstructions, token).ConfigureAwait(false);
             case "command.waitForIdle": await RequireAttached().Session.WaitForIdleAsync(token).ConfigureAwait(false); return null;
             case "command.session": return await SessionCommandAsync(p, token).ConfigureAwait(false);
             case "command.reload":
@@ -243,8 +277,27 @@ internal sealed partial class PiExtensionHost
                 lock (_virtualModels) _virtualModels.RemoveAll(item => item["definition"]?["provider"]?.GetValue<string>() == parameters.GetProperty("provider").GetString() &&
                     item["definition"]?["id"]?.GetValue<string>() == parameters.GetProperty("id").GetString());
                 RegistrationsChanged?.Invoke(); ProvidersChanged?.Invoke(); return;
-            case "mcp.register": lock (_mcpServers) _mcpServers.Add(JsonNode.Parse(parameters.GetRawText())!.AsObject()); return;
-            case "mcp.unregister": lock (_mcpServers) _mcpServers.RemoveAll(item => item["name"]?.GetValue<string>() == parameters.GetProperty("name").GetString()); return;
+            case "mcp.register":
+            {
+                var server = JsonNode.Parse(parameters.GetRawText())!.AsObject();
+                lock (_mcpServers) { _mcpServers.RemoveAll(item => item["name"]?.GetValue<string>() == server["name"]?.GetValue<string>()); _mcpServers.Add(server); }
+                // A server registered after loading connects right away (registerMcpServer); one registered while loading is read when its
+                // owner activates.
+                OwnerOf(server["extensionPath"]?.GetValue<string>())?.RegisterMcpServer(server);
+                return;
+            }
+            case "mcp.unregister":
+            {
+                var name = parameters.GetProperty("name").GetString();
+                string? path = null;
+                lock (_mcpServers)
+                {
+                    path = _mcpServers.FirstOrDefault(item => item["name"]?.GetValue<string>() == name)?["extensionPath"]?.GetValue<string>();
+                    _mcpServers.RemoveAll(item => item["name"]?.GetValue<string>() == name);
+                }
+                if (name is not null) OwnerOf(path)?.UnregisterMcpServer(name);
+                return;
+            }
             case "events.emit": DeliverFromNode(parameters); return;
             case "component.event": ComponentEvent?.Invoke(parameters.GetProperty("id").GetString()!, parameters.Clone()); return;
             case "registrations.changed":

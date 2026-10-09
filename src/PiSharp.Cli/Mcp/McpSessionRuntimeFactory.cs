@@ -140,7 +140,15 @@ public sealed class McpSessionRuntimeFactory
                     // extensions/mcp/index.ts before_agent_start waitForDirectServers. The tool_call waits (scriptNeedsServer, tool_search,
                     // resource tools) run inside those tools' calls.
                     if (connections is not null)
-                        attachment.Session.BeforeInputAdmission = token => connections.BeforeInputAsync(attachment.Session, token);
+                    {
+                        // Chained with a gate another host installed (the extensions' pending registrations).
+                        var installed = attachment.Session.BeforeInputAdmission;
+                        attachment.Session.BeforeInputAdmission = async token =>
+                        {
+                            if (installed is not null) await installed(token).ConfigureAwait(false);
+                            await connections.BeforeInputAsync(attachment.Session, token).ConfigureAwait(false);
+                        };
+                    }
                     // The manager and the resource tools bind before any server can connect.
                     admission.BindManager?.Invoke(owner, attachment, connections);
                     connections?.Start(owner, attachment);

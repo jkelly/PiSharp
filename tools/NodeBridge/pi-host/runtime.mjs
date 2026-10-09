@@ -169,11 +169,13 @@ export class ExtensionRuntime {
         const list = extension.handlers.get(event) ?? [];
         const first = list.length === 0;
         list.push(registered); extension.handlers.set(event, list);
-        if (first) changed('event', { event });
+        // The host registers natively per event name, and per handler for before_agent_start (each handler returns its own message).
+        if (first || event === 'before_agent_start') changed('event', { event });
         return () => {
           const handlers = extension.handlers.get(event); if (!handlers) return;
           const index = handlers.indexOf(registered); if (index === -1) return;
           handlers.splice(index, 1); if (handlers.length === 0) extension.handlers.delete(event);
+          changed('event', { event });
         };
       },
       registerTool(tool) {

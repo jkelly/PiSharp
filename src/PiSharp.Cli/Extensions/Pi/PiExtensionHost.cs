@@ -18,8 +18,12 @@ namespace PiSharp.Cli.Extensions.Pi;
 internal sealed record PiLoadedExtension(int Index, string Path, string ResolvedPath)
 {
     internal JsonObject Descriptor { get; set; } = new();
-    /// <summary>The registry owner id of this extension (registry identifiers are ASCII; the path is kept in <see cref="Path"/>).</summary>
-    internal string OwnerId => "pi-extension-" + Index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    /// <summary>The extension runtime generation that loaded this extension (0 at startup; each reload loads a new one).</summary>
+    internal int Generation { get; init; }
+    /// <summary>The registry owner id of this extension (registry identifiers are ASCII; the path is kept in <see cref="Path"/>); a reload's
+    /// owners are new owners of the rebuilt runtime.</summary>
+    internal string OwnerId => "pi-extension-" + Index.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+        (Generation == 0 ? "" : "-r" + Generation.ToString(System.Globalization.CultureInfo.InvariantCulture));
     internal IEnumerable<string> Events => (Descriptor["events"] as JsonArray ?? []).Select(node => node!.GetValue<string>());
     /// <summary>The registry owner generation once the extension is bound to a session (0 before).</summary>
     internal long OwnerGeneration { get; set; }
@@ -56,7 +60,9 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         MaximumOwners = 1024, MaximumRegistrations = 16_384, MaximumRegistrationsPerOwner = 2_048, MaximumMetadataCharacters = 64 * 1024 * 1024,
         MaximumDescriptionCharacters = 1024 * 1024, MaximumJsonCharacters = 64 * 1024 * 1024, MaximumJsonDepth = 64,
         // Pi extensions may replace built-in tools (registerTool with a built-in name) and register any command name.
-        ReservedToolNames = [], ReservedCommandNames = [], AllowAnyCommandName = true
+        ReservedToolNames = [], ReservedCommandNames = [], AllowAnyCommandName = true,
+        // runner.ts reads the extensions' live handler maps: owners and handlers added after the session bound take part at once.
+        FollowCurrentSnapshot = true
     };
 
     private readonly PiExtensionHostOptions _options;
@@ -212,18 +218,22 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     internal JsonNode? FlagValue(string name) { lock (_extensions) return _flagValues.TryGetValue(name, out var value) ? value?.DeepClone() : null; }
 
     /// <summary>The extension path of a registry owner id (MCP servers and diagnostics report paths).</summary>
-    internal string PathOfOwner(string ownerId) => Extensions.FirstOrDefault(extension => extension.OwnerId == ownerId)?.Path ?? ownerId;
+    internal string PathOfOwner(string ownerId)
+    {
+        lock (_ownerPaths) if (_ownerPaths.TryGetValue(ownerId, out var path)) return path;
+        return Extensions.FirstOrDefault(extension => extension.OwnerId == ownerId)?.Path ?? ownerId;
+    }
 
     /// <summary>Registers every loaded extension as a registry owner, in load order.</summary>
     internal async Task ActivateAsync(ExtensionRegistry registry, CancellationToken token)
     {
         var names = CommandInvocationNames();
         var owners = new List<PiNodeOwner>();
-        // The loaded extensions, then spare owners for extensions a reload adds.
-        foreach (var extension in Extensions.Concat(CreateSpares()))
+        foreach (var extension in Extensions)
         {
             var owner = new PiNodeOwner(this, extension, names);
             owners.Add(owner);
+            lock (_ownerPaths) _ownerPaths[extension.OwnerId] = extension.Path;
             await registry.ActivateAsync(extension.OwnerId, owner, token).ConfigureAwait(false);
         }
         lock (_extensions) _owners = [.. owners];
@@ -286,13 +296,20 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     {
         var id = Interlocked.Increment(ref _nextContext);
         _contexts[id] = context; Volatile.Write(ref _lastContext, context);
+        _flows[id] = ExecutionContext.Capture();
         return new(this, id);
     }
     internal readonly struct ContextLease(PiExtensionHost host, long id) : IDisposable
     {
         internal long Id => id;
-        public void Dispose() => host._contexts.TryRemove(id, out _);
+        public void Dispose() { host._contexts.TryRemove(id, out _); host._flows.TryRemove(id, out _); }
     }
+    /// <summary>The execution context of each callback a context lease was entered in (a session action the callback awaits runs as
+    /// part of it: a command's ctx.compact() compacts within the command's input).</summary>
+    private readonly ConcurrentDictionary<long, ExecutionContext?> _flows = new();
+    private ExecutionContext? FlowOf(JsonElement parameters) =>
+        parameters.ValueKind == JsonValueKind.Object && parameters.TryGetProperty("ctx", out var id) && id.ValueKind == JsonValueKind.Number &&
+        _flows.TryGetValue(id.GetInt64(), out var flow) ? flow : null;
     private IExtensionContext? ContextOf(JsonElement parameters) =>
         parameters.ValueKind == JsonValueKind.Object && parameters.TryGetProperty("ctx", out var id) && id.ValueKind == JsonValueKind.Number &&
         _contexts.TryGetValue(id.GetInt64(), out var context) ? context : _contexts.Values.LastOrDefault() ?? Volatile.Read(ref _lastContext);
