@@ -1,10 +1,10 @@
 # PiSharp
 
-PiSharp is a native .NET 10 / C# port of the [Pi coding agent](https://github.com/earendil-works/pi), in early implementation.
+PiSharp is a native .NET 10 / C# port of the [Pi coding agent](https://github.com/earendil-works/pi). Its version names the Pi release it matches: the current baseline is Pi **v1.1.0** (commit `abe508e1b89912adde45528136c3221eb69acdd7`), and a fourth number marks a C#-only patch. The version names the porting baseline; the [Parity page](https://pisharp.ai/parity/) and [sync-1.1.0-applicability.json](compatibility/sync-1.1.0-applicability.json) record what is ported and what still differs.
 
-The public version baseline is **0.99.1**, matching the pinned Pi **v0.99.1** release. This identifies the porting baseline, not complete behavioral parity or an already published binary. Fresh version-specific artifact qualification is required; earlier private packages retain their original versions. See the [0.99.1 release notes](docs/release-notes/0.99.1.md).
+Install the CLI with `dotnet tool install -g PiSharp.Cli` and run `pisharp` as you would run `pi`. It takes Pi's command line and reads Pi's files in `~/.pi/agent` and `.pi`: settings, credentials, models, MCP servers, context files, skills, prompt templates, themes, extensions and sessions. It has every Pi v1.1.0 chat API and provider catalog, the built-in tools (with images), codemode and `tool_search`, Pi's interactive mode and slash commands, print, JSON and RPC modes, and Pi's TypeScript extensions and packages through a Node bridge that installs Pi's own npm packages. Native C# extensions load from the same folders. The next release, 1.1.0.2, is described in the [release notes](docs/release-notes/1.1.0.2.md).
 
-The development build includes a native offline CLI, durable sessions and branch/history views, session replacement, native C# extension loading, and bounded optional Node bridge workflows. Accepted session lifecycle and history milestones include fresh context replacement, old-context write rejection and joined cleanup. Provider and interoperability capabilities retain their individually tested scopes. All eight original phase gates remain open. See [implementation status](IMPLEMENTATION_STATUS.md) for current evidence and gaps.
+Documentation is at [pisharp.ai](https://pisharp.ai/docs/). The full-parity work is tracked in [full-parity-v1.1.0.md](docs/plans/full-parity-v1.1.0.md) and [full-parity-progress.json](docs/plans/full-parity-progress.json).
 
 ## Native validation tooling
 
@@ -14,13 +14,13 @@ These historical preparation and recapture tools intentionally fail closed when 
 
 Provider fixtures distinguish authored contract cases from captured observations. Path-normalized public derivatives are labeled as such; they must not be treated as original raw wire evidence or whole-provider equivalence.
 
-## Planned direction
+## Design
 
 - A native C# core that runs without Node.js.
-- Native C# plugins through a dedicated plugin SDK.
-- An optional Node.js bridge for interoperability; Node.js will only be needed when using that bridge.
+- Native C# extensions through a dedicated extension SDK.
+- A Node.js bridge for Pi's TypeScript extensions; Node.js is only needed when an extension uses it.
 
-These capabilities are being implemented and qualified against the complete original plan. Read the [architecture and implementation strategy](docs/architecture.md) and the [planning index](docs/plans/README.md) for the remaining phases.
+Read the [architecture and implementation strategy](docs/architecture.md) and the [planning index](docs/plans/README.md) for the phases.
 
 ## Explicit session imports and exports
 
@@ -28,7 +28,7 @@ The CLI accepts explicit source and new destination paths. `session migrate` con
 
 ## Upstream baseline and attribution
 
-The canonical upstream is [earendil-works/pi](https://github.com/earendil-works/pi). Planning is pinned to **v0.99.1**, commit [`d86654abb8862e201933517d6f1fce9f88dd117f`](https://github.com/earendil-works/pi/tree/d86654abb8862e201933517d6f1fce9f88dd117f).
+The canonical upstream is [earendil-works/pi](https://github.com/earendil-works/pi). The port is pinned to **v1.1.0**, commit [`abe508e1b89912adde45528136c3221eb69acdd7`](https://github.com/earendil-works/pi/tree/abe508e1b89912adde45528136c3221eb69acdd7); planning started from v0.99.1, commit `d86654abb8862e201933517d6f1fce9f88dd117f`.
 
 Upstream Pi is MIT-licensed. Its [license at the planning baseline](https://github.com/earendil-works/pi/blob/d86654abb8862e201933517d6f1fce9f88dd117f/LICENSE) identifies **Copyright (c) 2025 Mario Zechner**. Public upstream contracts and behavior inform this implementation; applicable attribution is retained in [third-party notices](THIRD-PARTY-NOTICES.md). No private project code or context is used.
 

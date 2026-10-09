@@ -30,9 +30,12 @@ internal static class ChangelogSyncCases
             Check(entries.Count >= 3, "entries parsed");
             Equal("## [1.1.0.1] - 2026-10-08", entries.Single(entry => entry is { Major: 1, Minor: 1, Patch: 0, Revision: 1 }).Content.Split('\n')[0],
                 "four-part header");
-            Seq(["1.1.0.1"], Changelog.GetNewEntries(entries, "1.1.0").Select(Version), "newer than 1.1.0");
-            Equal(0, Changelog.GetNewEntries(entries, "1.1.0.1").Count, "nothing newer than 1.1.0.1");
-            Seq(["1.1.0.1", "1.1.0"], Changelog.GetNewEntries(entries, "0.99.1").Select(Version), "newer than 0.99.1");
+            // Version-agnostic: later releases add entries above 1.1.0.1 without editing this case.
+            var newer = Changelog.GetNewEntries(entries, "1.1.0").Select(Version).ToArray();
+            Check(newer.Contains("1.1.0.1") && !newer.Contains("1.1.0"), "newer than 1.1.0: " + string.Join(",", newer));
+            Equal(0, Changelog.GetNewEntries(entries, newer[0]).Count, "nothing newer than the newest entry");
+            var since = Changelog.GetNewEntries(entries, "0.99.1").Select(Version).ToArray();
+            Check(since.Length == newer.Length + 1 && since[^1] == "1.1.0", "newer than 0.99.1: " + string.Join(",", since));
             return Task.CompletedTask;
         });
 

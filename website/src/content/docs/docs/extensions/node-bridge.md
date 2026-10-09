@@ -1,27 +1,40 @@
 ---
-title: Node bridge
-description: The in-development bridge for Pi's TypeScript extensions.
+title: TypeScript extensions
+description: Run Pi's TypeScript and JavaScript extensions in PiSharp through the Node bridge.
 ---
 
-The Node bridge is an optional way to run Pi's TypeScript extensions in a separate Node worker that PiSharp starts and supervises. PiSharp installs and runs fully without Node.
+PiSharp runs Pi's TypeScript and JavaScript extensions unchanged. It starts Node, loads each extension with Pi's own packages, and connects the extension to the C# session. Write extensions as Pi's [Extensions](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/extensions.md) page describes.
 
-:::caution[In development]
-The bridge is a library today, not a CLI feature. It admits only seven of Pi's example extensions (from Pi v0.99.1), matched by content hash, and there's no CLI switch to turn it on yet. Loading your own extensions and installing packages from npm aren't built. See the **TypeScript extension compatibility** tab on the [Parity](/parity/) page.
-:::
+## Where extensions come from
 
-The rest of this page describes how the bridge is designed to work.
+The same places as in Pi:
 
-## How it works
+- `~/.pi/agent/extensions/` and the project's `.pi/extensions/`: a `.ts` or `.js` file, or a folder with `index.ts`, `index.js` or a `package.json` with a `pi.extensions` list.
+- The `extensions` and `packages` lists in `settings.json`.
+- `-e <path>` or `-e npm:<package>` for one run.
 
-- Extension descriptors, messages, tool arguments, results and hook decisions are sent between PiSharp and the worker as data. Functions, class instances and terminal UI component objects can't cross the process boundary.
-- Module resolution, transpilation and dependency installation stay inside the worker host. npm install scripts and native modules count as executable code, so they need your explicit trust and never run during ordinary discovery.
-- Each compatibility session starts with one worker, which keeps the ordering between extensions the same as Pi's.
-- Each handler is tied to its registration and released on unsubscribe, reload or session replacement. If the worker crashes, PiSharp doesn't replay an action with side effects just to recover.
+Project extensions load only when you trust the project. `--no-extensions` turns off everything but `-e`. Discovered extensions run as you, with your permissions, as in Pi.
 
-## Compatibility tiers
+## What you need
 
-Bridge support is tiered. If an extension registers something the bridge doesn't support, PiSharp reports it when it starts, so nothing is silently ignored. See the **TypeScript extension compatibility** tab on the [Parity](/parity/) page for current status.
+- **Node.js 22.13 or later**, on your `PATH` or named by `PISHARP_NODE`. Pi itself asks for Node 22.19.
+- **npm**, the first time an extension loads (see below).
 
-:::note
-Prefer [native C# extensions](/docs/extensions/build-an-extension/) for new work. They run in-process, are typed, and don't need Node.
-:::
+PiSharp starts Node only when an extension needs it. Without extensions, or with only [C# extensions](/docs/extensions/build-an-extension/), Node isn't needed.
+
+## Pi's own packages
+
+The first time a TypeScript extension loads, PiSharp installs Pi 1.1.0's npm packages (`@earendil-works/pi-coding-agent`, `pi-ai`, `pi-tui` and `pi-agent-core`, with `typebox` and `jiti`) into `~/.pi/agent/pisharp/pi-runtime/1.1.0`, using your npm. Every package's integrity is checked against the npm registry before it's used. Extensions then load through Pi's own `jiti` setup, so imports such as `@earendil-works/pi-coding-agent` resolve to the real code.
+
+`PISHARP_PI_RUNTIME_DIR` moves this folder.
+
+If the install can't run (offline, no npm, or a failed install), extensions still load against PiSharp's built-in copies of those modules, and PiSharp warns that they aren't running against the Pi 1.1.0 packages. The built-in copies don't support `.tsx` files or built-in tool factories with custom `operations`.
+
+## What works
+
+The whole `ExtensionAPI`: tools, commands, shortcuts, flags, message and tool renderers, providers (chat, classifier and image), virtual models, MCP servers, the event bus, and every extension event. `ctx.ui` dialogs, widgets and custom components show in the terminal UI and over RPC.
+
+## Differences from Pi
+
+- `ctx.ui.setTheme()` returns an error. Choose a theme in `/settings` instead.
+- `pi.sendMessage(…, { triggerTurn: true })` from inside a command starts its turn after the command's handler returns. In Pi the turn starts while the handler is still running. A handler that runs longer than about 30 seconds drops the message.

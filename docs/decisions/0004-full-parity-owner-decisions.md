@@ -52,6 +52,14 @@ Earlier decisions stand: MCP servers in `mcp.json` are trusted and their tools c
     project extension folders, settings, packages, `-e`), gated only by project trust,
     on every platform; the per-package approval and preflight files are not required
     there. Owner: IMPL-E.
+11. **`/bug`** keeps Pi's local report, zip and summary but does not upload to Pi's
+    developers; it opens a prefilled issue at github.com/jkelly/PiSharp/issues (or prints
+    the report path to attach).
+12. **Version check** looks up the latest `PiSharp.Cli` on NuGet and suggests
+    `dotnet tool update -g PiSharp.Cli`, honouring `PI_OFFLINE` and the setting that
+    disables it; it never asks pi.dev for Pi's version.
+13. **Nameless tool calls** (Google streams them) are accepted exactly as far as Pi accepts
+    them; the shared reducer check is relaxed to match, for every provider.
 
 Install telemetry (`core/telemetry.ts`, which reports installs to Pi's servers) is not
 ported: PiSharp is not Pi and must not report as it.
