@@ -82,6 +82,8 @@ public sealed class McpServerManager
     private sealed class Slot(McpServerEntry entry)
     {
         public McpServerEntry Entry = entry;
+        /// <summary>For servers extensions registered: the config as registered, to detect re-registrations (`/mcp` changes do not count).</summary>
+        public readonly string? Registered = entry.Scope == McpConfigurationScope.Extension ? entry.Config.Raw.ToString() : null;
         public McpPreparedServer? Server;
         public ConnectionState State;
         public string? Error, Message;
@@ -186,7 +188,7 @@ public sealed class McpServerManager
             lock (gate)
             {
                 removed = [.. servers.Where(slot => slot.Entry.Scope == McpConfigurationScope.Extension &&
-                    (!next.TryGetValue(slot.Entry.Name, out var entry) || entry.Config.Raw.ToString() != slot.Entry.Config.Raw.ToString() || entry.Source != slot.Entry.Source))];
+                    (!next.TryGetValue(slot.Entry.Name, out var entry) || entry.Config.Raw.ToString() != slot.Registered || entry.Source != slot.Entry.Source))];
                 foreach (var slot in removed) servers.Remove(slot);
                 added = [.. next.Values.Where(entry => !servers.Any(slot => slot.Entry.Name == entry.Name)).Select(entry => new Slot(entry))];
                 servers.AddRange(added);
