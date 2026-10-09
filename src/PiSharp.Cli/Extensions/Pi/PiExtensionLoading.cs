@@ -34,6 +34,7 @@ internal sealed class PiExtensionLoading
                 foreach (var path in paths) _diagnostics.Add(new("error", $"Failed to load extension \"{path}\": {error.Message}"));
                 return;
             }
+            if (Host.RuntimeFallback is { } fallback) _diagnostics.Add(new("warning", "Extensions are not running against the Pi " + PiNodeRuntime.PiVersion + " packages: " + fallback));
         }
         var before = Host.Errors.Length;
         await Host.LoadAsync(paths, token).ConfigureAwait(false);

@@ -35,6 +35,8 @@ internal sealed record PiExtensionHostOptions(string Cwd, string AgentDir, strin
     internal Func<string, string?> GetEnvironment { get; init; } = Environment.GetEnvironmentVariable;
     internal Action<string>? StandardError { get; init; }
     internal string? Theme { get; init; }
+    /// <summary>The Pi packages' node_modules to load extensions with; null installs or finds them (<see cref="PiNodeRuntime"/>).</summary>
+    internal string? PiModules { get; init; }
     internal ImmutableArray<PiTheme> Themes { get; init; } = [];
     internal Func<string, bool> ProjectTrusted { get; init; } = _ => true;
 }
@@ -73,6 +75,12 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     internal string Mode => _options.Mode;
     internal bool HasUI => _options.HasUI;
     internal string BridgeDirectory { get; private set; } = AppContext.BaseDirectory;
+    /// <summary>The installed Pi packages' node_modules the extensions run against, or null with <see cref="RuntimeFallback"/>.</summary>
+    internal string? PiModules { get; private set; }
+    /// <summary>Why the run uses PiSharp's compatibility modules instead of the installed Pi packages (offline, no npm, failed install).</summary>
+    internal string? RuntimeFallback { get; private set; }
+    /// <summary>What the Node host loaded: <c>pi@1.1.0</c> or <c>compatibility</c>.</summary>
+    internal string Modules { get; private set; } = "compatibility";
     internal ImmutableArray<PiLoadedExtension> Extensions { get { lock (_extensions) return [.. _extensions]; } }
     internal ImmutableArray<PiExtensionLoadError> Errors { get { lock (_extensions) return [.. _errors]; } }
     internal bool IsRunning => _node is { HasExited: false };
@@ -97,12 +105,19 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
             ?? throw new PiExtensionHostUnavailableException("The PiSharp Node extension host (node-bridge/pi-host/host.mjs) is missing from this installation.");
         host.BridgeDirectory = Path.GetDirectoryName(Path.GetDirectoryName(script)!)!;
         var cwd = Directory.Exists(options.Cwd) ? options.Cwd : Environment.CurrentDirectory;
+        // The Pi 1.1.0 packages extensions run against (installed into the agent dir on first use; the compatibility modules offline).
+        var installOutput = new PiNodeRuntimeOutput(options.StandardError);
+        (host.PiModules, host.RuntimeFallback) = options.PiModules is { } configured ? (configured, null)
+            : await PiNodeRuntime.EnsureAsync(options.AgentDir, options.GetEnvironment, installOutput, null, null, token).ConfigureAwait(false);
         host._node = await PiNodeHost.StartAsync(new PiNodeHostLaunch(node, script, cwd) { StandardError = options.StandardError }, host, token).ConfigureAwait(false);
-        await host._node.RequestAsync("init", new JsonObject
+        var init = await host._node.RequestAsync("init", new JsonObject
         {
             ["cwd"] = options.Cwd, ["agentDir"] = options.AgentDir, ["mode"] = options.Mode, ["hasUI"] = options.HasUI,
-            ["theme"] = options.Theme ?? "dark", ["version"] = PiConfig.Version, ["flagValues"] = new JsonObject()
+            ["theme"] = options.Theme ?? "dark", ["version"] = PiConfig.Version, ["flagValues"] = new JsonObject(),
+            ["piModules"] = host.PiModules
         }, token).ConfigureAwait(false);
+        host.Modules = init is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty("modules", out var modules) && modules.ValueKind == JsonValueKind.String
+            ? modules.GetString()! : "compatibility";
         return host;
     }
 

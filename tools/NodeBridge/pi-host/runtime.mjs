@@ -127,6 +127,8 @@ export class ExtensionRuntime {
     this.uiPromptDepth = 0; this.activeUIPrompt = undefined;
     this.components = new Map(); this.nextComponent = 0;
     this.themeFactory = options.themeFactory;
+    this.importExtension = options.importExtension;
+    this.createEventStream = options.createEventStream;
     this.themeName = options.theme ?? 'dark';
     this.rendererState = new Map();
     this.callbacks = new Map();
@@ -283,9 +285,13 @@ export class ExtensionRuntime {
   async load(extensionPath) {
     const resolvedPath = path.resolve(this.cwd, extensionPath);
     try {
-      const imported = await import(pathToFileURL(resolvedPath).href);
-      let factory = imported && 'default' in imported ? imported.default : imported;
-      if (factory && typeof factory === 'object' && typeof factory.default === 'function') factory = factory.default;
+      let factory;
+      if (this.importExtension) factory = await this.importExtension(resolvedPath);
+      else {
+        const imported = await import(pathToFileURL(resolvedPath).href);
+        factory = imported && 'default' in imported ? imported.default : imported;
+        if (factory && typeof factory === 'object' && typeof factory.default === 'function') factory = factory.default;
+      }
       if (typeof factory !== 'function') return { error: `Extension does not export a valid factory function: ${extensionPath}` };
       const extension = this.createExtension(extensionPath, resolvedPath);
       const load = this.createExtensionAPI(extension);
@@ -452,13 +458,36 @@ export class ExtensionRuntime {
       refresh: (options) => bridge.call('models.call', { ctx, op: 'refresh', args: [options ?? {}] }),
       classify: (model, context, options) => bridge.call('models.call', { ctx, op: 'classify', args: [model, context, plainOptions(options)] }, { signal: options?.signal }),
       generateImages: (model, context, options) => bridge.call('models.call', { ctx, op: 'generateImages', args: [model, context, plainOptions(options)] }, { signal: options?.signal }),
-      complete: (model, context, options) => bridge.call('models.call', { ctx, op: 'complete', args: [model, context, plainOptions(options)] }, { signal: options?.signal }),
+      // model-registry.ts stream/streamSimple/complete: request-time authentication and PiSharp's live route for the model.
+      stream: (model, context, options) => this.modelStream('stream', model, context, options, ctx),
+      streamSimple: (model, context, options) => this.modelStream('streamSimple', model, context, options, ctx),
+      complete: (model, context, options) => this.modelStream('complete', model, context, options, ctx).result(),
+      completeSimple: (model, context, options) => this.modelStream('completeSimple', model, context, options, ctx).result(),
       registerProvider: (providerOrName, config) => typeof providerOrName === 'string'
         ? this.registerProvider(providerOrName, config, { path: '<modelRegistry>' }) : this.registerNativeProvider(providerOrName, { path: '<modelRegistry>' }),
       unregisterProvider: (name) => this.unregisterProvider(name),
       registerVirtualModel: (definition) => this.registerVirtualModel(definition, { path: '<modelRegistry>' }),
       unregisterVirtualModel: (provider, id) => this.unregisterVirtualModel(provider, id),
     };
+  }
+
+  /** An AssistantMessageEventStream (the installed pi-ai's, or the compatibility module's) over the host's answer for the model. */
+  modelStream(name, model, context, options, ctx) {
+    const stream = this.createEventStream();
+    const failed = (error) => ({
+      role: 'assistant', content: [], api: model?.api ?? 'unknown', provider: model?.provider ?? 'unknown', model: model?.id ?? 'unknown',
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+      stopReason: options?.signal?.aborted ? 'aborted' : 'error', errorMessage: message(error), timestamp: Date.now(),
+    });
+    const finish = (result) => {
+      if (result.stopReason === 'error' || result.stopReason === 'aborted') stream.push({ type: 'error', reason: result.stopReason, error: result });
+      else { stream.push({ type: 'start', partial: result }); stream.push({ type: 'done', reason: result.stopReason ?? 'stop', message: result }); }
+      stream.end(result);
+    };
+    this.bridge.call('bridge.call', { name, args: [model, context, plainOptions(options)], ctx }, { signal: options?.signal })
+      .then((result) => finish(result && typeof result === 'object' && result.role === 'assistant' ? result : failed(new Error('PiSharp host returned no message'))),
+        (error) => finish(failed(error)));
+    return stream;
   }
 
   /** Source ExtensionUIContext over the host UI, with the ui_prompt_start/ui_prompt_end wrapping of withUIPrompt. */

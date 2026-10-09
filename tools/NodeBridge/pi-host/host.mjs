@@ -7,7 +7,9 @@ import { Worker, MessageChannel, receiveMessageOnPort } from 'node:worker_thread
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import util from 'node:util';
+import { Readable } from 'node:stream';
 import { installHooks } from './loader-hooks.mjs';
+import { loadPiModules } from './pi-modules.mjs';
 import { ExtensionRuntime, describeExtension } from './runtime.mjs';
 import { validateToolArguments } from './validate.mjs';
 
@@ -21,6 +23,12 @@ process.stdout.write = (chunk, encoding, callback) => {
   if (typeof encoding === 'function') encoding(); else if (typeof callback === 'function') callback();
   return true;
 };
+// Standard input is the protocol, read by the I/O thread. On Windows, opening it again here (the lazy process.stdin, which Pi's own
+// modules touch) blocks until the I/O thread's pending read completes, so extensions get an empty, never-ending stream instead, as
+// an extension would see stdin in Pi's RPC mode.
+const isolatedStdin = new Readable({ read() {} });
+isolatedStdin.isTTY = false;
+Object.defineProperty(process, 'stdin', { configurable: true, enumerable: true, get: () => isolatedStdin });
 
 // ------------------------------------------------------------------------------------------------ channel to the I/O thread
 const flag = new SharedArrayBuffer(4);
@@ -91,13 +99,22 @@ const active = new Map(); // host request id -> AbortController
 async function handle(method, params, id) {
   switch (method) {
     case 'init': {
-      await installHooks();
-      let themeFactory;
-      try { const themes = await import(pathToFileURL(path.join(here, 'virtual', 'theme.mjs')).href); themeFactory = (name) => themes.createTheme(name); } catch { themeFactory = undefined; }
       if (params.agentDir && !process.env.PI_CODING_AGENT_DIR) process.env.PI_CODING_AGENT_DIR = params.agentDir;
       globalThis.__pisharpHost = { agentDir: params.agentDir, version: params.version, cwd: params.cwd };
-      runtime = new ExtensionRuntime(bridge, { ...params, themeFactory });
-      return { node: process.version, pid: process.pid };
+      let themeFactory, importExtension, createEventStream, modules = 'compatibility';
+      if (params.piModules) {
+        // The installed Pi packages, loaded with Pi's own jiti and aliases.
+        const pi = await loadPiModules(params.piModules, params.theme);
+        themeFactory = pi.themeFactory; importExtension = pi.importExtension; createEventStream = pi.createEventStream; modules = 'pi@' + pi.version;
+      } else {
+        // Offline fallback: PiSharp's compatibility modules and loader hooks.
+        await installHooks();
+        try { const themes = await import(pathToFileURL(path.join(here, 'virtual', 'theme.mjs')).href); themeFactory = (name) => themes.createTheme(name); } catch { themeFactory = undefined; }
+        const ai = await import(pathToFileURL(path.join(here, 'virtual', 'pi-ai.mjs')).href);
+        createEventStream = () => ai.createAssistantMessageEventStream();
+      }
+      runtime = new ExtensionRuntime(bridge, { ...params, themeFactory, importExtension, createEventStream });
+      return { node: process.version, pid: process.pid, modules };
     }
     case 'load': {
       const results = [];
