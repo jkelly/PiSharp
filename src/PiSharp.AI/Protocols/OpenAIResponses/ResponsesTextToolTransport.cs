@@ -232,7 +232,10 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         private readonly ChatRequest _request;
         private Dictionary<string, string>? _grammarInputs;
         private readonly AssistantStreamReducer _reducer;
+        // openai-responses-shared.ts outputSlots: the open slot of each output_index. output_item.done removes it and a
+        // later output_item.added or output_item.done for that index opens a new content block; every block stays in _content.
         private readonly Dictionary<int, Slot> _slots = [];
+        private readonly List<Slot> _content = [];
         private readonly Dictionary<string, Slot> _reasoningById = new(StringComparer.Ordinal);
         private JsonFields _properties = JsonFields.Empty;
         private TokenUsage _usage = TokenUsage.Zero;
@@ -302,18 +305,20 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                 case "response.output_item.added":
                     Add(Index(value), Object(value.GetProperty("item")), Emit);
                     break;
+                // openai-responses-shared.ts processResponsesStream: each slot event finds the open slot of its output_index
+                // with getSlot(output_index, type) and does nothing ("if (!slot) continue;") when there is none of that type.
                 case "response.output_text.delta":
                 case "response.refusal.delta":
-                    var text = Active(value, "message");
+                    if (Active(value, "message") is not { } text) break;
                     Emit(new TextDelta(text.Index, String(value, "delta", allowEmpty: true)));
                     break;
                 case "response.reasoning_summary_text.delta":
                 case "response.reasoning_text.delta":
-                    var thinking = Active(value, "reasoning");
+                    if (Active(value, "reasoning") is not { } thinking) break;
                     Emit(new ThinkingDelta(thinking.Index, String(value, "delta", allowEmpty: true)));
                     break;
                 case "response.reasoning_summary_part.done":
-                    var summary = Active(value, "reasoning");
+                    if (Active(value, "reasoning") is not { } summary) break;
                     Emit(new ThinkingDelta(summary.Index, "\n\n"));
                     break;
                 case "response.reasoning_summary_part.added":
@@ -322,11 +327,11 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     // The pinned mapper obtains authoritative text from output_item.done.
                     break;
                 case "response.function_call_arguments.delta":
-                    var tool = Active(value, "function_call");
+                    if (Active(value, "function_call") is not { } tool) break;
                     Emit(new ToolCallDelta(tool.Index, String(value, "delta", allowEmpty: true)));
                     break;
                 case "response.function_call_arguments.done":
-                    var argsSlot = Active(value, "function_call");
+                    if (Active(value, "function_call") is not { } argsSlot) break;
                     var arguments = String(value, "arguments", allowEmpty: true);
                     var previous = _reducer.GetToolJsonPreview(argsSlot.Index);
                     if (arguments.StartsWith(previous, StringComparison.Ordinal))
@@ -336,18 +341,20 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     else Emit(new ToolCallCheckpoint(argsSlot.Index, arguments));
                     break;
                 case "response.custom_tool_call_input.delta":
-                    var custom = Active(value, "custom_tool_call");
+                    if (Active(value, "custom_tool_call") is not { } custom) break;
                     CustomInput(custom, custom.CustomInput + String(value, "delta", allowEmpty: true), false, Emit);
                     break;
                 case "response.custom_tool_call_input.done":
-                    var customDone = Active(value, "custom_tool_call");
+                    if (Active(value, "custom_tool_call") is not { } customDone) break;
                     CustomInput(customDone, String(value, "input", allowEmpty: true), true, Emit);
                     break;
                 case "response.output_item.done":
                     var item = Object(value.GetProperty("item"));
                     var outputIndex = Index(value);
-                    if (!_slots.TryGetValue(outputIndex, out var slot)) slot = Add(outputIndex, item, Emit);
-                    if (slot.Ended || String(item, "type") != slot.Kind || String(item, "id") != slot.ItemId) throw Protocol();
+                    // getOrCreateSlot(output_index, item): the open slot, else a new one for a supported item type. A slot of
+                    // another type is left open and the event does nothing; the slot's own id, call_id and name stay authoritative.
+                    var slot = _slots.TryGetValue(outputIndex, out var open) ? open : Add(outputIndex, item, Emit);
+                    if (slot is null || String(item, "type") != slot.Kind) break;
                     if (slot.Kind == "reasoning")
                     {
                         var summaryText = ReasoningText(item, "summary");
@@ -355,7 +362,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                         slot.FinalThinking = summaryText.Length > 0 ? summaryText : contentText.Length > 0 ? contentText :
                             ((ThinkingContent)_reducer.Snapshot().Content[slot.Index]).Thinking;
                         slot.ReasoningItem = JsonData.FromElement(item);
-                        _reasoningById[slot.ItemId] = slot;
+                        _reasoningById[String(item, "id")] = slot;
                         // Nonempty encryption is final: Source never replaces it during backfill.
                         // Only incomplete signatures must wait for the immutable native end.
                         if (!string.IsNullOrEmpty(OptionalStringOrNull(item, "encrypted_content"))) EndThinking(slot, Emit);
@@ -376,12 +383,11 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                                 _ => throw Protocol()
                             });
                         }
-                        var signature = Signature(slot.ItemId, OptionalString(item, "phase"));
+                        var signature = Signature(String(item, "id"), OptionalString(item, "phase"));
                         Emit(new TextEnded(slot.Index, string.Concat(pieces), JsonFields.Empty.Set("textSignature", StringData(signature))));
                     }
                     else if (slot.Kind == "custom_tool_call")
                     {
-                        if (String(item, "call_id") != slot.CallId || String(item, "name") != slot.Name) throw Protocol();
                         CustomInput(slot, OptionalStringOrNull(item, "input") ?? slot.CustomInput, true, Emit);
                         var started = (ToolCallContent)_reducer.Snapshot().Content[slot.Index];
                         var customFields = started.ExtraProperties ?? JsonFields.Empty;
@@ -391,7 +397,6 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                     }
                     else
                     {
-                        if (String(item, "call_id") != slot.CallId || String(item, "name") != slot.Name) throw Protocol();
                         var raw = OptionalString(item, "arguments");
                         if (string.IsNullOrEmpty(raw)) raw = _reducer.GetToolJsonPreview(slot.Index);
                         if (raw.Length == 0) raw = "{}";
@@ -405,6 +410,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                         Emit(new ToolCallEnded(slot.Index, new(original.Id, original.Name, final, fields)));
                     }
                     slot.Ended = true;
+                    _slots.Remove(outputIndex);
                     break;
                 case "error":
                     ProviderFailure("Error Code " + String(value, "code", allowEmpty: true) + ": " + String(value, "message", allowEmpty: true));
@@ -453,7 +459,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                             "Response incomplete: " + incompleteReason : "Response incomplete without a provider reason"));
                     if (response.TryGetProperty("usage", out var usage)) _usage = Usage(Object(usage));
                     ApplyServiceTier(OptionalStringOrNull(response, "service_tier") ?? _options.ServiceTier);
-                    foreach (var finished in _slots.Values.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
+                    foreach (var finished in _content.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
                         EndThinking(finished, Emit);
                     _completed = true;
                     break;
@@ -515,14 +521,16 @@ public sealed class ResponsesTextToolTransport : IChatTransport
 
         private static string? OptionalStringOrNull(JsonElement value, string name) =>
             value.TryGetProperty(name, out var field) && field.ValueKind != JsonValueKind.Null ? String(value, name, allowEmpty: true) : null;
-        private Slot Add(int outputIndex, JsonElement item, Action<StreamEvent> emit)
+        // openai-responses-shared.ts createSlot: a reasoning, message, function_call or custom_tool_call item opens a new
+        // content block and becomes the open slot of its output_index (replacing any open one); other item types open none.
+        private Slot? Add(int outputIndex, JsonElement item, Action<StreamEvent> emit)
         {
-            if (_slots.ContainsKey(outputIndex)) throw Protocol();
-            if (_slots.Count >= _options.MaximumContentSlots) throw Limit();
             var kind = String(item, "type");
+            if (kind is not ("reasoning" or "message" or "function_call" or "custom_tool_call")) return null;
+            if (_content.Count >= _options.MaximumContentSlots) throw Limit();
             var itemId = String(item, "id");
             var call = kind is "function_call" or "custom_tool_call";
-            var slot = new Slot(_slots.Count, kind, itemId, call ? String(item, "call_id") : null, call ? String(item, "name") : null);
+            var slot = new Slot(_content.Count, kind, itemId, call ? String(item, "call_id") : null, call ? String(item, "name") : null);
             if (kind == "reasoning") emit(new ThinkingStarted(slot.Index, new ThinkingContent("")));
             else if (kind == "message") emit(new TextStarted(slot.Index, new TextContent("")));
             else if (kind == "function_call")
@@ -542,8 +550,8 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                 if (OptionalString(item, "namespace") is { } ns) fields = fields.Set("namespace", StringData(ns));
                 emit(new ToolCallStarted(slot.Index, new(slot.CallId + "|" + itemId, slot.Name!, JsonData.EmptyObject, fields)));
             }
-            else throw Protocol();
-            _slots.Add(outputIndex, slot);
+            _slots[outputIndex] = slot;
+            _content.Add(slot);
             return slot;
         }
 
@@ -567,28 +575,27 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             emit(new ToolCallDelta(slot.Index, delta.ToString()));
         }
 
-        private Slot Active(JsonElement value, string kind)
-        {
-            if (!_slots.TryGetValue(Index(value), out var slot) || slot.Ended || slot.Kind != kind) throw Protocol();
-            if (value.TryGetProperty("item_id", out _) && String(value, "item_id") != slot.ItemId) throw Protocol();
-            return slot;
-        }
+        // getSlot(event.output_index, type): the open slot of that output_index when it has the type, matched by index alone
+        // (item_id is not consulted); a missing or non-index output_index finds none.
+        private Slot? Active(JsonElement value, string kind) =>
+            value.TryGetProperty("output_index", out var index) && index.ValueKind == JsonValueKind.Number &&
+            index.TryGetInt32(out var outputIndex) && _slots.TryGetValue(outputIndex, out var slot) && slot.Kind == kind ? slot : null;
 
         public List<StreamEvent> EndPendingThinking()
         {
             var events = new List<StreamEvent>();
-            foreach (var slot in _slots.Values.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
+            foreach (var slot in _content.Where(s => s.Kind == "reasoning" && s.Ended && !s.ThinkingEnded))
                 EndThinking(slot, progress => { _reducer.Apply(progress); events.Add(progress); });
             return events;
         }
         public StreamTerminalEvent Finish()
         {
             if (!_completed) throw new StreamProtocolException("Responses stream ended before a supported terminal response.");
-            var unfinished = _slots.Values.Any(slot => !slot.Ended);
+            var unfinished = _content.Any(slot => !slot.Ended);
             if (!_incomplete && !ProviderFailed && unfinished)
                 throw new StreamProtocolException("Responses stream completed with unfinished content.");
             if (_incomplete && _stopReason == StopReason.Length &&
-                _slots.Values.Any(slot => !slot.Ended && slot.Kind != "message"))
+                _content.Any(slot => !slot.Ended && slot.Kind != "message"))
             {
                 // Preserve usage and partial content, but never invent authoritative ends.
                 _stopReason = StopReason.Error;
@@ -597,7 +604,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var message = _reducer.Snapshot() with
             {
                 Usage = _usage, ExtraProperties = _properties,
-                StopReason = _stopReason == StopReason.Stop && _slots.Values.Any(slot => slot.Kind is "function_call" or "custom_tool_call") ? StopReason.ToolUse : _stopReason
+                StopReason = _stopReason == StopReason.Stop && _content.Any(slot => slot.Kind is "function_call" or "custom_tool_call") ? StopReason.ToolUse : _stopReason
             };
             StreamTerminalEvent terminal = message.StopReason == StopReason.Error ?
                 new StreamError(StopReason.Error, message) : new StreamDone(message.StopReason, message);
