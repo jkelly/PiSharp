@@ -34,6 +34,34 @@ internal static class PromptAuthCases
 
     public static IEnumerable<(string Id, Func<Task> Run)> All()
     {
+        // bug-report.ts: summarizeForBugReport finds no auth, the request fails in model-runtime.ts prepareRequest and
+        // getSummarizationFailure names it; the /bug flow shows "Failed to write bug report summary: …".
+        yield return ("e2e.prompt-auth.bug-summary-without-key", async () =>
+        {
+            await using var pi = new InteractiveHarness("bug-no-key");
+            pi.Vars.Remove("ANTHROPIC_API_KEY");
+            pi.Start("--provider", "anthropic", "--model", "claude-haiku-4-5", "--tui-mode", "regular");
+            await pi.WaitFor("escape interrupt");
+            await pi.Submit("/bug");
+            await pi.WaitFor("What went wrong?");
+            pi.Type("summary without credentials");
+            pi.Type("\r");
+            await pi.WaitFor("Include the session transcript?");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("Attach a summary written by");
+            pi.Type("\r");
+            await pi.WaitFor("Upload sends the report");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitUntil(text => string.Join(" ", text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+                .Contains("Failed to write bug report summary: Bug report summary failed: Provider is not configured: anthropic", StringComparison.Ordinal), "summary error");
+            Check(Directory.GetFiles(pi.Cwd, "pi-bug-report-*.zip").Length == 0, "no report written");
+            Equal(0, pi.Requests.Count, "nothing sent");
+        });
+
         // sdk.ts: a continued session whose model's provider has no auth runs on findInitialModel's pick, and interactive mode shows
         // modelFallbackMessage (Pi 1.1.0 picks openai/gpt-5.5 with only an OpenAI key).
         yield return ("e2e.prompt-auth.continue-falls-back-with-a-warning", async () =>

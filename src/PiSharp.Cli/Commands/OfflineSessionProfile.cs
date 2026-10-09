@@ -363,12 +363,18 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             : PiSharp.AI.Protocols.ProviderShared.ProviderTranscriptAccess.SupportedThinkingLevels(selection.Definition.Raw), async token =>
             {
                 var fresh = selection.WithRegistry(await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false));
-                if (fresh.Model.Provider == "anthropic" && fresh.Model.Api == "anthropic-messages")
+                try
                 {
-                    var (authentication, handler, reresolve) = await fresh.ResolveAnthropicAsync(runtime, token).ConfigureAwait(false);
-                    return await fresh.ConnectResolvedAnthropicAsync(authentication, handler, token, reresolve).ConfigureAwait(false);
+                    if (fresh.Model.Provider == "anthropic" && fresh.Model.Api == "anthropic-messages")
+                    {
+                        var (authentication, handler, reresolve) = await fresh.ResolveAnthropicAsync(runtime, token).ConfigureAwait(false);
+                        return await fresh.ConnectResolvedAnthropicAsync(authentication, handler, token, reresolve).ConfigureAwait(false);
+                    }
+                    return fresh.Connect(runtime);
                 }
-                return fresh.Connect(runtime);
+                // model-runtime.ts prepareRequest: no auth resolution for the provider.
+                catch (LiveSessionException error) when (error.Code == "MissingLiveApiKey")
+                { throw new LiveSessionConnection.ProviderNotConfiguredException("Provider is not configured: " + fresh.Model.Provider); }
             });
 
     internal static ModelDescriptor SelectModel(string? offlineApi) => offlineApi switch
@@ -615,7 +621,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             }
             // sdk.ts: a session without a model keeps the Agent's DEFAULT_MODEL; its provider has no auth, so nothing is ever sent to it.
             if (liveSelection is { IsUnselected: true })
-                connection = LiveSessionConnection.Deferred(liveSelection, ["off"], _ => throw new InvalidOperationException("No API key for provider: unknown"));
+                connection = LiveSessionConnection.Deferred(liveSelection, ["off"], _ => throw new LiveSessionConnection.ProviderNotConfiguredException("Unknown provider: " + liveSelection.Model.Provider));
             else
                 try
                 {

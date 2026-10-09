@@ -35,7 +35,7 @@ public sealed class TransportSessionSummaryGenerator(Func<SessionSummaryRequest,
                 // Provider errors and unrequested aborted terminals remain failed summaries.
                 if (terminal.Reason != terminal.Message.StopReason || terminal is StreamError &&
                     !(terminal.Reason == StopReason.Aborted && cancellationToken.IsCancellationRequested))
-                    throw Failed(terminal.Message);
+                    throw Failed(terminal.Message, request.Kind);
                 final = terminal.Message;
             }
         }
@@ -45,7 +45,7 @@ public sealed class TransportSessionSummaryGenerator(Func<SessionSummaryRequest,
         cancellationToken.ThrowIfCancellationRequested();
         if (final is null || final.StopReason is StopReason.Error or StopReason.Length or StopReason.Aborted or StopReason.Pending or StopReason.Deferred ||
             final.Content.IsDefault || final.Content.Any(content => content is ToolCallContent))
-            throw final is null ? new SessionCompactionException(SessionCompactionFailure.SummaryFailed) : Failed(final);
+            throw final is null ? new SessionCompactionException(SessionCompactionFailure.SummaryFailed) : Failed(final, request.Kind);
         // Validate owned usage and final wire envelope without persisting the assistant itself.
         _ = PiWireJson.WriteMessage(final);
         var text = string.Join('\n', final.Content.OfType<TextContent>().Select(content => content.Text));
@@ -54,12 +54,20 @@ public sealed class TransportSessionSummaryGenerator(Func<SessionSummaryRequest,
     }
 
     /// <summary>Carries the response's provider error text so summarization retry can classify it as Pi does.</summary>
-    private static SessionCompactionException Failed(AssistantMessage message)
+    private static SessionCompactionException Failed(AssistantMessage message, SessionSummaryKind kind)
     {
         string? error = null;
         if (message.StopReason == StopReason.Error && message.ExtraProperties?.TryGet("errorMessage", out var value) == true &&
             value is { Value.ValueKind: JsonValueKind.String }) error = value.Value.GetString();
+        // compaction.ts getSummarizationFailure with the label of the summary (compaction.ts, branch-summarization.ts).
+        var label = kind switch { SessionSummaryKind.TurnPrefix => "Turn prefix summarization", SessionSummaryKind.Branch => "Branch summarization", _ => "Summarization" };
+        var text = message.StopReason switch
+        {
+            StopReason.Error => $"{label} failed: {(string.IsNullOrEmpty(error) ? "Unknown error" : error)}",
+            StopReason.Length => $"{label} failed: generation hit the token cap and the summary is incomplete",
+            _ => null
+        };
         return new(SessionCompactionFailure.SummaryFailed)
-        { ProviderErrorMessage = message.StopReason == StopReason.Error ? error ?? "" : null, ProviderAborted = message.StopReason == StopReason.Aborted };
+        { ProviderErrorMessage = message.StopReason == StopReason.Error ? error ?? "" : null, ProviderAborted = message.StopReason == StopReason.Aborted, FailureText = text };
     }
 }

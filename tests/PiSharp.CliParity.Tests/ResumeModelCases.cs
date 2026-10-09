@@ -59,12 +59,15 @@ internal static partial class Program
     ];
 
     /// <summary>RPC commands sent one at a time, each after the previous response; the responses in order.</summary>
-    private static async Task<List<JsonNode>> RpcSequence(Sandbox sandbox, string[] args, params string[] commands)
+    private static Task<List<JsonNode>> RpcSequence(Sandbox sandbox, string[] args, params string[] commands) => RpcSequence(sandbox, args, null, commands);
+
+    /// <summary>As above, also collecting every other output record (events) in <paramref name="events"/>.</summary>
+    private static async Task<List<JsonNode>> RpcSequence(Sandbox sandbox, string[] args, List<JsonNode>? events, string[] commands)
     {
         var input = new ScriptedInput(); var responses = new List<JsonNode>();
         using var output = new LineOutput(line =>
         {
-            if (line["type"]?.GetValue<string>() != "response") return;
+            if (line["type"]?.GetValue<string>() != "response") { if (events is not null) lock (events) events.Add(line); return; }
             int count; lock (responses) { responses.Add(line); count = responses.Count; }
             if (count < commands.Length) input.Send(commands[count]); else input.Complete();
         });

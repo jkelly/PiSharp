@@ -520,12 +520,24 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         }
         public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            var inner = await owner.ConnectDeferredAsync(cancellationToken).ConfigureAwait(false);
+            LiveSessionConnection? inner = null; string? refused = null;
+            try { inner = await owner.ConnectDeferredAsync(cancellationToken).ConfigureAwait(false); }
+            catch (ProviderNotConfiguredException error) { refused = error.Message; }
+            if (inner is null)
+            {
+                // model-runtime.ts prepareRequest: the request fails as an error response carrying the ModelsError text.
+                var model = request.Model;
+                yield return new StreamError(StopReason.Error, new AssistantMessage(model.Api, model.Provider, model.Id, request.Timestamp, [], TokenUsage.Zero,
+                    StopReason.Error, JsonFields.Empty.Set("errorMessage", JsonData.Parse(System.Text.Json.JsonSerializer.Serialize(refused)))));
+                yield break;
+            }
             IChatTransport transport;
             lock (gate) transport = bound ??= replay ? inner.CreateCacheWarmTransport() : inner.CreateTransport(outputTokens, summary);
             await foreach (var observation in transport.StreamAsync(request, cancellationToken).ConfigureAwait(false)) yield return observation;
         }
     }
+    /// <summary>model-runtime.ts prepareRequest ModelsError: the provider is unknown or resolves no auth for this request.</summary>
+    internal sealed class ProviderNotConfiguredException(string message) : Exception(message);
     internal IChatTransport CreateTransport(int? outputTokens = null, bool summary = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
