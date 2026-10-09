@@ -308,6 +308,7 @@ public static class RpcSessionCommand
             return await Fail(liveError.Code, liveError.Message, 2).ConfigureAwait(false);
         if (operationFailure is NativeExtensionException extensionError)
             return await Fail(extensionError.Failure.ToString(), extensionError.Message, extensionError.Failure == NativeExtensionFailure.CleanupFailed ? 1 : 2).ConfigureAwait(false);
+        if (Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1") await stderr.WriteAsync(operationFailure + Environment.NewLine).ConfigureAwait(false);
         return await Fail("RpcHostFailed", "RPC host failed after owned cleanup; inspect durable state before retrying.", 1).ConfigureAwait(false);
 
         async ValueTask Cleanup(Func<ValueTask> close)

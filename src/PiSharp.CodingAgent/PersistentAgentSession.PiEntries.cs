@@ -40,6 +40,14 @@ public sealed partial class PersistentAgentSession
     public Task<SessionEntryAppendReceipt> AppendSessionInfoAsync(string name, CancellationToken cancellationToken = default) =>
         AppendLeafEntryAsync("session_info", writer => writer.WriteString("name", name), cancellationToken);
 
+    /// <summary>ThrowAvailable for observer and handler binding: a runtime binding under a replacement reservation (an MCP runtime
+    /// lease binds the profile's views, extension activations included) may bind them; disposed, retired or faulted sessions may not.</summary>
+    private void ThrowBindable()
+    {
+        if (_replacing && !_disposed && !_admissionStopped && !_retired && _fault is null) return;
+        ThrowAvailable();
+    }
+
     private async Task<SessionEntryAppendReceipt> AppendLeafEntryAsync(string type, Action<Utf8JsonWriter> write, CancellationToken cancellationToken)
     {
         lock (_gate) ThrowAvailable();

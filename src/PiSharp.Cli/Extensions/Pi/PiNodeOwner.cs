@@ -39,6 +39,11 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
         foreach (var command in (descriptor["commands"] as JsonArray ?? []).OfType<JsonObject>()) registry.RegisterCommand(Command(command));
         if (descriptor["toolRenderers"] is JsonValue renderers && renderers.GetValue<int>() > 0 && registry is IExtensionToolRendererRegistry rendererRegistry)
             rendererRegistry.RegisterToolRenderer(new("tool-renderer", ResolveRenderers));
+        // pi.registerMcpServer(): servers registered while the extension loaded are read when the session starts.
+        if (registry is PiSharp.Extensions.Mcp.Registration.IExtensionMcpServerRegistry mcp)
+            foreach (var server in host.McpServerRegistrations.Where(server => server["extensionPath"]?.GetValue<string>() == extension.Path))
+                try { mcp.RegisterMcpServer(server["name"]!.GetValue<string>(), JsonData.Parse(server["config"]?.ToJsonString() ?? "{}")); }
+                catch (NotSupportedException) { }
         return ValueTask.CompletedTask;
     }
 
