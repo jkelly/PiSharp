@@ -154,7 +154,7 @@ internal static class McpDynamicRootsTests
     private static async Task CloseReentry()
     {
         McpDynamicRootsHandler? handler = null; var refused = 0;
-        handler = new McpDynamicRootsHandler(_ =>
+        handler = new McpDynamicRootsHandler(token =>
         {
             try { _ = handler!.CloseAsync(); } catch (InvalidOperationException) { refused++; }
             return ValueTask.FromResult(JsonData.Parse("[]"));
