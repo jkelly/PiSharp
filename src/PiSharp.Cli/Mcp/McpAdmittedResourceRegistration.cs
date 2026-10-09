@@ -82,7 +82,7 @@ public sealed class McpAdmittedResourceRegistration
                 .Where(row => row.Tool.OwnerId == scope.OwnerId && row.Tool.OwnerGeneration == scope.OwnerGeneration && ids.Contains(row.Tool.RegistrationId)).ToImmutableArray();
             if (added.Length != descriptors.Length) throw new InvalidOperationException("Resource preparation changed actual registration ownership.");
             var preparedTools = added.Select(row => new SessionRegisteredTool(binding.RegisteredToolDeclarations[row.Index], binding.Adapters[row.Index])
-            { Exposure = row.Tool.Exposure, Namespace = row.Tool.Namespace, DefaultActive = row.Tool.DefaultActive, IsExtension = true,
+            { Exposure = row.Tool.Exposure, Namespace = row.Tool.Namespace, DefaultActive = row.Tool.DefaultActive, IsExtension = true, Annotations = row.Tool.Annotations,
                 PrepareLoadout = binding.GetLoadoutPreparation(row.Tool.Name) }).ToImmutableArray();
             var result = current.WithToolCatalog(current.RegisteredTools.AddRange(preparedTools), compose(current, binding));
             scope.ExtensionLifetimeCancellationToken.ThrowIfCancellationRequested();

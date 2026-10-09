@@ -1239,7 +1239,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         set { lock (_gate) { ThrowAvailable(); ThrowInputMutation(); _agent.FollowUpMode = value; } }
     }
     public IDisposable Subscribe(IAgentEventSink sink)
-    { lock (_gate) { ThrowAvailable(); return _agent.Subscribe(sink); } }
+    { lock (_gate) { ThrowBindable(); return _agent.Subscribe(sink); } }
     public bool Abort()
     {
         InputSubmission? input; ContextEditCancellation? edit; ContextEditCancellation? run;

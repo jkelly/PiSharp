@@ -1,0 +1,34 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/legacy-api-aliases.ts.
+// Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
+import { anthropicMessagesApi } from "./api/anthropic-messages.lazy.mjs";
+import { azureOpenAIResponsesApi } from "./api/azure-openai-responses.lazy.mjs";
+import { googleGenerativeAIApi } from "./api/google-generative-ai.lazy.mjs";
+import { googleVertexApi } from "./api/google-vertex.lazy.mjs";
+import { mistralConversationsApi } from "./api/mistral-conversations.lazy.mjs";
+import { openAICodexResponsesApi } from "./api/openai-codex-responses.lazy.mjs";
+import { openAICompletionsApi } from "./api/openai-completions.lazy.mjs";
+import { openAIResponsesApi } from "./api/openai-responses.lazy.mjs";
+const anthropicMessagesStreams = anthropicMessagesApi();
+const azureOpenAIResponsesStreams = azureOpenAIResponsesApi();
+const googleGenerativeAIStreams = googleGenerativeAIApi();
+const googleVertexStreams = googleVertexApi();
+const mistralConversationsStreams = mistralConversationsApi();
+const openAICodexResponsesStreams = openAICodexResponsesApi();
+const openAICompletionsStreams = openAICompletionsApi();
+const openAIResponsesStreams = openAIResponsesApi();
+export const streamAnthropic = anthropicMessagesStreams.stream;
+export const streamSimpleAnthropic = anthropicMessagesStreams.streamSimple;
+export const streamAzureOpenAIResponses = azureOpenAIResponsesStreams.stream;
+export const streamSimpleAzureOpenAIResponses = azureOpenAIResponsesStreams.streamSimple;
+export const streamGoogle = googleGenerativeAIStreams.stream;
+export const streamSimpleGoogle = googleGenerativeAIStreams.streamSimple;
+export const streamGoogleVertex = googleVertexStreams.stream;
+export const streamSimpleGoogleVertex = googleVertexStreams.streamSimple;
+export const streamMistral = mistralConversationsStreams.stream;
+export const streamSimpleMistral = mistralConversationsStreams.streamSimple;
+export const streamOpenAICodexResponses = openAICodexResponsesStreams.stream;
+export const streamSimpleOpenAICodexResponses = openAICodexResponsesStreams.streamSimple;
+export const streamOpenAICompletions = openAICompletionsStreams.stream;
+export const streamSimpleOpenAICompletions = openAICompletionsStreams.streamSimple;
+export const streamOpenAIResponses = openAIResponsesStreams.stream;
+export const streamSimpleOpenAIResponses = openAIResponsesStreams.streamSimple;

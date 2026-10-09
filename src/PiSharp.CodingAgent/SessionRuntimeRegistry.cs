@@ -21,6 +21,8 @@ public sealed record SessionRegisteredTool(JsonData Declaration, IPreparedToolAd
     public Func<ToolLoadout, ToolLoadoutChanges?>? PrepareLoadout { get; init; }
     /// <summary>Source promptGuidelines, reported to loadout preparation by ToolLoadout.GetPromptGuidelines.</summary>
     public ImmutableArray<string> PromptGuidelines { get; init; } = [];
+    /// <summary>Source ToolAnnotations of an extension or MCP tool (getAllTools reports them).</summary>
+    public ImmutableDictionary<string, bool>? Annotations { get; init; }
 }
 public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int MaximumTools = 128,
     int MaximumMessages = 1024, int MaximumDeclarations = 4096, int MaximumCharacters = 1_048_576,

@@ -59,7 +59,8 @@ public sealed partial class PersistentAgentSession
     public IDisposable SubscribeOperationEvents(ISessionOperationEventSink sink)
     {
         ArgumentNullException.ThrowIfNull(sink);
-        lock(_gate){ThrowAvailable();if(_operationSubscriptions.Length>=(_agentOptions?.MaximumSubscribers??128))throw new InvalidOperationException("Session subscriber limit reached.");var item=new OperationSubscription(sink);_operationSubscriptions=_operationSubscriptions.Add(item);return new OperationLease(this,item);}
+        // A runtime binding under a replacement reservation subscribes its observers (extension activations bind there too).
+        lock(_gate){ThrowBindable();if(_operationSubscriptions.Length>=(_agentOptions?.MaximumSubscribers??128))throw new InvalidOperationException("Session subscriber limit reached.");var item=new OperationSubscription(sink);_operationSubscriptions=_operationSubscriptions.Add(item);return new OperationLease(this,item);}
     }
     private AgentConfiguration RecoveryConfiguration(AgentConfiguration configuration)
     {

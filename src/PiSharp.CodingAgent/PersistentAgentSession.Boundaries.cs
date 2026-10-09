@@ -76,14 +76,14 @@ public sealed partial class PersistentAgentSession
     public void ConfigureBoundaryHandlers(SessionBoundaryHandler? turnEnd, SessionBoundaryHandler? beforeSettle,
         Func<SessionBoundaryKind, ValueTask>? invalidContinuation = null)
     {
-        lock (_gate) { ThrowAvailable(); _turnBoundary = turnEnd; _settleBoundary = beforeSettle; _invalidBoundaryContinuation = invalidContinuation; }
+        lock (_gate) { ThrowBindable(); _turnBoundary = turnEnd; _settleBoundary = beforeSettle; _invalidBoundaryContinuation = invalidContinuation; }
     }
 
     /// <summary>Trusted host binding of the message_end handlers. A replacement is persisted in place of the finalized message;
     /// one the session cannot record is passed to <paramref name="rejected"/> and the original is kept.</summary>
     public void ConfigureMessageEndHandler(SessionMessageEndHandler? handler, Func<Exception, ValueTask>? rejected = null)
     {
-        lock (_gate) { ThrowAvailable(); _messageEnd = handler; _messageEndRejected = rejected; }
+        lock (_gate) { ThrowBindable(); _messageEnd = handler; _messageEndRejected = rejected; }
     }
 
     /// <summary>The persisted form of a finalized message: its message_end replacement, if a handler replaced it.</summary>

@@ -53,7 +53,7 @@ public sealed class McpRegisteredProfileDiscoveryAdmission
             throw new InvalidOperationException("Discovery collides with an existing captured executable binding.");
         var added = Binding.Registrations.Select((tool, index) =>
             new SessionRegisteredTool(Binding.RegisteredToolDeclarations[index], Binding.Adapters[index])
-            { Namespace = tool.Namespace, Exposure = tool.Exposure, DefaultActive = tool.DefaultActive,
+            { Namespace = tool.Namespace, Exposure = tool.Exposure, DefaultActive = tool.DefaultActive, Annotations = tool.Annotations,
                 IsExtension = true, PrepareLoadout = Binding.GetLoadoutPreparation(tool.Name) }).ToImmutableArray();
         var final = acquiredRegistry.WithToolCatalog(acquiredRegistry.RegisteredTools.AddRange(added),
             composeHooks(acquiredRegistry, Binding));

@@ -108,8 +108,20 @@ public static class RpcSessionCommand
                 await SessionCommands.ScriptAsync(parsed.Script, cancellationToken).ConfigureAwait(false);
             gate = OfflineGate.From(turns);
             // Pending input commands may carry Pi-sized images; retain two maximal commands while a dialog is open.
-            ui = parsed.Extension is null ? null : new(new RpcExtensionUiOptions(MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes),
-                presentationObserver: presentation);
+            // Pi extensions (IMPL-E) get a UI in the modes upstream gives one (tui and rpc); print and json run without (hasUI false).
+            var piExtensions = pi?.Extensions;
+            ui = parsed.Extension is null && (piExtensions is null || pi!.ExtensionMode is not ("rpc" or "tui")) ? null
+                : new(new RpcExtensionUiOptions(MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes), presentationObserver: presentation);
+            if (piExtensions is not null)
+            {
+                // Source emitError: print and json modes write "Extension error (<path>): <error>"; RPC publishes an extension_error record.
+                piExtensions.ReportError = async (path, eventName, error) =>
+                {
+                    if (dispatcher is { } rpc) await rpc.PublishExtensionErrorAsync(path, eventName, error).ConfigureAwait(false);
+                    else { await stderr.WriteAsync(($"Extension error ({path}): {error}\n").AsMemory()).ConfigureAwait(false); await stderr.FlushAsync().ConfigureAwait(false); }
+                };
+                piExtensions.Settings = () => settings?.Values is { } values ? System.Text.Json.Nodes.JsonNode.Parse(values.ToString()) : null;
+            }
             IExtensionUiProvider? activationUi = ui is null ? null : decorateTerminalUi?.Invoke(ui) ?? ui;
             if (activationUi is not null && terminalInputAdmission is not null) activationUi = terminalInputAdmission.Decorate(activationUi);
             profile = await OfflineSessionProfile.CreateAsync(parsed.Workspace, parsed.Session, parsed.Script,
@@ -117,6 +129,11 @@ public static class RpcSessionCommand
                 async (diagnostic, token) =>
                 {
                     token.ThrowIfCancellationRequested();
+                    if (pi?.Extensions is { } nodeExtensions && diagnostic.OwnerId.StartsWith("pi-extension-", StringComparison.Ordinal))
+                    {
+                        await nodeExtensions.ReportAsync(nodeExtensions.PathOfOwner(diagnostic.OwnerId), diagnostic.EventName, diagnostic.ErrorText).ConfigureAwait(false);
+                        return;
+                    }
                     await stderr.WriteAsync((JsonSerializer.Serialize(new { schemaVersion = 1, type = "extension_input_diagnostic",
                         eventName = diagnostic.EventName, ownerId = diagnostic.OwnerId, ownerGeneration = diagnostic.OwnerGeneration,
                         registrationId = diagnostic.RegistrationId, failure = diagnostic.Failure.ToString() }) + "\n").AsMemory(), token).ConfigureAwait(false);
@@ -132,7 +149,10 @@ public static class RpcSessionCommand
                 originalSystemPrompt: pi?.SystemPrompt, toolPolicy: pi?.ToolPolicy ?? (parsed.ToolPolicy == "pi"
                     ? new PiSharp.Cli.Pi.PiToolPolicy(PiSharp.Cli.Pi.PiToolPolicyMode.Pi) { ProtectedDirectories = [Path.GetDirectoryName(parsed.Session)!] } : null),
                 // With --no-mcp extensions still register servers; nothing connects them, which is reported (reportUnhandledMcpServers).
-                mcpRegistrations: hostAdmission ? mcpHost!.Registrations : null).ConfigureAwait(false);
+                mcpRegistrations: hostAdmission ? mcpHost!.Registrations : null, piExtensions: pi?.Extensions).ConfigureAwait(false);
+            // A virtual selection's router reads this profile's session branch and records its state there.
+            if (liveSelection is { IsVirtual: true } virtualSelection) virtualSelection.VirtualSession = profile.CurrentVirtualModelSession;
+            if (pi?.Extensions is { } modelsHost) await PiSharp.Cli.Extensions.Pi.PiExtensionModels.CreateAsync(modelsHost, liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false);
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();
@@ -291,6 +311,7 @@ public static class RpcSessionCommand
             return await Fail(liveError.Code, liveError.Message, 2).ConfigureAwait(false);
         if (operationFailure is NativeExtensionException extensionError)
             return await Fail(extensionError.Failure.ToString(), extensionError.Message, extensionError.Failure == NativeExtensionFailure.CleanupFailed ? 1 : 2).ConfigureAwait(false);
+        if (Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1") await stderr.WriteAsync(operationFailure + Environment.NewLine).ConfigureAwait(false);
         return await Fail("RpcHostFailed", "RPC host failed after owned cleanup; inspect durable state before retrying.", 1).ConfigureAwait(false);
 
         async ValueTask Cleanup(Func<ValueTask> close)

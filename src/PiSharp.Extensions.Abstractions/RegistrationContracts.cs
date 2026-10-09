@@ -92,6 +92,9 @@ public sealed record ExtensionToolDescriptor(
     public JsonData? ConstrainedSampling { get; init; }
     /// <summary>The tool's own renderers, consulted after every registered tool renderer resolver.</summary>
     public ExtensionToolRenderers? Renderers { get; init; }
+    /// <summary>Source ToolAnnotations: the author's unverified hints with MCP's meaning (<c>readOnlyHint</c>, <c>destructiveHint</c>,
+    /// <c>idempotentHint</c>, <c>openWorldHint</c>), reported by getAllTools. Null declares none.</summary>
+    public System.Collections.Immutable.ImmutableDictionary<string, bool>? Annotations { get; init; }
 }
 
 public sealed record ExtensionCommandDescriptor(

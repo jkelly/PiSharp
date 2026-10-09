@@ -104,7 +104,10 @@ internal static partial class Program
     {
         Registry(out var registry);
         registry.RegisterVirtualModel(Router("router", "auto", _ => throw new InvalidOperationException()));
-        Equal("LiveApiUnavailable", Throws<LiveSessionException>(() => LiveSessionSelection.FromEntry(registry.Find("router", "auto")!, registry, null), "virtual").Code,
-            "a virtual model is routed before any request and never reaches a provider");
+        // IMPL-E: with its registry a virtual entry is a virtual selection (VirtualModelRoutingTransport.ForLive routes each request);
+        // without one it has no route of its own and never reaches a provider.
+        Check(LiveSessionSelection.FromEntry(registry.Find("router", "auto")!, registry, null).IsVirtual, "virtual selection over its registry");
+        Equal("LiveApiUnavailable", Throws<LiveSessionException>(() => LiveSessionSelection.FromEntry(registry.Find("router", "auto")!, null, null), "virtual").Code,
+            "a virtual model without its registry is never routed to a provider");
     }
 }

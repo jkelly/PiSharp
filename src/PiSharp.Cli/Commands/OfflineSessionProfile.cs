@@ -240,7 +240,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 new SessionRegisteredTool(extension.EnabledDeclarations[index], adapter, ToolExecutionMode.Sequential)
                 { IsExtension = true, Exposure = extension.EnabledRegistrations[index].Exposure, Namespace = extension.EnabledRegistrations[index].Namespace,
                     DefaultActive = extension.EnabledRegistrations[index].DefaultActive,
-                    PromptGuidelines = extension.EnabledRegistrations[index].PromptGuidelines,
+                    PromptGuidelines = extension.EnabledRegistrations[index].PromptGuidelines, Annotations = extension.EnabledRegistrations[index].Annotations,
                     PrepareLoadout = extension.Binding.GetLoadoutPreparation(adapter.Name) }));
         }
         if (toolSelection is not null)
@@ -391,8 +391,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null,
         OriginalSystemPromptAdmission? originalSystemPrompt = null, BuiltinToolSettings? toolSettings = null,
         PiSharp.Cli.Mcp.McpRegisteredServers? mcpRegistrations = null,
-        PiSharp.Cli.Pi.PiToolPolicy? toolPolicy = null)
+        PiSharp.Cli.Pi.PiToolPolicy? toolPolicy = null, PiSharp.Cli.Extensions.Pi.PiExtensionHost? piExtensions = null)
     {
+        if (piExtensions is not null && extension is not null) throw new ArgumentException("A published native extension and Pi extensions cannot share one profile.");
         toolSettings ??= BuiltinToolSettings.Default;
         if (configuredExecInstallation is not null && (extension is null || configuredExecInstallation.GetInvocationList().Length != 1))
             throw new ArgumentException("One native extension and one explicit execution installation factory required.");
@@ -528,6 +529,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         {
             if (extensionPreflight is not null) activation = await NativeExtensionActivation.LoadAsync(extensionPreflight, token, extensionUi, reportInputDiagnostic,
                 configuredInitializerInstallation: configuredInitializerInstallation, configuredExecInstallation: configuredExecInstallation, mcpServers: mcpRegistrations).ConfigureAwait(false);
+            else if (piExtensions is not null)
+                activation = await NativeExtensionActivation.LoadPiAsync(piExtensions, token, extensionUi, reportInputDiagnostic, mcpRegistrations).ConfigureAwait(false);
             // Pi provider request hooks (before_provider_request/headers, after_provider_response, provider_stream_event).
             if (liveSelection is not null && activation?.ProviderHttpHooks(liveSelection.Model) is { } providerHooks)
             {

@@ -21,7 +21,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
 {
     private readonly object _gate = new();
     private readonly ExtensionRegistry _registry;
-    private readonly PluginAssemblyLoader _loader;
+    private readonly PluginAssemblyLoader? _loader;
     private readonly CancellationTokenSource _closing = new();
     private readonly ImmutableDictionary<string, NativeToolObjectSchema> _schemas;
     private readonly NativeSessionSnapshotProvider _sessionViews;
@@ -37,7 +37,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
     internal IPromptInputAdmission RawInputHandlers { get; private set; } = null!;
 
     private NativeExtensionActivation(NativeExtensionConfiguration configuration, ExtensionRegistry registry,
-        PluginAssemblyLoader loader, ExtensionRegistrySnapshot snapshot, ImmutableDictionary<string, NativeToolObjectSchema> schemas,
+        PluginAssemblyLoader? loader, ExtensionRegistrySnapshot snapshot, ImmutableDictionary<string, NativeToolObjectSchema> schemas,
         NativeSessionSnapshotProvider sessionViews,
         Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? reportInputDiagnostic,
         NativeExtensionContextFacadeHost facadeHost, NativeExtensionRegistrationBridge? registrationBridge = null)
@@ -158,7 +158,8 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         Binding = new(_registry, policy, (tool, arguments, token) =>
         {
             token.ThrowIfCancellationRequested(); _closing.Token.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(_schemas.TryGetValue(tool.Name, out var schema) && schema.Validate(arguments));
+            // Pi extension tools validate (and coerce) their arguments with upstream's validateToolArguments in their own runtime.
+            return ValueTask.FromResult(Pi is not null || _schemas.TryGetValue(tool.Name, out var schema) && schema.Validate(arguments));
         }, invokerOptions: limits, options: new()
         {
             RestoreSystemMessage = (messages, token) => new SessionSystemReplay().Replay(messages, token).CurrentMessage,
@@ -185,6 +186,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
     {
         _sessionViews.Attach(owner);
         _facadeHost.Attach(owner);
+        Pi?.AttachSession(owner);
         var compaction = new NativeSessionCompactionObservationBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
         compaction.Attach(owner, owner.Current);
         var metadata = new NativeSessionInfoChangedBinding(_registry, Binding.Snapshot, _reportInputDiagnostic);
@@ -237,7 +239,10 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
     }
 
     internal ImmutableArray<IPreparedToolAdapter> EnabledAdapters => Binding.Adapters
-        .Where(adapter => _configuration.EnabledTools.Contains(adapter.Name, StringComparer.Ordinal)).ToImmutableArray();
+        .Where(adapter => IsEnabledTool(adapter.Name)).ToImmutableArray();
+    private bool IsEnabledTool(string name) => Pi is not null || _configuration.EnabledTools.Contains(name, StringComparer.Ordinal);
+    private bool IsEnabledCommand(string name) => Pi is not null ? Binding.Snapshot.Commands.Any(command => command.Name == name)
+        : _configuration.EnabledCommands.Contains(name, StringComparer.Ordinal);
 
     internal ExtensionSessionSnapshot? CaptureShutdownSessionSnapshot(AgentSessionAttachment? attached)
         => NativeSessionShutdownBinding.CaptureSnapshot(_registry, attached);
@@ -253,16 +258,16 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             JsonData.Parse(JsonSerializer.Serialize(new { type = "session_shutdown", reason })), _reportInputDiagnostic, retained);
     }
     internal ImmutableArray<ExtensionToolRegistrationInfo> EnabledRegistrations => Binding.Registrations
-        .Where(tool => _configuration.EnabledTools.Contains(tool.Name, StringComparer.Ordinal)).ToImmutableArray();
+        .Where(tool => IsEnabledTool(tool.Name)).ToImmutableArray();
     internal ImmutableArray<JsonData> EnabledDeclarations => Binding.Registrations
-        .Where(tool => _configuration.EnabledTools.Contains(tool.Name, StringComparer.Ordinal)).Select(tool =>
+        .Where(tool => IsEnabledTool(tool.Name)).Select(tool =>
             JsonData.Parse(JsonSerializer.Serialize(new { name = tool.Name, description = tool.Description, parameters = tool.Parameters.Value })))
         .ToImmutableArray();
 
     public JsonData CommandCatalog => Binding.Snapshot.CommandCatalog;
     public ValueTask<JsonData> CompleteCommandAsync(string name, string prefix, CancellationToken token)
     {
-        if (!_configuration.EnabledCommands.Contains(name, StringComparer.Ordinal)) throw new NativeExtensionException(NativeExtensionFailure.InvalidConfiguration);
+        if (!IsEnabledCommand(name)) throw new NativeExtensionException(NativeExtensionFailure.InvalidConfiguration);
         return _registry.CompleteCommandAsync(Binding.Snapshot, name, prefix, token, _closing.Token);
     }
 
@@ -271,7 +276,8 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         _closing.Token.ThrowIfCancellationRequested();
         if (!text.StartsWith('/')) return false;
         var separator = text.IndexOf(' '); var name = separator < 0 ? text[1..] : text[1..separator];
-        return _configuration.EnabledCommands.Contains(name, StringComparer.Ordinal);
+        if (Pi is not null) name = name.Replace(':', '.');
+        return IsEnabledCommand(name);
     }
 
     public async ValueTask<bool> TryExecuteAsync(string text, CancellationToken token)
@@ -279,6 +285,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         token.ThrowIfCancellationRequested();
         if (!IsRegisteredCommand(text)) return false;
         var separator = text.IndexOf(' '); var name = separator < 0 ? text[1..] : text[1..separator];
+        if (Pi is not null) name = name.Replace(':', '.');
         var arguments = separator < 0 ? "" : text[(separator + 1)..];
         var lifecycleOrigin = BeginLifecycleOrigin();
         Task? invocationOriginal = null; Exception? invocationDirect = null;
@@ -323,7 +330,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         try { _closing.Cancel(); } catch (Exception error) { failures.Add(error); }
         // Retire before joining: no queued report may start as current, but every admitted original reporter must settle.
         try { await DrainLoadoutDiagnosticsAsync(CancellationToken.None).ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
-        await CollectNativeCleanupAsync(_loader.DisposeAsync, failures).ConfigureAwait(false);
+        if (_loader is not null) await CollectNativeCleanupAsync(_loader.DisposeAsync, failures).ConfigureAwait(false);
         await CollectNativeCleanupAsync(_registry.DisposeAsync, failures).ConfigureAwait(false);
         try { _registrationBridge?.Dispose(); } catch (Exception error) { failures.Add(error); }
         try { _closing.Dispose(); } catch (Exception error) { failures.Add(error); }

@@ -90,6 +90,53 @@ public static class ModelOperationJson
     }
 
     /// <summary><c>{ api, provider, model, answers, stopReason, timestamp, usage?, errorMessage? }</c>.</summary>
+    /// <summary>Parses a ClassifierResult object (an extension's classifier provider returns it). Throws <see cref="FormatException"/>.</summary>
+    public static ClassifierResult ParseClassifierResult(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object) throw new FormatException("A classifier result must be an object.");
+        var answers = ImmutableArray.CreateBuilder<KeyValuePair<string, ClassifierAnswer>>();
+        if (value.TryGetProperty("answers", out var list) && list.ValueKind == JsonValueKind.Object)
+            foreach (var (id, answer) in ObjectEntries(list))
+            {
+                double Num(string name) => answer.TryGetProperty(name, out var number) && number.ValueKind == JsonValueKind.Number ? number.GetDouble() : 0;
+                answers.Add(new(id, (answer.TryGetProperty("type", out var type) ? type.GetString() : null) switch
+                {
+                    "choice" => new ClassifierChoiceAnswer(answer.GetProperty("choice").GetString() ?? "",
+                        answer.TryGetProperty("probabilities", out var probabilities) && probabilities.ValueKind == JsonValueKind.Object
+                            ? [.. ObjectEntries(probabilities).Select(entry => KeyValuePair.Create(entry.Key, entry.Value.GetDouble()))] : [], Num("confidence")),
+                    "score" => new ClassifierScoreAnswer(Num("score"), Num("confidence")),
+                    "bool" => new ClassifierBoolAnswer(Num("probability")),
+                    _ => throw new FormatException($"Unsupported classifier answer type for {id}.")
+                }));
+            }
+        return new(Str(value, "api"), Str(value, "provider"), Str(value, "model"), answers.ToImmutable(), StopReason(value),
+            value.TryGetProperty("timestamp", out var at) && at.ValueKind == JsonValueKind.Number ? at.GetInt64() : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+        {
+            Usage = value.TryGetProperty("usage", out var usage) && usage.ValueKind == JsonValueKind.Object ? PiWireJson.ReadUsageObject(usage) : null,
+            ErrorMessage = value.TryGetProperty("errorMessage", out var error) && error.ValueKind == JsonValueKind.String ? error.GetString() : null
+        };
+    }
+
+    /// <summary>Parses an AssistantImages object (an extension's image provider returns it). Throws <see cref="FormatException"/>.</summary>
+    public static AssistantImages ParseAssistantImages(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object) throw new FormatException("An images result must be an object.");
+        ImmutableArray<ImagesContentBlock> output = value.TryGetProperty("output", out var list) && list.ValueKind == JsonValueKind.Array
+            ? [.. list.EnumerateArray().Select((block, index) => ParseBlock(block) ?? throw new FormatException($"output[{index}] must be a text or image block."))] : [];
+        return new(Str(value, "api"), Str(value, "provider"), Str(value, "model"), output, StopReason(value),
+            value.TryGetProperty("timestamp", out var at) && at.ValueKind == JsonValueKind.Number ? at.GetInt64() : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+        {
+            ResponseId = value.TryGetProperty("responseId", out var id) && id.ValueKind == JsonValueKind.String ? id.GetString() : null,
+            Usage = value.TryGetProperty("usage", out var usage) && usage.ValueKind == JsonValueKind.Object ? PiWireJson.ReadUsageObject(usage) : null,
+            ErrorMessage = value.TryGetProperty("errorMessage", out var error) && error.ValueKind == JsonValueKind.String ? error.GetString() : null
+        };
+    }
+
+    private static string Str(JsonElement value, string name) => value.TryGetProperty(name, out var text) && text.ValueKind == JsonValueKind.String ? text.GetString()! : "";
+    private static ModelOperationStopReason StopReason(JsonElement value) =>
+        (value.TryGetProperty("stopReason", out var reason) ? reason.GetString() : null) switch
+        { "error" => ModelOperationStopReason.Error, "aborted" => ModelOperationStopReason.Aborted, _ => ModelOperationStopReason.Stop };
+
     public static JsonData WriteClassifierResult(ClassifierResult result)
     {
         ArgumentNullException.ThrowIfNull(result);

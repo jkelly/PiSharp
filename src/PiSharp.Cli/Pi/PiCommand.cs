@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Commands;
+using PiSharp.Cli.Extensions.Pi;
 using PiSharp.Cli.Prompts;
 using PiSharp.Cli.Settings;
 using PiSharp.Cli.Skills;
@@ -57,6 +58,11 @@ internal sealed record PiHost
     internal Func<string, CancellationToken, Task<bool>>? Confirm { get; init; }
     internal string? ApplicationDirectory { get; init; }
     internal Func<DateTimeOffset> Now { get; init; } = () => DateTimeOffset.UtcNow;
+    /// <summary>The <c>config</c> command's resource selector (IMPL-I's TUI); without one the command reports that it needs the UI.</summary>
+    internal PiSharp.Cli.Packages.PiPackageConfigSelector? ConfigSelector { get; init; }
+    /// <summary>The child processes package commands and package resolution run (npm, git), given the host's stdout and stderr; null
+    /// runs the user's own tools with this process's environment.</summary>
+    internal Func<TextWriter, TextWriter, PiSharp.Cli.Packages.PiPackageProcesses>? PackageProcesses { get; init; }
 }
 
 /// <summary>An exit decided by the entry after its messages were written.</summary>
@@ -97,11 +103,8 @@ internal static class PiCommand
         if (offline) { host.SetEnvironment("PI_OFFLINE", "1"); host.SetEnvironment("PI_SKIP_VERSION_CHECK", "1"); }
         if (args.Length > 0 && args[0] == "auth") return await PiAuthCommand.RunAsync(args, host, token).ConfigureAwait(false);
         if (args.Length > 0 && PackageCommands.Contains(args[0]))
-        {
-            // Package commands (pi install|remove|update|list|config) belong to IMPL-E.
-            await Error($"\"{PiConfig.DisplayName} {args[0]}\" is not available in this PiSharp build yet.").ConfigureAwait(false);
-            return 1;
-        }
+            return await PiSharp.Cli.Packages.PiPackageCommands.RunAsync(args, host, token).ConfigureAwait(false) ??
+                await PiSharp.Cli.Packages.PiPackageCommands.RunConfigAsync(args, host, token).ConfigureAwait(false) ?? 1;
 
         host.Timings.ResetTimings();
         var parsed = PiArgs.Parse(args);
@@ -140,7 +143,15 @@ internal static class PiCommand
         if (parsed.Help)
         {
             await Report(startupDiagnostics).ConfigureAwait(false);
-            await console.WriteAsync((PiHelp.Text(color: color) + "\n").AsMemory(), token).ConfigureAwait(false);
+            // main.ts: help prints after the runtime loaded the extensions (no trust prompt in this pass), listing their flags.
+            IReadOnlyList<PiExtensionFlag>? helpFlags = null;
+            if (host.LoadExtensions is null)
+            {
+                var helpTrusted = parsed.ProjectTrustOverride ?? (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home) || new ProjectTrustStore(agentDir, home).Get(cwd) == true);
+                await using var helpRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, helpTrusted, "print", false, null, token).ConfigureAwait(false);
+                helpFlags = helpRun.Host?.Flags;
+            }
+            await console.WriteAsync((PiHelp.Text(helpFlags, color: color) + "\n").AsMemory(), token).ConfigureAwait(false);
             await console.FlushAsync(token).ConfigureAwait(false);
             return 0;
         }
@@ -177,7 +188,15 @@ internal static class PiCommand
         // defaultProjectTrust and, with a UI, the prompt.
         var sessionCwd = plan.Cwd;
         var trustStore = new ProjectTrustStore(agentDir, home);
-        var extensions = host.LoadExtensions is null ? null : await host.LoadExtensions(sessionCwd, token).ConfigureAwait(false);
+        // resource-loader.ts loadProjectTrustExtensions: user and CLI extensions load before trust (their project_trust handlers vote);
+        // project extensions load after a trusted decision (loadFinalExtensionSet). Tests substitute host.LoadExtensions.
+        var extensionMode = appMode switch { PiAppMode.Interactive => "tui", PiAppMode.Rpc => "rpc", PiAppMode.Json => "json", _ => "print" };
+        await using var extensionRun = host.LoadExtensions is null
+            ? await PiExtensionRun.LoadAsync(host, parsed, sessionCwd, agentDir, home, false, extensionMode, appMode is PiAppMode.Interactive or PiAppMode.Rpc,
+                appMode == PiAppMode.Interactive ? null : err, token).ConfigureAwait(false)
+            : null;
+        var extensions = host.LoadExtensions is not null ? await host.LoadExtensions(sessionCwd, token).ConfigureAwait(false)
+            : extensionRun?.Host is not null ? await extensionRun.PreSessionAsync(token).ConfigureAwait(false) : null;
         var projectTrustDiagnostics = new List<PiDiagnostic>();
         bool projectTrusted;
         try
@@ -189,13 +208,30 @@ internal static class PiCommand
         }
         catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         var settings = PiSettings.Load(sessionCwd, agentDir, projectTrusted);
-        var runtimeDiagnostics = new List<PiDiagnostic>([.. projectTrustDiagnostics, .. settings.DrainDiagnostics()]);
+        if (extensionRun is not null)
+        {
+            if (projectTrusted) await extensionRun.LoadProjectAsync(settings, token).ConfigureAwait(false);
+            if (extensionRun.Host is { } trustedHost) trustedHost.ProjectTrusted = projectTrusted;
+            await extensionRun.ApplyFlagValuesAsync(parsed.UnknownFlags, token).ConfigureAwait(false);
+            if (extensionRun.Host is not null) extensions = await extensionRun.PreSessionAsync(token).ConfigureAwait(false);
+        }
+        var runtimeDiagnostics = new List<PiDiagnostic>([.. projectTrustDiagnostics, .. settings.DrainDiagnostics(), .. extensionRun?.Diagnostics ?? []]);
         // agent-session.ts extendResourcesFromExtensions: resources_discover adds skill, prompt and theme paths (reason "startup").
         var extensionErrors = new List<string>();
         var discovered = extensions is null ? PiDiscoveredResources.Empty : await PiExtensionEvents.ResourcesDiscoverAsync(extensions.Registry, extensions.Snapshot,
             sessionCwd, "startup", (path, message) => { extensionErrors.Add($"Extension error ({path}): {message}"); return ValueTask.CompletedTask; }, token).ConfigureAwait(false);
+        // resource-loader reload: packageManager.resolve() installs missing settings packages and lists their resources (IMPL-E).
+        PiSharp.Cli.Packages.PiResolvedPaths packageResources;
+        try
+        {
+            var packageOutput = appMode == PiAppMode.Interactive ? host.Stdout : err;
+            packageResources = await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, settings, host.GetEnvironment,
+                host.PackageProcesses?.Invoke(packageOutput, err) ?? new() { Output = packageOutput, ErrorOutput = err }).ResolveAsync(cancellationToken: token).ConfigureAwait(false);
+        }
+        catch (PiSharp.Cli.Packages.PiPackageException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         var resources = PiResources.Discover(new(sessionCwd, agentDir, home, settings, projectTrusted)
         {
+            Packages = packageResources,
             CliSkills = [.. parsed.Skills ?? []], CliPromptTemplates = [.. parsed.PromptTemplates ?? []], CliThemes = [.. parsed.Themes ?? []],
             NoSkills = parsed.NoSkills, NoPromptTemplates = parsed.NoPromptTemplates, NoThemes = parsed.NoThemes, NoContextFiles = parsed.NoContextFiles,
             SystemPrompt = parsed.SystemPrompt, AppendSystemPrompt = parsed.AppendSystemPrompt is null ? default : [.. parsed.AppendSystemPrompt]
@@ -227,6 +263,12 @@ internal static class PiCommand
         try { idleTimeout = PiHttpIdleTimeout.FromSettings(settings.Merged); }
         catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout) };
+        // runner.ts bindCore: virtual models the extensions registered join every model registry the run builds (model selection too).
+        if (extensionRun?.Host is { VirtualModelRegistrations.IsEmpty: false } virtualHost)
+        {
+            var configured = runtime.ConfigureRegistry;
+            runtime = runtime with { ConfigureRegistry = registry => { configured?.Invoke(registry); virtualHost.RegisterVirtualModels(registry); } };
+        }
         LiveSessionSelection selection;
         try
         {
@@ -283,6 +325,13 @@ internal static class PiCommand
 
         var allDiagnostics = Deduplicate([.. startupDiagnostics, .. runtimeDiagnostics]);
         if (appMode != PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
+        // main.ts: runtime errors (an extension that failed to load, an unknown extension flag) stop the run in every mode.
+        if (extensionRun?.Diagnostics.Any(diagnostic => diagnostic.Type == "error") == true)
+        {
+            if (appMode == PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
+            if (extensionRun.HasLoadErrors) await Line(err, Paint(Yellow, PiExtensionLoading.LoadFailureHint)).ConfigureAwait(false);
+            return 1;
+        }
         if (IsTruthyEnvFlag(host.GetEnvironment("PI_STARTUP_BENCHMARK")) && appMode != PiAppMode.Interactive)
         { await Error("PI_STARTUP_BENCHMARK only supports interactive mode").ConfigureAwait(false); return 1; }
         var packageDir = host.GetEnvironment("PI_PACKAGE_DIR") is { Length: > 0 } configuredPackage ? PiPaths.NormalizePath(configuredPackage, home) : null;
@@ -310,7 +359,8 @@ internal static class PiCommand
             MigratedAuthProviders = migrations.MigratedAuthProviders, DeprecationWarnings = migrations.DeprecationWarnings,
             ProjectTrusted = PiProjectTrust.Seam(trustedDirectories), StartupDiagnostics = allDiagnostics,
             ExtensionPaths = [.. (parsed.Extensions ?? []).Select(path => PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home) : path)],
-            NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal)
+            NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal),
+            Extensions = extensionRun?.Host, ExtensionMode = extensionMode
         };
         var sessionArgs = SessionArguments(plan, parsed);
         // The project .pi/mcp.json is read only for a trusted project (IMPL-H seam): the run's own trust answer.

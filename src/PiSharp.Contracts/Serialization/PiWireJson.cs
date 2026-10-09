@@ -123,6 +123,8 @@ public static partial class PiWireJson
         StopReason.Deferred => "deferred", _ => throw new ArgumentOutOfRangeException(nameof(reason))
     };
 
+    /// <summary>Reads a Pi Usage object (<c>{ input, output, cacheRead, cacheWrite, totalTokens, cost }</c>).</summary>
+    public static TokenUsage ReadUsageObject(JsonElement value) => ReadUsage(value);
     private static TokenUsage ReadUsage(JsonElement value)
     {
         var cost = value.GetProperty("cost");

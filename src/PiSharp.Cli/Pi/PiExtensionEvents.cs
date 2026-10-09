@@ -94,4 +94,8 @@ internal static class PiExtensionEvents
 
 /// <summary>The extensions a Pi-style run has loaded before its session starts (IMPL-E supplies them): the registry and the snapshot the
 /// CLI's own events dispatch over.</summary>
-internal sealed record PiLoadedExtensions(ExtensionRegistry Registry, ExtensionRegistrySnapshot Snapshot);
+internal sealed record PiLoadedExtensions(ExtensionRegistry Registry, ExtensionRegistrySnapshot Snapshot)
+{
+    /// <summary>The Node extension host that loaded the extensions (IMPL-E), which the session binds after project trust.</summary>
+    internal PiSharp.Cli.Extensions.Pi.PiExtensionHost? Host { get; init; }
+}

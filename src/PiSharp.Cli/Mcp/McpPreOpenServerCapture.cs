@@ -130,13 +130,13 @@ public sealed class McpPreOpenServerCapture : IAsyncDisposable
             throw new InvalidOperationException("Discovered MCP tool collides with an existing executable binding.");
         var descriptors = publication.Tools.Select(tool => new ExtensionToolDescriptor(tool.Name, tool.Name,
             tool.Description, tool.Parameters, (arguments, context, cancellation) => InvokeAsync(tool.OriginalName, arguments, context, cancellation))
-            { Namespace = tool.Namespace, Exposure = tool.Exposure, DefaultActive = tool.Exposure == ToolExposure.Direct }).ToImmutableArray();
+            { Namespace = tool.Namespace, Exposure = tool.Exposure, DefaultActive = tool.Exposure == ToolExposure.Direct, Annotations = tool.Annotations }).ToImmutableArray();
         var plan = extensions.PrepareToolCatalogReplacement(scope, [], descriptors, extensions.CaptureSnapshot());
         var binding = new ExtensionAgentBinding(extensions, policy, validator, options: new() { ActiveToolNames = [] },
             sessionCancellationToken: lifetime.Token, capturedSnapshot: plan.PreviewSnapshot);
         var added = binding.Registrations.Select((tool, index) =>
             new SessionRegisteredTool(binding.RegisteredToolDeclarations[index], binding.Adapters[index])
-            { Namespace = tool.Namespace, Exposure = tool.Exposure, DefaultActive = tool.DefaultActive, IsExtension = true,
+            { Namespace = tool.Namespace, Exposure = tool.Exposure, DefaultActive = tool.DefaultActive, IsExtension = true, Annotations = tool.Annotations,
                 PrepareLoadout = binding.GetLoadoutPreparation(tool.Name) }).ToImmutableArray();
         var replacement = initial.WithToolCatalog(initial.RegisteredTools.AddRange(added), compose(initial, binding));
         var stagedIds = descriptors.Select(tool => tool.RegistrationId).ToImmutableArray();

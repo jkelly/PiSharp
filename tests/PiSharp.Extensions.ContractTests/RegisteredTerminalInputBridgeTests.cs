@@ -80,7 +80,7 @@ internal static class RegisteredTerminalInputBridgeTests
                         return new(Data: data + "|native");
                     });
                     return ValueTask.CompletedTask;
-                })));
+                }))));
             var register = registry.InvokeCommandAsync(registry.CaptureSnapshot(), "raw", JsonData.EmptyObject).AsTask(); originals.Add(register); await register;
             var actual = input.DispatchAsync("x", 1, 1); originals.Add(actual);
             Check((await actual).Data == "x|native" && refused);
@@ -124,7 +124,7 @@ internal static class RegisteredTerminalInputBridgeTests
                         finally { registration.Dispose(); }
                     });
                     return ValueTask.CompletedTask;
-                })));
+                }))));
             var register = registry.InvokeCommandAsync(registry.CaptureSnapshot(), "raw", JsonData.EmptyObject).AsTask(); originals.Add(register); await register;
             var dispatch = input.DispatchAsync("x", 1, 1); originals.Add(dispatch);
             await Task.WhenAny(ready.Task, dispatch); Check(ready.Task.IsCompleted);

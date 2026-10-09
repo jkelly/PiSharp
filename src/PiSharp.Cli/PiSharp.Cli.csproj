@@ -15,6 +15,7 @@
     <InternalsVisibleTo Include="PiSharp.Models.Tests" />
     <InternalsVisibleTo Include="PiSharp.Codemode.Tests" />
     <InternalsVisibleTo Include="PiSharp.CliParity.Tests" />
+    <InternalsVisibleTo Include="PiSharp.ExtensionParity.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />
@@ -26,6 +27,12 @@
     <ProjectReference Include="../PiSharp.Extensions.Runtime/PiSharp.Extensions.Runtime.csproj" />
     <ProjectReference Include="../PiSharp.Extensions.Agent/PiSharp.Extensions.Agent.csproj" />
     <ProjectReference Include="../PiSharp.Codemode/PiSharp.Codemode.csproj" />
+    <ProjectReference Include="../PiSharp.Compatibility.Node/PiSharp.Compatibility.Node.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Node extension host (IMPL-E): TypeScript/JavaScript extensions run in the user's Node with these scripts. -->
+    <None Include="../../tools/NodeBridge/pi-host/**/*.mjs;../../tools/NodeBridge/pi-host/**/*.json" Exclude="../../tools/NodeBridge/pi-host/**/selftest.mjs;../../tools/NodeBridge/pi-host/**/port-upstream.mjs;../../tools/NodeBridge/pi-host/**/upstream-exports.json"
+          Link="node-bridge/pi-host/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Models/*.json" LogicalName="PiSharp.Cli.Models.%(Filename)%(Extension)" />

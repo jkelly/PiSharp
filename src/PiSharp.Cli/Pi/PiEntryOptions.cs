@@ -74,4 +74,8 @@ internal sealed record PiEntryOptions
     internal ImmutableArray<string> ExtensionPaths { get; init; } = [];
     internal bool NoExtensions { get; init; }
     internal ImmutableDictionary<string, string?> ExtensionFlagValues { get; init; } = ImmutableDictionary<string, string?>.Empty;
+    /// <summary>The extensions the run loaded (TypeScript/JavaScript in the Node host), bound to the session by the RPC host; null without.</summary>
+    internal PiSharp.Cli.Extensions.Pi.PiExtensionHost? Extensions { get; init; }
+    /// <summary>Source ExtensionMode of the run: <c>tui</c>, <c>rpc</c>, <c>json</c> or <c>print</c>.</summary>
+    internal string ExtensionMode { get; init; } = "print";
 }
