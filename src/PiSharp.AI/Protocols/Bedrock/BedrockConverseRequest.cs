@@ -45,7 +45,7 @@ public sealed record BedrockConverseOptions
     public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask<JsonData?>>? OnPayload { get; init; }
     public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask>? OnResponse { get; init; }
     public int MaximumPayloadBytes { get; init; } = 32 * 1024 * 1024;
-    public int MaximumContentBlocks { get; init; } = 256;
+    public int MaximumContentBlocks { get; init; } = int.MaxValue;
     public int MaximumResponseCharacters { get; init; } = 4 * 1024 * 1024;
 }
 

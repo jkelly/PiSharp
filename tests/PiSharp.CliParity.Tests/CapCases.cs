@@ -50,6 +50,27 @@ internal static partial class Program
             Equal(128, explicitVerb.MaximumTools, "explicit tools"); Check(explicitVerb.Queue is null, "explicit queue defaults");
             Equal(64, explicitVerb.Loop!.MaximumTurns, "explicit turns");
         })),
+        // anthropic-messages.ts and agent-loop.ts: a response of 80 tool_use blocks (formerly 64 stream content slots) runs every call.
+        ("caps.response-with-many-parallel-tool-calls", async () =>
+        {
+            using var sandbox = new Sandbox("caps-parallel-calls");
+            const int calls = 80;
+            var body = Frame("message_start", new { type = "message_start", message = new { id = "msg_m", role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 3, output_tokens = 0 } } });
+            for (var index = 0; index < calls; index++)
+                body += Frame("content_block_start", new { type = "content_block_start", index, content_block = new { type = "tool_use", id = "toolu_" + index, name = "ls", input = new { } } })
+                    + Frame("content_block_delta", new { type = "content_block_delta", index, delta = new { type = "input_json_delta", partial_json = "{\"path\":\".\"}" } })
+                    + Frame("content_block_stop", new { type = "content_block_stop", index });
+            body += Frame("message_delta", new { type = "message_delta", delta = new { stop_reason = "tool_use" }, usage = new { output_tokens = 2 } })
+                + Frame("message_stop", new { type = "message_stop" });
+            sandbox.Respond = (_, index) => index == 0 ? Sse(body) : AnthropicText("done");
+            var (code, stdout, stderr) = await sandbox.Run(["-p", "--tools", "ls", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "list"]);
+            Equal(0, code, "exit; " + stderr);
+            Equal("done\n", stdout, "final text");
+            var results = sandbox.Requests[1].Json.GetProperty("messages").EnumerateArray().Last().GetProperty("content").EnumerateArray()
+                .Where(item => item.GetProperty("type").GetString() == "tool_result").ToList();
+            Equal(calls, results.Count, "every call has its result");
+            Check(results.All(result => !result.TryGetProperty("is_error", out var error) || !error.GetBoolean()), "no call failed");
+        }),
         // mcp/index.ts and runtime.ts: 130 servers (formerly 128), one listing 201 tools over two pages (formerly 128 per binding and
         // per registry owner) with a 300 KB schema (formerly 256 KiB per schema and 64 KiB per registered schema), and a 2,000,000-
         // character result (formerly 1 MiB per response) cut to 20 KiB for the model with the whole text saved.

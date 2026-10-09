@@ -5,7 +5,9 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI;
 
-public sealed record StreamLimits(int MaximumBlocks = 256, int MaximumCharacters = PiRequestBudget.StreamCharacters);
+/// <summary>An assistant message keeps every content block its stream opens (pi-ai builds output.content without a count bound);
+/// the accumulated characters stay the memory bound.</summary>
+public sealed record StreamLimits(int MaximumBlocks = int.MaxValue, int MaximumCharacters = PiRequestBudget.StreamCharacters);
 
 /// <summary>One stream owns one reducer. Events remain immutable; only per-block accumulators change.</summary>
 public sealed class AssistantStreamReducer
