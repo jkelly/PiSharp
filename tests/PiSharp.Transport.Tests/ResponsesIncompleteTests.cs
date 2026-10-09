@@ -35,7 +35,8 @@ internal static class ResponsesIncompleteTests
         var usage = result.Message.Usage;
         Check(usage.Input == 5 && usage.Output == 7 && usage.CacheRead == 3 && usage.CacheWrite == 2 && usage.TotalTokens == 17, "Usage components lost");
         Check(usage.ExtraProperties!.Values["reasoning"].Value.GetInt64() == 4, "Reasoning usage lost");
-        Check(usage.Cost.Input == 0.00001m && usage.Cost.Output == 0.000021m && usage.Cost.CacheRead == 0.0000015m && usage.Cost.CacheWrite == 0.000002m,
+        // models.ts:1214-1217 calculateCost in binary64 Numbers (installed pi-ai 1.1.0 prices this incomplete usage identically).
+        Check(usage.Cost.Input == 0.000009999999999999999m && usage.Cost.Output == 0.000021000000000000002m && usage.Cost.CacheRead == 0.0000015m && usage.Cost.CacheWrite == 0.000002m,
             "Incomplete pricing differs from completed pricing");
         Check(Field(result, "responseId") == "resp_incomplete", "Response identity lost");
     }

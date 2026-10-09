@@ -31,7 +31,10 @@ internal static class CompletionsLifecycleHookTests
     {
         var options = new CompletionsHttpSseOptions();
         var (events, data, total, depth, framing) = options;
-        Check(events == 4096 && data == 65_536 && total == PiSharp.AI.PiRequestBudget.StreamTotalCharacters && depth == 32 && framing is null, "Existing positional options changed.");
+        // openai-completions.ts:558 reads every chunk the SDK stream yields (for await over the OpenAI Stream): no event count and no
+        // 64 KiB event bound; one event keeps the per-content budget and the stream the total budget.
+        Check(events == int.MaxValue && data == PiSharp.AI.PiRequestBudget.StreamCharacters && total == PiSharp.AI.PiRequestBudget.StreamTotalCharacters &&
+            depth == 32 && framing is null, "Existing positional options changed.");
         using var client = new HttpClient(new FakeHttpHandler((_, _) => throw new InvalidOperationException("Legacy control never sends.")));
         _ = new CompletionsHttpSseTransport(client, (_, _) => new(HttpMethod.Post, Endpoint), new());
         using var request = new CompletionsKeyAuthRequestFactory(Endpoint, Model).Create(Request(), Key);

@@ -36,9 +36,18 @@ internal static class ResponsesServiceTierTests
         var u = result.Message.Usage;
         Check(u.Input == 5 && u.Output == 7 && u.CacheRead == 3 && u.CacheWrite == 2 && u.TotalTokens == 17 &&
             u.ExtraProperties!.Values["reasoning"].Value.GetInt64() == 4, "Tier changed token counts");
-        Check(u.Cost.Input == 0.00001m * factor && u.Cost.Output == 0.000021m * factor &&
-            u.Cost.CacheRead == 0.0000015m * factor && u.Cost.CacheWrite == 0.000002m * factor &&
-            u.Cost.Total == 0.0000345m * factor, "Tier cost multiplier or total differs");
+        // models.ts:1214-1218 calculateCost and openai-responses.ts:411-418 applyServiceTierPricing run in binary64 Numbers; these are
+        // the costs the installed pi-ai 1.1.0 reports for this usage against a local fake server (flex 0.5, priority/fast 2 or 2.5).
+        var (input, output, read, write, total) = factor switch
+        {
+            1m => (0.000009999999999999999m, 0.000021000000000000002m, 0.0000015m, 0.000002m, 0.000034500000000000005m),
+            0.5m => (0.0000049999999999999996m, 0.000010500000000000001m, 0.00000075m, 0.000001m, 0.000017250000000000003m),
+            2m => (0.000019999999999999998m, 0.000042000000000000004m, 0.000003m, 0.000004m, 0.00006900000000000001m),
+            2.5m => (0.000024999999999999998m, 0.0000525m, 0.00000375m, 0.0000049999999999999996m, 0.00008625m),
+            _ => throw new InvalidOperationException("Unpinned tier factor")
+        };
+        Check(u.Cost.Input == input && u.Cost.Output == output && u.Cost.CacheRead == read && u.Cost.CacheWrite == write &&
+            u.Cost.Total == total, "Tier cost multiplier or total differs");
     }
     private static async Task Matrix()
     {
