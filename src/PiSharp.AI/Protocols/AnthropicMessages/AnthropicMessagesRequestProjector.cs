@@ -38,10 +38,10 @@ public sealed record AnthropicMessagesRequestOptions(
     bool OAuthProjection = false, bool InterleavedThinking = true, bool SupportsMidConversationSystemMessages = false,
     ImmutableArray<string> AllowedFallbackModels = default, ImmutableArray<string> BetaFeatures = default,
     JsonData? ToolChoice = null, string? UserId = null,
-    int MaximumMessages = 256, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
+    int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
     // anthropic.ts convertTools declares every tool of the context: no tool or declaration count bound (payload bytes bound the size).
-    int MaximumContentBlocks = 1024, int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue,
-    int MaximumProjectedMessages = 1024, int MaximumJsonDepth = 32,
+    int MaximumContentBlocks = PiRequestBudget.RequestItems, int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue,
+    int MaximumProjectedMessages = PiRequestBudget.RequestItems, int MaximumJsonDepth = 32,
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes,
     bool SupportsMidConversationToolChanges = false, bool SupportsMidConversationEffort = false)
 {

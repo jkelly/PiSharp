@@ -56,7 +56,9 @@ public sealed class PiMessagesKeyAuthRequestFactory
         }
         var bytes = Encoding.UTF8.GetBytes(EcmaScriptJsonProjection.Project(payload, new(MaximumInputCharacters: _options.MaximumPayloadBytes,
             MaximumInputBytes: _options.MaximumPayloadBytes, MaximumOutputCharacters: _options.MaximumPayloadBytes, MaximumOutputBytes: _options.MaximumPayloadBytes,
-            MaximumDepth: _options.MaximumJsonDepth, MaximumStringCharacters: _options.MaximumPayloadBytes)));
+            MaximumDepth: _options.MaximumJsonDepth, MaximumStringCharacters: _options.MaximumPayloadBytes,
+            // Node and number counts grow with the message count; the payload budget bounds them.
+            MaximumNodes: _options.MaximumPayloadBytes, MaximumNumbers: _options.MaximumPayloadBytes, MaximumTotalNumberCharacters: _options.MaximumPayloadBytes)));
         HttpRequestMessage? owned = null;
         try
         {

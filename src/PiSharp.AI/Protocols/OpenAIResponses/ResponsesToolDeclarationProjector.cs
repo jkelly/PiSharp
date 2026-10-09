@@ -9,7 +9,7 @@ namespace PiSharp.AI.Protocols.OpenAIResponses;
 
 public sealed record ResponsesToolDeclarationProjectionOptions(
     bool SupportsStrictMode = false, bool? Strict = false,
-    int MaximumMessages = 256, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
+    int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
     // openai-responses-shared.ts convertResponsesTools declares every tool: no tool or declaration count bound.
     int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue, int MaximumJsonDepth = 32,
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes)

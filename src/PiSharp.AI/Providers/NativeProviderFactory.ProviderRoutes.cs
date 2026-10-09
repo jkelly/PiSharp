@@ -38,7 +38,7 @@ public sealed record ProviderRouteOptions(Func<CancellationToken, ValueTask<Prov
     public ImmutableDictionary<string, string?>? Headers { get; init; }
     /// <summary>Provider env values for base URL placeholders such as {CLOUDFLARE_ACCOUNT_ID}.</summary>
     public ImmutableDictionary<string, string>? Environment { get; init; }
-    public int MaximumMessages { get; init; } = 1024;
+    public int MaximumMessages { get; init; } = PiRequestBudget.RequestMessages;
     public int MaximumEntryCharacters { get; init; } = 64 * 1_048_576;
     public int MaximumPayloadBytes { get; init; } = 64 * 1_048_576;
 }

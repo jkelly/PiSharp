@@ -82,7 +82,7 @@ public sealed class MistralSimpleHttpSseTransport : IChatTransport, IThinkingLev
     }
     private double Estimate(ImmutableArray<TranscriptEntry> messages)
     {
-        if (messages.Length > 256) throw Limit();
+        if (messages.Length > PiRequestBudget.RequestMessages) throw Limit();
         try
         {
             double latest = double.NegativeInfinity, usage = 0; int? last = null; long characters = 0;

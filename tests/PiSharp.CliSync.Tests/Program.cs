@@ -73,6 +73,7 @@ internal static partial class Program
             ("summary.compaction-and-branch-requests-match-upstream-per-family", SummaryRequestsFollowUpstream),
             ("provider.opencode.live-main-requests-carry-x-opencode-session", LiveOpenCodeSessionHeader),
             ("provider.azure.live-route-responses-completions-and-endpoint-errors", LiveAzureRoutes),
+            ("live.long-session-2000-messages-10000-records-opens-and-sends-whole-transcript", LiveLongSessionOpensAndPrompts),
             ("mcp.session.global-config-direct-background-failure-report-and-no-mcp", McpProductionSession),
             ("mcp.session.oauth-server-sends-stored-mcp-auth-token", McpOAuthServerUsesStoredTokens),
             ("mcp.session.windows-command-resolution-and-cmd-escaping", McpStdioWindowsCommand),

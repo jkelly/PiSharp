@@ -198,7 +198,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             var factory = new AnthropicMessagesKeyAuthRequestFactory(AnthropicBase, SelectedModel,
                 new(MaximumTokens: (int)summary.MaximumOutputTokens, ModelReasoning: false,
                     ModelSupportsImages: SelectedModelDefinition.DeclaresImageInput, CacheRetention: AnthropicCacheRetention.None,
-                    MaximumMessages: 512, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes),
+                    MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes),
                 new(MaxTokens: summary.MaximumOutputTokens, SessionId: summary.SessionId, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
             return new AnthropicMessagesHttpSseTransport(_client!, (request, token) => MarkSummary(factory.Create(request, InertKey, token), summary),
                 new(MaximumDataEvents: 256, MaximumTotalDataCharacters: PiSharp.AI.PiRequestBudget.StreamTotalCharacters));
@@ -206,8 +206,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         if (SelectedModel.Api == "openai-completions")
         {
             var factory = new CompletionsKeyAuthRequestFactory(CompletionsEndpoint, SelectedModel,
-                new(Reasoning: false, MaximumMessages: 512, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
-                    ToolDeclarations: new(MaximumMessages: 512, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes))
+                new(Reasoning: false, MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
+                    ToolDeclarations: new(MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes))
                     { ModelSupportsImages = SelectedModelDefinition.DeclaresImageInput },
                 new(MaxTokens: summary.MaximumOutputTokens, SupportsReasoningEffort: false, CacheRetention: CompletionsCacheRetention.None,
                     SessionId: summary.SessionId, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
@@ -215,7 +215,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 new(MaximumDataEvents: 256, MaximumTotalDataCharacters: PiSharp.AI.PiRequestBudget.StreamTotalCharacters));
         }
         var responses = new ResponsesKeyAuthRequestFactory(Endpoint, SelectedModel,
-            new(Reasoning: false, MaximumMessages: 512, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes)
+            new(Reasoning: false, MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes)
                 { ModelSupportsImages = SelectedModelDefinition.DeclaresImageInput },
             new(SupportsMaxOutputTokens: true, MaxOutputTokens: (int)summary.MaximumOutputTokens, SessionId: summary.SessionId,
                 MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
@@ -238,7 +238,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         else if (model.Api == "anthropic-messages")
         {
             var factory = new AnthropicMessagesKeyAuthRequestFactory(AnthropicBase, model,
-                new(MaximumTokens: 8192, ModelReasoning: false, ModelSupportsImages: modelDefinition.DeclaresImageInput, MaximumMessages: 512,
+                new(MaximumTokens: 8192, ModelReasoning: false, ModelSupportsImages: modelDefinition.DeclaresImageInput, MaximumMessages: PiRequestBudget.RequestMessages,
                     MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes),
                 new(MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
             transport = new AnthropicMessagesHttpSseTransport(_client!, (request, token) => factory.Create(request, InertKey, token),
@@ -248,8 +248,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         {
             var entryCharacters = PiPayloadBudget.RequestEntryCharacters;
             var factory = new CompletionsKeyAuthRequestFactory(CompletionsEndpoint, model,
-                new(Reasoning: false, MaximumMessages: 512, MaximumEntryCharacters: entryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
-                    ToolDeclarations: new(MaximumMessages: 512, MaximumEntryCharacters: entryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes))
+                new(Reasoning: false, MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: entryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
+                    ToolDeclarations: new(MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: entryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes))
                     { ModelSupportsImages = modelDefinition.DeclaresImageInput },
                 new(MaxTokens: 8192, SupportsReasoningEffort: false, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
             transport = new CompletionsHttpSseTransport(_client!, (request, token) => factory.Create(request, InertKey, token),
@@ -258,7 +258,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         else
         {
             var factory = new ResponsesKeyAuthRequestFactory(Endpoint, model,
-                new(Reasoning: false, MaximumMessages: 512, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes)
+                new(Reasoning: false, MaximumMessages: PiRequestBudget.RequestMessages, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes)
                 { ModelSupportsImages = modelDefinition.DeclaresImageInput },
                 new(MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes));
             transport = new ResponsesHttpSseTransport(_client!, request => factory.Create(request, InertKey),
@@ -343,7 +343,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         _startupRegistry = new([DecorateOriginalPromptBinding(new(model, transport, ExecutionMode: policy.Pi is not null ? ToolExecutionMode.Parallel : ToolExecutionMode.Sequential,
             Hooks: extension?.Binding.ContextHooks))], registrations, policy,
             new SessionRuntimeRegistryOptions(MaximumModels: piEntry ? int.MaxValue : 4096, MaximumTools: piEntry ? int.MaxValue : 128,
-                MaximumMessages: piEntry ? int.MaxValue : 1024, MaximumDeclarations: piEntry ? int.MaxValue : 4096, MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
+                MaximumMessages: piEntry ? int.MaxValue : PiRequestBudget.RequestMessages, MaximumDeclarations: piEntry ? int.MaxValue : PiRequestBudget.RequestItems, MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
                 LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
                 BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
                 DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync,

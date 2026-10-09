@@ -11,7 +11,7 @@ namespace PiSharp.Cli.Output;
 
 public sealed record SessionJsonEventOutputOptions(int MaximumRecordBytes = 1_048_576,
     long MaximumTotalBytes = 16_777_216, int MaximumRecords = 16_384, int MaximumPendingObservations = 128,
-    int MaximumJsonDepth = 32, int MaximumReturnedMessages = 1024, int MaximumPendingToolMessages = 128)
+    int MaximumJsonDepth = 32, int MaximumReturnedMessages = PiSharp.AI.PiRequestBudget.RequestMessages, int MaximumPendingToolMessages = 128)
 {
     internal void Validate()
     {

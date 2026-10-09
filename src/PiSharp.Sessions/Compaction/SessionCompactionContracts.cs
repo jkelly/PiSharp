@@ -59,7 +59,8 @@ public sealed record SessionCompactionPlan(string? FirstKeptEntryId, ImmutableAr
 public sealed record SessionBranchSummaryCollection(ImmutableArray<SessionEntry> Entries, string? CommonAncestorId);
 public sealed record SessionBranchSummaryPlan(ImmutableArray<TranscriptEntry> Messages, SessionFileOperations FileOps,
     double TotalTokens, string? CommonAncestorId = null);
-public sealed record SessionCompactionPlanningOptions(int MaximumEntries = 10_000, int MaximumMessages = 10_000,
+/// <summary>Pi plans compaction over any branch; the entry and message bounds match the session log record bound (100,000).</summary>
+public sealed record SessionCompactionPlanningOptions(int MaximumEntries = 100_000, int MaximumMessages = 100_000,
     int MaximumCharacters = 8_388_608);
 
 internal sealed class SessionFileOperationsBuilder

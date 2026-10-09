@@ -18,8 +18,8 @@ public sealed record RpcScopedModel(ModelDescriptor Model, string? ThinkingLevel
 public sealed record RpcDispatchOptions(int MaximumConcurrentCommands = 8, int MaximumCommandBytes = 1_048_576,
     int MaximumOutputBytes = 1_048_576, int MaximumJsonDepth = 32, int MaximumIdCharacters = 256,
     int MaximumCommandTypeCharacters = 128, int MaximumPromptCharacters = 65_536, int MaximumImages = 16,
-    int MaximumModels = 128, int MaximumModelDefinitionBytes = 1_048_576, int MaximumReturnedMessages = 1024,
-    int MaximumReturnedEntries = 4096, int MaximumContinuationRuns = 16, int MaximumPendingToolMessages = 128)
+    int MaximumModels = 128, int MaximumModelDefinitionBytes = 1_048_576, int MaximumReturnedMessages = PiSharp.AI.PiRequestBudget.RequestMessages,
+    int MaximumReturnedEntries = 100_000, int MaximumContinuationRuns = 16, int MaximumPendingToolMessages = 128)
 {
     internal void Validate(RpcSessionOwnership ownership)
     {

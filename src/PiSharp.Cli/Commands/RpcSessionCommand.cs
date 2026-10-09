@@ -30,16 +30,17 @@ public static class RpcSessionCommand
         "[[--bash-executable <absolute file>] --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]] " + NativeExtensionConfiguration.Flags + " " + SessionCatalogCommand.Flags + " " + CreationFlags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags;
     public const string CreationFlags = "[--session-mode open|new-memory|new-lazy]";
     /// <summary>agent-loop.ts runs tool turns until the model stops, with the whole transcript: the Pi entry has no turn or
-    /// transcript-message cap; the explicit verbs keep 64 turns and 1024 messages.</summary>
+    /// transcript-message cap; the explicit verbs keep 64 turns and only the default transcript bound (PiRequestBudget.RequestMessages).</summary>
     internal static AgentLoopOptions LoopOptions(bool pi) => pi ? new(MaximumTurns: int.MaxValue, MaximumTranscriptMessages: int.MaxValue)
-        : new(MaximumTurns: 64, MaximumTranscriptMessages: 1024);
+        : new(MaximumTurns: 64);
     /// <summary>agent.ts holds every tool, subscriber, queued message and progress update: the Pi entry has no count bound on them
     /// (the explicit verbs keep the profile defaults).</summary>
     internal static PiSharp.Agent.AgentOptions AgentOptions(bool pi) => pi
         ? PiPayloadBudget.PiAgent(new(Loop: LoopOptions(true))) : PiPayloadBudget.Agent(new(Loop: LoopOptions(false)));
-    /// <summary>session-manager.ts loads every line of the file: the Pi entry has no line or record cap (the explicit verbs keep 10,000).</summary>
+    /// <summary>session-manager.ts loads every line of the file: the Pi entry has no line or record cap (the explicit verbs keep the
+    /// session log reader's 100,000 records).</summary>
     internal static PiSharp.Sessions.Storage.SessionLogReaderOptions ReaderOptions(bool pi) =>
-        PiPayloadBudget.SessionReader(pi ? new(MaximumLines: int.MaxValue, MaximumRecords: int.MaxValue) : new(MaximumLines: 10_000, MaximumRecords: 10_000));
+        PiPayloadBudget.SessionReader(pi ? new(MaximumLines: int.MaxValue, MaximumRecords: int.MaxValue) : new());
     /// <summary>buildSessionContext walks every entry of the branch: the Pi entry has no entry, ancestor or message cap.</summary>
     internal static PiSharp.Sessions.Context.SessionContextProjectionOptions ContextOptions(bool pi) => pi
         ? PiPayloadBudget.Context with { MaximumEntries = int.MaxValue, MaximumAncestorSteps = int.MaxValue, MaximumOutputMessages = int.MaxValue }
@@ -374,8 +375,9 @@ public static class RpcSessionCommand
                     MaximumPromptCharacters: pi is null ? 65_536 : int.MaxValue, MaximumImages: pi is null ? 16 : int.MaxValue)
                     // rpc-mode.ts answers get_messages/get_entries with the whole session, handles every command as it arrives, reports every
                     // started tool and continues while input is queued: the Pi entry has no count bound on them (frames stay the memory bound).
-                    with { MaximumModels = pi is null ? 4096 : int.MaxValue, MaximumReturnedMessages = pi is null ? 1024 : int.MaxValue,
-                        MaximumReturnedEntries = pi is null ? 4096 : int.MaxValue, MaximumPendingToolMessages = pi is null ? 128 : int.MaxValue,
+                    // The explicit verbs return any session's messages and entries too (the request message and session record bounds).
+                    with { MaximumModels = pi is null ? 4096 : int.MaxValue, MaximumReturnedMessages = pi is null ? PiSharp.AI.PiRequestBudget.RequestMessages : int.MaxValue,
+                        MaximumReturnedEntries = pi is null ? 100_000 : int.MaxValue, MaximumPendingToolMessages = pi is null ? 128 : int.MaxValue,
                         MaximumContinuationRuns = pi is null ? 16 : int.MaxValue, MaximumConcurrentCommands = pi is null ? 8 : int.MaxValue },
                 sessionOwnership: RpcSessionOwnership.Borrowed, inputAdmission: profile.InputAdmission, extensionUi: ui,
                 extensionCommandCatalog: profile, sessionOwner: profile.Sessions,

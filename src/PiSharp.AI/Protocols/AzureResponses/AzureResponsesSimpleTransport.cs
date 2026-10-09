@@ -23,7 +23,7 @@ public sealed class AzureResponsesSimpleTransport : IChatTransport
     {
         ArgumentNullException.ThrowIfNull(client); ArgumentNullException.ThrowIfNull(model); ArgumentNullException.ThrowIfNull(options);
         if (options.DirectOptions is null || options.DirectOptions.ModelMetadata is null ||
-            options.MaximumContextMessages is < 1 or > 65_536 || options.MaximumContextCharacters is < 1 or > PiRequestBudget.MaximumBound ||
+            options.MaximumContextMessages is < 1 or > PiRequestBudget.MaximumCountBound || options.MaximumContextCharacters is < 1 or > PiRequestBudget.MaximumBound ||
             options.Reasoning is { } requested && !Levels.Contains(requested, StringComparer.Ordinal))
             throw new AzureResponsesException(AzureResponsesFailure.Configuration);
         // Existing Azure constructor remains the authority for exact identity/config/route admission.

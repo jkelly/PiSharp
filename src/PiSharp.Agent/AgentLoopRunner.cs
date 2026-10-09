@@ -5,7 +5,7 @@ using PiSharp.Contracts;
 
 namespace PiSharp.Agent;
 
-public sealed record AgentLoopOptions(int MaximumTurns = 16, int MaximumTranscriptMessages = 1024)
+public sealed record AgentLoopOptions(int MaximumTurns = 16, int MaximumTranscriptMessages = PiRequestBudget.RequestMessages)
 {
     /// <summary>Strict admission for retained canonical tool values, with the default execution/message boundary.</summary>
     public ToolResultValueOptions CanonicalToolResultLimits { get; init; } = ToolResultValueOptions.ExecutionBoundary;
@@ -357,7 +357,7 @@ public sealed class AgentLoopRunner
 
     /// <summary>Validate the supported native request message envelope without modifying canonical history.</summary>
     public static void ValidateRequestMessages(ImmutableArray<TranscriptEntry> messages,
-        ToolResultValueOptions? valueLimits = null, int maximumMessages = 1024)
+        ToolResultValueOptions? valueLimits = null, int maximumMessages = PiRequestBudget.RequestMessages)
     {
         if (maximumMessages <= 0 || messages.IsDefault || messages.Length > maximumMessages)
             throw new ArgumentException("Invalid request message count.", nameof(messages));

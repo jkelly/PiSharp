@@ -43,7 +43,7 @@ public static class SessionSummaryRequestBuilder
     }
     public static string SerializeConversation(ImmutableArray<TranscriptEntry> messages)
     {
-        if (messages.IsDefault || messages.Length > 10_000) throw new SessionCompactionException(SessionCompactionFailure.ResourceLimit);
+        if (messages.IsDefault || messages.Length > 100_000) throw new SessionCompactionException(SessionCompactionFailure.ResourceLimit);
         var parts = new List<string>(); long characters = 0;
         foreach (var original in messages)
         {
