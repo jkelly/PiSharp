@@ -57,8 +57,15 @@ public sealed partial class PersistentAgentSession
                 else _agent.Steer(message, cancellationToken);
                 return Task.FromResult(new SessionCustomMessageReceipt(SessionCustomMessageDisposition.Queued));
             }
-            if (_inputSubmission is not null) throw new InvalidOperationException("Input admission is already processing.");
-            if (triggerTurn != true)
+            if (_inputSubmission is not null)
+            {
+                // agent-session.ts sendCustomMessage: while a prompt's input is admitted (input hooks, an extension command's handler)
+                // the session is not streaming, so the message is appended (and emitted) at once, ahead of anything the prompt records.
+                if (triggerTurn == true || !_agent.Snapshot.PendingInputs.IsEmpty) throw new InvalidOperationException("Input admission is already processing.");
+                // The admission owns the session reservation; the append only takes the commit gate, as other leaf entries do.
+                idle = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+            else if (triggerTurn != true)
             {
                 if (!_agent.Snapshot.PendingInputs.IsEmpty) throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
                 idle = new(TaskCreationOptions.RunContinuationsAsynchronously); _active = idle; _appendingExtensionEntry = true;

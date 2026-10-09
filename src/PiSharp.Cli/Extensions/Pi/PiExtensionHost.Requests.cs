@@ -361,8 +361,8 @@ internal sealed partial class PiExtensionHost
         var message = p.GetProperty("message");
         var options = p.TryGetProperty("options", out var o) && o.ValueKind == JsonValueKind.Object ? o : default;
         var deliverAs = options.ValueKind == JsonValueKind.Object && options.TryGetProperty("deliverAs", out var d) ? d.GetString() : null;
-        // agent-session.ts sendCustomMessage: an idle session appends (and emits) the message at once. A command's own input admission
-        // is still settling while its handler runs, so the append waits for that admission to finish.
+        // agent-session.ts sendCustomMessage: an idle session appends (and emits) the message at once, also while a command's handler
+        // runs inside its prompt's input admission. A message that triggers a turn waits for that admission to finish.
         for (var attempt = 0; ; attempt++)
         {
             try { await Send().ConfigureAwait(false); return; }
