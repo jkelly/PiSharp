@@ -43,8 +43,10 @@ internal sealed class GoogleEventMapper
     }
     internal IReadOnlyList<StreamEvent> Convert(JsonData chunk)
     {
-        var value = chunk.Value; if (value.ValueKind != JsonValueKind.Object) throw GoogleData.Fail(GoogleFailure.MalformedStream);
-        if (value.TryGetProperty("error", out _)) throw GoogleData.Fail(GoogleFailure.ProviderError);
+        // @google/genai generateContentResponseFromMldev/FromVertex keeps only the response fields it knows: a JSON value that is not
+        // an object (null, array, string, number) carries none, and a frame's `error` member is dropped (an in-stream error is only
+        // raised for a whole read chunk, in the decoder). Neither ends the stream.
+        var value = chunk.Value; if (value.ValueKind != JsonValueKind.Object) return [];
         var frames = new List<StreamEvent>();
         var responseId = GoogleData.String(value, "responseId");
         if (!_extra.TryGet("responseId", out _) && !string.IsNullOrEmpty(responseId))
@@ -165,7 +167,10 @@ internal sealed class GoogleEventMapper
     internal IReadOnlyList<StreamEvent> EndContent() { var frames = new List<StreamEvent>(); End(frames); return frames; }
     internal StreamTerminalEvent Finish()
     {
-        if (_reason == StopReason.Pending) return Error(GoogleData.Fail(GoogleFailure.UnexpectedEof), false);
+        // google-vertex.ts names its provider in this text; google-generative-ai.ts does not.
+        if (_reason == StopReason.Pending) return Error(_request.Model.Api == "google-vertex"
+            ? new GoogleGenerativeAIException(GoogleFailure.UnexpectedEof, "Google Vertex stream ended without a finish reason")
+            : GoogleData.Fail(GoogleFailure.UnexpectedEof), false);
         if (_reason == StopReason.Error)
         {
             var raw = _extra.TryGet("rawStopReason", out var value) ? value!.Value.GetString() : "";

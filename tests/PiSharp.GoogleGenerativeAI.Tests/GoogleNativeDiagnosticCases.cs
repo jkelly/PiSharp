@@ -96,7 +96,8 @@ internal static class GoogleNativeDiagnosticCases
             {
                 case "tool-success": body = new(Wire(ToolChunk)); break;
                 case "provider-finish": body = new(Wire(ToolChunk.Replace("\"STOP\"", "\"SAFETY\"", StringComparison.Ordinal))); break;
-                case "provider-error-chunk": body = new(Wire("""{"error":{"message":"not copied"}}""")); break;
+                // @google/genai throws ApiError only for a whole read chunk whose error.code is in [400, 600); an SSE data frame's error member is dropped.
+                case "provider-error-chunk": body = new("""{"error":{"code":500,"message":"not copied","status":"INTERNAL"}}"""); break;
                 case "http-error": body = new("authored rejected body"); status = HttpStatusCode.BadRequest; break; // @google/genai shows the rejected body in its ApiError message.
                 case "invalid-json": body = new("data: {bad}\n\n"); break;
                 case "invalid-shape": body = new(Wire("""{"candidates":{}}""")); break;

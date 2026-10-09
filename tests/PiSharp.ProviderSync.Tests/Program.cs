@@ -71,7 +71,8 @@ internal static partial class Program
             ("tool-arguments.responses-finalizes-item-or-partial-arguments", ResponsesFinalArguments),
             ("tool-arguments.mistral-fragments-and-non-string-arguments", MistralFinalArguments),
             ("tool-arguments.google-args-of-any-json-kind", GoogleFinalArguments),
-            ("tool-arguments.pi-messages-object-assign-of-any-arguments", PiMessagesFinalArguments)
+            ("tool-arguments.pi-messages-object-assign-of-any-arguments", PiMessagesFinalArguments),
+            ("errors.in-stream-error-texts-google-and-vertex", GoogleStreamErrorTexts)
         };
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)

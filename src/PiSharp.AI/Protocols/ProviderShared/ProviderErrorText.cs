@@ -117,6 +117,60 @@ internal static class ProviderErrorText
             ",\"status\":" + StringLiteral(StatusText(response)) + "}}";
     }
 
+    /// <summary>@google/genai 2.21.0 <c>processStreamResponse</c>: every decoded read chunk is tried as a whole with
+    /// <c>JSON.parse(chunkString)</c>; an object with an <c>error</c> member whose <c>error.code</c> compares
+    /// <c>code &gt;= 400 &amp;&amp; code &lt; 600</c> (JavaScript coercion) throws <c>ApiError</c> with the message
+    /// <c>`got status: ${error.status}. ${JSON.stringify(chunkJson)}`</c>, which Pi shows verbatim. Any other chunk (not JSON, not an
+    /// object, a null error, a code outside the range) is ignored here and buffered for SSE framing. Null when nothing is thrown.</summary>
+    internal static string? GoogleStreamChunkError(string chunk)
+    {
+        if (SafeJson(chunk) is not { ValueKind: JsonValueKind.Object } data || !data.TryGetProperty("error", out var error) ||
+            error.ValueKind != JsonValueKind.Object) return null;
+        JsonElement? Member(string name)
+        {
+            JsonElement? found = null;
+            foreach (var property in error.EnumerateObject()) if (property.Name == name) found = property.Value;
+            return found;
+        }
+        var code = Member("code") is { } value ? JsToNumber(value) : double.NaN;
+        if (!(code >= 400 && code < 600)) return null;
+        var status = Member("status") is { } shown ? JsString(shown) : "undefined";
+        return "got status: " + status + ". " + data.GetRawText();
+    }
+
+    /// <summary>ECMAScript <c>ToNumber</c> of a parsed JSON value (an array or object through <c>ToPrimitive</c>).</summary>
+    private static double JsToNumber(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Number => value.GetDouble(),
+        JsonValueKind.True => 1,
+        JsonValueKind.False or JsonValueKind.Null => 0,
+        JsonValueKind.String or JsonValueKind.Array => StringToNumber(JsString(value)),
+        _ => double.NaN
+    };
+
+    /// <summary>ECMAScript <c>StringToNumber</c>: trimmed; empty is 0; 0x/0o/0b integers; Infinity; a decimal literal; else NaN.</summary>
+    private static double StringToNumber(string text)
+    {
+        text = EcmaTrim(text);
+        if (text.Length == 0) return 0;
+        if (text.Length > 2 && text[0] == '0' && (text[1] | 0x20) is 'x' or 'o' or 'b')
+        {
+            var radix = (text[1] | 0x20) switch { 'x' => 16, 'o' => 8, _ => 2 }; double result = 0;
+            foreach (var c in text.AsSpan(2))
+            {
+                var digit = c is >= '0' and <= '9' ? c - '0' : (c | 0x20) is >= 'a' and <= 'f' ? (c | 0x20) - 'a' + 10 : 99;
+                if (digit >= radix) return double.NaN;
+                result = result * radix + digit;
+            }
+            return result;
+        }
+        var body = text[0] is '+' or '-' ? text[1..] : text;
+        if (body == "Infinity") return text[0] == '-' ? double.NegativeInfinity : double.PositiveInfinity;
+        if (!System.Text.RegularExpressions.Regex.IsMatch(body, @"^(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$", System.Text.RegularExpressions.RegexOptions.CultureInvariant))
+            return double.NaN;
+        return double.Parse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
+    }
+
     /// <summary>Reads a rejected response's body, or null when it exceeds <paramref name="maximumBytes"/>.</summary>
     internal static async ValueTask<byte[]?> ReadBodyAsync(HttpResponseMessage response, long maximumBytes, CancellationToken token)
     {

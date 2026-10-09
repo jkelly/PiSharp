@@ -212,12 +212,21 @@ internal static class GoogleCases
         // Only first candidate is mapped, and signatures alone do not mark thinking.
         var ignored = await Complete(Wire("""{"candidates":[{"content":{"parts":[{"text":"visible","thoughtSignature":"c2ln"}]},"finishReason":"STOP"},{"content":{"parts":[{"text":"ignored"}]}}]}"""));
         Equal("visible", ((TextContent)ignored.Message.Content.Single()).Text);
-        foreach (var framing in new[] { "\uFEFF: ignored comment\n\ndata: " + TextChunk + "\n\n",
-            "data: {\"candidates\":\ndata: [{\"content\":{\"parts\":[{\"text\":\"π\"}]},\"finishReason\":\"STOP\"}]}\n\n",
-            "data: " + TextChunk, Wire(TextChunk) + "data: [DONE]\n\n" })
+        // @google/genai processStreamResponse framing: events split at \n\n, \r\r or \r\n\r\n; non-data events are skipped.
+        foreach (var framing in new[] { "\uFEFF: ignored comment\n\ndata: " + TextChunk + "\n\n", "data: " + TextChunk + "\r\r",
+            "data: " + TextChunk + "\r\n\r\n", "event: ignored\n\n  data:" + TextChunk + "  \n\n\n" })
         {
             var framed = await Complete(framing, Options() with { ReadBufferBytes = 1 });
             Check(framed.Failure is null, "Authored native framing failed."); Equal("π", ((TextContent)framed.Message.Content.Single()).Text);
+        }
+        // Multi-line data is one JSON text, an unterminated frame is an incomplete segment and [DONE] is not JSON.
+        foreach (var (framing, error) in new[] {
+            ("data: {\"candidates\":\ndata: [{\"content\":{\"parts\":[{\"text\":\"π\"}]},\"finishReason\":\"STOP\"}]}\n\n", "Unexpected token 'd', ...\"didates\":\ndata: [{\"c\"... is not valid JSON"),
+            ("data: " + TextChunk, "Incomplete JSON segment at the end"),
+            (Wire(TextChunk) + "data: [DONE]\n\n", "Unexpected token 'D', \"[DONE]\" is not valid JSON") })
+        {
+            var framed = await Complete(framing, Options() with { ReadBufferBytes = 1 });
+            Check(framed.Failure is not null, "Upstream-rejected framing accepted."); Equal(error, Error(framed));
         }
         var raw = JsonNode.Parse(Options().ModelMetadata.ToString())!;
         raw["cost"]!["tiers"] = JsonNode.Parse("""[{"inputTokensAbove":20,"input":9,"output":9,"cacheRead":9,"cacheWrite":0},{"inputTokensAbove":10,"input":4,"output":5,"cacheRead":1,"cacheWrite":0}]""");
