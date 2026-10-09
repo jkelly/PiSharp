@@ -91,7 +91,7 @@ internal static partial class PiAuthCommand
             if (parsed.Diagnostics.Count > 0) throw new AuthCommandError(string.Join("\n", parsed.Diagnostics.Select(diagnostic => diagnostic.Message)));
             var (provider, model) = Validate(parsed, kind);
             var runtime = host.LiveRuntime;
-            if (noRefresh) runtime = runtime with { CreateAuthHttp = null };
+            noRefreshMarker.Value = noRefresh;
             var registry = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false);
             var store = runtime.AuthPath is null ? null : new PiSharp.Cli.Authentication.AuthJsonCredentialStore(runtime.AuthPath, runtime.Time);
             var types = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -158,9 +158,34 @@ internal static partial class PiAuthCommand
         Dictionary<string, string> types, PiSharp.Cli.Commands.LiveSessionRuntime runtime, CancellationToken token)
     {
         if (types.TryGetValue(provider, out var type) && type == "oauth" && store is not null)
-            return (await store.ReadAsync(provider, token).ConfigureAwait(false))?.Access;
+            return noRefreshMarker.Value
+                ? (await store.ReadAsync(provider, token).ConfigureAwait(false))?.Access
+                : (await RefreshedAsync(provider, store, runtime, null, token).ConfigureAwait(false))?.Access;
         var model = registry.GetAll().FirstOrDefault(entry => entry.Provider == provider);
         return model is null ? null : FromAuth(registry.ResolveRequestAuth(model, out _));
+    }
+
+    /// <summary>auth check --no-refresh reads the stored token as it is (source getProviderCredential with refresh: false).</summary>
+    private static readonly AsyncLocal<bool> noRefreshMarker = new();
+
+    /// <summary>The stored OAuth credential through the provider refreshers (StoredOAuthLifecycle): refreshed and persisted when it
+    /// expires within the minimum validity (five minutes by default).</summary>
+    private static async Task<PiSharp.AI.Authentication.OAuth.OAuthCredentialSnapshot?> RefreshedAsync(string provider,
+        PiSharp.Cli.Authentication.AuthJsonCredentialStore store, PiSharp.Cli.Commands.LiveSessionRuntime runtime, long? minimumValidity, CancellationToken token)
+    {
+        var refreshes = new PiSharp.AI.Authentication.OAuth.ProviderOAuthRefreshes(PiSharp.Cli.Extensions.NativeExtensionModelOperations.DefaultOAuthRefreshes(
+            runtime.ReadEnvironment, runtime.CreateAuthHttp ?? (() => new HttpClient()), runtime.Time));
+        try { return await new PiSharp.AI.Authentication.OAuth.StoredOAuthLifecycle(store, refreshes, runtime.Time).ResolveAsync(provider, minimumValidity, token).ConfigureAwait(false); }
+        catch (PiSharp.AI.Authentication.OAuth.OAuthLifecycleException error)
+        {
+            // ai/src/auth/resolve.ts resolveStoredOAuth messages.
+            throw new AuthCommandError(error.Failure switch
+            {
+                PiSharp.AI.Authentication.OAuth.OAuthLifecycleFailure.Refresh => $"OAuth refresh failed for {provider}",
+                PiSharp.AI.Authentication.OAuth.OAuthLifecycleFailure.MinimumValidity => $"OAuth refresh returned a token that expires too soon for {provider}",
+                _ => $"Credential store read failed for {provider}"
+            });
+        }
     }
 
     private static string? FromAuth(ModelRequestAuth? auth)
@@ -209,11 +234,8 @@ internal static partial class PiAuthCommand
             if (kind == Kind.BearerToken && type != "oauth") continue;
             string? value;
             if (kind == Kind.BearerToken)
-            {
-                var stored = store is null ? null : await store.ReadAsync(id, token).ConfigureAwait(false);
-                var now = (runtime.Time ?? TimeProvider.System).GetUtcNow().ToUnixTimeMilliseconds();
-                value = stored is not null && stored.ExpiresUnixMilliseconds - now >= minExpiry ? stored.Access : null;
-            }
+                // credential-print.ts: getAuth with minOAuthValidityMs refreshes (and persists) a token that expires too soon.
+                value = store is null ? null : (await RefreshedAsync(id, store, runtime, minExpiry, token).ConfigureAwait(false))?.Access;
             else
             {
                 var target = model ?? registry.GetAll().FirstOrDefault(entry => entry.Provider == id);

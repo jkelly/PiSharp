@@ -138,7 +138,6 @@ internal static partial class Program
         ("tools.session-verbs-default-to-explicit-and-accept-tool-policy-pi", SessionVerbToolPolicy),
         ("tools.pi-policy-bash-runs-any-command-with-the-full-environment", async () =>
         {
-            if (!OperatingSystem.IsWindows()) return; // The native process layer is Windows-only in this build (see the report).
             using var sandbox = new Sandbox("pi-bash");
             Environment.SetEnvironmentVariable("CLIPARITY_MARKER", "marker-value");
             try

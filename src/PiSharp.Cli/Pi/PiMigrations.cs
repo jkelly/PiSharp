@@ -18,6 +18,7 @@ internal static class PiMigrations
         var providers = MigrateAuthToAuthJson(agentDir);
         MigrateSessionsFromAgentRoot(agentDir);
         MigrateToolsToBin(agentDir, messages);
+        MigrateKeybindingsConfigFile(agentDir);
         var warnings = MigrateExtensionSystem(cwd, agentDir, messages);
         return new(providers, warnings, messages.ToImmutable());
     }
@@ -89,6 +90,23 @@ internal static class PiMigrations
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { }
         }
+    }
+
+    /// <summary>Source migrateKeybindingsConfigFile: renamed legacy keybinding names are written back to keybindings.json
+    /// (two-space JSON, trailing newline); a malformed file is left alone.</summary>
+    internal static void MigrateKeybindingsConfigFile(string agentDir)
+    {
+        var path = Path.Join(agentDir, "keybindings.json");
+        if (!File.Exists(path)) return;
+        try
+        {
+            if (JsonNode.Parse(PiPaths.ReadText(path)) is not JsonObject raw) return;
+            var platform = OperatingSystem.IsWindows() ? "win32" : OperatingSystem.IsMacOS() ? "darwin" : "linux";
+            var config = PiSharp.Cli.Interactive.TerminalKeybindingConfigurationLoader.MigrateConfig(raw, platform, out var migrated);
+            if (!migrated) return;
+            File.WriteAllText(path, PiJson.Stringify(config, indent: true) + "\n", new System.Text.UTF8Encoding(false));
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { }
     }
 
     /// <summary>Source migrateToolsToBin: managed fd/rg binaries move from tools/ to bin/.</summary>

@@ -193,7 +193,6 @@ internal static partial class Program
         sandbox.Respond = (_, _) => AnthropicText("json answer");
         var (code, stdout, stderr) = await sandbox.Run("--mode", "json", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "Say hi");
         Equal(0, code, "exit code; stderr: " + stderr);
-        File.WriteAllText(Path.Combine(Path.GetTempPath(), "cliparity-json.txt"), stdout);
         var lines = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         var header = JsonNode.Parse(lines[0])!.AsObject();
         Names(["type", "version", "id", "timestamp", "cwd"], header.Select(pair => pair.Key), "header fields");
@@ -212,12 +211,11 @@ internal static partial class Program
         var body = sandbox.Requests[0].Json;
         var system = string.Join("\n\n", body.GetProperty("system").EnumerateArray().Select(block => block.GetProperty("text").GetString()));
         File.WriteAllText(Path.Combine(Path.GetTempPath(), "cliparity-system.txt"), system);
-        File.WriteAllText(Path.Combine(Path.GetTempPath(), "cliparity-body.json"), sandbox.Requests[0].Body);
         Equal(ExpectedDefaultPrompt(sandbox, DefaultTools), system, "system prompt");
     }
 
-    /// <summary>Pi's default tools (read, bash, edit, write); bash runs only where PiSharp's process layer does (Windows in this build).</summary>
-    private static string[] DefaultTools => OperatingSystem.IsWindows() ? ["read", "bash", "edit", "write"] : ["read", "edit", "write"];
+    /// <summary>Pi's default tools (read, bash, edit, write); bash runs on Windows, Linux and macOS.</summary>
+    private static string[] DefaultTools => ["read", "bash", "edit", "write"];
 
     /// <summary>The upstream default prompt for <paramref name="tools"/> (built-in snippets and guidelines), with no context files or skills.</summary>
     private static string ExpectedDefaultPrompt(Sandbox sandbox, string[] tools, string? projectContext = null, string? append = null)

@@ -514,6 +514,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         string? piShell = null;
         if (piPolicy is not null && bashTool is null)
             (bashTool, userBash, processCleanup, piShell) = PiBash(piPolicy, toolSettings, canonicalWorkspace, () => CurrentBashSession(bashOwner));
+        // Pi's grep and find over rg/fd from <agentDir>/bin or PATH, downloaded on first use (tools-manager.ts).
+        var piSearch = piPolicy?.Search is { } toolsManager && grepHost is null
+            ? new PiSharp.Cli.Pi.PiSearchTools(toolsManager, canonicalWorkspace, PiProcessRunner, piPolicy.Environment ?? ProcessEnvironment(), piPolicy.ReportToolStatus) : null;
         var policy = new FilePolicy(canonicalWorkspace, reads, writes, reserved, grant, grepHost)
         { Pi = piPolicy, PiShell = piShell, ProtectedRoots = [.. extension is null ? [] : new[] { extension.Package, extension.SnapshotRoot }] };
         var grepReader = grepHost is null ? null : new AdmittedGrepContextReader(canonicalWorkspace,
@@ -549,7 +552,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 // Pi edits files of any size; only the edit arguments and the display diff keep the profile bounds.
                 editOptions: new(MaximumInputBytes: 64 * 1024 * 1024, MaximumOutputBytes: 64 * 1024 * 1024, MaximumArgumentCharacters: 65_536,
                     DiffOptions: new(MaximumOutputCharacters: 4096)), bash: bashTool,
-                grep: grepHost?.Executor, grepContextReader: grepReader), policy,
+                grep: grepHost?.Executor ?? piSearch?.Grep, find: piSearch?.Find,
+                grepContextReader: grepReader ?? (piSearch is null ? null : new AdmittedGrepContextReader(canonicalWorkspace, files, policy.AuthorizeGrepContextAsync))), policy,
                 new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup, connection, toolSelection,
                 deferCatalogValidation: mcpAdmission is not null || registeredMcpAdmission is not null || readApplicationHost is not null,
                 originalSystemPrompt: originalSystemPrompt);
@@ -681,7 +685,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 allow = action.Kind == PreparedToolActionKind.Path && target is not null &&
                     action.CommandArguments.IsEmpty && action.Environment.Count == 0 && !IsPiProtected(target) &&
                     !IsPiProtected(PiSharp.Cli.Pi.PiPaths.Canonicalize(target)) &&
-                    (action.ToolName, action.Operation) is ("read", "read") or ("ls", "ls") or ("edit", "edit") or ("write", "write");
+                    (action.ToolName, action.Operation) is ("read", "read") or ("ls", "ls") or ("edit", "edit") or ("write", "write") or ("grep", "grep") or ("find", "find") &&
+                    // A search must not read the protected session trees.
+                    !(action.ToolName is "grep" or "find" && (Pi!.ProtectedTrees.Concat(Pi.ProtectedDirectories).Any(root => Comparer.Equals(root, target) || Within(root, target) || Within(target, root))));
             }
             Actions.Add(new { action.ToolName, action.Operation, action.Target, allowed = allow, policy = "pi" });
             return new(allow);
@@ -689,7 +695,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         public async ValueTask<bool> AuthorizeGrepContextAsync(string path, int maximumBytes, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            var allowed = grepHost is not null && Within(workspace, path) && reads.Contains(path) && !IsReserved(path);
+            var allowed = Pi is not null ? !IsPiProtected(path) && !IsPiProtected(PiSharp.Cli.Pi.PiPaths.Canonicalize(path)) :
+                grepHost is not null && Within(workspace, path) && reads.Contains(path) && !IsReserved(path);
             if (allowed) allowed = await grepHost!.ContextAdmission(path, maximumBytes, token).ConfigureAwait(false);
             // An awaited grant may span a session transition; recheck its reserved target before returning.
             token.ThrowIfCancellationRequested();
@@ -710,7 +717,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 Actions.Add(new { action.ToolName, action.Operation, action.Target, allowed = granted });
                 return new(granted);
             }
-            if (Pi is not null && action.ToolName is "bash" or "read" or "ls" or "edit" or "write") return AuthorizePi(action);
+            if (Pi is not null && action.ToolName is "bash" or "read" or "ls" or "edit" or "write" or "grep" or "find") return AuthorizePi(action);
             if (action.ToolName == "bash")
             {
                 var granted = bash is not null && await bash.AuthorizeAsync(action, token).ConfigureAwait(false);

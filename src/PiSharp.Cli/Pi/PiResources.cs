@@ -257,10 +257,11 @@ internal sealed class PiResources
     internal static PiResources WithDiscovered(PiResources resources, PiDiscoveredResources discovered, string cwd, string home)
     {
         if (discovered.IsEmpty) return resources;
-        ImmutableArray<PiResourcePath> Append(ImmutableArray<PiResourcePath> existing, ImmutableArray<string> added)
+        ImmutableArray<PiResourcePath> Append(ImmutableArray<PiResourcePath> existing, ImmutableArray<PiDiscoveredPath> added)
         {
             var seen = new HashSet<string>(existing.Select(item => PiPaths.Canonicalize(item.Path)), StringComparer.Ordinal);
-            return [.. existing, .. added.Select(path => new PiResourcePath(PiPaths.ResolvePath(path, cwd, home, trim: true), "temporary", "extension", true))
+            // buildExtensionResourcePaths: source "extension:<name>", scope temporary, origin top-level.
+            return [.. existing, .. added.Select(entry => new PiResourcePath(PiPaths.ResolvePath(entry.Path, cwd, home, trim: true), "temporary", entry.SourceLabel, true))
                 .Where(item => seen.Add(PiPaths.Canonicalize(item.Path)))];
         }
         var themePaths = Append(resources.ThemePaths, discovered.ThemePaths);

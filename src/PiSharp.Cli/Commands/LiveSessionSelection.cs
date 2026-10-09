@@ -61,7 +61,7 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
         }
         return await PiSharp.Cli.Models.ModelRegistry.CreateAsync(new()
         {
-            ModelsPath = ModelsPath, Environment = environment.Get, StoredCredentials = stored,
+            ModelsPath = ModelsPath, Environment = environment.Get, StoredCredentials = stored, CatalogBaseUrl = CatalogBaseUrl, CreateCatalogClient = CreateCatalogClient,
             ModelsStore = ModelsPath is null ? null : new PiSharp.Cli.Models.FileModelsStore(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(ModelsPath))!, "models-store.json"))
         }, cancellationToken).ConfigureAwait(false);
     }
@@ -72,6 +72,10 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
     internal PiSharp.Cli.Authentication.AnthropicLiveAuthentication CreateAnthropicAuthentication(PiSharp.Cli.Authentication.LiveProcessEnvironment environment) =>
         new(AuthPath is null ? null : new PiSharp.Cli.Authentication.AuthJsonCredentialStore(AuthPath, Time), environment,
             CreateAuthHttp ?? (() => new HttpClient()), Time);
+
+    /// <summary>The remote model catalog origin (null: https://pi.dev) and its HTTP client (tests).</summary>
+    internal string? CatalogBaseUrl { get; init; }
+    internal Func<HttpClient>? CreateCatalogClient { get; init; }
 
     /// <summary>The home directory the AWS shared config and SSO cache are read from (null: the user profile).</summary>
     internal string? HomeDirectory { get; init; }

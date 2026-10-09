@@ -26,6 +26,8 @@ internal sealed record PiHost
     internal required string Home { get; init; }
     internal required Func<string, string?> GetEnvironment { get; init; }
     internal Action<string, string?> SetEnvironment { get; init; } = (_, _) => { };
+    /// <summary>Observes the RPC mode's background catalog refresh (tests wait for it).</summary>
+    internal Action<Task>? CatalogRefreshStarted { get; init; }
     internal required TextWriter Stdout { get; init; }
     internal required TextWriter Stderr { get; init; }
     internal TextReader Stdin { get; init; } = TextReader.Null;
@@ -46,6 +48,9 @@ internal sealed record PiHost
     internal Func<string, CancellationToken, Task<PiLoadedExtensions?>>? LoadExtensions { get; init; }
     /// <summary>The non-interactive hosts' termination signals (print, JSON and RPC modes): null in tests and interactive mode.</summary>
     internal Func<ShutdownSignals>? Signals { get; init; }
+    /// <summary>The HTTP handler and base URL of rg/fd release downloads (tools-manager.ts; a fake release server in tests).</summary>
+    internal Func<HttpMessageHandler>? ToolsHttp { get; init; }
+    internal string ToolsReleaseBase { get; init; } = "https://github.com";
     /// <summary>PI_TIMING startup timings (IMPL-G's StartupTimings); disabled by default.</summary>
     internal PiSharp.CodingAgent.Diagnostics.StartupTimings Timings { get; init; } = new(false);
     /// <summary>Source promptConfirm on stdin/stdout.</summary>
@@ -216,7 +221,12 @@ internal static class PiCommand
 
         // Model (source buildSessionOptions), then the --api-key runtime override for its provider.
         var startupSnapshot = await settings.ToStartupSnapshotAsync(token).ConfigureAwait(false);
-        var runtime = host.LiveRuntime;
+        // main.ts configureHttpDispatcher(settingsManager.getHttpIdleTimeoutMs()): provider requests time out when headers or body data
+        // stall; an invalid setting stops startup.
+        long idleTimeout;
+        try { idleTimeout = PiHttpIdleTimeout.FromSettings(settings.Merged); }
+        catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
+        var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout) };
         LiveSessionSelection selection;
         try
         {
@@ -281,6 +291,8 @@ internal static class PiCommand
         // Decision 0004 (amended): as in Pi, project trust gates only project-local resources; an untrusted project keeps the pi policy.
         var toolPolicy = policyName == "explicit" ? PiToolPolicy.Explicit : new PiToolPolicy(PiToolPolicyMode.Pi)
         {
+            // tools-manager.ts: rg and fd from <agentDir>/bin or PATH, downloaded into <agentDir>/bin on first use.
+            Search = new PiToolsManager(Path.Join(agentDir, "bin"), host.GetEnvironment, host.ToolsHttp, host.ToolsReleaseBase),
             ProtectedDirectories = [.. new[] { plan.SessionDirectory, Path.GetDirectoryName(plan.SessionPath) }.OfType<string>().Select(Path.GetFullPath).Distinct(PiPaths.Comparer)],
             ProtectedTrees = [Path.GetFullPath(Path.Join(agentDir, "sessions"))]
         };
@@ -316,6 +328,9 @@ internal static class PiCommand
         {
             case PiAppMode.Rpc:
             {
+                // main.ts: RPC refreshes the model catalogs in the background (15 s, errors ignored) unless offline; interactive mode
+                // starts its own refresh after the TUI is up.
+                if (!offline) { var refresh = RefreshCatalogsInBackground(runtime); host.CatalogRefreshStarted?.Invoke(refresh); }
                 var input = host.OpenRpcInput?.Invoke() ?? throw new InvalidOperationException("RPC standard input is unavailable.");
                 var output = host.OpenRpcOutput?.Invoke() ?? throw new InvalidOperationException("RPC standard output is unavailable.");
                 await using (input.ConfigureAwait(false))
@@ -338,6 +353,18 @@ internal static class PiCommand
                 return signals?.Exit(code) ?? code;
             }
         }
+
+        static Task RefreshCatalogsInBackground(LiveSessionRuntime runtime) => Task.Run(async () =>
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            try
+            {
+                // A registry of its own: the running session's registry is not shared with this refresh.
+                var registry = await runtime.CreateModelRegistryAsync(timeout.Token).ConfigureAwait(false);
+                await registry.RefreshAsync(allowNetwork: true, force: null, providers: null, timeout.Token).ConfigureAwait(false);
+            }
+            catch (Exception) { } // .catch(() => {})
+        });
 
         async Task Error(string message) => await Line(err, Paint(Red, $"Error: {message}")).ConfigureAwait(false);
         async Task Report(IEnumerable<PiDiagnostic> diagnostics)
