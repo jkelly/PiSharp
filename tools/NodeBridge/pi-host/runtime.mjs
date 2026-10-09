@@ -376,6 +376,7 @@ export class ExtensionRuntime {
       },
       getSystemPrompt: () => extras.getSystemPrompt ? (runtime.assertActive(), extras.getSystemPrompt()) : read('systemPrompt'),
     };
+    Object.defineProperty(context, '__pisharpCtx', { value: ctx, enumerable: false });
     return context;
   }
 

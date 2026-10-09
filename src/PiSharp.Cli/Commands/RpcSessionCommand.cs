@@ -150,6 +150,9 @@ public static class RpcSessionCommand
                     ? new PiSharp.Cli.Pi.PiToolPolicy(PiSharp.Cli.Pi.PiToolPolicyMode.Pi) { ProtectedDirectories = [Path.GetDirectoryName(parsed.Session)!] } : null),
                 // With --no-mcp extensions still register servers; nothing connects them, which is reported (reportUnhandledMcpServers).
                 mcpRegistrations: hostAdmission ? mcpHost!.Registrations : null, piExtensions: pi?.Extensions).ConfigureAwait(false);
+            // A virtual selection's router reads this profile's session branch and records its state there.
+            if (liveSelection is { IsVirtual: true } virtualSelection) virtualSelection.VirtualSession = profile.CurrentVirtualModelSession;
+            if (pi?.Extensions is { } modelsHost) await PiSharp.Cli.Extensions.Pi.PiExtensionModels.CreateAsync(modelsHost, liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false);
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();

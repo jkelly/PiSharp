@@ -83,7 +83,7 @@ internal sealed partial class PiExtensionHost
             case "command.reload": throw new NotSupportedException("ctx.reload() is not available in this PiSharp host yet");
             case "models.read": return await ModelsAsync(Op(), Args(), token).ConfigureAwait(false);
             case "models.call": return await ModelsAsync(Op(), Args(), token).ConfigureAwait(false);
-            case "bridge.call": throw new NotSupportedException($"{p.GetProperty("name").GetString()} is not available in the PiSharp Node bridge");
+            case "bridge.call": return await BridgeCallAsync(p, request, token).ConfigureAwait(false);
             default: throw new NotSupportedException($"{request.Method} is not available in this PiSharp host");
         }
     }
@@ -155,6 +155,12 @@ internal sealed partial class PiExtensionHost
             default: return;
         }
     }
+
+    /// <summary>The system prompt of the current run after the Node before_agent_start handlers.</summary>
+    internal string? RunSystemPrompt { get; set; }
+
+    /// <summary>ctx.isProjectTrusted(): the run's resolved project trust (null before it is resolved).</summary>
+    internal bool? ProjectTrusted { get; set; }
 
     /// <summary>ctx.shutdown(): the mode's graceful shutdown.</summary>
     internal Action? ShutdownRequested { get; set; }
@@ -295,12 +301,14 @@ internal sealed partial class PiExtensionHost
             case "isIdle":
                 return state is null || !state.Agent.IsRunning && !state.IsProcessingOperation && !state.IsConfiguring && !state.IsAdmittingInput &&
                     !state.IsAppendingExtensionEntry && !state.IsEditingContext && !state.IsCompacting;
-            case "isProjectTrusted": return _options.ProjectTrusted(Cwd);
+            case "isProjectTrusted": return ProjectTrusted ?? _options.ProjectTrusted(Cwd);
             case "hasPendingMessages":
                 if (attached is null) return false;
                 var queues = attached.Session.GetPendingInputQueueSnapshot();
                 return !queues.SteeringMessages.IsEmpty || !queues.FollowUpMessages.IsEmpty || !state!.Agent.PendingInputs.IsEmpty;
             case "systemPrompt":
+                // agent-session.ts: during a run the prompt is the one before_agent_start handlers produced (agent.state.systemPrompt).
+                if (state is { Agent.IsRunning: true } && RunSystemPrompt is { } runPrompt) return runPrompt;
                 return state is null ? "" : new PiSharp.Sessions.Context.SessionSystemReplay().Replay(state.Agent.Messages, CancellationToken.None).Prompt;
             case "contextUsage": return ContextUsage?.Invoke();
             case "callableTools":
@@ -490,6 +498,35 @@ internal sealed partial class PiExtensionHost
         };
     }
 
+    /// <summary>The virtual modules' host hook. <c>builtinTool.execute</c> (createBashTool(...).execute and the other built-in tool
+    /// factories) runs PiSharp's own built-in tool through the calling tool's context; model catalog reads use the run's registry.</summary>
+    private async Task<JsonNode?> BridgeCallAsync(JsonElement p, PiNodeHostRequest request, CancellationToken token)
+    {
+        var name = p.GetProperty("name").GetString()!;
+        var args = p.TryGetProperty("args", out var a) && a.ValueKind == JsonValueKind.Array ? a : default;
+        switch (name)
+        {
+            case "builtinTool.execute":
+            {
+                var call = args[0];
+                if (call.TryGetProperty("operations", out var operations) && operations.ValueKind != JsonValueKind.Null)
+                    throw new NotSupportedException("Built-in tools with custom operations are not available in the PiSharp Node bridge");
+                if (ContextOf(p) is not IExtensionToolContext context)
+                    throw new NotSupportedException("Built-in tools run from extension code need a tool execution context in PiSharp");
+                var outcome = await context.ExecuteToolAsync(call.GetProperty("name").GetString()!, JsonData.Parse(call.GetProperty("params").GetRawText()),
+                    new ExtensionExecuteToolOptions(token, async (partial, _) => await request.ReportProgress(JsonNode.Parse(partial.ToString())).ConfigureAwait(false))).ConfigureAwait(false);
+                var result = JsonNode.Parse(outcome.Result.ToString())!.AsObject();
+                // Upstream execute throws for a failed call; the error text is the result's text.
+                if (outcome.IsError) throw new InvalidOperationException(string.Concat((result["content"] as JsonArray ?? []).Select(item => item?["text"]?.GetValue<string>())));
+                result.Remove("isError");
+                return result;
+            }
+            case "getModel": return Models is null ? null : await Models("find", JsonDocument.Parse(new JsonArray(args[0].GetString(), args[1].GetString()).ToJsonString()).RootElement, token).ConfigureAwait(false);
+            case "getModels": return Models is null ? new JsonArray() : await Models("getAll", default, token).ConfigureAwait(false);
+            default: throw new NotSupportedException($"{name} is not available in the PiSharp Node bridge");
+        }
+    }
+
     private async Task<JsonNode?> SessionCommandAsync(JsonElement p, CancellationToken token)
     {
         var context = ContextOf(p);
@@ -537,6 +574,57 @@ internal sealed partial class PiExtensionHost
         if (!p.TryGetProperty("withSession", out var callback) || callback.ValueKind != JsonValueKind.String) return;
         using var lease = Enter(replacement);
         await Node.RequestAsync("callback.invoke", new JsonObject { ["id"] = callback.GetString(), ["args"] = lease.Id }, token).ConfigureAwait(false);
+    }
+
+    // ----------------------------------------------------------------------------------------------------------------- virtual models
+
+    /// <summary>runner.ts bindCore: the virtual models the extensions registered (pi.registerVirtualModel) join a model registry;
+    /// routing calls the extension's <c>route(request, ctx)</c> in Node with upstream's ModelRouteRequest.</summary>
+    internal void RegisterVirtualModels(PiSharp.Cli.Models.ModelRegistry registry)
+    {
+        foreach (var registration in VirtualModelRegistrations)
+        {
+            if (registration["definition"] is not JsonObject definition) continue;
+            var provider = definition["provider"]?.GetValue<string>(); var id = definition["id"]?.GetValue<string>();
+            if (provider is null || id is null) continue;
+            ImmutableArray<string>? Strings(string name) => definition[name] is JsonArray items ? [.. items.Select(item => item!.GetValue<string>())] : null;
+            double? Number(string name) => definition[name] is JsonValue value && value.GetValueKind() == JsonValueKind.Number ? value.GetValue<double>() : null;
+            var thinkingLevels = Strings("thinkingLevels") ?? (definition["thinkingLevelMap"] is JsonObject map
+                ? [.. map.Where(level => level.Value is not null).Select(level => level.Key)] : null);
+            try
+            {
+                registry.RegisterVirtualModel(new(provider, id, definition["name"]?.GetValue<string>() ?? id,
+                    request => RouteAsync(registry, provider, id, request), thinkingLevels, Number("contextWindow"), Number("maxTokens"), Strings("input")));
+            }
+            catch (InvalidOperationException error)
+            { _ = ReportAsync(registration["extensionPath"]?.GetValue<string>() ?? provider, "register_virtual_model", error.Message); }
+        }
+    }
+
+    private async ValueTask<PiSharp.Cli.Models.ModelRoute> RouteAsync(PiSharp.Cli.Models.ModelRegistry registry, string provider, string id,
+        PiSharp.Cli.Models.ModelRouteRequest request)
+    {
+        static JsonNode Model(PiSharp.Cli.Models.RegistryModel model) => JsonNode.Parse(model.ToJsonString())!;
+        var payload = new JsonObject
+        {
+            ["model"] = Model(request.Model), ["thinkingLevel"] = request.ThinkingLevel,
+            ["reason"] = request.Reason switch { PiSharp.Cli.Models.ModelRouteReason.Continuation => "continuation", PiSharp.Cli.Models.ModelRouteReason.Retry => "retry",
+                PiSharp.Cli.Models.ModelRouteReason.Direct => "direct", _ => "user" },
+            ["messages"] = new JsonArray([.. request.Messages.Select(message => (JsonNode)message.DeepClone())])
+        };
+        if (request.Previous is { } previous)
+            payload["previous"] = new JsonObject { ["model"] = Model(previous.Model), ["thinkingLevel"] = previous.ThinkingLevel };
+        if (request.Failed is { } failed)
+            payload["failed"] = new JsonObject { ["model"] = Model(failed.Model), ["thinkingLevel"] = failed.ThinkingLevel, ["message"] = failed.Message.DeepClone() };
+        if (request.State is not null) payload["state"] = request.State.DeepClone();
+        var route = await Node.RequestAsync("virtualModel.route", new JsonObject { ["provider"] = provider, ["id"] = id, ["request"] = payload },
+            request.CancellationToken).ConfigureAwait(false);
+        if (route is not { ValueKind: JsonValueKind.Object } value || !value.TryGetProperty("model", out var target) || target.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException($"Virtual model {provider}/{id} returned no route.");
+        var routedProvider = target.GetProperty("provider").GetString()!; var routedId = target.GetProperty("id").GetString()!;
+        var physical = registry.Find(routedProvider, routedId) ?? PiSharp.Cli.Models.RegistryModel.FromJson(JsonNode.Parse(target.GetRawText())!.AsObject());
+        return new(physical, value.TryGetProperty("thinkingLevel", out var level) && level.ValueKind == JsonValueKind.String ? level.GetString()! : request.ThinkingLevel,
+            value.TryGetProperty("state", out var state) ? JsonNode.Parse(state.GetRawText()) : null);
     }
 
     // ----------------------------------------------------------------------------------------------------------------- user bash output

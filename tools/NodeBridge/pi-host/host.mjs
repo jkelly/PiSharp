@@ -71,7 +71,14 @@ const bridge = {
   },
   notify(method, params) { send({ type: 'notify', method, params: plain(params) }); },
 };
-globalThis.__pisharpBridge = { call: (name, ...args) => bridge.call('bridge.call', { name, args }) };
+// The virtual modules' host hook: call(name, ...args), where a trailing { signal, onUpdate, ctx } carries the caller's context.
+globalThis.__pisharpBridge = {
+  call: (name, ...args) => {
+    const last = args.at(-1);
+    const extras = last && typeof last === 'object' && ('signal' in last || 'onUpdate' in last || 'ctx' in last) ? args.pop() : undefined;
+    return bridge.call('bridge.call', { name, args, ctx: extras?.ctx?.__pisharpCtx }, { signal: extras?.signal, onProgress: extras?.onUpdate });
+  },
+};
 
 /** JSON-safe copy (functions and symbols dropped, undefined object members omitted, as JSON.stringify does). */
 function plain(value) { return value === undefined ? undefined : JSON.parse(JSON.stringify(value, (k, v) => typeof v === 'bigint' ? Number(v) : v) ?? 'null'); }
@@ -138,6 +145,11 @@ async function handle(method, params, id) {
     case 'component.input': runtime.inputComponent(params.id, params.data); return null;
     case 'component.dispose': runtime.disposeComponent(params.id); return null;
     case 'render.tool': return runtime.renderTool(params);
+    case 'render.resolve': {
+      const renderers = runtime.resolveToolRenderers(params.toolName);
+      return renderers ? { handled: true, renderShell: renderers.renderShell ?? 'default', hasRenderCall: typeof renderers.renderCall === 'function',
+        hasRenderResult: typeof renderers.renderResult === 'function' } : { handled: false };
+    }
     case 'render.message': return runtime.renderMessage(params);
     case 'render.entry': return runtime.renderEntry(params);
     case 'markdown.transform': return runtime.transformMarkdown(params.markdown, params.context);
@@ -147,7 +159,7 @@ async function handle(method, params, id) {
       const config = record?.config;
       if (!config) throw new Error(`Provider ${params.provider} is not registered by an extension`);
       if (params.op === 'classify') return config.classifiers[params.api].classify(...params.args);
-      if (params.op === 'generateImages') return config.images[params.api].generate(...params.args);
+      if (params.op === 'generateImages') return config.images[params.api].generateImages(...params.args);
       if (params.op === 'refreshModels') return config.refreshModels(params.args?.[0] ?? {});
       throw new Error(`Unsupported provider operation ${params.op}`);
     }

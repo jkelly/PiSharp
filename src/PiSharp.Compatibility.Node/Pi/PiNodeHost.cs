@@ -56,7 +56,27 @@ public sealed class PiNodeHost : IAsyncDisposable
     private long _nextId;
     private int _disposed;
 
-    private sealed record Pending(TaskCompletionSource<JsonElement?> Result, Action<JsonElement>? Progress);
+    private sealed record Pending(TaskCompletionSource<JsonElement?> Result, Action<JsonElement>? Progress)
+    {
+        /// <summary>The number of host-bound frames (requests, notifications) received before the response.</summary>
+        public long Barrier;
+    }
+    private long _received, _processed;
+    private TaskCompletionSource _progressed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private void Processed()
+    {
+        Interlocked.Increment(ref _processed);
+        Interlocked.Exchange(ref _progressed, new(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
+    }
+    private async Task WaitProcessedAsync(long target, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var progressed = Volatile.Read(ref _progressed);
+            if (Volatile.Read(ref _processed) >= target || _exited.Task.IsCompleted) return;
+            await progressed.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     private PiNodeHost(Process process, IPiNodeHostPeer peer) { _process = process; _peer = peer; }
 
@@ -128,8 +148,11 @@ public sealed class PiNodeHost : IAsyncDisposable
     private static int? SafeExitCode(Process process) { try { return process.ExitCode; } catch (InvalidOperationException) { return null; } }
 
     /// <summary>Sends a request; the result is null for <c>undefined</c>. A JavaScript error becomes <see cref="PiNodeHostException"/>.</summary>
+    /// <param name="afterPrecedingFrames">Return only once every request and notification Node sent before its response has been
+    /// handled (or started, for asynchronous requests), so effects the callee published (ctx.ui.notify, pi.appendEntry) land while
+    /// the caller's context is still current. Never set it from code that itself handles a Node frame.</param>
     public async Task<JsonElement?> RequestAsync(string method, object? parameters, CancellationToken cancellationToken = default,
-        Action<JsonElement>? onProgress = null)
+        Action<JsonElement>? onProgress = null, bool afterPrecedingFrames = false)
     {
         var id = Interlocked.Increment(ref _nextId);
         var pending = new Pending(new(TaskCreationOptions.RunContinuationsAsynchronously), onProgress);
@@ -140,7 +163,9 @@ public sealed class PiNodeHost : IAsyncDisposable
         try
         {
             await WriteAsync(new JsonObject { ["type"] = "request", ["id"] = id, ["method"] = method, ["params"] = ToNode(parameters) }).ConfigureAwait(false);
-            return await pending.Result.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            var result = await pending.Result.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (afterPrecedingFrames) await WaitProcessedAsync(Volatile.Read(ref pending.Barrier), cancellationToken).ConfigureAwait(false);
+            return result;
         }
         finally { _pending.TryRemove(id, out _); }
     }
@@ -227,6 +252,7 @@ public sealed class PiNodeHost : IAsyncDisposable
             case "response":
             {
                 if (!_pending.TryGetValue(frame.GetProperty("id").GetInt64(), out var pending)) return;
+                Volatile.Write(ref pending.Barrier, Volatile.Read(ref _received));
                 if (frame.TryGetProperty("error", out var error))
                     pending.Result.TrySetException(new PiNodeHostException(error.TryGetProperty("message", out var text) ? text.GetString() ?? "Error" : "Error",
                         error.TryGetProperty("stack", out var stack) ? stack.GetString() : null));
@@ -244,6 +270,7 @@ public sealed class PiNodeHost : IAsyncDisposable
                 var method = frame.GetProperty("method").GetString()!;
                 var parameters = frame.TryGetProperty("params", out var p) ? p : default;
                 if (method == "ready") { _ready.TrySetResult(parameters); return; }
+                Interlocked.Increment(ref _received);
                 _ordered.Writer.TryWrite(async () =>
                 {
                     try { await _peer.NotifyAsync(method, parameters).ConfigureAwait(false); }
@@ -279,6 +306,7 @@ public sealed class PiNodeHost : IAsyncDisposable
                 }
                 // Synchronous requests (the extension thread is blocked) and actions keep their order; asynchronous requests such as
                 // dialogs start in order and complete on their own.
+                Interlocked.Increment(ref _received);
                 if (synchronous) _ordered.Writer.TryWrite(Run);
                 else _ordered.Writer.TryWrite(() => { _ = Run(); return Task.CompletedTask; });
                 return;
@@ -292,6 +320,7 @@ public sealed class PiNodeHost : IAsyncDisposable
         {
             try { await work().ConfigureAwait(false); }
             catch (Exception error) when (error is not OutOfMemoryException) { Trace.TraceWarning("Node host work failed: {0}", error.Message); }
+            finally { Processed(); }
         }
     }
 

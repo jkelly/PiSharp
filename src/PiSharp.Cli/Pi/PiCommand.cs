@@ -211,6 +211,7 @@ internal static class PiCommand
         if (extensionRun is not null)
         {
             if (projectTrusted) await extensionRun.LoadProjectAsync(settings, token).ConfigureAwait(false);
+            if (extensionRun.Host is { } trustedHost) trustedHost.ProjectTrusted = projectTrusted;
             await extensionRun.ApplyFlagValuesAsync(parsed.UnknownFlags, token).ConfigureAwait(false);
             if (extensionRun.Host is not null) extensions = await extensionRun.PreSessionAsync(token).ConfigureAwait(false);
         }
@@ -262,6 +263,12 @@ internal static class PiCommand
         try { idleTimeout = PiHttpIdleTimeout.FromSettings(settings.Merged); }
         catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout) };
+        // runner.ts bindCore: virtual models the extensions registered join every model registry the run builds (model selection too).
+        if (extensionRun?.Host is { VirtualModelRegistrations.IsEmpty: false } virtualHost)
+        {
+            var configured = runtime.ConfigureRegistry;
+            runtime = runtime with { ConfigureRegistry = registry => { configured?.Invoke(registry); virtualHost.RegisterVirtualModels(registry); } };
+        }
         LiveSessionSelection selection;
         try
         {

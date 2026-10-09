@@ -59,12 +59,17 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
             catch (Exception error) when (error is InvalidDataException or IOException or UnauthorizedAccessException or PiSharp.AI.Authentication.OAuth.OAuthLifecycleException)
             { stored.Clear(); } // An unreadable store leaves the environment as the only credential source, as for availability upstream.
         }
-        return await PiSharp.Cli.Models.ModelRegistry.CreateAsync(new()
+        var registry = await PiSharp.Cli.Models.ModelRegistry.CreateAsync(new()
         {
             ModelsPath = ModelsPath, Environment = environment.Get, StoredCredentials = stored, CatalogBaseUrl = CatalogBaseUrl, CreateCatalogClient = CreateCatalogClient,
             ModelsStore = ModelsPath is null ? null : new PiSharp.Cli.Models.FileModelsStore(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(ModelsPath))!, "models-store.json"))
         }, cancellationToken).ConfigureAwait(false);
+        ConfigureRegistry?.Invoke(registry);
+        return registry;
     }
+
+    /// <summary>Extension registrations applied to every registry this runtime creates (pi.registerVirtualModel, IMPL-E).</summary>
+    internal Action<PiSharp.Cli.Models.ModelRegistry>? ConfigureRegistry { get; init; }
 
     /// <summary>The session's environment, built once from <see cref="ReadEnvironment"/>.</summary>
     internal PiSharp.Cli.Authentication.LiveProcessEnvironment CreateEnvironment() => new(ReadEnvironment, ProviderVariables);
@@ -148,7 +153,17 @@ internal sealed class LiveSessionSelection
         bool useModelMaximum = false)
     {
         var tokens = useModelMaximum ? 0 : ParseMaximumTokens(maximumTokens);
-        // A virtual entry has no route of its own: VirtualModelRoutingTransport.ForLive routes it (IMPL-E registers virtual models).
+        // A virtual entry has no route of its own: VirtualModelRoutingTransport.ForLive routes each request (pi.registerVirtualModel).
+        if (registry is not null && entry.Type == CatalogModelType.Chat && PiSharp.Cli.Models.VirtualModels.IsVirtual(entry))
+        {
+            // The catalog row of a virtual selection only describes it; limits it leaves out (0) are its physical routes' business.
+            var described = entry.With(json =>
+            {
+                if (entry.ContextWindow <= 0) json["contextWindow"] = 1;
+                if (entry.MaxTokens <= 0) json["maxTokens"] = 1;
+            });
+            return new(described.ToDefinition(), Math.Max(1, (int)Math.Min(entry.MaxTokens, int.MaxValue))) { Entry = entry, Registry = registry };
+        }
         if (entry.Type != CatalogModelType.Chat || PiSharp.Cli.Models.VirtualModels.IsVirtual(entry) || !SupportedApi(entry.Provider, entry.Api))
             throw new LiveSessionException("LiveApiUnavailable",
                 $"Model \"{entry.Provider}/{entry.Id}\" uses the {(entry.Api.Length == 0 ? "unknown" : entry.Api)} API, which has no live route in PiSharp yet.");
@@ -202,9 +217,14 @@ internal sealed class LiveSessionSelection
         return new(definition, maximumOutputTokens);
     }
 
+    /// <summary>A virtual selection (registerVirtualModel): the session the router reads its branch from and records state on.</summary>
+    internal Func<PiSharp.Cli.Models.IVirtualModelSession?>? VirtualSession { get; set; }
+    internal bool IsVirtual => Entry is not null && PiSharp.Cli.Models.VirtualModels.IsVirtual(Entry);
+
     internal LiveSessionConnection Connect(LiveSessionRuntime? runtime)
     {
         runtime ??= LiveSessionRuntime.Default;
+        if (IsVirtual && Registry is not null) return LiveSessionConnection.ForVirtual(this, runtime);
         if (LiveProviderRoute.TryConnect(this, runtime) is { } routed) return routed;
         var environment = runtime.CreateEnvironment();
         string? key; IReadOnlyDictionary<string, string>? headers = null;
@@ -383,9 +403,21 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         };
     }
     internal int MaximumOutputTokens => selection.MaximumOutputTokens;
+    private PiSharp.Cli.Models.VirtualModelRoutingTransport? _virtual;
+    private readonly List<IDisposable> _virtualConnections = [];
+    /// <summary>agent-session.ts with a virtual model: every request asks the router, then streams through the physical model's own
+    /// live route (each route's connection is owned here).</summary>
+    internal static LiveSessionConnection ForVirtual(LiveSessionSelection selection, LiveSessionRuntime runtime)
+    {
+        var connection = new LiveSessionConnection(selection, null, "");
+        connection._virtual = PiSharp.Cli.Models.VirtualModelRoutingTransport.ForLive(selection.Registry!, selection.Entry!, runtime, null,
+            () => selection.VirtualSession?.Invoke(), connection._virtualConnections);
+        return connection;
+    }
     internal IChatTransport CreateTransport(int? outputTokens = null, bool summary = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_virtual is not null) return _virtual;
         if (_resolvedMain is not null)
         {
             lock (_resolvedGate)
@@ -519,6 +551,12 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         foreach (var provider in _providers)
             try { provider.Dispose(); } catch (Exception error) { failures.Add(error); }
         _providers.Clear();
+        lock (_virtualConnections)
+        {
+            foreach (var routed in _virtualConnections)
+                try { routed.Dispose(); } catch (Exception error) { failures.Add(error); }
+            _virtualConnections.Clear();
+        }
         // Injected HTTP handlers belong to the caller; factory-created handlers belong to each provider.
         if (failures.Count != 0) throw new AggregateException(failures);
     }

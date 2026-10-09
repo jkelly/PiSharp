@@ -221,8 +221,8 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         _contexts.TryGetValue(id.GetInt64(), out var context) ? context : _contexts.Values.LastOrDefault() ?? Volatile.Read(ref _lastContext);
 
     /// <summary>Sends a request to the Node host on behalf of a native callback.</summary>
-    internal Task<JsonElement?> CallAsync(string method, JsonObject parameters, CancellationToken token, Action<JsonElement>? onProgress = null) =>
-        Node.RequestAsync(method, parameters, token, onProgress);
+    internal Task<JsonElement?> CallAsync(string method, JsonObject parameters, CancellationToken token, Action<JsonElement>? onProgress = null,
+        bool afterPrecedingFrames = false) => Node.RequestAsync(method, parameters, token, onProgress, afterPrecedingFrames);
 
     /// <summary>Reports extension errors returned by a Node dispatch (<c>errors: [{ event, error }]</c>).</summary>
     internal async ValueTask ReportErrorsAsync(PiLoadedExtension extension, JsonElement? result)

@@ -52,13 +52,15 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
     // ------------------------------------------------------------------------------------------------------------- dispatch
 
     /// <summary>Runs the extension's handlers for one event in Node and returns the reduced result (null for undefined).</summary>
-    private async Task<JsonElement?> EmitAsync(string eventName, JsonNode payload, IExtensionContext context, CancellationToken token, int? handler = null)
+    private async Task<JsonElement?> EmitAsync(string eventName, JsonNode payload, IExtensionContext context, CancellationToken token, int? handler = null,
+        bool whole = false)
     {
         using var lease = host.Enter(context);
         var parameters = new JsonObject { ["ext"] = extension.Index, ["event"] = eventName, ["payload"] = payload, ["ctx"] = lease.Id };
         if (handler is { } index) parameters["handler"] = index;
-        var response = await host.CallAsync("emit", parameters, token).ConfigureAwait(false);
+        var response = await host.CallAsync("emit", parameters, token, afterPrecedingFrames: true).ConfigureAwait(false);
         await host.ReportErrorsAsync(extension, response).ConfigureAwait(false);
+        if (whole) return response;
         return response is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty("result", out var result) ? result : null;
     }
 
@@ -109,7 +111,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
                     {
                         var result = await EmitAsync(eventName, Event("before_agent_start", ("prompt", snapshot.Prompt),
                             ("images", snapshot.Images is null ? null : Parse(snapshot.Images)), ("systemPrompt", snapshot.SystemPrompt)), context, token, handler).ConfigureAwait(false);
-                        if (result is not { ValueKind: JsonValueKind.Object } value) return null;
+                        if (result is not { ValueKind: JsonValueKind.Object } value) { host.RunSystemPrompt = snapshot.SystemPrompt; return null; }
                         PiSharp.Extensions.Events.ExtensionCustomMessage? message = null; string? systemPrompt = null;
                         if (value.TryGetProperty("messages", out var messages) && messages.ValueKind == JsonValueKind.Array && messages.GetArrayLength() > 0)
                         {
@@ -120,6 +122,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
                                 first.TryGetProperty("details", out var details) ? Data(details) : null);
                         }
                         if (value.TryGetProperty("systemPrompt", out var prompt) && prompt.ValueKind == JsonValueKind.String) systemPrompt = prompt.GetString();
+                        host.RunSystemPrompt = systemPrompt ?? snapshot.SystemPrompt;
                         return message is null && systemPrompt is null ? null : new ExtensionBeforeAgentStartPatch(message, systemPrompt);
                     }));
                 }
@@ -146,7 +149,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
                     var input = Parse(snapshot.Arguments);
                     var before = input.ToJsonString();
                     var result = await EmitAsync(eventName, Event("tool_call", ("toolName", snapshot.ToolName), ("toolCallId", snapshot.ToolCallId),
-                        ("input", input), ("parentToolCallId", snapshot.ParentToolCallId)), context, token).ConfigureAwait(false);
+                        ("input", input), ("parentToolCallId", snapshot.ParentToolCallId)), context, token, whole: true).ConfigureAwait(false);
                     if (result is not { ValueKind: JsonValueKind.Object } value) return null;
                     // Upstream handlers edit event.input in place; the edited input replaces the arguments.
                     JsonData? arguments = value.TryGetProperty("input", out var edited) && edited.ValueKind == JsonValueKind.Object && edited.GetRawText() != before
@@ -316,7 +319,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
             {
                 ["ext"] = extension.Index, ["name"] = name, ["toolCallId"] = invocation?.ToolCallId ?? Guid.NewGuid().ToString("N"),
                 ["params"] = Parse(arguments), ["ctx"] = lease.Id
-            }, token, Progress).ConfigureAwait(false);
+            }, token, Progress, afterPrecedingFrames: true).ConfigureAwait(false);
             Task pending; lock (gate) pending = updates;
             try { await pending.ConfigureAwait(false); } catch (OperationCanceledException) when (token.IsCancellationRequested) { }
             return result is { ValueKind: JsonValueKind.Object } value ? Data(value) : JsonData.Parse("{\"content\":[],\"details\":{}}");
@@ -372,7 +375,8 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
             var args = arguments.Value.ValueKind == JsonValueKind.String ? arguments.Value.GetString() ?? "" : "";
             try
             {
-                await host.CallAsync("command.execute", new JsonObject { ["ext"] = extension.Index, ["name"] = name, ["args"] = args, ["ctx"] = lease.Id }, token).ConfigureAwait(false);
+                await host.CallAsync("command.execute", new JsonObject { ["ext"] = extension.Index, ["name"] = name, ["args"] = args, ["ctx"] = lease.Id }, token,
+                    afterPrecedingFrames: true).ConfigureAwait(false);
             }
             catch (PiNodeHostException error)
             {

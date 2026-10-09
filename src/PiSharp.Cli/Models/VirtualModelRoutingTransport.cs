@@ -38,7 +38,7 @@ internal sealed class VirtualModelRoutingTransport(ModelRegistry registry, Regis
         if (!VirtualModels.IsVirtual(model)) throw new ArgumentException("A virtual route needs a virtual model.", nameof(model));
         return new(registry, model, physical =>
         {
-            var connection = Commands.LiveSessionSelection.FromEntry(physical, registry, maximumTokens).Connect(runtime);
+            var connection = Commands.LiveSessionSelection.FromEntry(physical, registry, maximumTokens, useModelMaximum: maximumTokens is null).Connect(runtime);
             lock (connections) connections.Add(connection);
             return connection.CreateTransport();
         }, session);

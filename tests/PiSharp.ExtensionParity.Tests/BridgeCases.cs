@@ -108,7 +108,7 @@ internal static partial class Program
               return { content: [{ type: "text", text: "probe raw" }], details: { ok: true } };
             },
           });
-          pi.on("tool_call", (event: any) => { if (event.toolName === "bash") return { block: true, reason: "Blocked by probe" }; });
+          pi.on("tool_call", (event: any) => { log("tool_call", event.toolName); if (event.toolName === "bash") return { block: true, reason: "Blocked by probe" }; });
           pi.on("tool_call", (event: any) => { if (event.toolName === "probe") event.input.count = Number(event.input.count) + 1; });
           pi.on("input", (event: any) => event.text.startsWith("rewrite:") ? { action: "transform", text: event.text.slice(8) } : undefined);
           pi.on("before_agent_start", (event: any) => ({ systemPrompt: event.systemPrompt + "\nPROBE-SYSTEM", message: { customType: "probe", content: "probe context", display: false } }));
@@ -132,7 +132,7 @@ internal static partial class Program
             1 => AnthropicToolCall("bash", new { command = "echo hi" }, "toolu_02"),
             _ => AnthropicText("done")
         };
-        var (code, stdout, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "--probe-mode", "loud-mode", "--probe-loud", "rewrite:Hello there"]);
+        var (code, stdout, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "--probe-mode", "loud-mode", "rewrite:Hello there", "--probe-loud"]);
         Equal(0, code, "exit; " + stderr);
         Equal("done", stdout.Trim(), "final text; requests " + sandbox.Requests.Count + "; stderr " + stderr + "; log " + string.Join(" | ", LogLines(sandbox)));
         var first = sandbox.Requests[0].Json;
@@ -141,7 +141,7 @@ internal static partial class Program
         Check(first.GetProperty("system").ToString().Contains("PROBE-SYSTEM", StringComparison.Ordinal), "before_agent_start system prompt");
         Check(first.GetProperty("messages").ToString().Contains("probe context", StringComparison.Ordinal), "before_agent_start message in context");
         Equal("rewritten probe raw", ToolResultText(sandbox.Requests[1]), "tool_result rewrite");
-        Check(ToolResultText(sandbox.Requests[2]).Contains("Blocked by probe", StringComparison.Ordinal), "tool_call block reason: " + ToolResultText(sandbox.Requests[2]));
+        Check(ToolResultText(sandbox.Requests[2]).Contains("Blocked by probe", StringComparison.Ordinal), "tool_call block reason: " + ToolResultText(sandbox.Requests[2]) + "; log " + string.Join(" | ", LogLines(sandbox)) + "; request " + sandbox.Requests[2].Body);
         var tool = LogRecords(sandbox, "tool").Single()[1]!.AsObject();
         Equal(42.0, tool["count"]!.GetValue<double>(), "validateToolArguments coerced the string and tool_call edited the input");
         Equal("number", tool["countType"]!.GetValue<string>(), "coerced type");
@@ -329,7 +329,7 @@ internal static partial class Program
         var host = sandbox.Host(stdout, stderr, null, rpcInput: input, rpcOutput: output) with { StdoutIsTty = false };
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(120));
         var code = await PiCommand.RunAsync(["--mode", "rpc", .. Model, "-e", extension], host, deadline.Token);
-        Equal(0, code, "exit; " + stderr);
+        Equal(0, code, "exit; " + stderr + "; output: " + string.Join("\n", lines));
         string[] all; lock (lines) all = [.. lines];
         Check(all.Any(line => line.Contains("\"method\":\"select\"", StringComparison.Ordinal) && line.Contains("Pick one", StringComparison.Ordinal)), "select request: " + string.Join("\n", all));
         Check(all.Any(line => line.Contains("\"method\":\"notify\"", StringComparison.Ordinal) && line.Contains("picked blue", StringComparison.Ordinal)), "notify with the answer: " + string.Join("\n", all));
@@ -390,11 +390,13 @@ internal static partial class Program
     private sealed class LineOutput(Action<string> onLine) : MemoryStream
     {
         private readonly StringBuilder pending = new();
-        public override void Write(byte[] buffer, int offset, int count) { base.Write(buffer, offset, count); Feed(buffer.AsSpan(offset, count)); }
-        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
-        { await base.WriteAsync(buffer, cancellationToken); Feed(buffer.Span); }
+        private int depth;
+        public override void Write(byte[] buffer, int offset, int count) { depth++; try { base.Write(buffer, offset, count); } finally { depth--; } if (depth == 0) Feed(buffer.AsSpan(offset, count)); }
+        public override void Write(ReadOnlySpan<byte> buffer) { depth++; try { base.Write(buffer); } finally { depth--; } if (depth == 0) Feed(buffer); }
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        { Write(buffer.Span); return ValueTask.CompletedTask; }
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-        { Write(buffer, offset, count); return Task.CompletedTask; }
+        { Write(buffer.AsSpan(offset, count)); return Task.CompletedTask; }
         private void Feed(ReadOnlySpan<byte> bytes)
         {
             List<string> complete = [];
