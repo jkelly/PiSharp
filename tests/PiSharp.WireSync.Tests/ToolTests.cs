@@ -55,7 +55,8 @@ internal static class ToolTests
             // Failed reads carry no structured result, and structured content never enters the model transcript.
             Check(batch.Outcomes.Single(outcome => outcome.Invocation.Call.Id == "read-past").Result.StructuredContent is null, "failed read had output");
             var transcript = ToolResultMessageMaterializer.ToTranscript(batch.Messages.Single(row => row.ToolCallId == "read-ok"), 5).WireBody.ToString();
-            Equal("""{"role":"toolResult","toolCallId":"read-ok","toolName":"read","content":[{"type":"text","text":"alpha\nbeta"}],"details":null,"isError":false,"timestamp":5}""", transcript);
+            // read.ts resolves details: undefined for an untruncated read, which JSON.stringify leaves out.
+            Equal("""{"role":"toolResult","toolCallId":"read-ok","toolName":"read","content":[{"type":"text","text":"alpha\nbeta"}],"isError":false,"timestamp":5}""", transcript);
         }
         finally { Directory.Delete(directory, recursive: true); }
     }

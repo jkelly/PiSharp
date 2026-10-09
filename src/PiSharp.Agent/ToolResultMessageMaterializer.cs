@@ -15,13 +15,15 @@ public static class ToolResultMessageMaterializer
         var result = outcome.Result;
         var limits = ToolResultValueCodec.ValidateLimits(options ?? ToolResultValueOptions.ExecutionBoundary);
         ToolResultValueCodec.Validate(result, limits);
+        // A failure is a tool that threw upstream: agent-loop.ts createErrorToolResult records its message with details {}; the
+        // native failure diagnostics stay on the tool result.
         var message = new ToolResultMessage(outcome.Invocation.Call.Id, outcome.Invocation.Call.Name,
             result.OwnedContent is ImmutableArray<TextContent> text ? text : [],
-            result.Details, outcome.IsError) { Usage = NestedToolUsage.Combine(result.Usage, outcome.NestedUsage), ValueOptions = limits,
+            result.Failure is null ? result.Details : JsonData.EmptyObject, outcome.IsError) { Usage = NestedToolUsage.Combine(result.Usage, outcome.NestedUsage), ValueOptions = limits,
                 NestedCalls = outcome.NestedCalls, DurationMs = outcome.DurationMs };
         if (result.OwnedContent is not ImmutableArray<TextContent>)
             message = message.WithOwnedContent(result.ContentValue);
-        return result.HasProperty("details") ? message : message.WithoutDetails();
+        return result.Failure is not null || result.HasProperty("details") ? message : message.WithoutDetails();
     }
     public static TranscriptEntry ToTranscript(ToolResultMessage message, long timestamp)
     {

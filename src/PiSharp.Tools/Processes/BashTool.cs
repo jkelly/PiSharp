@@ -20,7 +20,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
     /// <summary>Source bashSchema (TypeBox), checked by validateToolArguments before the tool runs.</summary>
     public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(Declaration, ToolSchemaOrigin.TypeBox);
     public static JsonData SourceDeclaration { get; } = JsonData.Parse("""
-        {"name":"bash","description":"Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"timeout":{"type":"number","description":"Timeout in seconds (optional, no default timeout)"}},"required":["command"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}
+        {"name":"bash","description":"Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.","parameters":{"type":"object","required":["command"],"properties":{"command":{"type":"string","description":"Shell command to execute"},"timeout":{"type":"number","description":"Timeout in seconds (optional, no default timeout)"}}},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}
         """);
     /// <summary>Source MAX_TIMEOUT_MS.</summary>
     public const double MaximumTimeoutMilliseconds = 2_147_483_647;
@@ -331,7 +331,9 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
         var structured = new Dictionary<string, object?> { ["output"] = result.StructuredOutput.Content,
             ["truncated"] = result.StructuredOutput.Truncated, ["exit_code"] = code, ["wall_time_seconds"] = result.WallTimeSeconds };
         if (result.StructuredOutput.Truncated && result.Output.FullOutputPath is { } path) structured["full_output_path"] = path;
-        return new([new TextContent(text)], Details(result.Output), IsError: code != 0)
-        { StructuredContent = JsonData.Parse(JsonSerializer.Serialize(structured)) };
+        // Source formatOutput: details is undefined (absent from the result) unless the output was truncated.
+        var details = Details(result.Output);
+        ToolResult final = new([new TextContent(text)], details, IsError: code != 0) { StructuredContent = JsonData.Parse(JsonSerializer.Serialize(structured)) };
+        return details.Value.ValueKind == JsonValueKind.Null ? final.WithProperty("details", null) : final;
     }
 }

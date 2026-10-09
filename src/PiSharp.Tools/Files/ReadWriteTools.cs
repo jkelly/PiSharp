@@ -48,9 +48,9 @@ public sealed class ReadWriteTools
     }
 
     /// <summary>Source createReadToolDefinition name, description, TypeBox parameters and constrainedSampling.</summary>
-    public static JsonData ReadDeclaration { get; } = JsonData.Parse("""{"name":"read","description":"Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to read (relative or absolute)"},"offset":{"type":"number","description":"Line number to start reading from (1-indexed)"},"limit":{"type":"number","description":"Maximum number of lines to read"}},"required":["path"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""");
+    public static JsonData ReadDeclaration { get; } = JsonData.Parse("""{"name":"read","description":"Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.","parameters":{"type":"object","required":["path"],"properties":{"path":{"type":"string","description":"Path to the file to read (relative or absolute)"},"offset":{"type":"number","description":"Line number to start reading from (1-indexed)"},"limit":{"type":"number","description":"Maximum number of lines to read"}}},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""");
     /// <summary>Source createWriteToolDefinition name, description, TypeBox parameters and constrainedSampling.</summary>
-    public static JsonData WriteDeclaration { get; } = JsonData.Parse("""{"name":"write","description":"Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to write (relative or absolute)"},"content":{"type":"string","description":"Content to write to the file"}},"required":["path","content"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""");
+    public static JsonData WriteDeclaration { get; } = JsonData.Parse("""{"name":"write","description":"Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.","parameters":{"type":"object","required":["path","content"],"properties":{"path":{"type":"string","description":"Path to the file to write (relative or absolute)"},"content":{"type":"string","description":"Content to write to the file"}}},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""");
 
     /// <summary>
     /// Source readOutputSchema: the result for programmatic callers (codemode), the text for text files or an image block
@@ -286,7 +286,9 @@ public sealed class ReadWriteTools
             output = truncation.Content + $"\n\n[{Js(lines.Length - (start + limited))} more lines in file. Use offset={Js(start + limited + 1)} to continue.]";
         else output = truncation.Content;
         ToolResult result = new([new TextContent(output)], details);
-        return result with { StructuredContent = ToReadOutput(result.ContentValue) };
+        result = result with { StructuredContent = ToReadOutput(result.ContentValue) };
+        // Source read: details is undefined (absent from the result) unless the output was truncated.
+        return details.Value.ValueKind == JsonValueKind.Null ? result.WithProperty("details", null) : result;
     }
 
     /// <summary>Source read image branch: processImage, the "Read image file" note with hints, and the non-vision note.</summary>
@@ -312,7 +314,7 @@ public sealed class ReadWriteTools
             }, OutputJson);
         }
         var value = JsonData.Parse(content);
-        return new ToolResult([], JsonData.Null) { ContentValue = value, StructuredContent = ToReadOutput(value) };
+        return (new ToolResult([], JsonData.Null) { ContentValue = value, StructuredContent = ToReadOutput(value) }).WithProperty("details", null);
     }
 
     private async ValueTask<ToolResult> WriteAsync(string target, Input input, CancellationToken token)
@@ -335,7 +337,8 @@ public sealed class ReadWriteTools
                 if (operationToken.IsCancellationRequested)
                     return FileError(ToolFailureKind.Canceled, "Operation aborted", "WriteCompletedAfterCancellation",
                         directoryAttempted, directoryCompleted, writeAttempted, writeCompleted);
-                return new([new TextContent($"Successfully wrote to {input.DisplayPath}")], JsonData.Null);
+                // Source write: details: undefined.
+                return new ToolResult([new TextContent($"Successfully wrote to {input.DisplayPath}")], JsonData.Null).WithProperty("details", null);
             }
             catch (OperationCanceledException) when (operationToken.IsCancellationRequested)
             { return FileError(ToolFailureKind.Canceled, "Operation aborted", "WriteCanceled",

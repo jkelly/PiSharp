@@ -8,12 +8,12 @@ public static class McpDiscoveryToolIdentity
 {
     public const string CodemodeName = "codemode";
     public const string ToolSearchName = "tool_search";
-    /// <summary>Pi 1.1.0 extensions/codemode/tool.ts codemodeSchema.</summary>
+    /// <summary>Pi 1.1.0 extensions/codemode/tool.ts codemodeSchema, in TypeBox's key order (type, required, properties).</summary>
     public static JsonData CodemodeSchema { get; } = JsonData.Parse("""
-        {"type":"object","properties":{"code":{"type":"string","description":"Raw JavaScript source."}},"required":["code"]}
+        {"type":"object","required":["code"],"properties":{"code":{"type":"string","description":"Raw JavaScript source."}}}
         """);
     public static JsonData ToolSearchSchema { get; } = JsonData.Parse("""
-        {"type":"object","properties":{"query":{"type":"string","description":"Search query for deferred tools."},"limit":{"type":"number","description":"Maximum number of tools to return. Defaults to 8."}},"required":["query"]}
+        {"type":"object","required":["query"],"properties":{"query":{"type":"string","description":"Search query for deferred tools."},"limit":{"type":"number","description":"Maximum number of tools to return. Defaults to 8."}}}
         """);
 
     public static bool IsCodemodeTool(string name, JsonData parameters) =>
