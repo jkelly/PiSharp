@@ -1245,8 +1245,8 @@
         },
         {
           "path": "tests/PiSharp.GoogleGenerativeAI.Tests/native-diagnostic-cases.json",
-          "bytes": 5026,
-          "sha256": "0865845196292af1e9b33ec7f81b6104a4fed4e32173902c170d0e455fa0a9b8"
+          "bytes": 5022,
+          "sha256": "9cde5e807a91fef1fc6bd1566c98ad7d3d799fb535af64b52a003c38213bb369"
         },
         {
           "path": "tests/PiSharp.GoogleGenerativeAI.Tests/preterminal-diagnostic-cases.json",
@@ -1260,8 +1260,8 @@
         },
         {
           "path": "tests/PiSharp.GoogleGenerativeAI.Tests/google-retry-cases.json",
-          "bytes": 5656,
-          "sha256": "975c04a73a89866dff8f1a9f048d738c2cb9011a62a9d4df7cf6508d55d41247"
+          "bytes": 5149,
+          "sha256": "9fb3b5a640fbcefd611beb4018869adb9db431a51e1643a6f1e89e15e66449a0"
         },
         {
           "path": "tests/PiSharp.GoogleGenerativeAI.Tests/google-simple-cases.json",
@@ -1282,8 +1282,8 @@
         },
         {
           "relative": "native-diagnostic-cases.json",
-          "bytes": 5026,
-          "sha256": "0865845196292af1e9b33ec7f81b6104a4fed4e32173902c170d0e455fa0a9b8"
+          "bytes": 5022,
+          "sha256": "9cde5e807a91fef1fc6bd1566c98ad7d3d799fb535af64b52a003c38213bb369"
         },
         {
           "relative": "preterminal-diagnostic-cases.json",
@@ -1297,8 +1297,8 @@
         },
         {
           "relative": "google-retry-cases.json",
-          "bytes": 5656,
-          "sha256": "975c04a73a89866dff8f1a9f048d738c2cb9011a62a9d4df7cf6508d55d41247"
+          "bytes": 5149,
+          "sha256": "9fb3b5a640fbcefd611beb4018869adb9db431a51e1643a6f1e89e15e66449a0"
         },
         {
           "relative": "google-simple-cases.json",
