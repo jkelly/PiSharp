@@ -88,9 +88,8 @@ internal static class Program
                 LiveRuntime = Commands.LiveSessionRuntime.Default,
                 CreateMcpHost = _ => Mcp.McpSessionHost.CreateDefault(),
                 OpenRpcInput = CancellableStandardInput.Open, OpenRpcOutput = () => standardOutput,
-                RunInteractive = OperatingSystem.IsWindows()
-                    ? (terminalArgs, options, token) => RunTerminalHostAsync(terminalArgs, token, liveRuntime: options.LiveRuntime, mcpHost: Mcp.McpSessionHost.CreateDefault())
-                    : null
+                RunInteractive = OperatingSystem.IsWindows() ? RunPiInteractiveAsync : null,
+                Signals = () => ShutdownSignals.Process, Timings = PiSharp.CodingAgent.Diagnostics.StartupTimings.Default
             };
             return await Pi.PiCommand.RunAsync(args, host, cancellation.Token).ConfigureAwait(false);
         }
@@ -100,6 +99,20 @@ internal static class Program
             Console.CancelKeyPress -= cancel;
             Console.SetOut(originalOut);
         }
+    }
+
+    /// <summary>Interactive mode of the Pi entry: the terminal host over the planned session. An uncaught exception is recorded in
+    /// crashes.json and reported as interactive-mode.ts does (IMPL-I supplies the loaded extensions).</summary>
+    private static Task<int> RunPiInteractiveAsync(string[] terminalArgs, Pi.PiEntryOptions options, CancellationToken token)
+    {
+        var index = Array.IndexOf(terminalArgs, "--session");
+        var sessionFile = index >= 0 && index + 1 < terminalArgs.Length ? terminalArgs[index + 1] : null;
+        AppDomain.CurrentDomain.UnhandledException += (_, crash) =>
+        {
+            if (crash.ExceptionObject is Exception error)
+                Diagnostics.CrashReporting.ReportUncaughtException(error, Console.Error, [], sessionFile, Environment.CurrentDirectory);
+        };
+        return RunTerminalHostAsync(terminalArgs, token, liveRuntime: options.LiveRuntime, mcpHost: Mcp.McpSessionHost.CreateDefault());
     }
 
     private static async Task<int> RunMcpAsync(string[] args)

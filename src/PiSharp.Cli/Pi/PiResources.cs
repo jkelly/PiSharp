@@ -252,6 +252,28 @@ internal sealed class PiResources
         };
     }
 
+    /// <summary>Source extendResources: paths that resources_discover handlers returned, resolved against the cwd and appended after
+    /// the run's own (duplicates dropped); new theme files are loaded as data.</summary>
+    internal static PiResources WithDiscovered(PiResources resources, PiDiscoveredResources discovered, string cwd, string home)
+    {
+        if (discovered.IsEmpty) return resources;
+        ImmutableArray<PiResourcePath> Append(ImmutableArray<PiResourcePath> existing, ImmutableArray<string> added)
+        {
+            var seen = new HashSet<string>(existing.Select(item => PiPaths.Canonicalize(item.Path)), StringComparer.Ordinal);
+            return [.. existing, .. added.Select(path => new PiResourcePath(PiPaths.ResolvePath(path, cwd, home, trim: true), "temporary", "extension", true))
+                .Where(item => seen.Add(PiPaths.Canonicalize(item.Path)))];
+        }
+        var themePaths = Append(resources.ThemePaths, discovered.ThemePaths);
+        var (themes, themeDiagnostics) = LoadThemes(themePaths);
+        return new()
+        {
+            ContextFiles = resources.ContextFiles, SystemPrompt = resources.SystemPrompt, SystemPromptSource = resources.SystemPromptSource,
+            AppendSystemPrompt = resources.AppendSystemPrompt, SkillPaths = Append(resources.SkillPaths, discovered.SkillPaths),
+            PromptPaths = Append(resources.PromptPaths, discovered.PromptPaths), ThemePaths = themePaths, Themes = themes,
+            Diagnostics = [.. resources.Diagnostics.Where(diagnostic => !diagnostic.Message.Contains("collision", StringComparison.Ordinal) && !diagnostic.Message.StartsWith("Theme file", StringComparison.Ordinal) && !diagnostic.Message.StartsWith("Failed to load theme", StringComparison.Ordinal)), .. themeDiagnostics]
+        };
+    }
+
     private static IEnumerable<string> Strings(JsonObject layer, string name) =>
         layer[name] is JsonArray array ? array.OfType<JsonValue>().Select(value => value.TryGetValue<string>(out var text) ? text : null).OfType<string>() : [];
 

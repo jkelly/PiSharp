@@ -15,7 +15,7 @@ namespace PiSharp.Cli.Pi;
 internal static class PiPrintMode
 {
     internal static async Task<int> RunAsync(string[] rpcArgs, bool json, PiSessionPlan plan, PiEntryOptions options, PiHost host,
-        PiSharp.Cli.Mcp.McpSessionHost? mcpHost, CancellationToken token)
+        PiSharp.Cli.Mcp.McpSessionHost? mcpHost, CancellationToken token, Func<bool>? userShutdown = null)
     {
         var stdout = host.Stdout; var stderr = host.Stderr;
         if (json)
@@ -32,6 +32,14 @@ internal static class PiPrintMode
         var connection = new BoundedRpcConnection(async (record, recordToken) =>
         {
             var type = record.Value.TryGetProperty("type", out var kind) ? kind.GetString() : null;
+            if (type == "extension_error")
+            {
+                // print-mode.ts bindExtensions onError: `Extension error (<path>): <error>` on stderr; RPC mode alone emits the record.
+                var path = record.Value.TryGetProperty("extensionPath", out var extensionPath) ? extensionPath.GetString() : null;
+                var message = record.Value.TryGetProperty("error", out var error) ? error.GetString() : null;
+                await PiCommand.Line(stderr, $"Extension error ({path}): {message}").ConfigureAwait(false);
+                return;
+            }
             // Session events only: command responses and PiSharp's own RPC records (pisharp_*) are not part of Pi's JSON stream.
             if (json && type != "response" && type?.StartsWith("pisharp_", StringComparison.Ordinal) != true)
             {
@@ -47,9 +55,8 @@ internal static class PiPrintMode
         {
             try
             {
-                return mcpHost is null
-                    ? await RpcSessionCommand.RunAsync(rpcArgs, connection.Input, connection.Output, stderr, hostStop.Token).ConfigureAwait(false)
-                    : await RpcSessionCommand.RunHostedAsync(rpcArgs, connection.Input, connection.Output, stderr, mcpHost, hostStop.Token).ConfigureAwait(false);
+                return await RpcSessionCommand.RunWithPresentationAsync(rpcArgs, connection.Input, connection.Output, stderr, null!, hostStop.Token,
+                    userShutdown: userShutdown, mcpHost: mcpHost).ConfigureAwait(false);
             }
             finally { records.Writer.TryComplete(); }
         }
@@ -88,6 +95,7 @@ internal static class PiPrintMode
         }
         catch (PromptFailure failure) { await PiCommand.Line(stderr, failure.Message).ConfigureAwait(false); exitCode = 1; }
         catch (HostEnded) { exitCode = 1; }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { exitCode = 1; }
         finally
         {
             connection.CompleteInput();

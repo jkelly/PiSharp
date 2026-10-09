@@ -30,6 +30,7 @@ internal static partial class Program
         cases.AddRange(TrustCases());
         cases.AddRange(EntryCases());
         cases.AddRange(AuthCases());
+        cases.AddRange(ExtensionEventCases());
         var filter = Environment.GetEnvironmentVariable("CLIPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;

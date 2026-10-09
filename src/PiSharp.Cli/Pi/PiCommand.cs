@@ -41,6 +41,13 @@ internal sealed record PiHost
     internal Func<string[], PiEntryOptions, CancellationToken, Task<int>>? RunInteractive { get; init; }
     internal PiProjectTrustPrompt? TrustPrompt { get; init; }
     internal PiSessionSelector? SelectSession { get; init; }
+    /// <summary>Extensions loaded before project trust is resolved (IMPL-E: user and CLI extensions); their project_trust and
+    /// resources_discover handlers take part in the run. Null without extensions.</summary>
+    internal Func<string, CancellationToken, Task<PiLoadedExtensions?>>? LoadExtensions { get; init; }
+    /// <summary>The non-interactive hosts' termination signals (print, JSON and RPC modes): null in tests and interactive mode.</summary>
+    internal Func<ShutdownSignals>? Signals { get; init; }
+    /// <summary>PI_TIMING startup timings (IMPL-G's StartupTimings); disabled by default.</summary>
+    internal PiSharp.CodingAgent.Diagnostics.StartupTimings Timings { get; init; } = new(false);
     /// <summary>Source promptConfirm on stdin/stdout.</summary>
     internal Func<string, CancellationToken, Task<bool>>? Confirm { get; init; }
     internal string? ApplicationDirectory { get; init; }
@@ -91,6 +98,7 @@ internal static class PiCommand
             return 1;
         }
 
+        host.Timings.ResetTimings();
         var parsed = PiArgs.Parse(args);
         if (parsed.Diagnostics.Count > 0)
         {
@@ -106,6 +114,7 @@ internal static class PiCommand
         ValidateForkFlags(parsed);
         ValidateSessionIdFlags(parsed);
 
+        host.Timings.Time("parseArgs");
         var cwd = host.Cwd; var home = host.Home;
         var agentDir = PiPaths.AgentDirectory(host.GetEnvironment, home);
         // Source isPlainRuntimeMetadataCommand/takeOverStdout: outside interactive mode (and plain --help/--list-models) console output
@@ -115,6 +124,7 @@ internal static class PiCommand
         var migrations = PiMigrations.Run(cwd, agentDir);
         foreach (var message in migrations.Messages) await Line(console, message).ConfigureAwait(false);
         // Source startupSettingsManager: SettingsManager.create(cwd, agentDir) reads the project layer (projectTrusted defaults to true).
+        host.Timings.Time("runMigrations");
         var startupSettings = PiSettings.Load(cwd, agentDir, projectTrusted: true);
         var startupDiagnostics = startupSettings.DrainDiagnostics();
         // http-dispatcher.ts applyHttpProxySettings: the global httpProxy fills HTTP_PROXY and HTTPS_PROXY when they are unset.
@@ -150,6 +160,7 @@ internal static class PiCommand
             await Line(err, Paint(Red, PiSessions.MissingCwdError(plan.Cwd, plan.SessionFile, cwd))).ConfigureAwait(false);
             return 1;
         }
+        host.Timings.Time("createSessionManager");
         string? sessionName = null;
         if (parsed.Name is not null)
         {
@@ -161,21 +172,31 @@ internal static class PiCommand
         // defaultProjectTrust and, with a UI, the prompt.
         var sessionCwd = plan.Cwd;
         var trustStore = new ProjectTrustStore(agentDir, home);
+        var extensions = host.LoadExtensions is null ? null : await host.LoadExtensions(sessionCwd, token).ConfigureAwait(false);
+        var projectTrustDiagnostics = new List<PiDiagnostic>();
         bool projectTrusted;
         try
         {
             projectTrusted = await PiProjectTrust.ResolveAsync(sessionCwd, home, trustStore, parsed.ProjectTrustOverride, startupSettings.DefaultProjectTrust,
-                appMode == PiAppMode.Interactive ? host.TrustPrompt : null, token).ConfigureAwait(false);
+                appMode == PiAppMode.Interactive ? host.TrustPrompt : null, token, extensions is null ? null : (trustCwd, trustToken) =>
+                    PiExtensionEvents.ProjectTrustAsync(extensions.Registry, extensions.Snapshot, trustCwd, message =>
+                    { projectTrustDiagnostics.Add(new("warning", message)); return ValueTask.CompletedTask; }, trustToken)).ConfigureAwait(false);
         }
         catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         var settings = PiSettings.Load(sessionCwd, agentDir, projectTrusted);
-        var runtimeDiagnostics = new List<PiDiagnostic>(settings.DrainDiagnostics());
+        var runtimeDiagnostics = new List<PiDiagnostic>([.. projectTrustDiagnostics, .. settings.DrainDiagnostics()]);
+        // agent-session.ts extendResourcesFromExtensions: resources_discover adds skill, prompt and theme paths (reason "startup").
+        var extensionErrors = new List<string>();
+        var discovered = extensions is null ? PiDiscoveredResources.Empty : await PiExtensionEvents.ResourcesDiscoverAsync(extensions.Registry, extensions.Snapshot,
+            sessionCwd, "startup", (path, message) => { extensionErrors.Add($"Extension error ({path}): {message}"); return ValueTask.CompletedTask; }, token).ConfigureAwait(false);
         var resources = PiResources.Discover(new(sessionCwd, agentDir, home, settings, projectTrusted)
         {
             CliSkills = [.. parsed.Skills ?? []], CliPromptTemplates = [.. parsed.PromptTemplates ?? []], CliThemes = [.. parsed.Themes ?? []],
             NoSkills = parsed.NoSkills, NoPromptTemplates = parsed.NoPromptTemplates, NoThemes = parsed.NoThemes, NoContextFiles = parsed.NoContextFiles,
             SystemPrompt = parsed.SystemPrompt, AppendSystemPrompt = parsed.AppendSystemPrompt is null ? default : [.. parsed.AppendSystemPrompt]
         });
+        resources = PiResources.WithDiscovered(resources, discovered, sessionCwd, home);
+        if (appMode != PiAppMode.Interactive) foreach (var line in extensionErrors) await Line(err, line).ConfigureAwait(false);
         runtimeDiagnostics.AddRange(resources.Diagnostics.Where(diagnostic => diagnostic.Message.StartsWith("Warning: ", StringComparison.Ordinal))
             .Select(diagnostic => diagnostic with { Message = diagnostic.Message["Warning: ".Length..] }));
         foreach (var diagnostic in resources.Diagnostics.Where(diagnostic => diagnostic.Type == "error"))
@@ -232,6 +253,7 @@ internal static class PiCommand
             return 1;
         }
 
+        host.Timings.Time("createAgentSessionRuntime");
         // Piped stdin joins the first message; it also turns interactive mode into print mode.
         string? stdinContent = null;
         if (appMode != PiAppMode.Rpc && !host.StdinIsTty)
@@ -245,7 +267,9 @@ internal static class PiCommand
             try { (fileText, fileImages) = await PiInitialMessage.ProcessFileArgumentsAsync(parsed.FileArgs, cwd, home, autoResizeImages: false, token).ConfigureAwait(false); }
             catch (PiFileArgumentException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         }
+        host.Timings.Time("readPipedStdin");
         var (initialMessage, initialImages) = PiInitialMessage.Build(parsed.Messages, fileText, fileImages, stdinContent);
+        host.Timings.Time("prepareInitialMessage");
 
         var allDiagnostics = Deduplicate([.. startupDiagnostics, .. runtimeDiagnostics]);
         if (appMode != PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
@@ -278,6 +302,14 @@ internal static class PiCommand
         var sessionArgs = SessionArguments(plan, parsed);
         var mcpHost = host.CreateMcpHost(agentDir);
         using var entered = options.Enter();
+        // print-mode.ts/rpc-mode.ts registerSignalHandlers: SIGTERM (and SIGHUP off Windows) shut the host down gracefully, then the
+        // process exits 143 (129). Interactive mode keeps the terminal's own handling.
+        var signals = appMode == PiAppMode.Interactive ? null : host.Signals?.Invoke();
+        using var signalled = signals is null ? null : CancellationTokenSource.CreateLinkedTokenSource(token, signals.Token);
+        var runToken = signalled?.Token ?? token;
+        Func<bool> userShutdown = () => signals?.Received is not null;
+        host.Timings.Time("createAgentSession");
+        host.Timings.PrintTimings();
         switch (appMode)
         {
             case PiAppMode.Rpc:
@@ -285,9 +317,11 @@ internal static class PiCommand
                 var input = host.OpenRpcInput?.Invoke() ?? throw new InvalidOperationException("RPC standard input is unavailable.");
                 var output = host.OpenRpcOutput?.Invoke() ?? throw new InvalidOperationException("RPC standard output is unavailable.");
                 await using (input.ConfigureAwait(false))
-                    return mcpHost is null
-                        ? await RpcSessionCommand.RunAsync(["session", "rpc", .. sessionArgs], input, output, err, token).ConfigureAwait(false)
-                        : await RpcSessionCommand.RunHostedAsync(["session", "rpc", .. sessionArgs], input, output, err, mcpHost, token).ConfigureAwait(false);
+                {
+                    var code = await RpcSessionCommand.RunWithPresentationAsync(["session", "rpc", .. sessionArgs], input, output, err, null!, runToken,
+                        userShutdown: userShutdown, mcpHost: mcpHost).ConfigureAwait(false);
+                    return signals?.Exit(code) ?? code;
+                }
             }
             case PiAppMode.Interactive:
                 if (host.RunInteractive is null)
@@ -297,7 +331,10 @@ internal static class PiCommand
                 }
                 return await host.RunInteractive(["session", "terminal", .. sessionArgs], options, token).ConfigureAwait(false);
             default:
-                return await PiPrintMode.RunAsync(["session", "rpc", .. sessionArgs], appMode == PiAppMode.Json, plan, options, host, mcpHost, token).ConfigureAwait(false);
+            {
+                var code = await PiPrintMode.RunAsync(["session", "rpc", .. sessionArgs], appMode == PiAppMode.Json, plan, options, host, mcpHost, runToken, userShutdown).ConfigureAwait(false);
+                return signals?.Exit(code) ?? code;
+            }
         }
 
         async Task Error(string message) => await Line(err, Paint(Red, $"Error: {message}")).ConfigureAwait(false);
