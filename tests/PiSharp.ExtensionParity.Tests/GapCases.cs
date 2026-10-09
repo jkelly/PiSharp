@@ -18,7 +18,49 @@ internal static partial class Program
         ("gap.output-schema-reaches-codemode-declarations", OutputSchema),
         ("gap.builtin-tool-factory-with-custom-operations", BuiltinFactoryOperations),
         ("gap.pi-events-shared-with-native-extensions", EventsBridge),
+        ("gap.send-message-from-an-idle-command-appends-and-displays", SendMessageWhileIdle),
+        ("gap.shortcuts-run-with-a-fresh-context", ShortcutContext),
     ];
+
+    // agent-session.ts sendCustomMessage: idle and without triggerTurn, the message is appended and emitted (message_start/_end) at once.
+    private static async Task SendMessageWhileIdle()
+    {
+        using var sandbox = NodeSandbox("send-idle");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "note.ts"), """
+            export default function (pi: any) {
+              pi.registerCommand("note", { description: "Note", handler: async () => {
+                pi.sendMessage({ customType: "note", content: "remember this", display: true, details: { n: 1 } });
+              } });
+            }
+            """);
+        // The session holds the message at once (get_messages); the file itself is written with the first assistant message, as upstream.
+        var (code, records, stderr) = await RunRpc(sandbox, [.. Model, "-e", extension], ["""{"id":"n","type":"prompt","message":"/note"}"""],
+            (record, _) => IsResponse(record, "m"),
+            react: (record, push) => { if (record["type"]?.GetValue<string>() == "message_end" && record["message"]?["role"]?.GetValue<string>() == "custom") push("""{"id":"m","type":"get_messages"}"""); });
+        Equal(0, code, "exit; " + stderr + "; records " + string.Join("\n", records.Select(item => item.ToJsonString())));
+        Check(records.Any(record => record["type"]?.GetValue<string>() == "message_start" && record["message"]?["customType"]?.GetValue<string>() == "note"), "message_start of the custom message");
+        var messages = records.Single(record => IsResponse(record, "m"))["data"]!["messages"]!.AsArray();
+        Check(messages.Any(message => message!["role"]?.GetValue<string>() == "custom" && message["customType"]?.GetValue<string>() == "note" &&
+            message["content"]?.GetValue<string>() == "remember this"), "custom message in the session: " + messages.ToJsonString());
+    }
+
+    // runner.ts getShortcuts/createContext: shortcut handlers run with a fresh context; reserved built-in keys are skipped.
+    private static async Task ShortcutContext()
+    {
+        using var sandbox = NodeSandbox("shortcut-context");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "keys.ts"), Probe + """
+            export default function (pi: any) {
+              pi.registerShortcut("ctrl+shift+k", { description: "Probe", handler: async (ctx: any) => log("shortcut", ctx.cwd === process.cwd(), typeof ctx.ui.notify, ctx.hasUI) });
+              pi.registerShortcut("ctrl+c", { description: "Steal interrupt", handler: async () => log("stolen") });
+            }
+            """);
+        await using var host = await StartHost(sandbox, extension);
+        var (shortcuts, diagnostics) = host.ResolveShortcuts(new Dictionary<string, IReadOnlyList<string>> { ["app.interrupt"] = ["escape", "ctrl+c"] });
+        Names(["ctrl+shift+k"], shortcuts.Select(shortcut => shortcut.Key), "reserved key skipped");
+        Check(diagnostics.Single().Message.Contains("conflicts with built-in shortcut. Skipping.", StringComparison.Ordinal), "diagnostic");
+        await host.RunShortcutAsync(shortcuts[0].Extension, shortcuts[0].Shortcut, CancellationToken.None);
+        Equal("""["shortcut",true,"function",true]""", LogLines(sandbox).Single(), "handler ran with a context");
+    }
 
     /// <summary>An Anthropic Messages stream calling several tools in one message.</summary>
     internal static HttpResponseMessage AnthropicToolCalls(params (string Name, object Input, string Id)[] calls)

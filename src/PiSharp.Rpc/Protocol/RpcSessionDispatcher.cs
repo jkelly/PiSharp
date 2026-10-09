@@ -1105,6 +1105,20 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 if (observation is AgentLoopStarted && run is not null)
                     run.HistoryLength = _session.Snapshot.Agent.Messages.Length;
             }
+            if (run is null && observation is AgentLoopInputMessageStarted { Message.Role: "custom" } or AgentLoopInputMessageEnded { Message.Role: "custom" })
+            {
+                // agent-session.ts _appendCustomMessage: an idle session appends an extension's custom message and emits its
+                // message_start/message_end at once, outside any run.
+                lock (_gate) if (_fatal is not null) throw _fatal;
+                await _projectionGate.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    foreach (var record in _events.Project(observation, _session.Snapshot, _session.Snapshot.Agent.Messages.Length))
+                        await WriteAsync(record).ConfigureAwait(false);
+                }
+                finally { _projectionGate.Release(); }
+                return;
+            }
             if (run is null) throw new RpcDispatchException(RpcDispatchFailure.SessionRunFailed);
             await run.Ready.Task.ConfigureAwait(false);
             lock (_gate) if (_fatal is not null) throw _fatal;

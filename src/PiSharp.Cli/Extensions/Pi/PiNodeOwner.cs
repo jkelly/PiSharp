@@ -35,6 +35,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
     public ValueTask InitializeAsync(IExtensionRegistry registry, CancellationToken cancellationToken)
     {
         var descriptor = extension.Descriptor;
+        if (registry is PiSharp.Extensions.Runtime.RegistrationScope scope) extension.OwnerGeneration = scope.OwnerGeneration;
         foreach (var eventName in extension.Events) RegisterEvent(registry, eventName);
         // A tool name an earlier extension registered is a load conflict (reported by the loader); the first registration is kept.
         foreach (var tool in (descriptor["tools"] as JsonArray ?? []).OfType<JsonObject>())

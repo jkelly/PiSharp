@@ -202,7 +202,11 @@ internal sealed partial class PiExtensionHost
     private static async Task Guard(Task work)
     {
         try { await work.ConfigureAwait(false); }
-        catch (Exception error) when (error is not OutOfMemoryException) { System.Diagnostics.Trace.TraceWarning("Extension action failed: {0}", error.Message); }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            System.Diagnostics.Trace.TraceWarning("Extension action failed: {0}", error.Message);
+            if (Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1") Console.Error.WriteLine("Extension action failed: " + error);
+        }
     }
 
     // ----------------------------------------------------------------------------------------------------------------- actions
@@ -213,13 +217,24 @@ internal sealed partial class PiExtensionHost
         var message = p.GetProperty("message");
         var options = p.TryGetProperty("options", out var o) && o.ValueKind == JsonValueKind.Object ? o : default;
         var deliverAs = options.ValueKind == JsonValueKind.Object && options.TryGetProperty("deliverAs", out var d) ? d.GetString() : null;
-        await actions.SendMessageAsync(new ExtensionCustomMessage(message.GetProperty("customType").GetString() ?? "",
+        // agent-session.ts sendCustomMessage: an idle session appends (and emits) the message at once. A command's own input admission
+        // is still settling while its handler runs, so the append waits for that admission to finish.
+        for (var attempt = 0; ; attempt++)
+        {
+            try { await Send().ConfigureAwait(false); return; }
+            catch (Exception error) when (attempt < 1200 && InputBusy(error) && !token.IsCancellationRequested)
+            { await Task.Delay(25, token).ConfigureAwait(false); }
+        }
+
+        static bool InputBusy(Exception? error) => error is not null &&
+            (error is InvalidOperationException { Message: "Input admission is already processing." } || InputBusy(error.InnerException));
+        ValueTask Send() => actions.SendMessageAsync(new ExtensionCustomMessage(message.GetProperty("customType").GetString() ?? "",
                 message.TryGetProperty("content", out var content) ? JsonData.Parse(content.GetRawText()) : JsonData.Parse("\"\""),
                 !message.TryGetProperty("display", out var display) || display.ValueKind != JsonValueKind.False,
                 message.TryGetProperty("details", out var details) ? JsonData.Parse(details.GetRawText()) : null),
             new ExtensionMessageOptions(options.ValueKind == JsonValueKind.Object && options.TryGetProperty("triggerTurn", out var trigger) && trigger.ValueKind is JsonValueKind.True or JsonValueKind.False ? trigger.GetBoolean() : null,
                 deliverAs switch { "followUp" => ExtensionMessageDelivery.FollowUp, "nextTurn" => ExtensionMessageDelivery.NextTurn, "steer" => ExtensionMessageDelivery.Steer, _ => null }),
-            token).ConfigureAwait(false);
+            token);
     }
 
     private async Task SendUserMessageAsync(JsonElement p, CancellationToken token)
@@ -481,8 +496,9 @@ internal sealed partial class PiExtensionHost
     /// a fresh scope of the session's UI serves it, for the same extension owner but without the finished operation's cancellation.</summary>
     private IExtensionUiScope? DetachedUi(JsonElement p)
     {
-        if (UiProvider is not { } provider || !p.TryGetProperty("ctx", out var id) || id.ValueKind != JsonValueKind.Number || _contexts.ContainsKey(id.GetInt64()))
-            return null;
+        if (UiProvider is not { } provider || !p.TryGetProperty("ctx", out var id) || id.ValueKind != JsonValueKind.Number) return null;
+        if (_contexts.TryGetValue(id.GetInt64(), out var live))
+            return live is IExtensionUiContext ? null : provider.OpenScope(live);
         return ContextOf(p) is { } context ? provider.OpenScope(new DetachedContext(context, Attached?.LifetimeToken ?? CancellationToken.None)) : null;
     }
 
@@ -707,7 +723,69 @@ internal sealed partial class PiExtensionHost
         [.. Extensions.SelectMany(extension => (extension.Descriptor["shortcuts"] as JsonArray ?? []).OfType<JsonObject>()
             .Select(item => (item["shortcut"]!.GetValue<string>(), item["description"]?.GetValue<string>(), extension.Path, extension.Index)))];
 
-    /// <summary>Runs a shortcut's handler with a context bound to <paramref name="context"/> (the interactive mode's current one).</summary>
+    /// <summary>Source runner.ts getShortcuts: the extension shortcuts for the effective keybindings. A key a reserved built-in action
+    /// uses is skipped; a key another built-in or an earlier extension uses goes to the later extension. Diagnostics are warnings.</summary>
+    internal (ImmutableArray<(string Key, string? Description, string ExtensionPath, int Extension, string Shortcut)> Shortcuts, ImmutableArray<(string Message, string Path)> Diagnostics)
+        ResolveShortcuts(IReadOnlyDictionary<string, IReadOnlyList<string>> keybindings)
+    {
+        var builtin = new Dictionary<string, (string Keybinding, bool Restrict)>(StringComparer.Ordinal);
+        foreach (var (keybinding, keys) in keybindings)
+        {
+            var restrict = ReservedKeybindings.Contains(keybinding);
+            foreach (var key in keys)
+            {
+                var normalized = key.ToLowerInvariant();
+                if (builtin.TryGetValue(normalized, out var existing) && existing.Restrict && !restrict) continue;
+                builtin[normalized] = (keybinding, restrict);
+            }
+        }
+        var chosen = new Dictionary<string, (string Key, string? Description, string ExtensionPath, int Extension, string Shortcut)>(StringComparer.Ordinal);
+        var order = new List<string>();
+        var diagnostics = ImmutableArray.CreateBuilder<(string, string)>();
+        foreach (var (shortcut, description, path, index) in Shortcuts)
+        {
+            var normalized = shortcut.ToLowerInvariant();
+            if (builtin.TryGetValue(normalized, out var bound) && bound.Restrict)
+            { diagnostics.Add(($"Extension shortcut '{shortcut}' from {path} conflicts with built-in shortcut. Skipping.", path)); continue; }
+            if (builtin.TryGetValue(normalized, out bound))
+                diagnostics.Add(($"Extension shortcut conflict: '{shortcut}' is built-in shortcut for {bound.Keybinding} and {path}. Using {path}.", path));
+            if (chosen.TryGetValue(normalized, out var earlier))
+                diagnostics.Add(($"Extension shortcut conflict: '{shortcut}' registered by both {earlier.ExtensionPath} and {path}. Using {path}.", path));
+            else order.Add(normalized);
+            chosen[normalized] = (normalized, description, path, index, shortcut);
+        }
+        return ([.. order.Select(key => chosen[key])], diagnostics.ToImmutable());
+    }
+
+    private static readonly ImmutableHashSet<string> ReservedKeybindings =
+    [
+        "app.interrupt", "app.clear", "app.exit", "app.suspend", "app.thinking.cycle", "app.model.cycleForward", "app.model.cycleBackward",
+        "app.model.select", "app.tools.expand", "app.thinking.toggle", "app.editor.external", "app.message.copy", "app.message.followUp",
+        "tui.input.submit", "tui.select.confirm", "tui.select.cancel", "tui.input.copy", "tui.editor.deleteToLineEnd"
+    ];
+
+    /// <summary>Source createContext() for a handler the mode runs outside any event (a shortcut): a fresh context of the extension's
+    /// owner for the current session; its UI is the session's.</summary>
+    internal IExtensionContext CreateContext(int extension)
+    {
+        var loaded = Extensions.FirstOrDefault(item => item.Index == extension) ?? throw new InvalidOperationException($"Unknown extension {extension}");
+        return new FreshContext(loaded.OwnerId, Math.Max(1, loaded.OwnerGeneration), Attached?.LifetimeToken ?? CancellationToken.None);
+    }
+
+    private sealed class FreshContext(string ownerId, long generation, CancellationToken session) : IExtensionContext
+    {
+        public string OwnerId => ownerId;
+        public long OwnerGeneration => generation;
+        public CancellationToken OperationCancellationToken => CancellationToken.None;
+        public CancellationToken SessionCancellationToken => session;
+        public CancellationToken ExtensionLifetimeCancellationToken => CancellationToken.None;
+    }
+
+    /// <summary>Runs a shortcut's handler with a fresh context (runner.ts: the shortcut handler gets createContext()).</summary>
+    internal Task RunShortcutAsync(int extension, string shortcut, CancellationToken token) =>
+        RunShortcutAsync(extension, shortcut, CreateContext(extension), token);
+
+    /// <summary>Runs a shortcut's handler with a context bound to <paramref name="context"/>.</summary>
     internal async Task RunShortcutAsync(int extension, string shortcut, IExtensionContext context, CancellationToken token)
     {
         using var lease = Enter(context);

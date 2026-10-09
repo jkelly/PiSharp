@@ -48,6 +48,10 @@ internal static class InteractiveHostServices
                     ? (entry, renderOptions, _) => new ExtensionRowsComponent(width => extensions.RenderEntry(customType, entry, width, renderOptions.Expanded) ?? [])
                     : null,
                 GetLoadedExtensions = extensions.LoadedExtensions,
+                // runner.ts getShortcuts: the handlers run with a fresh extension context (IMPL-E's PiExtensionHost.CreateContext).
+                GetExtensionShortcuts = keybindings => [.. options.Extensions!.ResolveShortcuts(keybindings).Shortcuts.Select(shortcut =>
+                    new ExtensionShortcut(shortcut.Key, shortcut.Description, shortcut.ExtensionPath,
+                        () => options.Extensions!.RunShortcutAsync(shortcut.Extension, shortcut.Shortcut, CancellationToken.None)))],
                 GetResourceDiagnostics = () =>
                 {
                     var diagnostics = resourceDiagnostics?.Invoke() ?? new ResourceDiagnostics([], [], [], []);

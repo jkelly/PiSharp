@@ -21,6 +21,8 @@ internal sealed record PiLoadedExtension(int Index, string Path, string Resolved
     /// <summary>The registry owner id of this extension (registry identifiers are ASCII; the path is kept in <see cref="Path"/>).</summary>
     internal string OwnerId => "pi-extension-" + Index.ToString(System.Globalization.CultureInfo.InvariantCulture);
     internal IEnumerable<string> Events => (Descriptor["events"] as JsonArray ?? []).Select(node => node!.GetValue<string>());
+    /// <summary>The registry owner generation once the extension is bound to a session (0 before).</summary>
+    internal long OwnerGeneration { get; set; }
     internal int HandlerCount(string eventName) => Descriptor["handlerCounts"] is JsonObject counts && counts[eventName] is JsonValue value ? value.GetValue<int>() : 1;
 }
 
