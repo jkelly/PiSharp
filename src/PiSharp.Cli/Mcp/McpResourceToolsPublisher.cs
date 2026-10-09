@@ -146,7 +146,8 @@ internal sealed class McpResourceToolsPublisher
                 cancellation.ThrowIfCancellationRequested();
                 var plan = registry.PrepareToolCatalogReplacement(scope, registrationIds, descriptors, registry.CaptureSnapshot());
                 var binding = new ExtensionAgentBinding(registry, policy, validator, sessionCancellationToken: current.LifetimeToken,
-                    options: new() { ActiveToolNames = [] }, capturedSnapshot: plan.PreviewSnapshot);
+                    invokerOptions: McpSessionHost.BindingInvokerOptions, options: PiSharp.Cli.Commands.PiPayloadBudget.PiBinding(new() { ActiveToolNames = [] }),
+                    capturedSnapshot: plan.PreviewSnapshot);
                 var nextNames = descriptors.Select(tool => tool.Name).ToImmutableHashSet(StringComparer.Ordinal);
                 var retained = expected.RegisteredTools.Where(tool => !publishedNames.Contains(tool.Adapter.Name)).ToImmutableArray();
                 var added = binding.Registrations.Where(tool => nextNames.Contains(tool.Name)).Select(tool =>

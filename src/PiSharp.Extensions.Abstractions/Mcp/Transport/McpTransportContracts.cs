@@ -24,8 +24,11 @@ public interface IMcpAdmittedHttpRequestOperation
     Task StopAsync();
 }
 public delegate IMcpAdmittedHttpRequestOperation McpAdmittedHttpRequestFactory(HttpRequestMessage request);
+/// <summary>Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES (16 MiB per
+/// message). The client correlates any number of requests in flight and answers any number of server requests over a
+/// connection's lifetime (client.ts has no count bound), so the request and callback counts are unbounded by default.</summary>
 public sealed record McpTransportLimits(int MaximumFrameBytes = 16 * 1024 * 1024, int ReadBufferBytes = 4096,
-    int MaximumInflight = 64, int MaximumCallbacks = 64, long MaximumRequestId = 9_007_199_254_740_991);
+    int MaximumInflight = int.MaxValue, int MaximumCallbacks = int.MaxValue, long MaximumRequestId = 9_007_199_254_740_991);
 /// <summary>All HTTP stream/session effects opt in explicitly. Resumption reopens GET only; never replays POST.</summary>
 public sealed record McpHttpProfile(bool OpenGetStream, bool DeleteSessionOnClose, int MaximumReconnects = 0,
     int InitialReconnectMilliseconds = 1000, int MaximumReconnectMilliseconds = 30000, int DeleteTimeoutMilliseconds = 1000);

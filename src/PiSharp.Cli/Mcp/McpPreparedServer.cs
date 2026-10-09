@@ -226,8 +226,10 @@ public sealed class McpPreparedServer : IAsyncDisposable
             var nextIds = descriptors.Select(tool => tool.RegistrationId).ToImmutableArray();
             var nextNames = descriptors.Select(tool => tool.Name).ToImmutableHashSet(StringComparer.Ordinal);
             var plan = registry.PrepareToolCatalogReplacement(scope, registrationIds, descriptors, current);
+            // mcp/index.ts registers every tool the server lists, with any result size the session admits (no 128-tool binding bound).
             var binding = new ExtensionAgentBinding(registry, policy, validator, sessionCancellationToken: attachment.LifetimeToken,
-                options: new() { ActiveToolNames = [] }, capturedSnapshot: plan.PreviewSnapshot);
+                invokerOptions: McpSessionHost.BindingInvokerOptions, options: PiSharp.Cli.Commands.PiPayloadBudget.PiBinding(new() { ActiveToolNames = [] }),
+                capturedSnapshot: plan.PreviewSnapshot);
             // Keep every unrelated native/extension registration. Replace only this server's prior names.
             var retained = expected.RegisteredTools.Where(tool => !publishedNames.Contains(tool.Adapter.Name)).ToImmutableArray();
             var added = binding.Registrations.Where(tool => nextNames.Contains(tool.Name)).Select(tool =>
