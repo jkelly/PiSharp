@@ -42,6 +42,8 @@
     <!-- The read tool's SkiaSharp image codec (owner decision 0004) and its native Skia components. -->
     <None Include="../../third-party/SkiaSharp.LICENSE.txt" Link="licenses/SkiaSharp.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <None Include="../../third-party/SkiaSharp.THIRD-PARTY-NOTICES.txt" Link="licenses/SkiaSharp.THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <!-- The interactive Mermaid renderer ports grok-mermaid 0.2.3 (Apache-2.0). -->
+    <None Include="../../third-party/grok-mermaid.LICENSE.txt" Link="licenses/grok-mermaid.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
   <ItemGroup Condition="'$(EnablePromptTemplateYaml)' == 'true'">
     <None Include="../../third-party/YamlDotNet.LICENSE.txt" Link="licenses/YamlDotNet.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
