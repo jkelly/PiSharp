@@ -24,11 +24,12 @@ internal static class McpCodemode
         """{"type":"object","properties":{"content":{"type":"array","items":{"type":"object"}},"isError":{"type":"boolean"},"_meta":{"type":"object"}},"required":["content"]}""");
 
     /// <summary>A fresh definition for one generation; each binds to exactly one attachment.</summary>
-    internal static McpDiscoveryExecutableDefinition Create(CodemodeMode mode, int? inlineBudget, Func<ICodemodeModelRuntime?> models, bool defaultActive = true)
+    internal static McpDiscoveryExecutableDefinition Create(CodemodeMode mode, int? inlineBudget, Func<ICodemodeModelRuntime?> models, bool defaultActive = true,
+        Func<Func<PiSharp.Extensions.Mcp.Configuration.McpServerEntry, bool>, CancellationToken, Task>? waitForServers = null)
     {
         var withModels = true;
         return McpDiscoveryExecutableDefinition.CreateCodemode(RegistrationId, CodemodeToolDefinition.CreateDescription([], withModels),
-            (code, attachment, invocation, token) => new(ExecuteAsync(code, attachment, invocation, models, token)),
+            (code, attachment, invocation, token) => new(ExecuteAsync(code, attachment, invocation, models, waitForServers, token)),
             loadout => CodemodeToolDefinition.PrepareLoadout(loadout, mode, withModels, inlineBudget, tool => OutputSchema(tool.Name, tool.Namespace)),
             descriptor => descriptor with
             {
@@ -47,12 +48,21 @@ internal static class McpCodemode
         _ => IsMcpTool(name, toolNamespace) ? McpResultSchema : null
     };
 
+    /// <summary>index.ts scriptNeedsServer: the script names the server's namespace, or searches, enumerates or describes tools or
+    /// namespaces, which may name the server in other forms.</summary>
+    internal static bool ScriptNeedsServer(string code, string server) =>
+        System.Text.RegularExpressions.Regex.IsMatch(code, @"\b(searchTools|describeNamespace|describeTool|ALL_TOOLS)\b", System.Text.RegularExpressions.RegexOptions.CultureInvariant) ||
+        code.Contains(PiSharp.Extensions.Mcp.Configuration.McpCatalogPlanner.Namespace(server), StringComparison.Ordinal);
+
     private static bool IsMcpTool(string name, ToolNamespace? toolNamespace) =>
         name.StartsWith("mcp__", StringComparison.Ordinal) && toolNamespace?.Name.StartsWith("mcp__", StringComparison.Ordinal) == true;
 
     private static async Task<JsonData> ExecuteAsync(string code, AgentSessionAttachment attachment, IExtensionToolInvocationContext invocation,
-        Func<ICodemodeModelRuntime?> models, CancellationToken token)
+        Func<ICodemodeModelRuntime?> models, Func<Func<PiSharp.Extensions.Mcp.Configuration.McpServerEntry, bool>, CancellationToken, Task>? waitForServers,
+        CancellationToken token)
     {
+        // index.ts tool_call: the script waits for the servers it needs, so their tools are registered before it runs.
+        if (waitForServers is not null) await waitForServers(entry => ScriptNeedsServer(code, entry.Name), token).ConfigureAwait(false);
         var host = new Host(attachment.Session, invocation, models);
         try
         {
@@ -70,7 +80,8 @@ internal static class McpCodemode
     {
         private readonly Lazy<ImmutableArray<CodemodeNestedTool>> tools = new(() =>
         {
-            var callable = invocation.Tools.ToHashSet(StringComparer.Ordinal);
+            // Tools of a catalog the session took during the run (a server that connected while the script waited) are callable too.
+            var callable = invocation.Tools.Concat(session.GetLateNestedToolNames()).ToHashSet(StringComparer.Ordinal);
             return [.. session.CaptureToolCatalogRegistry().RegisteredTools
                 .Select(tool => (Tool: tool, Name: tool.Declaration.Value.GetProperty("name").GetString()!))
                 .Where(row => callable.Contains(row.Name) && row.Name != Name)

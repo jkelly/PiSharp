@@ -131,7 +131,8 @@ public static class RpcSessionCommand
                 toolSettings: PiSharp.Tools.BuiltinToolSettings.FromSettings(settings?.Values),
                 originalSystemPrompt: pi?.SystemPrompt, toolPolicy: pi?.ToolPolicy ?? (parsed.ToolPolicy == "pi"
                     ? new PiSharp.Cli.Pi.PiToolPolicy(PiSharp.Cli.Pi.PiToolPolicyMode.Pi) { ProtectedDirectories = [Path.GetDirectoryName(parsed.Session)!] } : null),
-                mcpRegistrations: hostAdmission && !parsed.Tools.NoMcp ? mcpHost!.Registrations : null).ConfigureAwait(false);
+                // With --no-mcp extensions still register servers; nothing connects them, which is reported (reportUnhandledMcpServers).
+                mcpRegistrations: hostAdmission ? mcpHost!.Registrations : null).ConfigureAwait(false);
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();

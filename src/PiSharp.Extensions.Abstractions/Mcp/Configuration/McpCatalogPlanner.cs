@@ -9,14 +9,35 @@ namespace PiSharp.Extensions.Mcp.Configuration;
 
 /// <summary>Metadata supplied by the owning connection. No client, transport or executable callback crosses this leaf.</summary>
 public sealed record McpOfferedTool(string Name, JsonData InputSchema, string? Description = null,
-    string? Title = null, string? AnnotationTitle = null);
+    string? Title = null, string? AnnotationTitle = null)
+{
+    /// <summary>tools.ts toToolAnnotations: the boolean hints of the tool's annotations (readOnlyHint, destructiveHint, idempotentHint,
+    /// openWorldHint); null when it has none. The extension API carries them as a tool's `annotations` (getAllTools).</summary>
+    public ImmutableDictionary<string, bool>? Annotations { get; init; }
+
+    /// <summary>toToolAnnotations of a raw MCP tool.</summary>
+    public static ImmutableDictionary<string, bool>? ToolAnnotations(System.Text.Json.JsonElement tool)
+    {
+        if (tool.ValueKind != System.Text.Json.JsonValueKind.Object || !tool.TryGetProperty("annotations", out var annotations) ||
+            annotations.ValueKind != System.Text.Json.JsonValueKind.Object) return null;
+        var hints = ImmutableDictionary.CreateBuilder<string, bool>(StringComparer.Ordinal);
+        foreach (var hint in new[] { "readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint" })
+            if (annotations.TryGetProperty(hint, out var value) && value.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False)
+                hints[hint] = value.GetBoolean();
+        return hints.Count > 0 ? hints.ToImmutable() : null;
+    }
+}
 public sealed record McpServerToolSnapshot(McpServerEntry Entry, ImmutableArray<McpOfferedTool> Tools,
     string? Instructions = null, bool Connected = true, bool HasResources = false);
 /// <summary><paramref name="Namespace"/> carries the configured server description. The server's instructions are
 /// longer usage guidance kept out of tool listings, carried as <paramref name="NamespaceInstructions"/>.</summary>
 public sealed record McpPlannedTool(string Server, string OriginalName, string Name, string Label,
     string Description, JsonData Parameters, ToolNamespace Namespace, McpExposure McpExposure, ToolExposure Exposure,
-    double TimeoutMilliseconds, string? NamespaceInstructions = null);
+    double TimeoutMilliseconds, string? NamespaceInstructions = null)
+{
+    /// <summary>The offered tool's annotation hints (<see cref="McpOfferedTool.Annotations"/>).</summary>
+    public ImmutableDictionary<string, bool>? Annotations { get; init; }
+}
 public sealed record McpToolCatalogPlan(ImmutableArray<McpPlannedTool> Tools,
     ImmutableDictionary<string, string> NameOwners, bool NeedsCodemode, bool NeedsToolSearch,
     bool AutoEnableCodemode, McpExposure? ResourceToolsExposure);
@@ -113,7 +134,7 @@ public static class McpCatalogPlanner
                 if (string.IsNullOrEmpty(description)) description = $"MCP tool {tool.Name} from server {entry.Name}";
                 tools.Add(new(entry.Name, tool.Name, name, entry.Name + "/" + tool.Name, description,
                     Parameters(tool.InputSchema), group, exposure, ToToolExposure(exposure), entry.Config.TimeoutSeconds * 1000,
-                    snapshot.Instructions));
+                    snapshot.Instructions) { Annotations = tool.Annotations });
             }
         }
         McpExposure? resources = null;

@@ -16,6 +16,10 @@ public sealed record ToolInvocationScopeOptions(long SessionGeneration, Cancella
     /// <summary>Tools whose nested call trees are not limited by <see cref="MaximumDepth"/> or <see cref="MaximumNestedCalls"/>, because the original sets
     /// no limit on them (codemode scripts). Cancellation, deadlines and the session lifetime still apply.</summary>
     public ImmutableHashSet<string> UncountedNestedCallTools { get; init; } = ImmutableHashSet<string>.Empty;
+    /// <summary>The invoker of a catalog the host published while a run uses this one (source _refreshToolRegistry: a tool
+    /// registered during a run is callable at once). A nested call to a tool this invoker does not reach runs through that
+    /// invoker's pipeline when it reaches the tool. Null, or this invoker, adds nothing.</summary>
+    public Func<ToolInvoker?>? LateNestedTools { get; init; }
     internal void Validate()
     {
         if (SessionGeneration <= 0 || MaximumDepth is < 1 or > 64 || MaximumNestedCalls is < 1 or > 4096 ||

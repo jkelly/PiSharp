@@ -106,6 +106,9 @@ public sealed class McpServerManager
         public bool AutoEnableCodemode { get; init; } = true;
         /// <summary>The servers changed (enabled, disabled, exposure), for the `mcp_servers` prompt section.</summary>
         public Action<ImmutableArray<McpServerEntry>>? ServersChanged { get; init; }
+        /// <summary>The server's last `WWW-Authenticate` challenge (connection.challenge), which a sign-in answers; null clears it.</summary>
+        public Func<string, McpOAuthChallenge?>? Challenge { get; init; }
+        public Action<string>? ClearChallenge { get; init; }
     }
 
     private readonly object gate = new();
@@ -161,6 +164,36 @@ public sealed class McpServerManager
         }
     }
 
+    /// <summary>index.ts waitForServers: wait for the latest connection attempts of the enabled servers <paramref name="include"/>
+    /// selects, including attempts started while waiting, or until <paramref name="token"/> is cancelled (then it returns).</summary>
+    internal async Task WaitForServersAsync(Func<McpServerEntry, bool> include, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(include);
+        for (; ; )
+        {
+            (Slot Slot, Task Ready)[] waiting;
+            lock (gate) waiting = [.. servers.Where(slot => IsEnabled(slot) && include(slot.Entry)).Select(slot => (slot, slot.Ready))];
+            if (waiting.Length == 0 || token.IsCancellationRequested) return;
+            try { await Task.WhenAll(waiting.Select(row => row.Ready)).WaitAsync(token).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { return; }
+            lock (gate)
+                if (waiting.All(row => !IsEnabled(row.Slot) || !servers.Contains(row.Slot) || ReferenceEquals(row.Ready, row.Slot.Ready))) return;
+        }
+    }
+
+    /// <summary>server.ready: the server's readiness follows the attempt <paramref name="start"/> begins, from before it begins;
+    /// readiness never faults.</summary>
+    private Task Attempt(Slot slot, Func<Task> start)
+    {
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (gate) slot.Ready = ready.Task;
+        Task attempt;
+        try { attempt = start(); }
+        catch (Exception error) { attempt = Task.FromException(error); }
+        _ = attempt.ContinueWith(_ => ready.TrySetResult(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        return attempt;
+    }
+
     /// <summary>A background connection bound its server (it is connecting now).</summary>
     internal void Track(McpServerEntry entry, McpPreparedServer server)
     {
@@ -198,7 +231,7 @@ public sealed class McpServerManager
             foreach (var slot in removed) try { await CloseServerAsync(slot).ConfigureAwait(false); } catch (Exception) { /* The state is gone with the slot. */ }
             ImmutableArray<McpServerEntry> entries; lock (gate) entries = [.. servers.Select(slot => slot.Entry)];
             try { dependencies.ServersChanged?.Invoke(entries); } catch (Exception) { /* The section follows on the next change. */ }
-            await Task.WhenAll(added.Where(IsEnabled).Select(slot => StartAsync(slot, CancellationToken.None))).ConfigureAwait(false);
+            await Task.WhenAll(added.Where(IsEnabled).Select(slot => Attempt(slot, () => StartAsync(slot, CancellationToken.None)))).ConfigureAwait(false);
             EnsureDiscoveryActive();
             Changed();
         }
@@ -227,7 +260,7 @@ public sealed class McpServerManager
     private void Record(Slot slot, Exception? failure)
     {
         if (failure is null) { slot.State = ConnectionState.Connected; slot.Error = null; slot.TokensAtSignIn = null; return; }
-        if (NeedsSignIn(failure))
+        if (NeedsSignIn(failure, slot.Entry))
         {
             slot.State = ConnectionState.NeedsAuth; slot.Error = null;
             slot.TokensAtSignIn ??= StoredTokens(slot);
@@ -235,14 +268,36 @@ public sealed class McpServerManager
         else { slot.State = ConnectionState.Failed; slot.Error = FailureText(failure); slot.TokensAtSignIn = null; }
     }
 
-    private static bool NeedsSignIn(Exception failure)
+    /// <summary>runtime.ts needsSignIn: the OAuth sign-in is required, or a server that authenticates (OAuth or `auth.provider`)
+    /// still answers 401 (McpAuthRequiredError).</summary>
+    internal static bool NeedsSignIn(Exception failure, McpServerEntry? entry = null)
     {
-        for (Exception? current = failure; current is not null; current = current.InnerException)
+        var authenticated = entry is not null && entry.Config.Transport == McpTransportKind.Http &&
+            (McpConfigurationReader.UsesOAuth(entry.Config) || entry.Config.AuthProvider is not null);
+        bool Matches(Exception? current)
         {
-            if (current is McpOAuthAuthorizationRequiredException) return true;
-            if (current is AggregateException aggregate && aggregate.InnerExceptions.Any(NeedsSignIn)) return true;
+            for (; current is not null; current = current.InnerException)
+            {
+                if (current is McpOAuthAuthorizationRequiredException) return true;
+                if (authenticated && current is PiSharp.Extensions.Mcp.Transport.McpHttpStatusException { StatusCode: 401 }) return true;
+                if (current is AggregateException aggregate && aggregate.InnerExceptions.Any(Matches)) return true;
+            }
+            return false;
         }
-        return false;
+        return Matches(failure);
+    }
+
+    /// <summary>runtime.ts withClient: a call the server rejects for authentication (after any refresh) drops the connection and
+    /// marks the server as needing a sign-in (markNeedsAuth), so `/mcp` offers it and a sign-in elsewhere reconnects it.</summary>
+    internal void CallFailed(string name, Exception failure)
+    {
+        lock (gate)
+        {
+            if (Find(name) is not { } slot || !IsEnabled(slot) || !NeedsSignIn(failure, slot.Entry)) return;
+            slot.State = ConnectionState.NeedsAuth; slot.Error = null;
+            slot.TokensAtSignIn ??= StoredTokens(slot);
+        }
+        Changed();
     }
 
     private static string FailureText(Exception failure)
@@ -362,10 +417,14 @@ public sealed class McpServerManager
 
     private async Task ReconnectCoreAsync(Slot slot, CancellationToken token)
     {
-        await slot.Ready.ConfigureAwait(false);
-        var ready = ReconnectServerAsync(slot, token);
-        lock (gate) slot.Ready = ready.ContinueWith(_ => { }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-        await ready.ConfigureAwait(false);
+        Task previous; lock (gate) previous = slot.Ready;
+        await Attempt(slot, () => ReconnectAfterAsync(previous)).ConfigureAwait(false);
+
+        async Task ReconnectAfterAsync(Task before)
+        {
+            await before.ConfigureAwait(false);
+            await ReconnectServerAsync(slot, token).ConfigureAwait(false);
+        }
     }
 
     private async Task ReconnectServerAsync(Slot slot, CancellationToken token)
@@ -434,7 +493,9 @@ public sealed class McpServerManager
     internal async Task CountResourcesAsync(string name, McpPreparedServer server, CancellationToken token)
     {
         Slot? slot; lock (gate) slot = Find(name);
-        if (slot is not null) await CountResourcesAsync(slot, server, token).ConfigureAwait(false);
+        if (slot is null || !ReferenceEquals(slot.Server, server)) return;
+        await CountResourcesAsync(slot, server, token).ConfigureAwait(false);
+        Changed();
     }
 
     private async Task CountResourcesAsync(Slot slot, McpPreparedServer server, CancellationToken token)
@@ -499,38 +560,81 @@ public sealed class McpServerManager
         Slot? slot; lock (gate) slot = Find(name);
         if (slot is null) return $"No MCP server named \"{name}\".";
         if (SaveConfig(slot, enabled, null, inProject) is { } failed) return failed;
+        McpPreparedServer? server; Task previous;
+        lock (gate) { server = slot.Server; previous = slot.Ready; if (!enabled) { slot.State = ConnectionState.Starting; slot.Error = null; } }
         if (!enabled)
         {
-            lock (gate) slot.State = ConnectionState.Starting;
             Changed();
-            await CloseServerAsync(slot).ConfigureAwait(false);
+            // hideTools: the server disconnects and its tools leave the session; its registration stays for a re-enable.
+            if (server is not null) await Attempt(slot, () => DisableAsync(previous, server)).ConfigureAwait(false);
             Changed();
             return null;
         }
-        if (slot.Server is null) await StartAsync(slot, token).ConfigureAwait(false);
+        // startConnection: the server connects again with the registration it had.
+        await Attempt(slot, () => server is null ? StartAsync(slot, token) : EnableAsync(previous, server, token)).ConfigureAwait(false);
         EnsureDiscoveryActive();
         return null;
     }
 
-    /// <summary>setExposure: save the change and register the server's tools with the new exposure; tools no longer exposed
-    /// directly leave the declared set. PiSharp reconnects the server to register its tools again.</summary>
+    private async Task DisableAsync(Task previous, McpPreparedServer server)
+    {
+        await previous.ConfigureAwait(false);
+        McpServerEntry entry; lock (gate) entry = FindEntry(server) ?? server.Entry;
+        if (dependencies.Resources is { } resources)
+            try { await resources.UpdateAsync(entry.Name, null, entry.Config.Exposure, false, CancellationToken.None).ConfigureAwait(false); }
+            catch (Exception) { /* Resource tools follow on the next change. */ }
+        try { await server.ReconfigureAsync(entry, connect: false, CancellationToken.None).ConfigureAwait(false); }
+        catch (Exception) { /* A closed server has nothing left to withdraw. */ }
+    }
+
+    private async Task EnableAsync(Task previous, McpPreparedServer server, CancellationToken token)
+    {
+        await previous.ConfigureAwait(false);
+        Slot? slot; lock (gate) { slot = servers.FirstOrDefault(item => ReferenceEquals(item.Server, server)); if (slot is not null) { slot.State = ConnectionState.Connecting; slot.Error = null; } }
+        if (slot is null) return;
+        Changed();
+        Exception? failure = null;
+        try
+        {
+            try { await server.ReconfigureAsync(slot.Entry, connect: true, token).ConfigureAwait(false); }
+            // A server whose earlier publication or connection cannot be resumed is replaced by a fresh one.
+            catch (Exception error) when (error is InvalidOperationException or ObjectDisposedException && !NeedsSignIn(error, slot.Entry) && !token.IsCancellationRequested)
+            { await RebindAsync(slot, token).ConfigureAwait(false); return; }
+            await UpdateResourcesAsync(slot, token).ConfigureAwait(false);
+        }
+        catch (Exception error) when (!token.IsCancellationRequested) { failure = error; }
+        lock (gate) Record(slot, failure);
+        Changed();
+    }
+
+    private McpServerEntry? FindEntry(McpPreparedServer server) => servers.FirstOrDefault(item => ReferenceEquals(item.Server, server))?.Entry;
+
+    /// <summary>setExposure: save the change and register the server's tools again with the new exposure (when it is connected),
+    /// without reconnecting; tools no longer exposed directly leave the declared set, tools that became direct are activated.</summary>
     public async Task<string?> SetExposureAsync(string name, McpExposure exposure, CancellationToken token = default)
     {
         Slot? slot; lock (gate) slot = Find(name);
         if (slot is null) return $"No MCP server named \"{name}\".";
         if (SaveConfig(slot, null, exposure, false) is { } failed) return failed;
-        if (IsEnabled(slot) && slot.Server is not null)
+        if (IsEnabled(slot) && slot.Server is { } server)
         {
-            await RebindAsync(slot, token).ConfigureAwait(false);
-            if (Session() is { } session && slot.Server is not null)
-            {
-                var indirect = session.Attachment.Session.CaptureToolCatalogRegistry().RegisteredTools
-                    .Where(tool => tool.Exposure != PiSharp.Contracts.ToolExposure.Direct).Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
-                var serverTools = ServerToolNames(session.Attachment, slot.Entry.Name);
-                var active = session.Attachment.Session.GetToolActivationSelection().Names;
-                var kept = active.Where(tool => !serverTools.Contains(tool) || !indirect.Contains(tool)).ToImmutableArray();
-                if (kept.Length != active.Length) session.Attachment.Session.ScheduleToolActivation(kept, token);
-            }
+            try { await server.ReconfigureAsync(slot.Entry, connect: false, token).ConfigureAwait(false); }
+            catch (Exception error) when (!token.IsCancellationRequested) { lock (gate) slot.Error = FailureText(error); }
+            // syncResourceTools: the resource tools follow the widest exposure of the servers they reach.
+            if (dependencies.Resources is { } resources)
+                try { await resources.UpdateAsync(slot.Entry.Name, server, slot.Entry.Config.Exposure, server.Snapshot.Catalog is { Connected: true, HasResources: true }, token).ConfigureAwait(false); }
+                catch (Exception) when (!token.IsCancellationRequested) { /* The resource tools follow on the next change. */ }
+        }
+        if (Session() is { } session)
+        {
+            var indirect = session.Attachment.Session.CaptureToolCatalogRegistry().RegisteredTools
+                .Where(tool => tool.Exposure != PiSharp.Contracts.ToolExposure.Direct).Select(tool => tool.Adapter.Name).ToHashSet(StringComparer.Ordinal);
+            var serverTools = ServerToolNames(session.Attachment, slot.Entry.Name);
+            var active = session.Attachment.Session.GetToolActivationSelection().Names;
+            var kept = active.Where(tool => !serverTools.Contains(tool) || !indirect.Contains(tool)).ToImmutableArray();
+            if (kept.Length != active.Length)
+                try { session.Attachment.Session.ScheduleToolActivation(kept, token); }
+                catch (InvalidOperationException) { /* Another selected-state change runs; the tools stay until the next change. */ }
         }
         EnsureDiscoveryActive();
         Changed();
@@ -577,12 +681,14 @@ public sealed class McpServerManager
             var settings = Authentication.McpOAuthSettings.From(slot.Entry, dependencies.ResolveSecret);
             using var client = dependencies.CreateClient();
             await Authentication.McpSignIn.SignInAsync(new(url, dependencies.Credentials.ForServer(slot.Entry.Name, url), settings,
-                new(prompt.ShowAuthorizationUrl, prompt.PromptForRedirectUrl), AdmittedHttpClientRequestFactory.Create(client)), linked.Token).ConfigureAwait(false);
+                new(prompt.ShowAuthorizationUrl, prompt.PromptForRedirectUrl), AdmittedHttpClientRequestFactory.Create(client))
+            { Challenge = dependencies.Challenge?.Invoke(slot.Entry.Name) }, linked.Token).ConfigureAwait(false);
         }
         catch (Exception error) when (error is Authentication.McpSignInCancelledException || error is OperationCanceledException && linked.IsCancellationRequested)
         { return "Sign-in cancelled."; }
         catch (Exception error) { return "Sign-in failed: " + FailureText(error); }
-        // The challenge that asked for this sign-in is answered.
+        // The challenge that asked for this sign-in (for example for more scope) is answered.
+        try { dependencies.ClearChallenge?.Invoke(slot.Entry.Name); } catch (Exception) { /* Only the next sign-in reads it. */ }
         lock (gate) slot.TokensAtSignIn = null;
         await ReconnectCoreAsync(slot, cancel).ConfigureAwait(false);
         EnsureDiscoveryActive();

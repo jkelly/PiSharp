@@ -24,7 +24,8 @@ public sealed class McpServerRuntime : IAsyncDisposable
         internal string? Instructions;
     }
     private readonly object gate = new();
-    private readonly McpServerEntry entry;
+    // Replaced by ReconfigureAsync (`/mcp` enable, disable and exposure) under the gate; the connection stays the same.
+    private McpServerEntry entry;
     private readonly McpRuntimeOptions options;
     private readonly McpAdmittedChannelFactory acquire;
     private readonly McpCatalogPublisher publish;
@@ -215,6 +216,70 @@ public sealed class McpServerRuntime : IAsyncDisposable
         await GetConnectionAsync(token).ConfigureAwait(false); return Snapshot;
     }, cancellationToken);
 
+    /// <summary>index.ts setEnabled and setExposure: the server's configuration changed in `/mcp` (same connection, see
+    /// <see cref="McpConfigurationReader.SameConnection"/>). A disabled server disconnects and withdraws its tools (hideTools); an
+    /// enabled one registers its tools again with the new exposures (registerTools) without reconnecting, or, when it is not
+    /// connected, connects with <paramref name="connect"/> (startConnection) and otherwise keeps the configuration for its next
+    /// connection.</summary>
+    public Task<McpRuntimeSnapshot> ReconfigureAsync(McpServerEntry next, bool connect = true, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(next);
+        if (!McpConfigurationReader.SameConnection(next, entry)) throw new ArgumentException("A reconfiguration keeps the server and its connection.", nameof(next));
+        return RunAsync(async token =>
+        {
+            lock (gate) entry = next;
+            if (!next.Config.Enabled)
+            {
+                await DisconnectCoreAsync().ConfigureAwait(false);
+                await refreshGate.WaitAsync(token).ConfigureAwait(false);
+                try { await WithdrawAsync(token).ConfigureAwait(false); }
+                finally { refreshGate.Release(); }
+                return Snapshot;
+            }
+            Connection? current; lock (gate) current = connection is { Ready: true } ready ? ready : null;
+            if (current is null) { if (connect) await GetConnectionAsync(token).ConfigureAwait(false); return Snapshot; }
+            await refreshGate.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                ImmutableArray<JsonData> originals; lock (gate) originals = snapshot.OriginalTools;
+                await PublishAsync(current, originals, token).ConfigureAwait(false);
+            }
+            finally { refreshGate.Release(); }
+            return Snapshot;
+        }, cancellationToken);
+    }
+
+    /// <summary>hideTools: publish an empty catalog, so the server's tools leave the session; its connection is gone.</summary>
+    private async Task WithdrawAsync(CancellationToken token)
+    {
+        await publicationGate.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            McpRuntimeSnapshot previous; ImmutableArray<McpPlannedTool> old;
+            lock (gate)
+            {
+                if (closed) throw new OperationCanceledException(lifetime.Token);
+                if (publicationFailure is not null) throw new InvalidOperationException("MCP publication outcome requires owning-host resolution.", publicationFailure);
+                previous = snapshot; old = planned;
+            }
+            if (old.IsEmpty && previous.Catalog.Tools.IsEmpty) return;
+            var next = new McpRuntimeSnapshot(options.Generation, checked(previous.Revision + 1),
+                new(entry, [], previous.Catalog.Instructions, Connected: false, HasResources: previous.Catalog.HasResources), previous.InitializeResult, []);
+            var withdrawn = old.Select(tool => tool with { Exposure = ToolExposure.Hidden, McpExposure = McpExposure.Hidden }).ToImmutableArray();
+            publishing.Value = true;
+            try
+            {
+                var receipt = await publish(new(next, [], withdrawn), token).ConfigureAwait(false);
+                if (!receipt.Published || receipt.Generation != next.Generation || receipt.Revision != next.Revision)
+                    throw new InvalidOperationException("Matching actual MCP catalog publication receipt required.");
+            }
+            catch (Exception error) { lock (gate) publicationFailure ??= error; throw; }
+            finally { publishing.Value = false; }
+            lock (gate) { snapshot = next; planned = []; }
+        }
+        finally { publicationGate.Release(); }
+    }
+
     /// <summary>runtime.ts fetchResources: how many resources and resource templates the server lists, for the counts of `mcp list`
     /// and `/mcp`. MCP App resources (`ui://` URIs, `profile=mcp-app` HTML) are left out; a list that fails counts none, and a
     /// server without the resources capability has none.</summary>
@@ -367,7 +432,7 @@ public sealed class McpServerRuntime : IAsyncDisposable
         lock (gate)
         {
             if (closed) throw new ObjectDisposedException(nameof(McpServerRuntime));
-            if (!entry.Config.Enabled) throw new InvalidOperationException("MCP server is disabled.");
+            if (!entry.Config.Enabled) throw new InvalidOperationException($"MCP server \"{entry.Name}\" is disabled.");
             if (publicationFailure is not null) throw new InvalidOperationException("MCP publication outcome requires owning-host resolution.", publicationFailure);
             if (connection is { Ready: true } connected) return connected;
             owner = opening ??= new(ConnectCoreAsync, LazyThreadSafetyMode.ExecutionAndPublication);
@@ -498,12 +563,14 @@ public sealed class McpServerRuntime : IAsyncDisposable
                 var value = raw.Value;
                 var annotationTitle = value.TryGetProperty("annotations", out var annotations) && annotations.ValueKind == JsonValueKind.Object && String(annotations, "title", out var title) ? title : null;
                 return new McpOfferedTool(value.GetProperty("name").GetString()!, JsonData.FromElement(value.GetProperty("inputSchema")),
-                    String(value, "description", out var description) ? description : null, String(value, "title", out var toolTitle) ? toolTitle : null, annotationTitle);
+                    String(value, "description", out var description) ? description : null, String(value, "title", out var toolTitle) ? toolTitle : null, annotationTitle)
+                { Annotations = McpOfferedTool.ToolAnnotations(value) };
             }).ToImmutableArray();
             var catalog = new McpServerToolSnapshot(entry, tools, current.Instructions, HasResources: current.HasResources);
             // A reconnect that finds the published tools unchanged (a new session after an expired one, `/mcp` reconnect) needs no new
             // catalog: the registered tools reach the new connection. This also lets a call reconnect while its run holds the catalog.
-            if (reconnect && previous.Revision > 0 && previous.Catalog.Instructions == current.Instructions && previous.Catalog.HasResources == current.HasResources &&
+            if (reconnect && previous.Revision > 0 && ReferenceEquals(previous.Catalog.Entry, entry) &&
+                previous.Catalog.Instructions == current.Instructions && previous.Catalog.HasResources == current.HasResources &&
                 previous.OriginalTools.Select(tool => tool.ToString()).SequenceEqual(originals.Select(tool => tool.ToString()), StringComparer.Ordinal))
             {
                 lock (gate) snapshot = previous with { Catalog = previous.Catalog with { Connected = true }, InitializeResult = current.Initialize };

@@ -49,8 +49,7 @@ public sealed partial class PersistentAgentSession
             ThrowUserBashMutationLocked();
             cancellationToken.ThrowIfCancellationRequested();
             if (!ReferenceEquals(_registry, expected) || _active is not null ||
-                _inputSubmission is not null && (reservation is null || !IsExecutingInputCallback) ||
-                reservation is null && _pendingActivation is not null)
+                _inputSubmission is not null && (reservation is null || !IsExecutingInputCallback))
                 throw new InvalidOperationException("Catalog publication requires the captured idle session registry.");
             var state = _agent.Snapshot;
             if (!state.PendingInputs.IsEmpty || state.SteeringCount != 0 || state.FollowUpCount != 0)

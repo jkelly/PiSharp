@@ -52,8 +52,8 @@ internal static partial class Program
             Equal(300, fixture.Servers.Single().Calls.Count, "every call reached the server");
             Check(fixture.Servers.Single().Calls.All(call => call.Identity?.ParentToolCallId == "toolu_many"), "every call has the codemode parent");
         })),
-        // scriptNeedsServer: a script waits for the codemode servers it needs. PiSharp publishes a server's tools between runs, so a
-        // prompt admitted while codemode is active waits for codemode servers that are still connecting.
+        // scriptNeedsServer: a script waits for the codemode servers it needs inside its call (index.ts tool_call); the server's tools
+        // are published during the run, so the script calls them once the server connected (the case id predates this).
         Case("session.prompt-waits-for-connecting-codemode-servers", () => WithSessionRoot("waits", CodemodeDocs, async (root, fixture) =>
         {
             fixture.InitializeDelay = TimeSpan.FromSeconds(2);

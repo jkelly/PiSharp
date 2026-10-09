@@ -14,7 +14,7 @@ internal static partial class Program
 
     private static async Task<int> Main(string[] args)
     {
-        if (args.Length != 0 && (args.Length != 2 || args[0] != "--report")) throw new ArgumentException("Use [--report <fresh path>].");
+        if (args.Length != 0 && (args.Length != 2 || args[0] is not ("--report" or "--only"))) throw new ArgumentException("Use [--report <fresh path>] or [--only <case id prefix>].");
         var cases = new List<(string Id, Func<Task> Run)>
         {
             ("project.untrusted-project-file-is-ignored-silently", UntrustedProject),
@@ -47,9 +47,21 @@ internal static partial class Program
             ("retry.expired-session-call-and-transient-read-retried", CallAndReadRetries),
             ("retry.tool-calls-are-not-retried-after-transient-errors", CallsAreNotRetried),
             ("registration.native-api-validation-ownership-and-change-event", NativeRegistrationApiAndEvent),
-            ("registration.registered-servers-connect-override-and-disconnect", RegisteredServersConnect)
+            ("registration.registered-servers-connect-override-and-disconnect", RegisteredServersConnect),
+            ("run.late-server-tools-reach-the-running-turn", LateServerReachesTheRunningTurn),
+            ("run.catalog-after-the-last-request-recorded-at-settlement", LateServerAfterTheLastRequestIsRecordedAtSettlement),
+            ("run.idle-publication-with-a-pending-activation", IdlePublicationWithAPendingActivation),
+            ("waits.codemode-waits-inside-the-call-for-the-servers-it-names", CodemodeWaitsInsideTheCall),
+            ("manager.exposure-and-enable-keep-the-registration", ExposureAndEnableKeepTheRegistration),
+            ("registration.re-registrations-release-their-resources", ReRegistrationsReleaseTheirResources),
+            ("oauth.step-up-challenge-needs-auth-and-sign-in-in-the-session", StepUpChallengeInTheSession),
+            ("oauth.mcp-login-uses-the-servers-challenge", McpLoginUsesTheChallenge),
+            ("notifications.resource-list-changes-refresh-the-count", ResourceListChangesRefreshTheCount),
+            ("registration.unhandled-registered-servers-are-reported", UnhandledRegisteredServersAreReported),
+            ("results.tool-annotations-reach-the-plan", ToolAnnotationsReachThePlan)
         };
         var results = new List<object>(); var failures = 0;
+        if (args is ["--only", var prefix]) cases.RemoveAll(test => !test.Id.StartsWith(prefix, StringComparison.Ordinal));
         foreach (var test in cases)
         {
             try { await test.Run().WaitAsync(TimeSpan.FromSeconds(120)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY" }); }
@@ -58,7 +70,7 @@ internal static partial class Program
         var report = new { sourceSha = Upstream, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", cases = cases.Count, failures,
             genuineSourceCasesCaptured = 0, results };
         var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
-        if (args.Length == 2)
+        if (args is ["--report", _])
         {
             await using var file = new FileStream(args[1], FileMode.CreateNew, FileAccess.Write, FileShare.Read);
             await file.WriteAsync(Encoding.UTF8.GetBytes(json));

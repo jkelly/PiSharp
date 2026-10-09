@@ -182,6 +182,19 @@ public static class McpConfigurationReader
     public static bool HasIndirectTools(McpServerConfiguration config)
     { var exposures = ConfiguredExposures(config); return exposures.Contains(McpExposure.Codemode) || exposures.Contains(McpExposure.Deferred); }
 
+    /// <summary>Whether two entries name the same server with the same connection: the `/mcp` manager changes only `enabled`,
+    /// `exposure`, `toolExposure` and `description` of a server (saveConfig), which keep its transport.</summary>
+    public static bool SameConnection(McpServerEntry first, McpServerEntry second)
+    {
+        ArgumentNullException.ThrowIfNull(first); ArgumentNullException.ThrowIfNull(second);
+        if (ReferenceEquals(first, second)) return true;
+        static string Connection(McpServerEntry entry) => JsonSerializer.Serialize(McpJson.Properties(entry.Config.Raw.Value)
+            .Where(property => property.Name is not ("enabled" or "exposure" or "toolExposure" or "description"))
+            .ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal));
+        return first.Name == second.Name && first.Source == second.Source && first.Scope == second.Scope &&
+            first.Config.Transport == second.Config.Transport && Connection(first) == Connection(second);
+    }
+
     /// <summary>HTTP servers authenticate with OAuth unless the config supplies an `Authorization` header or `auth`.</summary>
     public static bool UsesOAuth(McpServerConfiguration config)
     {

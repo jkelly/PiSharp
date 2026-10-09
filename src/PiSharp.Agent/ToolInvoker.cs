@@ -188,6 +188,12 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
         finally { context.StopAdmission(); await context.CloseAsync().ConfigureAwait(false); }
     }
 
+    /// <summary>Names a nested call can reach through this invoker.</summary>
+    public ImmutableArray<string> CallableToolNames => _callableToolNames;
+
+    private bool ReachesNested(string? name) =>
+        name is not null && _tools.ContainsKey(name) && (_options.AllowedNestedTools?.Contains(name) ?? true);
+
     private async Task<ToolOutcome> ExecuteNestedAsync(ToolInvocationContext parent, ToolCallContent call,
         ToolProgressCallback onProgress, CancellationToken token)
     {
@@ -227,7 +233,9 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                     if (source.EventSink is { } events)
                         await events.EmitAsync(new ToolExecutionUpdated(invocation, partial), progressToken).ConfigureAwait(false);
                 }
-                var finalized = await ExecuteCoreAsync(invocation, Progress, linked.Token).ConfigureAwait(false);
+                var executor = !ReachesNested(call.Name) && _invocationScopes!.LateNestedTools?.Invoke() is { } late &&
+                    !ReferenceEquals(late, this) && late.ReachesNested(call.Name) ? late : this;
+                var finalized = await executor.ExecuteCoreAsync(invocation, Progress, linked.Token).ConfigureAwait(false);
                 outcome = new(invocation, finalized.Result) { IsError = finalized.IsError, DurationMs = finalized.DurationMs };
                 completedResult = finalized.Result;
             }

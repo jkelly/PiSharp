@@ -93,9 +93,9 @@ speaking upstream's protocol (start, call, output, done, crash, result, plus `re
 
 - `codemode` is registered with every CLI session, inactive, as upstream registers it: `--tools`, `--exclude-tools` and
   `defaultTools` select it, also with `--no-mcp`. Codemode MCP servers activate it unless `autoEnableCodemode` is false.
-- `scriptNeedsServer`: upstream makes a script wait for the servers it names or searches. PiSharp publishes a server's tools
-  between runs, so a prompt admitted while codemode is active waits until every codemode server has connected (or failed);
-  later prompts do not wait.
+- `scriptNeedsServer`: as upstream, a script waits inside its call for the servers it names or searches (or enumerates or
+  describes tools); prompts do not wait. A server that connects meanwhile has its tools published during the run, and the
+  script's nested calls reach them through the invoker of that catalog until the run's next request declares it.
 
 ## Not ported
 

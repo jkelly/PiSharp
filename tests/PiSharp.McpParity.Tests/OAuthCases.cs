@@ -28,6 +28,10 @@ internal static partial class Program
         public readonly ConcurrentQueue<(string Method, Uri Uri, string Body, string? Authorization)> Log = new();
         public readonly ConcurrentDictionary<string, bool> Accepted = new(StringComparer.Ordinal);
         public TimeSpan TokenDelay = TimeSpan.Zero;
+        /// <summary>The 401 challenge; and tokens whose calls are refused with <see cref="StepUpChallenge"/> (403 insufficient_scope).</summary>
+        public string Challenge = "Bearer resource_metadata=\"https://mcp.example.test/.well-known/oauth-protected-resource/mcp\"";
+        public readonly ConcurrentDictionary<string, bool> Limited = new(StringComparer.Ordinal);
+        public string StepUpChallenge = "Bearer error=\"insufficient_scope\", scope=\"docs.write\", resource_metadata=\"https://mcp.example.test/.well-known/oauth-protected-resource-alt/mcp\"";
         private int issued;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
@@ -38,7 +42,7 @@ internal static partial class Program
             if (uri.Host is "mcp.example.test" or "remote.example.test")
             {
                 if (uri.AbsolutePath == "/mcp") return Mcp(request, body, authorization);
-                if (uri.AbsolutePath == "/.well-known/oauth-protected-resource/mcp")
+                if (uri.AbsolutePath is "/.well-known/oauth-protected-resource/mcp" or "/.well-known/oauth-protected-resource-alt/mcp")
                     return Json(200, "{\"resource\":\"" + McpServerUrl.AbsoluteUri + "\",\"authorization_servers\":[\"" + OAuthIssuer + "\"]}");
                 return Json(404, "{}");
             }
@@ -62,16 +66,23 @@ internal static partial class Program
             if (authorization is null || !authorization.StartsWith("Bearer ", StringComparison.Ordinal) || !Accepted.ContainsKey(authorization["Bearer ".Length..]))
             {
                 var denied = new HttpResponseMessage(HttpStatusCode.Unauthorized);
-                denied.Headers.TryAddWithoutValidation("WWW-Authenticate", "Bearer resource_metadata=\"https://mcp.example.test/.well-known/oauth-protected-resource/mcp\"");
+                denied.Headers.TryAddWithoutValidation("WWW-Authenticate", Challenge);
                 return denied;
             }
             using var json = JsonDocument.Parse(body);
             if (!json.RootElement.TryGetProperty("id", out var id)) return new(HttpStatusCode.Accepted);
             var method = json.RootElement.GetProperty("method").GetString();
+            if (method == "tools/call" && Limited.ContainsKey(authorization["Bearer ".Length..]))
+            {
+                var forbidden = new HttpResponseMessage(HttpStatusCode.Forbidden);
+                forbidden.Headers.TryAddWithoutValidation("WWW-Authenticate", StepUpChallenge);
+                return forbidden;
+            }
             var result = method switch
             {
                 "initialize" => """{"protocolVersion":"2025-11-25","serverInfo":{"name":"remote","version":"1"},"capabilities":{"tools":{}}}""",
                 "tools/list" => """{"tools":[{"name":"lookup","description":"Looks up.","inputSchema":{"type":"object"}}]}""",
+                "tools/call" => """{"content":[{"type":"text","text":"remote answered."}]}""",
                 _ => "{}"
             };
             var response = Json(200, "{\"jsonrpc\":\"2.0\",\"id\":" + id.GetRawText() + ",\"result\":" + result + "}");

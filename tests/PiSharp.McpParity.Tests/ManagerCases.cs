@@ -114,7 +114,8 @@ internal static partial class Program
         bool Declares(int index) => ToolNames(requests[index]).Contains("mcp__docs__search");
         Check(Declares(0) && !Declares(1) && Declares(2) && Declares(3), "disable withdraws, enable and reconnect declare: " + string.Join(" | ", requests.Select(request => string.Join(",", ToolNames(request)))));
         Check(!Declares(4) && ToolNames(requests[4]).Contains("tool_search"), "deferred: not declared, tool_search activated: " + string.Join(",", ToolNames(requests[4])));
-        Check(fixture.Servers.Count(server => server.Name == "docs") >= 3, "connected again after enable, reconnect and exposure changes");
+        // setExposure registers the tools again without a new connection; enable and reconnect connect.
+        Equal(3, fixture.Servers.Count(server => server.Name == "docs"), "connected again after enable and reconnect, not after exposure changes");
     });
 
     // In a trusted project, "Disable in this project" adds a project override for a global server; later changes go to the override.

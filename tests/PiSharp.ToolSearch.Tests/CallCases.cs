@@ -26,8 +26,8 @@ internal static partial class Program
     });
 
     // IMPL-H (index.ts tool_call: tool_search waits for every server): a background server that is still connecting when the first
-    // prompt arrives. With tool_search active the prompt waits for it (PiSharp registers tools between runs, so the wait happens
-    // before the prompt is admitted), so the first search already finds its tools and the loaded tool's call succeeds.
+    // prompt arrives. The prompt is not delayed: the model's first request goes out at once, and tool_search waits inside its call.
+    // The server's tools are published during the run, so the search finds them and the loaded tool's call succeeds in the same run.
     private static Task LateBackgroundServerCallSucceeds() => WithRoot("late", DeferredDocs, async (root, fixture) =>
     {
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -37,8 +37,10 @@ internal static partial class Program
         await using (var rpc = new Rpc(Args(root, "new-memory"), provider, fixture.Host()))
         {
             var prompt = rpc.Prompt("p1", "find the install guide");
-            await Task.Delay(500);
-            Equal(0, provider.Snapshot().Length, "the prompt waits for the connecting server");
+            for (var waited = 0; provider.Snapshot().Length == 0 && waited < 200; waited++) await Task.Delay(50);
+            Equal(1, provider.Snapshot().Length, "the prompt does not wait for the connecting server");
+            await Task.Delay(300);
+            Equal(1, provider.Snapshot().Length, "tool_search waits inside its call for the connecting server");
             release.TrySetResult();
             await prompt;
             Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
