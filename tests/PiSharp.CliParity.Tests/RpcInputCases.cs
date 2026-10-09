@@ -57,6 +57,8 @@ internal static partial class Program
                 Line("{\"id\":\"L\",\"type\":\"" + longType + "\"}"),
                 Line("{\"id\":\"deep\",\"type\":\"bogus\",\"x\":" + new string('[', 60) + new string(']', 60) + "}"),
                 Line("{\"id\":[1.50,-0],\"type\":\"get_state\"}"),
+                // 1e999 is Infinity: JSON.stringify writes null, String() writes Infinity.
+                Line("{\"id\":\"i\",\"type\":1e999}"), Line("{\"type\":-1e999,\"id\":1e999}"),
             ]);
             string[] expected =
             [
@@ -68,6 +70,8 @@ internal static partial class Program
                 """{"id":"n","type":"response","command":null,"success":false,"error":"Unknown command: null"}""",
                 "{\"id\":\"L\",\"type\":\"response\",\"command\":\"" + longType + "\",\"success\":false,\"error\":\"Unknown command: " + longType + "\"}",
                 """{"id":"deep","type":"response","command":"bogus","success":false,"error":"Unknown command: bogus"}""",
+                """{"id":"i","type":"response","command":null,"success":false,"error":"Unknown command: Infinity"}""",
+                """{"id":null,"type":"response","command":null,"success":false,"error":"Unknown command: -Infinity"}""",
             ];
             Equal(string.Join("\n", expected.Order(StringComparer.Ordinal)),
                 string.Join("\n", frames.Code.Where(frame => !frame.Contains("\"command\":\"get_state\"", StringComparison.Ordinal)).Order(StringComparer.Ordinal)), "rpc responses");

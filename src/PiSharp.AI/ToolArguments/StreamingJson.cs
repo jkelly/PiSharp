@@ -31,21 +31,28 @@ public static class StreamingJson
     /// <c>JSON.parse(text)</c> with the same ownership as <see cref="Parse"/>: any JSON value, duplicate names keep the last value,
     /// lone surrogates become U+FFFD. A text JSON.parse rejects is a <see cref="JsonException"/> carrying V8's SyntaxError message.
     /// </summary>
-    public static JsonData JsonParse(string text) => JsonParse(text, out _);
+    public static JsonData JsonParse(string text) => JsonParse(text, out _, out _);
 
-    /// <summary><see cref="JsonParse(string)"/>, also returning the exact (not well-formed) value of each top-level object member
-    /// whose string value has a lone surrogate, for callers that echo such a value back.</summary>
-    public static JsonData JsonParse(string text, out IReadOnlyDictionary<string, string>? loneSurrogateMembers)
+    /// <summary><see cref="JsonParse(string)"/>, also returning what the owned value cannot show of top-level object members, for
+    /// callers that echo them: the exact (not well-formed) string of a member with a lone surrogate, and the binary64 of a member
+    /// whose number is beyond binary64's range (owned as null, as JSON.stringify writes it, though <c>String(value)</c> is
+    /// "Infinity" or "-Infinity").</summary>
+    public static JsonData JsonParse(string text, out IReadOnlyDictionary<string, string>? loneSurrogateMembers,
+        out IReadOnlyDictionary<string, double>? nonFiniteMembers)
     {
         var value = Syntax(text);
-        loneSurrogateMembers = null;
+        loneSurrogateMembers = null; nonFiniteMembers = null;
         if (value is ObjectValue obj)
         {
-            Dictionary<string, string>? members = null;
+            Dictionary<string, string>? members = null; Dictionary<string, double>? numbers = null;
             foreach (var key in obj.Order)
+            {
                 if (obj.Properties[key] is StringValue member && !ReferenceEquals(ToWellFormed(member.Text), member.Text))
                     (members ??= new(StringComparer.Ordinal))[ToWellFormed(key)] = member.Text;
-            loneSurrogateMembers = members;
+                else if (obj.Properties[key] is NumberValue number && !double.IsFinite(number.Number))
+                    (numbers ??= new(StringComparer.Ordinal))[ToWellFormed(key)] = number.Number;
+            }
+            loneSurrogateMembers = members; nonFiniteMembers = numbers;
         }
         var owned = Stringify(value, wellFormed: true);
         try { return JsonData.Parse(owned); }

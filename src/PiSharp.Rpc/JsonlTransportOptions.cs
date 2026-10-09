@@ -59,9 +59,11 @@ internal static class JsonlRecordCodec
             CheckDepth(text, options.MaximumJsonDepth);
             try
             {
-                var record = PiSharp.AI.StreamingJson.JsonParse(text, out var exact);
-                // The owned record is well-formed; an id or type with a lone surrogate is still echoed exactly.
+                var record = PiSharp.AI.StreamingJson.JsonParse(text, out var exact, out var nonFinite);
+                // The owned record is well-formed; an id or type with a lone surrogate is still echoed exactly, and a type of 1e999
+                // still reads as String(Infinity).
                 if (exact is not null) ExactMembers.AddOrUpdate(record, exact);
+                if (nonFinite is not null) NonFiniteMembers.AddOrUpdate(record, nonFinite);
                 return record;
             }
             catch (JsonException)
@@ -89,6 +91,8 @@ internal static class JsonlRecordCodec
 
     /// <summary>Exact top-level string members (with lone surrogates) of records read with <see cref="JsonlTransportOptions.JavaScriptInput"/>.</summary>
     internal static readonly System.Runtime.CompilerServices.ConditionalWeakTable<JsonData, IReadOnlyDictionary<string, string>> ExactMembers = new();
+    /// <summary>Top-level numbers beyond binary64's range (owned as null) of records read with <see cref="JsonlTransportOptions.JavaScriptInput"/>.</summary>
+    internal static readonly System.Runtime.CompilerServices.ConditionalWeakTable<JsonData, IReadOnlyDictionary<string, double>> NonFiniteMembers = new();
 
     internal static byte[] Encode(JsonData record, JsonlTransportOptions options)
     {

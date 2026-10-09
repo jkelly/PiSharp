@@ -54,7 +54,13 @@ internal static class RpcCommandCodec
         // An object without a type reaches the same default branch: "Unknown command: undefined", with its id.
         if (!body.TryGetProperty("type", out var type)) throw new RpcCommandException(id, null, "Unknown command: undefined");
         // A non-string type matches no case: error(id, type, `Unknown command: ${type}`), the type echoed as its JSON value.
-        if (type.ValueKind != JsonValueKind.String) throw new RpcCommandException(id, RawJson(type), "Unknown command: " + JsString(type));
+        if (type.ValueKind != JsonValueKind.String)
+        {
+            // 1e999 parses to Infinity: JSON.stringify writes null (the owned value), String(Infinity) is "Infinity".
+            var text = JsonlRecordCodec.NonFiniteMembers.TryGetValue(input, out var nonFinite) && nonFinite.TryGetValue("type", out var number)
+                ? double.IsPositiveInfinity(number) ? "Infinity" : "-Infinity" : JsString(type);
+            throw new RpcCommandException(id, RawJson(type), "Unknown command: " + text);
+        }
         if (type.GetString()!.Length > options.MaximumCommandTypeCharacters)
             throw new RpcCommandException(id, "parse", "Command type must be a bounded string.");
         var name = Exact("type", type);
