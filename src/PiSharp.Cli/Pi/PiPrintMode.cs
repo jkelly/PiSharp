@@ -71,8 +71,10 @@ internal static class PiPrintMode
                 if (exitCode == 0) exitCode = await PromptAsync(message, null).ConfigureAwait(false);
             if (exitCode == 0 && !json)
             {
-                var messages = await CommandAsync(new JsonObject { ["type"] = "get_messages" }).ConfigureAwait(false);
-                if (messages is { } data && data.TryGetProperty("messages", out var list) && list.ValueKind == JsonValueKind.Array && list.GetArrayLength() > 0)
+                // print-mode.ts reads session.state.messages directly; a host that cannot answer is a failure, never a silent success.
+                var (messages, readError) = await CommandAsync(new JsonObject { ["type"] = "get_messages" }).ConfigureAwait(false);
+                if (messages is null) { await PiCommand.Line(stderr, readError).ConfigureAwait(false); exitCode = 1; }
+                else if (messages is { } data && data.TryGetProperty("messages", out var list) && list.ValueKind == JsonValueKind.Array && list.GetArrayLength() > 0)
                 {
                     var last = list[list.GetArrayLength() - 1];
                     if (last.TryGetProperty("role", out var role) && role.GetString() == "assistant")
@@ -131,7 +133,7 @@ internal static class PiPrintMode
                 else if (type == "agent_settled" && responded && waitSettled) return 0;
             }
         }
-        async Task<JsonElement?> CommandAsync(JsonObject command)
+        async Task<(JsonElement? Data, string Error)> CommandAsync(JsonObject command)
         {
             var id = "pi-print-" + ++sequence; command["id"] = id;
             await connection.SendAsync(JsonData.Parse(command.ToJsonString()), token).ConfigureAwait(false);
@@ -139,8 +141,9 @@ internal static class PiPrintMode
             {
                 var record = await NextAsync().ConfigureAwait(false);
                 if (record.Value.GetProperty("type").GetString() != "response" || !record.Value.TryGetProperty("id", out var responseId) || responseId.GetString() != id) continue;
-                if (!record.Value.GetProperty("success").GetBoolean()) return null;
-                return record.Value.TryGetProperty("data", out var data) ? data.Clone() : null;
+                if (!record.Value.GetProperty("success").GetBoolean())
+                    return (null, record.Value.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.String ? error.GetString()! : "Request failed");
+                return (record.Value.TryGetProperty("data", out var data) ? data.Clone() : JsonDocument.Parse("{}").RootElement.Clone(), "");
             }
         }
         async Task<JsonData> NextAsync()

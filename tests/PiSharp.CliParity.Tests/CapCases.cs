@@ -70,6 +70,35 @@ internal static partial class Program
             Check(text.StartsWith("<skill name=\"big\"", StringComparison.Ordinal) && text.Contains(new string('b', 200_000), StringComparison.Ordinal) &&
                 text.EndsWith("</skill>\n\n" + arguments, StringComparison.Ordinal), "the whole skill and the whole argument text: " + text.Length);
         }),
+        // print-mode.ts: a final assistant message with stopReason "error" prints its errorMessage to stderr and exits 1, also after a
+        // session of more than 1,024 messages (formerly the message read failed and the run exited 0 with nothing printed).
+        ("caps.print-error-after-a-long-session-exits-one", async () =>
+        {
+            using var sandbox = new Sandbox("caps-print-error");
+            var lines = new List<string> { new System.Text.Json.Nodes.JsonObject { ["type"] = "session", ["version"] = 3, ["id"] = "long-error",
+                ["timestamp"] = "2026-01-01T00:00:00.000Z", ["cwd"] = sandbox.Cwd }.ToJsonString() };
+            string? parent = null;
+            for (var index = 0; index < 1100; index++)
+            {
+                var message = index % 2 == 0
+                    ? new System.Text.Json.Nodes.JsonObject { ["role"] = "user", ["content"] = "question " + index, ["timestamp"] = index }
+                    : new System.Text.Json.Nodes.JsonObject { ["role"] = "assistant", ["content"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["type"] = "text", ["text"] = "answer" }),
+                        ["api"] = "anthropic-messages", ["provider"] = "anthropic", ["model"] = "claude-sonnet-4-5", ["stopReason"] = "stop", ["timestamp"] = index,
+                        ["usage"] = new System.Text.Json.Nodes.JsonObject { ["input"] = 1, ["output"] = 1, ["cacheRead"] = 0, ["cacheWrite"] = 0, ["totalTokens"] = 2,
+                            ["cost"] = new System.Text.Json.Nodes.JsonObject { ["input"] = 0, ["output"] = 0, ["cacheRead"] = 0, ["cacheWrite"] = 0, ["total"] = 0 } } };
+                lines.Add(new System.Text.Json.Nodes.JsonObject { ["type"] = "message", ["id"] = "m" + index, ["parentId"] = parent,
+                    ["timestamp"] = "2026-01-01T00:00:00.000Z", ["message"] = message }.ToJsonString());
+                parent = "m" + index;
+            }
+            var file = sandbox.Write("long-error.jsonl", string.Join("\n", lines) + "\n");
+            sandbox.Respond = (_, _) => AnthropicError(400, "fixture refusal");
+            var (code, stdout, stderr) = await sandbox.Run(["-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "--session", file, "go"]);
+            Equal(1, code, "exit; " + stderr);
+            Equal("", stdout, "nothing on stdout");
+            var last = System.Text.Json.JsonDocument.Parse(File.ReadLines(file).Last()).RootElement.GetProperty("message");
+            Equal("error", last.GetProperty("stopReason").GetString(), "the run ended with an error message");
+            Equal(last.GetProperty("errorMessage").GetString() + "\n", stderr, "stderr is the errorMessage");
+        }),
         // anthropic-messages.ts and agent-loop.ts: a response of 80 tool_use blocks (formerly 64 stream content slots) runs every call.
         ("caps.response-with-many-parallel-tool-calls", async () =>
         {
