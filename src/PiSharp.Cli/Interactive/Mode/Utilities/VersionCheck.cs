@@ -1,31 +1,52 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/utils/version-check.ts, with management-http.ts
-// (fetchWithRetry) and the semver valid/compare it uses. The HTTP client and environment are injectable.
+// (fetchWithRetry). Owner decision 12 (docs/decisions/0004-full-parity-owner-decisions.md): PiSharp keeps Pi's timing, gates and
+// error handling but asks NuGet for the latest PiSharp.Cli instead of pi.dev for Pi's version. The HTTP client, NuGet base URL and
+// environment are injectable.
+using System.Globalization;
 using System.Net.Sockets;
-using System.Numerics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using PiSharp.CodingAgent.Diagnostics;
 
 namespace PiSharp.Cli.Interactive.Mode.Utilities;
 
-/// <summary>Source <c>LatestPiRelease</c>.</summary>
-internal sealed record LatestPiRelease(string Version, string? PackageName = null, string? Note = null);
+/// <summary>Source <c>LatestPiRelease</c>: the newest <c>PiSharp.Cli</c> on the feed (NuGet carries no package-name or note).</summary>
+internal sealed record LatestRelease(string Version);
 
-/// <summary>Source <c>{ timeoutMs?, retry? }</c> plus the injected HTTP client and environment.</summary>
+/// <summary>Source <c>{ timeoutMs?, retry? }</c> plus the injected HTTP client, NuGet flat-container base URL and environment.</summary>
 internal sealed record VersionCheckOptions
 {
     public int? TimeoutMs { get; init; }
     public bool Retry { get; init; }
     public HttpMessageInvoker? Http { get; init; }
+    /// <summary>The NuGet V3 flat-container base (null: <see cref="VersionCheck.DefaultNuGetBaseUrl"/>).</summary>
+    public string? BaseUrl { get; init; }
     public Func<string, string?>? Env { get; init; }
 }
 
+/// <summary>
+/// The startup update check. Upstream asks <c>https://pi.dev/api/latest-version</c>; PiSharp asks NuGet's flat container for the
+/// versions of <c>PiSharp.Cli</c> and takes the highest one. Prereleases: a stable PiSharp only considers stable versions (the
+/// suggested <c>dotnet tool update</c> installs stable versions only); a prerelease PiSharp considers every version, so it hears of
+/// both the next prerelease and the release that follows it, and a prerelease suggestion carries <c>--prerelease</c>.
+/// </summary>
 internal static partial class VersionCheck
 {
-    public const string LatestVersionUrl = "https://pi.dev/api/latest-version";
+    public const string DefaultNuGetBaseUrl = "https://api.nuget.org/v3-flatcontainer";
+    public const string PackageId = "PiSharp.Cli";
+    public const string ChangelogUrl = "https://github.com/jkelly/PiSharp/blob/main/CHANGELOG.md";
     private const int DefaultVersionCheckTimeoutMs = 10000;
     private static readonly HashSet<int> RetryableStatusCodes = [408, 425, 429, 500, 502, 503, 504];
     private static readonly Lazy<HttpClient> SharedClient = new(() => new HttpClient { Timeout = Timeout.InfiniteTimeSpan });
+
+    /// <summary>The flat-container version index of <c>PiSharp.Cli</c> (NuGet lowercases the id).</summary>
+    public static string IndexUrl(string? baseUrl = null) =>
+        $"{(baseUrl ?? DefaultNuGetBaseUrl).TrimEnd('/')}/{PackageId.ToLowerInvariant()}/index.json";
+
+    /// <summary>The command the notice suggests for <paramref name="version"/>: <c>dotnet tool update -g PiSharp.Cli</c>, with
+    /// <c>--prerelease</c> when the version is a prerelease (the plain command installs stable versions only).</summary>
+    public static string UpdateCommand(string version) =>
+        NuGetVersion.Parse(version) is { IsPrerelease: true } ? $"dotnet tool update -g {PackageId} --prerelease" : $"dotnet tool update -g {PackageId}";
 
     /// <summary>Include useful errno details hidden behind a generic transport error: codes of the cause (or of each error in an
     /// aggregate cause), else the first cause message. A code is <c>Exception.Data["code"]</c> or a socket error's errno name.</summary>
@@ -63,14 +84,17 @@ internal static partial class VersionCheck
         return null;
     }
 
+    /// <summary>Source comparePackageVersions over NuGet versions: up to four numeric parts (missing parts are 0, so 1.1.0 equals
+    /// 1.1.0.0), then prerelease labels; build metadata is ignored. Null when either side is not a version.</summary>
     public static int? ComparePackageVersions(string leftVersion, string rightVersion)
     {
-        var left = SemVer.Parse(PiSharp.Tui.Pi.TextUtils.JsTrim(leftVersion));
-        var right = SemVer.Parse(PiSharp.Tui.Pi.TextUtils.JsTrim(rightVersion));
+        var left = NuGetVersion.Parse(leftVersion);
+        var right = NuGetVersion.Parse(rightVersion);
         if (left is null || right is null) return null;
-        return SemVer.Compare(left, right);
+        return NuGetVersion.Compare(left, right);
     }
 
+    /// <summary>Source isNewerPackageVersion: by version when both parse, else any difference after trimming counts as newer.</summary>
     public static bool IsNewerPackageVersion(string candidateVersion, string currentVersion)
     {
         var comparison = ComparePackageVersions(candidateVersion, currentVersion);
@@ -78,17 +102,34 @@ internal static partial class VersionCheck
         return PiSharp.Tui.Pi.TextUtils.JsTrim(candidateVersion) != PiSharp.Tui.Pi.TextUtils.JsTrim(currentVersion);
     }
 
-    public static async Task<LatestPiRelease?> GetLatestPiRelease(string currentVersion, VersionCheckOptions? options = null,
+    /// <summary>The highest version in <paramref name="versions"/> PiSharp <paramref name="currentVersion"/> should be offered:
+    /// stable versions only, unless the running version is itself a prerelease. Entries that are not versions are skipped.</summary>
+    public static string? SelectLatestVersion(IEnumerable<string> versions, string currentVersion)
+    {
+        var includePrerelease = NuGetVersion.Parse(currentVersion) is { IsPrerelease: true };
+        (string Text, NuGetVersion Parsed)? best = null;
+        foreach (var text in versions)
+        {
+            if (NuGetVersion.Parse(text) is not { } parsed || (parsed.IsPrerelease && !includePrerelease)) continue;
+            if (best is null || NuGetVersion.Compare(parsed, best.Value.Parsed) > 0) best = (PiSharp.Tui.Pi.TextUtils.JsTrim(text), parsed);
+        }
+        return best?.Text;
+    }
+
+    /// <summary>Source getLatestPiRelease: nothing with <c>PI_OFFLINE</c>; otherwise one GET of the NuGet version index (retried when
+    /// requested), nothing on a non-OK status or an unexpected body. Transport errors throw.</summary>
+    public static async Task<LatestRelease?> GetLatestRelease(string currentVersion, VersionCheckOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         options ??= new();
         var env = options.Env ?? Environment.GetEnvironmentVariable;
         if (!string.IsNullOrEmpty(env("PI_OFFLINE"))) return null;
 
+        var url = IndexUrl(options.BaseUrl);
         using var response = await FetchWithRetry(options.Http ?? SharedClient.Value, () =>
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, LatestVersionUrl);
-            request.Headers.TryAddWithoutValidation("User-Agent", BugReport.PiUserAgent(currentVersion));
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.TryAddWithoutValidation("User-Agent", $"pisharp/{currentVersion} ({BugReport.Platform}; {BugReport.Runtime}; {BugReport.Arch})");
             request.Headers.TryAddWithoutValidation("accept", "application/json");
             return request;
         }, options.Retry ? 2 : 0, options.TimeoutMs ?? DefaultVersionCheckTimeoutMs, cancellationToken).ConfigureAwait(false);
@@ -97,30 +138,23 @@ internal static partial class VersionCheck
         var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         using var document = JsonDocument.Parse(text);
         var data = document.RootElement;
-        // `data.version` on a JSON null throws a TypeError upstream; other non-objects read undefined.
-        if (data.ValueKind == JsonValueKind.Null) throw new InvalidOperationException("Cannot read properties of null (reading 'version')");
-        if (data.ValueKind != JsonValueKind.Object) return null;
-        string? Text(string name) => data.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
-        var version = Text("version");
-        if (version is null || PiSharp.Tui.Pi.TextUtils.JsTrim(version).Length == 0) return null;
-        var packageName = Text("packageName") is { } name && PiSharp.Tui.Pi.TextUtils.JsTrim(name).Length > 0 ? PiSharp.Tui.Pi.TextUtils.JsTrim(name) : null;
-        var note = Text("note") is { } rawNote && PiSharp.Tui.Pi.TextUtils.JsTrim(rawNote).Length > 0 ? PiSharp.Tui.Pi.TextUtils.JsTrim(rawNote) : null;
-        return new(PiSharp.Tui.Pi.TextUtils.JsTrim(version), packageName, note);
+        if (data.ValueKind != JsonValueKind.Object || !data.TryGetProperty("versions", out var versions) || versions.ValueKind != JsonValueKind.Array)
+            return null;
+        var latest = SelectLatestVersion(versions.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!),
+            currentVersion);
+        return latest is null ? null : new(latest);
     }
 
-    public static async Task<string?> GetLatestPiVersion(string currentVersion, VersionCheckOptions? options = null,
-        CancellationToken cancellationToken = default) =>
-        (await GetLatestPiRelease(currentVersion, options, cancellationToken).ConfigureAwait(false))?.Version;
-
-    /// <summary>The automatic startup check: skipped with <c>PI_SKIP_VERSION_CHECK</c>, one request, never throws.</summary>
-    public static async Task<LatestPiRelease?> CheckForNewPiVersion(string currentVersion, VersionCheckOptions? options = null)
+    /// <summary>Source checkForNewPiVersion, the automatic startup check: skipped with <c>PI_SKIP_VERSION_CHECK</c> (which
+    /// <c>--offline</c> also sets), one request, never throws; the release only when it is newer than the running version.</summary>
+    public static async Task<LatestRelease?> CheckForNewVersion(string currentVersion, VersionCheckOptions? options = null)
     {
         options ??= new();
         var env = options.Env ?? Environment.GetEnvironmentVariable;
         if (!string.IsNullOrEmpty(env("PI_SKIP_VERSION_CHECK"))) return null;
         try
         {
-            var latestRelease = await GetLatestPiRelease(currentVersion, options with { Retry = false }).ConfigureAwait(false);
+            var latestRelease = await GetLatestRelease(currentVersion, options with { Retry = false }).ConfigureAwait(false);
             return latestRelease is not null && IsNewerPackageVersion(latestRelease.Version, currentVersion) ? latestRelease : null;
         }
         catch (Exception)
@@ -157,63 +191,63 @@ internal static partial class VersionCheck
         }
     }
 
-    /// <summary>The semver package's <c>valid</c> (strict: optional leading <c>v</c>) and <c>compare</c> (main, then prerelease).</summary>
-    private sealed partial record SemVer(BigInteger Major, BigInteger Minor, BigInteger Patch, string[] Prerelease)
+    /// <summary>A NuGet (SemVer 2.0) version: one to four numeric parts, optional dot-separated prerelease labels and build metadata.
+    /// Comparison follows NuGet: numeric parts, then a release above its prereleases, then label by label (numeric labels
+    /// numerically and below alphanumeric ones, alphanumeric ones case-insensitively), more labels winning a common prefix.</summary>
+    private sealed partial record NuGetVersion(long[] Parts, string[] Prerelease)
     {
-        private const string NumericIdentifier = "0|[1-9][0-9]*";
-        private const string PrereleaseIdentifier = "(?:" + NumericIdentifier + "|[0-9]*[a-zA-Z-][a-zA-Z0-9-]*)";
+        public bool IsPrerelease => Prerelease.Length > 0;
 
-        [GeneratedRegex("^v?(" + NumericIdentifier + @")\.(" + NumericIdentifier + @")\.(" + NumericIdentifier + ")" +
-            @"(?:-(" + PrereleaseIdentifier + @"(?:\." + PrereleaseIdentifier + @")*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$")]
+        [GeneratedRegex(@"^v?([0-9]+)(?:\.([0-9]+))?(?:\.([0-9]+))?(?:\.([0-9]+))?(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$",
+            RegexOptions.CultureInvariant)]
         private static partial Regex Full();
 
-        private static readonly BigInteger MaxSafeInteger = new(9007199254740991);
-
-        public static SemVer? Parse(string version)
+        public static NuGetVersion? Parse(string version)
         {
-            if (version.Length > 256) return null;
-            var match = Full().Match(version);
+            var trimmed = PiSharp.Tui.Pi.TextUtils.JsTrim(version);
+            if (trimmed.Length > 256) return null;
+            var match = Full().Match(trimmed);
             if (!match.Success) return null;
-            var major = BigInteger.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
-            var minor = BigInteger.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
-            var patch = BigInteger.Parse(match.Groups[3].Value, System.Globalization.CultureInfo.InvariantCulture);
-            if (major > MaxSafeInteger || minor > MaxSafeInteger || patch > MaxSafeInteger) return null;
-            var prerelease = match.Groups[4].Success ? match.Groups[4].Value.Split('.') : [];
-            return new(major, minor, patch, prerelease);
+            var parts = new long[4];
+            for (var index = 0; index < 4; index++)
+            {
+                var group = match.Groups[index + 1];
+                if (!group.Success) continue;
+                if (!int.TryParse(group.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var part)) return null;
+                parts[index] = part;
+            }
+            return new(parts, match.Groups[5].Success ? match.Groups[5].Value.Split('.') : []);
         }
 
-        public static int Compare(SemVer left, SemVer right)
+        public static int Compare(NuGetVersion left, NuGetVersion right)
         {
-            var main = left.Major != right.Major ? left.Major.CompareTo(right.Major)
-                : left.Minor != right.Minor ? left.Minor.CompareTo(right.Minor) : left.Patch.CompareTo(right.Patch);
-            if (main != 0) return Math.Sign(main);
-            if (left.Prerelease.Length > 0 && right.Prerelease.Length == 0) return -1;
-            if (left.Prerelease.Length == 0 && right.Prerelease.Length > 0) return 1;
-            if (left.Prerelease.Length == 0 && right.Prerelease.Length == 0) return 0;
+            for (var index = 0; index < 4; index++)
+                if (left.Parts[index] != right.Parts[index]) return left.Parts[index] < right.Parts[index] ? -1 : 1;
+            if (left.IsPrerelease != right.IsPrerelease) return left.IsPrerelease ? -1 : 1;
             for (var index = 0; ; index++)
             {
                 if (index >= left.Prerelease.Length && index >= right.Prerelease.Length) return 0;
                 if (index >= right.Prerelease.Length) return 1;
                 if (index >= left.Prerelease.Length) return -1;
-                var comparison = CompareIdentifiers(left.Prerelease[index], right.Prerelease[index]);
+                var comparison = CompareLabels(left.Prerelease[index], right.Prerelease[index]);
                 if (comparison != 0) return comparison;
             }
         }
 
-        private static int CompareIdentifiers(string a, string b)
+        private static int CompareLabels(string a, string b)
         {
             var aNumeric = a.All(char.IsAsciiDigit);
             var bNumeric = b.All(char.IsAsciiDigit);
             if (aNumeric && bNumeric)
             {
-                var difference = BigInteger.Parse(a, System.Globalization.CultureInfo.InvariantCulture)
-                    .CompareTo(BigInteger.Parse(b, System.Globalization.CultureInfo.InvariantCulture));
-                return Math.Sign(difference);
+                var lengthA = a.TrimStart('0').Length;
+                var lengthB = b.TrimStart('0').Length;
+                if (lengthA != lengthB) return lengthA < lengthB ? -1 : 1;
+                return Math.Sign(string.CompareOrdinal(a.TrimStart('0'), b.TrimStart('0')));
             }
-            if (a == b) return 0;
             if (aNumeric) return -1;
             if (bNumeric) return 1;
-            return string.CompareOrdinal(a, b) < 0 ? -1 : 1;
+            return Math.Sign(StringComparer.OrdinalIgnoreCase.Compare(a, b));
         }
     }
 }

@@ -429,14 +429,14 @@ public sealed class AgentLoopRunner
                         string.IsNullOrWhiteSpace(assistant.Model)) throw new JsonException();
                     var ids = new HashSet<string>(StringComparer.Ordinal);
                     foreach (var call in assistant.Content.OfType<ToolCallContent>())
-                        if (string.IsNullOrWhiteSpace(call.Id) || string.IsNullOrWhiteSpace(call.Name) || !ids.Add(call.Id))
+                        if (call.Id is null || call.Name is null || call.Id.Length > 0 && !ids.Add(call.Id))
                             throw new JsonException();
                 }
                 else if (message.Role == "toolResult")
                 {
                     var body = message.WireBody.Value;
-                    if (string.IsNullOrWhiteSpace(body.GetProperty("toolCallId").GetString()) ||
-                        string.IsNullOrWhiteSpace(body.GetProperty("toolName").GetString())) throw new JsonException();
+                    // A nameless or id-less call's result carries the empty toolName/toolCallId it was given (owner decision 13).
+                    if (body.GetProperty("toolCallId").GetString() is null || body.GetProperty("toolName").GetString() is null) throw new JsonException();
                     _ = body.GetProperty("timestamp").GetInt64();
                     _ = body.GetProperty("isError").GetBoolean();
                     if (body.GetProperty("content").ValueKind != JsonValueKind.Array) throw new JsonException();

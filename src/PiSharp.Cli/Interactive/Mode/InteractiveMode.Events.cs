@@ -942,7 +942,7 @@ internal sealed partial class InteractiveMode
     {
         if (bugReportHintShown) return;
         bugReportHintShown = true;
-        chatContainer.AddChild(new ThemedText(() => theme.Fg("muted", $"If this looks like a {AppName} bug, /bug sends a report to the developers."), outputPad, 0));
+        chatContainer.AddChild(new ThemedText(() => theme.Fg("muted", "If this looks like a PiSharp bug, /bug prepares a report and a GitHub issue."), outputPad, 0));
         ui.RequestRender();
     }
 

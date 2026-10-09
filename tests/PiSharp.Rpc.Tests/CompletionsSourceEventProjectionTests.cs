@@ -22,7 +22,8 @@ internal static class CompletionsSourceEventProjectionTests
     public static IEnumerable<(string Name, Func<Task> Run)> Cases()
     {
         yield return ("rpc.completions-default-provisional-start-header-suppression-and-final-policy", DefaultProjection);
-        yield return ("rpc.completions-unfilled-and-bounded-source-deny-final-authority", FailedProjection);
+        yield return ("rpc.completions-unfilled-call-ends-nameless-and-gets-tool-not-found", UnfilledProjection);
+        yield return ("rpc.completions-bounded-source-denies-final-authority", FailedProjection);
         yield return ("rpc.completions-truncated-final-arguments-finalize-through-parse-streaming-json", TruncatedFinalProjection);
     }
 
@@ -54,14 +55,34 @@ internal static class CompletionsSourceEventProjectionTests
         Check(!fixture.Dispatcher.Completion.IsCompleted, "A supported source operation failed the default RPC session.");
     }
 
+    // Owner decision 13: openai-completions.ts keeps a call that never gets an id or a name with id "" and name "" and ends it normally;
+    // agent-loop.ts finds no tool named "" and answers "Tool  not found". No tool is prepared, decided or executed.
+    private static async Task UnfilledProjection()
+    {
+        await using var fixture = await Fixture.Create([First, """{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}"""]);
+        await fixture.Run();
+        Equal(1, fixture.Probe.Ended); Equal(0, fixture.Adapter.Preparations); Equal(0, fixture.Policy.Decisions); Equal(0, fixture.Adapter.Executions);
+        var records = fixture.Output.Records();
+        var final = records.Where(record => Type(record) == "message_update").Select(record => record.Value.GetProperty("assistantMessageEvent"))
+            .Single(value => value.GetProperty("type").GetString() == "toolcall_end").GetProperty("toolCall");
+        Equal("", final.GetProperty("id").GetString()); Equal("", final.GetProperty("name").GetString());
+        Equal("{\"value\":null}", final.GetProperty("arguments").GetRawText());
+        var end = records.Single(record => Type(record) == "tool_execution_end").Value;
+        Check(end.GetProperty("isError").GetBoolean(), "A nameless call did not fail.");
+        Equal("", end.GetProperty("toolName").GetString()); Equal("", end.GetProperty("toolCallId").GetString());
+        Equal("Tool  not found", end.GetProperty("result").GetProperty("content")[0].GetProperty("text").GetString());
+        var result = fixture.Session.Snapshot.Context.Messages.Single(message => message.Role == "toolResult").WireBody.Value;
+        Equal("", result.GetProperty("toolCallId").GetString()); Equal("", result.GetProperty("toolName").GetString());
+        Equal(1, records.Count(record => Type(record) == "agent_settled"));
+        Check(!fixture.Dispatcher.Completion.IsCompleted, "A nameless call failed the default RPC session.");
+    }
+
     private static async Task FailedProjection()
     {
-        foreach (var scenario in new[] { "unfilled", "bounded" })
+        foreach (var scenario in new[] { "bounded" })
         {
-            var chunks = scenario == "unfilled" ? new[] { First,
-                """{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""" } : new[] { First, Last };
-            await using var fixture = await Fixture.Create(chunks,
-                scenario == "bounded" ? new(MaximumContentCharacters: 64) : null);
+            var chunks = new[] { First, Last };
+            await using var fixture = await Fixture.Create(chunks, new(MaximumContentCharacters: 64));
             await fixture.Run();
             Equal(0, fixture.Probe.Ended); Equal(0, fixture.Adapter.Preparations); Equal(0, fixture.Policy.Decisions); Equal(0, fixture.Adapter.Executions);
             var records = fixture.Output.Records();

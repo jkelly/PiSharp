@@ -126,14 +126,7 @@ public sealed class NativeShellOperations : IShellOperations
     public async ValueTask<int?> ExecuteAsync(string command, string workingDirectory, ProcessRawOutputCallback onData,
         CancellationToken cancellationToken)
     {
-        // Source createLocalShellOperations exec: the working-directory check, then spawn, whose argument check, command-line limit
-        // and missing shell fail as Node's errors. Executors report these messages as the command's failure.
-        if (!Directory.Exists(workingDirectory))
-            throw new PiSharp.Agent.ToolSourceErrorException($"Working directory does not exist: {workingDirectory}\nCannot execute bash commands.");
-        if (_shell.CommandTransport == ShellCommandTransport.Argv && (NodeArgumentErrors.SpawnArguments(_shell.CommandArguments(command)) ??
-            NodeArgumentErrors.SpawnLimit(_shell.Shell, _shell.CommandArguments(command))) is { } spawnError)
-            throw new PiSharp.Agent.ToolSourceErrorException(spawnError);
-        if (!File.Exists(_shell.Shell)) throw new PiSharp.Agent.ToolSourceErrorException($"spawn {_shell.Shell} ENOENT");
+        ShellSpawnPreflight.Check(_shell, command, workingDirectory, _environment);
         var request = new ProcessRequest(_shell.Shell, _shell.CommandArguments(command), workingDirectory, _environment,
             Path.Combine(_scratchDirectory, "pi-bash-discarded-" + Guid.NewGuid().ToString("N") + ".log"))
         { StandardInput = _shell.CommandTransport == ShellCommandTransport.Stdin ? Encoding.UTF8.GetBytes(command) : null };
@@ -149,5 +142,24 @@ public sealed class NativeShellOperations : IShellOperations
     private sealed class DiscardedOutputStorage : IProcessOutputStorage
     {
         public ValueTask<Stream> CreateNewAsync(string absolutePath) => ValueTask.FromResult(Stream.Null);
+    }
+}
+
+/// <summary>Source createLocalShellOperations exec, before anything is spawned, on every platform: the working-directory check, then
+/// child_process.spawn's argument validation (a NUL byte in the file, args, cwd or env is ERR_INVALID_ARG_VALUE) and the operating
+/// system's command-line limit, then the missing shell (spawn ENOENT). Executors report these messages as the command's failure. A NUL
+/// never reaches posix_spawn or CreateProcess, which would cut the string there and run the truncated command.</summary>
+internal static class ShellSpawnPreflight
+{
+    internal static void Check(ShellConfiguration shell, string command, string workingDirectory, IReadOnlyDictionary<string, string> environment)
+    {
+        if (!Directory.Exists(workingDirectory))
+            throw new PiSharp.Agent.ToolSourceErrorException($"Working directory does not exist: {workingDirectory}\nCannot execute bash commands.");
+        var arguments = shell.CommandArguments(command);
+        // With commandTransport "stdin" the command goes to standard input, which Node does not check; only the spawn strings are.
+        if ((NodeArgumentErrors.SpawnNullBytes(shell.Shell, arguments, workingDirectory, environment) ??
+            NodeArgumentErrors.SpawnLimit(shell.Shell, arguments)) is { } spawnError)
+            throw new PiSharp.Agent.ToolSourceErrorException(spawnError);
+        if (!File.Exists(shell.Shell)) throw new PiSharp.Agent.ToolSourceErrorException($"spawn {shell.Shell} ENOENT");
     }
 }

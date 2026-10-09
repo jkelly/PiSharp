@@ -311,63 +311,6 @@ internal static partial class Program
         });
     }
 
-    private sealed class FakeHandler(Func<HttpRequestMessage, string, HttpResponseMessage> respond) : HttpMessageHandler
-    {
-        internal readonly List<(HttpRequestMessage Request, string Body)> Requests = [];
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
-            Requests.Add((request, body));
-            return respond(request, body);
-        }
-    }
-
-    private static HttpResponseMessage JsonResponse(HttpStatusCode status, string body, string? reason = null) =>
-        new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json"), ReasonPhrase = reason };
-
-    private static IEnumerable<(string, Func<Task>)> BugReportUploadCases()
-    {
-        yield return Case("bug-report-upload/multipart-request-and-id", async () =>
-        {
-            var handler = new FakeHandler((_, _) => JsonResponse(HttpStatusCode.OK, """{"ok":true,"bug_report":{"id":"br_1"}}"""));
-            using var client = new HttpClient(handler);
-            var bundle = SampleBundle();
-            Equal("br_1", await BugReportUpload.UploadBugReportAsync(bundle, new("tok", "https://gw.example/base/"), client), "id");
-            var (request, body) = handler.Requests[0];
-            Equal(("POST", "https://gw.example/v1/bug-reports", "Bearer tok"), (request.Method.Method, request.RequestUri!.AbsoluteUri, request.Headers.Authorization?.ToString()), "request");
-            var contentType = request.Content!.Headers.ContentType!.ToString();
-            Check(contentType.StartsWith("multipart/form-data; boundary=----formdata-undici-0", StringComparison.Ordinal), contentType);
-            var boundary = contentType[(contentType.IndexOf('=') + 1)..];
-            var files = BugReport.BugReportFiles(bundle);
-            var expected = string.Concat(files.Select(file => $"--{boundary}\r\nContent-Disposition: form-data; name=\"{file.Name}\"; filename=\"{file.Name}\"\r\nContent-Type: {file.ContentType}\r\n\r\n{file.Data}\r\n")) + $"--{boundary}--\r\n";
-            Equal(expected, body, "multipart body");
-        });
-        yield return Case("bug-report-upload/anonymous-default-gateway", async () =>
-        {
-            var handler = new FakeHandler((_, _) => JsonResponse(HttpStatusCode.Created, """{"ok":true,"bug_report":{"id":"x"}}"""));
-            using var client = new HttpClient(handler);
-            Equal("x", await BugReportUpload.UploadBugReportAsync(SampleBundle(), null, client, _ => null), "id");
-            Equal(("https://radius.pi.dev/v1/bug-reports", false), (handler.Requests[0].Request.RequestUri!.AbsoluteUri, handler.Requests[0].Request.Headers.Contains("Authorization")), "anonymous");
-            Equal("https://gw.local", BugReportUpload.GetRadiusGatewayUrl(name => name == "PI_RADIUS_GATEWAY" ? "gw.local//" : null), "env override normalized");
-            Equal("http://127.0.0.1:9", BugReportUpload.GetRadiusGatewayUrl(_ => "http://127.0.0.1:9/"), "explicit scheme kept");
-        });
-        yield return Case("bug-report-upload/failure-texts", async () =>
-        {
-            async Task<string> Failure(HttpResponseMessage response)
-            {
-                using var client = new HttpClient(new FakeHandler((_, _) => response));
-                return (await ThrowsAsync<BugReportUploadException>(() => BugReportUpload.UploadBugReportAsync(SampleBundle(), new(GatewayUrl: "https://gw"), client), "failure")).Message;
-            }
-            Equal("Bug report upload failed: too large", await Failure(JsonResponse(HttpStatusCode.BadRequest, """{"ok":false,"error":"invalid","description":"too large"}""", "Bad Request")), "description");
-            Equal("Bug report upload failed: invalid", await Failure(JsonResponse(HttpStatusCode.BadRequest, """{"ok":false,"error":"invalid","description":""}""", "Bad Request")), "error");
-            Equal("Bug report upload failed: Bad Gateway", await Failure(new(HttpStatusCode.BadGateway) { Content = new StringContent("<html>"), ReasonPhrase = "Bad Gateway" }), "status text");
-            Equal("Bug report upload failed: 503", await Failure(new(HttpStatusCode.ServiceUnavailable) { Content = new StringContent(""), ReasonPhrase = "" }), "status code");
-            Equal("Bug report upload failed: OK", await Failure(JsonResponse(HttpStatusCode.OK, """{"ok":true}""", "OK")), "ok without id");
-            Equal("Bug report upload failed: Unauthorized", await Failure(JsonResponse(HttpStatusCode.Unauthorized, """{"ok":true,"description":"ignored"}""", "Unauthorized")), "ok flag hides detail");
-            Equal("Bug report upload failed: 42", await Failure(JsonResponse(HttpStatusCode.BadRequest, """{"description":42}""", "Bad Request")), "non-string detail");
-        });
-    }
-
     private static IEnumerable<(string, Func<Task>)> StartupTimingsCases()
     {
         yield return Case("timings/prints-namespaces-to-stderr", () =>

@@ -106,7 +106,8 @@ internal static class CompletionsHttpSseTransportTests
             var final = (StreamDone)frames[^1]; Equal(StopReason.ToolUse, final.Reason);
             Equal("Exact \u03c0\U0001f600\0", ((TextContent)final.Message.Content[0]).Text);
             var call = (ToolCallContent)final.Message.Content[1]; Equal("call-owned", call.Id); Equal("inspect", call.Name);
-            Equal("{\"value\":1.00,\"keep\":null}", call.Arguments.ToString()); Equal(8L, final.Message.Usage.TotalTokens);
+            // openai-completions.ts:656 finalizes with parseStreamingJson (JSON.parse): 1.00 is the Number 1 (installed pi-ai 1.1.0).
+            Equal("{\"value\":1,\"keep\":null}", call.Arguments.ToString()); Equal(8L, final.Message.Usage.TotalTokens);
             Equal(1, body.AsyncDisposeCalls); Check(body.Disposed && !body.SyncBeforeAsync && fixture.Response.Disposed, "Async body/response cleanup order changed.");
             Equal(0, fixture.Response.SerializeCalls); await ThrowsAsync<ObjectDisposedException>(() => fixture.Requests.Single().Content!.ReadAsStringAsync());
             Check(!fixture.Handler.Disposed, "Composition disposed the borrowed client.");

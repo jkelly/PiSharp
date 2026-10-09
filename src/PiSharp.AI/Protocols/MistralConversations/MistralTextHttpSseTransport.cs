@@ -200,7 +200,8 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
             foreach (var p in message.EnumerateObject()) if (p.Name is not ("role" or "content" or "toolCalls" or "toolCallId" or "name" or "prefix")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload message field.");
             var role = message.GetProperty("role").GetString(); if (role is not ("system" or "user" or "assistant" or "tool")) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral payload role.");
             if (message.TryGetProperty("toolCalls", out var calls)) { if (role != "assistant") throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral tool-call role."); ValidateToolCalls(calls); }
-            if (role == "tool" && (string.IsNullOrEmpty(message.GetProperty("toolCallId").GetString()) || string.IsNullOrEmpty(message.GetProperty("name").GetString())))
+            // A nameless call's result replays with name "" (owner decision 13).
+            if (role == "tool" && (string.IsNullOrEmpty(message.GetProperty("toolCallId").GetString()) || message.GetProperty("name").GetString() is null))
                 throw Fail(NativeChatFailureCode.UnsupportedFeature, "Invalid Mistral tool result.");
             if (!message.TryGetProperty("content", out var content))
             { if (role != "assistant" || !message.TryGetProperty("toolCalls", out _)) throw Fail(NativeChatFailureCode.UnsupportedFeature, "Missing Mistral content."); index++; continue; }

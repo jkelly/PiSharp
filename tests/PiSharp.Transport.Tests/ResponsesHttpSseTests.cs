@@ -13,6 +13,9 @@ internal static class ResponsesHttpSseTests
     private const string Completed = """{"type":"response.completed","response":{"id":"response-http","status":"completed","output":[],"usage":{"input_tokens":5,"output_tokens":3,"total_tokens":8}}}""";
     private const string Created = """{"type":"response.created","response":{"id":"response-http"}}""";
     private static readonly string FinalArguments = "{\"text\":\"" + Unicode + "\",\"exact\":9007199254740993,\"scale\":1.0}";
+    // openai-responses-shared.ts:716 finalizes item.arguments with parseStreamingJson (JSON.parse): binary64 Numbers, so 2^53 + 1
+    // reads as 2^53 and 1.0 as 1 (captured from the installed pi-ai 1.1.0 against a local fake server).
+    private static readonly string ParsedFinalArguments = "{\"text\":\"" + Unicode + "\",\"exact\":9007199254740992,\"scale\":1}";
 
     public static async Task FragmentedMappingAndOwnedCleanup()
     {
@@ -40,9 +43,9 @@ internal static class ResponsesHttpSseTests
             var call = (ToolCallContent)final.Message.Content[1];
             Equal("call-http|fc-http", call.Id);
             Equal("inspect", call.Name);
-            Equal(FinalArguments, call.Arguments.Value.GetRawText());
-            Equal("9007199254740993", call.Arguments.Value.GetProperty("exact").GetRawText());
-            Equal("1.0", call.Arguments.Value.GetProperty("scale").GetRawText());
+            Equal(ParsedFinalArguments, call.Arguments.Value.GetRawText());
+            Equal("9007199254740992", call.Arguments.Value.GetProperty("exact").GetRawText());
+            Equal("1", call.Arguments.Value.GetProperty("scale").GetRawText());
             Equal(5L, final.Message.Usage.Input);
             Equal(3L, final.Message.Usage.Output);
             Equal(8L, final.Message.Usage.TotalTokens);

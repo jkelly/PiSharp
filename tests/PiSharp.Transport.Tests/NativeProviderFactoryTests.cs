@@ -43,10 +43,13 @@ internal static class NativeProviderFactoryTests
     {
         using var handler = new CaptureHandler();
         var model = Model("responses");
-        foreach (var endpoint in new[] { "http://api.openai.com/v1/responses", "https://example.invalid/v1/responses",
-            "https://api.openai.com/v1/responses?secret=value", "https://api.openai.com/v1/responses#fragment",
-            "https://user@api.openai.com/v1/responses", "https://api.openai.com:444/v1/responses" })
+        foreach (var endpoint in new[] { "https://api.openai.com/v1/responses?secret=value", "https://api.openai.com/v1/responses#fragment",
+            "https://user@api.openai.com/v1/responses", "ftp://api.openai.com/v1/responses" })
             Expect<ArgumentException>(() => NativeProviderFactory.CreateResponses(model, new(endpoint), Key, new(false), handler: handler));
+        // A models.json baseUrl may point the built-in provider anywhere (model-config.ts:203 baseUrl is any non-empty string;
+        // openai-responses.ts:295 passes it to the SDK as baseURL), so other http(s) hosts, schemes and ports are admitted.
+        foreach (var endpoint in new[] { "http://api.openai.com/v1/responses", "https://example.invalid/v1/responses", "https://api.openai.com:444/v1/responses" })
+            using (NativeProviderFactory.CreateResponses(model, new(endpoint), Key, new(false), handler: handler)) { }
         Expect<ArgumentException>(() => NativeProviderFactory.CreateResponses(model with { Provider = "openrouter" },
             new(Address("responses")), Key, new(false), handler: handler));
         Expect<ArgumentException>(() => NativeProviderFactory.CreateResponses(model, new(Address("responses")),

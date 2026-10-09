@@ -114,9 +114,8 @@ internal sealed class GoogleEventMapper
                     JsonElement? Field(string field) => call.ValueKind == JsonValueKind.Object && call.TryGetProperty(field, out var found) ? found : null;
                     var nameValue = Field("name");
                     var name = nameValue is { } named && Truthy(named) ? ProviderShared.ProviderErrorText.JsString(named) : "";
-                    // Native deviation kept: upstream pushes a nameless call, but every native stream requires tool identity
-                    // (AssistantStreamReducer), so it fails here as malformed data.
-                    if (name.Length == 0) throw GoogleData.Fail(GoogleFailure.MalformedStream);
+                    // A nameless call (name "", missing, or a non-object functionCall) is pushed as upstream pushes it, with name "" and an id
+                    // "_<ms>_<n>" or "undefined_<ms>_<n>" (owner decision 13); the agent answers it with "Tool  not found".
                     var provided = Field("id") is { } given && Truthy(given) ? ProviderShared.ProviderErrorText.JsString(given) : null;
                     var id = provided is null || _blocks.OfType<ToolCallContent>().Any(x => x.Id == provided)
                         ? (nameValue is { } rawName ? ProviderShared.ProviderErrorText.JsString(rawName) : "undefined") + "_" + _request.Timestamp + "_" +

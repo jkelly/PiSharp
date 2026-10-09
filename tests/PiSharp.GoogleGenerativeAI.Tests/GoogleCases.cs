@@ -279,14 +279,17 @@ internal static class GoogleCases
             var failed = await Complete(Wire(chunk)); Check(failed.Failure is not null && failed.Message.StopReason == StopReason.Error, "Invalid chunk accepted: " + chunk);
             Equal(error, Error(failed));
         }
-        // Native deviation (unchanged): upstream pushes a nameless tool call (name "", id "_..." or "undefined_..."), but native streams
-        // require tool identity before any execution authority, so these fail as malformed data.
-        foreach (var chunk in new[] {
-            """{"candidates":[{"content":{"parts":[{"functionCall":{"name":"","args":{}}}]},"finishReason":"STOP"}]}""",
-            """{"candidates":[{"content":{"parts":[{"functionCall":{"args":{"a":1}}}]},"finishReason":"STOP"}]}""",
-            """{"candidates":[{"content":{"parts":[{"functionCall":"x"}]},"finishReason":"STOP"}]}""" })
+        // Owner decision 13: upstream pushes a nameless tool call with name "" and an id "_<ms>_<n>" (name "") or "undefined_<ms>_<n>" (name
+        // missing, or a non-object functionCall), and the turn ends as toolUse (captured from @earendil-works/pi-ai@1.1.0).
+        foreach (var (chunk, prefix) in new[] {
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":{"name":"","args":{}}}]},"finishReason":"STOP"}]}""", "_"),
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":{"args":{"a":1}}}]},"finishReason":"STOP"}]}""", "undefined_"),
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":"x"}]},"finishReason":"STOP"}]}""", "undefined_") })
         {
-            var failed = await Complete(Wire(chunk)); Check(failed.Failure is not null && failed.Message.StopReason == StopReason.Error, "Nameless tool call accepted: " + chunk);
+            var nameless = await Complete(Wire(chunk));
+            Check(nameless.Failure is null && nameless.Message.StopReason == StopReason.ToolUse, "Nameless tool call not pushed: " + chunk);
+            var call = nameless.Message.Content.OfType<ToolCallContent>().Single();
+            Check(call.Name.Length == 0 && System.Text.RegularExpressions.Regex.IsMatch(call.Id, "^" + prefix + "\\d+_\\d+$"), "Nameless identity: " + call.Id + "/" + call.Name);
         }
         var eof = await Complete(Wire(ToolChunk.Replace(",\"finishReason\":\"STOP\"", "", StringComparison.Ordinal)));
         Check(eof.Failure is not null && Error(eof).Contains("without a finish reason", StringComparison.Ordinal), "Missing finish accepted.");

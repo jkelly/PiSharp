@@ -29,21 +29,26 @@ internal static class NativeSdkCreationPreflightTests
         ("native-sdk-creation-preflight canceled staged validator joins actual writer close and file deletion", StagedCancellationCleanup)
     ];
 
+    private const int SnapshotEntries = 4_096;
+    private const long SnapshotCharacters = 1_048_576;
+    private const long SnapshotUtf8Bytes = 1_048_576;
+
     private static async Task CountBoundaryRollback()
     {
-        await using var f = await Fixture.Open(new(ExtensionSessionSnapshotLimits.MaximumBranchEntries));
+        await using var f = await Fixture.Open(new(SnapshotEntries));
         await RejectedClone(f, ExtensionRegistrationFailure.LimitExceeded, async snapshot =>
         {
-            Equal(ExtensionSessionSnapshotLimits.MaximumBranchEntries + 1, snapshot.BranchEntries.Length);
-            var sizes = Size(snapshot); Check(sizes.Characters < ExtensionSessionSnapshotLimits.MaximumCharacters &&
-                sizes.Utf8Bytes < ExtensionSessionSnapshotLimits.MaximumUtf8Bytes, "Count fixture also exceeded a byte/character budget.");
+            Equal(SnapshotEntries + 1, snapshot.BranchEntries.Length);
+            var sizes = Size(snapshot); Check(sizes.Characters < SnapshotCharacters &&
+                sizes.Utf8Bytes < SnapshotUtf8Bytes, "Count fixture also exceeded a byte/character budget.");
             await Task.CompletedTask;
         });
     }
 
     private static async Task GlobalLabelBudgets()
     {
-        foreach (var budget in new[] { "record", "characters", "utf8" })
+        // Session entries have no per-entry bound of their own (runner.ts hands handlers the whole session): only the aggregates.
+        foreach (var budget in new[] { "characters", "utf8" })
         {
             var spec = budget switch
             {
@@ -58,13 +63,13 @@ internal static class NativeSdkCreationPreflightTests
                 Equal(spec.Count + 1, snapshot.BranchEntries.Length);
                 if (budget == "record")
                     Check(sizes.MaximumRecordCharacters > f.Options.MaximumJsonCharacters &&
-                        sizes.Characters < ExtensionSessionSnapshotLimits.MaximumCharacters, "Per-record fixture did not isolate the record budget.");
+                        sizes.Characters < SnapshotCharacters, "Per-record fixture did not isolate the record budget.");
                 else if (budget == "characters")
                     Check(sizes.MaximumRecordCharacters <= f.Options.MaximumJsonCharacters &&
-                        sizes.Characters > ExtensionSessionSnapshotLimits.MaximumCharacters, "Aggregate character fixture failed to cross the actual staged budget.");
+                        sizes.Characters > SnapshotCharacters, "Aggregate character fixture failed to cross the actual staged budget.");
                 else
                     Check(sizes.MaximumRecordCharacters <= f.Options.MaximumJsonCharacters &&
-                        sizes.Characters < ExtensionSessionSnapshotLimits.MaximumCharacters && sizes.Utf8Bytes > ExtensionSessionSnapshotLimits.MaximumUtf8Bytes,
+                        sizes.Characters < SnapshotCharacters && sizes.Utf8Bytes > SnapshotUtf8Bytes,
                         "UTF8 fixture did not isolate aggregate bytes from characters and per-record limits.");
                 return Task.CompletedTask;
             });
@@ -87,7 +92,7 @@ internal static class NativeSdkCreationPreflightTests
 
     private static async Task UnderLimitOpaqueControl()
     {
-        var count = ExtensionSessionSnapshotLimits.MaximumBranchEntries - 1;
+        var count = SnapshotEntries - 1;
         await using var f = await Fixture.Open(new(count)); var previous = f.Owner.Current; var original = await Bytes(f.Files.Source);
         var returned = false;
         await f.Register(async (context, _) =>
@@ -97,7 +102,7 @@ internal static class NativeSdkCreationPreflightTests
             var created = await ((IExtensionSessionCreationCommandContext)context).CreateSessionAsync(new(ExtensionSessionCreationKind.Clone));
             Check(created is not null, "Exact-boundary clone was vetoed."); returned = true;
             var fresh = created!.Context.SessionSnapshot!;
-            Equal(ExtensionSessionSnapshotLimits.MaximumBranchEntries, fresh.BranchEntries.Length); Equal(2L, fresh.Generation);
+            Equal(SnapshotEntries, fresh.BranchEntries.Length); Equal(2L, fresh.Generation);
             Equal("1.00e400", fresh.BranchEntries[0].Value.GetProperty("data").GetProperty("opaque").GetRawText());
             Equal("global label", fresh.BranchEntries[^1].Value.GetProperty("label").GetString());
             var receipt = await created.Context.AppendSessionEntryAsync("fresh", 1, JsonData.Parse("{\"fresh\":true}"));
@@ -123,8 +128,8 @@ internal static class NativeSdkCreationPreflightTests
             var captured = ((IExtensionSessionContext)context).SessionSnapshot!;
             Equal(f.Spec.Count, captured.BranchEntries.Length); Equal("e" + (f.Spec.Count - 1), captured.SelectedLeafId);
             var acceptedSize = Size(captured);
-            Check(acceptedSize.Characters <= ExtensionSessionSnapshotLimits.MaximumCharacters &&
-                acceptedSize.Utf8Bytes <= ExtensionSessionSnapshotLimits.MaximumUtf8Bytes && acceptedSize.MaximumRecordCharacters <= f.Options.MaximumJsonCharacters,
+            Check(acceptedSize.Characters <= SnapshotCharacters &&
+                acceptedSize.Utf8Bytes <= SnapshotUtf8Bytes && acceptedSize.MaximumRecordCharacters <= f.Options.MaximumJsonCharacters,
                 "Original callback did not satisfy the eventual SDK snapshot budgets.");
             var error = await Throws<ExtensionRegistrationException>(() => ((IExtensionSessionCreationCommandContext)context)
                 .CreateSessionAsync(new(ExtensionSessionCreationKind.Clone)).AsTask());
@@ -220,7 +225,10 @@ internal static class NativeSdkCreationPreflightTests
     {
         public Files Files { get; } = new();
         public Spec Spec { get; }
-        public ExtensionRegistryOptions Options { get; } = new();
+        // The SDK host bounds its callback views explicitly here, so the boundary fixtures stay small; the defaults
+        // (ExtensionSessionSnapshotLimits) grow with the session as the request budgets do.
+        public ExtensionRegistryOptions Options { get; } = new()
+        { MaximumSessionBranchEntries = SnapshotEntries, MaximumSessionCharacters = SnapshotCharacters, MaximumSessionUtf8Bytes = SnapshotUtf8Bytes };
         public StorageFactory Storage { get; } = new();
         public LocalFiles IO { get; }
         public ReplaceableAgentSession Owner { get; private set; } = null!;

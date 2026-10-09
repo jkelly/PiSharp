@@ -29,7 +29,7 @@ internal static class SlashCommands
         new("export", "Export session (HTML default, or specify path: .html/.jsonl)"),
         new("import", "Import and resume a session from a JSONL file"),
         new("share", "Share session as a secret GitHub gist"),
-        new("bug", "Report a bug to the Pi developers", "<description>"),
+        new("bug", "Report a PiSharp bug as a GitHub issue", "<description>"),
         new("copy", "Copy last agent message to clipboard"),
         new("name", "Set session display name"),
         new("session", "Show session info and stats"),

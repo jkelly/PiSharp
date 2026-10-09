@@ -180,8 +180,10 @@ public sealed class AnthropicMessagesRequestProjector
                         else if (block is ToolCallContent tool)
                         {
                             var id = same ? tool.Id : NormalizeId(tool.Id);
-                            if (string.IsNullOrWhiteSpace(id) || !_callIds.Add(id)) throw Fail(AnthropicRequestFailure.IdentityCollision);
-                            var name = ToolName(tool.Name); if (string.IsNullOrWhiteSpace(name)) throw Fail(AnthropicRequestFailure.UnsupportedContent);
+                            // convertMessages replays a nameless or id-less call with the empty name/id it was given (owner decision 13); id-less
+                            // calls may share the id "".
+                            if (id.Length > 0 && !_callIds.Add(id)) throw Fail(AnthropicRequestFailure.IdentityCollision);
+                            var name = ToolName(tool.Name);
                             blocks.Add(new JsonObject { ["type"] = "tool_use", ["id"] = id, ["name"] = name, ["input"] = Node(tool.Arguments.Value) });
                             _pendingCalls.Add((id, name));
                         }
@@ -198,7 +200,7 @@ public sealed class AnthropicMessagesRequestProjector
                 {
                     var body = entry.Body.Value; var original = String(body, "toolCallId");
                     var id = _idMap.GetValueOrDefault(original, original);
-                    if (!_pendingCalls.Any(call => call.Id == id) || !_answered.Add(id)) throw Fail(AnthropicRequestFailure.UnmatchedToolResult);
+                    if (!_pendingCalls.Any(call => call.Id == id) || !_answered.Add(id) && id.Length > 0) throw Fail(AnthropicRequestFailure.UnmatchedToolResult);
                     var isError = body.GetProperty("isError");
                     if (isError.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw Fail(AnthropicRequestFailure.InvalidTranscript);
                     var content = body.TryGetProperty("content", out var supplied) ? supplied : default;

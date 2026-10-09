@@ -507,6 +507,98 @@ internal static class InteractiveModeCases
             await pi.WaitFor("Hello from the fake model.");
             Equal(0, checks, "no package check with PI_OFFLINE");
         });
+        // interactive-mode.ts run(): checkForNewPiVersion starts after init, once per startup with no cache, and a newer release shows
+        // showNewVersionNotification. Owner decision 12: the latest PiSharp.Cli on NuGet, `dotnet tool update -g PiSharp.Cli`.
+        const string feedIndex = "https://nuget.test/v3-flatcontainer/pisharp.cli/index.json";
+        static Func<HttpRequestMessage, HttpResponseMessage> Feed(string json, System.Net.HttpStatusCode status = System.Net.HttpStatusCode.OK) =>
+            _ => new HttpResponseMessage(status) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") };
+        static InteractiveHarness Online(string name, string version, Func<HttpRequestMessage, HttpResponseMessage> feed)
+        {
+            var pi = new InteractiveHarness(name) { ProductVersion = version, VersionFeed = feed };
+            pi.Vars.Remove("PI_OFFLINE");
+            pi.Configure = context => context with { EnsureTool = (_, _) => Task.FromResult<string?>(null) };
+            return pi;
+        }
+        yield return ("e2e.version.update-notification", async () =>
+        {
+            await using var pi = Online("version-newer", "1.1.0.2", Feed("{\"versions\":[\"1.1.0\",\"1.1.0.1\",\"1.1.0.2\",\"1.1.0.10\",\"1.1.0.11-preview.1\"]}"));
+            pi.Start(Regular);
+            await pi.WaitFor("Update Available");
+            await pi.WaitFor("Changelog: ");
+            var lines = pi.Terminal.Lines;
+            var title = Array.FindIndex(lines, line => line.Trim() == "Update Available");
+            Check(title > 0, "title line");
+            Check(lines[title - 1].Trim().Length > 0 && lines[title - 1].Trim().All(c => c == '─'), "top border");
+            Equal(" New version 1.1.0.10 is available. Run dotnet tool update -g PiSharp.Cli", lines[title + 1], "instruction");
+            Equal(" Changelog: https://github.com/jkelly/PiSharp/blob/main/CHANGELOG.md", lines[title + 2], "changelog");
+            Check(lines[title + 3].Trim().Length > 0 && lines[title + 3].Trim().All(c => c == '─'), "bottom border");
+            lock (pi.VersionRequests) Equal(feedIndex, string.Join(" | ", pi.VersionRequests), "one NuGet request");
+            Check(!pi.Terminal.Text.Contains("pi update", StringComparison.Ordinal), "no pi update instruction");
+        });
+        yield return ("e2e.version.prerelease-notification", async () =>
+        {
+            await using var pi = Online("version-prerelease", "1.1.0.3-preview.1", Feed("{\"versions\":[\"1.1.0.2\",\"1.1.0.3-preview.1\",\"1.1.0.3-preview.2\"]}"));
+            pi.Start(Regular);
+            await pi.WaitFor("Update Available");
+            Contains(pi.Terminal.Text, "New version 1.1.0.3-preview.2 is available. Run dotnet tool update -g PiSharp.Cli --prerelease", "prerelease instruction");
+        });
+        const string stableFeed = "{\"versions\":[\"1.1.0.1\",\"1.1.0.2\",\"1.1.0.12-preview.1\"]}";
+        foreach (var (label, version, feed) in new[] { ("equal", "1.1.0.2", stableFeed), ("equal-three-part", "1.1.0.0", "{\"versions\":[\"1.0.0\",\"1.1.0\"]}"),
+            ("older-feed", "1.1.0.10", stableFeed), ("stable-ignores-prerelease", "1.1.0.11", stableFeed) })
+            yield return ($"e2e.version.no-notice-{label}", async () =>
+            {
+                await using var pi = Online("version-" + label, version, Feed(feed));
+                pi.Start(Regular);
+                await pi.WaitFor("escape interrupt");
+                await pi.Submit("hello");
+                await pi.WaitFor("Hello from the fake model.");
+                lock (pi.VersionRequests) Equal(1, pi.VersionRequests.Count, "one NuGet request");
+                Check(!pi.Terminal.Text.Contains("Update Available", StringComparison.Ordinal), "no notice");
+            });
+        foreach (var (label, status, body) in new[] { ("not-found", System.Net.HttpStatusCode.NotFound, "{}"),
+            ("server-error", System.Net.HttpStatusCode.InternalServerError, "{}"), ("malformed", System.Net.HttpStatusCode.OK, "<html>"),
+            ("unexpected-shape", System.Net.HttpStatusCode.OK, "{\"versions\":\"9.9.9\"}") })
+            yield return ($"e2e.version.feed-error-silent-{label}", async () =>
+            {
+                await using var pi = Online("version-error-" + label, "1.1.0.2", Feed(body, status));
+                pi.Start(Regular);
+                await pi.WaitFor("escape interrupt");
+                await pi.Submit("hello");
+                await pi.WaitFor("Hello from the fake model.");
+                lock (pi.VersionRequests) Equal(1, pi.VersionRequests.Count, "one NuGet request");
+                Check(!pi.Terminal.Text.Contains("Update Available", StringComparison.Ordinal), "no notice");
+                Check(!pi.Terminal.Text.Contains("Error", StringComparison.Ordinal) && !pi.Terminal.Text.Contains("Warning", StringComparison.Ordinal), "silent");
+            });
+        yield return ("e2e.version.feed-throws-silent", async () =>
+        {
+            await using var pi = Online("version-throws", "1.1.0.2", _ => throw new HttpRequestException("fetch failed"));
+            pi.Start(Regular);
+            await pi.WaitFor("escape interrupt");
+            await pi.Submit("hello");
+            await pi.WaitFor("Hello from the fake model.");
+            lock (pi.VersionRequests) Equal(1, pi.VersionRequests.Count, "one NuGet request, no retry");
+            Check(!pi.Terminal.Text.Contains("fetch failed", StringComparison.Ordinal), "silent");
+        });
+        // version-check.ts: PI_OFFLINE (getLatestPiRelease) and PI_SKIP_VERSION_CHECK (checkForNewPiVersion; main.ts sets both for
+        // --offline) send nothing. Pi has no settings key for the check (docs/settings.md: enableInstallTelemetry "Does not control
+        // update checks"), so the environment and --offline are the switches.
+        foreach (var (label, configure, extra) in new (string, Action<InteractiveHarness>, string[])[]
+        {
+            ("pi-offline", pi => pi.Vars["PI_OFFLINE"] = "1", []),
+            ("skip-version-check", pi => pi.Vars["PI_SKIP_VERSION_CHECK"] = "1", []),
+            ("offline-flag", _ => { }, ["--offline"]),
+        })
+            yield return ($"e2e.version.no-request-{label}", async () =>
+            {
+                await using var pi = Online("version-off-" + label, "1.1.0.1", Feed("{\"versions\":[\"9.0.0\"]}"));
+                configure(pi);
+                pi.Start([.. Regular, .. extra]);
+                await pi.WaitFor("escape interrupt");
+                await pi.Submit("hello");
+                await pi.WaitFor("Hello from the fake model.");
+                lock (pi.VersionRequests) Equal(0, pi.VersionRequests.Count, "no NuGet request");
+                Check(!pi.Terminal.Text.Contains("Update Available", StringComparison.Ordinal), "no notice");
+            });
         // main.ts: a resumed session whose stored cwd is gone asks to continue in the current cwd (Continue/Cancel); the session file
         // keeps its header and receives the new entries.
         foreach (var answer in new[] { "continue", "cancel" })
@@ -616,7 +708,7 @@ internal static class InteractiveModeCases
         yield return ("e2e.slash.bug-cancel", Case("bug", async pi =>
         {
             await pi.Submit("/bug");
-            await pi.WaitUntil(text => text.Contains("Pi developers", StringComparison.Ordinal) || text.Contains("bug", StringComparison.OrdinalIgnoreCase), "bug flow prompt");
+            await pi.WaitFor("Nothing is uploaded.");
             await Task.Delay(200);
             pi.Type("\u001b");
             await pi.WaitFor("Bug report cancelled");
@@ -638,7 +730,7 @@ internal static class InteractiveModeCases
             pi.Type("\r");
             await pi.WaitFor("Attach a summary written by");
             pi.Type("\r");
-            await pi.WaitFor("Upload sends the report");
+            await pi.WaitFor("Open GitHub Issue writes");
             pi.Type("\u001b[B");
             await Task.Delay(100);
             pi.Type("\r");
@@ -653,6 +745,84 @@ internal static class InteractiveModeCases
             var file = pi.SessionFiles().Single();
             await pi.WaitUntil(_ => InteractiveHarness.ReadShared(file).Contains("\"type\":\"custom\"", StringComparison.Ordinal), "bug report custom entry");
         }));
+        // Owner decision 11: /bug's "Open GitHub Issue" writes the zip and opens a prefilled issue at github.com/jkelly/PiSharp with
+        // the mode's URL opener (a fake here: no real browser). The only HTTP traffic is the prompt and the summary request to the
+        // fake provider; nothing is uploaded.
+        yield return ("e2e.slash.bug-github-issue", async () =>
+        {
+            var opened = new List<string>();
+            await using var pi = new InteractiveHarness("bug-issue", columns: 120, rows: 90);
+            pi.Vars["DISPLAY"] = ":0";
+            pi.Configure = context => context with { OpenUrl = url => { lock (opened) opened.Add(url); } };
+            pi.Start(Regular);
+            await pi.WaitFor("escape interrupt");
+            await pi.Submit("first message");
+            await pi.WaitFor("Hello from the fake model.");
+            pi.Respond = (_, _) => InteractiveHarness.AnthropicText("Summary: the agent misbehaved.");
+            await pi.Submit("/bug");
+            await pi.WaitFor("What went wrong?");
+            pi.Type("tool output vanished");
+            pi.Type("\r");
+            await pi.WaitFor("Include the session transcript?");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("Attach a summary written by");
+            pi.Type("\r");
+            await pi.WaitFor("Open GitHub Issue writes");
+            pi.Type("\r");
+            await pi.WaitFor("Opened a prefilled GitHub issue in your browser.");
+            var url = opened.Single();
+            var zip = Directory.GetFiles(pi.Cwd, "pi-bug-report-*.zip").Single();
+            var id = Path.GetFileNameWithoutExtension(zip)["pi-bug-report-".Length..];
+            Check(url.StartsWith("https://github.com/jkelly/PiSharp/issues/new?title=Bug%20report%3A%20tool%20output%20vanished&body=" +
+                "%23%23%20Description%0A%0Atool%20output%20vanished%0A%0A%23%23%20Summary%0A%0ASummary%3A%20the%20agent%20misbehaved.%0A%0A" +
+                "%23%23%20Environment%0A%0A-%20PiSharp%3A%20", StringComparison.Ordinal), "issue link: " + url);
+            var body = Uri.UnescapeDataString(url[(url.IndexOf("&body=", StringComparison.Ordinal) + "&body=".Length)..]);
+            Contains(body, "\n- Model: anthropic/claude-sonnet-4-5", "model in the issue");
+            Contains(body, $"Report ID: `{id}`. The full report is `pi-bug-report-{id}.zip` (report.json, diagnostics.json, summary.md)", "report to attach");
+            Check(!body.Contains(pi.Cwd, StringComparison.Ordinal) && !body.Contains("sk-test-key", StringComparison.Ordinal), "no paths or keys in the issue");
+            Check(url.Length <= 8000, "link length");
+            var screen = string.Join("", pi.Terminal.Text.Split('\n').Select(line => line.Trim()));
+            Contains(screen, Path.GetFileName(zip), "report path printed");
+            Contains(screen, url[..60], "link printed");
+            Equal(2, pi.Requests.Count, "only the prompt and the summary went over HTTP");
+            Check(pi.Requests.All(request => !request.Contains("bug_report", StringComparison.Ordinal) && !request.Contains("report.json", StringComparison.Ordinal)), "nothing uploaded");
+            Check(pi.CatalogRequests.All(request => !request.Contains("bug-reports", StringComparison.Ordinal)), "no upload endpoint");
+            var file = pi.SessionFiles().Single();
+            await pi.WaitUntil(_ => InteractiveHarness.ReadShared(file).Contains("\"delivery\":\"github-issue\"", StringComparison.Ordinal), "bug report custom entry");
+        });
+        // Without a browser the user can see (here an SSH session), the report path and the link are printed and nothing opens.
+        yield return ("e2e.slash.bug-github-issue-headless", async () =>
+        {
+            var opened = new List<string>();
+            await using var pi = new InteractiveHarness("bug-headless", columns: 220, rows: 60);
+            pi.Vars["SSH_CONNECTION"] = "10.0.0.1 50000 10.0.0.2 22";
+            pi.Vars["DISPLAY"] = ":0";
+            pi.Configure = context => context with { OpenUrl = url => { lock (opened) opened.Add(url); } };
+            pi.Start(Regular);
+            await pi.WaitFor("escape interrupt");
+            await pi.Submit("/bug");
+            await pi.WaitFor("What went wrong?");
+            pi.Type("\r");
+            await pi.WaitFor("Include the session transcript?");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("Attach a summary written by");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("Open GitHub Issue writes");
+            pi.Type("\r");
+            await pi.WaitFor("No browser could be opened.");
+            var zip = Directory.GetFiles(pi.Cwd, "pi-bug-report-*.zip").Single();
+            var screen = string.Join("", pi.Terminal.Text.Split('\n').Select(line => line.Trim()));
+            Contains(screen, "Bug report exported to: " + zip, "report path printed");
+            Contains(screen, "https://github.com/jkelly/PiSharp/issues/new?title=Bug%20report%20from%20PiSharp%20", "link printed");
+            Equal(0, opened.Count, "no browser opened");
+            Equal(0, pi.Requests.Count, "nothing sent");
+        });
         yield return ("e2e.autocomplete.slash-commands", Case("autocomplete", async pi =>
         {
             pi.Type("/hot");

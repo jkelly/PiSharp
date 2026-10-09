@@ -15,6 +15,17 @@ internal static class BrowserOpener
         _ => ("xdg-open", [target]),
     };
 
+    /// <summary>PiSharp (the /bug issue link, owner decision 11): whether a browser the user can see is likely. Not over SSH
+    /// (<c>SSH_CONNECTION</c>, <c>SSH_CLIENT</c>, <c>SSH_TTY</c>); on Windows and macOS otherwise yes; elsewhere only with a display
+    /// (<c>DISPLAY</c> or <c>WAYLAND_DISPLAY</c>), since xdg-open has nothing to open a browser on without one.</summary>
+    public static bool CanOpenBrowser(Func<string, string?> environment, string? platform = null)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        bool Set(string name) => !string.IsNullOrEmpty(environment(name));
+        if (Set("SSH_CONNECTION") || Set("SSH_CLIENT") || Set("SSH_TTY")) return false;
+        return (platform ?? ClipboardEnvironment.CurrentPlatform) is "win32" or "darwin" || Set("DISPLAY") || Set("WAYLAND_DISPLAY");
+    }
+
     /// <summary>Open a URL or file in the platform browser/default handler. This never invokes a shell: on Windows
     /// <c>cmd /c start</c> would re-parse metacharacters (&amp;, |, ^, ...) and make attacker-controlled URLs injectable.
     /// Launch is best-effort; failures (for example a missing xdg-open) are ignored because callers still show the target.</summary>

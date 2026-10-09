@@ -17,7 +17,7 @@ internal static class CompletionsSourceDifferentialTests
             yield return ($"Completions qualified complete final push drain and undefined case {selected}", () => ReferenceCase(repo, selected));
         }
         yield return ("Completions exact source binary64 arithmetic and owned cost serialization", CostSerialization);
-        yield return ("Completions provisional headers preserve immutable history and strict final authority", ProvisionalAuthority);
+        yield return ("Completions provisional headers preserve immutable history and final identity authority", ProvisionalAuthority);
         yield return ("Completions consecutive reasoning details retain signatures common and opaque fields", ReasoningDetails);
         yield return ("Completions source snapshot replay metadata and raw chunk caps cannot be bypassed", SnapshotBounds);
         yield return ("Completions default 1024 fragments stay compact without cumulative snapshot copies", CompactFragmented);
@@ -152,19 +152,24 @@ internal static class CompletionsSourceDifferentialTests
         var header = frames.OfType<ToolCallHeaderUpdated>().Single();
         Check(CompletionsSourceEventProjection.ReadEmission(header) is null, "Native header update invented an extra source push.");
         Equal("", start.ToolCall.Id, "mutable alias entered native start");
-        foreach (var chunks in new[]
-        {
-            new[] { """{"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"arguments":"{}"}}]},"finish_reason":"tool_calls"}]}""" },
-            new[] { """{"choices":[{"delta":{"tool_calls":[{"index":1,"id":"x","function":{"name":"read","arguments":"{\"n\":"}}]},"finish_reason":"tool_calls"}]}""" }
-        })
-        {
-            var failed = await Collect(chunks); Check(failed[^1] is StreamError && !failed.OfType<ToolCallEnded>().Any() && !failed.OfType<StreamDone>().Any(),
-                "Provisional identity or repaired arguments acquired final tool authority.");
-        }
+        // Owner decision 13: a provisional identity that is never filled ends as upstream ends it, with id "" and name ""
+        // (openai-completions.ts ensureToolCallBlock; captured pi-ai 1.1.0 turn is toolUse). Its finality grants no execution: the agent
+        // finds no tool named "" and answers "Tool  not found".
+        var unfilled = await Collect(["""{"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"arguments":"{}"}}]},"finish_reason":"tool_calls"}]}"""]);
+        Check(unfilled[^1] is StreamDone { Reason: StopReason.ToolUse } && unfilled.OfType<ToolCallEnded>().Single().ToolCall is { Id: "", Name: "" },
+            "An unfilled provisional identity did not end as upstream ends it.");
+        // Pi abe508 openai-completions.ts:464 finalizes with parseStreamingJson (json-parse.ts:104-124): an unfinished '{"n":' is the
+        // partial-json {} (installed pi-ai 1.1.0), so a complete identity with repaired arguments ends the call.
+        var repaired = await Collect(["""{"choices":[{"delta":{"tool_calls":[{"index":1,"id":"x","function":{"name":"read","arguments":"{\"n\":"}}]},"finish_reason":"tool_calls"}]}"""]);
+        Check(repaired[^1] is StreamDone && repaired.OfType<ToolCallEnded>().Single().ToolCall.Arguments.ToString() == "{}",
+            "Repaired arguments did not finalize as parseStreamingJson returns them.");
         var direct = new AssistantStreamReducer(((StreamStarted)frames[0]).Partial); direct.Apply(frames[0]); direct.Apply(start);
         direct.Apply(header);
         Throws<StreamProtocolException>(() => direct.Apply(new ToolCallHeaderUpdated(start.ContentIndex, "changed", "read")));
-        Throws<StreamProtocolException>(() => direct.Apply(new ToolCallEnded(start.ContentIndex, new("one", "read", JsonData.Parse("[1]")))));
+        Throws<StreamProtocolException>(() => direct.Apply(new ToolCallEnded(start.ContentIndex, new("changed", "read", JsonData.Parse("{}")))));
+        // parseStreamingJson may finalize any JSON value (a non-object reaches agent-loop validateToolArguments), so the reducer keeps it.
+        direct.Apply(new ToolCallEnded(start.ContentIndex, new("one", "read", JsonData.Parse("[1]"))));
+        Equal("[1]", ((ToolCallContent)direct.Snapshot().Content[start.ContentIndex]).Arguments.ToString(), "non-object final arguments");
     }
 
     private static async Task ReasoningDetails()

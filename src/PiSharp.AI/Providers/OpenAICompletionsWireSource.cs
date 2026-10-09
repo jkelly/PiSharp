@@ -400,7 +400,8 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                     }
                     if (slot is null)
                     {
-                        if (wireIndex is null && string.IsNullOrEmpty(callId)) throw Protocol();
+                        // ensureToolCallBlock: a delta with neither an index nor an id matches no block and opens a new one; a call that
+                        // never gets an id or a name keeps id "" / name "" (owner decision 13).
                         callId ??= ""; name ??= "";
                         if (callId.Contains('\0') || name.Contains('\0')) throw Protocol();
                         Charge(callId.Length + (long)name.Length + 2);
@@ -431,7 +432,6 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                         { if (name.Contains('\0')) throw Protocol(); Charge(name.Length); slot.Name = name; filled = true; }
                         if (filled) Push(new ToolCallHeaderUpdated(slot.ContentIndex, slot.Id, slot.Name));
                     }
-                    if (wireIndex is null && string.IsNullOrEmpty(callId)) throw Protocol();
                     if (isCustom && slot.CustomProperty is null) InitializeCustom(slot, undefinedPartial: false);
                     if (!string.IsNullOrEmpty(arguments))
                     {
@@ -483,7 +483,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
                     var identities = new HashSet<string>(StringComparer.Ordinal);
                     foreach (var slot in _tools)
                     {
-                        if (string.IsNullOrWhiteSpace(slot.Id) || string.IsNullOrWhiteSpace(slot.Name) || !identities.Add(slot.Id)) throw Protocol();
+                        if (slot.Id.Length > 0 && !identities.Add(slot.Id)) throw Protocol();
                         // openai-completions.ts finishCurrentBlock: block.arguments = parseStreamingJson(block.partialArgs); a custom tool
                         // call keeps the arguments its input built.
                         var parsed = slot.CustomProperty is null ? StreamingJson.Parse(_reducer.GetToolJsonPreview(slot.ContentIndex))

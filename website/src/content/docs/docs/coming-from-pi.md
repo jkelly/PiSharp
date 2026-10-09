@@ -40,6 +40,7 @@ PiSharp opens Pi's current (v3) session files directly. For v1 and v2 files, or 
 - **C# extensions.** Besides Pi's TypeScript extensions, PiSharp loads native C# extensions from the same extension folders. See [Build an extension](/docs/extensions/build-an-extension/).
 - **Tool policy.** A PiSharp option, `--tool-policy explicit`, limits the built-in tools to paths and commands you grant. The default, `pi`, behaves as Pi does. See [Tool policy](/docs/reference/configuration/#tool-policy).
 - **No telemetry.** PiSharp doesn't report installs to Pi's servers. `PI_TELEMETRY` is ignored.
+- **`/bug` opens a GitHub issue.** Reports never go to Pi's developers. PiSharp writes the report zip and opens a prefilled issue on [PiSharp's GitHub](https://github.com/jkelly/PiSharp/issues) for you to attach it to. See [/bug](/docs/guides/interactive/).
 - **It names itself.** Requests carry a PiSharp user agent, not Pi's.
 - **Versions match Pi's.** See [How versions work](/docs/versioning/).
 

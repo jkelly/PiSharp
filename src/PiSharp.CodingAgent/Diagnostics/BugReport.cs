@@ -43,7 +43,7 @@ public sealed record BugReportBundle(JsonData Metadata, JsonData Diagnostics, st
     public int CrashCount => Diagnostics.Value.GetProperty("crashes").GetArrayLength();
 }
 
-/// <summary>bug-report.ts <c>BugReportFile</c>: shared by upload and zip export.</summary>
+/// <summary>bug-report.ts <c>BugReportFile</c>: the zip archive's entries (PiSharp never uploads reports; owner decision 11).</summary>
 public sealed record BugReportFile(string Name, string ContentType, string Data);
 
 /// <summary>The model request for <see cref="BugReport.GenerateBugReportSummaryAsync"/>: one user message whose only content
@@ -282,7 +282,8 @@ public static class BugReport
     public static string BugReportArchiveFileName(string id) => $"pi-bug-report-{id}.zip";
 
     /// <summary>The <c>pi.bug-report</c> custom entry data (<c>BugReportSessionEntryData</c>) recorded after a successful
-    /// upload or export. <paramref name="delivery"/> is <c>"zip"</c> or <c>"upload"</c>; <paramref name="path"/> is the archive.</summary>
+    /// export. <paramref name="delivery"/> is <c>"zip"</c> or PiSharp's <c>"github-issue"</c> (Pi's <c>"upload"</c> is never
+    /// recorded: PiSharp does not upload reports); <paramref name="path"/> is the archive.</summary>
     public static JsonData BugReportSessionEntryData(BugReportBundle bundle, string delivery, string? path = null)
     {
         ArgumentNullException.ThrowIfNull(bundle);

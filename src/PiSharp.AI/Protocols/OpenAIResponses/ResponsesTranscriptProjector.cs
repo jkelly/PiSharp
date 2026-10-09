@@ -211,10 +211,12 @@ public sealed class ResponsesTranscriptProjector
                                 break;
                             case TextContent text: content.Add(same ? text : new TextContent(text.Text)); break;
                             case ToolCallContent tool:
-                                if (tool.Id.Length == 0 || tool.Name.Length == 0) throw Failure(ResponsesProjectionFailure.InvalidTranscript);
+                                // A nameless call, or one with empty id parts, replays with them (owner decision 13); calls with an empty
+                                // call id may share it, as upstream sends them.
                                 var id = same ? tool.Id : NormalizeId(tool.Id, assistant);
                                 if (id != tool.Id) _idMap[tool.Id] = id;
-                                if (!_callIds.Add(CallParts(id).Call)) throw Failure(ResponsesProjectionFailure.IdentityCollision);
+                                var callPart = CallParts(id).Call;
+                                if (callPart.Length > 0 && !_callIds.Add(callPart)) throw Failure(ResponsesProjectionFailure.IdentityCollision);
                                 content.Add(new ToolCallContent(id, tool.Name, tool.Arguments, same ? tool.ExtraProperties : null));
                                 break;
                         }
@@ -232,7 +234,7 @@ public sealed class ResponsesTranscriptProjector
 
         private List<Entry> PairAndOrder(List<Entry> entries)
         {
-            var result = new List<Entry>(); var pending = new Dictionary<string, string>(StringComparer.Ordinal);
+            var result = new List<Entry>(); var pending = new List<(string Id, string Name)>();
             var matched = new HashSet<string>(StringComparer.Ordinal); var held = new List<Entry>();
             void Close()
             {
@@ -259,13 +261,17 @@ public sealed class ResponsesTranscriptProjector
                     Close();
                     if (assistant.StopReason is StopReason.Error or StopReason.Aborted) continue;
                     foreach (var tool in assistant.Content.OfType<ToolCallContent>())
-                        if (!pending.TryAdd(tool.Id, tool.Name)) throw Failure(ResponsesProjectionFailure.IdentityCollision);
+                    {
+                        if (!SharedCallId(tool.Id) && pending.Any(call => call.Id == tool.Id)) throw Failure(ResponsesProjectionFailure.IdentityCollision);
+                        pending.Add((tool.Id, tool.Name));
+                    }
                     result.Add(entry);
                 }
                 else if (entry.Role == "toolResult")
                 {
                     var id = String(entry.Body.Value, "toolCallId");
-                    if (!pending.TryGetValue(id, out var name) || name != String(entry.Body.Value, "toolName") || !matched.Add(id))
+                    var resultName = String(entry.Body.Value, "toolName");
+                    if (!pending.Any(call => call.Id == id && call.Name == resultName) || !matched.Add(id) && !SharedCallId(id))
                         throw Failure(ResponsesProjectionFailure.UnmatchedToolResult);
                     result.Add(entry);
                 }
@@ -411,13 +417,15 @@ public sealed class ResponsesTranscriptProjector
             foreach (var character in value.Take(64)) result.Append(char.IsAsciiLetterOrDigit(character) || character is '_' or '-' ? character : '_');
             return result.ToString().TrimEnd('_');
         }
+        // const [callId, itemId] = id.split("|"): either part may be empty (owner decision 13).
         private static (string Call, string? Item) CallParts(string id)
         {
             var parts = id.Split('|');
-            if (parts.Length > 2 || parts[0].Length == 0 || parts.Length == 2 && parts[1].Length == 0)
-                throw Failure(ResponsesProjectionFailure.IdentityCollision);
+            if (parts.Length > 2) throw Failure(ResponsesProjectionFailure.IdentityCollision);
             return (parts[0], parts.Length == 2 ? parts[1] : null);
         }
+        /// <summary>An id-less call's empty call id, which several calls may share.</summary>
+        private static bool SharedCallId(string id) => id.Split('|')[0].Length == 0;
         private bool SameModel(AssistantMessage assistant) => assistant.Provider == request.Model.Provider && assistant.Api == request.Model.Api && assistant.Model == request.Model.Id;
 
         private string ArgumentString(JsonElement value)

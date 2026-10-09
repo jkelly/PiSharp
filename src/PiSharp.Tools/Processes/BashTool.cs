@@ -68,7 +68,8 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             invocation.AssistantMessage.Content.IsDefault || invocation.SourceIndex < 0 ||
             invocation.SourceIndex >= invocation.AssistantMessage.Content.Length ||
             !ReferenceEquals(invocation.AssistantMessage.Content[invocation.SourceIndex], invocation.Call) ||
-            !Text(invocation.Call.Id) || string.IsNullOrWhiteSpace(invocation.Call.Id))
+            // An id-less call (id "", owner decision 13) runs as upstream runs it; the id names the call, it authorizes nothing.
+            !Text(invocation.Call.Id))
             throw Invalid();
         var input = Parse(invocation.Call.Arguments, normalized: false);
         cancellationToken.ThrowIfCancellationRequested();
@@ -82,9 +83,11 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             _options.ExposeSessionEnvironment ? _options.SessionEnvironment?.Invoke() : null);
         var context = new BashSpawnContext(Resolve(input.Command), _options.WorkingDirectory, environment);
         if (_options.SpawnHook is { } hook) context = hook(context) ?? throw Invalid();
-        // Source spawn(shell, [...args, command]): Node rejects an argument with a NUL byte.
-        if (_options.CommandTransport == ShellCommandTransport.Argv && context.Command.Contains('\0') &&
-            NodeArgumentErrors.SpawnArguments(Shell.CommandArguments(context.Command)) is { } spawnError)
+        // Source spawn(shell, [...args, command], { cwd, env }): Node rejects a NUL byte in the file, an argument, the cwd or the
+        // environment before spawning, on every platform (posix_spawn would otherwise cut the string and run something else). With
+        // commandTransport "stdin" the command is not a spawn argument.
+        if (NodeArgumentErrors.SpawnNullBytes(_options.Executable, Shell.CommandArguments(context.Command), context.WorkingDirectory,
+            context.Environment) is { } spawnError)
             throw new ToolSourceErrorException(spawnError);
         if (!Text(context.Command, allowNul: StdinTransport) || context.Command.Length > _options.MaximumCommandCharacters + (_options.CommandPrefix?.Length + 1 ?? 0) &&
             _options.SpawnHook is null || !Absolute(context.WorkingDirectory) || !EnvironmentValid(context.Environment)) throw Invalid();

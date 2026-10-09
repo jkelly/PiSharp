@@ -136,7 +136,7 @@ internal static class ToolImageResumeTests
         {
             var changed = JsonNode.Parse(tool)!.AsObject(); changed.Remove(name); await Rejected(history.SetItem(history.Length - 1, Entry(changed.ToJsonString())), "missing-" + name);
         }
-        foreach (var (name, value) in new (string, JsonNode?)[] { ("toolCallId", JsonValue.Create(" ")), ("toolName", JsonValue.Create("")), ("timestamp", JsonValue.Create("wrong")), ("isError", JsonValue.Create("wrong")) })
+        foreach (var (name, value) in new (string, JsonNode?)[] { ("toolCallId", JsonValue.Create(1)), ("toolName", null), ("timestamp", JsonValue.Create("wrong")), ("isError", JsonValue.Create("wrong")) })
         { var changed = JsonNode.Parse(tool)!.AsObject(); changed[name] = value; await Rejected(history.SetItem(history.Length - 1, Entry(changed.ToJsonString())), "invalid-" + name); }
         await Rejected(ReplaceTool(history, "\"content\":[{\"type\":\"image\",\"data\":\"PRIVATE_RESUME_BLOB\",\"mimeType\":null}]"), "sanitized-image-diagnostic");
         var wrong = JsonNode.Parse(tool)!.AsObject(); wrong["role"] = "assistant";
