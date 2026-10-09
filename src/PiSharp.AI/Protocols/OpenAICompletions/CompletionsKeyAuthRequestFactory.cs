@@ -65,6 +65,7 @@ public sealed class CompletionsKeyAuthRequestFactory
         CompletionsTranscriptProjectionOptions? projectionOptions = null, CompletionsKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new(); _projectionOptions = projectionOptions ?? new();
+        _withSession = session => new(endpoint, expectedModel, projectionOptions, _options with { SessionId = session });
         if (endpoint is null || expectedModel is null || !endpoint.IsAbsoluteUri || endpoint.Scheme is not ("http" or "https") ||
             endpoint.UserInfo.Length != 0 || endpoint.Fragment.Length != 0 ||
             expectedModel.Api != "openai-completions" || !Identity(expectedModel.Id) || !Identity(expectedModel.Provider) ||
@@ -178,12 +179,25 @@ public sealed class CompletionsKeyAuthRequestFactory
                 }
             }
         }
+        foreach (var (name, value) in PiSharp.AI.Providers.ProviderHeaderPolicies.OpenCodeSessionHeaders(expectedModel.Provider, endpoint, _options.SessionId)) headers[name] = value;
         ReadHeaders(_options.Headers, headers, ref supplied); CheckHeaders(headers, includeAuthorization: false);
         _headers = headers.ToImmutableArray();
     }
 
+    // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id).
+    private readonly Func<string, CompletionsKeyAuthRequestFactory> _withSession;
+    private sealed record SessionScoped(string Id, CompletionsKeyAuthRequestFactory Factory);
+    private SessionScoped? _sessionScoped;
+    private CompletionsKeyAuthRequestFactory? ScopedTo(ChatRequest? request)
+    {
+        if (request?.SessionId is not { } id || _options.SessionId is not null) return null;
+        if (Volatile.Read(ref _sessionScoped) is { } cached && cached.Id == id) return cached.Factory;
+        var created = _withSession(id); Volatile.Write(ref _sessionScoped, new(id, created)); return created;
+    }
+
     public HttpRequestMessage Create(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
     {
+        if (ScopedTo(request) is { } scoped) return scoped.Create(request, explicitApiKey, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(CompletionsRequestFailure.InvalidRequest);
         if (string.IsNullOrEmpty(explicitApiKey)) throw Fail(CompletionsRequestFailure.InvalidKey);

@@ -87,6 +87,16 @@ public static class ProviderHeaderPolicies
     public static ImmutableDictionary<string, string?> CloudflareGatewayHeaders(string apiKey) => ImmutableDictionary.CreateRange(StringComparer.Ordinal,
         new KeyValuePair<string, string?>[] { new("cf-aig-authorization", "Bearer " + apiKey), new("Authorization", null), new("x-api-key", null) });
 
+    /// <summary>provider-attribution.ts getSessionHeaders (and opencode-headers.ts withOpenCodeSessionHeader): an OpenCode request
+    /// (provider opencode or opencode-go, or an opencode.ai base URL) carries x-opencode-session with the session id and
+    /// x-opencode-client naming the client (PiSharp, which does not identify as Pi). Caller headers applied later override them.</summary>
+    public static IEnumerable<KeyValuePair<string, string>> OpenCodeSessionHeaders(string provider, Uri endpoint, string? sessionId)
+    {
+        if (string.IsNullOrEmpty(sessionId) || !(provider is "opencode" or "opencode-go" || endpoint.Host.Equals("opencode.ai", StringComparison.OrdinalIgnoreCase))) yield break;
+        yield return new("x-opencode-session", sessionId);
+        yield return new("x-opencode-client", "pisharp");
+    }
+
     /// <summary>withOpenCodeSessionHeader: x-opencode-session carries the session id unless the caller already sets it.</summary>
     public static ImmutableDictionary<string, string?>? WithOpenCodeSessionHeader(string? sessionId, ImmutableDictionary<string, string?>? headers)
     {

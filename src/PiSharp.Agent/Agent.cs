@@ -22,6 +22,8 @@ public sealed record AgentConfiguration(ModelDescriptor Model, IChatTransport Tr
     IToolHooks? ToolHooks = null, ToolExecutionMode ExecutionMode = ToolExecutionMode.Parallel, AgentHooks? Hooks = null)
 {
     public string ThinkingLevel { get; init; } = "off";
+    /// <summary>Source agent.sessionId: the session id every request carries (<see cref="ChatRequest.SessionId"/>).</summary>
+    public string? SessionId { get; init; }
 }
 public enum AgentCancellationBehavior { Propagate, SettleAborted }
 public sealed record AgentOptions(AgentLoopOptions? Loop = null, AgentPendingInputQueueOptions? Queue = null,
@@ -335,7 +337,7 @@ public sealed class Agent : IAsyncDisposable
             }
             var turn = new TurnRunner(new ChatClient(config.Transport, _options.StreamCapacity) { TimeProvider = _options.TimeProvider },
                 new ToolBatchScheduler(config.Tools, config.ToolHooks, config.ExecutionMode, _progressOptions, _options.ResultValues)
-                { TimeProvider = _options.TimeProvider }, config.ThinkingLevel);
+                { TimeProvider = _options.TimeProvider }, config.ThinkingLevel, config.SessionId);
             async ValueTask<AgentLoopRequestPreparation?> PrepareBoundary(AgentRequestBoundary boundary, CancellationToken cancellation, int attempt = 0)
             {
                 if (attempt >= 16) throw new InvalidOperationException("Request boundary revision retry limit exceeded.");
@@ -361,7 +363,7 @@ public sealed class Agent : IAsyncDisposable
                     throw new ArgumentException("Invalid boundary system update.");
                 var nextRunner = new TurnRunner(new ChatClient(admitted.Transport, _options.StreamCapacity) { TimeProvider = _options.TimeProvider },
                     new ToolBatchScheduler(admitted.Tools, admitted.ToolHooks, admitted.ExecutionMode, _progressOptions, _options.ResultValues)
-                    { TimeProvider = _options.TimeProvider }, admitted.ThinkingLevel);
+                    { TimeProvider = _options.TimeProvider }, admitted.ThinkingLevel, admitted.SessionId);
                 cancellation.ThrowIfCancellationRequested();
                 var published = false;
                 try { await InCallbackAsync(run, () => update.PublishAsync(() =>

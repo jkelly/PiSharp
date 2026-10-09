@@ -65,7 +65,8 @@ public sealed partial class PersistentAgentSession
     private AgentConfiguration RecoveryConfiguration(AgentConfiguration configuration)
     {
         var original=configuration.Hooks??new();
-        return configuration with { Hooks=original with { PrepareRequestBoundary=PrepareActivationRequestAsync, FinishTurnDecision=async (turn,token)=>
+        // agent.sessionId = sessionManager.getSessionId(): every provider request carries the session id.
+        return configuration with { SessionId=configuration.SessionId??_store.Snapshot.Header.Id, Hooks=original with { PrepareRequestBoundary=PrepareActivationRequestAsync, FinishTurnDecision=async (turn,token)=>
         {
             var decision=original.FinishTurnDecision is null?AgentLoopFinishAction.Default:await original.FinishTurnDecision(turn,token).ConfigureAwait(false);
             double? desired;lock(_gate)desired=_automaticCompaction is null?null:_recoveryDesiredOutput;

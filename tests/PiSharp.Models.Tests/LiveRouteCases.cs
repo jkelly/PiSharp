@@ -62,6 +62,7 @@ internal static partial class Program
         ("live.one-model-per-provider-against-fake-http", LiveEveryProvider),
         ("live.provider-api-routes-are-available-before-any-request", LiveUnsupported),
         ("live.models-json-custom-provider-headers-and-auth-header", LiveCustomProvider),
+        ("live.models-json-key-and-headers-for-anthropic-azure-and-mistral", LiveConfiguredHeaders),
         ("live.cli-patterns-fallback-thinking-and-ambiguity", LivePatterns),
         ("live.scoped-models-and-settings-defaults", LiveScoped),
         ("live.legacy-pinned-parse-still-exact", Sync(LiveLegacyParse)),
@@ -145,6 +146,31 @@ internal static partial class Program
             .ResolveAsync(null, new LiveSessionRuntime(Env(), () => null), null, false, CancellationToken.None), "classifier-only");
         Check(classifier.Code == "UnknownLiveModel" && classifier.Message == "Unknown provider \"typesafe\". Use --list-models to see available providers/models.", classifier.Message);
     }
+
+    // provider-composer composeApiKeyAuth and model-runtime getAuth: a models.json apiKey authenticates a provider with nothing stored
+    // (anthropic included), and the configured provider and model headers reach every request (anthropic, azure and mistral included).
+    private static Task LiveConfiguredHeaders() => WithTemp("live-configured", async root =>
+    {
+        var models = Path.Combine(root, "models.json");
+        await File.WriteAllTextAsync(models, """
+            {"providers":{"anthropic":{"apiKey":"cfg-anthropic-key","headers":{"X-Proxy":"p1"}},"azure":{"headers":{"X-Az":"a1"}},"mistral":{"headers":{"X-Mi":"m1"}}}}
+            """);
+        var endpoint = new LiveEndpoint(_ => new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("""{"error":{"message":"refused"}}""") });
+        var runtime = new LiveSessionRuntime(Env(("AZURE_OPENAI_API_KEY", "az-key"), ("AZURE_OPENAI_BASE_URL", "https://az.invalid/openai/v1"), ("MISTRAL_API_KEY", "mi-key")),
+            () => endpoint, ModelsPath: models);
+        var anthropic = await new SettingsModelSelection("anthropic", LiveModelFor("anthropic"), null).ResolveAsync(null, runtime, null, false, CancellationToken.None);
+        var (authentication, handler, reresolve) = await anthropic.ResolveAnthropicAsync(runtime, CancellationToken.None);
+        await using (var connection = await anthropic.ConnectResolvedAnthropicAsync(authentication, handler, CancellationToken.None, reresolve))
+            await Drive(connection.CreateTransport(), anthropic.Model);
+        var sent = endpoint.Snapshot()[^1];
+        Equal("cfg-anthropic-key", sent.Headers["x-api-key"], "models.json apiKey for anthropic"); Equal("p1", sent.Headers["X-Proxy"], "anthropic provider header");
+        foreach (var (provider, header, value) in new[] { ("azure", "X-Az", "a1"), ("mistral", "X-Mi", "m1") })
+        {
+            var selection = await new SettingsModelSelection(provider, LiveModelFor(provider), null).ResolveAsync(null, runtime, null, false, CancellationToken.None);
+            using (var connection = selection.Connect(runtime)) await Drive(connection.CreateTransport(), selection.Model);
+            Equal(value, endpoint.Snapshot()[^1].Headers.GetValueOrDefault(header), provider + " configured header");
+        }
+    });
 
     private static Task LiveCustomProvider() => WithTemp("live-custom", async root =>
     {

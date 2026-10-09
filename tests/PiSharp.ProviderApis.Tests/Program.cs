@@ -44,6 +44,7 @@ internal static partial class Program
             ("copilot.dynamic-headers-and-bearer-auth-on-every-api", CopilotRequests),
             ("cloudflare.workers-ai-and-gateway-urls-and-auth", CloudflareRequests),
             ("opencode.session-header-policy", Sync(OpenCodeHeaders)),
+            ("opencode.request-session-id-sets-the-session-headers", OpenCodeSessionFromRequest),
             ("budget.4-5-mb-images-reach-copilot-bedrock-and-codex", LargeImageRequests),
             ("authjson.json-provider-fields-and-api-key-entries", AuthJsonFields),
             ("authjson.stored-command-keys-resolve-for-every-provider", StoredCommandKeys),

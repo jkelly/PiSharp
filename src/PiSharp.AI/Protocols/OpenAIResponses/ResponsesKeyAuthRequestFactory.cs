@@ -82,6 +82,7 @@ public sealed class ResponsesKeyAuthRequestFactory
         ResponsesTranscriptProjectionOptions projectionOptions, ResponsesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
+        _withSession = session => new(endpoint, expectedModel, projectionOptions, _options with { SessionId = session });
         if (_options.OnPayload?.GetInvocationList().Length > 1 || _options.OnResponse?.GetInvocationList().Length > 1 ||
             _options.OnProviderStreamEvent?.GetInvocationList().Length > 1)
             throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
@@ -155,8 +156,20 @@ public sealed class ResponsesKeyAuthRequestFactory
             ? ",\"prompt_cache_retention\":\"24h\"" : "";
     }
 
+    // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id).
+    private readonly Func<string, ResponsesKeyAuthRequestFactory> _withSession;
+    private sealed record SessionScoped(string Id, ResponsesKeyAuthRequestFactory Factory);
+    private SessionScoped? _sessionScoped;
+    private ResponsesKeyAuthRequestFactory? ScopedTo(ChatRequest? request)
+    {
+        if (request?.SessionId is not { } id || _options.SessionId is not null) return null;
+        if (Volatile.Read(ref _sessionScoped) is { } cached && cached.Id == id) return cached.Factory;
+        var created = _withSession(id); Volatile.Write(ref _sessionScoped, new(id, created)); return created;
+    }
+
     public HttpRequestMessage Create(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
     {
+        if (ScopedTo(request) is { } scoped) return scoped.Create(request, explicitApiKey, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Failure(ResponsesKeyAuthRequestFailure.InvalidRequest);
         if (explicitApiKey is null || explicitApiKey.Length == 0)
@@ -254,6 +267,7 @@ public sealed class ResponsesKeyAuthRequestFactory
                 headers["x-client-request-id"] = session;
             }
         }
+        foreach (var (name, value) in PiSharp.AI.Providers.ProviderHeaderPolicies.OpenCodeSessionHeaders(_model.Provider, _endpoint, _options.SessionId)) headers[name] = value;
         Merge(_options.Headers);
         long total = 0;
         if (headers.Count > _options.MaximumHeaders) throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);

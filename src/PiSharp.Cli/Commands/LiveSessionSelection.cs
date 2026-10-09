@@ -74,9 +74,12 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
     /// <summary>The session's environment, built once from <see cref="ReadEnvironment"/>.</summary>
     internal PiSharp.Cli.Authentication.LiveProcessEnvironment CreateEnvironment() => new(ReadEnvironment, ProviderVariables);
 
-    internal PiSharp.Cli.Authentication.AnthropicLiveAuthentication CreateAnthropicAuthentication(PiSharp.Cli.Authentication.LiveProcessEnvironment environment) =>
+    /// <param name="configuredApiKey">The models.json <c>providers.anthropic.apiKey</c> (provider-composer composeApiKeyAuth), used when
+    /// nothing is stored.</param>
+    internal PiSharp.Cli.Authentication.AnthropicLiveAuthentication CreateAnthropicAuthentication(PiSharp.Cli.Authentication.LiveProcessEnvironment environment,
+        Func<string?>? configuredApiKey = null) =>
         new(AuthPath is null ? null : new PiSharp.Cli.Authentication.AuthJsonCredentialStore(AuthPath, Time), environment,
-            CreateAuthHttp ?? (() => new HttpClient()), Time);
+            CreateAuthHttp ?? (() => new HttpClient()), Time) { ConfiguredApiKey = configuredApiKey };
 
     /// <summary>The remote model catalog origin (null: https://pi.dev) and its HTTP client (tests).</summary>
     internal string? CatalogBaseUrl { get; init; }
@@ -205,7 +208,8 @@ internal sealed class LiveSessionSelection
     {
         if (Model.Provider != "anthropic") throw new ArgumentException("Anthropic resolution requires an Anthropic selection.");
         runtime ??= LiveSessionRuntime.Default;
-        var authentication = runtime.CreateAnthropicAuthentication(runtime.CreateEnvironment());
+        var registry = Registry;
+        var authentication = runtime.CreateAnthropicAuthentication(runtime.CreateEnvironment(), registry is null ? null : () => registry.ConfiguredApiKey("anthropic"));
         AuthenticationResolution resolved;
         // Source ModelsError texts: a failed refresh or an unreadable store refuses the session with its reason.
         try { resolved = await authentication.ResolveAsync(cancellationToken).ConfigureAwait(false); }
@@ -393,7 +397,11 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             ModelSupportsImages: definition.DeclaresImageInput, ThinkingEnabled: false,
             MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
             CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), definition.Raw, summary);
-        var options = new AnthropicMessagesKeyAuthRequestOptions(MaxTokens: maximum, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes);
+        // getApiKeyAndHeaders: models.json provider headers (authHeader with the resolved key) and model headers travel with every request.
+        var configured = selected.Registry is { } registry && selected.Entry is { } entry
+            ? registry.ConfiguredRequestHeaders(entry, authentication.Authentication is { Kind: not AuthenticationKind.WorkloadIdentityFederation } resolved ? resolved.Secret : null) : null;
+        var options = new AnthropicMessagesKeyAuthRequestOptions(MaxTokens: maximum, MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes,
+            Headers: configured is null ? null : JsonData.Parse(System.Text.Json.JsonSerializer.Serialize(configured)));
         return summary
             ? AnthropicResolvedTransports.AcquireSummaryAsync(selected.Model, new Uri(definition.BaseUrl), authentication,
                 maximum, projection, options, handler, token)
@@ -482,15 +490,17 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         {
             // providers/azure.ts: azure-openai-responses through its Simple stream, openai-completions through the OpenAI client.
             var azure = Azure ?? throw new InvalidOperationException("Azure endpoint configuration missing.");
+            // getApiKeyAndHeaders: the configured models.json provider/model headers travel with every request.
+            var azureHeaders = RequestHeaders is null ? null : JsonData.Parse(System.Text.Json.JsonSerializer.Serialize(RequestHeaders));
             if (model.Api == "azure-openai-responses")
                 return Own(NativeProviderFactory.CreateAzureResponses(model, credential, definition.Raw,
                     new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes) { ModelSupportsImages = definition.DeclaresImageInput }, maximum, azure, handler,
-                    fixedReasoningOff: summary));
+                    fixedReasoningOff: summary, headers: azureHeaders));
             return Own(NativeProviderFactory.CreateAzureCompletions(model, credential, azure,
                 new(Reasoning: reasoning, MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes,
                     ToolDeclarations: new(MaximumMessages: 1024, MaximumEntryCharacters: PiPayloadBudget.RequestEntryCharacters, MaximumInputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputCharacters: PiPayloadBudget.RequestPayloadBytes, MaximumOutputBytes: PiPayloadBudget.RequestPayloadBytes)) { ModelSupportsImages = definition.DeclaresImageInput },
                 new(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
-                    MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { ModelMetadata = definition.Raw }, handler, summary ? null : definition.Raw));
+                    MaximumPayloadBytes: PiPayloadBudget.RequestPayloadBytes) { ModelMetadata = definition.Raw, Headers = azureHeaders }, handler, summary ? null : definition.Raw));
         }
         if (model.Api == "openai-completions")
         {
@@ -556,7 +566,8 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
                 var options = new MistralTextOptions(endpoint, SupportsText: true,
                     new(costs.GetProperty("input").GetDouble(), costs.GetProperty("output").GetDouble(),
                         costs.GetProperty("cacheRead").GetDouble(), costs.GetProperty("cacheWrite").GetDouble()), "PiSharp")
-                    { MaxTokens = maximum, Reasoning = !summary && reasoning, CachePrompt = !summary, SupportsImages = definition.DeclaresImageInput };
+                    { MaxTokens = maximum, Reasoning = !summary && reasoning, CachePrompt = !summary, SupportsImages = definition.DeclaresImageInput,
+                      Headers = RequestHeaders?.ToImmutableDictionary(pair => pair.Key, pair => (string?)pair.Value, StringComparer.Ordinal) };
                 return NativeProviderFactory.CreateCatalogMistral(model, definition.BaseUrl, credential, definition.Raw, options, simple: !summary, handler);
             }
             default: throw new LiveSessionException("LiveApiUnavailable", $"The {model.Api} API has no live route in PiSharp yet.");

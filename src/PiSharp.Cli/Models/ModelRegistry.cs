@@ -355,6 +355,22 @@ internal sealed class ModelRegistry
         }
     }
 
+    /// <summary>composeApiKeyAuth for a provider with its own auth resolution (Anthropic): the models.json <c>apiKey</c> (config value
+    /// resolved, !command run), used when nothing is stored for the provider. Null when none is configured.</summary>
+    internal string? ConfiguredApiKey(string providerId) =>
+        ModelProviderComposer.ApiKey(ProviderConfig(providerId)) is { } rawKey ? Values.ResolveOrThrow(rawKey, $"API key for provider \"{providerId}\"", null) : null;
+
+    /// <summary>composeApiKeyAuth withConfiguredAuth plus getAuth's resolveConfiguredModelHeaders: the models.json provider headers
+    /// (and <c>authHeader</c> with the resolved key), then the model's configured headers. Null when nothing is configured.</summary>
+    internal IReadOnlyDictionary<string, string>? ConfiguredRequestHeaders(RegistryModel model, string? key)
+    {
+        var providerConfig = ProviderConfig(model.Provider);
+        var headers = Values.ResolveHeadersOrThrow(ModelProviderComposer.ConfiguredHeaders(providerConfig), $"provider \"{model.Provider}\"", null);
+        var auth = ModelProviderComposer.WithConfiguredAuth(key, null, headers, ModelProviderComposer.AuthHeader(providerConfig) && key is not null);
+        var modelHeaders = Values.ResolveHeadersOrThrow(ModelProviderComposer.RawModelHeaders(model, providerConfig), $"model \"{model.Reference}\"", null);
+        return ModelProviderComposer.MergeHeaders(auth, modelHeaders);
+    }
+
     /// <summary>Source registerVirtualModel: re-registering replaces; a physical model with the same provider and id conflicts.</summary>
     internal void RegisterVirtualModel(VirtualModelDefinition definition)
     {

@@ -16,6 +16,7 @@ internal static partial class Program
     [
         Case("diagnostics.projector.records-and-reads-every-declared-adapter", DiagnosticAdapters),
         Case("catalog.mid-run-publication-retries-without-an-idle-fallback", MidRunPublicationRetries),
+        Case("requests.carry-the-session-id", RequestsCarrySessionId),
         Case("diagnostics.rpc-host.mistral-failure-is-recorded-and-the-host-survives", MistralFailureThroughRpc),
         Case("mistral.replay-ignores-extra-system-and-user-fields", MistralExtraFields),
     ];
@@ -41,6 +42,14 @@ internal static partial class Program
         f.StartRpc(); await f.PromptAsync();
         Check(receipt is not null, "The publication fell back to the idle boundary.");
         Equal(21, prepares, "prepared again after each concurrent change");
+    }
+
+    // agent-session.ts: agent.sessionId = sessionManager.getSessionId(), and every provider request gets it (StreamOptions.sessionId).
+    private static async Task RequestsCarrySessionId()
+    {
+        await using var f = await CreateAsync(Response(text: "one"));
+        f.StartRpc(); await f.PromptAsync();
+        Equal(f.Session.Snapshot.Log.Header.Id, f.Transport.Requests.Single().SessionId, "request session id");
     }
 
     private static Task DiagnosticAdapters()
