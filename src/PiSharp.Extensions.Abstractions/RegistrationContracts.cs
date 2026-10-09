@@ -95,6 +95,12 @@ public sealed record ExtensionToolDescriptor(
     /// <summary>Source ToolAnnotations: the author's unverified hints with MCP's meaning (<c>readOnlyHint</c>, <c>destructiveHint</c>,
     /// <c>idempotentHint</c>, <c>openWorldHint</c>), reported by getAllTools. Null declares none.</summary>
     public System.Collections.Immutable.ImmutableDictionary<string, bool>? Annotations { get; init; }
+    /// <summary>Source ToolDefinition.promptSnippet: the one-line entry of the system prompt's tool list (none when null).</summary>
+    public string? PromptSnippet { get; init; }
+    /// <summary>Source ToolDefinition.executionMode <c>"sequential"</c>: a batch containing this tool runs its calls one at a time.</summary>
+    public bool SequentialExecution { get; init; }
+    /// <summary>Source ToolDefinition.outputSchema: the JSON schema of the result's <c>structuredContent</c> (codemode resolves to it).</summary>
+    public JsonData? OutputSchema { get; init; }
 }
 
 public sealed record ExtensionCommandDescriptor(

@@ -68,7 +68,7 @@ internal sealed class PiExtensionRun : IAsyncDisposable
         foreach (var resource in cli.Extensions.Concat(resolved.Extensions))
         {
             if (!resource.Enabled || resource.Path.StartsWith("builtin:", StringComparison.Ordinal)) continue;
-            if (seen.Add(Path.GetFullPath(resource.Path))) list.Add(new(resource.Path, resource.Metadata.Scope, resource.Metadata.Source));
+            if (seen.Add(Path.GetFullPath(resource.Path))) list.Add(new(resource.Path, resource.Metadata.Scope, resource.Metadata.Source, resource.Metadata.Origin, resource.Metadata.BaseDir));
         }
         // A local -e path that does not exist is still reported (Extension path does not exist).
         foreach (var path in _parsed.Extensions ?? [])

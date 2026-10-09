@@ -54,7 +54,7 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         MaximumOwners = 1024, MaximumRegistrations = 16_384, MaximumRegistrationsPerOwner = 2_048, MaximumMetadataCharacters = 64 * 1024 * 1024,
         MaximumDescriptionCharacters = 1024 * 1024, MaximumJsonCharacters = 64 * 1024 * 1024, MaximumJsonDepth = 64,
         // Pi extensions may replace built-in tools (registerTool with a built-in name) and register any command name.
-        ReservedToolNames = [], ReservedCommandNames = []
+        ReservedToolNames = [], ReservedCommandNames = [], AllowAnyCommandName = true
     };
 
     private readonly PiExtensionHostOptions _options;
@@ -81,6 +81,17 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     internal string? RuntimeFallback { get; private set; }
     /// <summary>What the Node host loaded: <c>pi@1.1.0</c> or <c>compatibility</c>.</summary>
     internal string Modules { get; private set; } = "compatibility";
+    /// <summary>The bound session's command catalog (RPC get_commands rows): extension commands, prompt templates and skills.</summary>
+    internal Func<PiSharp.Contracts.JsonData>? CommandCatalog { get; set; }
+    private readonly ConcurrentDictionary<string, JsonObject> _sourceInfos = new(PiPaths.Comparer);
+
+    /// <summary>applyExtensionSourceInfo: the resolved source of an extension path (package, scope, origin).</summary>
+    internal void SetSourceInfo(string path, JsonObject sourceInfo) => _sourceInfos[Path.GetFullPath(path)] = sourceInfo;
+
+    /// <summary>The extension's sourceInfo (also its commands' and tools'); getDefaultSourceInfoForPath for a path without one.</summary>
+    internal JsonObject SourceInfoOf(PiLoadedExtension extension) =>
+        _sourceInfos.TryGetValue(Path.GetFullPath(extension.ResolvedPath), out var info) ? (JsonObject)info.DeepClone()
+            : new JsonObject { ["path"] = extension.Path, ["source"] = "local", ["scope"] = "temporary", ["origin"] = "top-level", ["baseDir"] = Path.GetDirectoryName(extension.ResolvedPath) };
     internal ImmutableArray<PiLoadedExtension> Extensions { get { lock (_extensions) return [.. _extensions]; } }
     internal ImmutableArray<PiExtensionLoadError> Errors { get { lock (_extensions) return [.. _errors]; } }
     internal bool IsRunning => _node is { HasExited: false };

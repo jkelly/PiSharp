@@ -124,6 +124,7 @@ public static class RpcSessionCommand
             }
             IExtensionUiProvider? activationUi = ui is null ? null : decorateTerminalUi?.Invoke(ui) ?? ui;
             if (activationUi is not null && terminalInputAdmission is not null) activationUi = terminalInputAdmission.Decorate(activationUi);
+            if (piExtensions is not null) piExtensions.UiProvider = activationUi;
             profile = await OfflineSessionProfile.CreateAsync(parsed.Workspace, parsed.Session, parsed.Script,
                 turns, parsed.Reads, parsed.Writes, cancellationToken, gate.BeforeSendAsync, parsed.OfflineApi, parsed.Bash, parsed.Extension, activationUi,
                 async (diagnostic, token) =>
@@ -207,6 +208,12 @@ public static class RpcSessionCommand
                 postInputSettlement: profile.DrainLifecycleHandoffsAsync,
                 postRunSettlement: profile.DrainLifecycleHandoffsAsync, userBash: profile.UserBash);
             profile.ConfigureLifecycleModeStop(lifecycleStop.CancelAsync);
+            if (pi?.Extensions is { } compactingExtensions)
+            {
+                var compactor = dispatcher;
+                compactingExtensions.Compact = async (instructions, token) =>
+                    System.Text.Json.Nodes.JsonNode.Parse((await compactor.CompactForExtensionAsync(profile.ManualCompactionRequest(instructions), token).ConfigureAwait(false)).ToString());
+            }
             // The dispatcher took ownership of the idle session: background MCP servers may publish their tools from now on.
             if (mcpHost is not null && mcpAdmission is not null) mcpHost.HostStarted(mcpAdmission);
             await dispatcher.RunAsync(reader, lifecycleRun.Token).ConfigureAwait(false);
@@ -279,6 +286,7 @@ public static class RpcSessionCommand
             if (finalSession is not null)
             {
                 var state = finalSession.Snapshot;
+                if (state.Fault is not null && Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1") await stderr.WriteAsync("session fault: " + state.Fault + Environment.NewLine).ConfigureAwait(false);
                 var bytes = backend is null ? new FileInfo(finalSession.Path).Length : backend.GetMetadata(finalSession.Path).Bytes;
                 var newFault = state.Fault is not null &&
                     (operationFailure is null || !ReferenceEquals(state.Fault, operationFault));
@@ -289,7 +297,10 @@ public static class RpcSessionCommand
         catch (Exception error) { cleanupFailures.Add(error); }
         settlement?.Complete((operationFailure is null ? cleanupFailures : cleanupFailures.Prepend(operationFailure)).ToImmutableArray());
         if (cleanupFailures.Count > 0)
+        {
+            if (Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1") await stderr.WriteAsync(string.Join(Environment.NewLine, cleanupFailures) + Environment.NewLine).ConfigureAwait(false);
             return await Fail("CleanupFailed", "RPC host cleanup failed after joining owned work; inspect durable state.", 1).ConfigureAwait(false);
+        }
         if (operationFailure is null)
         {
             if (cancellationToken.IsCancellationRequested && userShutdown?.Invoke() != true)

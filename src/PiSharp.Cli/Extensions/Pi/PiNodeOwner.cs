@@ -286,6 +286,9 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
             Exposure = exposure, Namespace = grouping,
             DefaultActive = tool["defaultActive"] is JsonValue active ? active.GetValue<bool>() : exposure is ToolExposure.Direct or ToolExposure.ModelOnly,
             PromptGuidelines = [.. (tool["promptGuidelines"] as JsonArray ?? []).Select(item => item!.GetValue<string>())],
+            PromptSnippet = tool["promptSnippet"] is JsonValue snippet && snippet.GetValueKind() == JsonValueKind.String ? snippet.GetValue<string>() : null,
+            SequentialExecution = tool["executionMode"]?.GetValue<string>() == "sequential",
+            OutputSchema = tool["outputSchema"] is JsonObject output ? JsonData.Parse(output.ToJsonString()) : null,
             ConstrainedSampling = tool["constrainedSampling"] is JsonObject sampling ? JsonData.Parse(sampling.ToJsonString()) : null,
             Annotations = tool["annotations"] is JsonObject hints
                 ? hints.Where(hint => hint.Value is JsonValue value && value.GetValueKind() is JsonValueKind.True or JsonValueKind.False)
@@ -374,8 +377,8 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
     {
         var name = command["name"]!.GetValue<string>();
         var invocation = commandNames?.GetValueOrDefault((extension.Index, name)) ?? name;
-        invocation = invocation.Replace(':', '.'); // Registry names are ASCII identifiers; /name:2 maps to name.2.
-        return new("command-" + invocation, invocation, command["description"]?.GetValue<string>() ?? "", async (arguments, context, token) =>
+        // The registration id is an identifier; the command keeps its Pi name (name:N for duplicates).
+        return new("command-" + string.Concat(invocation.Select(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '.')), invocation, command["description"]?.GetValue<string>() ?? "", async (arguments, context, token) =>
         {
             using var lease = host.Enter(context);
             var args = arguments.Value.ValueKind == JsonValueKind.String ? arguments.Value.GetString() ?? "" : "";

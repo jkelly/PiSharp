@@ -35,7 +35,34 @@ internal sealed partial class PiExtensionHost
     }
     internal void BindActivation(NativeExtensionActivation activation, ExtensionRegistry registry, NativeExistingSessionRegistrationActions actions,
         NativeExtensionContextFacadeHost facadeHost)
-    { _activation = activation; _actions = actions; _ = registry; _ = facadeHost; }
+    {
+        _activation = activation; _actions = actions; _ = facadeHost;
+        // pi.events: the Node extensions and the native extensions of the session share one event bus.
+        _eventBus = registry.SharedEventBus;
+        _eventBus.Tap = (channel, data) =>
+        {
+            if (_deliveringFromNode) return;
+            JsonNode? json;
+            try { json = data switch { null => null, JsonData value => JsonNode.Parse(value.ToString()), JsonElement element => JsonNode.Parse(element.GetRawText()),
+                JsonNode node => node.DeepClone(), _ => JsonSerializer.SerializeToNode(data, data.GetType()) }; }
+            catch (Exception error) when (error is NotSupportedException or JsonException or InvalidOperationException) { return; }
+            if (IsRunning) _ = Node.NotifyAsync("events.deliver", new JsonObject { ["channel"] = channel, ["data"] = json });
+        };
+    }
+
+    private PiSharp.Extensions.Runtime.ExtensionEventBus? _eventBus;
+    [ThreadStatic] private static bool _deliveringFromNode;
+
+    /// <summary>A Node extension's pi.events.emit: the native extensions' listeners receive the data as <see cref="JsonData"/>.</summary>
+    private void DeliverFromNode(JsonElement parameters)
+    {
+        if (_eventBus is not { } bus) return;
+        var data = parameters.TryGetProperty("data", out var value) && value.ValueKind != JsonValueKind.Null ? JsonData.Parse(value.GetRawText()) : null;
+        _deliveringFromNode = true;
+        try { bus.Emit(parameters.GetProperty("channel").GetString()!, data); }
+        catch (Exception error) when (error is PiSharp.Extensions.ExtensionEventBusUnhandledErrorException or InvalidOperationException) { }
+        finally { _deliveringFromNode = false; }
+    }
 
     /// <summary>The extension statuses set with <c>ctx.ui.setStatus</c> (the footer reads them; IMPL-I).</summary>
     internal IReadOnlyDictionary<string, string?> Statuses => _statuses;
@@ -72,7 +99,11 @@ internal sealed partial class PiExtensionHost
             case "ui.read": return UiRead(Op());
             case "ui.setTheme": return new JsonObject { ["success"] = false, ["error"] = "Theme switching from extensions is not available in this PiSharp host" };
             case "ctx.executeTool": return await ExecuteToolAsync(p, request, token).ConfigureAwait(false);
-            case "ctx.compact": throw new NotSupportedException("ctx.compact() is not available in this PiSharp host yet");
+            case "ctx.compact":
+                // Source ExtensionContext.compact(): abort, then the session's manual compaction; onComplete gets the CompactionResult.
+                if (Compact is null) throw new NotSupportedException("ctx.compact() needs a session host with compaction (RPC, interactive)");
+                return await Compact(p.TryGetProperty("customInstructions", out var instructions) && instructions.ValueKind == JsonValueKind.String
+                    ? instructions.GetString() : null, token).ConfigureAwait(false);
             case "command.waitForIdle": await RequireAttached().Session.WaitForIdleAsync(token).ConfigureAwait(false); return null;
             case "command.session": return await SessionCommandAsync(p, token).ConfigureAwait(false);
             case "command.reload": throw new NotSupportedException("ctx.reload() is not available in this PiSharp host yet");
@@ -139,6 +170,7 @@ internal sealed partial class PiExtensionHost
                 RegistrationsChanged?.Invoke(); return;
             case "mcp.register": lock (_mcpServers) _mcpServers.Add(JsonNode.Parse(parameters.GetRawText())!.AsObject()); return;
             case "mcp.unregister": lock (_mcpServers) _mcpServers.RemoveAll(item => item["name"]?.GetValue<string>() == parameters.GetProperty("name").GetString()); return;
+            case "events.emit": DeliverFromNode(parameters); return;
             case "registrations.changed":
             {
                 var index = parameters.GetProperty("ext").GetInt32();
@@ -159,6 +191,12 @@ internal sealed partial class PiExtensionHost
 
     /// <summary>ctx.shutdown(): the mode's graceful shutdown.</summary>
     internal Action? ShutdownRequested { get; set; }
+
+    /// <summary>The session's extension UI (RPC or terminal) for UI calls made after their callback returned.</summary>
+    internal IExtensionUiProvider? UiProvider { get; set; }
+
+    /// <summary>ctx.compact(): the mode's manual compaction (the RPC dispatcher's), returning the CompactionResult.</summary>
+    internal Func<string?, CancellationToken, Task<JsonNode?>>? Compact { get; set; }
 
     private static async Task Guard(Task work)
     {
@@ -257,7 +295,7 @@ internal sealed partial class PiExtensionHost
                     .Select(hint => KeyValuePair.Create(hint.Key, (JsonNode?)hint.Value))]);
             if (annotations.TryGetValue(name, out var source) && registered.IsExtension)
             {
-                info["sourceInfo"] = new JsonObject { ["path"] = source.Extension.ResolvedPath, ["source"] = "local", ["scope"] = "user", ["origin"] = "top-level" };
+                info["sourceInfo"] = SourceInfoOf(source.Extension);
             }
             else info["sourceInfo"] = new JsonObject { ["path"] = "<builtin:" + name + ">", ["source"] = "builtin", ["scope"] = "temporary", ["origin"] = "top-level" };
             tools.Add(info);
@@ -270,14 +308,33 @@ internal sealed partial class PiExtensionHost
     /// <summary>Source getCommands: extension commands (with invocation names), then prompt templates and skills (IMPL-I adds those).</summary>
     private JsonArray Commands()
     {
+        // The session's command catalog (extension commands, prompt templates, skills) when a session is bound; else this host's own.
+        var names = CommandInvocationNames();
+        var byOwner = Extensions.ToDictionary(extension => extension.OwnerId, StringComparer.Ordinal);
+        if (CommandCatalog?.Invoke() is { } catalog)
+        {
+            var rows = new JsonArray();
+            foreach (var row in catalog.Value.EnumerateArray())
+            {
+                var item = JsonNode.Parse(row.GetRawText())!.AsObject();
+                var owner = item["ownerId"]?.GetValue<string>();
+                item.Remove("ownerId"); item.Remove("ownerGeneration"); item.Remove("registrationId");
+                if (owner is not null && byOwner.TryGetValue(owner, out var extension)) item["sourceInfo"] = SourceInfoOf(extension);
+                rows.Add(item);
+            }
+            return rows;
+        }
         var commands = new JsonArray();
         foreach (var extension in Extensions)
             foreach (var command in (extension.Descriptor["commands"] as JsonArray ?? []).OfType<JsonObject>())
+            {
+                var name = command["name"]!.GetValue<string>();
                 commands.Add(new JsonObject
                 {
-                    ["name"] = command["name"]!.GetValue<string>(), ["description"] = command["description"]?.DeepClone(), ["source"] = "extension",
-                    ["sourceInfo"] = new JsonObject { ["path"] = extension.ResolvedPath, ["source"] = "local", ["scope"] = "user", ["origin"] = "top-level" }
+                    ["name"] = names.GetValueOrDefault((extension.Index, name)) ?? name, ["description"] = command["description"]?.DeepClone(), ["source"] = "extension",
+                    ["sourceInfo"] = SourceInfoOf(extension)
                 });
+            }
         return commands;
     }
 
@@ -411,9 +468,28 @@ internal sealed partial class PiExtensionHost
 
     private IExtensionUi? UiOf(JsonElement p) => (ContextOf(p) as IExtensionUiContext)?.Ui;
 
+    /// <summary>The UI of a ctx whose callback already returned: upstream's ctx.ui outlives the callback (an onComplete, a timer), so
+    /// a fresh scope of the session's UI serves it, for the same extension owner but without the finished operation's cancellation.</summary>
+    private IExtensionUiScope? DetachedUi(JsonElement p)
+    {
+        if (UiProvider is not { } provider || !p.TryGetProperty("ctx", out var id) || id.ValueKind != JsonValueKind.Number || _contexts.ContainsKey(id.GetInt64()))
+            return null;
+        return ContextOf(p) is { } context ? provider.OpenScope(new DetachedContext(context, Attached?.LifetimeToken ?? CancellationToken.None)) : null;
+    }
+
+    private sealed class DetachedContext(IExtensionContext inner, CancellationToken session) : IExtensionContext
+    {
+        public string OwnerId => inner.OwnerId;
+        public long OwnerGeneration => inner.OwnerGeneration;
+        public CancellationToken OperationCancellationToken => CancellationToken.None;
+        public CancellationToken SessionCancellationToken => session;
+        public CancellationToken ExtensionLifetimeCancellationToken => inner.ExtensionLifetimeCancellationToken;
+    }
+
     private async Task<JsonNode?> DialogAsync(JsonElement p, string op, JsonElement args, CancellationToken token)
     {
-        var ui = UiOf(p);
+        await using var detached = DetachedUi(p);
+        var ui = detached ?? UiOf(p);
         if (ui is null) return op == "confirm" ? false : null;
         string Text(int index) => args.GetArrayLength() > index && args[index].ValueKind == JsonValueKind.String ? args[index].GetString()! : "";
         ExtensionUiDialogOptions? Options(int index) => args.GetArrayLength() > index && args[index].ValueKind == JsonValueKind.Object &&
@@ -442,8 +518,9 @@ internal sealed partial class PiExtensionHost
         // addAutocompleteProvider, onTerminalInput, setToolsExpanded, component widgets): the interactive mode (IMPL-I) subscribes here;
         // component ids render through RenderComponentAsync.
         if (op is not null) InteractiveUi?.Invoke(op, args.ValueKind == JsonValueKind.Array ? args.Clone() : default);
-        var ui = UiOf(p);
-        if (ui is null) return;
+        await using var detached = DetachedUi(p);
+        IExtensionUi? ui;
+        try { ui = detached ?? UiOf(p); } catch (Exception error) when (error is InvalidOperationException or ObjectDisposedException or OperationCanceledException) { ui = null; }
         ExtensionUiNotification? notification = op switch
         {
             "notify" => new ExtensionUiNotify(Text(0) ?? "", Text(1) switch { "warning" => ExtensionUiNotifyKind.Warning, "error" => ExtensionUiNotifyKind.Error, _ => ExtensionUiNotifyKind.Info }),
@@ -454,8 +531,9 @@ internal sealed partial class PiExtensionHost
             _ => null
         };
         if (notification is null) return;
+        if (ui is null) return;
         try { await ui.PublishAsync(notification).ConfigureAwait(false); }
-        catch (Exception error) when (error is InvalidOperationException or NotSupportedException or OperationCanceledException) { }
+        catch (Exception error) when (error is InvalidOperationException or NotSupportedException or OperationCanceledException or ObjectDisposedException) { }
 
         ExtensionUiNotification? Widget()
         {
