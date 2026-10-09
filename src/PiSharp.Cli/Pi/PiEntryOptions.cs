@@ -71,4 +71,6 @@ internal sealed record PiEntryOptions
     internal ImmutableArray<string> ExtensionPaths { get; init; } = [];
     internal bool NoExtensions { get; init; }
     internal ImmutableDictionary<string, string?> ExtensionFlagValues { get; init; } = ImmutableDictionary<string, string?>.Empty;
+    /// <summary>Interactive mode inputs (IMPL-I): directories, resources and the live host link.</summary>
+    internal PiSharp.Cli.Interactive.Mode.InteractiveStartup? Interactive { get; init; }
 }

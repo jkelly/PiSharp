@@ -186,6 +186,9 @@ public static class RpcSessionCommand
                 postInputSettlement: profile.DrainLifecycleHandoffsAsync,
                 postRunSettlement: profile.DrainLifecycleHandoffsAsync, userBash: profile.UserBash);
             profile.ConfigureLifecycleModeStop(lifecycleStop.CancelAsync);
+            // IMPL-I: the interactive mode reads the live session for features the RPC protocol does not carry.
+            var publishedProfile = profile; var publishedSession = session;
+            pi?.Interactive?.Host.Publish(() => publishedProfile.Sessions?.Current.Session ?? publishedSession, publishedProfile);
             // The dispatcher took ownership of the idle session: background MCP servers may publish their tools from now on.
             if (mcpHost is not null && mcpAdmission is not null) mcpHost.HostStarted(mcpAdmission);
             await dispatcher.RunAsync(reader, lifecycleRun.Token).ConfigureAwait(false);

@@ -297,7 +297,8 @@ internal static class PiCommand
             MigratedAuthProviders = migrations.MigratedAuthProviders, DeprecationWarnings = migrations.DeprecationWarnings,
             ProjectTrusted = PiProjectTrust.Seam(trustedDirectories), StartupDiagnostics = allDiagnostics,
             ExtensionPaths = [.. (parsed.Extensions ?? []).Select(path => PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home) : path)],
-            NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal)
+            NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal),
+            Interactive = appMode == PiAppMode.Interactive ? new(agentDir, home, sessionCwd, sessionDir, sessionDir is null, resources, projectTrusted, plan.Mode) : null
         };
         var sessionArgs = SessionArguments(plan, parsed);
         var mcpHost = host.CreateMcpHost(agentDir);

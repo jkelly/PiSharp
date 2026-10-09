@@ -197,7 +197,7 @@ public abstract partial class TuiBase : Container, ITui
     private readonly List<OverlayEntry> overlayStack = [];
     private List<(OverlayEntry Entry, int Row, int Col, int Width, int Height)> renderedOverlayLayouts = [];
     private FocusRestore overlayFocusRestore = FocusRestore.Inactive;
-    protected bool HasOverlayEntries => overlayStack.Count > 0;
+    public bool HasOverlayEntries => overlayStack.Count > 0;
 
     private sealed class OverlayEntry
     {
