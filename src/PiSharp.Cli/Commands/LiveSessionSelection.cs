@@ -466,6 +466,8 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
         };
     }
     internal int MaximumOutputTokens => selection.MaximumOutputTokens;
+    /// <summary>A virtual selection: its summaries are sized from the routed physical model, not from this selection.</summary>
+    internal bool IsVirtual => _virtual is not null;
     private PiSharp.Cli.Models.VirtualModelRoutingTransport? _virtual;
     private readonly List<IDisposable> _virtualConnections = [];
     /// <summary>agent-session.ts with a virtual model: every request asks the router, then streams through the physical model's own
@@ -546,8 +548,12 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     /// summaries pass none). The request is the model's own request (its level metadata bound) at that level, or with reasoning
     /// undefined when there is none.
     /// </summary>
-    internal IChatTransport CreateSummaryTransport(int maximum, string? level)
+    /// <param name="carriesLevel">The summary sends the session's thinking level (compaction and bug reports; branch summaries
+    /// do not). A virtual selection then uses its router's level instead.</param>
+    internal IChatTransport CreateSummaryTransport(int maximum, string? level, bool carriesLevel = true)
     {
+        // agent-session.ts _getSummarizationRequestAuth: a virtual selection summarizes through the physical model its router picks.
+        if (_virtual is not null) return _virtual.Summary(maximum, carriesLevel);
         var raw = selection.Definition.Raw.Value;
         var reasoning = raw.TryGetProperty("reasoning", out var flag) && flag.ValueKind == System.Text.Json.JsonValueKind.True;
         // The provider streams clamp the level to the model's levels (models.ts clampThinkingLevel), as the session already does.
