@@ -160,8 +160,11 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         paths = [.. paths.Where(path => !PiNativeExtension.IsManifest(path))];
         if (paths.Count == 0) return;
         if (_node is null) await StartNodeAsync(token).ConfigureAwait(false);
-        var result = await Node.RequestAsync("load", new JsonObject { ["paths"] = new JsonArray([.. paths.Select(path => (JsonNode)path)]) }, token).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("The Node extension host returned no load result.");
+        // The registrations the factories made reach the host as notifications sent before the load result (providers, virtual models,
+        // MCP servers applied once a factory succeeded): the load completes only after they were handled, so they are in place when
+        // the extensions are activated.
+        var result = await Node.RequestAsync("load", new JsonObject { ["paths"] = new JsonArray([.. paths.Select(path => (JsonNode)path)]) }, token,
+            afterPrecedingFrames: true).ConfigureAwait(false) ?? throw new InvalidOperationException("The Node extension host returned no load result.");
         lock (_extensions)
         {
             foreach (var item in result.GetProperty("results").EnumerateArray())

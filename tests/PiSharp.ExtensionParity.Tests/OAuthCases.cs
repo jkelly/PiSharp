@@ -76,7 +76,8 @@ internal static partial class Program
         var authPath = Path.Combine(sandbox.AgentDir, "auth.json");
         await using (var host = await StartHost(sandbox, extension))
         {
-            await WaitUntil(() => !host.ProviderRegistrations.IsEmpty);
+            // The provider registration is in place once the load completed.
+            Check(!host.ProviderRegistrations.IsEmpty, "provider registered by the time the load completed");
             ProviderAuthCatalog.Extensions = () => host.OAuthEntries();
             try
             {

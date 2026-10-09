@@ -37,8 +37,9 @@ internal sealed partial class PiExtensionHost
         lock (_mcpServers) _mcpServers.Clear();
         var nodePaths = paths.Where(path => !PiNativeExtension.IsManifest(path)).ToList();
         if (_node is null && nodePaths.Count > 0) await StartNodeAsync(token).ConfigureAwait(false);
-        JsonElement? result = _node is null ? null : await Node.RequestAsync("reload", new JsonObject { ["paths"] = new JsonArray([.. nodePaths.Select(path => (JsonNode)path)]) }, token)
-            .ConfigureAwait(false) ?? throw new InvalidOperationException("The Node extension host returned no reload result.");
+        // As for a load: the reloaded factories' registrations (notifications sent before the result) are handled before the new owners activate.
+        JsonElement? result = _node is null ? null : await Node.RequestAsync("reload", new JsonObject { ["paths"] = new JsonArray([.. nodePaths.Select(path => (JsonNode)path)]) }, token,
+            afterPrecedingFrames: true).ConfigureAwait(false) ?? throw new InvalidOperationException("The Node extension host returned no reload result.");
         var errors = ImmutableArray.CreateBuilder<PiExtensionLoadError>();
         ImmutableArray<PiNodeOwner> previous;
         int generation;
