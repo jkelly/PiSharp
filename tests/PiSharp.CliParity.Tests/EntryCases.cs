@@ -15,6 +15,7 @@ internal static partial class Program
         ("entry.initial-message-merge-and-remaining-messages", InitialMessages),
         ("entry.print-error-stop-reason-exits-1", PrintError),
         ("entry.rpc-mode-dispatches-on-standard-streams", RpcMode),
+        ("entry.rpc-mode-switches-among-available-models", RpcModelSwitching),
         ("entry.interactive-mode-hands-the-session-to-the-frontend", Interactive),
         ("entry.export-writes-html-and-reports-the-path", Export),
         ("entry.environment-variables-and-proxy-setting", EnvironmentVariables),
@@ -96,6 +97,34 @@ internal static partial class Program
         Equal(1, sandbox.SessionFiles().Length, "rpc mode persists the session in the default layout");
     }
 
+    // rpc-mode.ts get_available_models/set_model/cycle_model over modelRuntime.getAvailableSnapshot: the registry's available models are
+    // selectable, cycle_model walks the --models scope (isScoped) and the next request goes to the selected model.
+    private static async Task RpcModelSwitching()
+    {
+        using var sandbox = new Sandbox("rpc-models");
+        var commands = string.Join("\n",
+            """{"id":"1","type":"get_available_models"}""",
+            """{"id":"2","type":"set_model","provider":"openai","modelId":"gpt-4o"}""",
+            """{"id":"3","type":"cycle_model"}""",
+            """{"id":"4","type":"prompt","message":"hi"}""") + "\n";
+        var gate = new GatedInput(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(commands)));
+        using var output = new SignalingStream("\"type\":\"agent_settled\"", gate.Release);
+        using var stdout = new StringWriter(); using var stderr = new StringWriter();
+        var host = sandbox.Host(stdout, stderr, null, rpcInput: gate, rpcOutput: output) with { StdoutIsTty = false };
+        var code = await PiCommand.RunAsync(["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5",
+            "--models", "claude-sonnet-4-5,claude-haiku-4-5"], host, CancellationToken.None);
+        Equal(0, code, "exit; " + stderr);
+        var responses = System.Text.Encoding.UTF8.GetString(output.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => JsonNode.Parse(line)!).Where(line => line["type"]?.GetValue<string>() == "response")
+            .ToDictionary(line => line["id"]!.GetValue<string>());
+        var ids = (responses["1"]["data"]!["models"] as JsonArray)!.Select(model => model!["id"]!.GetValue<string>()).ToList();
+        Check(ids.Contains("claude-sonnet-4-5") && ids.Contains("claude-haiku-4-5"), "available models: " + string.Join(",", ids));
+        Check(responses["2"]["success"]!.GetValue<bool>() == false && responses["2"]["error"]!.GetValue<string>() == "Model not found: openai/gpt-4o",
+            "an unavailable model is refused: " + responses["2"].ToJsonString());
+        Equal("claude-haiku-4-5", responses["3"]["data"]!["model"]!["id"]!.GetValue<string>(), "cycle_model walks the scope");
+        Check(responses["3"]["data"]!["isScoped"]!.GetValue<bool>(), "isScoped");
+        Equal("claude-haiku-4-5", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "the prompt goes to the selected model");
+    }
     // main.ts interactive: plain `pisharp` on a terminal starts the frontend with the session and the initial messages (IMPL-I renders).
     private static async Task Interactive()
     {

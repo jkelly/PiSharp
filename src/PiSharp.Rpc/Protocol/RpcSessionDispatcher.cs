@@ -110,6 +110,18 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     private readonly Func<long> _clock;
     private readonly ImmutableDictionary<ModelDescriptor, JsonData> _models;
     private readonly ImmutableArray<ModelDescriptor> _modelOrder;
+    private readonly RpcModelRuntime? _modelRuntime;
+    private readonly Func<ModelDescriptor, PiSharp.Sessions.Compaction.SessionCompactionSettings?>? _compactionSettings;
+    /// <summary>The definition of a model: the startup definitions, then the host's current runtime models.</summary>
+    private bool TryGetModel(ModelDescriptor model, out JsonData wire)
+    {
+        if (_models.TryGetValue(model, out wire!)) return true;
+        if (_modelRuntime is not null)
+            foreach (var definition in _modelRuntime.Available())
+                if (definition.Model == model) { wire = definition.WireBody; return true; }
+        wire = null!; return false;
+    }
+    private bool KnowsModel(ModelDescriptor model) => TryGetModel(model, out _);
     private readonly RpcDispatchOptions _options;
     private readonly RpcSessionOwnership _ownership;
     private readonly IPromptInputAdmission? _inputAdmission;
@@ -179,7 +191,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         Func<SessionTreeNavigationReceipt, string?, ValueTask>? selectedTreePublisher = null,
         Func<PersistentAgentSession, Task>? postInputSettlement = null,
         Func<PersistentAgentSession, Task>? postRunSettlement = null,
-        PiSharp.CodingAgent.Execution.IUserBashExecutor? userBash = null)
+        PiSharp.CodingAgent.Execution.IUserBashExecutor? userBash = null, RpcModelRuntime? modelRuntime = null,
+        Func<ModelDescriptor, PiSharp.Sessions.Compaction.SessionCompactionSettings?>? compactionSettings = null)
     {
         ArgumentNullException.ThrowIfNull(session); ArgumentNullException.ThrowIfNull(output); ArgumentNullException.ThrowIfNull(clock);
         if (selectedTreePublisher is not null && selectedTreePublisher.GetInvocationList().Length != 1)
@@ -202,6 +215,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         if (sessionOwner is not null && (!ReferenceEquals(sessionOwner.Current.Session, session) || sessionOwner.AttachmentChanged is not null))
             throw new ArgumentException("RPC requires the exclusive current session attachment.", nameof(sessionOwner));
         if (sessionStartup is null) _startupReady.TrySetResult();
+        _modelRuntime = modelRuntime; _compactionSettings = compactionSettings;
         _models = RpcCommandCodec.Models(models, _options);
         _modelOrder = models.Select(value => value.Model).ToImmutableArray();
         if (_modelOrder.Select(value => (value.Provider, value.Id)).Distinct().Count() != _modelOrder.Length)
@@ -869,7 +883,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             }
             else
             {
-                if (!_models.ContainsKey(snapshot.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
+                if (!KnowsModel(snapshot.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
                 originating = _session;
                 run = new(snapshot.Agent.Messages.Length); lock (_gate) _run = run;
                 try { processing = _session.PromptAsync(input); }
@@ -931,7 +945,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                     RunState? active; lock (_gate) active = _run;
                     if (active is not null && !_session.Snapshot.Agent.IsRunning)
                         throw new RpcCommandException(command.Id, command.Type, "Session is settling. Wait for agent_settled before prompting again.");
-                    if (!_models.ContainsKey(_session.Snapshot.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
+                    if (!KnowsModel(_session.Snapshot.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
                     lock (_gate) _startingInput = candidate;
                 }
             }
@@ -1197,7 +1211,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     private JsonData State()
     {
         var snapshot = _session.Snapshot; var queue = _session.GetPendingInputQueueSnapshot();
-        if (!_models.TryGetValue(snapshot.Agent.Model, out var model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
+        if (!TryGetModel(snapshot.Agent.Model, out var model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
         string? name = null;
         foreach (var entry in snapshot.Log.Entries.Reverse())
             if (entry.Type == "session_info")

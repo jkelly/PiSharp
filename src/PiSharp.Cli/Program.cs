@@ -88,7 +88,15 @@ internal static class Program
                 LiveRuntime = Commands.LiveSessionRuntime.Default,
                 CreateMcpHost = _ => Mcp.McpSessionHost.CreateDefault(),
                 OpenRpcInput = CancellableStandardInput.Open, OpenRpcOutput = () => standardOutput,
-                RunInteractive = OperatingSystem.IsWindows() ? RunPiInteractiveAsync : null,
+                RunInteractive = (terminalArgs, options, token) => RunPiInteractiveAsync(terminalArgs, options, output, token),
+                TrustPrompt = stdinRedirected || Console.IsOutputRedirected ? null : (title, choices, token) =>
+                    new Interactive.Mode.StartupUi(new CodingAgent.Export.PiThemeHost().GetAgentDirectory(), Directory.GetCurrentDirectory()).PromptProjectTrustAsync(title, choices, token),
+                SelectSession = stdinRedirected || Console.IsOutputRedirected ? null : (current, all, token) =>
+                    new Interactive.Mode.StartupUi(new CodingAgent.Export.PiThemeHost().GetAgentDirectory(), Directory.GetCurrentDirectory()).SelectSessionAsync(current, all, token),
+                ConfigSelector = stdinRedirected || Console.IsOutputRedirected ? null : (request, token) =>
+                    new Interactive.Mode.StartupUi(request.AgentDir, request.Cwd).SelectConfigAsync(request, token),
+                PromptMissingSessionCwd = stdinRedirected || Console.IsOutputRedirected ? null : (prompt, fallbackCwd, token) =>
+                    new Interactive.Mode.StartupUi(new CodingAgent.Export.PiThemeHost().GetAgentDirectory(), Directory.GetCurrentDirectory()).PromptForMissingSessionCwdAsync(prompt, fallbackCwd, token),
                 Signals = () => ShutdownSignals.Process, Timings = PiSharp.CodingAgent.Diagnostics.StartupTimings.Default
             };
             return await Pi.PiCommand.RunAsync(args, host, cancellation.Token).ConfigureAwait(false);
@@ -101,9 +109,9 @@ internal static class Program
         }
     }
 
-    /// <summary>Interactive mode of the Pi entry: the terminal host over the planned session. An uncaught exception is recorded in
-    /// crashes.json and reported as interactive-mode.ts does (IMPL-I supplies the loaded extensions).</summary>
-    private static Task<int> RunPiInteractiveAsync(string[] terminalArgs, Pi.PiEntryOptions options, CancellationToken token)
+    /// <summary>Interactive mode of the Pi entry (IMPL-I): Pi's TUI over the planned session, on Windows, Linux and macOS. An uncaught
+    /// exception is recorded in crashes.json and reported as interactive-mode.ts does.</summary>
+    private static async Task<int> RunPiInteractiveAsync(string[] terminalArgs, Pi.PiEntryOptions options, TextWriter output, CancellationToken token)
     {
         var index = Array.IndexOf(terminalArgs, "--session");
         var sessionFile = index >= 0 && index + 1 < terminalArgs.Length ? terminalArgs[index + 1] : null;
@@ -112,9 +120,12 @@ internal static class Program
             if (crash.ExceptionObject is Exception error)
                 Diagnostics.CrashReporting.ReportUncaughtException(error, Console.Error, [], sessionFile, Environment.CurrentDirectory);
         };
-        return RunTerminalHostAsync(terminalArgs, token, liveRuntime: options.LiveRuntime, mcpHost: Mcp.McpSessionHost.CreateDefault());
+        if (options.Interactive is null)
+            return await RunTerminalHostAsync(terminalArgs, token, liveRuntime: options.LiveRuntime, mcpHost: Mcp.McpSessionHost.CreateDefault()).ConfigureAwait(false);
+        var binding = new Interactive.Mode.McpBinding();
+        var mcpHost = Mcp.McpSessionHost.CreateDefault() with { ObserveManager = manager => binding.Manager = manager, IsProjectTrusted = options.ProjectTrusted };
+        return await Interactive.Mode.InteractiveModeHost.RunAsync(terminalArgs, options, mcpHost, binding, output, Console.Error, token).ConfigureAwait(false);
     }
-
     private static async Task<int> RunMcpAsync(string[] args)
     {
         Stream standardOutput;

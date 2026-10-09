@@ -44,6 +44,9 @@ internal sealed record PiHost
     internal Func<string[], PiEntryOptions, CancellationToken, Task<int>>? RunInteractive { get; init; }
     internal PiProjectTrustPrompt? TrustPrompt { get; init; }
     internal PiSessionSelector? SelectSession { get; init; }
+    /// <summary>Source promptForMissingSessionCwd (interactive mode): the prompt text and the current cwd; the cwd to continue in, or
+    /// null when cancelled.</summary>
+    internal Func<string, string, CancellationToken, Task<string?>>? PromptMissingSessionCwd { get; init; }
     /// <summary>Extensions loaded before project trust is resolved (IMPL-E: user and CLI extensions); their project_trust and
     /// resources_discover handlers take part in the run. Null without extensions.</summary>
     internal Func<string, CancellationToken, Task<PiLoadedExtensions?>>? LoadExtensions { get; init; }
@@ -170,11 +173,23 @@ internal static class PiCommand
             (!string.IsNullOrEmpty(envSessionDir) ? PiPaths.ResolvePath(envSessionDir, cwd, home) : null) ??
             (startupSettings.SessionDir(home) is { } settingsDir ? PiPaths.ResolvePath(settingsDir, cwd, home) : null);
         var plan = await PiSessionPlanner.PlanAsync(parsed, cwd, sessionDir, agentDir, home, appMode, host, token).ConfigureAwait(false);
+        string? sessionCwdOverride = null;
         if (plan.SessionFile is not null && plan.Cwd.Length > 0 && !Directory.Exists(plan.Cwd))
         {
-            // Source getMissingSessionCwdIssue: the interactive prompt belongs to IMPL-I; without it the run stops as print mode does.
-            await Line(err, Paint(Red, PiSessions.MissingCwdError(plan.Cwd, plan.SessionFile, cwd))).ConfigureAwait(false);
-            return 1;
+            // Source getMissingSessionCwdIssue: interactive mode asks to continue in the current cwd (SessionManager.open with the cwd
+            // override; Cancel exits 0); the other modes stop with the error.
+            if (appMode == PiAppMode.Interactive && host.PromptMissingSessionCwd is { } promptCwd)
+            {
+                var selectedCwd = await promptCwd(PiSessions.MissingCwdPrompt(plan.Cwd, cwd), cwd, token).ConfigureAwait(false);
+                if (selectedCwd is null) return 0;
+                sessionCwdOverride = selectedCwd;
+                plan = plan with { Cwd = selectedCwd };
+            }
+            else
+            {
+                await Line(err, Paint(Red, PiSessions.MissingCwdError(plan.Cwd, plan.SessionFile, cwd))).ConfigureAwait(false);
+                return 1;
+            }
         }
         host.Timings.Time("createSessionManager");
         string? sessionName = null;
@@ -349,6 +364,8 @@ internal static class PiCommand
         var options = new PiEntryOptions
         {
             ToolPolicy = toolPolicy, Settings = startupSnapshot, Selection = selection, LiveRuntime = runtime,
+            SessionCwdOverride = sessionCwdOverride,
+            ReloadSettings = reloadToken => PiSettings.Load(sessionCwd, agentDir, projectTrusted).ToStartupSnapshotAsync(reloadToken),
             SystemPrompt = PiSystemPrompt.Admission(resources, skills?.Resources, host.ApplicationDirectory ?? packageDir),
             HeaderId = plan.HeaderId, HeaderTimestamp = plan.HeaderTimestamp, SessionName = sessionName,
             Skills = skills, PromptTemplates = prompts, ThinkingLevel = parsed.Thinking, ThinkingFromCli = parsed.Thinking is not null,
@@ -360,7 +377,8 @@ internal static class PiCommand
             ProjectTrusted = PiProjectTrust.Seam(trustedDirectories), StartupDiagnostics = allDiagnostics,
             ExtensionPaths = [.. (parsed.Extensions ?? []).Select(path => PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home) : path)],
             NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal),
-            Extensions = extensionRun?.Host, ExtensionMode = extensionMode
+            Extensions = extensionRun?.Host, ExtensionMode = extensionMode,
+            Interactive = appMode == PiAppMode.Interactive ? new(agentDir, home, sessionCwd, sessionDir, sessionDir is null, resources, projectTrusted, plan.Mode) : null
         };
         var sessionArgs = SessionArguments(plan, parsed);
         // The project .pi/mcp.json is read only for a trusted project (IMPL-H seam): the run's own trust answer.

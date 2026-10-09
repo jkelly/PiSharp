@@ -146,6 +146,7 @@ internal sealed partial class PiExtensionHost
             case "component.invalidate":
                 if (_components.TryGetValue(parameters.GetProperty("id").GetString()!, out var component))
                     await component.Ui.InvalidateCustomComponentAsync(component.Identity).ConfigureAwait(false);
+                else ComponentInvalidated?.Invoke(parameters.GetProperty("id").GetString()!); // IMPL-I: widget, header and footer components
                 return;
             case "component.done":
                 if (_components.TryRemove(parameters.GetProperty("id").GetString()!, out var done))
@@ -451,17 +452,25 @@ internal sealed partial class PiExtensionHost
     private JsonNode? UiRead(string op) => op switch
     {
         "getEditorText" => EditorText?.Invoke() ?? "",
-        "getToolsExpanded" => false,
+        "getToolsExpanded" => ToolsExpanded?.Invoke() ?? false,
         "getAllThemes" => new JsonArray([.. new[] { ("dark", (string?)null), ("light", null) }.Concat(_options.Themes.Select(theme => (theme.Name, (string?)theme.Path)))
             .Select(theme => (JsonNode)new JsonObject { ["name"] = theme.Item1, ["path"] = theme.Item2 })]),
-        "terminalSize" => new JsonObject { ["columns"] = SafeConsole(() => Console.WindowWidth, 80), ["rows"] = SafeConsole(() => Console.WindowHeight, 24) },
-        "getGitBranch" => null,
+        "terminalSize" => TerminalSize?.Invoke() is { } size ? new JsonObject { ["columns"] = size.Columns, ["rows"] = size.Rows }
+            : new JsonObject { ["columns"] = SafeConsole(() => Console.WindowWidth, 80), ["rows"] = SafeConsole(() => Console.WindowHeight, 24) },
+        "getGitBranch" => GitBranch?.Invoke(),
         "getExtensionStatuses" => new JsonObject([.. _statuses.Where(item => item.Value is not null).Select(item => KeyValuePair.Create(item.Key, (JsonNode?)item.Value))]),
-        "getAvailableProviderCount" => 0,
+        "getAvailableProviderCount" => AvailableProviderCount?.Invoke() ?? 0,
         _ => null
     };
     /// <summary>ctx.ui.getEditorText() (IMPL-I's editor supplies it).</summary>
     internal Func<string>? EditorText { get; set; }
+    /// <summary>IMPL-I: the interactive terminal's size, tools expansion, git branch and provider count (footer data), read without the UI loop.</summary>
+    internal Func<(int Columns, int Rows)>? TerminalSize { get; set; }
+    internal Func<bool>? ToolsExpanded { get; set; }
+    internal Func<string?>? GitBranch { get; set; }
+    internal Func<int>? AvailableProviderCount { get; set; }
+    /// <summary>IMPL-I: a widget, header or footer component asked to be redrawn (tui.requestRender in Node).</summary>
+    internal Action<string>? ComponentInvalidated { get; set; }
     private static int SafeConsole(Func<int> read, int fallback) { try { var value = read(); return value > 0 ? value : fallback; } catch (IOException) { return fallback; } catch (InvalidOperationException) { return fallback; } }
 
     // ----------------------------------------------------------------------------------------------------------------- UI

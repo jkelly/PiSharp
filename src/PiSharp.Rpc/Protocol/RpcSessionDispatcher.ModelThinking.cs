@@ -18,12 +18,14 @@ public sealed partial class RpcSessionDispatcher
             if (attachment is not null && !ReferenceEquals(_sessionOwner!.Current, attachment))
                 throw new RpcCommandException(command.Id, command.Type, "Model/thinking command belongs to a retired session attachment.");
             var current = _session.Snapshot;
-            if (!_models.ContainsKey(current.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
+            if (!KnowsModel(current.Agent.Model)) throw new RpcDispatchException(RpcDispatchFailure.InvalidModelDefinition);
+            // A host with a model runtime answers from its current available snapshot (rpc-mode.ts getAvailableSnapshot).
+            var (modelOrder, models) = _modelRuntime is null ? (_modelOrder, _models) : RuntimeModels();
             if (command.Type == "get_available_models")
                 return RpcCommandCodec.Build(writer =>
                 {
                     writer.WritePropertyName("models"); writer.WriteStartArray();
-                    foreach (var model in _modelOrder) writer.WriteRawValue(_models[model].Value.GetRawText());
+                    foreach (var model in modelOrder) writer.WriteRawValue(models[model].Value.GetRawText());
                     writer.WriteEndArray();
                 }, _options.MaximumOutputBytes);
             var levels = _session.GetSupportedThinkingLevels(current.Agent.Model);
@@ -35,26 +37,42 @@ public sealed partial class RpcSessionDispatcher
             if (command.Type is "set_model" or "cycle_model")
             {
                 ModelDescriptor selected;
+                string? scopedThinking = null; var isScoped = false;
                 if (command.Type == "set_model")
                 {
-                    selected = _modelOrder.FirstOrDefault(value => value.Provider == command.Provider && value.Id == command.ModelId)
+                    selected = modelOrder.FirstOrDefault(value => value.Provider == command.Provider && value.Id == command.ModelId)
                         ?? throw new RpcCommandException(command.Id, command.Type, "Model not found: " + command.Provider + "/" + command.ModelId);
                 }
                 else
                 {
-                    if (_modelOrder.Length <= 1) return NullData;
-                    var index = _modelOrder.IndexOf(current.Agent.Model);
-                    selected = _modelOrder[((index < 0 ? 0 : index) + 1) % _modelOrder.Length];
+                    // agent-session.ts cycleModel: the scoped models that are available when a scope is set, else every available model.
+                    var scope = _modelRuntime?.Scoped?.Invoke() ?? [];
+                    if (!scope.IsDefaultOrEmpty)
+                    {
+                        var scoped = scope.Where(value => models.ContainsKey(value.Model)).ToList();
+                        if (scoped.Count <= 1) return NullData;
+                        var scopedIndex = scoped.FindIndex(value => value.Model == current.Agent.Model);
+                        var next = scoped[((scopedIndex < 0 ? 0 : scopedIndex) + 1) % scoped.Count];
+                        selected = next.Model; scopedThinking = next.ThinkingLevel; isScoped = true;
+                    }
+                    else
+                    {
+                        if (modelOrder.Length <= 1) return NullData;
+                        var index = modelOrder.IndexOf(current.Agent.Model);
+                        selected = modelOrder[((index < 0 ? 0 : index) + 1) % modelOrder.Length];
+                    }
                 }
-                var selectedWire = _models[selected];
+                var selectedWire = models[selected];
                 var retryWindow = selectedWire.Value.TryGetProperty("contextWindow", out var admittedWindow) &&
                     admittedWindow.ValueKind == System.Text.Json.JsonValueKind.Number && admittedWindow.TryGetDouble(out var window) &&
                     double.IsFinite(window) && window >= 0 ? window : 0;
-                var thinking = ClampThinkingLevel(current.Context.ThinkingLevel, _session.GetSupportedThinkingLevels(selected));
+                // _getThinkingLevelForModelSwitch: an explicit scoped level, else the host's per-model/default setting, else the current level.
+                var requestedThinking = scopedThinking ?? _modelRuntime?.SwitchThinkingLevel?.Invoke(selected) ?? current.Context.ThinkingLevel;
+                var thinking = ClampThinkingLevel(requestedThinking, _session.GetSupportedThinkingLevels(selected));
                 var data = command.Type == "set_model" ? selectedWire : RpcCommandCodec.Build(writer =>
                 {
                     RpcCommandCodec.Raw(writer, "model", selectedWire); writer.WriteString("thinkingLevel", thinking);
-                    writer.WriteBoolean("isScoped", false);
+                    writer.WriteBoolean("isScoped", isScoped);
                 }, _options.MaximumOutputBytes);
                 _ = RpcCommandCodec.Success(command, data, _options); // Bound the complete response before durable effects.
                 await _session.ConfigureAsync(new(Model: selected, ThinkingLevel: thinking)
@@ -80,6 +98,14 @@ public sealed partial class RpcSessionDispatcher
     }
 
     private static JsonData NullData { get; } = JsonData.Parse("null");
+
+    /// <summary>The host's current available models, in its order, validated as startup definitions are.</summary>
+    private (ImmutableArray<ModelDescriptor> Order, ImmutableDictionary<ModelDescriptor, JsonData> Models) RuntimeModels()
+    {
+        var available = _modelRuntime!.Available();
+        if (available.IsDefaultOrEmpty) return ([], ImmutableDictionary<ModelDescriptor, JsonData>.Empty);
+        return ([.. available.Select(definition => definition.Model)], RpcCommandCodec.Models(available, _options));
+    }
     private JsonData Levels(ImmutableArray<string> levels) => RpcCommandCodec.Build(writer =>
     {
         writer.WritePropertyName("levels"); writer.WriteStartArray(); foreach (var level in levels) writer.WriteStringValue(level);

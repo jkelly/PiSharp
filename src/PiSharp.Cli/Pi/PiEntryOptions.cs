@@ -41,6 +41,10 @@ internal sealed record PiEntryOptions
 
     internal required PiToolPolicy ToolPolicy { get; init; }
     internal required StartupSettingsSnapshot Settings { get; init; }
+    /// <summary>The cwd the session continues in when its stored cwd no longer exists (SessionManager.open cwdOverride).</summary>
+    internal string? SessionCwdOverride { get; init; }
+    /// <summary>Re-reads the settings files (the SettingsManager the session runtime reads when it creates a new session).</summary>
+    internal Func<CancellationToken, Task<StartupSettingsSnapshot>>? ReloadSettings { get; init; }
     internal required OriginalSystemPromptAdmission SystemPrompt { get; init; }
     internal required LiveSessionSelection Selection { get; init; }
     internal required LiveSessionRuntime LiveRuntime { get; init; }
@@ -78,4 +82,6 @@ internal sealed record PiEntryOptions
     internal PiSharp.Cli.Extensions.Pi.PiExtensionHost? Extensions { get; init; }
     /// <summary>Source ExtensionMode of the run: <c>tui</c>, <c>rpc</c>, <c>json</c> or <c>print</c>.</summary>
     internal string ExtensionMode { get; init; } = "print";
+    /// <summary>Interactive mode inputs (IMPL-I): directories, resources and the live host link.</summary>
+    internal PiSharp.Cli.Interactive.Mode.InteractiveStartup? Interactive { get; init; }
 }
