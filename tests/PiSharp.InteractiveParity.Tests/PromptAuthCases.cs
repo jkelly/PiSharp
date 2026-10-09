@@ -34,6 +34,27 @@ internal static class PromptAuthCases
 
     public static IEnumerable<(string Id, Func<Task> Run)> All()
     {
+        // interactive-mode.ts findExactModelMatch: no cached match refreshes the catalogs (model-runtime.ts refresh re-reads models.json
+        // and the credentials, without network under PI_OFFLINE) and matches against the refreshed available snapshot.
+        yield return ("e2e.models.model-command-refreshes-when-nothing-cached-matches", async () =>
+        {
+            await using var pi = new InteractiveHarness("model-refresh");
+            pi.Start("--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tui-mode", "regular");
+            await pi.WaitFor("escape interrupt");
+            await pi.WaitUntil(text => text.Contains("claude-sonnet-4-5", StringComparison.Ordinal), "footer");
+            // Another process stores an OpenAI key: the cached available snapshot does not have OpenAI's models yet.
+            pi.Write(Path.Combine(pi.AgentDir, "auth.json"), """{"openai":{"type":"api_key","key":"sk-openai-later"}}""");
+            pi.Type("/model openai/gpt-4o");
+            await Task.Delay(300);
+            pi.Type("\r");
+            await Task.Delay(300);
+            pi.Type("\r");
+            await pi.WaitFor("Model: gpt-4o");
+            Check(!pi.Terminal.Text.Contains("Could not refresh", StringComparison.Ordinal) && !pi.Terminal.Text.Contains("Model refresh timed out", StringComparison.Ordinal),
+                "no refresh warning offline: " + pi.Terminal.Text);
+            Equal(0, pi.CatalogRequests.Count, "no catalog network under PI_OFFLINE: " + string.Join(", ", pi.CatalogRequests));
+        });
+
         // bug-report.ts: summarizeForBugReport finds no auth, the request fails in model-runtime.ts prepareRequest and
         // getSummarizationFailure names it; the /bug flow shows "Failed to write bug report summary: …".
         yield return ("e2e.prompt-auth.bug-summary-without-key", async () =>

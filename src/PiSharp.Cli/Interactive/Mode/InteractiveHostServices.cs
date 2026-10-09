@@ -63,10 +63,15 @@ internal static class InteractiveHostServices
             RefreshModelCatalogs = async token =>
             {
                 await registryLoad.ConfigureAwait(false);
+                // model-runtime.ts refresh(): models.json and the providers are re-read, and the network is used unless PI_OFFLINE
+                // is set (allowNetwork ?? modelNetworkEnabled).
+                try { registry = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false); }
+                catch (Exception error) when (error is not OperationCanceledException) { /* The registry of the last load stays. */ }
+                catch (OperationCanceledException) { return new ModelsRefreshResult(true, []); }
                 if (registry is null) return new ModelsRefreshResult(false, []);
                 try
                 {
-                    var errors = await registry.RefreshAsync(allowNetwork: true, force: null, providers: null, token).ConfigureAwait(false);
+                    var errors = await registry.RefreshAsync(allowNetwork: runtime.ReadEnvironment("PI_OFFLINE") is null, force: null, providers: null, token).ConfigureAwait(false);
                     if (Profile()?.LiveModels is { } models) await models.RefreshAsync(token).ConfigureAwait(false);
                     return new ModelsRefreshResult(false, [.. errors.Select(error => KeyValuePair.Create(error.Key, error.Value.Message))]);
                 }
