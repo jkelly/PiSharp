@@ -52,6 +52,11 @@ internal sealed record PiHost
     internal Func<string, CancellationToken, Task<bool>>? Confirm { get; init; }
     internal string? ApplicationDirectory { get; init; }
     internal Func<DateTimeOffset> Now { get; init; } = () => DateTimeOffset.UtcNow;
+    /// <summary>The <c>config</c> command's resource selector (IMPL-I's TUI); without one the command reports that it needs the UI.</summary>
+    internal PiSharp.Cli.Packages.PiPackageConfigSelector? ConfigSelector { get; init; }
+    /// <summary>The child processes package commands and package resolution run (npm, git), given the host's stdout and stderr; null
+    /// runs the user's own tools with this process's environment.</summary>
+    internal Func<TextWriter, TextWriter, PiSharp.Cli.Packages.PiPackageProcesses>? PackageProcesses { get; init; }
 }
 
 /// <summary>An exit decided by the entry after its messages were written.</summary>
@@ -92,11 +97,8 @@ internal static class PiCommand
         if (offline) { host.SetEnvironment("PI_OFFLINE", "1"); host.SetEnvironment("PI_SKIP_VERSION_CHECK", "1"); }
         if (args.Length > 0 && args[0] == "auth") return await PiAuthCommand.RunAsync(args, host, token).ConfigureAwait(false);
         if (args.Length > 0 && PackageCommands.Contains(args[0]))
-        {
-            // Package commands (pi install|remove|update|list|config) belong to IMPL-E.
-            await Error($"\"{PiConfig.DisplayName} {args[0]}\" is not available in this PiSharp build yet.").ConfigureAwait(false);
-            return 1;
-        }
+            return await PiSharp.Cli.Packages.PiPackageCommands.RunAsync(args, host, token).ConfigureAwait(false) ??
+                await PiSharp.Cli.Packages.PiPackageCommands.RunConfigAsync(args, host, token).ConfigureAwait(false) ?? 1;
 
         host.Timings.ResetTimings();
         var parsed = PiArgs.Parse(args);
@@ -189,8 +191,18 @@ internal static class PiCommand
         var extensionErrors = new List<string>();
         var discovered = extensions is null ? PiDiscoveredResources.Empty : await PiExtensionEvents.ResourcesDiscoverAsync(extensions.Registry, extensions.Snapshot,
             sessionCwd, "startup", (path, message) => { extensionErrors.Add($"Extension error ({path}): {message}"); return ValueTask.CompletedTask; }, token).ConfigureAwait(false);
+        // resource-loader reload: packageManager.resolve() installs missing settings packages and lists their resources (IMPL-E).
+        PiSharp.Cli.Packages.PiResolvedPaths packageResources;
+        try
+        {
+            var packageOutput = appMode == PiAppMode.Interactive ? host.Stdout : err;
+            packageResources = await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, settings, host.GetEnvironment,
+                host.PackageProcesses?.Invoke(packageOutput, err) ?? new() { Output = packageOutput, ErrorOutput = err }).ResolveAsync(cancellationToken: token).ConfigureAwait(false);
+        }
+        catch (PiSharp.Cli.Packages.PiPackageException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         var resources = PiResources.Discover(new(sessionCwd, agentDir, home, settings, projectTrusted)
         {
+            Packages = packageResources,
             CliSkills = [.. parsed.Skills ?? []], CliPromptTemplates = [.. parsed.PromptTemplates ?? []], CliThemes = [.. parsed.Themes ?? []],
             NoSkills = parsed.NoSkills, NoPromptTemplates = parsed.NoPromptTemplates, NoThemes = parsed.NoThemes, NoContextFiles = parsed.NoContextFiles,
             SystemPrompt = parsed.SystemPrompt, AppendSystemPrompt = parsed.AppendSystemPrompt is null ? default : [.. parsed.AppendSystemPrompt]
