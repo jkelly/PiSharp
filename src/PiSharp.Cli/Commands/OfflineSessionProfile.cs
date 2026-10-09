@@ -549,11 +549,15 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         string? piShell = null;
         if (piPolicy is not null && bashTool is null)
             (bashTool, userBash, processCleanup, piShell) = PiBash(piPolicy, toolSettings, canonicalWorkspace, () => CurrentBashSession(bashOwner));
-        // Pi's grep and find over rg/fd from <agentDir>/bin or PATH, downloaded on first use (tools-manager.ts).
-        var piSearch = piPolicy?.Search is { } toolsManager && grepHost is null
-            ? new PiSharp.Cli.Pi.PiSearchTools(toolsManager, canonicalWorkspace, PiProcessRunner, piPolicy.Environment ?? ProcessEnvironment(), piPolicy.ReportToolStatus) : null;
         var policy = new FilePolicy(canonicalWorkspace, reads, writes, reserved, grant, grepHost)
         { Pi = piPolicy, PiShell = piShell, ProtectedRoots = [.. extension is null ? [] : new[] { extension.Package, extension.SnapshotRoot }] };
+        // The pi tool policy resolves ~ to the user's home directory (path-utils.ts expandPath uses os.homedir()).
+        var toolHome = piPolicy is null ? canonicalWorkspace : Path.TrimEndingDirectorySeparator(Path.GetFullPath(
+            piPolicy.Home ?? (Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) is { Length: > 0 } userHome ? userHome : canonicalWorkspace)));
+        // Pi's grep and find over rg/fd from <agentDir>/bin or PATH, downloaded on first use (tools-manager.ts), over any path.
+        var piSearch = piPolicy?.Search is { } toolsManager && grepHost is null
+            ? new PiSharp.Cli.Pi.PiSearchTools(toolsManager, canonicalWorkspace, toolHome, piPolicy.Environment ?? ProcessEnvironment(), piPolicy.ReportToolStatus,
+                (path, token) => policy.AuthorizeGrepContextAsync(path, int.MaxValue, token)) : null;
         var grepReader = grepHost is null ? null : new AdmittedGrepContextReader(canonicalWorkspace,
             grepHost.ContextOperations, policy.AuthorizeGrepContextAsync);
         NativeExtensionActivation? activation = null;
@@ -584,13 +588,13 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                     .ConnectResolvedAnthropicAsync(resolvedAnthropicAuthentication, resolvedAnthropicHandler, token).AsTask();
                 connection = await connectionOriginal.ConfigureAwait(false);
             }
-            var profile = new OfflineSessionProfile(canonicalWorkspace, new BuiltinToolCatalog(canonicalWorkspace, canonicalWorkspace, files,
+            var profile = new OfflineSessionProfile(canonicalWorkspace, new BuiltinToolCatalog(canonicalWorkspace, toolHome, files,
                 readWriteOptions: ReadOptions(toolSettings, modelDefinition.DeclaresImageInput),
                 // Pi edits files of any size; only the edit arguments and the display diff keep the profile bounds.
                 editOptions: new(MaximumInputBytes: 64 * 1024 * 1024, MaximumOutputBytes: 64 * 1024 * 1024, MaximumArgumentCharacters: 65_536,
                     DiffOptions: new(MaximumOutputCharacters: 4096)), bash: bashTool,
-                grep: grepHost?.Executor ?? piSearch?.Grep, find: piSearch?.Find,
-                grepContextReader: grepReader ?? (piSearch is null ? null : new AdmittedGrepContextReader(canonicalWorkspace, files, policy.AuthorizeGrepContextAsync))), policy,
+                grep: grepHost?.Executor, grepContextReader: grepReader,
+                piGrep: piSearch?.Grep(files), piFind: piSearch?.Find(files), pi: piPolicy is not null), policy,
                 new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup, connection, toolSelection,
                 deferCatalogValidation: mcpAdmission is not null || registeredMcpAdmission is not null || readApplicationHost is not null,
                 originalSystemPrompt: originalSystemPrompt);
@@ -739,7 +743,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             token.ThrowIfCancellationRequested();
             var allowed = Pi is not null ? !IsPiProtected(path) && !IsPiProtected(PiSharp.Cli.Pi.PiPaths.Canonicalize(path)) :
                 grepHost is not null && Within(workspace, path) && reads.Contains(path) && !IsReserved(path);
-            if (allowed) allowed = await grepHost!.ContextAdmission(path, maximumBytes, token).ConfigureAwait(false);
+            if (allowed && grepHost is not null) allowed = await grepHost.ContextAdmission(path, maximumBytes, token).ConfigureAwait(false);
             // An awaited grant may span a session transition; recheck its reserved target before returning.
             token.ThrowIfCancellationRequested();
             allowed = allowed && !IsReserved(path);

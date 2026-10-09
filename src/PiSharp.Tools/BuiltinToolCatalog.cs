@@ -25,7 +25,7 @@ public sealed class BuiltinToolCatalog
     public BuiltinToolCatalog(string workingDirectory, string homeDirectory, IDirectoryFileOperations? operations = null,
         ReadWriteToolOptions? readWriteOptions = null, EditToolOptions? editOptions = null,
         BashTool? bash = null, IFindExecutor? find = null, IGrepExecutor? grep = null, IFileAccessProbe? editAccessProbe = null,
-        IGrepContextReader? grepContextReader = null)
+        IGrepContextReader? grepContextReader = null, PiGrepTool? piGrep = null, PiFindTool? piFind = null, bool pi = false)
     {
         var files = operations ?? new LocalFileOperations();
         _workingDirectory = workingDirectory; _homeDirectory = homeDirectory; _files = files;
@@ -37,18 +37,21 @@ public sealed class BuiltinToolCatalog
         }, new(MaximumKeyCharacters: Math.Max(readOptions.MaximumPathCharacters, editProfile.MaximumPathCharacters)));
         var readWrite = new ReadWriteTools(workingDirectory, homeDirectory, files, readOptions, _mutations);
         var edit = new EditTool(workingDirectory, homeDirectory, _mutations, files, editProfile, editAccessProbe);
-        var listing = new LsTool(workingDirectory, homeDirectory, files);
+        // The pi tool policy (owner decision 0004): grep, find and ls search any path as Pi does (piGrep/piFind replace the admitted ones).
+        var listing = new LsTool(workingDirectory, homeDirectory, files, pi);
         var tools = ImmutableArray.CreateBuilder<BuiltinToolRegistration>();
         tools.Add(new(readWrite.Declarations[0], readWrite.Adapters[0]));
         if (bash is not null) tools.Add(new(bash.Declaration, bash));
         tools.Add(new(edit.Declaration, edit));
         tools.Add(new(readWrite.Declarations[1], readWrite.Adapters[1]));
-        if (grep is not null)
+        if (piGrep is not null) tools.Add(new(piGrep.Declaration, piGrep));
+        else if (grep is not null)
         {
             var search = new GrepTool(workingDirectory, homeDirectory, grep, files, grepContextReader);
             tools.Add(new(search.Declaration, search.Adapter));
         }
-        if (find is not null)
+        if (piFind is not null) tools.Add(new(piFind.Declaration, piFind));
+        else if (find is not null)
         {
             var search = new FindTool(workingDirectory, homeDirectory, find, files);
             tools.Add(new(search.Declaration, search.Adapter));

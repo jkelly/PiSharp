@@ -200,5 +200,42 @@ internal static partial class Program
             Check(!Directory.Exists(Path.Combine(sandbox.Cwd, ".pisharp-search")), "per-search spill root removed");
             Equal("", stderr.ToString(), "print mode stays silent about downloads");
         }),
+        // grep.ts, find.ts and ls.ts have no workspace bounds: under the pi tool policy they search any path, read context lines from
+        // any file, list linked entries wherever they point, and grep stops ripgrep at the match limit.
+        ("tools.pi-policy-grep-find-and-ls-reach-outside-the-cwd", async () =>
+        {
+            if (OnProcessPath("rg") is not { } realRg || (OnProcessPath("fd") ?? OnProcessPath("fdfind")) is not { } realFd)
+                throw new SkipException("rg and fd are not on this machine's PATH.");
+            using var sandbox = new Sandbox("search-outside");
+            var bin = Path.Combine(sandbox.AgentDir, "bin"); Directory.CreateDirectory(bin);
+            File.Copy(realRg, Path.Combine(bin, "rg" + ExecutableSuffix)); File.Copy(realFd, Path.Combine(bin, "fd" + ExecutableSuffix));
+            MakeExecutable(Path.Combine(bin, "rg" + ExecutableSuffix)); MakeExecutable(Path.Combine(bin, "fd" + ExecutableSuffix));
+            sandbox.Write(Path.Combine(sandbox.Root, "outside", "far.txt"), "alpha\nneedle far\nomega\n");
+            sandbox.Write(Path.Combine(sandbox.Cwd, "many.txt"), string.Concat(Enumerable.Repeat("hit\n", 50)));
+            var linked = false;
+            try { Directory.CreateSymbolicLink(Path.Combine(sandbox.Cwd, "link"), Path.Combine(sandbox.Root, "outside")); linked = true; }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+            sandbox.Respond = (_, index) => index switch
+            {
+                0 => AnthropicToolCall("grep", new { pattern = "needle", path = "../outside", context = 1 }, "toolu_g"),
+                1 => AnthropicToolCall("find", new { pattern = "*.txt", path = "../outside" }, "toolu_f"),
+                2 => AnthropicToolCall("ls", new { path = "." }, "toolu_l"),
+                3 => AnthropicToolCall("grep", new { pattern = "hit", limit = 3 }, "toolu_m"),
+                _ => AnthropicText("done")
+            };
+            var (code, _, stderr) = await sandbox.Run("-p", "--tools", "grep,find,ls", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "search");
+            Equal(0, code, "exit; " + stderr);
+            static string Content(Seen request)
+            {
+                var messages = request.Json.GetProperty("messages");
+                return messages[messages.GetArrayLength() - 1].GetProperty("content")[0].GetProperty("content").GetString()!;
+            }
+            Equal("far.txt-1- alpha\nfar.txt:2: needle far\nfar.txt-3- omega", Content(sandbox.Requests[1]), "grep outside the cwd with context");
+            Equal("far.txt", Content(sandbox.Requests[2]), "find outside the cwd");
+            var ls = Content(sandbox.Requests[3]);
+            Check(ls.Contains("many.txt", StringComparison.Ordinal) && (!linked || ls.Contains("link/", StringComparison.Ordinal)), "ls lists the outside link: " + ls);
+            var limited = Content(sandbox.Requests[4]);
+            Check(limited == "many.txt:1: hit\nmany.txt:2: hit\nmany.txt:3: hit\n\n[3 matches limit reached. Use limit=6 for more, or refine pattern]", "grep limit: " + limited);
+        }),
     ];
 }

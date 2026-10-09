@@ -395,7 +395,8 @@ internal static class PiCommand
             // tools-manager.ts: rg and fd from <agentDir>/bin or PATH, downloaded into <agentDir>/bin on first use.
             Search = new PiToolsManager(Path.Join(agentDir, "bin"), host.GetEnvironment, host.ToolsHttp, host.ToolsReleaseBase),
             ProtectedDirectories = [.. new[] { plan.SessionDirectory, Path.GetDirectoryName(plan.SessionPath) }.OfType<string>().Select(Path.GetFullPath).Distinct(PiPaths.Comparer)],
-            ProtectedTrees = [Path.GetFullPath(Path.Join(agentDir, "sessions"))]
+            ProtectedTrees = [Path.GetFullPath(Path.Join(agentDir, "sessions"))],
+            Home = Path.GetFullPath(home)
         };
         var trustedDirectories = new Dictionary<string, bool>(PiPaths.Comparer) { [Path.GetFullPath(sessionCwd)] = projectTrusted };
         var options = new PiEntryOptions
