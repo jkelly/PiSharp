@@ -217,7 +217,16 @@ internal sealed partial class PiExtensionHost
                 }
                 return await Compact(customInstructions, token).ConfigureAwait(false);
             case "command.waitForIdle": await RequireAttached().Session.WaitForIdleAsync(token).ConfigureAwait(false); return null;
-            case "command.session": return await SessionCommandAsync(p, token).ConfigureAwait(false);
+            case "command.session":
+                // ctx.navigateTree/newSession/fork/switchSession: the native command context answers only inside the command callback
+                // that created it, so the action runs in that callback's execution context (as the command awaits it upstream).
+                if (FlowOf(p) is { } commandFlow)
+                {
+                    Task<JsonNode?> action = null!;
+                    ExecutionContext.Run(commandFlow, _ => action = SessionCommandAsync(p, token), null);
+                    return await action.ConfigureAwait(false);
+                }
+                return await SessionCommandAsync(p, token).ConfigureAwait(false);
             case "command.reload":
                 // ctx.reload(): the mode's reload; the command's pi and ctx objects are stale afterwards.
                 if (Reload is null) throw new NotSupportedException("ctx.reload() needs a session host that reloads (RPC, interactive)");
