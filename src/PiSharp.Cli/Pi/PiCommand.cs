@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.Cli.Commands;
+using PiSharp.Cli.Extensions.Pi;
 using PiSharp.Cli.Prompts;
 using PiSharp.Cli.Settings;
 using PiSharp.Cli.Skills;
@@ -135,7 +136,15 @@ internal static class PiCommand
         if (parsed.Help)
         {
             await Report(startupDiagnostics).ConfigureAwait(false);
-            await console.WriteAsync((PiHelp.Text(color: color) + "\n").AsMemory(), token).ConfigureAwait(false);
+            // main.ts: help prints after the runtime loaded the extensions (no trust prompt in this pass), listing their flags.
+            IReadOnlyList<PiExtensionFlag>? helpFlags = null;
+            if (host.LoadExtensions is null)
+            {
+                var helpTrusted = parsed.ProjectTrustOverride ?? (!ProjectTrustStore.HasTrustRequiringProjectResources(cwd, home) || new ProjectTrustStore(agentDir, home).Get(cwd) == true);
+                await using var helpRun = await PiExtensionRun.LoadAsync(host, parsed, cwd, agentDir, home, helpTrusted, "print", false, null, token).ConfigureAwait(false);
+                helpFlags = helpRun.Host?.Flags;
+            }
+            await console.WriteAsync((PiHelp.Text(helpFlags, color: color) + "\n").AsMemory(), token).ConfigureAwait(false);
             await console.FlushAsync(token).ConfigureAwait(false);
             return 0;
         }
@@ -172,7 +181,15 @@ internal static class PiCommand
         // defaultProjectTrust and, with a UI, the prompt.
         var sessionCwd = plan.Cwd;
         var trustStore = new ProjectTrustStore(agentDir, home);
-        var extensions = host.LoadExtensions is null ? null : await host.LoadExtensions(sessionCwd, token).ConfigureAwait(false);
+        // resource-loader.ts loadProjectTrustExtensions: user and CLI extensions load before trust (their project_trust handlers vote);
+        // project extensions load after a trusted decision (loadFinalExtensionSet). Tests substitute host.LoadExtensions.
+        var extensionMode = appMode switch { PiAppMode.Interactive => "tui", PiAppMode.Rpc => "rpc", PiAppMode.Json => "json", _ => "print" };
+        await using var extensionRun = host.LoadExtensions is null
+            ? await PiExtensionRun.LoadAsync(host, parsed, sessionCwd, agentDir, home, false, extensionMode, appMode is PiAppMode.Interactive or PiAppMode.Rpc,
+                appMode == PiAppMode.Interactive ? null : err, token).ConfigureAwait(false)
+            : null;
+        var extensions = host.LoadExtensions is not null ? await host.LoadExtensions(sessionCwd, token).ConfigureAwait(false)
+            : extensionRun?.Host is not null ? await extensionRun.PreSessionAsync(token).ConfigureAwait(false) : null;
         var projectTrustDiagnostics = new List<PiDiagnostic>();
         bool projectTrusted;
         try
@@ -184,7 +201,13 @@ internal static class PiCommand
         }
         catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         var settings = PiSettings.Load(sessionCwd, agentDir, projectTrusted);
-        var runtimeDiagnostics = new List<PiDiagnostic>([.. projectTrustDiagnostics, .. settings.DrainDiagnostics()]);
+        if (extensionRun is not null)
+        {
+            if (projectTrusted) await extensionRun.LoadProjectAsync(settings, token).ConfigureAwait(false);
+            await extensionRun.ApplyFlagValuesAsync(parsed.UnknownFlags, token).ConfigureAwait(false);
+            if (extensionRun.Host is not null) extensions = await extensionRun.PreSessionAsync(token).ConfigureAwait(false);
+        }
+        var runtimeDiagnostics = new List<PiDiagnostic>([.. projectTrustDiagnostics, .. settings.DrainDiagnostics(), .. extensionRun?.Diagnostics ?? []]);
         // agent-session.ts extendResourcesFromExtensions: resources_discover adds skill, prompt and theme paths (reason "startup").
         var extensionErrors = new List<string>();
         var discovered = extensions is null ? PiDiscoveredResources.Empty : await PiExtensionEvents.ResourcesDiscoverAsync(extensions.Registry, extensions.Snapshot,
@@ -273,6 +296,13 @@ internal static class PiCommand
 
         var allDiagnostics = Deduplicate([.. startupDiagnostics, .. runtimeDiagnostics]);
         if (appMode != PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
+        // main.ts: runtime errors (an extension that failed to load, an unknown extension flag) stop the run in every mode.
+        if (extensionRun?.Diagnostics.Any(diagnostic => diagnostic.Type == "error") == true)
+        {
+            if (appMode == PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
+            if (extensionRun.HasLoadErrors) await Line(err, Paint(Yellow, PiExtensionLoading.LoadFailureHint)).ConfigureAwait(false);
+            return 1;
+        }
         if (IsTruthyEnvFlag(host.GetEnvironment("PI_STARTUP_BENCHMARK")) && appMode != PiAppMode.Interactive)
         { await Error("PI_STARTUP_BENCHMARK only supports interactive mode").ConfigureAwait(false); return 1; }
         var packageDir = host.GetEnvironment("PI_PACKAGE_DIR") is { Length: > 0 } configuredPackage ? PiPaths.NormalizePath(configuredPackage, home) : null;
@@ -297,7 +327,8 @@ internal static class PiCommand
             MigratedAuthProviders = migrations.MigratedAuthProviders, DeprecationWarnings = migrations.DeprecationWarnings,
             ProjectTrusted = PiProjectTrust.Seam(trustedDirectories), StartupDiagnostics = allDiagnostics,
             ExtensionPaths = [.. (parsed.Extensions ?? []).Select(path => PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home) : path)],
-            NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal)
+            NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal),
+            Extensions = extensionRun?.Host, ExtensionMode = extensionMode
         };
         var sessionArgs = SessionArguments(plan, parsed);
         var mcpHost = host.CreateMcpHost(agentDir);
