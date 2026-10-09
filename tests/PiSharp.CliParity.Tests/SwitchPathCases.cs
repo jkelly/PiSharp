@@ -57,6 +57,26 @@ internal static partial class Program
             Equal("this is not a session\n", File.ReadAllText(junk), "junk file unchanged");
             Equal(empty, Data(10)["sessionFile"]!.GetValue<string>(), "the current session stays");
         }),
+        ("switch.headerless-entries-are-not-a-valid-session", async () =>
+        {
+            using var sandbox = new Sandbox("headerless");
+            // session-manager.ts loadEntriesFromFile validates the header first and returns no entries without one, so
+            // _setSessionFile refuses the non-empty file (the _loadEntries header-less branch is not reached from a file). Pi 1.1.0
+            // run with node: "Error: Session file is not a valid pi session: <path>" and exit 1 at startup, the same text for
+            // switch_session, the file unchanged.
+            var text = string.Join("\n",
+                "{\"type\":\"message\",\"id\":\"a3\",\"parentId\":null,\"timestamp\":\"2026-10-09T10:00:00.003Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"headerless question\"}],\"timestamp\":1}}",
+                "{\"type\":\"message\",\"id\":\"a4\",\"parentId\":\"a3\",\"timestamp\":\"2026-10-09T10:00:00.004Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"headerless answer\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-haiku-4-5\",\"usage\":{\"input\":3,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":5,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}},\"stopReason\":\"stop\",\"timestamp\":2}}") + "\n";
+            var headerless = sandbox.Write(Path.Combine(sandbox.Root, "elsewhere", "headerless.jsonl"), text);
+            var (code, stdout, stderr) = await sandbox.Run("-p", "--session", headerless, "hi");
+            Check(code == 1 && stdout == "" && stderr == "Error: Session file is not a valid pi session: " + headerless + "\n", $"startup: {code} {stderr}");
+            var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"],
+                """{"id":"1","type":"switch_session","sessionPath":""" + JsonValue.Create(headerless)!.ToJsonString() + "}");
+            Check(!responses[0]["success"]!.GetValue<bool>() && responses[0]["error"]!.GetValue<string>() == "Session file is not a valid pi session: " + headerless,
+                "switch: " + responses[0].ToJsonString());
+            Equal(text, File.ReadAllText(headerless), "file unchanged");
+            Equal(0, sandbox.Requests.Count, "nothing sent");
+        }),
         ("switch.empty-session-file-at-startup-records-model-and-thinking", async () =>
         {
             using var sandbox = new Sandbox("startup-empty");
