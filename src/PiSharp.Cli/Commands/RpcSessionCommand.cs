@@ -40,7 +40,11 @@ public static class RpcSessionCommand
     internal static PiSharp.Sessions.Context.SessionContextProjectionOptions ContextOptions(bool pi) => pi
         ? PiPayloadBudget.Context with { MaximumEntries = int.MaxValue, MaximumAncestorSteps = int.MaxValue, MaximumOutputMessages = int.MaxValue }
         : PiPayloadBudget.Context;
-    private static readonly JsonlTransportOptions Framing = new(MaximumFrameBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
+    /// <summary>Pi-entry prompt bounds: no text length or image count limit; the images and the message stay within one RPC frame.</summary>
+    private static readonly PromptInputAdmissionOptions PiPromptBounds = new(MaximumTextCharacters: int.MaxValue, MaximumImages: int.MaxValue,
+        MaximumImageCharacters: PiPayloadBudget.RpcCommandBytes, MaximumImageBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 64,
+        MaximumMessageCharacters: PiPayloadBudget.RpcCommandBytes);
+    private static readonly JsonlTransportOptions Framing =new(MaximumFrameBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
     private sealed record Arguments(string Session, string Workspace, string? Script, bool Latest, string? Leaf,
         ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi, OfflineBashAuthorization? Bash,
         NativeExtensionConfiguration? Extension, bool SupportsImages, ImmutableArray<SessionCatalogStore> Stores, string SessionMode, SettingsModelSelection? Live,
@@ -153,6 +157,8 @@ public static class RpcSessionCommand
             if (!Directory.Exists(parsed.Workspace)) throw new SessionCommandException(SessionCommandFailure.WorkspaceMissing);
             // A Pi-style entry (plain pisharp, -p, --mode json|rpc) already resolved settings, model, prompt and tool policy.
             var pi = PiSharp.Cli.Pi.PiEntryOptions.Current;
+            // Pi has no prompt length or image count limit; template, skill and extension input admission use these bounds too.
+            using var piPromptBounds = pi is null ? null : PromptInputAdmissionOptions.UseAsDefault(PiPromptBounds);
             liveRuntime ??= pi?.LiveRuntime;
             var settings = pi?.Settings ?? await SettingsStartupConfiguration.LoadAsync(parsed.Settings, stderr, settingsFileSystem, cancellationToken).ConfigureAwait(false);
             var liveSelection = pi?.Selection ?? (parsed.Live is null ? null : await parsed.Live.ResolveAsync(settings, liveRuntime ?? LiveSessionRuntime.Default, stderr,
@@ -170,7 +176,14 @@ public static class RpcSessionCommand
             // Pi extensions (IMPL-E) get a UI in the modes upstream gives one (tui and rpc); print and json run without (hasUI false).
             var piExtensions = pi?.Extensions;
             ui = parsed.Extension is null && (piExtensions is null || pi!.ExtensionMode is not ("rpc" or "tui")) ? null
-                : new(new RpcExtensionUiOptions(MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes), presentationObserver: presentation);
+                : new(pi is null ? new RpcExtensionUiOptions(MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes)
+                    // rpc-mode.ts createExtensionUIContext: dialogs, their texts, choices and responses have no limits of their own;
+                    // requests and responses stay within one frame and a bounded number of open dialogs.
+                    : new RpcExtensionUiOptions(MaximumOutstandingRequests: 4096, MaximumRequestBytes: PiPayloadBudget.OutputRecordBytes,
+                        MaximumResponseBytes: PiPayloadBudget.RpcCommandBytes, MaximumRetainedBytes: 4 * PiPayloadBudget.RpcCommandBytes,
+                        MaximumTextCharacters: int.MaxValue, MaximumChoices: int.MaxValue, MaximumJsonDepth: 64, MaximumIdCharacters: int.MaxValue,
+                        MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes),
+                    presentationObserver: presentation);
             if (piExtensions is not null)
             {
                 // Source emitError: print and json modes write "Extension error (<path>): <error>"; RPC publishes an extension_error record.
@@ -340,7 +353,9 @@ public static class RpcSessionCommand
                 options: new(MaximumCommandBytes: PiPayloadBudget.RpcCommandBytes, MaximumOutputBytes: outputFraming.MaximumFrameBytes,
                     MaximumModels: 4096, MaximumModelDefinitionBytes: 16 * 1024 * 1024, MaximumJsonDepth: framing.MaximumJsonDepth,
                     // rpc-mode.ts has no id or type length limit.
-                    MaximumIdCharacters: javaScriptInput ? int.MaxValue : 256, MaximumCommandTypeCharacters: javaScriptInput ? int.MaxValue : 128),
+                    MaximumIdCharacters: javaScriptInput ? int.MaxValue : 256, MaximumCommandTypeCharacters: javaScriptInput ? int.MaxValue : 128,
+                    // Pi has no prompt, steer, follow_up or bash text limit and no image count limit (the frame bound stays).
+                    MaximumPromptCharacters: pi is null ? 65_536 : int.MaxValue, MaximumImages: pi is null ? 16 : int.MaxValue),
                 sessionOwnership: RpcSessionOwnership.Borrowed, inputAdmission: profile.InputAdmission, extensionUi: ui,
                 extensionCommandCatalog: profile, sessionOwner: profile.Sessions,
                 // main.ts: the initial runtime's session starts with reason "startup" in the Pi entry (new, continued or resumed alike).

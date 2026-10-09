@@ -39,6 +39,19 @@ public sealed record PromptInputAdmissionOptions(int MaximumTextCharacters = 65_
     public bool QueueOnly { get; init; }
     /// <summary>Trusted synchronous preflight over owned values, outside state locks. May be called again if the queue grows.</summary>
     public Action<TranscriptEntry, AgentPendingInputQueueSnapshot, PromptInputStreamingBehavior>? BeforeQueueCommit { get; init; }
+
+    private static readonly AsyncLocal<PromptInputAdmissionOptions?> AmbientDefault = new();
+    /// <summary>The bounds used where a caller passes none (template, skill and extension input admission): the ambient ones set by
+    /// <see cref="UseAsDefault"/> for the current flow, else the defaults.</summary>
+    public static PromptInputAdmissionOptions Default => AmbientDefault.Value ?? new();
+    /// <summary>Makes <paramref name="options"/> the default bounds for this execution flow (and work it starts) until disposed.</summary>
+    public static IDisposable UseAsDefault(PromptInputAdmissionOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var previous = AmbientDefault.Value; AmbientDefault.Value = options;
+        return new Restore(() => AmbientDefault.Value = previous);
+    }
+    private sealed class Restore(Action restore) : IDisposable { public void Dispose() => restore(); }
 }
 
 /// <summary>Pure owned admission/materialization. No clock, effects, queue, or source image normalization.</summary>
@@ -113,7 +126,7 @@ public static class PromptInputValue
 
     private static PromptInputAdmissionOptions Limits(PromptInputAdmissionOptions? options)
     {
-        var value = options ?? new();
+        var value = options ?? PromptInputAdmissionOptions.Default;
         if (value.MaximumTextCharacters <= 0 || value.MaximumImages < 0 || value.MaximumImageCharacters <= 0 ||
             value.MaximumImageBytes <= 0 || value.MaximumJsonDepth is < 1 or > 64 ||
             value.MaximumMessageCharacters <= 0 || value.MaximumMessageBytes <= 0)

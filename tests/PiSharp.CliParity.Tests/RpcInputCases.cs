@@ -75,6 +75,22 @@ internal static partial class Program
             Equal("[1.5,0]", state.GetProperty("id").GetRawText(), "array id");
             Check(state.GetProperty("success").GetBoolean(), "get_state with an array id failed");
         }),
+        ("rpc-input.prompt-text-and-image-count-have-no-pi-limit", async () =>
+        {
+            // rpc-mode.ts prompt: session.prompt(command.message, { images }) has no length or image count limit of its own.
+            const string png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+            var text = new string('x', 70_000);
+            var images = string.Join(",", Enumerable.Repeat("{\"type\":\"image\",\"data\":\"" + png + "\",\"mimeType\":\"image/png\"}", 17));
+            var result = await RunRpc([Encoding.UTF8.GetBytes("{\"id\":\"p\",\"type\":\"prompt\",\"message\":\"" + text + "\",\"images\":[" + images + "]}\n")]);
+            var prompt = JsonDocument.Parse(result.Code.Single(frame => frame.Contains("\"id\":\"p\"", StringComparison.Ordinal))).RootElement;
+            Check(prompt.GetProperty("success").GetBoolean(), "prompt refused: " + prompt.GetRawText());
+            // The admitted user message carries the whole text and every image.
+            var user = result.All.Select(line => JsonDocument.Parse(line).RootElement).First(frame => frame.GetProperty("type").GetString() == "message_start" &&
+                frame.GetProperty("message").GetProperty("role").GetString() == "user");
+            var content = user.GetProperty("message").GetProperty("content");
+            Equal(17, content.EnumerateArray().Count(block => block.GetProperty("type").GetString() == "image"), "images admitted");
+            Check(content.EnumerateArray().Any(block => block.GetProperty("type").GetString() == "text" && block.GetProperty("text").GetString() == text), "text admitted");
+        }),
         ("rpc-input.null-command-is-an-unhandled-type-error", async () =>
         {
             // handleCommand(null) reads null.id, and so does its catch block: Node prints the TypeError and exits 1 with no response.
@@ -85,16 +101,17 @@ internal static partial class Program
         }),
     ];
 
-    private static async Task<(int Exit, string[] Code, string Stderr)> RunRpc(IEnumerable<byte[]> lines)
+    private static async Task<(int Exit, string[] Code, string Stderr, string[] All)> RunRpc(IEnumerable<byte[]> lines, Action<Sandbox>? setup = null)
     {
         using var sandbox = new Sandbox("rpc-input");
+        setup?.Invoke(sandbox);
         var input = new MemoryStream([.. lines.SelectMany(line => line)]);
         using var output = new MemoryStream();
         using var stdout = new StringWriter(); using var stderr = new StringWriter();
         var host = sandbox.Host(stdout, stderr, null, rpcInput: input, rpcOutput: output) with { StdoutIsTty = false };
         var exit = await PiCommand.RunAsync(["--mode", "rpc", "--offline", "--provider", "anthropic", "--model", "claude-sonnet-4-5"], host, CancellationToken.None);
-        var responses = Encoding.UTF8.GetString(output.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Where(line => JsonDocument.Parse(line).RootElement.GetProperty("type").GetString() == "response").ToArray();
-        return (exit, responses, stderr.ToString());
+        var all = Encoding.UTF8.GetString(output.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var responses = all.Where(line => JsonDocument.Parse(line).RootElement.GetProperty("type").GetString() == "response").ToArray();
+        return (exit, responses, stderr.ToString(), all);
     }
 }
