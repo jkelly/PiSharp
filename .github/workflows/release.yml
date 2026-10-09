@@ -37,6 +37,12 @@ jobs:
         with:
           global-json-file: global.json
 
+      # PiSharp.ExtensionParity.Tests runs TypeScript extensions with Node.js 22.13 or later (module.stripTypeScriptTypes) and
+      # installs the Pi 1.1.0 packages with npm; the runner image's default Node.js is older.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Resolve version
         id: version
         shell: bash
@@ -52,7 +58,7 @@ jobs:
       - name: Run offline tests
         if: github.event_name == 'push' || !inputs.skip_tests
         run: |
-          for t in PiSharp.AzureResponses.Tests PiSharp.MistralConversations.Tests PiSharp.AnthropicAuthSync.Tests PiSharp.McpSync.Tests PiSharp.ProviderSync.Tests PiSharp.WireSync.Tests PiSharp.CliSync.Tests PiSharp.ToolSearch.Tests PiSharp.Classifiers.Tests PiSharp.Models.Tests PiSharp.Codemode.Tests PiSharp.ProviderApis.Tests PiSharp.CliParity.Tests PiSharp.McpParity.Tests PiSharp.SessionParity.Tests PiSharp.InteractiveParity.Tests; do
+          for t in PiSharp.AzureResponses.Tests PiSharp.MistralConversations.Tests PiSharp.AnthropicAuthSync.Tests PiSharp.McpSync.Tests PiSharp.ProviderSync.Tests PiSharp.WireSync.Tests PiSharp.CliSync.Tests PiSharp.ToolSearch.Tests PiSharp.Classifiers.Tests PiSharp.Models.Tests PiSharp.Codemode.Tests PiSharp.ProviderApis.Tests PiSharp.CliParity.Tests PiSharp.McpParity.Tests PiSharp.SessionParity.Tests PiSharp.InteractiveParity.Tests PiSharp.ExtensionParity.Tests; do
             dotnet run --project "tests/$t/$t.csproj" -c Release \
               -p:RestoreSources=https://api.nuget.org/v3/index.json -p:RestoreLockedMode=false
           done
