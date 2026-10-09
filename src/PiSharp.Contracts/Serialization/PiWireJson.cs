@@ -33,7 +33,7 @@ public static partial class PiWireJson
             "text" => new TextContent(String(value, "text"), JsonFields.FromObjectExcept(value, "type", "text")),
             "thinking" => new ThinkingContent(String(value, "thinking"), JsonFields.FromObjectExcept(value, "type", "thinking")),
             "toolCall" => new ToolCallContent(String(value, "id"), String(value, "name"),
-                RequireObject(value.GetProperty("arguments")), JsonFields.FromObjectExcept(value, "type", "id", "name", "arguments")),
+                JsonData.FromElement(value.GetProperty("arguments")), JsonFields.FromObjectExcept(value, "type", "id", "name", "arguments")),
             var kind => throw new JsonException($"Unsupported assistant content type: {kind}")
         };
     }
@@ -64,7 +64,7 @@ public static partial class PiWireJson
             "toolcall_checkpoint" => new ToolCallCheckpoint(Index(), String(value, "json"), Extras("contentIndex", "json")),
             "toolcall_delta" => new ToolCallDelta(Index(), String(value, "delta"), Extras("contentIndex", "delta")),
             "toolcall_end" => new ToolCallEnded(Index(), new ToolCallContent(String(value, "id"), String(value, "name"),
-                RequireObject(value.GetProperty("arguments")), Extras("contentIndex", "id", "name", "arguments")),
+                JsonData.FromElement(value.GetProperty("arguments")), Extras("contentIndex", "id", "name", "arguments")),
                 Extras("contentIndex", "id", "name", "arguments")),
             "content_finalized" => new ContentBlockFinalized(Index(), ReadContent(value.GetProperty("content")), Extras("contentIndex", "content")),
             "done" => new StreamDone(ReadStopReason(String(value, "reason")), ReadMessage(value.GetProperty("message")), Extras("reason", "message")),
@@ -208,8 +208,6 @@ public static partial class PiWireJson
     }
 
     private static JsonData Own(JsonNode node) => JsonData.Parse(node.ToJsonString());
-    private static JsonData RequireObject(JsonElement value) => value.ValueKind == JsonValueKind.Object
-        ? JsonData.FromElement(value) : throw new JsonException("Tool arguments must be a JSON object.");
     private static string String(JsonElement value, string name) => value.GetProperty(name).GetString()
         ?? throw new JsonException($"{name} cannot be null.");
     private static void RequireString(JsonElement value, string name, string expected)

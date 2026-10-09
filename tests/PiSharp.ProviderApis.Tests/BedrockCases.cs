@@ -225,6 +225,35 @@ internal static partial class Program
             JsonDocument.Parse(Wire(((StreamDone)toolEvents[^1]).Message)).RootElement.GetProperty("content").GetRawText(), "unstopped tool arguments");
     }
 
+    private static async Task BedrockToolArguments()
+    {
+        // bedrock-converse-stream.ts finalizes every tool call, stopped or not, with block.arguments = parseStreamingJson(block.partialJson):
+        // malformed input never fails the turn and any JSON value is kept.
+        foreach (var (input, expected) in new[]
+        {
+            ("{\"path\":\"a\",\"path\":\"b\",\"n\":1.50}", "{\"path\":\"b\",\"n\":1.5}"), ("[1,2", "[1,2]"), ("\"text\"", "\"text\""), ("not json", "{}"),
+            ("{\"p\":\"C:\\x\\y\"", "{}"), ("{\"p\":\"C:\\x\\y\"}", "{\"p\":\"C:\\\\x\\\\y\"}"), ("{\"a\":\"x\u0001", "{}"),
+            ("{\"a\":\"x\u0001\"}", "{\"a\":\"x\\u0001\"}"), ("null", "null"), ("", "{}"),
+        })
+            foreach (var stopped in new[] { true, false })
+            {
+                var tool = Bedrock(SonnetRow);
+                var messages = new List<byte[]>
+                {
+                    EventMessage("messageStart", """{"role":"assistant"}"""),
+                    EventMessage("contentBlockStart", """{"contentBlockIndex":0,"start":{"toolUse":{"toolUseId":"t1","name":"read"}}}"""),
+                };
+                if (input.Length > 0) messages.Add(EventMessage("contentBlockDelta", "{\"contentBlockIndex\":0,\"delta\":{\"toolUse\":{\"input\":" + JsonSerializer.Serialize(input) + "}}}"));
+                if (stopped) messages.Add(EventMessage("contentBlockStop", """{"contentBlockIndex":0}"""));
+                messages.Add(EventMessage("messageStop", """{"stopReason":"tool_use"}"""));
+                tool.Http.OnUrl("https://", _ => EventStream(messages: [.. messages]));
+                var events = await Collect(tool.Transport, new(tool.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 6));
+                var done = (StreamDone)events[^1];
+                Equal(StopReason.ToolUse, done.Reason, input);
+                Equal(expected, done.Message.Content.OfType<ToolCallContent>().Single().Arguments.ToString(), (stopped ? "stopped " : "unstopped ") + input);
+            }
+    }
+
     private static async Task BedrockErrors()
     {
         var hi = ImmutableArray.Create(Entry("""{"role":"user","content":"Hi","timestamp":1}"""));

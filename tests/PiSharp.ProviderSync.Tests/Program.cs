@@ -63,7 +63,14 @@ internal static partial class Program
             ("pricing.prompt-length-tier-completions-responses-google-mistral-boundaries", SharedPromptLengthPricing),
             ("errors.status-error-texts-completions-responses-anthropic-google", ProviderStatusErrorTexts),
             ("errors.in-stream-error-texts-completions-anthropic", ProviderStreamErrorTexts),
-            ("errors.pi-messages-diagnostic-body-truncation-ellipsis", PiMessagesDiagnosticBodyTruncation)
+            ("errors.pi-messages-diagnostic-body-truncation-ellipsis", PiMessagesDiagnosticBodyTruncation),
+            ("tool-arguments.parse-streaming-json-matches-pi-ai-goldens", StreamingJsonGoldens),
+            ("tool-arguments.anthropic-finalizes-with-parse-streaming-json", AnthropicFinalArguments),
+            ("tool-arguments.completions-finalizes-with-parse-streaming-json", CompletionsFinalArguments),
+            ("tool-arguments.responses-finalizes-item-or-partial-arguments", ResponsesFinalArguments),
+            ("tool-arguments.mistral-fragments-and-non-string-arguments", MistralFinalArguments),
+            ("tool-arguments.google-args-of-any-json-kind", GoogleFinalArguments),
+            ("tool-arguments.pi-messages-object-assign-of-any-arguments", PiMessagesFinalArguments)
         };
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)

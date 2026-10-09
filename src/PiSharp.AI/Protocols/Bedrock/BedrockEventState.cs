@@ -31,7 +31,6 @@ internal sealed class BedrockEventState
     private readonly ChatRequest _request;
     private readonly AssistantStreamReducer _reducer;
     private readonly List<Block> _blocks = [];
-    private readonly StreamingJsonPreview _preview = new(new(MaximumCharacters: 4 * 1024 * 1024, MaximumDepth: 64));
     private StopReason _stopReason = StopReason.Pending;
     private string? _rawStopReason, _stopError;
     private TokenUsage _usage = TokenUsage.Zero;
@@ -178,16 +177,8 @@ internal sealed class BedrockEventState
         block.RedactedChunks = null;
     }
 
-    private JsonData Arguments(Block block)
-    {
-        if (block.PartialJson.Length == 0) return JsonData.EmptyObject;
-        try
-        {
-            var value = _preview.Parse(block.PartialJson.ToString()).Value;
-            return value.Value.ValueKind == JsonValueKind.Object ? value : JsonData.EmptyObject;
-        }
-        catch (StreamingJsonPreviewException) { return JsonData.EmptyObject; }
-    }
+    // bedrock-converse-stream.ts: block.arguments = parseStreamingJson(block.partialJson), whatever JSON value that is.
+    private static JsonData Arguments(Block block) => StreamingJson.Parse(block.PartialJson.ToString());
 
     private static JsonFields Signature(string value) => JsonFields.Empty.Set("thinkingSignature", JsonData.Parse(JsonSerializer.Serialize(value)));
     private static JsonFields ThinkingProperties(Block block)

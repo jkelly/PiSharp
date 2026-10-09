@@ -31,6 +31,7 @@ internal static partial class Program
             ("bedrock.adaptive-opus-gpt-oss-gpt-and-govcloud-request-fields", BedrockReasoningFields),
             ("bedrock.stream-text-thinking-tool-usage-cost-and-stop-reasons", BedrockStreamEvents),
             ("bedrock.redacted-reasoning-and-blocks-without-stop", BedrockRedactedReasoning),
+            ("bedrock.tool-arguments-finalize-through-parse-streaming-json", BedrockToolArguments),
             ("bedrock.http-errors-retries-stream-exceptions-and-diagnostics", BedrockErrors),
             ("bedrock.bearer-token-region-arn-and-endpoint-selection", BedrockEndpoints),
             ("aws.credential-chain-env-profiles-assume-role-sso-container-imds", AwsCredentialChainCases),

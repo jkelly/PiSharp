@@ -105,11 +105,11 @@ internal sealed class GoogleEventMapper
                     var id = GoogleData.String(call, "id");
                     if (string.IsNullOrEmpty(id) || _blocks.OfType<ToolCallContent>().Any(x => x.Id == id))
                         id = $"{name}_{_request.Timestamp}_{Interlocked.Increment(ref _toolCounter)}";
-                    var args = !call.TryGetProperty("args", out var arguments) || arguments.ValueKind == JsonValueKind.Null ?
-                        JsonData.EmptyObject : JsonData.FromElement(arguments);
-                    FinalToolArguments.ParseStrict(args.ToString());
-                    var delta = EcmaScriptJsonProjection.Project(args);
-                    args = FinalToolArguments.ParseStrict(delta).Json;
+                    // google-generative-ai.ts: arguments = part.functionCall.args ?? {} (whatever JSON value the chunk carried), and the
+                    // delta is JSON.stringify(arguments).
+                    var raw = !call.TryGetProperty("args", out var arguments) || arguments.ValueKind == JsonValueKind.Null ? "{}" : arguments.GetRawText();
+                    var delta = StreamingJson.ParseToJson(raw);
+                    var args = StreamingJson.Parse(raw);
                     var properties = JsonFields.Empty; var signature = GoogleData.String(part, "thoughtSignature");
                     if (!string.IsNullOrEmpty(signature)) properties = properties.Set("thoughtSignature", JsonData.Parse(JsonSerializer.Serialize(signature)));
                     Charge(id.Length + name.Length + delta.Length + (signature?.Length ?? 0));

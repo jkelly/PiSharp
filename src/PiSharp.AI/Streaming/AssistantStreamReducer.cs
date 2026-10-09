@@ -162,7 +162,6 @@ public sealed class AssistantStreamReducer
                 if ((original.Id != end.ToolCall.Id || original.Name != end.ToolCall.Name) &&
                     !(_allowPiMessagesIdentityReplacement && _start!.Api == "pi-messages"))
                     throw new StreamProtocolException("Tool-call identity changes at its end.");
-                FinalToolArguments.ParseStrict(end.ToolCall.Arguments.ToString());
                 if (_blocks.Where(block => !ReferenceEquals(block, call)).Any(block => block.Content is ToolCallContent tool && tool.Id == end.ToolCall.Id))
                     throw new StreamProtocolException("Duplicate final tool-call ID.");
                 CheckSize(ContentCharacters(end.ToolCall) - ContentCharacters(original));
@@ -176,7 +175,7 @@ public sealed class AssistantStreamReducer
                 if (finalized.Content is ToolCallContent tool)
                 {
                     var started = (ToolCallContent)block.Content;
-                    if (started.Id != tool.Id || started.Name != tool.Name || tool.Arguments.Value.ValueKind != JsonValueKind.Object)
+                    if (started.Id != tool.Id || started.Name != tool.Name)
                         throw new StreamProtocolException("Tool-call identity changes at its end.");
                     CheckSize(ContentCharacters(tool) - ContentCharacters(started));
                 }
@@ -273,8 +272,8 @@ public sealed class AssistantStreamReducer
     {
         if (string.IsNullOrWhiteSpace(call.Id) || string.IsNullOrWhiteSpace(call.Name))
             throw new StreamProtocolException("Tool-call ID and name are required.");
-        if (call.Arguments.Value.ValueKind != JsonValueKind.Object)
-            throw new StreamProtocolException("Tool-call arguments must be an object.");
+        // Arguments are any JSON value: parseStreamingJson, a provider SDK or a pi-messages toolCall may produce an array, a
+        // string, a number, a boolean or null, and upstream keeps it.
     }
     private static JsonFields EndProperties(JsonFields? initial, JsonFields? final, params string[] names)
     {

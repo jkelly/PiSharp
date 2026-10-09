@@ -395,10 +395,10 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                         var raw = OptionalString(item, "arguments");
                         if (string.IsNullOrEmpty(raw)) raw = _reducer.GetToolJsonPreview(slot.Index);
                         if (raw.Length == 0) raw = "{}";
+                        // openai-responses-shared.ts output_item.done: parseStreamingJson(item.arguments || partialJson || "{}").
                         JsonData final;
-                        try { final = FinalToolArguments.ParseStrict(raw).Json; }
-                        catch (Exception exception) when (exception is JsonException or StreamProtocolException) { throw Protocol(); }
-                        CheckJson(final.Value, 0);
+                        try { final = StreamingJson.Parse(raw); }
+                        catch (JsonException) { throw Protocol(); }
                         var original = (ToolCallContent)_reducer.Snapshot().Content[slot.Index];
                         var fields = original.ExtraProperties ?? JsonFields.Empty;
                         if (OptionalString(item, "namespace") is { } ns) fields = fields.Set("namespace", StringData(ns));

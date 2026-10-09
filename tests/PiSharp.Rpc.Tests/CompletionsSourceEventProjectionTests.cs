@@ -22,7 +22,8 @@ internal static class CompletionsSourceEventProjectionTests
     public static IEnumerable<(string Name, Func<Task> Run)> Cases()
     {
         yield return ("rpc.completions-default-provisional-start-header-suppression-and-final-policy", DefaultProjection);
-        yield return ("rpc.completions-unfilled-malformed-and-bounded-source-deny-final-authority", FailedProjection);
+        yield return ("rpc.completions-unfilled-and-bounded-source-deny-final-authority", FailedProjection);
+        yield return ("rpc.completions-truncated-final-arguments-finalize-through-parse-streaming-json", TruncatedFinalProjection);
     }
 
     private static async Task DefaultProjection()
@@ -55,11 +56,10 @@ internal static class CompletionsSourceEventProjectionTests
 
     private static async Task FailedProjection()
     {
-        foreach (var scenario in new[] { "unfilled", "malformed", "bounded" })
+        foreach (var scenario in new[] { "unfilled", "bounded" })
         {
             var chunks = scenario == "unfilled" ? new[] { First,
-                """{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""" } : scenario == "malformed" ? new[] { First,
-                """{"choices":[{"delta":{"tool_calls":[{"index":9,"id":"real-call","function":{"name":"read","arguments":"1"}}]},"finish_reason":"tool_calls"}]}""" } : new[] { First, Last };
+                """{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""" } : new[] { First, Last };
             await using var fixture = await Fixture.Create(chunks,
                 scenario == "bounded" ? new(MaximumContentCharacters: 64) : null);
             await fixture.Run();
@@ -84,6 +84,19 @@ internal static class CompletionsSourceEventProjectionTests
             Equal(1, records.Count(record => Type(record) == "agent_settled"));
             Check(!fixture.Dispatcher.Completion.IsCompleted, "A sanitized provider failure became a fatal RPC route: " + scenario);
         }
+    }
+
+    // openai-completions.ts finalizes block.arguments = parseStreamingJson(block.partialArgs): the unterminated {"value":null,"n":1
+    // becomes {"value":null,"n":1} and the tool call ends normally, reaching the final tool policy like a complete one.
+    private static async Task TruncatedFinalProjection()
+    {
+        await using var fixture = await Fixture.Create([First,
+            """{"choices":[{"delta":{"tool_calls":[{"index":9,"id":"real-call","function":{"name":"read","arguments":"1"}}]},"finish_reason":"tool_calls"}]}"""]);
+        await fixture.Run();
+        Equal(1, fixture.Probe.Ended); Equal(1, fixture.Adapter.Preparations);
+        var prepared = fixture.Adapter.Prepared ?? throw new InvalidOperationException("Final invocation was not prepared.");
+        Equal("{\"value\":null,\"n\":1}", prepared.Call.Arguments.ToString());
+        Check(!fixture.Dispatcher.Completion.IsCompleted, "A repaired final argument failed the default RPC session.");
     }
 
     private sealed class Fixture : IAsyncDisposable

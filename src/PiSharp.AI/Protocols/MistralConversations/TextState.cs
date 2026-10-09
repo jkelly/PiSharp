@@ -108,13 +108,15 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
                     var block = new ToolCallContent(id, name, JsonData.EmptyObject); blocks.Add(block);
                     frames.Add(Snapshot(new ToolCallStarted(saved.Index, block)));
                 }
-                var fragment = function.TryGetProperty("arguments", out var args) && args.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined)
-                    ? args.ValueKind == JsonValueKind.String ? args.GetString()! : args.ValueKind == JsonValueKind.Object
-                        ? System.Text.Json.Nodes.JsonNode.Parse(args.GetRawText())!.ToJsonString()
-                        : throw Fail(NativeChatFailureCode.UnsupportedFeature, "Unsupported Mistral tool argument fragment.") : "{}";
+                // typeof arguments === "string" ? arguments : JSON.stringify(arguments || {})
+                var fragment = !function.TryGetProperty("arguments", out var args) ? "{}"
+                    : args.ValueKind == JsonValueKind.String ? args.GetString()!
+                    : args.ValueKind is JsonValueKind.Null or JsonValueKind.False || args.ValueKind == JsonValueKind.Number && args.GetDouble() == 0 ? "{}"
+                    : StreamingJson.ParseToJson(args.GetRawText());
                 characters += fragment.Length; Limit(characters, options.MaximumContentCharacters);
                 var raw = saved.Raw + fragment;
-                var parsed = new StreamingJsonPreview(new(options.MaximumContentCharacters, options.MaximumJsonDepth)).Parse(raw).Value;
+                // mistral-conversations.ts: block.arguments = parseStreamingJson(block.partialArgs) on every delta and at the end.
+                var parsed = StreamingJson.Parse(raw);
                 var previous = (ToolCallContent)blocks[saved.Index];
                 blocks[saved.Index] = previous with { Arguments = parsed };
                 tools[key] = (saved.Index, raw);
