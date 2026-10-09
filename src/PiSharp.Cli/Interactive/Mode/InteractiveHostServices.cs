@@ -44,6 +44,11 @@ internal static class InteractiveHostServices
                 catch (OperationCanceledException) { return new ModelsRefreshResult(true, []); }
             },
             GetModelsJsonError = () => registry?.GetError(),
+            ResolveToolRenderers = toolName =>
+            {
+                try { return Profile()?.ResolveExtensionToolRenderers(toolName) is { } extension ? BuiltInToolRenderers.Resolve(toolName, null, extension) : null; }
+                catch { return null; }
+            },
             EnsureTool = (tool, status) => ToolsManager.EnsureTool(tool, startup.AgentDir, context.GetEnvironment, status),
             IsAnthropicSubscriptionAuth = async () =>
             {

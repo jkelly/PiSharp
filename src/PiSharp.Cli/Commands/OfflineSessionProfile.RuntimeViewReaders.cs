@@ -16,6 +16,13 @@ internal sealed partial class OfflineSessionProfile
         if (view.Extension is null) throw new InvalidOperationException("No active extension command revision.");
         return await view.Extension.CompleteCommandAsync(name, prefix, token).ConfigureAwait(false);
     }
+    /// <summary>IMPL-I: the renderers extensions registered for <paramref name="toolName"/> (ExtensionRunner.resolveToolRenderers), for
+    /// the interactive mode's tool rows; null without extensions or renderers.</summary>
+    internal ExtensionToolRenderers? ResolveExtensionToolRenderers(string toolName)
+    {
+        var view = CaptureRuntimeView(); using var use = view.Lifetime.Enter();
+        return view.Extension?.ResolveToolRenderers(toolName);
+    }
     internal async ValueTask StartLifecycleAsync(string reason, CancellationToken token)
     {
         var view = CaptureRuntimeView(); using var use = view.Lifetime.Enter();

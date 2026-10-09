@@ -33,6 +33,9 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
     private Task? _disposal;
     internal ImmutableDictionary<string, string> Targets { get; }
     internal ExtensionAgentBinding Binding { get; private set; } = null!;
+    /// <summary>IMPL-I: resolveToolRenderers for the interactive mode's tool rows (resolvers in load order, then the tool's own).</summary>
+    internal PiSharp.Extensions.ExtensionToolRenderers? ResolveToolRenderers(string toolName) =>
+        Binding is null ? null : _registry.ResolveToolRenderers(Binding.Snapshot, toolName);
     internal IPromptInputAdmission InputAdmission { get; private set; } = null!;
     internal IPromptInputAdmission RawInputHandlers { get; private set; } = null!;
 
