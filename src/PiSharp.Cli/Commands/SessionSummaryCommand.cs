@@ -53,8 +53,8 @@ public static class SessionSummaryCommand
             try
             {
                 var options = new PersistentAgentSessionOptions(UseLatestLeaf: latest, SelectedLeafId: leaf,
-                    AgentOptions: new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024)),
-                    SessionLogStoreOptions: new(ReaderOptions: new(MaximumInputBytes: 8_388_608, MaximumLines: 10_000, MaximumRecords: 10_000)));
+                    AgentOptions: new(Loop: new(MaximumTurns: 64)),
+                    SessionLogStoreOptions: new(ReaderOptions: new(MaximumInputBytes: 8_388_608)));
                 long Clock() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); string NextId() => "cli-summary-" + Guid.NewGuid().ToString("N");
                 var lifecycle = profile.CreateLifecycle(Clock, NextId, options);
                 session = await lifecycle.OpenAsync(new(sessionPath, latest, leaf), profile.SelectedModel, cancellationToken).ConfigureAwait(false);

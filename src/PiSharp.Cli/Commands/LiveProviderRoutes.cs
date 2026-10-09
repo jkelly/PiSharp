@@ -143,7 +143,7 @@ internal sealed class LiveProviderRoute
                     var baseUrl = ProviderHeaderPolicies.ResolveCloudflareBaseUrl(auth.BaseUrl ?? definition.BaseUrl, auth.Environment);
                     return new ProviderRequestAuth(auth.ApiKey, baseUrl, auth.Headers);
                 })
-                { MaxTokens = maximum, Summary = summary, SummaryThinking = thinking, MaximumMessages = 1024 }, handler);
+                { MaxTokens = maximum, Summary = summary, SummaryThinking = thinking, MaximumMessages = PiRequestBudget.RequestMessages }, handler);
         }
     }
 

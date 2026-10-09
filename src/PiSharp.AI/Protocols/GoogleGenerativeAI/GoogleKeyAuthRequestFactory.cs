@@ -32,7 +32,9 @@ public sealed class GoogleKeyAuthRequestFactory(ModelDescriptor model, GoogleGen
         // The body (images included) is bounded by the payload budget, not by the projection's 1 MiB string defaults.
         var projected = EcmaScriptJsonProjection.Project(body, new(MaximumInputCharacters: options.MaximumPayloadBytes,
             MaximumInputBytes: options.MaximumPayloadBytes, MaximumOutputCharacters: options.MaximumPayloadBytes,
-            MaximumOutputBytes: options.MaximumPayloadBytes, MaximumStringCharacters: options.MaximumPayloadBytes));
+            MaximumOutputBytes: options.MaximumPayloadBytes, MaximumStringCharacters: options.MaximumPayloadBytes,
+            // Node and number counts grow with the message count; the payload budget bounds them.
+            MaximumNodes: options.MaximumPayloadBytes, MaximumNumbers: options.MaximumPayloadBytes, MaximumTotalNumberCharacters: options.MaximumPayloadBytes));
         if (Encoding.UTF8.GetByteCount(projected) > options.MaximumPayloadBytes) throw GoogleData.Fail(GoogleFailure.ResourceLimit);
         var headers = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
         {

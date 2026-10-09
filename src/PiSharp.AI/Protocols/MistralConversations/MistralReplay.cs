@@ -11,7 +11,7 @@ public sealed partial class MistralTextHttpSseTransport
 {
     private ImmutableArray<TranscriptEntry> ResolveReplay(ChatRequest request, MistralToolIds ids)
     {
-        if (request.Messages.IsDefault || request.Messages.Length > 256) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral replay message limit.");
+        if (request.Messages.IsDefault || request.Messages.Length > PiRequestBudget.RequestMessages) throw Fail(NativeChatFailureCode.ResourceLimit, "Mistral replay message limit.");
         long size = 0;
         foreach (var entry in request.Messages)
         {
@@ -79,7 +79,7 @@ public sealed partial class MistralTextHttpSseTransport
             foreach (var call in pending)
                 if (!existing.Contains(call["id"]!.GetValue<string>()))
                 {
-                    Limit(result.Count + 1, 1024);
+                    Limit(result.Count + 1, PiRequestBudget.RequestItems);
                     result.Add(new("toolResult", JsonData.Parse(new JsonObject
                 {
                     ["role"] = "toolResult", ["toolCallId"] = call["id"]!.GetValue<string>(), ["toolName"] = call["name"]!.GetValue<string>(),
@@ -105,7 +105,7 @@ public sealed partial class MistralTextHttpSseTransport
             else if (entry.Role == "system" && pending.Count > 0) held.Add(entry);
             else { if (entry.Role == "user") Close(); result.Add(entry); }
         }
-        Close(); Limit(result.Count, 1024); return result.ToImmutable();
+        Close(); Limit(result.Count, PiRequestBudget.RequestItems); return result.ToImmutable();
     }
     private ImmutableArray<TranscriptEntry> CollapseSystems(ImmutableArray<TranscriptEntry> messages)
     {

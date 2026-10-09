@@ -11,9 +11,9 @@ namespace PiSharp.AI.Protocols.OpenAIResponses;
 public sealed record ResponsesTranscriptProjectionOptions(
     bool Reasoning, bool SupportsDeveloperRole = true, bool SupportsMidConversationSystemMessages = false,
     bool IncludeInitialSystemPrompt = true, ImmutableHashSet<string>? AllowedToolCallProviders = null,
-    int MaximumMessages = 256, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
-    int MaximumContentBlocks = 1024, int MaximumJsonDepth = 32,
-    int MaximumOutputItems = 1024, int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes,
+    int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
+    int MaximumContentBlocks = PiRequestBudget.RequestItems, int MaximumJsonDepth = 32,
+    int MaximumOutputItems = PiRequestBudget.RequestItems, int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes,
     ResponsesToolDeclarationProjectionOptions? ToolDeclarations = null,
     bool SynthesizeMissingToolResults = false)
 {

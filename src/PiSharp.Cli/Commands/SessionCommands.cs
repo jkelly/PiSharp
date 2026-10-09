@@ -58,7 +58,7 @@ public static class SessionCommands
         " (startup settings/tools apply to create, prompt and resume); session inspect|tree|history --session <JSONL> [--leaf <id>|--root]";
     private static readonly UTF8Encoding Utf8 = new(false, true);
     // Pi-sized records and files (owner decision 0004): sessions hold read images of up to 4.5MB of base64.
-    private static readonly SessionLogReaderOptions ReaderBounds = PiPayloadBudget.SessionReader(new(MaximumLines: 10_000, MaximumRecords: 10_000));
+    private static readonly SessionLogReaderOptions ReaderBounds = PiPayloadBudget.SessionReader(new());
     private sealed record Arguments(string Command, string Session, string? Workspace, string? Script, string? Message,
         bool Latest, string? Leaf, ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi,
         OfflineBashAuthorization? Bash, bool Print, bool Json, NativeExtensionConfiguration? Extension, bool SupportsImages,
@@ -246,7 +246,7 @@ public static class SessionCommands
         await profile.LoadPromptTemplatesAsync(args.Prompts, stderr, token).ConfigureAwait(false);
         await profile.LoadSkillsAsync(args.Skills, stderr, token).ConfigureAwait(false);
         var options = new PersistentAgentSessionOptions(UseLatestLeaf: args.Latest, SelectedLeafId: args.Leaf,
-            AgentOptions: PiPayloadBudget.Agent(new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024))),
+            AgentOptions: PiPayloadBudget.Agent(new(Loop: new(MaximumTurns: 64))),
             SessionLogStoreOptions: new(ReaderOptions: ReaderBounds), ContextOptions: PiPayloadBudget.Context);
         var startTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); long sequence = 0;
         long Clock() => startTime + Interlocked.Increment(ref sequence);

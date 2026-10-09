@@ -9,7 +9,7 @@ namespace PiSharp.Extensions.Runtime.Dispatch;
 public sealed record ExtensionEventDispatchOptions(int MaximumTextCharacters = 65_536,
     int MaximumJsonCharacters = 8 * 1024 * 1024, int MaximumJsonBytes = 32 * 1024 * 1024,
     int MaximumJsonDepth = 32, int MaximumImages = 128, int MaximumConcurrentDispatches = 32,
-    int MaximumDispatchDepth = 8, int MaximumContextMessages = 1024);
+    int MaximumDispatchDepth = 8, int MaximumContextMessages = 1_000_000); // PiRequestBudget.RequestMessages: runner.ts emits the whole context.
 
 /// <summary>Typed event reducers. Complete tool-result admission is supplied by the host's pure codec.
 /// This standalone dispatcher does not activate extensions, invoke tools, authorize calls, or persist entries.</summary>
