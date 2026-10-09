@@ -52,6 +52,8 @@ internal sealed record InteractiveModeContext
     public Func<string, Action<string, string>, Task<string?>> EnsureTool { get; init; } = (_, _) => Task.FromResult<string?>(null);
     public Func<CancellationToken, Task<ModelsRefreshResult>> RefreshModelCatalogs { get; init; } = _ => Task.FromResult(new ModelsRefreshResult(false, []));
     public Func<string, Task<LatestPiRelease?>> CheckForNewVersion { get; init; } = version => VersionCheck.CheckForNewPiVersion(version);
+    /// <summary>Source packageManager.checkForAvailableUpdates: the display names of installed packages with updates.</summary>
+    public Func<Task<IReadOnlyList<string>>> CheckForPackageUpdates { get; init; } = () => Task.FromResult<IReadOnlyList<string>>([]);
     public Func<string, IReadOnlyList<string>, TimeSpan, Task<ProcessResult>> RunProcess { get; init; } = DefaultRunProcess;
     public Func<CrashNoticeInfo?> TakeUnnotifiedCrash { get; init; } = () => null;
     public Func<string, object?, string?, string, bool> RecordCrashImpl { get; init; } = (_, _, _, _) => false;

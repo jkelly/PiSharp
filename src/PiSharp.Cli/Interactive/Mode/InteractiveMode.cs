@@ -365,8 +365,10 @@ internal sealed partial class InteractiveMode
         }
         ui.RequestRender();
 
-        fdPath = await context.EnsureTool("fd", ShowManagedToolStatus);
-        _ = await context.EnsureTool("rg", ShowManagedToolStatus);
+        // The tools manager reports from its download threads: statuses join the loop in order.
+        void ToolStatus(string type, string message) => context.Loop.Post(() => ShowManagedToolStatus(type, message));
+        var ensured = await Task.WhenAll(context.EnsureTool("fd", ToolStatus), context.EnsureTool("rg", ToolStatus));
+        fdPath = ensured[0];
 
         SetupKeyHandlers();
         SetupEditorSubmitHandler();
@@ -405,6 +407,7 @@ internal sealed partial class InteractiveMode
         if (string.IsNullOrEmpty(context.GetEnvironment("PI_OFFLINE")))
             _ = RefreshCatalogsAtStartupAsync();
         _ = CheckForNewVersionAsync();
+        _ = CheckForPackageUpdatesAsync();
         _ = CheckTmuxKeyboardSetupAsync();
 
         foreach (var (type, message) in options.StartupDiagnostics)
@@ -459,6 +462,22 @@ internal sealed partial class InteractiveMode
             if (await context.CheckForNewVersion(version) is { } release) ShowNewVersionNotification(release.Version, release.Note);
         }
         catch { }
+    }
+
+    /// <summary>Source checkForPackageUpdates (nothing offline or on failure) and showPackageUpdateNotification.</summary>
+    private async Task CheckForPackageUpdatesAsync()
+    {
+        try
+        {
+            var updates = string.IsNullOrEmpty(context.GetEnvironment("PI_OFFLINE")) ? await context.CheckForPackageUpdates() : [];
+            if (updates.Count > 0) ShowPackageUpdateNotification(updates);
+        }
+        catch { }
+        finally
+        {
+            // npm can overwrite the shared console title on Windows while checking package versions.
+            if (OperatingSystem.IsWindows() && isInitialized) UpdateTerminalTitle();
+        }
     }
 
     private async Task CheckTmuxKeyboardSetupAsync()

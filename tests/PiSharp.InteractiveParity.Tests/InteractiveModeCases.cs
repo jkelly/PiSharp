@@ -355,9 +355,58 @@ internal static class InteractiveModeCases
             Check(pi.Terminal.Lines.Any(line => line.StartsWith("Error: Unknown thinking level", StringComparison.Ordinal)), "error line has no padding with outputPad 0");
         });
 
+        // interactive-mode.ts init: ensureTool("fd"/"rg") through the run's tools manager after the TUI mounts; download statuses show
+        // in the chat (showManagedToolStatus).
+        yield return ("e2e.tools.ensure-through-tools-manager", async () =>
+        {
+            await using var pi = new InteractiveHarness("tools");
+            var seen = new List<string>();
+            pi.Vars.Remove("PI_OFFLINE");
+            pi.Vars["PATH"] = Directory.CreateDirectory(Path.Combine(pi.Root, "empty-path")).FullName;
+            pi.ToolsHttp = () => new RecordingHandler(seen);
+            pi.Start(Regular);
+            await pi.WaitFor("fd not found. Downloading...");
+            await pi.WaitFor("Warning: Failed to download fd");
+            await pi.WaitFor("Warning: Failed to download ripgrep");
+            lock (seen)
+            {
+                Check(seen.Any(url => url.StartsWith("https://gh.test/sharkdp/fd/", StringComparison.Ordinal)), "fd requested from the release server");
+                Check(seen.Any(url => url.StartsWith("https://gh.test/BurntSushi/ripgrep/", StringComparison.Ordinal)), "rg requested from the release server");
+            }
+            await pi.Submit("still works");
+            await pi.WaitFor("Hello from the fake model.");
+        });
+        // interactive-mode.ts init: checkForPackageUpdates (skipped with PI_OFFLINE) and showPackageUpdateNotification.
+        yield return ("e2e.packages.update-notification", async () =>
+        {
+            await using var pi = new InteractiveHarness("package-updates");
+            var checks = 0;
+            pi.Vars.Remove("PI_OFFLINE");
+            pi.Configure = context => context with
+            {
+                CheckForPackageUpdates = () => { Interlocked.Increment(ref checks); return Task.FromResult<IReadOnlyList<string>>(["@acme/pi-tools", "github.com/acme/skills"]); },
+                EnsureTool = (_, _) => Task.FromResult<string?>(null)
+            };
+            pi.Start(Regular);
+            await pi.WaitFor("Package Updates Available");
+            await pi.WaitFor("- github.com/acme/skills");
+            Contains(pi.Terminal.Text, "update --extensions", "update instruction");
+            Equal(1, checks, "checked once at startup");
+        });
+        yield return ("e2e.packages.no-check-offline", async () =>
+        {
+            var checks = 0;
+            await using var pi = await Started("package-offline", pi => pi.Configure = context => context with
+            {
+                CheckForPackageUpdates = () => { Interlocked.Increment(ref checks); return Task.FromResult<IReadOnlyList<string>>(["x"]); }
+            });
+            await pi.Submit("hello");
+            await pi.WaitFor("Hello from the fake model.");
+            Equal(0, checks, "no package check with PI_OFFLINE");
+        });
         yield return ("e2e.autocomplete.at-file", Case("at-file", async pi =>
         {
-            if (PiSharp.Cli.Interactive.Mode.Utilities.ToolsManager.GetToolPath("fd", pi.AgentDir, Environment.GetEnvironmentVariable) is null)
+            if (new PiSharp.Cli.Pi.PiToolsManager(Path.Join(pi.AgentDir, "bin"), Environment.GetEnvironmentVariable).GetToolPath("fd") is null)
                 throw new SkipCaseException("fd is not installed on this machine.");
             File.WriteAllText(Path.Combine(pi.Cwd, "readme-target.md"), "x");
             pi.Type("look at @readme-t");
@@ -411,5 +460,14 @@ internal static class InteractiveModeCases
             pi.Type("\t");
             await pi.WaitUntil(text => text.Contains("/hotkeys", StringComparison.Ordinal), "completed command");
         }));
+    }
+
+    private sealed class RecordingHandler(List<string> seen) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            lock (seen) seen.Add(request.RequestUri!.AbsoluteUri);
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+        }
     }
 }

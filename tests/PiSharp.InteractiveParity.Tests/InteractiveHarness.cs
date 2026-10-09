@@ -25,6 +25,8 @@ internal sealed class InteractiveHarness : IAsyncDisposable
     public string? ClipboardText { get; set; }
     /// <summary>Further context changes for a case (applied after the harness defaults).</summary>
     public Func<InteractiveModeContext, InteractiveModeContext>? Configure { get; set; }
+    /// <summary>The fake GitHub the fd/rg tools manager downloads from (PiHost.ToolsHttp/ToolsReleaseBase).</summary>
+    public Func<HttpMessageHandler>? ToolsHttp { get; set; }
 
     private InteractiveModeContext ConfigureContext(InteractiveModeContext context)
     {
@@ -94,7 +96,8 @@ internal sealed class InteractiveHarness : IAsyncDisposable
             RunInteractive = (terminalArgs, options, token) => InteractiveModeHost.RunAsync(terminalArgs, options,
                 new PiSharp.Cli.Mcp.McpSessionHost(AgentDir, Home, () => []), new McpBinding(), Stdout, Stderr, token,
                 loop => new PiSharp.Tui.Pi.ProcessTerminal(loop, Terminal, name => Vars.GetValueOrDefault(name)), mode => Mode = mode, ConfigureContext),
-            ApplicationDirectory = Path.Combine(Root, "app"), Now = () => DateTimeOffset.UtcNow
+            ApplicationDirectory = Path.Combine(Root, "app"), Now = () => DateTimeOffset.UtcNow,
+            ToolsHttp = ToolsHttp, ToolsReleaseBase = ToolsHttp is null ? "https://github.com" : "https://gh.test"
         };
         run = Task.Run(() => PiCommand.RunAsync(args, host, deadline.Token));
     }

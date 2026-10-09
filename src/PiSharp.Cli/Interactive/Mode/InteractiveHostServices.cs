@@ -49,7 +49,17 @@ internal static class InteractiveHostServices
                 try { return Profile()?.ResolveExtensionToolRenderers(toolName) is { } extension ? BuiltInToolRenderers.Resolve(toolName, null, extension) : null; }
                 catch { return null; }
             },
-            EnsureTool = (tool, status) => ToolsManager.EnsureTool(tool, startup.AgentDir, context.GetEnvironment, status),
+            // tools-manager.ts ensureTool through the run's tools manager (the one grep and find use), downloading into <agentDir>/bin.
+            EnsureTool = (tool, status) => (options.ToolPolicy.Search ?? new PiToolsManager(Path.Join(startup.AgentDir, "bin"), context.GetEnvironment))
+                .EnsureToolAsync(tool, report => status(report.Type, report.Message), CancellationToken.None),
+            CheckForPackageUpdates = async () =>
+            {
+                var settings = PiSettings.Load(startup.Cwd, startup.AgentDir, startup.ProjectTrusted);
+                var manager = new PiSharp.Cli.Packages.PiPackageManager(startup.Cwd, startup.AgentDir, startup.Home, settings, context.GetEnvironment,
+                    new() { Output = TextWriter.Null, ErrorOutput = TextWriter.Null });
+                var updates = await manager.CheckForAvailableUpdatesAsync().ConfigureAwait(false);
+                return [.. updates.Select(update => update.DisplayName)];
+            },
             IsAnthropicSubscriptionAuth = async () =>
             {
                 await registryLoad.ConfigureAwait(false);
