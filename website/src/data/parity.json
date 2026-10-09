@@ -54,7 +54,7 @@
         {
           "area": "Slash commands",
           "status": "ported",
-          "notes": "All 24 of Pi's built-in commands, with the same names, descriptions and arguments, plus /mcp. /bug is Pi's: its upload goes to Pi's developers.",
+          "notes": "All 24 of Pi's built-in commands, with the same names, descriptions and arguments, plus /mcp. /bug builds Pi's local report and opens a prefilled PiSharp GitHub issue instead of uploading to Pi's developers.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.InteractiveParity.Tests"
         },
         {
@@ -216,7 +216,6 @@
         { "title": "JSON depth 64", "notes": "Session records, RPC input and streamed tool-call arguments nested deeper than 64 levels are refused. JSON.parse has no such limit." },
         { "title": "Fractional token counts", "notes": "Usage counts must be whole numbers. A provider that reports a fraction fails the response, and Bedrock reads it as 0." },
         { "title": "Memory bounds", "notes": "PiSharp keeps byte bounds Pi doesn't have: 64 MiB per session line and session file, 16 MiB per streamed event and 64 MiB per response, 8 MiB per tool result, 32 MiB per RPC record." },
-        { "title": "Google calls without a name", "notes": "A Gemini function call with no name fails the stream. Pi records it with an empty name." },
         { "title": "triggerTurn during a command", "notes": "An extension's sendMessage with triggerTurn from inside a command runs after the command returns, not while it runs." },
         { "title": "User bash start failures", "notes": "When your !command shell can't start, Windows shows \"RPC command failed.\" and Linux and macOS report the shell's own error with exit code 127, where Pi shows Node's spawn error." },
         { "title": "Linux X11 clipboard", "notes": "Pi has a built-in X11 clipboard helper. PiSharp needs xclip or xsel." }

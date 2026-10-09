@@ -30,6 +30,8 @@ A C#-only patch on the Pi v1.1.0 baseline that ports the rest of Pi v1.1.0. Upda
 
 - Long sessions: no more failures past 256 or 1,024 messages
 - Prompts sent right after `agent_settled` are accepted
+- Gemini tool calls without a name are recorded, as in Pi
+- `/bug` opens a PiSharp GitHub issue; the update check uses NuGet
 
 ### New dependencies
 

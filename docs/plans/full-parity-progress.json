@@ -145,11 +145,6 @@
     },
     {
       "from": "BURN-DOWN",
-      "item": "Google function calls without a name fail the stream; upstream records name \"\"",
-      "owner": "open"
-    },
-    {
-      "from": "BURN-DOWN",
       "item": "extension sendMessage with triggerTurn from inside a command handler runs after the handler returns; dropped after about 30 s; untested",
       "owner": "open"
     },
@@ -187,11 +182,6 @@
       "from": "IMPL-G",
       "item": "project_trust and resources_discover are not dispatched to native C# extensions; compatibility/extensions/event-catalog.v1.1.0.overlay.json still marks the agent-loop topics WireOnlyNotDispatchedToExtensions",
       "owner": "open"
-    },
-    {
-      "from": "IMPL-I",
-      "item": "/bug uploads reports to Pi's developers (Earendil, Radius gateway) as upstream does; decide whether PiSharp should keep that",
-      "owner": "owner decision"
     },
     {
       "from": "IMPL-I",
