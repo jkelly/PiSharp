@@ -457,7 +457,9 @@ public sealed class ResponsesTextToolTransport : IChatTransport
                         EndThinking(finished, Emit);
                     _completed = true;
                     break;
-                default: throw Protocol();
+                // openai-responses-shared.ts processResponsesStream: other event types (response.content_part.added,
+                // response.output_text.done, response.content_part.done, ...) fall through its if/else chain and are ignored.
+                default: break;
             }
             return events;
         }
