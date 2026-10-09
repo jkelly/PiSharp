@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json.Nodes;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.GoogleGenerativeAI;
@@ -179,7 +180,10 @@ public sealed class GoogleGenerativeAIHttpTransport : IChatTransport
             if (n > _options.MaximumErrorBytes - bytes.Length) throw GoogleData.Fail(GoogleFailure.ResourceLimit);
             bytes.Write(buffer, 0, n);
         }
-        // Public server body/error normalization is an explicit SDK parity gap; secrets are not copied into diagnostics.
-        return new(GoogleFailure.ProviderError, $"Google request failed with HTTP {(int)response.StatusCode}.");
+        // google-generative-ai.ts / google-vertex.ts show formatProviderError(normalizeProviderError(ApiError)): the @google/genai
+        // message, JSON.stringify(errorBody), unchanged (ApiError has a status but no body field). A JSON-typed body that
+        // response.json() rejects keeps the status-only text, since the engine SyntaxError text is not reproduced.
+        return new(GoogleFailure.ProviderError, ProviderErrorText.GoogleStatus(response, bytes.ToArray())
+            ?? $"Google request failed with HTTP {(int)response.StatusCode}.");
     }
 }

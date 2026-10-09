@@ -15,6 +15,8 @@ internal static class GoogleRetryCases
 {
     private static readonly ModelDescriptor Model = new("gemini-3-flash-preview", "google-generative-ai", "google");
     private const string PrivateText = "inert-google-retry-private-key";
+    // @google/genai ApiError message for the untyped 429 body: JSON.stringify({error:{message,code,status}}).
+    private const string RejectedMessage = """{"error":{"message":"authored rejected body","code":429,"status":"Too Many Requests"}}""";
     private const string Success = """{"candidates":[{"content":{"parts":[{"text":"owned"}]},"finishReason":"STOP"}]}""";
     private const string Tool = """{"candidates":[{"content":{"parts":[{"functionCall":{"id":"one","name":"inspect","args":{"value":7}}}]},"finishReason":"STOP"}]}""";
     private static readonly JsonData Metadata = JsonData.Parse("""{"type":"chat","id":"gemini-3-flash-preview","api":"google-generative-ai","provider":"google","name":"authored","baseUrl":"https://google.invalid/v1beta","reasoning":true,"input":["text"],"contextWindow":100000,"maxTokens":1000,"cost":{"input":2,"output":3,"cacheRead":0.5,"cacheWrite":0},"headers":{"x-model":"owned"}}""");
@@ -152,7 +154,7 @@ internal static class GoogleRetryCases
                     var result = await original;
                     AssertOutcome(result, Enum.Parse<NativeChatFailureCode>(row.GetProperty("failure").GetString()!));
                     if (row.GetProperty("id").GetString() == "default-cap-over")
-                        Equal("Server requested 61s retry delay (max: 60s). Google request failed with HTTP 429.",
+                        Equal("Server requested 61s retry delay (max: 60s). " + RejectedMessage,
                             result.Terminal.Message.ExtraProperties!.Values["errorMessage"].Value.GetString());
                     Equal(1, fixture.Requests.Count); Equal(0, fixture.Retries.Count); Equal(0, clock.Created);
                 }
@@ -198,7 +200,7 @@ internal static class GoogleRetryCases
                 AssertOutcome(result, cancel ? NativeChatFailureCode.Cancelled : failCleanup ? NativeChatFailureCode.ProviderError : null, failCleanup);
                 Equal(cancel || failCleanup ? 1 : 2, fixture.Requests.Count); fixture.AssertReleased(0);
                 if (failCleanup && !cancel)
-                    Equal("Google request failed with HTTP 429.", result.Terminal.Message.ExtraProperties!.Values["errorMessage"].Value.GetString());
+                    Equal(RejectedMessage, result.Terminal.Message.ExtraProperties!.Values["errorMessage"].Value.GetString());
             }
             finally { fixture.Cancel(); fixture.FirstBody.ReleaseCleanup.TrySetResult(); clock.ReleaseAll(); await Join(original); }
         }

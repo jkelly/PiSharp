@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.AnthropicMessages;
@@ -82,7 +83,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 if (cancellationToken.IsCancellationRequested) { failure = AnthropicMessagesFailure.Cancelled; break; }
                 var moved = false;
                 try { moved = await enumerator.MoveNextAsync().ConfigureAwait(false); }
-                catch (Exception) { failure = cancellationToken.IsCancellationRequested ? AnthropicMessagesFailure.Cancelled : AnthropicMessagesFailure.SourceFailed; }
+                catch (Exception error) { failure = SourceFailure(state, error, cancellationToken); }
                 if (failure is not null || !moved) break;
                 if (cancellationToken.IsCancellationRequested) { failure = AnthropicMessagesFailure.Cancelled; break; }
                 // Source value acquisition has its own failure boundary: no DTO has
@@ -110,6 +111,16 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         }
         if (cancellationToken.IsCancellationRequested) failure = AnthropicMessagesFailure.Cancelled;
         yield return state.Finish(failure);
+    }
+
+    /// <summary>A source failure. Provider error text the source surfaces (a rejected response's SDK message, or a named
+    /// error event's data) is what anthropic-messages.ts shows as errorMessage.</summary>
+    private static AnthropicMessagesFailure SourceFailure(State state, Exception error, CancellationToken token)
+    {
+        if (token.IsCancellationRequested) return AnthropicMessagesFailure.Cancelled;
+        if (error is not ProviderDisplayException shown) return AnthropicMessagesFailure.SourceFailed;
+        state.SourceMessage ??= shown.Message;
+        return shown.InStream ? AnthropicMessagesFailure.ProviderError : AnthropicMessagesFailure.SourceFailed;
     }
 
     private static AnthropicMessagesFailure Classify(Exception error, CancellationToken token) =>
@@ -152,6 +163,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         private bool _messageStopped;
         private StopReason _reason = StopReason.Pending;
         private string? _stopErrorMessage;
+        internal string? SourceMessage;
         public StreamStarted Start { get; }
         public State(ChatRequest request, AnthropicMessagesOptions options)
         {
@@ -366,7 +378,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 properties = properties.Set("diagnostics", JsonData.Parse(diagnostics.ToJsonString()));
             }
             if (failure is not null) properties = properties.Set("errorMessage", TextData(failure == AnthropicMessagesFailure.Cancelled
-                ? "Anthropic stream was cancelled." : failure == AnthropicMessagesFailure.ProviderError && _reason == StopReason.Error && _stopErrorMessage is not null
+                ? "Anthropic stream was cancelled." : SourceMessage is not null ? SourceMessage : failure == AnthropicMessagesFailure.ProviderError && _reason == StopReason.Error && _stopErrorMessage is not null
                     ? _stopErrorMessage : "Anthropic stream did not complete."))
                 .Set("anthropicFailure", TextData(failure.Value.ToString()));
             var final = snapshot with { Content = content.ToImmutable(), Usage = _usage, StopReason = reason, ExtraProperties = properties };

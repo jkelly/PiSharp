@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text;
 using System.Text.Json.Nodes;
 using PiSharp.Contracts.Compatibility;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.AI.Transports;
 using PiSharp.Contracts;
 
@@ -113,7 +114,8 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
                 var body = await ReadErrorBody(prepared, context, cancellationToken).ConfigureAwait(false);
                 var prefix = request.Model.Provider == "openai" ? "OpenAI" : request.Model.Provider;
                 var rejection = new HttpSseRejectedException(response.StatusCode);
-                context.DisplayMessage = $"{prefix} API error ({(int)response.StatusCode}): " + (body ?? rejection.Message);
+                // openai-responses.ts: formatProviderError(normalizeProviderError(APIError), prefix + " API error").
+                context.DisplayMessage = ProviderErrorText.Format(ProviderErrorText.OpenAIStatus((int)response.StatusCode, body), prefix + " API error");
                 throw rejection;
             }
             if (_factory?.Policy.OnResponse is { } responseHook)
@@ -193,10 +195,11 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
         return JsonData.Parse(new JsonObject { ["status"] = (int)response.StatusCode, ["headers"] = headers }.ToJsonString());
     }
 
-    private async ValueTask<string?> ReadErrorBody(PreparedDtos prepared, ResponsesFailureContext context, CancellationToken token)
+    /// <summary>The SDK's <c>response.text()</c> of the rejected body: UTF-8 with replacement, a leading BOM removed.</summary>
+    private async ValueTask<string> ReadErrorBody(PreparedDtos prepared, ResponsesFailureContext context, CancellationToken token)
     {
         var body = await prepared.Body(token).ConfigureAwait(false);
-        using var reader = new StreamReader(body, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true);
+        using var reader = new StreamReader(body, new UTF8Encoding(false, false), detectEncodingFromByteOrderMarks: false, bufferSize: 1024, leaveOpen: true);
         var buffer = new char[1024]; var text = new StringBuilder();
         while (true)
         {
@@ -205,21 +208,9 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
             if (read > _options.MaximumTotalDataCharacters - text.Length) throw Limit();
             text.Append(buffer, 0, read);
         }
-        var value = text.ToString().Trim(EcmaWhitespace);
-        if (value.Length == 0) return null;
-        try
-        {
-            var json = JsonData.Parse(value);
-            if (json.Value.ValueKind == JsonValueKind.Object && json.Value.TryGetProperty("error", out var error) &&
-                error.ValueKind == JsonValueKind.Object && error.EnumerateObject().Any())
-                value = EcmaScriptJsonProjection.Project(JsonData.FromElement(error));
-        }
-        catch (Exception error) when (error is JsonException or EcmaScriptJsonProjectionException) { }
-        return value.Length <= 4000 ? value : value[..4000] + $"... [truncated {value.Length - 4000} chars]";
+        return ProviderErrorText.FetchText(text.ToString());
     }
 
-    // ECMAScript WhiteSpace and LineTerminator code points; FEFF is included, 0085/180E/200B are not.
-    private static readonly char[] EcmaWhitespace = "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff".ToCharArray();
     private static async ValueTask<bool> MoveNextAsync(IAsyncEnumerator<SseEvent> events)
     {
         try { return await events.MoveNextAsync().ConfigureAwait(false); }

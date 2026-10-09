@@ -97,7 +97,7 @@ internal static class GoogleNativeDiagnosticCases
                 case "tool-success": body = new(Wire(ToolChunk)); break;
                 case "provider-finish": body = new(Wire(ToolChunk.Replace("\"STOP\"", "\"SAFETY\"", StringComparison.Ordinal))); break;
                 case "provider-error-chunk": body = new(Wire("""{"error":{"message":"not copied"}}""")); break;
-                case "http-error": body = new(PrivateText); status = HttpStatusCode.BadRequest; break;
+                case "http-error": body = new("authored rejected body"); status = HttpStatusCode.BadRequest; break; // @google/genai shows the rejected body in its ApiError message.
                 case "invalid-json": body = new("data: {bad}\n\n"); break;
                 case "invalid-shape": body = new(Wire("""{"candidates":{}}""")); break;
                 case "invalid-tool-args": body = new(Wire(ToolChunk.Replace("""{"value":7,"keep":null}""", "[]", StringComparison.Ordinal))); break;
@@ -358,7 +358,7 @@ internal static class GoogleNativeDiagnosticCases
                 "eof" => Wire(ToolChunk.Replace(",\"finishReason\":\"STOP\"", "", StringComparison.Ordinal)),
                 "unsupported" => Wire(ToolChunk.Replace("\"promptTokenCount\":11", "\"promptTokenCount\":0.5", StringComparison.Ordinal)),
                 "length" => Wire(ToolChunk.Replace("\"STOP\"", "\"MAX_TOKENS\"", StringComparison.Ordinal)), _ => Wire(ToolChunk) };
-            if (scenario == "http") wire = PrivateText;
+            if (scenario == "http") wire = "authored rejected body"; // @google/genai shows the rejected body in its ApiError message.
             var body = new OwnedBody(wire) { HoldCleanup = true, FailCleanup = scenario is "cleanup" or "cancel" };
             var options = scenario == "callback" ? Options() with { Hooks = new() { OnProviderStreamEvent = (_, _, _) => throw new IOException(PrivateText) } } : Options();
             if (scenario == "resource") options = options with { MaximumContentCharacters = 1 };

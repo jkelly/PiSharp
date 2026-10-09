@@ -334,7 +334,14 @@ internal static class Program
             ("{\"message\":\"denied\",\"code\":\"fixture\"}", "Azure OpenAI API error (403): {\"message\":\"denied\",\"code\":\"fixture\"}"),
             ("proxy denied", "Azure OpenAI API error (403): 403 proxy denied"),
             ("", "Azure OpenAI API error (403): 403 status code (no body)"),
-            ("{\"error\":{\"code\":\"fixture\"}}", "Azure OpenAI API error (403): 403 {\"code\":\"fixture\"}")
+            ("{\"error\":{\"code\":\"fixture\"}}", "Azure OpenAI API error (403): 403 {\"code\":\"fixture\"}"),
+            // openai SDK 7.19.0 makeStatusError/makeMessage; AzureOpenAI shares the client (texts captured via pi-ai 1.1.0 openai-responses).
+            ("<html><body>Bad gateway</body></html>", "Azure OpenAI API error (403): 403 <html><body>Bad gateway</body></html>"),
+            ("null", "Azure OpenAI API error (403): 403 null"),
+            ("[1,2]", "Azure OpenAI API error (403): 403 [1,2]"),
+            ("{\"error\":null}", "Azure OpenAI API error (403): 403 {\"error\":null}"),
+            ("{\"error\":\"nope\"}", "Azure OpenAI API error (403): 403 \"nope\""),
+            ("{\"error\":{\"message\":\"a\",\"x\":1.50,\"message\":\"b\"}}", "Azure OpenAI API error (403): {\"message\":\"b\",\"x\":1.5}")
         })
         {
             var body = new Body(wire); using var handler = new Handler(body, HttpStatusCode.Forbidden); using var client = new HttpClient(handler);

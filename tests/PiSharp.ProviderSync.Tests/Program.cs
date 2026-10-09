@@ -60,7 +60,10 @@ internal static partial class Program
             ("responses.ctc-replay-cross-provider", ResponsesCtcCrossProvider),
             ("responses.ctc-replay-grammar-then-function-call-and-support-switch", ResponsesCtcMixed),
             ("pricing.prompt-length-tier-anthropic-haiku-5-5-catalog-boundaries", AnthropicPromptLengthPricing),
-            ("pricing.prompt-length-tier-completions-responses-google-mistral-boundaries", SharedPromptLengthPricing)
+            ("pricing.prompt-length-tier-completions-responses-google-mistral-boundaries", SharedPromptLengthPricing),
+            ("errors.status-error-texts-completions-responses-anthropic-google", ProviderStatusErrorTexts),
+            ("errors.in-stream-error-texts-completions-anthropic", ProviderStreamErrorTexts),
+            ("errors.pi-messages-diagnostic-body-truncation-ellipsis", PiMessagesDiagnosticBodyTruncation)
         };
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
