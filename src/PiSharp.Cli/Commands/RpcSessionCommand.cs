@@ -69,6 +69,52 @@ public static class RpcSessionCommand
         Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null) =>
         RunCoreAsync(args, stdin, stdout, stderr, presentation, cancellationToken, userShutdown, stopTerminalAndJoin, liveRuntime, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission, terminalInputAdmission: terminalInputAdmission, decorateTerminalUi: decorateTerminalUi, mcpHost: mcpHost);
 
+    /// <summary>agent-session.ts _getThinkingLevelForModelSwitch: the settings' per-model level (modelThinkingLevels), else
+    /// defaultThinkingLevel, else null (the current level stays).</summary>
+    internal static string? ModelSwitchThinkingLevel(StartupSettingsSnapshot? settings, ModelDescriptor model)
+    {
+        if (settings?.Values.Value is not { ValueKind: JsonValueKind.Object } values) return null;
+        if (values.TryGetProperty("modelThinkingLevels", out var overrides) && overrides.ValueKind == JsonValueKind.Object &&
+            overrides.TryGetProperty(model.Provider + "/" + model.Id, out var perModel) && perModel.ValueKind == JsonValueKind.String &&
+            perModel.GetString() is { Length: > 0 } level) return level;
+        return values.TryGetProperty("defaultThinkingLevel", out var fallback) && fallback.ValueKind == JsonValueKind.String &&
+            fallback.GetString() is { Length: > 0 } defaultLevel ? defaultLevel : null;
+    }
+
+    /// <summary>settings-manager.ts getCompactionSettings(model): compaction.enabled, and reserveTokens/keepRecentTokens from
+    /// compaction.modelOverrides["provider/id"], then compaction, then the defaults; a token value that is not a non-negative safe
+    /// integer is refused with upstream's message.</summary>
+    internal static PiSharp.Sessions.Compaction.SessionCompactionSettings CompactionSettings(StartupSettingsSnapshot? settings, ModelDescriptor model)
+    {
+        var defaults = new PiSharp.Sessions.Compaction.SessionCompactionSettings();
+        if (settings?.Values.Value is not { ValueKind: JsonValueKind.Object } values || !values.TryGetProperty("compaction", out var compaction) ||
+            compaction.ValueKind != JsonValueKind.Object) return defaults;
+        var key = model.Provider + "/" + model.Id;
+        JsonElement? overrides = null;
+        if (compaction.TryGetProperty("modelOverrides", out var all) && all.ValueKind == JsonValueKind.Object && all.TryGetProperty(key, out var entry))
+        {
+            if (entry.ValueKind != JsonValueKind.Object)
+                throw new InvalidOperationException($"Invalid compaction.modelOverrides[\"{key}\"] setting: {entry.GetRawText()}. Expected an object.");
+            overrides = entry;
+        }
+        double Token(string field, double fallback)
+        {
+            static bool Safe(JsonElement value) => value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number) &&
+                number >= 0 && number == Math.Floor(number) && number <= 9007199254740991;
+            if (compaction.TryGetProperty(field, out var ordinary) && !Safe(ordinary))
+                throw new InvalidOperationException($"Invalid compaction.{field} setting: {ordinary.GetRawText().Trim('"')}. Expected a non-negative safe integer.");
+            if (overrides is { } modelEntry && modelEntry.TryGetProperty(field, out var overridden))
+            {
+                if (!Safe(overridden))
+                    throw new InvalidOperationException($"Invalid compaction.modelOverrides[\"{key}\"].{field} setting: {overridden.GetRawText().Trim('"')}. Expected a non-negative safe integer.");
+                return overridden.GetDouble();
+            }
+            return compaction.TryGetProperty(field, out var value) ? value.GetDouble() : fallback;
+        }
+        var enabled = !(compaction.TryGetProperty("enabled", out var flag) && flag.ValueKind == JsonValueKind.False);
+        return new(enabled, Token("reserveTokens", defaults.ReserveTokens), Token("keepRecentTokens", defaults.KeepRecentTokens));
+    }
+
     private static async Task<int> RunCoreAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
         IRpcExtensionUiPresentationObserver? presentation, CancellationToken cancellationToken, Func<bool>? userShutdown = null,
         Func<RpcSessionShutdownSettlement, ValueTask<RpcTerminalStoppedAcknowledgment>>? stopTerminalAndJoin = null,
@@ -168,15 +214,39 @@ public static class RpcSessionCommand
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);
             var lifecycle = profile.CreateLifecycle(Clock, NextId, options, catalog: catalog, backend: backend);
+            // sdk.ts createAgentSession for a new session (/new, new_session): the CLI level, else the per-model or global default
+            // the settings files hold now, clamped to the model.
+            lifecycle.ConfigureNewSession = async (created, token) =>
+            {
+                var current = pi?.ReloadSettings is { } reload ? await reload(token).ConfigureAwait(false) : settings;
+                var level = SettingsModelSelection.Thinking(current, created.Snapshot.Agent.Model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel,
+                    false, created.GetSupportedThinkingLevels());
+                if (level is not null && level != created.Snapshot.Context.ThinkingLevel)
+                    await created.ConfigureAsync(new(ThinkingLevel: level), token).ConfigureAwait(false);
+            };
+            // sdk.ts createAgentSession for a new session (/new, new_session): the CLI level, else the per-model or global default
+            // the settings files hold now, clamped to the model.
+            lifecycle.ConfigureNewSession = async (created, token) =>
+            {
+                var current = pi?.ReloadSettings is { } reload ? await reload(token).ConfigureAwait(false) : settings;
+                var level = SettingsModelSelection.Thinking(current, created.Snapshot.Agent.Model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel,
+                    false, created.GetSupportedThinkingLevels());
+                if (level is not null && level != created.Snapshot.Context.ThinkingLevel)
+                    await created.ConfigureAsync(new(ThinkingLevel: level), token).ConfigureAwait(false);
+            };
             session = parsed.SessionMode == "open"
                 ? await lifecycle.OpenAsync(new(parsed.Session, parsed.Latest, parsed.Leaf), profile.SelectedModel, cancellationToken).ConfigureAwait(false)
                 : await lifecycle.CreateAsync(parsed.Session, new PiSharp.Sessions.Serialization.SessionEntryCodec().Parse(JsonSerializer.Serialize(new
                     { type = "session", version = 3, id = pi?.HeaderId ?? NextId(), timestamp = pi?.HeaderTimestamp ?? DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("O", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
                     profile.SelectedModel, cancellationToken).ConfigureAwait(false);
             if (parsed.SessionMode != "open") await session.ConfigureAsync(new(SystemMessage: new("system", profile.InitialSystem)), cancellationToken).ConfigureAwait(false);
-            if (!string.Equals(SessionCommands.Absolute(session.WorkingDirectory), profile.Workspace,
-                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            // A session whose stored cwd no longer exists continues in the cwd the user chose (main.ts promptForMissingSessionCwd).
+            var pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            var continuesElsewhere = pi?.SessionCwdOverride is { } cwdOverride && string.Equals(SessionCommands.Absolute(cwdOverride), profile.Workspace, pathComparison) &&
+                !Directory.Exists(session.WorkingDirectory);
+            if (!continuesElsewhere && !string.Equals(SessionCommands.Absolute(session.WorkingDirectory), profile.Workspace, pathComparison))
                 throw new SessionCommandException(SessionCommandFailure.WorkspaceMismatch);
+            if (continuesElsewhere) lifecycle.WorkingDirectoryOverride = profile.Workspace;
             var thinking = SettingsModelSelection.Thinking(settings, session.Snapshot.Agent.Model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel,
                 parsed.SessionMode == "open", session.GetSupportedThinkingLevels());
             if (thinking is not null && thinking != session.Snapshot.Context.ThinkingLevel)
@@ -196,8 +266,20 @@ public static class RpcSessionCommand
             writer = new JsonlWriter(observedOutput, outputFraming);
             // The profile retains resource ownership across the terminal-stopped boundary. Dispatcher cleanup
             // already fences RPC/UI admission and joins its original run, reader, callbacks and writer.
+            // Pi entries switch among the registry's available models (set_model, cycle_model and the --models scope; /model and Ctrl+P
+            // in interactive mode), as agent-session.ts setModel/cycleModel do over modelRuntime.getAvailableSnapshot.
+            var liveModels = pi is not null && profile.IsLive
+                ? await profile.EnableModelSwitchingAsync(liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false) : null;
+            var scope = liveSelection?.ScopedModels ?? [];
+            var modelRuntime = liveModels is null ? null : new PiSharp.Rpc.Protocol.RpcModelRuntime(() => liveModels.Available)
+            {
+                Scoped = scope.IsDefaultOrEmpty ? null : () => [.. scope.Select(scoped =>
+                    new PiSharp.Rpc.Protocol.RpcScopedModel(new(scoped.Model.Id, scoped.Model.Api, scoped.Model.Provider), scoped.ThinkingLevel))],
+                SwitchThinkingLevel = model => ModelSwitchThinkingLevel(pi?.ReloadSettings is { } reload ? reload(CancellationToken.None).GetAwaiter().GetResult() : settings, model)
+            };
             dispatcher = new(session, writer, Clock, [new(profile.SelectedModel, profile.SelectedModelWire)],
-                options: new(MaximumCommandBytes: PiPayloadBudget.RpcCommandBytes, MaximumOutputBytes: outputFraming.MaximumFrameBytes),
+                options: new(MaximumCommandBytes: PiPayloadBudget.RpcCommandBytes, MaximumOutputBytes: outputFraming.MaximumFrameBytes,
+                    MaximumModels: 4096, MaximumModelDefinitionBytes: 16 * 1024 * 1024),
                 sessionOwnership: RpcSessionOwnership.Borrowed, inputAdmission: profile.InputAdmission, extensionUi: ui,
                 extensionCommandCatalog: profile, sessionOwner: profile.Sessions,
                 sessionStartup: token => profile.StartLifecycleAsync(parsed.SessionMode == "open" ? "resume" : "new", token),
@@ -205,7 +287,9 @@ public static class RpcSessionCommand
                 inputAdmissionSelector: profile.PromptInputSelector, exportHtmlWriter: profile.ExportHtmlWriter,
                 selectedTreePublisher: profile.PublishSelectedTreeAsync,
                 postInputSettlement: profile.DrainLifecycleHandoffsAsync,
-                postRunSettlement: profile.DrainLifecycleHandoffsAsync, userBash: profile.UserBash);
+                postRunSettlement: profile.DrainLifecycleHandoffsAsync, userBash: profile.UserBash, modelRuntime: modelRuntime,
+                compactionSettings: pi is null ? null : model => CompactionSettings(pi.ReloadSettings is { } reloadCompaction
+                    ? reloadCompaction(CancellationToken.None).GetAwaiter().GetResult() : settings, model));
             profile.ConfigureLifecycleModeStop(lifecycleStop.CancelAsync);
             // IMPL-I: the interactive mode reads the live session for features the RPC protocol does not carry.
             var publishedProfile = profile; var publishedSession = session;

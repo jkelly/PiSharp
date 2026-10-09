@@ -1,13 +1,14 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/utils/changelog.ts (and config.ts getChangelogPath/getPackageDir).
-// PiSharp's changelog is CHANGELOG.md next to the executable (AppContext.BaseDirectory), or under PI_PACKAGE_DIR when set.
+// PiSharp's changelog is CHANGELOG.md next to the executable (AppContext.BaseDirectory), or under PI_PACKAGE_DIR when set. PiSharp
+// versions have a fourth part (1.1.0.1, a PiSharp release on a Pi baseline): headers, comparisons and the last-seen version accept it.
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
 namespace PiSharp.Cli.Interactive.Mode.Utilities;
 
-/// <summary>Source <c>ChangelogEntry</c>.</summary>
-internal sealed record ChangelogEntry(int Major, int Minor, int Patch, string Content);
+/// <summary>Source <c>ChangelogEntry</c>, with PiSharp's fourth version part (0 when absent).</summary>
+internal sealed record ChangelogEntry(int Major, int Minor, int Patch, string Content, int Revision = 0);
 
 internal static partial class Changelog
 {
@@ -23,10 +24,11 @@ internal static partial class Changelog
     [GeneratedRegex(@"(!?\[[^\]\n]+\]\()([^\s)]+)((?:\s+[^)]*)?\))")]
     private static partial Regex InlineMarkdownLink();
 
-    [GeneratedRegex(@"##\s+\[?([0-9]+)\.([0-9]+)\.([0-9]+)\]?")]
+    [GeneratedRegex(@"##\s+\[?([0-9]+)\.([0-9]+)\.([0-9]+)(?:\.([0-9]+))?\]?")]
     private static partial Regex VersionHeader();
 
-    private static string EntryVersion(ChangelogEntry entry) => $"{entry.Major}.{entry.Minor}.{entry.Patch}";
+    private static string EntryVersion(ChangelogEntry entry) =>
+        entry.Revision > 0 ? $"{entry.Major}.{entry.Minor}.{entry.Patch}.{entry.Revision}" : $"{entry.Major}.{entry.Minor}.{entry.Patch}";
 
     private static string NormalizeTag(string version) => version.StartsWith('v') ? version : "v" + version;
 
@@ -93,17 +95,18 @@ internal static partial class Changelog
             var content = File.ReadAllText(changelogPath, new UTF8Encoding(false));
             var entries = new List<ChangelogEntry>();
             var currentLines = new List<string>();
-            (int Major, int Minor, int Patch)? currentVersion = null;
+            (int Major, int Minor, int Patch, int Revision)? currentVersion = null;
             foreach (var line in content.Split('\n'))
             {
                 if (line.StartsWith("## ", StringComparison.Ordinal))
                 {
                     if (currentVersion is { } previous && currentLines.Count > 0)
-                        entries.Add(new(previous.Major, previous.Minor, previous.Patch, PiSharp.Tui.Pi.TextUtils.JsTrim(string.Join("\n", currentLines))));
+                        entries.Add(new(previous.Major, previous.Minor, previous.Patch, PiSharp.Tui.Pi.TextUtils.JsTrim(string.Join("\n", currentLines)), previous.Revision));
                     var versionMatch = VersionHeader().Match(line);
                     if (versionMatch.Success)
                     {
-                        currentVersion = (ParseInt(versionMatch.Groups[1].Value), ParseInt(versionMatch.Groups[2].Value), ParseInt(versionMatch.Groups[3].Value));
+                        currentVersion = (ParseInt(versionMatch.Groups[1].Value), ParseInt(versionMatch.Groups[2].Value), ParseInt(versionMatch.Groups[3].Value),
+                            versionMatch.Groups[4].Success ? ParseInt(versionMatch.Groups[4].Value) : 0);
                         currentLines = [line];
                     }
                     else
@@ -118,7 +121,7 @@ internal static partial class Changelog
                 }
             }
             if (currentVersion is { } last && currentLines.Count > 0)
-                entries.Add(new(last.Major, last.Minor, last.Patch, PiSharp.Tui.Pi.TextUtils.JsTrim(string.Join("\n", currentLines))));
+                entries.Add(new(last.Major, last.Minor, last.Patch, PiSharp.Tui.Pi.TextUtils.JsTrim(string.Join("\n", currentLines)), last.Revision));
             return entries;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException)
@@ -136,14 +139,16 @@ internal static partial class Changelog
     {
         if (v1.Major != v2.Major) return v1.Major.CompareTo(v2.Major);
         if (v1.Minor != v2.Minor) return v1.Minor.CompareTo(v2.Minor);
-        return v1.Patch.CompareTo(v2.Patch);
+        if (v1.Patch != v2.Patch) return v1.Patch.CompareTo(v2.Patch);
+        return v1.Revision.CompareTo(v2.Revision);
     }
 
     /// <summary>Entries newer than <paramref name="lastVersion"/> (missing or non-numeric parts count as 0).</summary>
     public static List<ChangelogEntry> GetNewEntries(IEnumerable<ChangelogEntry> entries, string lastVersion)
     {
         var parts = lastVersion.Split('.').Select(JsNumberToInt).ToArray();
-        var last = new ChangelogEntry(parts.Length > 0 ? parts[0] : 0, parts.Length > 1 ? parts[1] : 0, parts.Length > 2 ? parts[2] : 0, "");
+        var last = new ChangelogEntry(parts.Length > 0 ? parts[0] : 0, parts.Length > 1 ? parts[1] : 0, parts.Length > 2 ? parts[2] : 0, "",
+            parts.Length > 3 ? parts[3] : 0);
         return [.. entries.Where(entry => CompareVersions(entry, last) > 0)];
     }
 

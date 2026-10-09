@@ -92,11 +92,14 @@ internal static class InteractiveModeHost
                 InitialMessages = [.. options.InitialMessages],
                 Verbose = options.Verbose,
                 TuiMode = options.TuiMode,
-                InitialThemeSetting = options.Theme
+                InitialThemeSetting = options.Theme,
+                ScopedModels = [.. options.Selection.ScopedModels.Select(scoped => new ScopedModel(scoped.Model.CloneJson(), scoped.ThinkingLevel))]
             }));
             observeMode?.Invoke(mode);
             host = Task.Run(() => RpcSessionCommand.RunWithPresentationAsync(rpcArgs, connection.Input, connection.Output, hostDiagnostics, mode,
-                hostCancellation.Token, userShutdown: () => Volatile.Read(ref userQuit) != 0 && !token.IsCancellationRequested, mcpHost: mcpHost));
+                hostCancellation.Token, userShutdown: () => Volatile.Read(ref userQuit) != 0 && !token.IsCancellationRequested, mcpHost: mcpHost,
+                // ctx.ui.custom() components of the Node extension host show in the mode (interactive-mode.ts custom()).
+                decorateTerminalUi: options.Extensions is null ? null : inner => new InteractiveCustomComponentUi(inner, () => mode)));
             var ready = await Task.WhenAny(startup.Host.Ready, host);
             if (ready == host)
             {

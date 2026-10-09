@@ -47,6 +47,8 @@
     <None Include="../../third-party/YamlDotNet.LICENSE.txt" Link="licenses/YamlDotNet.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <!-- The codemode tool's description names this reference (CodemodeToolDefinition.DocsPath). -->
     <None Include="docs/codemode.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <!-- What's New and /changelog read CHANGELOG.md next to the executable (built from website/src/content/changelog). -->
+    <None Include="../../CHANGELOG.md" Link="CHANGELOG.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <None Include="../../third-party/Jint.LICENSE.txt;../../third-party/Jint.CREDITS.txt;../../third-party/Acornima.LICENSE.txt;../../third-party/Acornima.NOTICE.txt" Link="licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
 </Project>

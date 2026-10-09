@@ -52,6 +52,8 @@ internal sealed record InteractiveModeContext
     public Func<string, Action<string, string>, Task<string?>> EnsureTool { get; init; } = (_, _) => Task.FromResult<string?>(null);
     public Func<CancellationToken, Task<ModelsRefreshResult>> RefreshModelCatalogs { get; init; } = _ => Task.FromResult(new ModelsRefreshResult(false, []));
     public Func<string, Task<LatestPiRelease?>> CheckForNewVersion { get; init; } = version => VersionCheck.CheckForNewPiVersion(version);
+    /// <summary>Source packageManager.checkForAvailableUpdates: the display names of installed packages with updates.</summary>
+    public Func<Task<IReadOnlyList<string>>> CheckForPackageUpdates { get; init; } = () => Task.FromResult<IReadOnlyList<string>>([]);
     public Func<string, IReadOnlyList<string>, TimeSpan, Task<ProcessResult>> RunProcess { get; init; } = DefaultRunProcess;
     public Func<CrashNoticeInfo?> TakeUnnotifiedCrash { get; init; } = () => null;
     public Func<string, object?, string?, string, bool> RecordCrashImpl { get; init; } = (_, _, _, _) => false;
@@ -72,6 +74,8 @@ internal sealed record InteractiveModeContext
     // Extensions
     public Func<string, ToolRenderers?>? ResolveToolRenderers { get; init; }
     public Func<IReadOnlyList<MarkdownTransformer>>? MarkdownTransformers { get; init; }
+    /// <summary>The run's extension host (TypeScript extensions in Node): ctx.ui components, widgets and terminal input.</summary>
+    public IInteractiveExtensionHost? Extensions { get; init; }
     public Func<string, EntryRenderer?>? GetEntryRenderer { get; init; }
     public Func<string, MessageRenderer?>? GetMessageRenderer { get; init; }
     public Func<IReadOnlyDictionary<string, IReadOnlyList<string>>, IReadOnlyList<ExtensionShortcut>>? GetExtensionShortcuts { get; init; }
@@ -98,6 +102,8 @@ internal sealed record InteractiveModeContext
     public Func<string, string> ImportSessionFile { get; init; } = path => path;
     public Func<PiSharp.CodingAgent.Export.SessionShareUi, string?, CancellationToken, Task> ShareSession { get; init; } =
         (_, _, _) => throw new InvalidOperationException("Sharing is unavailable in this host.");
+    /// <summary>Source sessionManager.appendLabelChange (the /tree label editor): a <c>label</c> entry for an entry; null clears it.</summary>
+    public Func<string, string?, Task> AppendLabelChange { get; init; } = (_, _) => throw new InvalidOperationException("Tree labels are not supported by this session host.");
     public Func<IBugReportUi, string?, Task> ReportBug { get; init; } = (_, _) => throw new InvalidOperationException("Bug reports are unavailable in this host.");
     public Func<string, string, RpcSessionClient?, Task> RenameSessionFile { get; init; } = (_, _, _) => Task.CompletedTask;
 

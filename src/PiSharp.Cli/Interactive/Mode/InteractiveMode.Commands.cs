@@ -458,6 +458,9 @@ internal sealed partial class InteractiveMode
         {
             await context.ReloadSession(rpc);
             await settings.ReloadAsync();
+            // agent-session.ts reload: settingsManager.reload() then syncQueueModesFromSettings().
+            await rpc.RequestAsync(new JsonObject { ["type"] = "set_steering_mode", ["mode"] = settings.SteeringMode });
+            await rpc.RequestAsync(new JsonObject { ["type"] = "set_follow_up_mode", ["mode"] = settings.FollowUpMode });
             hideThinkingBlock = settings.HideThinkingBlock;
             outputPad = settings.OutputPad;
             await RefreshSessionAsync();
@@ -875,9 +878,10 @@ internal sealed partial class InteractiveMode
         try { await CompactAsync(customInstructions); }
         catch (RpcCommandFailedException error)
         {
-            // Errors arrive as compaction_end events when the host started compacting; otherwise show them here.
-            if (!state.IsCompacting && error.Message is "Already compacted" or "Nothing to compact (session too small)" or
-                "Session is processing or settling; manual compaction requires idle admission.") ShowError(error.Message);
+            // Compaction failures arrive as compaction_end events (shown once, as upstream ignores the rejection); only a refusal that
+            // starts no compaction (admission, invalid compaction settings) is shown here.
+            if (!state.IsCompacting && (error.Message is "Session is processing or settling; manual compaction requires idle admission." ||
+                error.Message.StartsWith("Compaction failed: Invalid compaction", StringComparison.Ordinal))) ShowError(error.Message);
         }
     }
 

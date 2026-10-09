@@ -503,7 +503,12 @@ internal sealed partial class InteractiveMode
             var selector = new TreeSelectorComponent(tree, realLeafId, ui.Terminal.Rows,
                 entryId => Run(() => NavigateTreeAsync(entryId, done)),
                 () => { done(); ui.RequestRender(); },
-                (_, _) => ShowError("Tree labels are not supported by this session host."),
+                (entryId, label) => Run(async () =>
+                {
+                    try { await context.AppendLabelChange(entryId, label); }
+                    catch (Exception error) when (error is InvalidOperationException or IOException) { ShowError(error.Message); }
+                    ui.RequestRender();
+                }),
                 initialSelectedId, initialFilterMode);
             selector.OnCopy = text => Run(async () =>
             {

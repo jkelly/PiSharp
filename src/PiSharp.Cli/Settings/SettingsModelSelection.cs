@@ -56,20 +56,21 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
     private LiveSessionSelection Select(ModelRegistry registry, StartupSettingsSnapshot? settings, ImmutableArray<string> patterns, bool continuing,
         ImmutableArray<string>.Builder warnings)
     {
-        if (Model is not null)
-        {
-            var resolved = ModelResolver.ResolveCliModel(Provider, Model, CliThinking, registry.GetAll(), registry.HasConfiguredAuth);
-            if (resolved.Warning is not null) warnings.Add(resolved.Warning);
-            if (resolved.Error is not null || resolved.Model is null)
-                throw new LiveSessionException("UnknownLiveModel", resolved.Error ?? "Select a chat model for the supported live API.");
-            return Annotate(Entry(resolved.Model, registry), CliThinking is null ? resolved.ThinkingLevel : null, [], warnings);
-        }
+        // main.ts: the scope (--models, else enabledModels) is resolved and kept for cycling even when --model picks the model.
         var scoped = ImmutableArray<ScopedModel>.Empty;
         if (!patterns.IsDefaultOrEmpty)
         {
             var (models, scopeDiagnostics) = ModelResolver.ResolveModelScope(patterns, registry.GetAvailable());
             scoped = models;
             foreach (var diagnostic in scopeDiagnostics) warnings.Add(diagnostic.Message);
+        }
+        if (Model is not null)
+        {
+            var resolved = ModelResolver.ResolveCliModel(Provider, Model, CliThinking, registry.GetAll(), registry.HasConfiguredAuth);
+            if (resolved.Warning is not null) warnings.Add(resolved.Warning);
+            if (resolved.Error is not null || resolved.Model is null)
+                throw new LiveSessionException("UnknownLiveModel", resolved.Error ?? "Select a chat model for the supported live API.");
+            return Annotate(Entry(resolved.Model, registry), CliThinking is null ? resolved.ThinkingLevel : null, scoped, warnings);
         }
         var defaultProvider = Provider ?? Read(settings, "defaultProvider"); var defaultModel = Read(settings, "defaultModel");
         if (scoped.Length > 0 && !continuing)

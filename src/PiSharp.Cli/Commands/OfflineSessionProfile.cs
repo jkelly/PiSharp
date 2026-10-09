@@ -114,6 +114,23 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     internal ToolInvoker ExportHtmlWriter { get; }
     public ModelDescriptor SelectedModel { get; }
     internal bool IsLive => _live is not null;
+    private LiveModelCatalog? _liveModels;
+    /// <summary>The models this live session can switch to (null until <see cref="EnableModelSwitchingAsync"/>).</summary>
+    internal LiveModelCatalog? LiveModels => _liveModels;
+
+    /// <summary>agent-session.ts setModel/cycleModel: binds the run registry's available models to this session's runtime (each
+    /// connects on first use, with the extensions' provider request hooks for its model).</summary>
+    internal async Task<LiveModelCatalog?> EnableModelSwitchingAsync(LiveSessionRuntime runtime, CancellationToken token)
+    {
+        if (_live is null || _liveModels is not null) return _liveModels;
+        LiveSessionRuntime RuntimeFor(ModelDescriptor model) => _extension?.ProviderHttpHooks(model) is { } hooks
+            ? runtime with { CreateHttpHandler = () => hooks(runtime.CreateHttpHandler()) } : runtime;
+        var catalog = new LiveModelCatalog(runtime, RuntimeFor,
+            binding => DecorateOriginalPromptBinding(binding with { Hooks = _extension?.Binding.ContextHooks }), _startupRegistry, SelectedModel, SelectedModelWire);
+        _liveModels = catalog;
+        await catalog.RefreshAsync(token).ConfigureAwait(false);
+        return catalog;
+    }
     internal FrozenCatalogModel SelectedModelDefinition { get; }
     internal JsonData SelectedModelWire
     {
@@ -145,6 +162,10 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
 
     private IChatTransport SummaryTransport(SessionSummaryRequest summary)
     {
+        // A model the session switched to summarizes through its own live route.
+        if (summary.Model != SelectedModel && _liveModels?.Transport(summary.Model) is { } switched && summary.ThinkingLevel is null &&
+            summary.CacheRetention == "none" && summary.MaximumOutputTokens is > 0 and <= 1_000_000 && summary.MaximumOutputTokens == Math.Floor(summary.MaximumOutputTokens))
+            return switched.Summary((int)summary.MaximumOutputTokens);
         if (summary.Model != SelectedModel || summary.ThinkingLevel is not null || summary.CacheRetention != "none" ||
             summary.MaximumOutputTokens is <= 0 or > 1_000_000 || summary.MaximumOutputTokens != Math.Floor(summary.MaximumOutputTokens))
             throw new SessionCompactionException(SessionCompactionFailure.InvalidSettings);
@@ -283,7 +304,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         startupOriginalPrompt = OriginalSystemPromptBuilder.Capture(originalSystemPrompt ?? new() { CustomPrompt = literalSystem },
             workspace, initialTools, literal: originalSystemPrompt is null);
         _startupRegistry = new([DecorateOriginalPromptBinding(new(model, transport, ExecutionMode: ToolExecutionMode.Sequential, Hooks: extension?.Binding.ContextHooks))], registrations, policy,
-            new SessionRuntimeRegistryOptions(MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
+            new SessionRuntimeRegistryOptions(MaximumModels: 4096, MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
                 LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
                 BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
                 DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync,
@@ -627,6 +648,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         Task? liveCleanup = null;
         try { if (_live is not null) { liveCleanup = _live.DisposeAsync().AsTask(); await liveCleanup.ConfigureAwait(false); } }
         catch (Exception error) { failures.Add((Exception?)liveCleanup?.Exception ?? error); }
+        try { if (_liveModels is not null) await _liveModels.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
         try { _client?.Dispose(); } catch (Exception error) { failures.Add(error); }
         try { await CloseProfileViewsAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
         if (failures.Count > 0) settlement.TrySetException(new NativeExtensionException(NativeExtensionFailure.CleanupFailed, new AggregateException(failures)));

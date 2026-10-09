@@ -29,7 +29,7 @@ internal static class Program
             if (all?.Invoke(null, null) is IEnumerable<(string Id, Func<Task> Run)> found) cases.AddRange(found);
         }
         var filter = Environment.GetEnvironmentVariable("INTERACTIVEPARITY_FILTER");
-        if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
+        if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => filter.Split('|').Any(part => test.Id.Contains(part, StringComparison.Ordinal)))];
         var results = new List<object>(); var failures = 0; var skipped = 0;
         foreach (var test in cases)
         {

@@ -93,6 +93,10 @@ internal static class Program
                     new Interactive.Mode.StartupUi(new CodingAgent.Export.PiThemeHost().GetAgentDirectory(), Directory.GetCurrentDirectory()).PromptProjectTrustAsync(title, choices, token),
                 SelectSession = stdinRedirected || Console.IsOutputRedirected ? null : (current, all, token) =>
                     new Interactive.Mode.StartupUi(new CodingAgent.Export.PiThemeHost().GetAgentDirectory(), Directory.GetCurrentDirectory()).SelectSessionAsync(current, all, token),
+                ConfigSelector = stdinRedirected || Console.IsOutputRedirected ? null : (request, token) =>
+                    new Interactive.Mode.StartupUi(request.AgentDir, request.Cwd).SelectConfigAsync(request, token),
+                PromptMissingSessionCwd = stdinRedirected || Console.IsOutputRedirected ? null : (prompt, fallbackCwd, token) =>
+                    new Interactive.Mode.StartupUi(new CodingAgent.Export.PiThemeHost().GetAgentDirectory(), Directory.GetCurrentDirectory()).PromptForMissingSessionCwdAsync(prompt, fallbackCwd, token),
                 Signals = () => ShutdownSignals.Process, Timings = PiSharp.CodingAgent.Diagnostics.StartupTimings.Default
             };
             return await Pi.PiCommand.RunAsync(args, host, cancellation.Token).ConfigureAwait(false);

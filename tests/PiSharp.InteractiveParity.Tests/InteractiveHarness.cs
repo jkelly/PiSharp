@@ -25,6 +25,10 @@ internal sealed class InteractiveHarness : IAsyncDisposable
     public string? ClipboardText { get; set; }
     /// <summary>Further context changes for a case (applied after the harness defaults).</summary>
     public Func<InteractiveModeContext, InteractiveModeContext>? Configure { get; set; }
+    /// <summary>The fake GitHub the fd/rg tools manager downloads from (PiHost.ToolsHttp/ToolsReleaseBase).</summary>
+    public Func<HttpMessageHandler>? ToolsHttp { get; set; }
+    /// <summary>Answers the missing-session-cwd prompt (PiHost.PromptMissingSessionCwd): prompt text and current cwd to the chosen cwd.</summary>
+    public Func<string, string, string?>? MissingCwdAnswer { get; set; }
 
     private InteractiveModeContext ConfigureContext(InteractiveModeContext context)
     {
@@ -94,7 +98,9 @@ internal sealed class InteractiveHarness : IAsyncDisposable
             RunInteractive = (terminalArgs, options, token) => InteractiveModeHost.RunAsync(terminalArgs, options,
                 new PiSharp.Cli.Mcp.McpSessionHost(AgentDir, Home, () => []), new McpBinding(), Stdout, Stderr, token,
                 loop => new PiSharp.Tui.Pi.ProcessTerminal(loop, Terminal, name => Vars.GetValueOrDefault(name)), mode => Mode = mode, ConfigureContext),
-            ApplicationDirectory = Path.Combine(Root, "app"), Now = () => DateTimeOffset.UtcNow
+            ApplicationDirectory = Path.Combine(Root, "app"), Now = () => DateTimeOffset.UtcNow,
+            ToolsHttp = ToolsHttp, ToolsReleaseBase = ToolsHttp is null ? "https://github.com" : "https://gh.test",
+            PromptMissingSessionCwd = MissingCwdAnswer is null ? null : (prompt, fallback, _) => Task.FromResult(MissingCwdAnswer(prompt, fallback))
         };
         run = Task.Run(() => PiCommand.RunAsync(args, host, deadline.Token));
     }
@@ -131,6 +137,14 @@ internal sealed class InteractiveHarness : IAsyncDisposable
         var finished = await Task.WhenAny(run, Task.Delay(60_000));
         if (finished != run) throw new TimeoutException($"pi did not exit. Screen:\n{Terminal.Text}\nstderr:\n{Stderr}");
         return await run;
+    }
+
+    /// <summary>Reads a file the session writer holds open.</summary>
+    public static string ReadShared(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     public string[] SessionFiles() => Directory.Exists(Path.Combine(AgentDir, "sessions"))

@@ -480,12 +480,14 @@ internal static class ToolRenderingCases
                 var component = new ToolExecutionComponent("read", "tool-compact", new JsonObject { ["path"] = scenario.Path }, null,
                     BuiltInToolRenderers.ForToolDefinition("read"), Ui(), cwd);
                 component.UpdateResult(TextResult(scenario.Content));
-                var collapsed = Render(component);
+                // The header holds an absolute path (outside AGENTS.md): render wider than any temp path so it never wraps.
+                var width = Math.Max(120, scenario.Compact.Length + 40);
+                var collapsed = Render(component, width);
                 Contains(collapsed, scenario.Compact, "compact header");
                 Check(!collapsed.Contains(scenario.Hidden, StringComparison.Ordinal), "content hidden");
                 if (scenario.Absent is not null) Check(!collapsed.Contains(scenario.Absent, StringComparison.Ordinal), "absent text");
                 component.SetExpanded(true);
-                Contains(Render(component), scenario.Hidden, "expanded content");
+                Contains(Render(component, width), scenario.Hidden, "expanded content");
             })));
         }
 
