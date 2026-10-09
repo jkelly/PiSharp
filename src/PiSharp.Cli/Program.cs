@@ -26,30 +26,13 @@ internal static class Program
             return args is ["session", "terminal", ..] ? await RunSessionAsync(args).ConfigureAwait(false)
                 : ShutdownSignals.Process.Exit(await RunSessionAsync(args).ConfigureAwait(false));
         if (args.Length > 0 && args[0] == "mcp") return await RunMcpAsync(args[1..]).ConfigureAwait(false);
+        // Pi's own command line (plain pisharp, -p, --mode json|rpc, --help, --list-models, ...); the offline demo keeps its form.
+        if (args is not ["--offline-demo", ..]) return await RunPiAsync(args).ConfigureAwait(false);
         Stream standardOutput;
         try { standardOutput = StandardOutputStream.Open(); }
         catch (Exception) { return Fail("StandardOutputUnavailable", "Standard output could not be opened.", 1); }
         await using var ownedOutput = standardOutput;
         await using var output = new Utf8StreamTextWriter(standardOutput);
-        if (args is ["--list-models", ..])
-        {
-            using var listing = new CancellationTokenSource();
-            ConsoleCancelEventHandler stop = (_, observation) => { observation.Cancel = true; listing.Cancel(); };
-            Console.CancelKeyPress += stop;
-            try { return await Models.ModelListing.RunAsync(args, output, Console.Error, Commands.LiveSessionRuntime.Default, listing.Token).ConfigureAwait(false); }
-            catch (OperationCanceledException) when (listing.IsCancellationRequested) { return Fail("Canceled", "Model listing canceled.", 1); }
-            finally { Console.CancelKeyPress -= stop; }
-        }
-        if (args is ["--help"])
-        {
-            try
-            {
-                await output.WriteLineAsync(Usage).ConfigureAwait(false);
-                await output.FlushAsync().ConfigureAwait(false);
-                return 0;
-            }
-            catch (Exception) { return Fail("OutputFailed", "Standard output delivery failed.", 1); }
-        }
         if (args.Length != 5 || args[0] != "--offline-demo") return Fail("InvalidArguments", Usage, 2);
         string? workspace = null; string? session = null;
         for (var index = 1; index < args.Length; index += 2)
@@ -75,6 +58,61 @@ internal static class Program
         catch (Exception)
         { return Fail("OfflineDemoFailed", "Offline demo failed; inspect the newly created workspace and session before retrying with new paths.", 1); }
         finally { Console.CancelKeyPress -= cancel; }
+    }
+
+    /// <summary>The Pi-compatible entry over the real console. Standard output carries only the mode's own output: other console
+    /// writes go to standard error (source output-guard.ts takeOverStdout).</summary>
+    private static async Task<int> RunPiAsync(string[] args)
+    {
+        Stream standardOutput;
+        try { standardOutput = StandardOutputStream.Open(); }
+        catch (Exception) { return Fail("StandardOutputUnavailable", "Standard output could not be opened.", 1); }
+        await using var ownedOutput = standardOutput;
+        await using var output = new Utf8StreamTextWriter(standardOutput);
+        var originalOut = Console.Out;
+        Console.SetOut(Console.Error);
+        using var cancellation = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancel = (_, observation) => { observation.Cancel = true; cancellation.Cancel(); };
+        Console.CancelKeyPress += cancel;
+        try
+        {
+            var stdinRedirected = Console.IsInputRedirected;
+            var host = new Pi.PiHost
+            {
+                Cwd = Directory.GetCurrentDirectory(), Home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                GetEnvironment = Environment.GetEnvironmentVariable, SetEnvironment = Environment.SetEnvironmentVariable,
+                Stdout = output, Stderr = Console.Error,
+                Stdin = stdinRedirected ? new StreamReader(Console.OpenStandardInput(), new System.Text.UTF8Encoding(false), false) : Console.In,
+                StdinIsTty = !stdinRedirected, StdoutIsTty = !Console.IsOutputRedirected,
+                Color = !Console.IsErrorRedirected && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("NO_COLOR")),
+                LiveRuntime = Commands.LiveSessionRuntime.Default,
+                CreateMcpHost = _ => Mcp.McpSessionHost.CreateDefault(),
+                OpenRpcInput = CancellableStandardInput.Open, OpenRpcOutput = () => standardOutput,
+                RunInteractive = OperatingSystem.IsWindows() ? RunPiInteractiveAsync : null,
+                Signals = () => ShutdownSignals.Process, Timings = PiSharp.CodingAgent.Diagnostics.StartupTimings.Default
+            };
+            return await Pi.PiCommand.RunAsync(args, host, cancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return 130; }
+        finally
+        {
+            Console.CancelKeyPress -= cancel;
+            Console.SetOut(originalOut);
+        }
+    }
+
+    /// <summary>Interactive mode of the Pi entry: the terminal host over the planned session. An uncaught exception is recorded in
+    /// crashes.json and reported as interactive-mode.ts does (IMPL-I supplies the loaded extensions).</summary>
+    private static Task<int> RunPiInteractiveAsync(string[] terminalArgs, Pi.PiEntryOptions options, CancellationToken token)
+    {
+        var index = Array.IndexOf(terminalArgs, "--session");
+        var sessionFile = index >= 0 && index + 1 < terminalArgs.Length ? terminalArgs[index + 1] : null;
+        AppDomain.CurrentDomain.UnhandledException += (_, crash) =>
+        {
+            if (crash.ExceptionObject is Exception error)
+                Diagnostics.CrashReporting.ReportUncaughtException(error, Console.Error, [], sessionFile, Environment.CurrentDirectory);
+        };
+        return RunTerminalHostAsync(terminalArgs, token, liveRuntime: options.LiveRuntime, mcpHost: Mcp.McpSessionHost.CreateDefault());
     }
 
     private static async Task<int> RunMcpAsync(string[] args)

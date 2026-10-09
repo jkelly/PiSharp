@@ -14,6 +14,7 @@
     <InternalsVisibleTo Include="PiSharp.ToolSearch.Tests" />
     <InternalsVisibleTo Include="PiSharp.Models.Tests" />
     <InternalsVisibleTo Include="PiSharp.Codemode.Tests" />
+    <InternalsVisibleTo Include="PiSharp.CliParity.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" />

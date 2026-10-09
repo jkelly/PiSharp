@@ -33,7 +33,11 @@ public static class RpcSessionCommand
     private sealed record Arguments(string Session, string Workspace, string? Script, bool Latest, string? Leaf,
         ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi, OfflineBashAuthorization? Bash,
         NativeExtensionConfiguration? Extension, bool SupportsImages, ImmutableArray<SessionCatalogStore> Stores, string SessionMode, SettingsModelSelection? Live,
-        PromptTemplateCliConfiguration Prompts, StartupSettingsRequest? Settings, string? Thinking, ToolSelectionCliOptions Tools, SkillCliConfiguration Skills);
+        PromptTemplateCliConfiguration Prompts, StartupSettingsRequest? Settings, string? Thinking, ToolSelectionCliOptions Tools, SkillCliConfiguration Skills)
+    {
+        /// <summary><c>--tool-policy pi|explicit</c> (decision 0004); these verbs default to explicit.</summary>
+        internal string? ToolPolicy { get; init; }
+    }
 
     public static Task<int> RunAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
         CancellationToken cancellationToken = default, PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
@@ -88,9 +92,12 @@ public static class RpcSessionCommand
             cancellationToken.ThrowIfCancellationRequested();
             if (!stdin.CanRead || !stdout.CanWrite) throw Invalid();
             if (!Directory.Exists(parsed.Workspace)) throw new SessionCommandException(SessionCommandFailure.WorkspaceMissing);
-            var settings = await SettingsStartupConfiguration.LoadAsync(parsed.Settings, stderr, settingsFileSystem, cancellationToken).ConfigureAwait(false);
-            var liveSelection = parsed.Live is null ? null : await parsed.Live.ResolveAsync(settings, liveRuntime ?? LiveSessionRuntime.Default, stderr,
-                parsed.SessionMode == "open", cancellationToken).ConfigureAwait(false);
+            // A Pi-style entry (plain pisharp, -p, --mode json|rpc) already resolved settings, model, prompt and tool policy.
+            var pi = PiSharp.Cli.Pi.PiEntryOptions.Current;
+            liveRuntime ??= pi?.LiveRuntime;
+            var settings = pi?.Settings ?? await SettingsStartupConfiguration.LoadAsync(parsed.Settings, stderr, settingsFileSystem, cancellationToken).ConfigureAwait(false);
+            var liveSelection = pi?.Selection ?? (parsed.Live is null ? null : await parsed.Live.ResolveAsync(settings, liveRuntime ?? LiveSessionRuntime.Default, stderr,
+                parsed.SessionMode == "open", cancellationToken).ConfigureAwait(false));
             // Production sessions read the global mcp.json once at start (--no-mcp connects nothing); every session gets the built-in codemode.
             var hostAdmission = mcpAdmission is null && mcpHost is not null;
             if (hostAdmission) mcpAdmission = mcpHost!.CreateAdmission(parsed.Workspace, stderr, settings?.Values, parsed.Tools.NoMcp);
@@ -118,13 +125,18 @@ public static class RpcSessionCommand
                     if (dispatcher is { } rpc) await rpc.PublishExtensionErrorAsync(parsed.Extension?.Package ?? diagnostic.OwnerId,
                         diagnostic.EventName, diagnostic.ErrorText).ConfigureAwait(false);
                 }, modelSupportsImages: parsed.SupportsImages, liveSelection: liveSelection, liveRuntime: liveRuntime,
-                toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings), mcpAdmission: parsed.Tools.NoMcp && !hostAdmission ? null : mcpAdmission,
+                toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings) ??
+                    (pi is null ? null : new InitialToolSelection(PiSharp.Tools.BuiltinToolPrompts.DefaultToolNames, true)),
+                mcpAdmission: parsed.Tools.NoMcp && !hostAdmission ? null : mcpAdmission,
                 toolSettings: PiSharp.Tools.BuiltinToolSettings.FromSettings(settings?.Values),
+                originalSystemPrompt: pi?.SystemPrompt, toolPolicy: pi?.ToolPolicy ?? (parsed.ToolPolicy == "pi"
+                    ? new PiSharp.Cli.Pi.PiToolPolicy(PiSharp.Cli.Pi.PiToolPolicyMode.Pi) { ProtectedDirectories = [Path.GetDirectoryName(parsed.Session)!] } : null),
                 mcpRegistrations: hostAdmission && !parsed.Tools.NoMcp ? mcpHost!.Registrations : null).ConfigureAwait(false);
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();
-            await profile.LoadSkillsAsync(parsed.Skills, stderr, cancellationToken).ConfigureAwait(false);
+            if (pi?.Skills is { } piSkills) profile.AdoptOriginalPromptSkills(piSkills);
+            else await profile.LoadSkillsAsync(parsed.Skills, stderr, cancellationToken).ConfigureAwait(false);
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);
             var options = new PersistentAgentSessionOptions(UseLatestLeaf: parsed.Latest, SelectedLeafId: parsed.Leaf,
@@ -138,7 +150,7 @@ public static class RpcSessionCommand
             session = parsed.SessionMode == "open"
                 ? await lifecycle.OpenAsync(new(parsed.Session, parsed.Latest, parsed.Leaf), profile.SelectedModel, cancellationToken).ConfigureAwait(false)
                 : await lifecycle.CreateAsync(parsed.Session, new PiSharp.Sessions.Serialization.SessionEntryCodec().Parse(JsonSerializer.Serialize(new
-                    { type = "session", version = 3, id = NextId(), timestamp = DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("O", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
+                    { type = "session", version = 3, id = pi?.HeaderId ?? NextId(), timestamp = pi?.HeaderTimestamp ?? DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("O", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
                     profile.SelectedModel, cancellationToken).ConfigureAwait(false);
             if (parsed.SessionMode != "open") await session.ConfigureAsync(new(SystemMessage: new("system", profile.InitialSystem)), cancellationToken).ConfigureAwait(false);
             if (!string.Equals(SessionCommands.Absolute(session.WorkingDirectory), profile.Workspace,
@@ -148,7 +160,8 @@ public static class RpcSessionCommand
                 parsed.SessionMode == "open", session.GetSupportedThinkingLevels());
             if (thinking is not null && thinking != session.Snapshot.Context.ThinkingLevel)
                 await session.ConfigureAsync(new(ThinkingLevel: thinking), cancellationToken).ConfigureAwait(false);
-            await profile.LoadPromptTemplatesAsync(parsed.Prompts, stderr, cancellationToken).ConfigureAwait(false);
+            await profile.LoadPromptTemplatesAsync(pi?.PromptTemplates ?? parsed.Prompts, pi is null ? stderr : TextWriter.Null, cancellationToken).ConfigureAwait(false);
+            if (pi?.SessionName is { } sessionName) await session.SetSessionNameAsync(session.Snapshot.Log.Header.Id, sessionName, cancellationToken).ConfigureAwait(false);
             if (parsed.SessionMode == "open") await profile.ApplySkillsAsync(session, cancellationToken).ConfigureAwait(false);
             if (settings is not null) { session.SteeringMode = settings.SteeringMode; session.FollowUpMode = settings.FollowUpMode; }
             await profile.AttachOwnerAsync(session, options, Clock, NextId, parsed.Stores.IsEmpty ? null : parsed.Stores, lifecycle).ConfigureAwait(false);
@@ -318,7 +331,7 @@ public static class RpcSessionCommand
             if (key is not ("--session" or "--workspace" or "--offline-script" or "--offline-api" or "--offline-images" or "--provider" or "--model" or "--models" or "--max-output-tokens" or "--leaf" or "--allow-read" or "--allow-write" or
                 "--bash-executable" or "--bash-spill-root" or "--allow-bash-command" or "--bash-timeout" or "--session-store" or "--session-mode" or
                 "--extension-package" or "--extension-manifest" or "--extension-approval" or "--extension-snapshot-root" or "--enable-extension-tool" or "--deny-extension-tool" or "--enable-extension-command" or
-                "--user-settings" or "--project-settings" or "--steering-mode" or "--follow-up-mode" or "--thinking") ||
+                "--user-settings" or "--project-settings" or "--steering-mode" or "--follow-up-mode" or "--thinking" or "--tool-policy") ||
                 ++index >= args.Length) throw Invalid();
             var value = args[index];
             if (key == "--allow-read") reads.Add(SessionCommands.Absolute(value));
@@ -369,7 +382,8 @@ public static class RpcSessionCommand
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))) throw Invalid();
         return new(SessionCommands.Absolute(session), SessionCommands.Absolute(workspace), script is null ? null : SessionCommands.Absolute(script),
             !root && leaf is null, leaf, reads.ToImmutable(), writes.ToImmutable(), model.Api, bash, extension, imageInput == "true", stores.ToImmutable(), sessionMode, liveSelection,
-            new(prompts.ToImmutable()), SettingsStartupConfiguration.FromOptions(options), thinking, tools, new(skills.ToImmutable()));
+            new(prompts.ToImmutable()), SettingsStartupConfiguration.FromOptions(options), thinking, tools, new(skills.ToImmutable()))
+        { ToolPolicy = options.TryGetValue("--tool-policy", out var policy) ? policy is "pi" or "explicit" ? policy : throw Invalid() : null };
     }
     private static SessionCommandException Invalid() => new(SessionCommandFailure.InvalidArguments);
     private static bool Unicode(string value)
