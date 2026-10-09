@@ -80,8 +80,9 @@ internal static partial class Program
             Check(reopened.PendingToolNames.IsEmpty, "the prompt kept restored pending tools");
             // The run recorded the restored loadout before the prompt, so the transcript declares only registered tools.
             var record = RecordedAtPrompt(reopened, count, leaf);
-            Names(["read", DocsTool], SystemTools(record, "toolsRemoved"), "recorded loadout removals");
-            Names(["read"], SystemTools(record, "toolsAdded"), "recorded loadout declarations");
+            // declareToolChanges records the difference: the unregistered tool is removed, read is unchanged.
+            Names([DocsTool], SystemTools(record, "toolsRemoved"), "recorded loadout removals");
+            Names([], SystemTools(record, "toolsAdded"), "recorded loadout declarations");
             await ConnectDocs(owner, Tool(DocsTool, ToolExposure.Deferred));
             Names(["read"], owner.Current.Session.GetActiveTools(), "tool registered after the prompt was activated");
         }
@@ -118,10 +119,10 @@ internal static partial class Program
             Check(FileBytes(path).SequenceEqual(before), "opening the session wrote to its file");
             await reopened.SetActiveToolsAsync(["read"]);
             Check(reopened.PendingToolNames.IsEmpty, "deactivating selection kept restored pending tools");
-            // The selection's record replaces the recorded loadout, including the unregistered docs tool.
+            // The selection's record removes the deactivated tools, the unregistered docs tool included.
             var selection = reopened.Snapshot.Log.Entries[^1].WireBody.Value.GetProperty("message");
-            Names(["read", "grep", DocsTool], SystemTools(selection, "toolsRemoved"), "selection replaces the recorded names");
-            Names(["read"], SystemTools(selection, "toolsAdded"), "selection declarations");
+            Names(["grep", DocsTool], SystemTools(selection, "toolsRemoved"), "selection removes the deactivated names");
+            Names([], SystemTools(selection, "toolsAdded"), "selection adds nothing");
             await ConnectDocs(owner, Tool(DocsTool, ToolExposure.Deferred));
             Names(["read"], owner.Current.Session.GetActiveTools(), "dropped pending tool or turned-off grep came back");
         }
@@ -197,7 +198,8 @@ internal static partial class Program
             await reopened.PromptAsync(SettledUser("go")); await reopened.WaitForIdleAsync();
             var record = RecordedAtPrompt(reopened, count, leaf);
             Equal(DocsTool + " tool, updated", Description(record, DocsTool), "restored loadout records the current declaration");
-            Names(["read", DocsTool], SystemTools(record, "toolsRemoved"), "recorded declarations replaced");
+            Names([DocsTool], SystemTools(record, "toolsRemoved"), "the changed declaration is removed");
+            Names([DocsTool], SystemTools(record, "toolsAdded"), "and added again");
         }
         finally { Directory.Delete(Path.GetDirectoryName(path)!, recursive: true); }
 
@@ -232,10 +234,10 @@ internal static partial class Program
             Names(["read"], reopened.GetActiveTools(), "hidden tool skipped");
             Names([DocsTool], reopened.PendingToolNames, "skipped hidden tool pending");
             Names(["read"], reopened.Snapshot.Agent.Tools.Select(tool => tool.Name), "the agent's loadout leaves the hidden tool out");
-            // The registration records the whole loadout, replacing the recorded names.
+            // The registration activates it again with the recorded declaration: the declared tools are unchanged, so nothing is recorded.
+            var count = reopened.Snapshot.Log.Entries.Length;
             await ConnectDocs(owner, Tool(DocsTool));
-            var record = owner.Current.Session.Snapshot.Log.Entries[^1].WireBody.Value.GetProperty("message");
-            Names(["read", DocsTool], SystemTools(record, "toolsRemoved"), "registration replaces the recorded loadout");
+            Equal(count, owner.Current.Session.Snapshot.Log.Entries.Length, "an unchanged loadout was recorded");
             Names(["read", DocsTool], owner.Current.Session.GetActiveTools(), "tool activates once it is declarable again");
         }
         finally { Directory.Delete(Path.GetDirectoryName(path)!, recursive: true); }
@@ -252,8 +254,8 @@ internal static partial class Program
             Names(["read"], session.GetActiveTools(), "navigation skips the hidden tool");
             await session.PromptAsync(SettledUser("go")); await session.WaitForIdleAsync();
             var record = RecordedAtPrompt(session, count, withDocs);
-            Names(["read", DocsTool], SystemTools(record, "toolsRemoved"), "the prompt replaces the branch's recorded loadout");
-            Names(["read"], SystemTools(record, "toolsAdded"), "the prompt records the loadout without the hidden tool");
+            Names([DocsTool], SystemTools(record, "toolsRemoved"), "the prompt removes the hidden tool");
+            Names([], SystemTools(record, "toolsAdded"), "the prompt adds nothing");
         }
         finally { Directory.Delete(directory, recursive: true); }
     }
@@ -324,8 +326,8 @@ internal static partial class Program
             count = reopened.Snapshot.Log.Entries.Length; leaf = reopened.Snapshot.Context.LeafId!;
             await reopened.PromptAsync(SettledUser("go")); await reopened.WaitForIdleAsync();
             var record = RecordedAtPrompt(reopened, count, leaf);
-            Names(["read", "grep", DocsTool], SystemTools(record, "toolsRemoved"), "recorded names removed");
-            Names(["read", "grep"], SystemTools(record, "toolsAdded"), "restored loadout recorded");
+            Names([DocsTool, "grep"], SystemTools(record, "toolsRemoved"), "unregistered and changed tools removed, in recorded order");
+            Names(["grep"], SystemTools(record, "toolsAdded"), "changed tool added with its current declaration");
             Equal("grep tool, updated", Description(record, "grep"), "current declaration recorded");
             Names(["read", "grep"], DeclaredTools(requests.Single()), "the request declares the restored loadout");
             Check(reopened.PendingToolNames.IsEmpty, "the prompt kept pending tools");
@@ -352,11 +354,48 @@ internal static partial class Program
             var count = reopened.Snapshot.Log.Entries.Length; var leaf = reopened.Snapshot.Context.LeafId;
             await reopened.PromptAsync(SettledUser("go")); await reopened.WaitForIdleAsync();
             var record = RecordedAtPrompt(reopened, count, leaf);
-            Names(["read", "grep", DocsTool], SystemTools(record, "toolsRemoved"), "recorded names removed");
-            Names(["grep"], SystemTools(record, "toolsAdded"), "the selection recorded");
+            Names(["read", DocsTool], SystemTools(record, "toolsRemoved"), "the deselected and unregistered tools removed");
+            Names([], SystemTools(record, "toolsAdded"), "the kept tool is not declared again");
             Names(["grep"], reopened.Snapshot.Agent.Tools.Select(tool => tool.Name), "the agent runs the selection");
         }
         finally { Directory.Delete(Path.GetDirectoryName(path)!, recursive: true); }
+    }
+
+    // agent-loop declareToolChanges with pi-ai getToolStateChanges/withToolChanges, as Pi 1.1.0 writes them (captured with the
+    // installed Pi: a removal is {"role","content","sections","timestamp","toolsRemoved"}, a resumed changed declaration
+    // {..., "toolsAdded":[ls,read], "toolsRemoved":[{"name":"ls"},{"name":"mcp__gone__search"}]}, a reorder writes no tool change).
+    private static void ToolChangeRecords()
+    {
+        static TranscriptEntry System(string json) => new("system", JsonData.Parse(json));
+        var registry = new SessionRuntimeRegistry([new(SettledModel, new SettledTransport())],
+            [Tool("read"), Changed("grep"), Tool("ls"), Tool("find")], new Deny(), new()
+            {
+                PreparePromptSections = request => new(new object(), [KeyValuePair.Create("tools", string.Join(",", request.SelectedTools))], () => { })
+            });
+        static string Declaration(string name, string description) =>
+            JsonSerializer.Serialize(new { name, description, parameters = new { type = "object" } });
+        var transcript = ImmutableArray.Create(System("{\"role\":\"system\",\"content\":\"\",\"timestamp\":1,\"toolsAdded\":[" +
+            string.Join(",", Declaration("read", "read tool"), Declaration("grep", "grep tool"), Declaration("gone", "gone tool")) + "]}"));
+        // Changed declarations are removed and added again; added follows the loadout's order, removed the recorded order.
+        var change = registry.CreateToolChangeMessage(transcript, ["ls", "grep", "read"], 5, default)!;
+        Equal("{\"role\":\"system\",\"content\":\"\",\"timestamp\":5,\"toolsAdded\":[" +
+            Declaration("ls", "ls tool") + "," + JsonSerializer.Serialize(new { name = "grep", description = "grep tool, updated",
+                parameters = new { type = "object", properties = new { query = new { type = "string" } } } }) +
+            "],\"toolsRemoved\":[{\"name\":\"grep\"},{\"name\":\"gone\"}]}", change.WireBody.Value.GetRawText(), "tool change record");
+        // A removal only, and no record when the declared tools are unchanged (also when only their order changes).
+        var applied = transcript.Add(change);
+        Equal("{\"role\":\"system\",\"content\":\"\",\"timestamp\":6,\"toolsRemoved\":[{\"name\":\"read\"}]}",
+            registry.CreateToolChangeMessage(applied, ["ls", "grep"], 6, default)!.WireBody.Value.GetRawText(), "removal record");
+        Equal(null, registry.CreateToolChangeMessage(applied, ["read", "grep", "ls"], 7, default), "a reorder records no tool change");
+        // With prompt sections the tool change follows them: role, content, sections, timestamp, toolsAdded, toolsRemoved.
+        var (merged, _) = registry.PreparePromptSectionMessage(["ls", "find"], applied,
+            registry.CreateToolChangeMessage(applied, ["ls", "find"], 8, default), 8, default);
+        Names(["role", "content", "sections", "timestamp", "toolsAdded", "toolsRemoved"],
+            merged!.WireBody.Value.EnumerateObject().Select(property => property.Name), "merged record fields");
+        Equal("{\"tools\":\"ls,find\"}", merged.WireBody.Value.GetProperty("sections").GetRawText(), "merged sections");
+        Equal(8, merged.WireBody.Value.GetProperty("timestamp").GetInt64(), "merged timestamp");
+        var (sectionsOnly, _) = registry.PreparePromptSectionMessage(["read"], [], null, 9, default);
+        Equal("{\"role\":\"system\",\"content\":\"\",\"sections\":{\"tools\":\"read\"},\"timestamp\":9}", sectionsOnly!.WireBody.Value.GetRawText(), "sections record");
     }
 
     private static async Task NavigationWithoutSystemMessageKeepsTools()

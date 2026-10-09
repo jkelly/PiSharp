@@ -238,6 +238,61 @@ public sealed partial class SessionRuntimeRegistry
         return selected.ToImmutable();
     }
 
+    /// <summary>
+    /// Source agent-loop declareToolChanges with pi-ai getToolStateChanges: the record of the loadout <paramref name="names"/>
+    /// (declared with their current bindings) against the tools the <paramref name="transcript"/> declares. A tool whose
+    /// declaration changed is removed and added again. toolsAdded follows the loadout's order and toolsRemoved the recorded
+    /// order; an empty list is omitted, and an unchanged loadout has no record (null).
+    /// </summary>
+    internal TranscriptEntry? CreateToolChangeMessage(ImmutableArray<TranscriptEntry> transcript, ImmutableArray<string> names,
+        long timestamp, CancellationToken cancellationToken)
+    {
+        var selected = NormalizeActiveTools(names, cancellationToken);
+        var recorded = new SessionSystemReplay().Replay(transcript, cancellationToken).Tools;
+        var previous = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var tool in recorded) previous[tool.Value.GetProperty("name").GetString()!] = DeclarationKey(tool.Value);
+        var current = selected.ToDictionary(name => name, name => DeclarationKey(_tools[name].Declaration.Value), StringComparer.Ordinal);
+        var added = selected.Where(name => !previous.TryGetValue(name, out var key) || key != current[name]).ToArray();
+        var removed = recorded.Select(tool => tool.Value.GetProperty("name").GetString()!)
+            .Where(name => !current.TryGetValue(name, out var key) || key != previous[name]).ToArray();
+        if (added.Length == 0 && removed.Length == 0) return null;
+        using var output = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(output, new JsonWriterOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
+        {
+            writer.WriteStartObject(); writer.WriteString("role", "system"); writer.WriteString("content", ""); writer.WriteNumber("timestamp", timestamp);
+            if (added.Length > 0)
+            {
+                writer.WritePropertyName("toolsAdded"); writer.WriteStartArray();
+                foreach (var name in added) writer.WriteRawValue(_tools[name].Declaration.Value.GetRawText());
+                writer.WriteEndArray();
+            }
+            if (removed.Length > 0)
+            {
+                writer.WritePropertyName("toolsRemoved"); writer.WriteStartArray();
+                foreach (var name in removed) { writer.WriteStartObject(); writer.WriteString("name", name); writer.WriteEndObject(); }
+                writer.WriteEndArray();
+            }
+            writer.WriteEndObject();
+        }
+        var body = JsonData.Parse(System.Text.Encoding.UTF8.GetString(output.ToArray()));
+        long characters = 0; Charge(body.Value, ref characters, cancellationToken);
+        return new("system", body);
+    }
+
+    /// <summary>pi-ai declarationsEqual: the serialized toToolDeclaration (name, description, parameters, constrainedSampling).</summary>
+    private static string DeclarationKey(JsonElement tool)
+    {
+        using var output = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(output))
+        {
+            writer.WriteStartObject();
+            foreach (var field in new[] { "name", "description", "parameters", "constrainedSampling" })
+                if (tool.TryGetProperty(field, out var value)) { writer.WritePropertyName(field); value.WriteTo(writer); }
+            writer.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(output.ToArray());
+    }
+
     /// <summary>With <paramref name="replaceDeclarations"/> an unchanged name list is still recorded, replacing declarations
     /// that a restored loadout took from the current bindings.</summary>
     internal TranscriptEntry? CreateActivationMessage(ImmutableArray<string> names, ImmutableArray<string> previous,
@@ -269,7 +324,7 @@ public sealed partial class SessionRuntimeRegistry
     /// <paramref name="fallbackModel"/>, the session's own model.</param>
     public SessionRuntimeSelection Resolve(SessionContextProjection context, ModelDescriptor? fallbackModel = null,
         CancellationToken cancellationToken = default, ImmutableArray<string>? initialActiveToolNames = null, SessionContextModel? tolerated = null,
-        string? thinkingLevel = null)
+        string? thinkingLevel = null, ImmutableArray<string>? activeOrder = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
@@ -283,13 +338,15 @@ public sealed partial class SessionRuntimeRegistry
                 model = Model(_options.RestoreFallbackModel?.Invoke(selected, fallbackModel) ?? throw Error(SessionRuntimeRegistryFailure.UnknownModel), catalog);
         }
         else model = Model(fallbackModel, catalog);
-        return ResolveCatalog(catalog, model.Model, context.LlmMessages, thinkingLevel ?? context.ThinkingLevel, cancellationToken, initialActiveToolNames: initialActiveToolNames);
+        return ResolveCatalog(catalog, model.Model, context.LlmMessages, thinkingLevel ?? context.ThinkingLevel, cancellationToken, initialActiveToolNames: initialActiveToolNames,
+            activeOrder: activeOrder);
     }
 
     public SessionRuntimeSelection Resolve(ModelDescriptor model, ImmutableArray<TranscriptEntry> messages,
         string thinkingLevel = "off", CancellationToken cancellationToken = default, bool prepareLoadout = true,
-        ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null)
-        => ResolveCatalog(_modelCatalog.Read(), model, messages, thinkingLevel, cancellationToken, prepareLoadout, preparedLoadout, initialActiveToolNames);
+        ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null, ImmutableArray<string>? activeOrder = null)
+        => ResolveCatalog(_modelCatalog.Read(), model, messages, thinkingLevel, cancellationToken, prepareLoadout, preparedLoadout, initialActiveToolNames,
+            activeOrder: activeOrder);
 
     /// <summary>
     /// Source _restoreToolsFromTranscript and _applyToolLoadout (session open, tree navigation): the recorded loadout is
@@ -328,7 +385,8 @@ public sealed partial class SessionRuntimeRegistry
 
     private SessionRuntimeSelection ResolveCatalog(ModelCatalog catalog, ModelDescriptor model, ImmutableArray<TranscriptEntry> messages,
         string thinkingLevel = "off", CancellationToken cancellationToken = default, bool prepareLoadout = true,
-        ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null, RestoreLog? restore = null)
+        ToolLoadoutPresentation? preparedLoadout = null, ImmutableArray<string>? initialActiveToolNames = null, RestoreLog? restore = null,
+        ImmutableArray<string>? activeOrder = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var binding = Model(model, catalog);
@@ -392,6 +450,10 @@ public sealed partial class SessionRuntimeRegistry
             }
             active = effective; order = effectiveOrder;
         }
+        // Source getActiveToolNames: the loadout keeps the order it was selected in, while the transcript declares its tools in
+        // replay order (a minimal record does not reorder them). The same tools in another order take that order.
+        if (activeOrder is { IsDefault: false } wanted && wanted.Length == order.Count && wanted.Distinct(StringComparer.Ordinal).Count() == wanted.Length &&
+            wanted.All(active.ContainsKey)) order = [.. wanted];
         var resolved = ImmutableArray.CreateBuilder<SessionRegisteredTool>();
         var rawDeclarations = ImmutableArray.CreateBuilder<JsonData>();
         foreach (var name in order.ToArray())

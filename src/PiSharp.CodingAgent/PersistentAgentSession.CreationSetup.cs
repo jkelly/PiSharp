@@ -18,8 +18,8 @@ public sealed partial class PersistentAgentSession
             SessionLogStoreSnapshot log; SessionContextProjection previous;
             lock (_gate) { reservation.ValidateCatalogAuthority(this); if (_setupAppending) throw new InvalidOperationException("Setup selection cannot overlap an append."); log = _acknowledgedLog; previous = _context; }
             var projected = _projector.Project(log.Entries, leaf, token);
-            var configuration = _registry?.Resolve(WithUnrecordedLoadout(projected, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), token),
-                _configuration.Model, token).Configuration ?? _configuration;
+            var current = _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+            var configuration = _registry?.Resolve(WithUnrecordedLoadout(projected, current, token), _configuration.Model, token, activeOrder: current).Configuration ?? _configuration;
             ValidateRuntimeContext(projected, configuration, _toleratedSelection, _toleratedThinking);
             lock (_gate)
             {
@@ -62,7 +62,8 @@ public sealed partial class PersistentAgentSession
             var resolved = prospective with { LlmMessages = WithUnrecordedLoadout(prospective.LlmMessages,
                 _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), token, previous.LlmMessages.Length) };
             var configuration = _registry is { } registry
-                ? (await SessionLoadoutDiagnosticBoundary.RunAsync(() => registry.Resolve(resolved, _configuration.Model, token, tolerated: _toleratedSelection, thinkingLevel: KeptThinking(_configuration)),
+                ? (await SessionLoadoutDiagnosticBoundary.RunAsync(() => registry.Resolve(resolved, _configuration.Model, token, tolerated: _toleratedSelection, thinkingLevel: KeptThinking(_configuration),
+                    activeOrder: _configuration.Tools.Select(tool => tool.Name).ToImmutableArray()),
                     () => new ValueTask(reservation.DrainLoadoutDiagnosticsAsync(token))).ConfigureAwait(false)).Configuration
                 : _configuration;
             ValidateRuntimeContext(prospective, configuration, _toleratedSelection, _toleratedThinking);

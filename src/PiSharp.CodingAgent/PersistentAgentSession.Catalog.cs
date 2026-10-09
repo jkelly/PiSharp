@@ -82,31 +82,29 @@ public sealed partial class PersistentAgentSession
                 (requested, pendingCandidates) = PendingToolRequestLocked(replacement, activeNames, restorePrevious);
             }
             var selected = replacement.NormalizeActiveTools(requested, work);
-            // Always replace declarations, including a changed schema under an unchanged name.
-            var byName = replacement.RegisteredTools.ToDictionary(tool => tool.Adapter.Name, StringComparer.Ordinal);
-            var message = JsonData.Parse(JsonSerializer.Serialize(new { role = "system", content = "", timestamp = _clock(),
-                toolsRemoved = RecordedActiveToolNames(context, work).Select(name => new { name }),
-                toolsAdded = selected.Select(name => byName[name].Declaration.Value) }));
-            var entry = Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,
-                writer => { writer.WritePropertyName("message"); writer.WriteRawValue(message.Value.GetRawText()); });
-            var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, work);
-            var selection = await replacement.PrepareAndDrainAsync(() => replacement.Resolve(prospective, configuration.Model, work), work)
+            // Source declareToolChanges: the loadout's difference from the declared tools, a changed schema under an unchanged name
+            // included; nothing when the declared tools are unchanged.
+            var message = replacement.CreateToolChangeMessage(context.LlmMessages, selected, _clock(), work);
+            var entry = message is null ? null : Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,
+                writer => { writer.WritePropertyName("message"); writer.WriteRawValue(message.WireBody.Value.GetRawText()); });
+            var prospective = entry is null ? context : _projector.Project(log.Entries.Add(entry), entry.Id, work);
+            var selection = await replacement.PrepareAndDrainAsync(() => replacement.Resolve(prospective, configuration.Model, work, activeOrder: selected), work)
                 .ConfigureAwait(false);
             ValidateRuntimeContext(prospective, selection.Configuration, _toleratedSelection, _toleratedThinking);
             await using (var probe = new NativeAgent(selection.Configuration, _clock, new NoopSink(), _agentOptions))
                 probe.ConfigureAndReplaceMessages(selection.Configuration, SessionContextProjector.AgentMessages(prospective));
-            work.ThrowIfCancellationRequested(); writeAdmitted = true;
+            work.ThrowIfCancellationRequested(); writeAdmitted = entry is not null;
             // Once admitted, finish the original append and publish its acknowledgment even if the owner closes meanwhile (an MCP
             // server publishing its catalog while the session shuts down): a cancelled append would fault the session.
-            var acknowledged = await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
-            if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+            var acknowledged = entry is null ? null : await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
+            if (acknowledged is { CheckpointAcknowledged: false }) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             lock (_gate)
             {
                 // No caller-cancellation check after durable acknowledgment: join the actual publication.
                 publishPreparedRegistry();
                 _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(prospective));
                 _registry = replacement; _configuration = selection.Configuration;
-                _acknowledgedLog = acknowledged.Snapshot; _context = prospective;
+                if (acknowledged is not null) { _acknowledgedLog = acknowledged.Snapshot; _context = prospective; }
                 _activationEpoch = nextActivation; _pendingActivation = null;
                 // The publication recorded the whole loadout, replacing the recorded names: a restored loadout is recorded too.
                 _unrecordedLoadout = false;

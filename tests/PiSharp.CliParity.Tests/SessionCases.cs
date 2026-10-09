@@ -196,10 +196,13 @@ internal static partial class Program
         Check(added.Length >= 3, "the prompt appended its entries");
         var loadout = added[0]["message"]!;
         Equal("system", loadout["role"]!.GetValue<string>(), "the loadout record comes first");
+        // declareToolChanges/withToolChanges field order (Pi 1.1.0 writes role, content, sections, timestamp, toolsAdded, toolsRemoved).
+        Names(new[] { "role", "content", "sections", "timestamp", "toolsAdded", "toolsRemoved" }.Where(loadout.AsObject().ContainsKey),
+            loadout.AsObject().Select(field => field.Key), "record fields");
         Equal(JsonNode.Parse(lines[^1])!["id"]!.GetValue<string>(), added[0]["parentId"]!.GetValue<string>(), "the record continues the resumed leaf");
-        Names(["read", "ls", "mcp__gone__search"], loadout["toolsRemoved"]!.AsArray().Select(tool => tool!["name"]!.GetValue<string>()), "recorded names removed");
+        Names(["ls", "mcp__gone__search"], loadout["toolsRemoved"]!.AsArray().Select(tool => tool!["name"]!.GetValue<string>()), "recorded names removed");
         var current = loadout["toolsAdded"]!.AsArray();
-        Names(["read", "ls"], current.Select(tool => tool!["name"]!.GetValue<string>()), "selected loadout recorded");
+        Names(["ls"], current.Select(tool => tool!["name"]!.GetValue<string>()), "the changed declaration is added again");
         Check(current.Single(tool => tool!["name"]!.GetValue<string>() == "ls")!["description"]!.GetValue<string>() != "an older ls", "the current ls declaration is recorded");
         Equal("user", added[1]["message"]!["role"]!.GetValue<string>(), "the user message follows the record");
         Equal(added[0]["id"]!.GetValue<string>(), added[1]["parentId"]!.GetValue<string>(), "the user message continues the record");

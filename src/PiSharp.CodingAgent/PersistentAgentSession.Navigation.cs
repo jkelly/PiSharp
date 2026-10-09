@@ -173,7 +173,7 @@ public sealed partial class PersistentAgentSession
                 configuration = _registry is { } changedRegistry
                     ? (await PrepareAndDrainLoadoutAsync(() => changedRegistry.Resolve(unrecorded ? prospective with { LlmMessages =
                         WithLoadoutRecord(changedRegistry, prospective.LlmMessages, restoredNames, work) } : prospective,
-                        kept.Model, work, tolerated: Divergent(prospective, kept.Model), thinkingLevel: kept.ThinkingLevel), work).ConfigureAwait(false)).Configuration
+                        kept.Model, work, tolerated: Divergent(prospective, kept.Model), thinkingLevel: kept.ThinkingLevel, activeOrder: restoredNames), work).ConfigureAwait(false)).Configuration
                     : revision.Configuration;
                 toleratedModel = Divergent(prospective, kept.Model);
                 toleratedThinking = prospective.ThinkingLevel != kept.ThinkingLevel ? prospective.ThinkingLevel : null;

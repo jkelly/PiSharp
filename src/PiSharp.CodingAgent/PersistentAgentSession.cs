@@ -421,8 +421,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             // Pi sets no limit on the nested calls of codemode scripts.
             var registry = _registry.BindInvocationOwner(new(generation, linked.Token) { UncountedNestedCallTools = ["codemode"],
                 LateNestedTools = LateNestedInvoker });
-            var selection = registry.Resolve(WithUnrecordedLoadout(_context, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), default),
-                _configuration.Model, tolerated: _toleratedSelection, thinkingLevel: KeptThinking(_configuration));
+            var current = _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+            var selection = registry.Resolve(WithUnrecordedLoadout(_context, current, default), _configuration.Model, tolerated: _toleratedSelection,
+                thinkingLevel: KeptThinking(_configuration), activeOrder: current);
             _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(_context));
             _configuration = selection.Configuration;
             _registry = registry;
@@ -491,9 +492,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             // Source setThinkingLevel: a change of the session's level (which tree navigation may have kept over the branch's).
             if (update.ThinkingLevel is { } level && level != effectiveThinking)
                 Add("thinking_level_change", writer => writer.WriteString("thinkingLevel", level));
-            var activation = update.ActiveToolNames is { } activeNames
-                ? _registry!.CreateActivationMessage(activeNames, RecordedActiveToolNames(context, work), _clock(), work, update.ReplaceDeclarations)
-                : null;
+            // Source declareToolChanges: the selection is recorded as its difference from the tools the transcript declares.
+            var selectedTools = update.ActiveToolNames is { } activeNames ? _registry!.NormalizeActiveTools(activeNames, work) : (ImmutableArray<string>?)null;
+            var activation = selectedTools is { } selectedNames ? _registry!.CreateToolChangeMessage(context.LlmMessages, selectedNames, _clock(), work) : null;
+            var currentNames = _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
             var systemUpdate = update.ActiveToolNames is not null ? activation : update.SystemMessage;
             SessionPromptSectionPreparation? promptPreparation = null;
             if (update.SystemMessage is null)
@@ -513,7 +515,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 });
             }
             var prospective = _projector.Project(log.Entries.AddRange(entries), parent, work);
-            if (entries.Count == 0)
+            bool unrecorded; lock (_gate) unrecorded = _unrecordedLoadout;
+            // A selection that only reorders the tools (or matches the recorded loadout) writes nothing but still becomes the loadout.
+            if (entries.Count == 0 && (selectedTools is null || selectedTools.Value.SequenceEqual(currentNames, StringComparer.Ordinal) && !unrecorded))
             {
                 promptPreparation?.ValidateSource();
                 work.ThrowIfCancellationRequested();
@@ -523,11 +527,13 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             }
             // A selection records the whole loadout (the recorded names removed); otherwise a restored loadout that awaits its record
             // stays the agent's loadout, and the record the next request writes precedes this update.
-            var resolved = activation is not null ? prospective : prospective with { LlmMessages = WithUnrecordedLoadout(prospective.LlmMessages,
-                _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), work, context.LlmMessages.Length) };
+            var resolved = selectedTools is not null ? prospective : prospective with { LlmMessages = WithUnrecordedLoadout(prospective.LlmMessages,
+                currentNames, work, context.LlmMessages.Length) };
             var targetThinking = update.ThinkingLevel ?? effectiveThinking;
             var selection = await PrepareAndDrainLoadoutAsync(() => _registry!.Resolve(resolved, update.Model ?? _configuration.Model, work,
-                thinkingLevel: resolved.ThinkingLevel != targetThinking ? targetThinking : null), work).ConfigureAwait(false);
+                thinkingLevel: resolved.ThinkingLevel != targetThinking ? targetThinking : null, activeOrder: selectedTools ?? currentNames), work).ConfigureAwait(false);
+            if (selectedTools is { } expected && !selection.Configuration.Tools.Select(tool => tool.Name).SequenceEqual(expected, StringComparer.Ordinal))
+                throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
             // A stored selection only carries provider/modelId; preserve exact API matching for an explicitly requested model.
             if (update.Model is { } requested && selection.Configuration.Model != requested)
                 throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -542,9 +548,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 if (!ReferenceEquals(_context, context) || !ReferenceEquals(_acknowledgedLog, log) || !ReferenceEquals(_active, idle) ||
                     !ReferenceEquals(_acknowledgedPromptRevision, priorPromptRevision))
                     throw new InvalidOperationException("Prompt configuration reservation changed.");
-            writeAdmitted = true;
-            var acknowledged = await _store.AppendAsync(entries.ToImmutable(), work).ConfigureAwait(false);
-            if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+            writeAdmitted = entries.Count != 0;
+            var acknowledged = entries.Count == 0 ? null : await _store.AppendAsync(entries.ToImmutable(), work).ConfigureAwait(false);
+            if (acknowledged is { CheckpointAcknowledged: false }) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             ModelDescriptor previousModel; long generation;
             lock (_gate)
             {
@@ -554,11 +560,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     SelectPendingToolsLocked(_configuration.Tools.Select(tool => tool.Name).ToImmutableArray(),
                         selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray());
                 _configuration = selection.Configuration;
-                _acknowledgedLog = acknowledged.Snapshot;
-                _context = prospective;
+                if (acknowledged is not null) { _acknowledgedLog = acknowledged.Snapshot; _context = prospective; }
                 _toleratedThinking = prospective.ThinkingLevel != selection.Configuration.ThinkingLevel ? prospective.ThinkingLevel : null;
                 _acknowledgedPromptRevision = promptPreparation?.Revision ?? _acknowledgedPromptRevision;
-                if (activation is not null) _unrecordedLoadout = false;
+                if (selectedTools is not null) _unrecordedLoadout = false;
                 restoreActivation();
             }
             // Source setModel/setThinkingLevel: thinking_level_changed (and thinking_level_select) when the level changed,
@@ -1308,7 +1313,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     private void ValidateLoadout(ImmutableArray<TranscriptEntry> messages, CancellationToken token = default)
     {
         var selected = LoadoutRegistry().Resolve(_configuration.Model, WithUnrecordedLoadout(messages, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), token),
-            _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false);
+            _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false, activeOrder: _configuration.Tools.Select(tool => tool.Name).ToImmutableArray());
         if (!selected.Configuration.Tools.Select(tool => (tool.Name, tool.ExecutionMode))
             .SequenceEqual(_configuration.Tools.Select(tool => (tool.Name, tool.ExecutionMode))))
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);

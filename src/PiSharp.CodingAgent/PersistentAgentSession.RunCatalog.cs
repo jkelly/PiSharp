@@ -108,17 +108,16 @@ public sealed partial class PersistentAgentSession
                 if (!ReferenceEquals(_pendingActivation, pending) || !ReferenceEquals(_active, operation) || _fault is not null || _disposed) return;
                 registry = _registry!; context = _context; log = _acknowledgedLog; configuration = _configuration; epoch = _activationEpoch;
             }
-            var delta = registry.CreateActivationMessage(pending.Names, RecordedActiveToolNames(context, default), _clock(), default,
-                replaceDeclarations: true)!;
-            var entry = Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,
+            var delta = registry.CreateToolChangeMessage(context.LlmMessages, pending.Names, _clock(), default);
+            var entry = delta is null ? null : Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,
                 writer => { writer.WritePropertyName("message"); writer.WriteRawValue(delta.WireBody!.Value.GetRawText()); });
-            var prospective = _projector.Project(log.Entries.Add(entry), entry.Id);
+            var prospective = entry is null ? context : _projector.Project(log.Entries.Add(entry), entry.Id);
             AgentConfiguration verified;
             _activationPreparation.Value = true;
             try
             {
                 verified = registry.Resolve(configuration.Model, prospective.LlmMessages, configuration.ThinkingLevel, prepareLoadout: false,
-                    preparedLoadout: pending.Presentation).Configuration;
+                    preparedLoadout: pending.Presentation, activeOrder: pending.Names).Configuration;
             }
             finally { _activationPreparation.Value = false; }
             ValidateRuntimeContext(prospective, verified, _toleratedSelection, _toleratedThinking);
@@ -126,14 +125,14 @@ public sealed partial class PersistentAgentSession
             {
                 if (!ReferenceEquals(_pendingActivation, pending) || _activationEpoch != epoch || !ReferenceEquals(_context, context) ||
                     !ReferenceEquals(_acknowledgedLog, log) || !ReferenceEquals(_registry, registry) || _fault is not null || _disposed) return;
-                _activationPublishing = true; writeAdmitted = true;
+                _activationPublishing = true; writeAdmitted = entry is not null;
             }
-            var acknowledged = await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
-            if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+            var acknowledged = entry is null ? null : await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
+            if (acknowledged is { CheckpointAcknowledged: false }) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             lock (_gate)
             {
                 _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(verified), SessionContextProjector.AgentMessages(prospective));
-                _configuration = verified; _context = prospective; _acknowledgedLog = acknowledged.Snapshot;
+                _configuration = verified; if (acknowledged is not null) { _context = prospective; _acknowledgedLog = acknowledged.Snapshot; }
                 _pendingActivation = null; _lateNestedInvoker = null; _recordedRegistry = null; _unrecordedLoadout = false;
             }
         }
@@ -145,7 +144,7 @@ public sealed partial class PersistentAgentSession
             throw new PersistentAgentSessionException(fault);
         }
         catch { if (writeAdmitted) lock (_gate) _fault ??= new(PersistentAgentSessionFailure.InvalidCommit); throw; }
-        finally { if (writeAdmitted) lock (_gate) _activationPublishing = false; _commits.Release(); }
+        finally { lock (_gate) _activationPublishing = false; _commits.Release(); }
     }
 
     /// <summary>While a catalog published during the run awaits its boundary, nested calls (codemode scripts) reach its tools

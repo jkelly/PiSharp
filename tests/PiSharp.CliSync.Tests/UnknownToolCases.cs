@@ -56,8 +56,8 @@ internal static partial class Program
             var count = opened.Snapshot.Log.Entries.Length; var leaf = opened.Snapshot.Context.LeafId;
             await opened.PromptAsync(SettledUser("go")); await opened.WaitForIdleAsync();
             var record = RecordedAtPrompt(opened, count, leaf);
-            Names(["read", "grep"], SystemTools(record, "toolsRemoved"), "initial selection replaces the recorded names");
-            Names(["grep"], SystemTools(record, "toolsAdded"), "initial selection recorded");
+            Names(["read"], SystemTools(record, "toolsRemoved"), "initial selection removes the unselected tool");
+            Names([], SystemTools(record, "toolsAdded"), "initial selection keeps grep's recorded declaration");
         }
         finally { Directory.Delete(Path.GetDirectoryName(recorded)!, recursive: true); }
     });
