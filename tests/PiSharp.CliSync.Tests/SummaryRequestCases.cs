@@ -91,16 +91,7 @@ internal static partial class Program
             catch (PiSharp.Sessions.Compaction.SessionCompactionException) { }
             var sent = endpoint.Snapshot().Single();
             Equal(test.Url, sent.Url, label + " url");
-            if (test.Provider == "google")
-            {
-                // The SDK serializes Content as {parts, role} and gives systemInstruction role "user"; PiSharp's Google wire (all
-                // requests, not only summaries) orders {role, parts} and omits that role. The summary options are generationConfig.
-                using var expected = System.Text.Json.JsonDocument.Parse(test.Body); using var actual = System.Text.Json.JsonDocument.Parse(sent.Body!);
-                Equal(expected.RootElement.GetProperty("generationConfig").GetRawText(), actual.RootElement.GetProperty("generationConfig").GetRawText(), label + " generationConfig");
-                Equal("SYS", actual.RootElement.GetProperty("systemInstruction").GetProperty("parts")[0].GetProperty("text").GetString(), label + " system");
-                Equal("PROMPT", actual.RootElement.GetProperty("contents")[0].GetProperty("parts")[0].GetProperty("text").GetString(), label + " prompt");
-            }
-            else Equal(test.Body, sent.Body, label + " body");
+            Equal(test.Body, sent.Body, label + " body");
             Equal(test.Beta, sent.Headers.TryGetValue("anthropic-beta", out var beta) ? beta : null, label + " anthropic-beta");
             // cacheRetention "none": the routing session id never becomes a cache key or an affinity header.
             foreach (var name in new[] { "session_id", "x-client-request-id", "x-session-id", "x-session-affinity", "x-affinity" })
