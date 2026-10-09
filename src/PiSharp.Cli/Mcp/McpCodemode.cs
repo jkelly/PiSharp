@@ -91,9 +91,14 @@ internal static class McpCodemode
         {
             var outcome = await invocation.ExecuteToolAsync(name, arguments ?? JsonData.Null, new(cancellationToken)).ConfigureAwait(false);
             JsonData? scriptValue = null;
-            if (IsMcpTool(name, Tools.FirstOrDefault(tool => tool.Name == name)?.Namespace) && outcome.Result.Value.ValueKind == JsonValueKind.Object)
+            if (IsMcpTool(name, Tools.FirstOrDefault(tool => tool.Name == name)?.Namespace) && outcome.Result.Value.ValueKind == JsonValueKind.Object &&
+                outcome.Result.Value.TryGetProperty("structuredContent", out var callToolResult) && callToolResult.ValueKind == JsonValueKind.Object &&
+                outcome.Result.Value.TryGetProperty("details", out var details) && details.ValueKind == JsonValueKind.Object && details.TryGetProperty("server", out _))
+                // convertMcpResult: the tool's structuredContent is the CallToolResult without _meta (production servers).
+                scriptValue = JsonData.FromElement(callToolResult);
+            else if (IsMcpTool(name, Tools.FirstOrDefault(tool => tool.Name == name)?.Namespace) && outcome.Result.Value.ValueKind == JsonValueKind.Object)
             {
-                // convertMcpResult: the script receives the CallToolResult without _meta.
+                // A raw CallToolResult: the script receives it without _meta.
                 var fields = outcome.Result.Value.EnumerateObject().Where(property => property.Name is not ("_meta" or "details" or "usage"))
                     .ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
                 scriptValue = JsonData.Parse(JsonSerializer.Serialize(fields));

@@ -30,6 +30,7 @@ public sealed class McpPreparedServer : IAsyncDisposable
     private readonly ExtensionToolArgumentValidator validator;
     private readonly McpPreparedHookComposer composeHooks;
     private readonly McpServerRuntime runtime;
+    private readonly McpServerEntry serverEntry;
     private readonly SemaphoreSlim publications = new(1, 1);
     private readonly AsyncLocal<bool> inside = new();
     private readonly object admission = new();
@@ -56,7 +57,7 @@ public sealed class McpPreparedServer : IAsyncDisposable
         if (options.Generation != attachment.Generation || captured.InvocationOwnerGeneration != attachment.Generation ||
             !captured.UsesFinalActionPolicy(policy))
             throw new ArgumentException("MCP binding requires the captured attachment generation and native final-action policy.");
-        runtime = new(entry, options, channelFactory, PublishAsync);
+        runtime = new(entry, options, channelFactory, PublishAsync); serverEntry = entry;
         resource = owner.RegisterOwnedResource(attachment, CloseOwnedAsync, runtime.CloseAsync);
     }
 
@@ -64,6 +65,21 @@ public sealed class McpPreparedServer : IAsyncDisposable
         => RunAsync(() => runtime.ConnectAsync(token), token);
     public Task<McpRuntimeSnapshot> RefreshToolsAsync(CancellationToken token = default)
         => RunAsync(() => runtime.RefreshToolsAsync(token), token);
+    /// <summary>Drops the connection and connects again, republishing the tools (`/mcp` reconnect, after a sign-in).</summary>
+    public Task<McpRuntimeSnapshot> ReconnectAsync(CancellationToken token = default)
+        => RunAsync(() => runtime.ReconnectAsync(token), token);
+    /// <summary>Drops the connection without reconnecting (sign-out); the tools stay registered and the next call reconnects.</summary>
+    public Task DisconnectAsync(CancellationToken token = default)
+        => RunAsync(async () => { await runtime.DisconnectAsync(token).ConfigureAwait(false); return runtime.Snapshot; }, token);
+    /// <summary>How many resources and templates the server lists (fetchResources), for `/mcp`.</summary>
+    public async Task<(int Resources, int Templates)> CountResourcesAsync(CancellationToken token = default)
+    {
+        var counts = (0, 0);
+        await RunAsync(async () => { counts = await runtime.CountResourcesAsync(token).ConfigureAwait(false); return runtime.Snapshot; }, token).ConfigureAwait(false);
+        return counts;
+    }
+    /// <summary>The runtime's current catalog state (connected, tools, instructions, resources).</summary>
+    public McpRuntimeSnapshot Snapshot => runtime.Snapshot;
     /// <summary>Called by the actual prepared resource dispatch after its resource-scope admission.
     /// The resource scope can differ from this server's tool scope; both belong to the captured attachment.</summary>
     public McpResourceServer CaptureResourceServer(IExtensionToolInvocationContext invocation)
@@ -81,6 +97,13 @@ public sealed class McpPreparedServer : IAsyncDisposable
         }
     }
     public bool CatalogWithdrawalAcknowledged { get { lock (admission) return withdrawalAcknowledged; } }
+    /// <summary>Whether closing with the owner's shutdown records the withdrawal of this server's tools in the session. The
+    /// original records nothing at session_shutdown (production sessions set false), so a resumed session's loadout still names
+    /// the tools and declares them again once the server connects.</summary>
+    public bool DurableWithdrawalOnShutdown { get; init; } = true;
+    /// <summary>Whether calls return tools.ts convertMcpResult's tool result (model content, details, the CallToolResult as
+    /// structuredContent, isError) instead of the raw CallToolResult. Production sessions set it.</summary>
+    public bool ConvertResults { get; init; }
     public Task CloseAsync()
     {
         RefuseReentry();
@@ -122,10 +145,12 @@ public sealed class McpPreparedServer : IAsyncDisposable
             // The owning stop phase already initiated and joined the actual runtime close before this reservation.
             // Its original failure is retained by the resource owner; do not count it again in withdrawal.
             await Task.WhenAll(originals).ConfigureAwait(false);
-            var withdrew = registrationIds.IsEmpty;
+            // index.ts session_shutdown records nothing: the tools leave with the session. Only a close while the session
+            // continues (disable, reconnect with a new configuration, reload) withdraws them durably.
+            var withdrew = registrationIds.IsEmpty || transaction.IsSessionShutdown && !DurableWithdrawalOnShutdown;
             // Withdrawal is host-owned; runtime close only marks its borrowed metadata disconnected.
             // Last committed ownership is retained until the same durable catalog boundary acknowledges.
-            if (!registrationIds.IsEmpty)
+            if (!withdrew)
             {
                 try
                 {
@@ -243,7 +268,18 @@ public sealed class McpPreparedServer : IAsyncDisposable
             admitted.Add(settled.Task);
         }
         var prior = inside.Value; inside.Value = true;
-        try { return await runtime.CallToolAsync(toolName, arguments, invocation, token).ConfigureAwait(false); }
+        try
+        {
+            if (!ConvertResults) return await runtime.CallToolAsync(toolName, arguments, invocation, token).ConfigureAwait(false);
+            JsonData raw;
+            try { raw = await runtime.CallToolAsync(toolName, arguments, invocation, token).ConfigureAwait(false); }
+            // A call that fails reaches the model as an error with the reason, as the original's tool pipeline reports a thrown error.
+            catch (Exception failure) when (!token.IsCancellationRequested && failure is not OperationCanceledException)
+            { return McpToolResults.Failure(serverEntry, toolName, failure); }
+            var readable = runtime.Snapshot.Catalog.HasResources && serverEntry.Config.Exposure != McpExposure.Hidden;
+            return await McpToolResults.ConvertAsync(serverEntry.Name, toolName, raw, readable,
+                (data, extension, cancellation) => McpResourceToolsPublisher.SaveAsync(data, extension, null!, cancellation), token).ConfigureAwait(false);
+        }
         finally { inside.Value = prior; lock (admission) admitted.Remove(settled.Task); settled.TrySetResult(); }
     }
 }

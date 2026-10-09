@@ -69,7 +69,13 @@ public sealed class McpDiscoveryExecutableDefinition
         return CreateToolSearch(registrationId, description, (query, limit, _, invocation, token) => admittedExecutor(query, limit, invocation, token), prepareLoadout);
     }
     internal static McpDiscoveryExecutableDefinition CreateToolSearch(string registrationId, string description,
-        McpBoundToolSearchExecutor admittedExecutor, Func<ToolLoadout, ToolLoadoutChanges?>? prepareLoadout = null)
+        McpBoundToolSearchExecutor admittedExecutor, Func<ToolLoadout, ToolLoadoutChanges?>? prepareLoadout = null) =>
+        CreateToolSearch(registrationId, description, admittedExecutor, prepareLoadout, null);
+    /// <summary><paramref name="configure"/> adds presentation metadata or the default active state (tool-search/index.ts
+    /// registers it inactive) without changing the tool's identity.</summary>
+    internal static McpDiscoveryExecutableDefinition CreateToolSearch(string registrationId, string description,
+        McpBoundToolSearchExecutor admittedExecutor, Func<ToolLoadout, ToolLoadoutChanges?>? prepareLoadout,
+        Func<ExtensionToolDescriptor, ExtensionToolDescriptor>? configure)
     {
         Single(admittedExecutor);
         var fence = new ExecutionFence();
@@ -83,7 +89,8 @@ public sealed class McpDiscoveryExecutableDefinition
             if (limit is { } value && !double.IsFinite(value)) throw new ArgumentException("A finite search limit is required.");
             return admittedExecutor(query, limit, attachment, invocation, token);
         }
-        return new(McpDiscoveryKind.ToolSearch, McpDiscoveryToolIdentity.CreateToolSearch(registrationId, description, Execute, prepareLoadout), fence);
+        var descriptor = McpDiscoveryToolIdentity.CreateToolSearch(registrationId, description, Execute, prepareLoadout);
+        return new(McpDiscoveryKind.ToolSearch, configure?.Invoke(descriptor) ?? descriptor, fence);
     }
     private static void Single(Delegate admitted)
     { ArgumentNullException.ThrowIfNull(admitted); if (admitted.GetInvocationList().Length != 1) throw new ArgumentException("One joined semantic implementation is required."); }

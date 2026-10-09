@@ -9,7 +9,7 @@ internal static partial class Program
 {
     private const string Found = "Found: install guide.";
 
-    // A direct server connects before the session opens; the model calls its tool and the server's result reaches the transcript.
+    // A direct server connects in the background and the first prompt waits for it; the model calls its tool and the result reaches the transcript.
     private static Task DirectServerCallSucceeds() => WithRoot("direct", """{"mcpServers":{"web":{"command":"web-server","exposure":"direct"}}}""",
         async (root, fixture) =>
     {
@@ -25,27 +25,27 @@ internal static partial class Program
         Names(["search:{\"query\":\"install\"}"], fixture.Servers.Single().Calls, "the call reached the server");
     });
 
-    // A background server that connects only after the first prompt: tool_search finds nothing then; once its tools register
-    // (at the next idle boundary), tool_search loads one and its call succeeds.
+    // IMPL-H (index.ts tool_call: tool_search waits for every server): a background server that is still connecting when the first
+    // prompt arrives. With tool_search active the prompt waits for it (PiSharp registers tools between runs, so the wait happens
+    // before the prompt is admitted), so the first search already finds its tools and the loaded tool's call succeeds.
     private static Task LateBackgroundServerCallSucceeds() => WithRoot("late", DeferredDocs, async (root, fixture) =>
     {
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         fixture.Initialized = release.Task;
-        var provider = new Endpoint(() => Call("toolu_early", "tool_search", new { query = "search documentation", limit = 1 }), () => Text("nothing yet"),
-            () => Call("toolu_search", "tool_search", new { query = "search documentation", limit = 1 }),
+        var provider = new Endpoint(() => Call("toolu_search", "tool_search", new { query = "search documentation", limit = 1 }),
             () => Call("toolu_docs", "mcp__docs__search", new { query = "install" }), () => Text("done"));
         await using (var rpc = new Rpc(Args(root, "new-memory"), provider, fixture.Host()))
         {
-            await rpc.Prompt("p1", "find the install guide");
+            var prompt = rpc.Prompt("p1", "find the install guide");
+            await Task.Delay(500);
+            Equal(0, provider.Snapshot().Length, "the prompt waits for the connecting server");
             release.TrySetResult();
-            await Connected(fixture, rpc);
-            await rpc.Prompt("p2", "try again");
+            await prompt;
             Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
         }
         var requests = provider.Snapshot();
-        Names(["No matching tools found."], ToolResults(requests[1]), "before the server registered its tools");
-        Names([LoadedSearch], ToolResults(requests[3]), "after it registered");
-        Names([Found], ToolResults(requests[4]), "late background server's tool result");
+        Names([LoadedSearch], ToolResults(requests[1]), "the first search finds the late server's tools");
+        Names([Found], ToolResults(requests[2]), "late background server's tool result");
         Names(["search:{\"query\":\"install\"}"], fixture.Servers.Single().Calls, "the call reached the late server");
     });
 

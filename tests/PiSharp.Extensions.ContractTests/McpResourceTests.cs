@@ -122,7 +122,8 @@ internal static class McpResourceTests
             .ExecuteAsync(McpResourceTools.ReadResource, Json("""{"server":"a","uri":"a"}"""), new Context());
         Check(saved.Contains("😀😀😀😀😀😀😀😀") && result.FullOutputPath == "synthetic/full.txt" && result.Content.Length == 2);
         var text = result.Content[0].Value.GetProperty("text").GetString()!;
-        Check(text.Contains("chars truncated.") && !text.Contains('\ufffd') && result.Content[1].Value.GetProperty("type").GetString() == "image");
+        // truncate.ts truncateMiddle: `\u2026N chars truncated\u2026`.
+        Check(text.Contains("chars truncated\u2026") && !text.Contains('\ufffd') && result.Content[1].Value.GetProperty("type").GetString() == "image");
         Check(result.StructuredContent.Value.GetProperty("contents")[0].GetProperty("text").GetString() == "😀😀😀😀😀😀😀😀");
     }
     private static async Task Identity()

@@ -8,6 +8,7 @@ using PiSharp.Extensions;
 using PiSharp.Extensions.Mcp.Configuration;
 using PiSharp.Extensions.Mcp.Resources;
 using PiSharp.Extensions.Mcp.Runtime;
+using PiSharp.Extensions.Mcp.Transport;
 
 namespace PiSharp.Extensions.Runtime.Mcp;
 
@@ -107,7 +108,21 @@ public sealed class McpServerRuntime : IAsyncDisposable
             parameters.Value.TryGetProperty(key, out var supplied) && supplied.ValueKind != JsonValueKind.String) ||
             method == "resources/read" && (parameters is null || !String(parameters.Value, "uri", out var uri) || string.IsNullOrWhiteSpace(uri)))
             throw new ArgumentException("Invalid resource method parameters.", nameof(parameters));
-        return ResourceOwnedAsync(method, parameters, requestOptions, invocation, cancellationToken);
+        return ResourceRetriedAsync(method, parameters, requestOptions, invocation, cancellationToken);
+    }
+    /// <summary>runtime.ts withClient(readOnly): reading and listing resources is retried once after a transient HTTP error (250 ms
+    /// later), and once on a new session when the server no longer knows the session.</summary>
+    private async Task<JsonData> ResourceRetriedAsync(string method, JsonData? parameters, McpRequestOptions requestOptions,
+        IExtensionToolInvocationContext invocation, CancellationToken cancellationToken)
+    {
+        try { return await ResourceOwnedAsync(method, parameters, requestOptions, invocation, cancellationToken).ConfigureAwait(false); }
+        catch (Exception error) when (!cancellationToken.IsCancellationRequested && entry.Config.Transport == McpTransportKind.Http &&
+            (SessionExpired(error) || Find<McpHttpStatusException>(error) is { } status && Transient(status)))
+        {
+            if (SessionExpired(error)) { try { await DisconnectCoreAsync().ConfigureAwait(false); } catch (Exception) { /* The retry opens a new connection. */ } }
+            else await Task.Delay(ConnectRetryDelays[0], cancellationToken).ConfigureAwait(false);
+        }
+        return await ResourceOwnedAsync(method, parameters, requestOptions, invocation, cancellationToken).ConfigureAwait(false);
     }
     private async Task<JsonData> ResourceOwnedAsync(string method, JsonData? parameters, McpRequestOptions supplied,
         IExtensionToolInvocationContext invocation, CancellationToken cancellationToken)
@@ -192,6 +207,65 @@ public sealed class McpServerRuntime : IAsyncDisposable
     public Task<McpRuntimeSnapshot> ConnectAsync(CancellationToken cancellationToken = default) => RunAsync(async token =>
     { await GetConnectionAsync(token).ConfigureAwait(false); return Snapshot; }, cancellationToken);
 
+    /// <summary>runtime.ts reconnect: drop the current connection (joining its close) and connect again, republishing the
+    /// tools, for example after a sign-in or from the `/mcp` manager.</summary>
+    public Task<McpRuntimeSnapshot> ReconnectAsync(CancellationToken cancellationToken = default) => RunAsync(async token =>
+    {
+        await DisconnectCoreAsync().ConfigureAwait(false);
+        await GetConnectionAsync(token).ConfigureAwait(false); return Snapshot;
+    }, cancellationToken);
+
+    /// <summary>runtime.ts fetchResources: how many resources and resource templates the server lists, for the counts of `mcp list`
+    /// and `/mcp`. MCP App resources (`ui://` URIs, `profile=mcp-app` HTML) are left out; a list that fails counts none, and a
+    /// server without the resources capability has none.</summary>
+    public Task<(int Resources, int Templates)> CountResourcesAsync(CancellationToken cancellationToken = default) => RunAsync(async token =>
+    {
+        var current = await GetConnectionAsync(token).ConfigureAwait(false);
+        if (!current.HasResources) return (0, 0);
+        async Task<int> CountAsync(string method, string key)
+        {
+            var count = 0; var cursors = new HashSet<string>(StringComparer.Ordinal); string? cursor = null;
+            try
+            {
+                for (var page = 0; page < options.Limits.MaximumPages; page++)
+                {
+                    var response = await current.Channel.RequestAsync(method, cursor is null ? null : Json(new { cursor }), RequestOptions(), token).ConfigureAwait(false);
+                    CheckResponse(response);
+                    if (response.Value.ValueKind != JsonValueKind.Object || !response.Value.TryGetProperty(key, out var items) || items.ValueKind != JsonValueKind.Array) return count;
+                    count += items.EnumerateArray().Count(item => !IsMcpAppResource(item));
+                    if (!response.Value.TryGetProperty("nextCursor", out var next) || next.ValueKind != JsonValueKind.String || !cursors.Add(next.GetString()!)) return count;
+                    cursor = next.GetString();
+                }
+                return count;
+            }
+            catch (Exception) when (!token.IsCancellationRequested) { return 0; }
+        }
+        var counts = await Task.WhenAll(CountAsync("resources/list", "resources"), CountAsync("resources/templates/list", "resourceTemplates")).ConfigureAwait(false);
+        return (counts[0], counts[1]);
+    }, cancellationToken);
+
+    /// <summary>resources.ts isMcpAppResource: user interfaces for hosts that render them.</summary>
+    private static bool IsMcpAppResource(JsonElement item)
+    {
+        if (item.ValueKind != JsonValueKind.Object) return false;
+        var uri = String(item, "uri", out var direct) ? direct : String(item, "uriTemplate", out var template) ? template : "";
+        if (uri!.StartsWith("ui://", StringComparison.Ordinal)) return true;
+        return String(item, "mimeType", out var mime) && System.Text.RegularExpressions.Regex.IsMatch(mime!, ";\\s*profile\\s*=\\s*\"?mcp-app\"?",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    }
+
+    /// <summary>runtime.ts signOut: drop the current connection without reconnecting; the next call connects again.</summary>
+    public Task DisconnectAsync(CancellationToken cancellationToken = default) => RunAsync(async _ =>
+    { await DisconnectCoreAsync().ConfigureAwait(false); return true; }, cancellationToken);
+
+    private async Task DisconnectCoreAsync()
+    {
+        Lazy<Task<Connection>>? pending; lock (gate) pending = opening;
+        if (pending is not null) try { await pending.Value.ConfigureAwait(false); } catch (Exception) { /* The failed attempt left no connection. */ }
+        Connection? current; lock (gate) current = connection;
+        if (current is not null) await RetireDisconnectedAsync(current).ConfigureAwait(false);
+    }
+
     public Task<McpRuntimeSnapshot> RefreshToolsAsync(CancellationToken cancellationToken = default) => RunAsync(async token =>
     {
         await refreshGate.WaitAsync(token).ConfigureAwait(false);
@@ -237,6 +311,8 @@ public sealed class McpServerRuntime : IAsyncDisposable
             context.SessionCancellationToken, context.ExtensionLifetimeCancellationToken);
         return await RunAsync(async requestToken =>
         {
+            for (var attempt = 1; ; attempt++)
+            {
             var current = await GetConnectionAsync(requestToken).ConfigureAwait(false);
             var progress = new InvocationProgress(entry.Name, toolName, context, requestToken, publishing);
             JsonData? result = null; Exception? failure = null;
@@ -247,6 +323,13 @@ public sealed class McpServerRuntime : IAsyncDisposable
             }
             catch (Exception error) { failure = error; }
             var progressFailure = await progress.JoinAsync().ConfigureAwait(false);
+            // runtime.ts withClient: the server no longer knows the session (restart, deploy), so it did not run the call. Retry once on
+            // a new session; other failures are not retried, since the server may already have run the call.
+            if (attempt == 1 && failure is not null && progressFailure is null && SessionExpired(failure))
+            {
+                try { await RetireDisconnectedAsync(current).ConfigureAwait(false); } catch (Exception) { /* The retry opens a new connection. */ }
+                continue;
+            }
             if (failure is McpRuntimeDisconnectedException)
                 try { await RetireDisconnectedAsync(current).ConfigureAwait(false); } catch (Exception cleanup) { failure = new AggregateException(failure, cleanup); }
             if (failure is not null && progressFailure is not null && !ReferenceEquals(failure, progressFailure)) throw new AggregateException(failure, progressFailure);
@@ -255,8 +338,27 @@ public sealed class McpServerRuntime : IAsyncDisposable
             requestToken.ThrowIfCancellationRequested();
             if (result is null) throw new McpRuntimeProtocolException("Missing MCP tools/call result");
             CheckResponse(result); return ValidateToolResult(result);
+            }
         }, owned.Token).ConfigureAwait(false);
     }
+
+    /// <summary>The HTTP server answered 404 for the session (McpSessionExpiredError).</summary>
+    private static bool SessionExpired(Exception error) => Find<McpHttpStatusException>(error) is { SessionExpired: true };
+    /// <summary>runtime.ts isTransientError: network failures and 408, 429 and 5xx other than 501.</summary>
+    private static bool Transient(Exception error) =>
+        Find<McpHttpStatusException>(error) is { } status ? status.StatusCode is 408 or 429 || status.StatusCode >= 500 && status.StatusCode != 501
+            : Find<HttpRequestException>(error) is not null;
+    private static T? Find<T>(Exception? error) where T : Exception
+    {
+        for (; error is not null; error = error.InnerException)
+        {
+            if (error is T match) return match;
+            if (error is AggregateException aggregate) foreach (var inner in aggregate.InnerExceptions) if (Find<T>(inner) is { } nested) return nested;
+        }
+        return null;
+    }
+    /// <summary>runtime.ts CONNECT_RETRY_DELAYS_MS: delays between attempts to connect to an HTTP server that failed transiently.</summary>
+    private static readonly TimeSpan[] ConnectRetryDelays = [TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(1)];
 
     private async Task<Connection> GetConnectionAsync(CancellationToken token)
     {
@@ -274,7 +376,7 @@ public sealed class McpServerRuntime : IAsyncDisposable
         var result = await owner.Value.ConfigureAwait(false); token.ThrowIfCancellationRequested(); return result;
     }
 
-    private async Task<Connection> ConnectCoreAsync()
+    private async Task<Connection> ConnectOnceAsync()
     {
         Connection? acquired = null;
         try
@@ -313,7 +415,7 @@ public sealed class McpServerRuntime : IAsyncDisposable
             if (string.IsNullOrEmpty(acquired.Instructions)) acquired.Instructions = null;
             var tools = acquired.HasTools ? await ListToolsAsync(acquired, lifetime.Token).ConfigureAwait(false) : ImmutableArray<JsonData>.Empty;
             acquired.Initialize = initialize;
-            await PublishAsync(acquired, tools, lifetime.Token).ConfigureAwait(false);
+            await PublishAsync(acquired, tools, lifetime.Token, reconnect: true).ConfigureAwait(false);
             lock (gate) acquired.Ready = !closed;
             lifetime.Token.ThrowIfCancellationRequested();
             return acquired;
@@ -327,6 +429,25 @@ public sealed class McpServerRuntime : IAsyncDisposable
                 catch (Exception cleanup) { throw new AggregateException(failure, cleanup); }
             }
             throw;
+        }
+    }
+
+    /// <summary>runtime.ts open: HTTP servers that fail with a transient error (network, 408, 429, 5xx) get two more attempts, 250 ms
+    /// and 1 s apart; closing the runtime stops the wait.</summary>
+    private async Task<Connection> ConnectCoreAsync()
+    {
+        try
+        {
+            for (var attempt = 0; ; attempt++)
+            {
+                try { return await ConnectOnceAsync().ConfigureAwait(false); }
+                catch (Exception error) when (entry.Config.Transport == McpTransportKind.Http && attempt < ConnectRetryDelays.Length &&
+                    !lifetime.IsCancellationRequested && Transient(error))
+                {
+                    try { await Task.Delay(ConnectRetryDelays[attempt], lifetime.Token).ConfigureAwait(false); }
+                    catch (OperationCanceledException) { ExceptionDispatchInfo.Capture(error).Throw(); }
+                }
+            }
         }
         finally { lock (gate) opening = null; }
     }
@@ -360,7 +481,7 @@ public sealed class McpServerRuntime : IAsyncDisposable
         throw new McpRuntimeProtocolException("MCP tools/list exceeded " + options.Limits.MaximumPages.ToString(CultureInfo.InvariantCulture) + " pages");
     }
 
-    private async Task PublishAsync(Connection current, ImmutableArray<JsonData> originals, CancellationToken token)
+    private async Task PublishAsync(Connection current, ImmutableArray<JsonData> originals, CancellationToken token, bool reconnect = false)
     {
         await publicationGate.WaitAsync(token).ConfigureAwait(false);
         try
@@ -380,6 +501,14 @@ public sealed class McpServerRuntime : IAsyncDisposable
                     String(value, "description", out var description) ? description : null, String(value, "title", out var toolTitle) ? toolTitle : null, annotationTitle);
             }).ToImmutableArray();
             var catalog = new McpServerToolSnapshot(entry, tools, current.Instructions, HasResources: current.HasResources);
+            // A reconnect that finds the published tools unchanged (a new session after an expired one, `/mcp` reconnect) needs no new
+            // catalog: the registered tools reach the new connection. This also lets a call reconnect while its run holds the catalog.
+            if (reconnect && previous.Revision > 0 && previous.Catalog.Instructions == current.Instructions && previous.Catalog.HasResources == current.HasResources &&
+                previous.OriginalTools.Select(tool => tool.ToString()).SequenceEqual(originals.Select(tool => tool.ToString()), StringComparer.Ordinal))
+            {
+                lock (gate) snapshot = previous with { Catalog = previous.Catalog with { Connected = true }, InitializeResult = current.Initialize };
+                return;
+            }
             var next = new McpRuntimeSnapshot(options.Generation, checked(previous.Revision + 1), catalog, current.Initialize, originals);
             var plan = McpCatalogPlanner.Plan([catalog], previousNameOwners: owners);
             var names = plan.Tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
