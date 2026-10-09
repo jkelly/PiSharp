@@ -271,7 +271,7 @@ public sealed partial class PersistentAgentSession
                 var entry = SummaryRecord(request is not null, id, parent, firstKept, tokensBefore, text, usage, details,
                     provided is not null, previous, _clock);
                 var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, work);
-                ValidateRuntimeContext(prospective, configuration, _toleratedSelection);
+                ValidateRuntimeContext(prospective, configuration, _toleratedSelection, _toleratedThinking);
                 await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
                     probe.ConfigureAndReplaceMessages(configuration, SessionContextProjector.AgentMessages(prospective));
                 if (preflight is not null) await preflight(new(entry, prospective, log), work).ConfigureAwait(false);

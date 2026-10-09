@@ -121,7 +121,7 @@ public sealed partial class PersistentAgentSession
                     preparedLoadout: pending.Presentation).Configuration;
             }
             finally { _activationPreparation.Value = false; }
-            ValidateRuntimeContext(prospective, verified, _toleratedSelection);
+            ValidateRuntimeContext(prospective, verified, _toleratedSelection, _toleratedThinking);
             lock (_gate)
             {
                 if (!ReferenceEquals(_pendingActivation, pending) || _activationEpoch != epoch || !ReferenceEquals(_context, context) ||

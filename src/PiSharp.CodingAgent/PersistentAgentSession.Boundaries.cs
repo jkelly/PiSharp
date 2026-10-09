@@ -181,7 +181,7 @@ public sealed partial class PersistentAgentSession
                 previous = _context; log = _acknowledgedLog;
             }
             var (entries, prospective) = BoundaryEntries(previous, log, drafts, existing => Identity(_nextEntryId, log.Header.Id, existing), _clock, CancellationToken.None);
-            ValidateRuntimeContext(prospective, _configuration, _toleratedSelection);
+            ValidateRuntimeContext(prospective, _configuration, _toleratedSelection, _toleratedThinking);
             if (_registry is not null) ValidateLoadout(prospective.LlmMessages);
             await using (var probe = new NativeAgent(_configuration, _clock, new NoopSink(), _agentOptions))
                 probe.ConfigureAndReplaceMessages(_configuration, SessionContextProjector.AgentMessages(prospective));

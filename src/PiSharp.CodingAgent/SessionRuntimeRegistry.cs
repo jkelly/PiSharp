@@ -268,7 +268,8 @@ public sealed partial class SessionRuntimeRegistry
     /// <param name="tolerated">A branch selection the session was opened over (a fallback model or --model): it keeps
     /// <paramref name="fallbackModel"/>, the session's own model.</param>
     public SessionRuntimeSelection Resolve(SessionContextProjection context, ModelDescriptor? fallbackModel = null,
-        CancellationToken cancellationToken = default, ImmutableArray<string>? initialActiveToolNames = null, SessionContextModel? tolerated = null)
+        CancellationToken cancellationToken = default, ImmutableArray<string>? initialActiveToolNames = null, SessionContextModel? tolerated = null,
+        string? thinkingLevel = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
@@ -282,7 +283,7 @@ public sealed partial class SessionRuntimeRegistry
                 model = Model(_options.RestoreFallbackModel?.Invoke(selected, fallbackModel) ?? throw Error(SessionRuntimeRegistryFailure.UnknownModel), catalog);
         }
         else model = Model(fallbackModel, catalog);
-        return ResolveCatalog(catalog, model.Model, context.LlmMessages, context.ThinkingLevel, cancellationToken, initialActiveToolNames: initialActiveToolNames);
+        return ResolveCatalog(catalog, model.Model, context.LlmMessages, thinkingLevel ?? context.ThinkingLevel, cancellationToken, initialActiveToolNames: initialActiveToolNames);
     }
 
     public SessionRuntimeSelection Resolve(ModelDescriptor model, ImmutableArray<TranscriptEntry> messages,
@@ -299,7 +300,7 @@ public sealed partial class SessionRuntimeRegistry
     /// </summary>
     internal SessionRestoredLoadout ResolveRestored(SessionContextProjection context, ModelDescriptor? fallbackModel,
         CancellationToken cancellationToken, ImmutableArray<string>? initialActiveToolNames = null, ModelDescriptor? selectedModel = null,
-        SessionContextModel? tolerated = null)
+        SessionContextModel? tolerated = null, string? thinkingLevel = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
@@ -316,7 +317,7 @@ public sealed partial class SessionRuntimeRegistry
         }
         else model = Model(fallbackModel, catalog);
         var restore = new RestoreLog();
-        var selection = ResolveCatalog(catalog, model.Model, context.LlmMessages, context.ThinkingLevel, cancellationToken,
+        var selection = ResolveCatalog(catalog, model.Model, context.LlmMessages, thinkingLevel ?? context.ThinkingLevel, cancellationToken,
             initialActiveToolNames: initialActiveToolNames, restore: restore);
         // Source _isAllowedTool: names that --tools/--exclude-tools keep out of the catalog never become pending.
         return new(selection, [.. restore.Skipped.Where(name => _options.LifetimeToolSelection?.IsAllowed(name) != false)],

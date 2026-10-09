@@ -111,11 +111,16 @@ public sealed partial class PersistentAgentSession
             ImmutableArray<string> pendingTools = []; var unrecorded = false;
             PendingActivation? keptTools = null;
             var configuration = revision.Configuration;
+            // Source navigateTree: the leaf moves and the tools are restored, while agent.state.model and thinkingLevel stay as they
+            // are; the target branch's recorded model and thinking level are tolerated until a response or a change names the session's.
+            var kept = revision.Configuration;
+            var toleratedModel = Divergent(prospective, kept.Model);
+            var toleratedThinking = prospective.ThinkingLevel != kept.ThinkingLevel ? prospective.ThinkingLevel : null;
             if (_registry is { } registry)
             {
                 var current = GetToolActivationSelection().Names;
                 var keepCurrent = !current.IsEmpty && !prospective.LlmMessages.Any(message => message.Role == "system");
-                var (restoredLoadout, keptPresentation) = await PrepareAndDrainLoadoutAsync(() => (registry.ResolveRestored(prospective, revision.Configuration.Model, work, tolerated: _toleratedSelection),
+                var (restoredLoadout, keptPresentation) = await PrepareAndDrainLoadoutAsync(() => (registry.ResolveRestored(prospective, kept.Model, work, selectedModel: kept.Model, thinkingLevel: kept.ThinkingLevel),
                     keepCurrent ? registry.PrepareActiveLoadout(registry.NormalizeActiveTools(current, work), work) : null), work).ConfigureAwait(false);
                 configuration = restoredLoadout.Selection.Configuration;
                 if (keepCurrent) keptTools = new(0, registry.NormalizeActiveTools(current, work), keptPresentation);
@@ -125,7 +130,7 @@ public sealed partial class PersistentAgentSession
                     unrecorded = restoredLoadout.RequiresRecord;
                 }
             }
-            ValidateRuntimeContext(prospective, configuration, _toleratedSelection);
+            ValidateRuntimeContext(prospective, configuration, toleratedModel, toleratedThinking);
             var messages = SessionContextProjector.AgentMessages(prospective);
             await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
                 probe.ConfigureAndReplaceMessages(configuration, messages);
@@ -168,9 +173,11 @@ public sealed partial class PersistentAgentSession
                 configuration = _registry is { } changedRegistry
                     ? (await PrepareAndDrainLoadoutAsync(() => changedRegistry.Resolve(unrecorded ? prospective with { LlmMessages =
                         WithLoadoutRecord(changedRegistry, prospective.LlmMessages, restoredNames, work) } : prospective,
-                        revision.Configuration.Model, work), work).ConfigureAwait(false)).Configuration
+                        kept.Model, work, tolerated: Divergent(prospective, kept.Model), thinkingLevel: kept.ThinkingLevel), work).ConfigureAwait(false)).Configuration
                     : revision.Configuration;
-                ValidateRuntimeContext(prospective, configuration, _toleratedSelection);
+                toleratedModel = Divergent(prospective, kept.Model);
+                toleratedThinking = prospective.ThinkingLevel != kept.ThinkingLevel ? prospective.ThinkingLevel : null;
+                ValidateRuntimeContext(prospective, configuration, toleratedModel, toleratedThinking);
                 messages = SessionContextProjector.AgentMessages(prospective);
                 await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
                     probe.ConfigureAndReplaceMessages(configuration, messages);
@@ -194,6 +201,7 @@ public sealed partial class PersistentAgentSession
                     var restoreActivation = PrepareActivationRestoration(configuration);
                     _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(configuration), messages);
                     _configuration = configuration; _context = prospective; _acknowledgedLog = publishedLog;
+                    _toleratedSelection = toleratedModel; _toleratedThinking = toleratedThinking;
                     restoreActivation();
                     _unrecordedLoadout = unrecorded;
                     // The kept tools remain the logical selection; the next request boundary records them.

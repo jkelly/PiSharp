@@ -92,7 +92,7 @@ public sealed partial class PersistentAgentSession
             var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, work);
             var selection = await replacement.PrepareAndDrainAsync(() => replacement.Resolve(prospective, configuration.Model, work), work)
                 .ConfigureAwait(false);
-            ValidateRuntimeContext(prospective, selection.Configuration, _toleratedSelection);
+            ValidateRuntimeContext(prospective, selection.Configuration, _toleratedSelection, _toleratedThinking);
             await using (var probe = new NativeAgent(selection.Configuration, _clock, new NoopSink(), _agentOptions))
                 probe.ConfigureAndReplaceMessages(selection.Configuration, SessionContextProjector.AgentMessages(prospective));
             work.ThrowIfCancellationRequested(); writeAdmitted = true;

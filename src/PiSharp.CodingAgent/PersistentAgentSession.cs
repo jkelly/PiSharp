@@ -176,7 +176,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     {
         get
         {
-            lock (_gate) return new(_agent.Snapshot, _acknowledgedLog, _context, _fault, _disposed, _configuring)
+            // A kept thinking level (tree navigation) is the session's level, as agent.state.thinkingLevel is upstream.
+            lock (_gate) return new(_agent.Snapshot, _acknowledgedLog, _toleratedThinking is { } recorded && _context.ThinkingLevel == recorded
+                ? _context with { ThinkingLevel = _configuration.ThinkingLevel } : _context, _fault, _disposed, _configuring)
             { IsAdmittingInput = _inputSubmission is not null, InputCancellationCallbackFailed = _inputCancellationCallbackFailed,
                 IsAppendingExtensionEntry = _appendingExtensionEntry, IsEditingContext = _editingContext, IsCompacting = _compacting,
                 AutoCompactionEnabled = _automaticCompaction?.Request.Settings?.Enabled == true,
@@ -386,7 +388,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             var registry = _registry.BindInvocationOwner(new(generation, linked.Token) { UncountedNestedCallTools = ["codemode"],
                 LateNestedTools = LateNestedInvoker });
             var selection = registry.Resolve(WithUnrecordedLoadout(_context, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), default),
-                _configuration.Model, tolerated: _toleratedSelection);
+                _configuration.Model, tolerated: _toleratedSelection, thinkingLevel: KeptThinking(_configuration));
             _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(_context));
             _configuration = selection.Configuration;
             _registry = registry;
@@ -442,8 +444,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             var work = cancellation.Token;
             await _commits.WaitAsync(work).ConfigureAwait(false); commitHeld = true;
             await DrainLoadoutDiagnosticsAsync(work).ConfigureAwait(false);
-            SessionContextProjection context; SessionLogStoreSnapshot log; object? priorPromptRevision;
-            lock (_gate) { context = _context; log = _acknowledgedLog; priorPromptRevision = _acknowledgedPromptRevision; }
+            SessionContextProjection context; SessionLogStoreSnapshot log; object? priorPromptRevision; string effectiveThinking;
+            lock (_gate) { context = _context; log = _acknowledgedLog; priorPromptRevision = _acknowledgedPromptRevision; effectiveThinking = _configuration.ThinkingLevel; }
             var entries = ImmutableArray.CreateBuilder<SessionEntry>();
             var parent = context.LeafId;
             if (update.Model is { } model)
@@ -452,7 +454,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     writer.WriteString("provider", model.Provider);
                     writer.WriteString("modelId", model.Id);
                 });
-            if (update.ThinkingLevel is { } level && level != context.ThinkingLevel)
+            // Source setThinkingLevel: a change of the session's level (which tree navigation may have kept over the branch's).
+            if (update.ThinkingLevel is { } level && level != effectiveThinking)
                 Add("thinking_level_change", writer => writer.WriteString("thinkingLevel", level));
             var activation = update.ActiveToolNames is { } activeNames
                 ? _registry!.CreateActivationMessage(activeNames, RecordedActiveToolNames(context, work), _clock(), work, update.ReplaceDeclarations)
@@ -488,7 +491,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             // stays the agent's loadout, and the record the next request writes precedes this update.
             var resolved = activation is not null ? prospective : prospective with { LlmMessages = WithUnrecordedLoadout(prospective.LlmMessages,
                 _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), work, context.LlmMessages.Length) };
-            var selection = await PrepareAndDrainLoadoutAsync(() => _registry!.Resolve(resolved, update.Model ?? _configuration.Model, work), work).ConfigureAwait(false);
+            var targetThinking = update.ThinkingLevel ?? effectiveThinking;
+            var selection = await PrepareAndDrainLoadoutAsync(() => _registry!.Resolve(resolved, update.Model ?? _configuration.Model, work,
+                thinkingLevel: resolved.ThinkingLevel != targetThinking ? targetThinking : null), work).ConfigureAwait(false);
             // A stored selection only carries provider/modelId; preserve exact API matching for an explicitly requested model.
             if (update.Model is { } requested && selection.Configuration.Model != requested)
                 throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -517,6 +522,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 _configuration = selection.Configuration;
                 _acknowledgedLog = acknowledged.Snapshot;
                 _context = prospective;
+                _toleratedThinking = prospective.ThinkingLevel != selection.Configuration.ThinkingLevel ? prospective.ThinkingLevel : null;
                 _acknowledgedPromptRevision = promptPreparation?.Revision ?? _acknowledgedPromptRevision;
                 if (activation is not null) _unrecordedLoadout = false;
                 restoreActivation();
@@ -525,7 +531,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             // then model_select when the model changed. Listener failures cannot undo the committed configuration.
             writeAdmitted = false;
             if (entries.Any(entry => entry.Type == "thinking_level_change"))
-                await EmitOperationAsync(new SessionThinkingLevelChanged(generation, prospective.ThinkingLevel, context.ThinkingLevel)).ConfigureAwait(false);
+                await EmitOperationAsync(new SessionThinkingLevelChanged(generation, selection.Configuration.ThinkingLevel, effectiveThinking)).ConfigureAwait(false);
             if (update.Model is { } selected && selected != previousModel)
                 await EmitOperationAsync(new SessionModelSelected(generation, selected, previousModel, update.ModelSelectSource ?? "set")).ConfigureAwait(false);
             return Snapshot with { IsConfiguring = false };
@@ -909,9 +915,12 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
 
     /// <param name="tolerated">The selection the branch recorded when the session was opened on another model (sdk.ts: a fallback
     /// model, or --model); it stands until a response or a model_change on the branch names the session's model.</param>
-    private static void ValidateRuntimeContext(SessionContextProjection context, AgentConfiguration configuration, SessionContextModel? tolerated = null)
+    /// <param name="toleratedThinking">The thinking level the branch records when tree navigation kept the session's own level.</param>
+    private static void ValidateRuntimeContext(SessionContextProjection context, AgentConfiguration configuration, SessionContextModel? tolerated = null,
+        string? toleratedThinking = null)
     {
-        if (context.ThinkingLevel != configuration.ThinkingLevel) throw Error(PersistentAgentSessionFailure.UnsupportedThinkingLevel);
+        if (context.ThinkingLevel != configuration.ThinkingLevel && context.ThinkingLevel != toleratedThinking)
+            throw Error(PersistentAgentSessionFailure.UnsupportedThinkingLevel);
         // Source getBranchSelection: a virtual model_change holds over the physical responses it routed.
         if (SessionBranchSelection.Select(context, configuration.Model) is { } model &&
             (model.Provider != configuration.Model.Provider || model.ModelId != configuration.Model.Id) && model != tolerated)
@@ -920,6 +929,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
 
     /// <summary>The branch selection a session opened on another model tolerates (see <see cref="ValidateRuntimeContext"/>).</summary>
     private SessionContextModel? _toleratedSelection;
+    private string? _toleratedThinking;
+    /// <summary>The thinking level a re-resolution keeps while the branch records another (see <see cref="_toleratedThinking"/>).</summary>
+    private string? KeptThinking(AgentConfiguration configuration) => _toleratedThinking is null ? null : configuration.ThinkingLevel;
     private static SessionContextModel? Divergent(SessionContextProjection context, ModelDescriptor model) =>
         SessionBranchSelection.Select(context, model) is { } recorded && (recorded.Provider != model.Provider || recorded.ModelId != model.Id) ? recorded : null;
 
@@ -1382,7 +1394,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 });
             // Reject unsupported selected influences/bounds before writing, without rewriting history.
             var nextContext = _projector.Project(log.Entries.Add(entry), entry.Id);
-            ValidateRuntimeContext(nextContext, _configuration, _toleratedSelection);
+            ValidateRuntimeContext(nextContext, _configuration, _toleratedSelection, _toleratedThinking);
             if (_registry is not null) ValidateLoadout(nextContext.LlmMessages);
             // A replacement enters the running loop (source in-place mutation), so it must be a message the loop can send.
             if (!ReferenceEquals(message, original) && role != "custom") AgentLoopRunner.ValidateRequestMessages([message]);

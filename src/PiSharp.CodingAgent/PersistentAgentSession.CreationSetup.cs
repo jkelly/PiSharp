@@ -20,7 +20,7 @@ public sealed partial class PersistentAgentSession
             var projected = _projector.Project(log.Entries, leaf, token);
             var configuration = _registry?.Resolve(WithUnrecordedLoadout(projected, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), token),
                 _configuration.Model, token).Configuration ?? _configuration;
-            ValidateRuntimeContext(projected, configuration, _toleratedSelection);
+            ValidateRuntimeContext(projected, configuration, _toleratedSelection, _toleratedThinking);
             lock (_gate)
             {
                 reservation.ValidateCatalogAuthority(this);
@@ -62,10 +62,10 @@ public sealed partial class PersistentAgentSession
             var resolved = prospective with { LlmMessages = WithUnrecordedLoadout(prospective.LlmMessages,
                 _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), token, previous.LlmMessages.Length) };
             var configuration = _registry is { } registry
-                ? (await SessionLoadoutDiagnosticBoundary.RunAsync(() => registry.Resolve(resolved, _configuration.Model, token, tolerated: _toleratedSelection),
+                ? (await SessionLoadoutDiagnosticBoundary.RunAsync(() => registry.Resolve(resolved, _configuration.Model, token, tolerated: _toleratedSelection, thinkingLevel: KeptThinking(_configuration)),
                     () => new ValueTask(reservation.DrainLoadoutDiagnosticsAsync(token))).ConfigureAwait(false)).Configuration
                 : _configuration;
-            ValidateRuntimeContext(prospective, configuration, _toleratedSelection);
+            ValidateRuntimeContext(prospective, configuration, _toleratedSelection, _toleratedThinking);
             await using (var probe = new PiSharp.Agent.Agent(configuration, _clock, new NoopSink(), _agentOptions))
                 probe.ConfigureAndReplaceMessages(configuration, SessionContextProjector.AgentMessages(prospective));
             token.ThrowIfCancellationRequested(); writing = true;
