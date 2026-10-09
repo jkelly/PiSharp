@@ -90,22 +90,49 @@ internal static class InteractiveHostServices
             ReportBug = (ui, hint) =>
             {
                 var session = startup.Host.CurrentSession ?? throw new InvalidOperationException("The session is not ready.");
-                return InteractiveBugReport.ReportBug(new BugReportSession(session, context, getState?.Invoke()), ui,
+                return InteractiveBugReport.ReportBug(new BugReportSession(session, context, getState?.Invoke(), Profile()?.SummaryGenerator), ui,
                     new BugReportEnvironment { Env = context.GetEnvironment, Cwd = () => startup.Cwd,
                         CrashLogPath = PiSharp.Cli.Diagnostics.CrashReporting.DefaultCrashLogPath() }, hint);
             }
         };
     }
 
-    /// <summary>The /bug flow's view of the session: model, metadata, entries and the transcript (serializeSessionBranch with the
-    /// pi.share trailing entry). Summaries need a summarization transport the RPC host does not expose to the terminal.</summary>
-    private sealed class BugReportSession(PiSharp.CodingAgent.PersistentAgentSession session, InteractiveModeContext context, SessionState? state) : IBugReportSession
+    /// <summary>The /bug flow's view of the session: model, metadata, entries, the transcript (serializeSessionBranch with the
+    /// pi.share trailing entry), the summary (generateBugReportSummary through the host's summarization transport) and the
+    /// bug report's custom entry.</summary>
+    private sealed class BugReportSession(PiSharp.CodingAgent.PersistentAgentSession session, InteractiveModeContext context, SessionState? state,
+        PiSharp.CodingAgent.ISessionSummaryGenerator? summaries) : IBugReportSession
     {
         public string? ModelName => SessionEntries.Str(state?.Model?["name"]);
         public string? ModelProvider => SessionEntries.Str(state?.Model?["provider"]);
         public string SessionId => session.Snapshot.Log.Header.Id;
-        public Task<string> SummarizeForBugReportAsync(string? hint, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("Bug report summaries are not available in this session host.");
+        public Task<string> SummarizeForBugReportAsync(string? hint, CancellationToken cancellationToken)
+        {
+            if (state?.Model is not JsonObject model) throw new InvalidOperationException("No model selected");
+            var generator = summaries ?? throw new InvalidOperationException("Bug report summaries are not available in this session host.");
+            static double Number(JsonNode? node) => node is JsonValue value && value.TryGetValue<double>(out var number) ? number : 0;
+            var descriptor = session.Snapshot.Agent.Model;
+            var options = new BugReportSummaryOptions(session.Snapshot.Context.Messages, Number(model["contextWindow"]), Number(model["maxTokens"]),
+                model["reasoning"] is JsonValue reasoning && reasoning.TryGetValue<bool>(out var reasons) && reasons)
+            { Hint = hint, ThinkingLevel = state.ThinkingLevel, SessionId = SessionId };
+            // completeSummarization through the host's summary transport (the session model, cacheRetention none). It runs without
+            // reasoning: the summary transport admits no thinking level.
+            return BugReport.GenerateBugReportSummaryAsync(options, async (request, token) =>
+            {
+                var maximum = double.IsFinite(request.MaxTokens) ? Math.Floor(request.MaxTokens) : 4096;
+                try
+                {
+                    var summary = await generator.GenerateAsync(new(PiSharp.Sessions.Compaction.SessionSummaryKind.History, descriptor,
+                        request.SystemPrompt, request.Prompt, maximum, null, request.SessionId), token).ConfigureAwait(false);
+                    return new PiSharp.Contracts.AssistantMessage(descriptor.Api, descriptor.Provider, descriptor.Id, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        [new PiSharp.Contracts.TextContent(summary.Text)], summary.Usage ?? PiSharp.Contracts.TokenUsage.Zero, PiSharp.Contracts.StopReason.Stop);
+                }
+                catch (PiSharp.Sessions.Compaction.SessionCompactionException error) when (error.ProviderAborted || token.IsCancellationRequested)
+                { throw new InvalidOperationException("Bug report summary was cancelled", error); }
+                catch (PiSharp.Sessions.Compaction.SessionCompactionException error) when (error.ProviderErrorMessage is not null)
+                { throw new InvalidOperationException("Bug report summary failed: " + (error.ProviderErrorMessage.Length == 0 ? "Unknown error" : error.ProviderErrorMessage), error); }
+            }, cancellationToken);
+        }
         public BugReportMetadataOptions GetMetadataOptions()
         {
             static PiSharp.Contracts.JsonData Read(string path)
@@ -125,7 +152,8 @@ internal static class InteractiveHostServices
             (parentId, timestamp) => new PiSharp.CodingAgent.Export.SessionShare().CreateShareTrailingEntries(
                 PiSharp.CodingAgent.Export.AgentSessionExport.State(session), parentId, timestamp));
         public Task<string?> GetRadiusTokenAsync(CancellationToken cancellationToken) => Task.FromResult<string?>(null);
-        public void AppendCustomEntry(string customType, PiSharp.Contracts.JsonData data) { }
+        public void AppendCustomEntry(string customType, PiSharp.Contracts.JsonData data) =>
+            session.AppendCustomEntryAsync(customType, data).GetAwaiter().GetResult();
     }
 
     private static string KeyOf(SessionEntry entry)

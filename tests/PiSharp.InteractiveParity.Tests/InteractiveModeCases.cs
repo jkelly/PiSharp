@@ -372,6 +372,38 @@ internal static class InteractiveModeCases
             pi.Type("\u001b");
             await pi.WaitFor("Bug report cancelled");
         }));
+        // /bug without the transcript: the session model writes the summary (generateBugReportSummary), the zip carries it as
+        // summary.md and the session records the report (appendCustomEntry).
+        yield return ("e2e.slash.bug-summary-zip", Case("bug-summary", async pi =>
+        {
+            await pi.Submit("first message");
+            await pi.WaitFor("Hello from the fake model.");
+            pi.Respond = (_, _) => InteractiveHarness.AnthropicText("Summary: the agent misbehaved.");
+            await pi.Submit("/bug");
+            await pi.WaitFor("What went wrong?");
+            pi.Type("tool output vanished");
+            pi.Type("\r");
+            await pi.WaitFor("Include the session transcript?");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("Attach a summary written by");
+            pi.Type("\r");
+            await pi.WaitFor("Upload sends the report");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("Bug report exported to:");
+            Contains(pi.Requests[^1], "<user-report>\\ntool output vanished\\n</user-report>", "summary request carries the hint");
+            var zip = Directory.GetFiles(pi.Cwd, "pi-bug-report-*.zip").Single();
+            using (var archive = System.IO.Compression.ZipFile.OpenRead(zip))
+            {
+                using var reader = new StreamReader(archive.GetEntry("summary.md")!.Open());
+                Contains(reader.ReadToEnd(), "Summary: the agent misbehaved.", "summary.md");
+            }
+            var file = pi.SessionFiles().Single();
+            await pi.WaitUntil(_ => InteractiveHarness.ReadShared(file).Contains("\"type\":\"custom\"", StringComparison.Ordinal), "bug report custom entry");
+        }));
         yield return ("e2e.autocomplete.slash-commands", Case("autocomplete", async pi =>
         {
             pi.Type("/hot");
