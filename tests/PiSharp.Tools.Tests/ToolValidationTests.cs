@@ -19,6 +19,7 @@ internal static class ToolValidationTests
         ("validation invoker failure is the upstream error result without running the tool", InvokerFailure),
         ("validation edit prepareArguments runs before the schema check", EditPrepareArguments),
         ("validation thrown prepareArguments error is the error result text", PreparationError),
+        ("validation non-object final arguments get the upstream root error", NonObjectArguments),
     ];
 
     private static JsonElement Goldens()
@@ -172,6 +173,25 @@ internal static class ToolValidationTests
         public ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token) => throw new InvalidOperationException("The tool ran.");
         public ValueTask<bool> ValidateAsync(PreparedToolAction action, CancellationToken token) => throw new InvalidOperationException("The tool ran.");
         public ValueTask<ToolResult> ExecuteAsync(PreparedToolAction action, CancellationToken token) => throw new InvalidOperationException("The tool ran.");
+    }
+
+    // parseStreamingJson can finalize any JSON value; agent-loop prepareToolCall runs prepareArguments and validateToolArguments on it.
+    // Captured from pi-ai 1.1.0 validateToolArguments with the pi-coding-agent read, edit and bash tools.
+    private static async Task NonObjectArguments()
+    {
+        using var temp = new Temp();
+        var policy = new Recording();
+        var read = new ReadWriteTools(temp.Root, temp.Root).CreateInvoker(policy);
+        var edit = new BuiltinTools(temp.Root).Edit.CreateInvoker(policy);
+        var bash = new ToolInvoker([new BashTool(new NoRunner(), new BashToolOptions(Environment.ProcessPath!, temp.Root, ImmutableDictionary<string, string>.Empty, temp.Root))], policy);
+        foreach (var (name, invoker) in new[] { ("read", read), ("edit", edit), ("bash", bash) })
+            foreach (var (arguments, received) in new[] { ("[1,2]", "[\n  1,\n  2\n]"), ("\"s\"", "\"s\""), ("5", "5"), ("null", "null"), ("true", "true"), ("[]", "[]") })
+            {
+                var result = await invoker.ExecuteAsync(Invocation(name, arguments), default);
+                Check(result.IsError && result.Failure?.Kind == ToolFailureKind.InvalidArguments, name + " " + arguments + " was not a validation error.");
+                Equal("Validation failed for tool \"" + name + "\":\n  - root: must be object\n\nReceived arguments:\n" + received, Text(result));
+            }
+        Equal(0, policy.Actions.Count);
     }
 
     private sealed class BuiltinTools(string root)

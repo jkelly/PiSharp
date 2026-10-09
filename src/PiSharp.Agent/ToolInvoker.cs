@@ -310,7 +310,11 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
             var reachable = invocation.Context?.CallDepth is > 0 ? _options.AllowedNestedTools : _options.AllowedRootTools;
             if (reachable is not null && !reachable.Contains(invocation.Call.Name))
                 return CompleteResult(Error(ToolFailureKind.UnknownTool));
-            if (!ValidArguments(invocation.Call.Arguments, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+            // parseStreamingJson may finalize an array, string, number, boolean or null: source prepareToolCall still runs the tool's
+            // prepareArguments and validateToolArguments on it, whose error result ("root: must be object") the model receives.
+            var schemaAdapter = tool as IToolArgumentSchemaAdapter;
+            if (!ValidArguments(invocation.Call.Arguments, cancellationToken, anyKind: schemaAdapter?.ArgumentSchema is not null))
+                return CompleteResult(Error(ToolFailureKind.InvalidArguments));
             cancellationToken.ThrowIfCancellationRequested();
             var initialView = invocation;
             if (tool is IInitialToolArgumentPreparationAdapter initial)
@@ -320,7 +324,7 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                 catch (ToolArgumentPreparationException error) when (!cancellationToken.IsCancellationRequested)
                 { return CompleteResult(ToolResult.Error(ToolFailureKind.InvalidArguments, error.Message)); }
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!ValidArguments(arguments, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+                if (!ValidArguments(arguments, cancellationToken, anyKind: schemaAdapter?.ArgumentSchema is not null)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
                 if (!ReferenceEquals(arguments, invocation.Call.Arguments))
                 {
                     var call = invocation.Call with { Arguments = arguments };
@@ -329,7 +333,7 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
             }
             // Source prepareToolCall: validateToolArguments(tool, preparedToolCall). The committed assistant message and the
             // tool execution events keep the model's arguments; only preparation and execution see the coerced ones.
-            if (tool is IToolArgumentSchemaAdapter { ArgumentSchema: { } schema })
+            if (schemaAdapter is { ArgumentSchema: { } schema })
             {
                 var validated = ToolArgumentValidation.ValidateJson(invocation.Call.Name, schema.Parameters.ToString(),
                     initialView.Call.Arguments.ToString(), schema.Origin);
@@ -465,8 +469,8 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
         return result.ToImmutable();
     }
 
-    private bool ValidArguments(JsonData? arguments, CancellationToken token) =>
-        arguments is not null && arguments.Value.ValueKind == JsonValueKind.Object &&
+    private bool ValidArguments(JsonData? arguments, CancellationToken token, bool anyKind = false) =>
+        arguments is not null && (anyKind || arguments.Value.ValueKind == JsonValueKind.Object) &&
         arguments.ToString().Length <= _options.MaximumArgumentCharacters && ValidJson(arguments.Value, 0, token, allowNulData: true);
 
     private bool ValidAction(PreparedToolAction? action, string name, CancellationToken token)

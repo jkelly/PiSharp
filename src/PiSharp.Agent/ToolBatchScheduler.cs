@@ -325,15 +325,14 @@ public sealed class ToolBatchScheduler
         catch (ChannelClosedException) { /* The consumer fault path owns cancellation and joins this execution. */ }
     }
 
-    // This is the sole preflight path for both execution modes. Only complete JSON objects are admitted.
+    // This is the sole preflight path for both execution modes. Arguments of any JSON kind reach the executor, whose
+    // validateToolArguments gives upstream's result for a non-object.
     private async ValueTask<Preparation> PrepareAsync(ToolInvocation invocation, CancellationToken cancellationToken)
     {
         if (invocation.AssistantMessage.StopReason == StopReason.Length)
             return Immediate(ToolFailureKind.Truncated, "Tool call came from an output-length-truncated assistant message.");
         if (!tools.TryGetValue(invocation.Call.Name, out var tool))
             return Immediate(ToolFailureKind.UnknownTool, $"Tool {invocation.Call.Name} not found");
-        if (invocation.Call.Arguments.Value.ValueKind != JsonValueKind.Object)
-            return Immediate(ToolFailureKind.InvalidArguments, "Final tool arguments must be a JSON object.");
         if (cancellationToken.IsCancellationRequested) return Immediate(ToolFailureKind.Canceled, "Operation aborted");
         try
         {
