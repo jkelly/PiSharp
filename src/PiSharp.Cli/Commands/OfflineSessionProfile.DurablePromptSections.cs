@@ -34,9 +34,12 @@ internal sealed partial class OfflineSessionProfile
     /// extension tool that replaces a built-in name replaces its entries. Read at every prompt start, so tools registered later count.</summary>
     private OriginalSystemPromptSnapshot WithExtensionToolPrompts(OriginalSystemPromptSnapshot snapshot, AgentSessionAttachment? attached)
     {
-        var registry = attached?.Session.CaptureToolCatalogRegistry() ?? _startupRegistry;
+        if (_extension is null) return snapshot;
+        SessionRuntimeRegistry? registry;
+        try { registry = attached?.Session.CaptureToolCatalogRegistry() ?? _startupRegistry; }
+        catch (Exception error) when (error is InvalidOperationException or ObjectDisposedException) { registry = _startupRegistry; }
         if (registry is null) return snapshot;
-        var pi = (_extension?.Pi ?? (attached is null ? null : CaptureRuntimeView(attached).Extension?.Pi))?.Extensions
+        var pi = _extension?.Pi?.Extensions
             .SelectMany(extension => (extension.Descriptor["tools"] as System.Text.Json.Nodes.JsonArray ?? []).OfType<System.Text.Json.Nodes.JsonObject>())
             .Select(tool => tool["name"]!.GetValue<string>()).ToHashSet(StringComparer.Ordinal) ?? [];
         return WithExtensionToolPrompts(snapshot, registry.RegisteredTools, pi);

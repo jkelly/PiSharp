@@ -90,7 +90,7 @@ internal sealed partial class OfflineSessionProfile
         {
             input = PromptInputValue.Own(input);
             token.ThrowIfCancellationRequested();
-            if (profile.CaptureRuntimeView().Extension?.Pi is { } pi) await pi.WaitForRegistrationsAsync(token).ConfigureAwait(false);
+            if (profile._extension?.Pi is { } pi) await pi.WaitForRegistrationsAsync(token).ConfigureAwait(false);
             var text = input.Text;
             var command = IsReloadCommand(text);
             if (!command)
