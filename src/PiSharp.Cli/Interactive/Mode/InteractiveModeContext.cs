@@ -98,6 +98,8 @@ internal sealed record InteractiveModeContext
     public Func<string, string> ImportSessionFile { get; init; } = path => path;
     public Func<PiSharp.CodingAgent.Export.SessionShareUi, string?, CancellationToken, Task> ShareSession { get; init; } =
         (_, _, _) => throw new InvalidOperationException("Sharing is unavailable in this host.");
+    /// <summary>Source sessionManager.appendLabelChange (the /tree label editor): a <c>label</c> entry for an entry; null clears it.</summary>
+    public Func<string, string?, Task> AppendLabelChange { get; init; } = (_, _) => throw new InvalidOperationException("Tree labels are not supported by this session host.");
     public Func<IBugReportUi, string?, Task> ReportBug { get; init; } = (_, _) => throw new InvalidOperationException("Bug reports are unavailable in this host.");
     public Func<string, string, RpcSessionClient?, Task> RenameSessionFile { get; init; } = (_, _, _) => Task.CompletedTask;
 

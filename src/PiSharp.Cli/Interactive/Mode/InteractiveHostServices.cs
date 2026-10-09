@@ -85,6 +85,8 @@ internal static class InteractiveHostServices
                     status.Decision?.MissCost ?? 0, status.Decision?.WarmCost ?? 0)
                 : null,
             SetCacheWarmingMode = _ => Profile()?.CurrentCacheWarmer?.OnModeChanged(),
+            AppendLabelChange = (entryId, label) => (startup.Host.CurrentSession ?? throw new InvalidOperationException("The session is not ready."))
+                .AppendLabelChangeAsync(entryId, label),
             ReportBug = (ui, hint) =>
             {
                 var session = startup.Host.CurrentSession ?? throw new InvalidOperationException("The session is not ready.");

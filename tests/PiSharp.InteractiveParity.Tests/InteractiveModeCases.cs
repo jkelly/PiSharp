@@ -170,6 +170,24 @@ internal static class InteractiveModeCases
             await pi.WaitUntil(text => !text.Contains("Auto-compact", StringComparison.Ordinal), "settings closed");
         }));
 
+        // interactive-mode.ts showTreeSelector: the label editor (shift+l) appends a label entry through sessionManager.appendLabelChange.
+        yield return ("e2e.selector.tree-label", Case("tree-label", async pi =>
+        {
+            await pi.Submit("label me");
+            await pi.WaitFor("Hello from the fake model.");
+            await pi.Submit("/tree");
+            await pi.WaitFor("Session Tree");
+            pi.Type("L");
+            await Task.Delay(300);
+            pi.Type("checkpoint-one");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("checkpoint-one");
+            Check(!pi.Terminal.Text.Contains("not supported", StringComparison.Ordinal), "no unsupported error");
+            var file = pi.SessionFiles().Single();
+            await pi.WaitUntil(_ => InteractiveHarness.ReadShared(file).Contains("\"label\":\"checkpoint-one\"", StringComparison.Ordinal), "label entry written");
+            pi.Type("\u001b");
+        }));
         yield return ("e2e.selector.tree-and-fork", Case("tree", async pi =>
         {
             await pi.Submit("tree message");

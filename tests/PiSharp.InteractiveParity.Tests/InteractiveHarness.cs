@@ -133,6 +133,14 @@ internal sealed class InteractiveHarness : IAsyncDisposable
         return await run;
     }
 
+    /// <summary>Reads a file the session writer holds open.</summary>
+    public static string ReadShared(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
     public string[] SessionFiles() => Directory.Exists(Path.Combine(AgentDir, "sessions"))
         ? Directory.GetFiles(Path.Combine(AgentDir, "sessions"), "*.jsonl", SearchOption.AllDirectories) : [];
 
