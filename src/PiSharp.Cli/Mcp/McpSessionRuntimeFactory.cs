@@ -137,8 +137,8 @@ public sealed class McpSessionRuntimeFactory
                 {
                     activation.BindOwner(owner, attachment);
                     admission.BindProfileView?.Invoke(owner, attachment);
-                    // extensions/mcp/index.ts waitForDirectServers and the tool_call waits (scriptNeedsServer, tool_search). PiSharp
-                    // publishes a server's tools between runs, so the waits happen before a prompt is admitted.
+                    // extensions/mcp/index.ts before_agent_start waitForDirectServers. The tool_call waits (scriptNeedsServer, tool_search,
+                    // resource tools) run inside those tools' calls.
                     if (connections is not null)
                         attachment.Session.BeforeInputAdmission = token => connections.BeforeInputAsync(attachment.Session, token);
                     // The manager and the resource tools bind before any server can connect.

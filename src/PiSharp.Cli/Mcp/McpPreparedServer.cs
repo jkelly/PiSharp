@@ -264,8 +264,8 @@ public sealed class McpPreparedServer : IAsyncDisposable
                             (expected, cancellation) => Prepare(expected, attachment.Session.GetActiveTools(), cancellation), token).ConfigureAwait(false);
                         break;
                     }
-                    // A run (or another catalog change) can start between the idle wait and the publication; nothing was
-                    // committed, so the catalog is published at the next idle boundary instead, as the original applies it.
+                    // A run (or another catalog change) can start between the idle wait and the publication; nothing was committed,
+                    // so the publication is tried again (during that run, or at the next idle boundary).
                     catch (InvalidOperationException) when (attempt < 64 && !token.IsCancellationRequested &&
                         !attachment.LifetimeToken.IsCancellationRequested && ReferenceEquals(owner.Current, attachment)) { }
                 }
