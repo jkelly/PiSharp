@@ -216,6 +216,17 @@ internal static class Themes
         }
     }
 
+    /// <summary>setRegisteredThemes from theme files (name, path); files that fail to load are skipped (the resource loader reports them).</summary>
+    public static void SetRegisteredThemes(IEnumerable<(string Name, string Path)> themes)
+    {
+        var loaded = new List<Theme>();
+        foreach (var (_, path) in themes)
+        {
+            try { loaded.Add(LoadThemeFromPath(path)); } catch { }
+        }
+        SetRegisteredThemes(loaded);
+    }
+
     public static void SetRegisteredThemes(IEnumerable<PiTheme> themes) => SetRegisteredThemes(themes.Select(theme => Theme.FromPiTheme(theme, Mode)));
 
     public static IReadOnlyList<string> GetAvailableThemes() => GetAvailableThemesWithPaths().Select(info => info.Name).ToList();
@@ -413,7 +424,7 @@ internal static class Themes
     /// <summary>Test hook: reset module state.</summary>
     internal static void ResetForTests()
     {
-        StopThemeWatcher(); current = null; currentThemeName = null; onThemeChange = null;
+        StopThemeWatcher(); current = null; currentThemeName = null; onThemeChange = null; AgentDirectory = null;
         lock (Gate) RegisteredThemes.Clear();
         TerminalColorsReport = new(null, null, null); TerminalColorsPending = false; TerminalColorScheme = null;
     }
