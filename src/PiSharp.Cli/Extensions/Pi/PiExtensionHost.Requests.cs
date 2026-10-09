@@ -438,6 +438,10 @@ internal sealed partial class PiExtensionHost
         var args = p.TryGetProperty("args", out var a) && a.ValueKind == JsonValueKind.Array ? a : default;
         string? Text(int index) => args.ValueKind == JsonValueKind.Array && args.GetArrayLength() > index && args[index].ValueKind == JsonValueKind.String ? args[index].GetString() : null;
         if (op == "setStatus") _statuses[Text(0) ?? ""] = Text(1);
+        // Interactive-only UI (setFooter, setHeader, setWorkingMessage/Visible/Indicator, setHiddenThinkingLabel, setEditorComponent,
+        // addAutocompleteProvider, onTerminalInput, setToolsExpanded, component widgets): the interactive mode (IMPL-I) subscribes here;
+        // component ids render through RenderComponentAsync.
+        if (op is not null) InteractiveUi?.Invoke(op, args.ValueKind == JsonValueKind.Array ? args.Clone() : default);
         var ui = UiOf(p);
         if (ui is null) return;
         ExtensionUiNotification? notification = op switch
@@ -593,6 +597,22 @@ internal sealed partial class PiExtensionHost
     }
 
     // ----------------------------------------------------------------------------------------------------------------- UI seams (IMPL-I)
+
+    /// <summary>Every <c>ctx.ui</c> publication (operation name and its JSON arguments) for the interactive mode's own widgets.</summary>
+    internal Action<string, JsonElement>? InteractiveUi { get; set; }
+
+    /// <summary>Renders a Node-side component (a widget, footer, header or editor factory's component) at a width.</summary>
+    internal async Task<ImmutableArray<string>> RenderComponentAsync(string componentId, int width, CancellationToken token) =>
+        PiNodeOwner.Rows(await Node.RequestAsync("component.render", new JsonObject { ["id"] = componentId, ["width"] = width }, token).ConfigureAwait(false)).Rows;
+
+    /// <summary>Feeds terminal input to a Node-side component (handleInput).</summary>
+    internal Task InputComponentAsync(string componentId, string data, CancellationToken token) =>
+        Node.RequestAsync("component.input", new JsonObject { ["id"] = componentId, ["data"] = data }, token);
+
+    /// <summary>ctx.ui.onTerminalInput handlers (published as <c>onTerminalInput</c> with a callback id): the handler's
+    /// <c>{ consume?, data? }</c> result for one input chunk, or null.</summary>
+    internal async Task<JsonElement?> InvokeTerminalInputAsync(string callbackId, string data, CancellationToken token) =>
+        await Node.RequestAsync("callback.invoke", new JsonObject { ["id"] = callbackId, ["args"] = data }, token).ConfigureAwait(false);
 
     /// <summary>Source registerShortcut: the extensions' shortcuts (key id, description, extension path), in load order. The
     /// interactive mode resolves conflicts with its keybindings (runner.ts getShortcuts) and calls <see cref="RunShortcutAsync"/>.</summary>

@@ -8,7 +8,31 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> ProviderCases() =>
     [
         ("provider.classifier-and-image-providers-registered-by-an-extension", ClassifierAndImageProviders),
+        ("provider.pi-ai-complete-from-extension-code", CompleteFromExtension),
     ];
+
+    // summarize.ts/qna.ts style: an extension calls pi-ai complete() with ctx.model; the request streams through PiSharp's live route.
+    private static async Task CompleteFromExtension()
+    {
+        using var sandbox = NodeSandbox("complete");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "summarize.ts"), """
+            import { complete } from "@earendil-works/pi-ai";
+            import { appendFileSync } from "node:fs";
+            export default function (pi: any) {
+              pi.registerCommand("summarize", { description: "Summarize", handler: async (args: string, ctx: any) => {
+                const reply = await complete(ctx.model, { systemPrompt: "You summarize.", messages: [{ role: "user", content: [{ type: "text", text: "Summarize: " + args }], timestamp: Date.now() }] });
+                appendFileSync(process.cwd() + "/probe.log", JSON.stringify(["reply", reply.stopReason, reply.content.map((c: any) => c.text ?? "").join(""), reply.errorMessage ?? null]) + "\n");
+              } });
+            }
+            """);
+        sandbox.Respond = (_, _) => AnthropicText("short summary");
+        var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "/summarize the plan"]);
+        Equal(0, code, "exit; " + stderr);
+        Equal("""["reply","stop","short summary",null]""", LogLines(sandbox).Single(), "complete() result");
+        var request = sandbox.Requests.Single().Json;
+        Check(request.GetProperty("system").ToString().Contains("You summarize.", StringComparison.Ordinal), "system prompt sent");
+        Check(request.GetProperty("messages")[0].ToString().Contains("Summarize: the plan", StringComparison.Ordinal), "user message sent");
+    }
 
     private const string ProviderExtension = """
         import { appendFileSync } from "node:fs";
