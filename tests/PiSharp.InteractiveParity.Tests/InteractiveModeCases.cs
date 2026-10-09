@@ -220,8 +220,13 @@ internal static class InteractiveModeCases
 
         yield return ("e2e.slash.reload", Case("reload", async pi =>
         {
+            // agent-session.ts reload re-reads the settings and syncs the queue modes from them.
+            File.WriteAllText(Path.Combine(pi.AgentDir, "settings.json"), """{"steeringMode":"all","followUpMode":"all"}""");
             await pi.Submit("/reload");
-            await pi.WaitUntil(text => text.Contains("Reloaded keybindings", StringComparison.Ordinal) || text.Contains("Reload failed", StringComparison.Ordinal), "reload finished");
+            await pi.WaitFor("Reloaded keybindings, extensions, skills, prompts, themes, and context files");
+            var state = await pi.Mode!.Rpc.RequestAsync(new System.Text.Json.Nodes.JsonObject { ["type"] = "get_state" });
+            Equal("all", state?["steeringMode"]?.GetValue<string>(), "steering mode from the reloaded settings");
+            Equal("all", state?["followUpMode"]?.GetValue<string>(), "follow-up mode from the reloaded settings");
         }));
 
         yield return ("e2e.slash.debug-log", Case("debug", async pi =>

@@ -68,6 +68,8 @@ internal sealed partial class InteractiveMode
     private readonly InteractiveModeOptions options;
     private readonly InteractiveModeContext context;
     private readonly RpcSessionClient rpc;
+    /// <summary>The in-process RPC client (tests read the host state through it).</summary>
+    internal RpcSessionClient Rpc => rpc;
     private readonly InteractiveSettings settings;
     private TuiBase renderer;
     private readonly TuiReference ui;

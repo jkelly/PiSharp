@@ -458,6 +458,9 @@ internal sealed partial class InteractiveMode
         {
             await context.ReloadSession(rpc);
             await settings.ReloadAsync();
+            // agent-session.ts reload: settingsManager.reload() then syncQueueModesFromSettings().
+            await rpc.RequestAsync(new JsonObject { ["type"] = "set_steering_mode", ["mode"] = settings.SteeringMode });
+            await rpc.RequestAsync(new JsonObject { ["type"] = "set_follow_up_mode", ["mode"] = settings.FollowUpMode });
             hideThinkingBlock = settings.HideThinkingBlock;
             outputPad = settings.OutputPad;
             await RefreshSessionAsync();
