@@ -1,0 +1,111 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/agent/src/agent-loop.ts (prepareToolCall) and
+// packages/ai/src/utils/validation.ts (validateToolArguments) through the Pi entry: the tool runs with the coerced arguments, a
+// failure is the error result whose text is the validation message, and the session keeps the model's arguments.
+using System.Text.Json;
+using PiSharp.Cli.Mcp;
+using PiSharp.Cli.Pi;
+using PiSharp.Contracts;
+using PiSharp.Extensions.Mcp.Runtime;
+
+internal static partial class Program
+{
+    /// <summary>A fake MCP server with one tool whose plain JSON schema requires an integer; tools/call echoes its arguments.</summary>
+    private sealed class EchoMcpChannel : IMcpAdmittedRequestChannel
+    {
+        public List<string> Calls { get; } = [];
+        public ValueTask StartAsync(CancellationToken token) => ValueTask.CompletedTask;
+        public ValueTask ConfigureRootsAsync(JsonData roots, CancellationToken token) => ValueTask.CompletedTask;
+        public ValueTask NotifyAsync(string method, JsonData? parameters, CancellationToken token) => ValueTask.CompletedTask;
+        public ValueTask<JsonData> RequestAsync(string method, JsonData? parameters, McpRequestOptions options, CancellationToken token)
+        {
+            if (method == "initialize")
+                return ValueTask.FromResult(JsonData.Parse("{\"protocolVersion\":\"2025-11-25\",\"serverInfo\":{\"name\":\"fixture\",\"version\":\"1\"},\"capabilities\":{\"tools\":{}}}"));
+            if (method == "tools/list")
+                return ValueTask.FromResult(JsonData.Parse("""
+                    {"tools":[{"name":"count","description":"Counts.","inputSchema":{"type":"object","properties":{"n":{"type":"integer"},"flag":{"type":"boolean"}},"required":["n"]}}]}
+                    """));
+            if (method == "tools/call")
+            {
+                var arguments = parameters!.Value.GetProperty("arguments").GetRawText();
+                lock (Calls) Calls.Add(arguments);
+                return ValueTask.FromResult(JsonData.Parse(JsonSerializer.Serialize(new { content = new[] { new { type = "text", text = "got " + arguments } } })));
+            }
+            return ValueTask.FromException<JsonData>(new IOException("Unexpected MCP request " + method));
+        }
+        public Task CloseAsync() => Task.CompletedTask;
+    }
+
+    /// <summary>The tool_result block the model received in <paramref name="request"/>'s last message: its text and is_error.</summary>
+    private static (string Text, bool IsError) ToolResultBlock(Seen request)
+    {
+        var messages = request.Json.GetProperty("messages");
+        var block = messages[messages.GetArrayLength() - 1].GetProperty("content").EnumerateArray().First(item => item.GetProperty("type").GetString() == "tool_result");
+        var content = block.GetProperty("content");
+        var text = content.ValueKind == JsonValueKind.String ? content.GetString()!
+            : string.Concat(content.EnumerateArray().Where(item => item.GetProperty("type").GetString() == "text").Select(item => item.GetProperty("text").GetString()));
+        return (text, block.TryGetProperty("is_error", out var error) && error.GetBoolean());
+    }
+
+    private static IEnumerable<(string, Func<Task>)> ValidationCases() =>
+    [
+        ("validation.read-runs-with-coerced-arguments-and-the-session-keeps-the-model-arguments", async () =>
+        {
+            using var sandbox = new Sandbox("validation-coerce");
+            var file = sandbox.Write(Path.Combine(sandbox.Cwd, "lines.txt"), "one\ntwo\nthree\nfour");
+            sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("read", new { path = file, offset = "2", limit = "2" }) : AnthropicText("done");
+            var (code, stdout, stderr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "read it");
+            Equal(0, code, "exit; " + stderr);
+            Equal("done\n", stdout, "answer");
+            var (text, isError) = ToolResultBlock(sandbox.Requests[1]);
+            Equal(false, isError, "coerced read is not an error: " + text);
+            Equal("two\nthree\n\n[1 more lines in file. Use offset=4 to continue.]", text, "read received offset 2 and limit 2 as numbers");
+            // The persisted assistant message (and the request replaying it) keeps the model's string arguments.
+            var replayed = sandbox.Requests[1].Json.GetProperty("messages").EnumerateArray().SelectMany(message => message.GetProperty("content").ValueKind == JsonValueKind.Array
+                ? message.GetProperty("content").EnumerateArray() : []).First(block => block.GetProperty("type").GetString() == "tool_use");
+            Equal("\"2\"", replayed.GetProperty("input").GetProperty("limit").GetRawText(), "replayed tool_use input");
+            var session = File.ReadAllLines(sandbox.SessionFiles().Single()).Select(line => JsonDocument.Parse(line).RootElement)
+                .Where(entry => entry.GetProperty("type").GetString() == "message" && entry.GetProperty("message").GetProperty("role").GetString() == "assistant")
+                .SelectMany(entry => entry.GetProperty("message").GetProperty("content").EnumerateArray())
+                .First(block => block.GetProperty("type").GetString() == "toolCall");
+            Equal("\"2\"", session.GetProperty("arguments").GetProperty("offset").GetRawText(), "persisted toolCall arguments");
+        }),
+        ("validation.read-without-path-returns-the-upstream-validation-error-result", async () =>
+        {
+            using var sandbox = new Sandbox("validation-missing");
+            sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("read", new { limit = "ten" }) : AnthropicText("done");
+            var (code, _, stderr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "read it");
+            Equal(0, code, "exit; " + stderr);
+            var (text, isError) = ToolResultBlock(sandbox.Requests[1]);
+            Equal(true, isError, "validation failure is an error result");
+            Equal("Validation failed for tool \"read\":\n  - path: must have required properties path\n  - limit: must be number\n\nReceived arguments:\n{\n  \"limit\": \"ten\"\n}",
+                text, "upstream validation message");
+        }),
+        ("validation.mcp-tool-plain-json-schema-coerces-and-rejects-before-calling-the-server", async () =>
+        {
+            using var sandbox = new Sandbox("validation-mcp");
+            sandbox.Write(Path.Combine(sandbox.Cwd, ".pi", "mcp.json"), """{"mcpServers":{"proj":{"command":"proj-server","exposure":"direct"}}}""");
+            var channel = new EchoMcpChannel();
+            sandbox.Respond = (_, index) => index switch
+            {
+                0 => AnthropicToolCall("mcp__proj__count", new { n = "5", flag = "true", extra = (string?)null }, "toolu_c1"),
+                1 => AnthropicToolCall("mcp__proj__count", new { n = "five" }, "toolu_c2"),
+                _ => AnthropicText("done")
+            };
+            using var stdout = new StringWriter(); using var stderr = new StringWriter();
+            var host = sandbox.Host(stdout, stderr, null) with
+            {
+                CreateMcpHost = agentDir => new McpSessionHost(agentDir, sandbox.Home, () => [])
+                { CreateChannel = entry => (actual, token) => ValueTask.FromResult<IMcpAdmittedRequestChannel>(channel) }
+            };
+            var code = await PiCommand.RunAsync(["-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "count"], host, CancellationToken.None);
+            Equal(0, code, "exit; " + stderr);
+            // coerceWithJsonSchema: "5" -> 5 and "true" -> true; the unknown null property is kept (no Value.Convert for plain schemas).
+            Equal("{\"n\":5,\"flag\":true,\"extra\":null}", channel.Calls.Single(), "the server received the coerced arguments");
+            var (text, isError) = ToolResultBlock(sandbox.Requests[1]);
+            Equal(false, isError, "coerced call succeeded: " + text);
+            (text, isError) = ToolResultBlock(sandbox.Requests[2]);
+            Equal(true, isError, "invalid MCP arguments are an error result");
+            Equal("Validation failed for tool \"mcp__proj__count\":\n  - n: must be integer\n\nReceived arguments:\n{\n  \"n\": \"five\"\n}", text, "upstream validation message");
+        }),
+    ];
+}

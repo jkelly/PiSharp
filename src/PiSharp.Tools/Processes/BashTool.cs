@@ -9,7 +9,7 @@ using PiSharp.Contracts;
 namespace PiSharp.Tools.Processes;
 
 /// <summary>Explicit Bash argv adapter. Hosts execute it through the mandatory final-action ToolInvoker policy.</summary>
-public sealed class BashTool : IPreparedToolAdapter
+public sealed class BashTool : IToolArgumentSchemaAdapter
 {
     private readonly IProcessRunner _runner;
     private readonly BashToolOptions _options;
@@ -17,6 +17,8 @@ public sealed class BashTool : IPreparedToolAdapter
     public string Name => "bash";
     /// <summary>Source createShellToolDefinition for bash: description, TypeBox parameters and constrainedSampling.</summary>
     public JsonData Declaration { get; } = SourceDeclaration;
+    /// <summary>Source bashSchema (TypeBox), checked by validateToolArguments before the tool runs.</summary>
+    public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(Declaration, ToolSchemaOrigin.TypeBox);
     public static JsonData SourceDeclaration { get; } = JsonData.Parse("""
         {"name":"bash","description":"Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"timeout":{"type":"number","description":"Timeout in seconds (optional, no default timeout)"}},"required":["command"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}
         """);
@@ -180,8 +182,9 @@ public sealed class BashTool : IPreparedToolAdapter
         if (value.ValueKind != JsonValueKind.Object) throw Invalid();
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in value.EnumerateObject())
-            if (!names.Add(property.Name) || property.Name is not ("command" or "timeout") &&
-                !(normalized && property.Name is "outputPath" or "standardInput")) throw Invalid();
+            // Source bashSchema admits additional properties; execute reads only command and timeout.
+            if (!names.Add(property.Name) || normalized && property.Name is not ("command" or "timeout" or "outputPath" or "standardInput"))
+                throw Invalid();
         if (!value.TryGetProperty("command", out var command) || command.ValueKind != JsonValueKind.String) throw Invalid();
         var text = command.GetString()!;
         if (!Text(text) || text.Length > _options.MaximumCommandCharacters) throw Invalid();

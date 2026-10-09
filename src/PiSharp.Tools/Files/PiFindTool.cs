@@ -9,13 +9,15 @@ namespace PiSharp.Tools.Files;
 
 /// <summary>The find tool of the <c>pi</c> tool policy (owner decision 0004), as find.ts: fd over any path, its results relativized to
 /// the search path. The explicit policy keeps <see cref="FindTool"/>.</summary>
-public sealed class PiFindTool : IPreparedToolAdapter
+public sealed class PiFindTool : IToolArgumentSchemaAdapter
 {
     private const double DefaultLimit = 1000;
     private readonly PathResolver _paths;
     private readonly Func<CancellationToken, ValueTask<string?>> _fd;
     private readonly IReadOnlyDictionary<string, string>? _environment;
     public string Name => "find";
+    /// <summary>Source TypeBox parameters, checked by validateToolArguments before the tool runs.</summary>
+    public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(Declaration, ToolSchemaOrigin.TypeBox);
     public JsonData Declaration { get; } = JsonData.Parse("""{"name":"find","description":"Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).","parameters":{"type":"object","properties":{"pattern":{"type":"string","description":"Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'"},"path":{"type":"string","description":"Directory to search in (default: current directory)"},"limit":{"type":"number","description":"Maximum number of results (default: 1000)"}},"required":["pattern"]}}""");
 
     /// <param name="fd">ensureTool("fd"): the fd executable, or null when it is not available and could not be downloaded.</param>

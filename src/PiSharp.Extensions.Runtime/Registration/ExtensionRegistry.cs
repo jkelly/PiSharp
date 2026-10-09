@@ -113,7 +113,8 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             descriptor.PromptGuidelines.Any(guideline => !RegistrationPolicy.Description(guideline, options)) ||
             descriptor.Renderers is { } renderers && (renderers.RenderShell is { } shell && !Enum.IsDefined(shell) ||
                 renderers.RenderCall?.GetInvocationList().Length > 1 || renderers.RenderResult?.GetInvocationList().Length > 1) ||
-            !RegistrationPolicy.Json(descriptor.Parameters, options, requireObject: true) ||
+            !RegistrationPolicy.Json(descriptor.Parameters, options, requireObject: true) || !Enum.IsDefined(descriptor.ParametersOrigin) ||
+            descriptor.ValidationParameters is { } validation && !RegistrationPolicy.Json(validation, options, requireObject: true) ||
             descriptor.ConstrainedSampling is { } sampling && !RegistrationPolicy.Json(sampling, options, requireObject: true))
             throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, scope.OwnerId, operation);
         return Add(scope, descriptor.RegistrationId, descriptor.Name, RegistrationKind.Tool, descriptor,

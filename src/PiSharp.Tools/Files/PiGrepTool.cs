@@ -11,7 +11,7 @@ namespace PiSharp.Tools.Files;
 
 /// <summary>The grep tool of the <c>pi</c> tool policy (owner decision 0004), as grep.ts: ripgrep over any path, streamed and stopped at
 /// the match limit, context lines read from the files themselves. The explicit policy keeps <see cref="GrepTool"/>.</summary>
-public sealed class PiGrepTool : IPreparedToolAdapter
+public sealed class PiGrepTool : IToolArgumentSchemaAdapter
 {
     private const double DefaultLimit = 100;
     private readonly PathResolver _paths;
@@ -20,6 +20,8 @@ public sealed class PiGrepTool : IPreparedToolAdapter
     private readonly IReadOnlyDictionary<string, string>? _environment;
     private readonly Func<string, CancellationToken, ValueTask<bool>>? _authorizeRead;
     public string Name => "grep";
+    /// <summary>Source TypeBox parameters, checked by validateToolArguments before the tool runs.</summary>
+    public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(Declaration, ToolSchemaOrigin.TypeBox);
     public JsonData Declaration { get; } = JsonData.Parse("""{"name":"grep","description":"Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.","parameters":{"type":"object","properties":{"pattern":{"type":"string","description":"Search pattern (regex or literal string)"},"path":{"type":"string","description":"Directory or file to search (default: current directory)"},"glob":{"type":"string","description":"Filter files by glob pattern, e.g. '*.ts' or '**/*.spec.ts'"},"ignoreCase":{"type":"boolean","description":"Case-insensitive search (default: false)"},"literal":{"type":"boolean","description":"Treat pattern as literal string instead of regex (default: false)"},"context":{"type":"number","description":"Number of lines to show before and after each match (default: 0)"},"limit":{"type":"number","description":"Maximum number of matches to return (default: 100)"}},"required":["pattern"]}}""");
 
     /// <param name="ripgrep">ensureTool("rg"): the rg executable, or null when it is not available and could not be downloaded.</param>

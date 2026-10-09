@@ -56,8 +56,10 @@ public sealed class LsTool
         return new(path.Length == 0 ? "." : path, limit);
     }
 
-    private sealed class ListingAdapter(LsTool owner) : IPreparedToolAdapter
+    private sealed class ListingAdapter(LsTool owner) : IToolArgumentSchemaAdapter
     {
+        /// <summary>Source TypeBox parameters, checked by validateToolArguments before the tool runs.</summary>
+        public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(owner.Declaration, ToolSchemaOrigin.TypeBox);
         public string Name => "ls";
         public async ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token)
         {

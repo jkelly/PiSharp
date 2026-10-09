@@ -102,9 +102,11 @@ public sealed class ReadWriteTools
         return [new("read", invoker), new("write", invoker)];
     }
 
-    private sealed class Adapter(ReadWriteTools owner, string name) : IPreparedToolAdapter
+    private sealed class Adapter(ReadWriteTools owner, string name) : IToolArgumentSchemaAdapter
     {
         public string Name => name;
+        /// <summary>Source read/write TypeBox parameters, checked by validateToolArguments before the tool runs.</summary>
+        public ToolArgumentSchema? ArgumentSchema { get; } = ToolArgumentSchema.FromDeclaration(name == "read" ? ReadDeclaration : WriteDeclaration, ToolSchemaOrigin.TypeBox);
         public async ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
@@ -156,7 +158,8 @@ public sealed class ReadWriteTools
         var value = arguments.Value;
         var allowed = name == "read" ? new[] { "path", "offset", "limit" } : new[] { "path", "content" };
         foreach (var property in value.EnumerateObject())
-            if (!allowed.Contains(property.Name, StringComparer.Ordinal) && !(normalized && property.Name == "displayPath"))
+            // Source read/write schemas admit additional properties; execute reads only the declared ones.
+            if (normalized && !allowed.Contains(property.Name, StringComparer.Ordinal) && property.Name != "displayPath")
                 throw new ArgumentException("Unsupported file argument.");
         var path = String(value, "path", empty: false);
         if (path.Length > _options.MaximumPathCharacters) throw new ArgumentException("Oversized file path.");

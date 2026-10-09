@@ -12,6 +12,7 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> BridgeCases() =>
     [
         ("bridge.typescript-extension-tool-called-by-the-model", TypeScriptTool),
+        ("bridge.tool-arguments-validated-as-upstream-for-typebox-and-raw-schemas", ValidatedToolArguments),
         ("bridge.extension-api-members-in-a-print-run", ApiMembers),
         ("bridge.events-reach-node-handlers", EventsReachNode),
         ("bridge.command-from-the-prompt-with-actions", CommandFromPrompt),
@@ -139,6 +140,43 @@ internal static partial class Program
         Check(sandbox.Requests[0].Json.GetProperty("tools").EnumerateArray().Any(tool => tool.GetProperty("name").GetString() == "greet"), "tool declared");
         var text = ToolResultText(sandbox.Requests[1]);
         Check(text.StartsWith("Hello, Ada! entries=", StringComparison.Ordinal) && text.EndsWith("id=toolu_01", StringComparison.Ordinal), "tool text: " + text);
+    }
+
+    // agent-loop prepareToolCall + validation.ts validateToolArguments for extension tools: a Type.* schema (TypeBox's hidden "~kind"
+    // markers reach PiSharp through the bridge) is also converted by Value.Convert ("a" -> ["a"]); a raw-object schema gets the
+    // JSON-schema coercion only, so the same value fails. Expected texts were captured from the real pi-ai 1.1.0 / typebox 1.3.27.
+    private static async Task ValidatedToolArguments()
+    {
+        using var sandbox = NodeSandbox("validated-args");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "validated.ts"), """
+            import { Type } from "typebox";
+            import { appendFileSync } from "node:fs";
+            const log = (...items: unknown[]) => appendFileSync(process.cwd() + "/probe.log", JSON.stringify(items) + "\n");
+            export default function (pi: any) {
+              pi.registerTool({ name: "typed", label: "Typed", description: "TypeBox schema",
+                parameters: Type.Object({ n: Type.Number(), when: Type.Optional(Type.Boolean()), tags: Type.Optional(Type.Array(Type.String())) }),
+                async execute(_id: string, params: any) { log("typed", params); return { content: [{ type: "text", text: "typed ok" }], details: {} }; } });
+              pi.registerTool({ name: "raw", label: "Raw", description: "Raw JSON schema",
+                parameters: { type: "object", properties: { n: { type: "integer" }, tags: { type: "array", items: { type: "string" } } }, required: ["n"] },
+                async execute(_id: string, params: any) { log("raw", params); return { content: [{ type: "text", text: "raw ok" }], details: {} }; } });
+            }
+            """);
+        sandbox.Respond = (_, index) => index switch
+        {
+            0 => AnthropicToolCall("typed", new { n = "5", when = "true", tags = "a" }, "toolu_1"),
+            1 => AnthropicToolCall("typed", new { n = "x" }, "toolu_2"),
+            2 => AnthropicToolCall("raw", new { n = "7", tags = "a" }, "toolu_3"),
+            3 => AnthropicToolCall("raw", new { n = "7" }, "toolu_4"),
+            _ => AnthropicText("done")
+        };
+        var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "Validate"]);
+        Equal(0, code, "exit; " + stderr);
+        Equal("""[["typed",{"n":5,"when":true,"tags":["a"]}],["raw",{"n":7}]]""",
+            new JsonArray([.. LogLines(sandbox).Select(line => JsonNode.Parse(line))]).ToJsonString(), "the tools received the coerced arguments");
+        Equal("typed ok", ToolResultText(sandbox.Requests[1]), "typed result");
+        Equal("Validation failed for tool \"typed\":\n  - n: must be number\n\nReceived arguments:\n{\n  \"n\": \"x\"\n}", ToolResultText(sandbox.Requests[2]), "typed failure");
+        Equal("Validation failed for tool \"raw\":\n  - tags: must be array\n\nReceived arguments:\n{\n  \"n\": \"7\",\n  \"tags\": \"a\"\n}", ToolResultText(sandbox.Requests[3]), "raw failure");
+        Equal("raw ok", ToolResultText(sandbox.Requests[4]), "raw result");
     }
 
     private static string ToolResultText(Seen request)

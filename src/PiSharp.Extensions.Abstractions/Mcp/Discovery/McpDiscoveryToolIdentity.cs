@@ -39,7 +39,8 @@ public static class McpDiscoveryToolIdentity
         if (execute.GetInvocationList().Length != 1) throw new ArgumentException("Discovery requires one joined admitted callback.", nameof(execute));
         if (prepare?.GetInvocationList().Length > 1) throw new ArgumentException("Discovery presentation requires one pure callback.", nameof(prepare));
         return new(registrationId, name, description, schema, execute)
-        { Exposure = ToolExposure.ModelOnly, DefaultActive = true, PrepareLoadout = prepare };
+        // codemodeSchema and toolSearchSchema are TypeBox schemas (Type.Object), so validateToolArguments also converts their arguments.
+        { Exposure = ToolExposure.ModelOnly, DefaultActive = true, PrepareLoadout = prepare, ParametersOrigin = ToolSchemaOrigin.TypeBox };
     }
 
 }

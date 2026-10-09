@@ -10,10 +10,13 @@ namespace PiSharp.Extensions.Agent;
 /// <summary>Executes only the captured extension registration through its registry's owned dispatch.</summary>
 internal sealed class ExtensionToolAdapter(ExtensionRegistry registry, ExtensionRegistrySnapshot snapshot,
     ExtensionToolRegistrationInfo tool, ExtensionToolArgumentValidator validateArguments,
-    ToolResultValueOptions resultValues, CancellationToken sessionToken) : IInvocationPreparedToolAdapter, IInitialToolArgumentPreparationAdapter
+    ToolResultValueOptions resultValues, CancellationToken sessionToken) : IInvocationPreparedToolAdapter, IInitialToolArgumentPreparationAdapter,
+    IToolArgumentSchemaAdapter
 {
     private readonly string target = tool.OwnerId + "/" + tool.OwnerGeneration.ToString(CultureInfo.InvariantCulture) + "/" + tool.RegistrationId;
     public string Name => tool.Name;
+    /// <summary>Source validateToolArguments against the registration's parameters, after its prepareArguments.</summary>
+    public ToolArgumentSchema? ArgumentSchema { get; } = new(tool.ValidationParameters ?? tool.Parameters, tool.ParametersOrigin);
     public ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested(); sessionToken.ThrowIfCancellationRequested();

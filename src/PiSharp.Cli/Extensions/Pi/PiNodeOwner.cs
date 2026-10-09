@@ -450,10 +450,15 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
             Annotations = tool["annotations"] is JsonObject hints
                 ? hints.Where(hint => hint.Value is JsonValue value && value.GetValueKind() is JsonValueKind.True or JsonValueKind.False)
                     .ToImmutableDictionary(hint => hint.Key, hint => hint.Value!.GetValue<bool>(), StringComparer.Ordinal) : null,
-            PrepareInitialArgumentsAsync = async (arguments, token) =>
+            // agent-loop prepareToolCall: the tool's prepareArguments (when it has one), then validateToolArguments against its
+            // parameters. JSON drops TypeBox 1.x's hidden "~kind" markers, so the bridge reports them in validationParameters; a
+            // schema carrying TypeBox 0.x's Kind symbol skips the JSON-schema coercion.
+            ValidationParameters = tool["validationParameters"] is JsonObject validation ? JsonData.Parse(validation.ToJsonString()) : null,
+            ParametersOrigin = tool["parametersOrigin"]?.GetValue<string>() == "legacy-typebox-kind" ? ToolSchemaOrigin.LegacyTypeBoxKindSymbol : ToolSchemaOrigin.JsonSchema,
+            PrepareInitialArgumentsAsync = tool["hasPrepareArguments"]?.GetValue<bool>() != true ? null : async (arguments, token) =>
             {
                 var prepared = await host.CallAsync("tool.prepareArguments", new JsonObject { ["ext"] = extension.Index, ["name"] = name, ["args"] = Parse(arguments) }, token).ConfigureAwait(false);
-                return prepared is { } value ? Data(value) : arguments;
+                return prepared is { ValueKind: not JsonValueKind.Null } value ? Data(value) : arguments;
             },
             PrepareLoadout = tool["hasPrepareLoadout"]?.GetValue<bool>() == true ? loadout => PrepareLoadout(name, loadout) : null,
             Renderers = hasCall || hasResult ? new ExtensionToolRenderers(

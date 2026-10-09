@@ -533,10 +533,12 @@ public sealed partial class SessionRuntimeRegistry
             else if (char.IsLowSurrogate(value[index])) return false;
         return true;
     }
-    private sealed class NamedAdapter(string name, IPreparedToolAdapter inner) : IInvocationPreparedToolAdapter, IInitialToolArgumentPreparationAdapter
+    private sealed class NamedAdapter(string name, IPreparedToolAdapter inner) : IInvocationPreparedToolAdapter, IInitialToolArgumentPreparationAdapter,
+        IToolArgumentSchemaAdapter
     {
         public IPreparedToolAdapter Original => inner;
         public string Name => name;
+        public ToolArgumentSchema? ArgumentSchema => (inner as IToolArgumentSchemaAdapter)?.ArgumentSchema;
         public ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken token) =>
             inner is IInitialToolArgumentPreparationAdapter initial
                 ? initial.PrepareInitialArgumentsAsync(invocation, token)

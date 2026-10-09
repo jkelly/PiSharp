@@ -15,6 +15,9 @@ public sealed record ExtensionToolRegistrationInfo(string OwnerId, long OwnerGen
     string RegistrationId, string Name, string Description, JsonData Parameters)
 {
     public bool HasInitialArgumentPreparation { get; init; }
+    /// <summary>The descriptor's parameter schema origin and validation schema (source validateToolArguments).</summary>
+    public ToolSchemaOrigin ParametersOrigin { get; init; } = ToolSchemaOrigin.JsonSchema;
+    public JsonData? ValidationParameters { get; init; }
     public ToolExposure Exposure { get; init; } = ToolExposure.Direct;
     public ToolNamespace? Namespace { get; init; }
     public bool DefaultActive { get; init; } = true;
@@ -89,6 +92,7 @@ public sealed class ExtensionRegistrySnapshot
             return new ExtensionToolRegistrationInfo(entry.OwnerId, entry.OwnerGeneration,
                 entry.RegistrationId, entry.Name, descriptor.Description, descriptor.Parameters)
                 { HasInitialArgumentPreparation = descriptor.PrepareInitialArgumentsAsync is not null,
+                    ParametersOrigin = descriptor.ParametersOrigin, ValidationParameters = descriptor.ValidationParameters,
                     Exposure = descriptor.Exposure, Namespace = descriptor.Namespace, DefaultActive = descriptor.DefaultActive,
                     HasLoadoutPreparation = descriptor.PrepareLoadout is not null, PromptGuidelines = descriptor.PromptGuidelines,
                     ConstrainedSampling = descriptor.ConstrainedSampling, Annotations = descriptor.Annotations,

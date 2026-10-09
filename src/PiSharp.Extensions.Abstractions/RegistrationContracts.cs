@@ -79,6 +79,12 @@ public sealed record ExtensionToolDescriptor(
     string RegistrationId, string Name, string Description, JsonData Parameters, ExtensionToolCallback ExecuteAsync)
 {
     public ExtensionToolArgumentPreparationCallback? PrepareInitialArgumentsAsync { get; init; }
+    /// <summary>Source validateToolArguments: how <see cref="Parameters"/> was produced. Plain JSON schemas (the default, as MCP
+    /// tools and extensions passing raw objects) get JSON-schema coercion only; TypeBox 1.x schemas are also converted.</summary>
+    public ToolSchemaOrigin ParametersOrigin { get; init; } = ToolSchemaOrigin.JsonSchema;
+    /// <summary>The schema validateToolArguments checks when it differs from the model-facing <see cref="Parameters"/>, for example a
+    /// Node extension's TypeBox schema with its hidden "~kind" markers made visible. Null checks <see cref="Parameters"/>.</summary>
+    public JsonData? ValidationParameters { get; init; }
     public ToolExposure Exposure { get; init; } = ToolExposure.Direct;
     public ToolNamespace? Namespace { get; init; }
     /// <summary>Only direct/model-only tools activate by default. Other exposures require explicit activation.</summary>

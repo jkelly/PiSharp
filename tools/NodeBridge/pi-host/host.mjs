@@ -11,7 +11,6 @@ import { Readable } from 'node:stream';
 import { installHooks } from './loader-hooks.mjs';
 import { loadPiModules } from './pi-modules.mjs';
 import { ExtensionRuntime, describeExtension } from './runtime.mjs';
-import { validateToolArguments } from './validate.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -153,11 +152,11 @@ async function handle(method, params, id) {
       } finally { active.delete(id); }
     }
     case 'tool.prepareArguments': {
-      // agent-core prepareToolCall: the tool's prepareArguments shim, then validateToolArguments against its schema.
+      // agent-core prepareToolCall: the tool's prepareArguments shim. PiSharp then runs validateToolArguments against the schema
+      // describeTool reported (validationParameters keeps TypeBox's hidden markers).
       const tool = runtime.extensions[params.ext]?.tools.get(params.name)?.definition;
       if (!tool) throw new Error(`Tool ${params.name} not found`);
-      const prepared = tool.prepareArguments ? tool.prepareArguments(params.args) : params.args;
-      return validateToolArguments(tool, { name: params.name, arguments: prepared });
+      return plain(tool.prepareArguments ? tool.prepareArguments(params.args) : params.args) ?? null;
     }
     case 'tool.prepareLoadout': {
       const tool = runtime.extensions[params.ext]?.tools.get(params.name)?.definition;

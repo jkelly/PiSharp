@@ -36,6 +36,25 @@ public interface IInitialToolArgumentPreparationAdapter : IPreparedToolAdapter
     ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken cancellationToken);
 }
 
+/// <summary>The tool's parameter schema, checked by source validateToolArguments (packages/ai/src/utils/validation.ts).</summary>
+public sealed record ToolArgumentSchema(JsonData Parameters, ToolSchemaOrigin Origin)
+{
+    /// <summary>The <c>parameters</c> object of a model-facing declaration; null when the declaration has none.</summary>
+    public static ToolArgumentSchema? FromDeclaration(JsonData declaration, ToolSchemaOrigin origin) =>
+        declaration is not null && declaration.Value.ValueKind == JsonValueKind.Object &&
+        declaration.Value.TryGetProperty("parameters", out var parameters) && parameters.ValueKind == JsonValueKind.Object
+            ? new(JsonData.FromElement(parameters), origin) : null;
+}
+
+/// <summary>Source agent-loop prepareToolCall: after the tool's prepareArguments, validateToolArguments converts and coerces the
+/// arguments against the tool's parameter schema; the tool receives the coerced arguments, and a failure becomes the error result
+/// whose text is the validation message without running the tool.</summary>
+public interface IToolArgumentSchemaAdapter : IPreparedToolAdapter
+{
+    /// <summary>Null skips schema validation.</summary>
+    ToolArgumentSchema? ArgumentSchema { get; }
+}
+
 public sealed record ToolActionAuthorization(bool Allow, bool Terminate = false);
 public interface IToolActionPolicy
 {
@@ -299,6 +318,24 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                 {
                     var call = invocation.Call with { Arguments = arguments };
                     initialView = invocation with { AssistantMessage = assistant with { Content = assistant.Content.SetItem(invocation.SourceIndex, call) }, Call = call };
+                }
+            }
+            // Source prepareToolCall: validateToolArguments(tool, preparedToolCall). The committed assistant message and the
+            // tool execution events keep the model's arguments; only preparation and execution see the coerced ones.
+            if (tool is IToolArgumentSchemaAdapter { ArgumentSchema: { } schema })
+            {
+                var validated = ToolArgumentValidation.ValidateJson(invocation.Call.Name, schema.Parameters.ToString(),
+                    initialView.Call.Arguments.ToString(), schema.Origin);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!validated.IsValid) return CompleteResult(ToolResult.Error(ToolFailureKind.InvalidArguments, validated.ErrorMessage!));
+                if (validated.ArgumentsJson is not { } coercedJson) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+                var coerced = JsonData.Parse(coercedJson);
+                if (!ValidArguments(coerced, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+                if (!JsonElement.DeepEquals(coerced.Value, initialView.Call.Arguments.Value))
+                {
+                    var call = initialView.Call with { Arguments = coerced };
+                    initialView = initialView with { AssistantMessage = initialView.AssistantMessage with
+                        { Content = initialView.AssistantMessage.Content.SetItem(invocation.SourceIndex, call) }, Call = call };
                 }
             }
             var action = await tool.PrepareAsync(initialView, cancellationToken).ConfigureAwait(false);

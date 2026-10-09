@@ -54,8 +54,10 @@ public sealed class FindTool
             throw new ArgumentException("Unsupported find glob pattern.");
         return new(pattern, path.Length == 0 ? "." : path, limit);
     }
-    private sealed class SearchAdapter(FindTool owner) : IPreparedToolAdapter
+    private sealed class SearchAdapter(FindTool owner) : IToolArgumentSchemaAdapter
     {
+        /// <summary>Source TypeBox parameters, checked by validateToolArguments before the tool runs.</summary>
+        public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(owner.Declaration, ToolSchemaOrigin.TypeBox);
         public string Name => "find";
         public async ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token)
         {

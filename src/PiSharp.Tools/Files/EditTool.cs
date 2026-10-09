@@ -2,6 +2,7 @@
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using PiSharp.Agent;
 using PiSharp.Agent.Tools;
 using PiSharp.Contracts;
@@ -20,7 +21,7 @@ public sealed record EditToolOptions(int MaximumInputBytes = 64 * 1024 * 1024, i
 }
 
 /// <summary>Prepared edit adapter. Hosts share its required mutation queue with all coordinated writers and route it through policy.</summary>
-public sealed class EditTool : IPreparedToolAdapter
+public sealed class EditTool : IToolArgumentSchemaAdapter, IInitialToolArgumentPreparationAdapter
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly IFileOperations _operations;
@@ -31,6 +32,8 @@ public sealed class EditTool : IPreparedToolAdapter
     private readonly DiffFormatterOptions _diffOptions;
     public string Name => "edit";
     public JsonData Declaration { get; }
+    /// <summary>Source editSchema (TypeBox), checked by validateToolArguments after prepareEditArguments.</summary>
+    public ToolArgumentSchema? ArgumentSchema { get; } = ToolArgumentSchema.FromDeclaration(SourceDeclaration, ToolSchemaOrigin.TypeBox);
     public FileMutationQueueSnapshot MutationSnapshot => _mutations.Snapshot;
 
     public EditTool(string workingDirectory, string homeDirectory, FileMutationQueue mutationQueue,
@@ -58,6 +61,46 @@ public sealed class EditTool : IPreparedToolAdapter
                 MaximumActionCharacters: checked(_options.MaximumArgumentCharacters + 2 * _options.MaximumPathCharacters + 128),
                 MaximumResultCharacters: checked(_diffOptions.MaximumOutputCharacters * 12 + _options.MaximumPathCharacters * 6 + 1024)));
     public ToolDefinition CreateDefinition(ToolInvoker invoker) => new(Name, invoker ?? throw new ArgumentNullException(nameof(invoker)));
+
+    /// <summary>Source prepareArguments (prepareEditArguments), run before validateToolArguments checks the schema.</summary>
+    public ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(PrepareEditArguments(invocation.Call.Arguments));
+    }
+
+    /// <summary>Source prepareEditArguments: edits sent as a JSON string or as a single edit object become an edits array, and a
+    /// legacy top-level oldText/newText pair is appended to the edits.</summary>
+    public static JsonData PrepareEditArguments(JsonData arguments)
+    {
+        if (arguments is null || arguments.Value.ValueKind != JsonValueKind.Object) return arguments!;
+        JsonObject args;
+        try { args = JsonNode.Parse(arguments.ToString())!.AsObject(); }
+        catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException) { return arguments; }
+        var changed = false;
+        if (args["edits"] is JsonValue encoded && encoded.GetValueKind() == JsonValueKind.String)
+        {
+            try
+            {
+                var parsed = JsonNode.Parse(encoded.GetValue<string>());
+                if (parsed is JsonArray) { args["edits"] = parsed; changed = true; }
+                else if (IsSingleEdit(parsed)) { args["edits"] = new JsonArray(parsed); changed = true; }
+            }
+            catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException) { }
+        }
+        else if (IsSingleEdit(args["edits"])) { args["edits"] = new JsonArray(args["edits"]!.DeepClone()); changed = true; }
+        if (IsString(args["oldText"]) && IsString(args["newText"]))
+        {
+            var edits = args["edits"] is JsonArray existing ? existing.DeepClone().AsArray() : new JsonArray();
+            edits.Add(new JsonObject { ["oldText"] = args["oldText"]!.DeepClone(), ["newText"] = args["newText"]!.DeepClone() });
+            args.Remove("oldText"); args.Remove("newText");
+            args["edits"] = edits; changed = true;
+        }
+        return changed ? JsonData.Parse(args.ToJsonString()) : arguments;
+
+        static bool IsString(JsonNode? value) => value is JsonValue text && text.GetValueKind() == JsonValueKind.String;
+        static bool IsSingleEdit(JsonNode? value) => value is JsonObject edit && IsString(edit["oldText"]) && IsString(edit["newText"]);
+    }
 
     public async ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token)
     {
@@ -150,7 +193,8 @@ public sealed class EditTool : IPreparedToolAdapter
             throw new ArgumentException("Invalid edit arguments.");
         var value = arguments.Value;
         foreach (var property in value.EnumerateObject())
-            if (property.Name is not ("path" or "edits") && !(normalized ? property.Name == "displayPath" : property.Name is "oldText" or "newText"))
+            // Source editSchema admits additional properties; execute reads only path and edits.
+            if (normalized && property.Name is not ("path" or "edits" or "displayPath"))
                 throw new ArgumentException("Unsupported edit argument.");
         var path = Text(value.GetProperty("path")); var display = normalized ? Text(value.GetProperty("displayPath")) : path;
         if (path.Length == 0 || display.Length == 0 || path.Length > _options.MaximumPathCharacters || display.Length > _options.MaximumPathCharacters)

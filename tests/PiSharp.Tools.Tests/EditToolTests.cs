@@ -51,8 +51,11 @@ internal static class EditToolTests
         }
         var before = operations.WriteCalls;
         foreach (var input in new[] { "{}", "{\"path\":\"file\",\"edits\":[]}", "{\"path\":\"file\",\"edits\":\"invalid json\"}",
-            "{\"path\":\"file\",\"edits\":[{\"oldText\":1,\"newText\":\"x\"}]}", "{\"path\":\"file\",\"oldText\":\"a\"}" })
+            "{\"path\":\"file\",\"oldText\":\"a\"}" })
             Failure(await Invoke(tool, JsonData.Parse(input)), ToolFailureKind.InvalidArguments);
+        // Source validateToolArguments coerces a number oldText to its string: the edit runs (and finds no "1").
+        Check((await Invoke(tool, JsonData.Parse("{\"path\":\"file\",\"edits\":[{\"oldText\":1,\"newText\":\"x\"}]}"))).Failure?.Kind
+            == ToolFailureKind.ExecutionError, "Number oldText was not coerced.");
         Equal(before, operations.WriteCalls); Throws<ArgumentNullException>(() => tool.CreateInvoker(null!));
     }
 

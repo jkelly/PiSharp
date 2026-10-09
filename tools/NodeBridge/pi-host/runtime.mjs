@@ -78,9 +78,37 @@ function restoreSystemMessages(current, visible, returned) {
   return head ? [head, ...returned] : returned;
 }
 
+const TYPEBOX_KIND = Symbol.for('TypeBox.Kind');
+/** validateToolArguments reads TypeBox 1.x's hidden (non-enumerable) markers ("~kind", "~optional", ...), which JSON drops: a copy of
+ *  the schema with every own property made visible, or undefined when the schema has no hidden property (PiSharp's port honours
+ *  visible markers exactly like the hidden ones). */
+function validationSchema(schema) {
+  let marked = false;
+  const seen = new Set();
+  const copy = (value) => {
+    if (typeof value !== 'object' || value === null) return value;
+    if (seen.has(value)) return undefined;
+    seen.add(value);
+    try {
+      if (Array.isArray(value)) return value.map(copy);
+      const result = {};
+      for (const key of Object.getOwnPropertyNames(value)) {
+        if (value[key] === undefined || typeof value[key] === 'function') continue;
+        if (!Object.prototype.propertyIsEnumerable.call(value, key)) marked = true;
+        result[key] = copy(value[key]);
+      }
+      return result;
+    } finally { seen.delete(value); }
+  };
+  const result = copy(schema);
+  return marked ? result : undefined;
+}
+
 /** A JSON-safe copy of a registration's descriptive fields (functions are reported as flags). */
 function describeTool(tool) {
+  const legacyKind = typeof tool.parameters === 'object' && tool.parameters !== null && Object.getOwnPropertySymbols(tool.parameters).includes(TYPEBOX_KIND);
   return {
+    validationParameters: validationSchema(tool.parameters), parametersOrigin: legacyKind ? 'legacy-typebox-kind' : undefined,
     name: tool.name, label: tool.label, description: tool.description, promptSnippet: tool.promptSnippet, promptGuidelines: tool.promptGuidelines,
     parameters: tool.parameters, exposure: tool.exposure, namespace: tool.namespace, annotations: tool.annotations, defaultActive: tool.defaultActive,
     executionMode: tool.executionMode, renderShell: tool.renderShell, constrainedSampling: tool.constrainedSampling || undefined, outputSchema: tool.outputSchema,

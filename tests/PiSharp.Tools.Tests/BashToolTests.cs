@@ -24,7 +24,6 @@ internal static class BashToolTests
         var tool = Make(files, runner); var invoker = tool.CreateInvoker(policy);
         foreach (var raw in new[]
         {
-            """{"command":"echo","extra":true}""", """{"command":4}""",
             """{"command":"echo","timeout":1e999}""",
             """{"command":"\ud800"}""", """{"command":"x\u0000y"}""", """{"command":[]}""",
             JsonSerializer.Serialize(new { command = new string('x', 12_001) })
