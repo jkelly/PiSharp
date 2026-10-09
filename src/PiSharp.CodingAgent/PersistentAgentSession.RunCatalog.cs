@@ -26,8 +26,11 @@ public sealed partial class PersistentAgentSession
     {
         ArgumentNullException.ThrowIfNull(prepare);
         if (_activationPreparation.Value || _inLoadoutDiagnosticDrain.Value) return null;
-        for (var attempt = 0; attempt < 16; attempt++)
+        // Source _refreshToolRegistry applies at once; a concurrent change that came first is prepared on again (each retry follows
+        // another committed change), with no fallback to the idle boundary while the run is in its provider phase.
+        while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             SessionRuntimeRegistry expected; ImmutableArray<string> names; long epoch; AgentConfiguration configuration;
             Sessions.Context.SessionContextProjection context;
             lock (_gate)
@@ -70,7 +73,6 @@ public sealed partial class PersistentAgentSession
             }
             return new(Snapshot, replacement);
         }
-        return null;
     }
 
     private ToolInvoker? _lateNestedInvoker;

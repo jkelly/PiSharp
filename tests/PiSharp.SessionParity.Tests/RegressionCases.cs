@@ -15,9 +15,33 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> RegressionCases() =>
     [
         Case("diagnostics.projector.records-and-reads-every-declared-adapter", DiagnosticAdapters),
+        Case("catalog.mid-run-publication-retries-without-an-idle-fallback", MidRunPublicationRetries),
         Case("diagnostics.rpc-host.mistral-failure-is-recorded-and-the-host-survives", MistralFailureThroughRpc),
         Case("mistral.replay-ignores-extra-system-and-user-fields", MistralExtraFields),
     ];
+
+    // agent-session.ts _refreshToolRegistry applies a catalog change during a run at once. A publication that loses to concurrent
+    // changes is prepared again on top of them for as long as the run is in its provider phase (formerly 16 tries, then idle).
+    private static async Task MidRunPublicationRetries()
+    {
+        await using var f = await CreateAsync(Response(text: "done"));
+        var session = f.Session; var prepares = 0; PiSharp.CodingAgent.SessionToolCatalogReceipt? receipt = null;
+        ValueTask<PiSharp.CodingAgent.PreparedSessionToolCatalog> Same(PiSharp.CodingAgent.SessionRuntimeRegistry expected, ImmutableArray<string> names) =>
+            ValueTask.FromResult(new PiSharp.CodingAgent.PreparedSessionToolCatalog(expected.WithToolCatalog(expected.RegisteredTools, null), names, () => { }));
+        f.Transport.DuringStream = async () =>
+        {
+            f.Transport.DuringStream = null;
+            receipt = await session.TryPublishToolCatalogDuringRunAsync(async (expected, names, _) =>
+            {
+                // A concurrent catalog change commits first on each of the first 20 tries.
+                if (++prepares <= 20) Check(await session.TryPublishToolCatalogDuringRunAsync((inner, innerNames, _) => Same(inner, innerNames)) is not null, "concurrent change");
+                return await Same(expected, names);
+            });
+        };
+        f.StartRpc(); await f.PromptAsync();
+        Check(receipt is not null, "The publication fell back to the idle boundary.");
+        Equal(21, prepares, "prepared again after each concurrent change");
+    }
 
     private static Task DiagnosticAdapters()
     {
