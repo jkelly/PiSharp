@@ -9,10 +9,11 @@ using PiSharp.Contracts;
 
 namespace PiSharp.Tools.Files;
 
-/// <summary>Memory bounds for the edit tool. Pi has no size limits; the defaults are the largest admitted values. The display
+/// <summary>Memory bounds for the edit tool. Pi has no size or replacement-count limits; the defaults are the largest admitted values
+/// (the number of edits is bounded only by the argument size). The display
 /// diff is bounded separately: an edit whose diff exceeds <see cref="DiffOptions"/> still succeeds, with the diff omitted.</summary>
 public sealed record EditToolOptions(int MaximumInputBytes = 64 * 1024 * 1024, int MaximumOutputBytes = 64 * 1024 * 1024,
-    int MaximumArgumentCharacters = 8 * 1024 * 1024, int MaximumPathCharacters = 4096, int MaximumEdits = 1024,
+    int MaximumArgumentCharacters = 8 * 1024 * 1024, int MaximumPathCharacters = 4096, int MaximumEdits = int.MaxValue,
     DiffFormatterOptions? DiffOptions = null)
 {
     /// <summary>The diff bounds used when <see cref="DiffOptions"/> is absent.</summary>
@@ -42,7 +43,7 @@ public sealed class EditTool : IToolArgumentSchemaAdapter, IInitialToolArgumentP
         ArgumentNullException.ThrowIfNull(mutationQueue);
         _options = options ?? new(); _diffOptions = _options.DiffOptions ?? EditToolOptions.DefaultDiffOptions;
         if (_options.MaximumInputBytes is < 1 or > 64 * 1024 * 1024 || _options.MaximumOutputBytes is < 1 or > 64 * 1024 * 1024 ||
-            _options.MaximumArgumentCharacters is < 1 or > 8 * 1024 * 1024 || _options.MaximumPathCharacters is < 1 or > 65_536 || _options.MaximumEdits is < 1 or > 1024 ||
+            _options.MaximumArgumentCharacters is < 1 or > 8 * 1024 * 1024 || _options.MaximumPathCharacters is < 1 or > 65_536 || _options.MaximumEdits < 1 ||
             _diffOptions.MaximumOutputCharacters is < 1 or > 1_048_576)
             throw new ArgumentOutOfRangeException(nameof(options));
         DiffFormatter.ValidateOptions(_diffOptions);

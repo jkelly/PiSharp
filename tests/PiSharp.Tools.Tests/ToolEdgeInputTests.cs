@@ -15,6 +15,7 @@ internal static class ToolEdgeInputTests
         ("edge empty paths reach the file system as the source tools do", EmptyPaths),
         ("edge pi ls limits follow the source number arithmetic", LsNumbers),
         ("edge NUL bytes give Node's argument errors", NulBytes),
+        ("edge edit applies more than 1024 replacements as the source does", ManyEdits),
     ];
 
     private static async Task ReadNumbers()
@@ -111,6 +112,18 @@ internal static class ToolEdgeInputTests
             Text(await bash.ExecuteAsync(Invocation("bash", """{"command":"echo a\u0000b"}"""), default)), "bash");
         Equal("The argument 'args[1]' must be a string without null bytes. Received \"echo 'q\\\\ \\x00\\n\\t\\x01\u00e9\"",
             Text(await bash.ExecuteAsync(Invocation("bash", """{"command":"echo 'q\\ \u0000\n\t\u0001\u00e9"}"""), default)), "bash escapes");
+    }
+
+    // edit.ts has no replacement-count limit (the native cap was 1,024).
+    private static async Task ManyEdits()
+    {
+        using var temp = new Temp();
+        await File.WriteAllTextAsync(temp.File("many.txt"), string.Join("\n", Enumerable.Range(0, 2000).Select(index => $"[{index}]")));
+        var edits = string.Join(",", Enumerable.Range(0, 1500).Select(index => $$"""{"oldText":"[{{index}}]","newText":"<{{index}}>"}"""));
+        var edit = new EditTool(temp.Root, temp.Root, new((path, _) => ValueTask.FromResult(path)));
+        var result = await edit.CreateInvoker(new Allow()).ExecuteAsync(Invocation("edit", $$"""{"path":"many.txt","edits":[{{edits}}]}"""), default);
+        Equal("Successfully replaced 1500 block(s) in many.txt.", Text(result), "1500 edits");
+        Equal("<1499>\n[1500]", string.Join("\n", (await File.ReadAllTextAsync(temp.File("many.txt"))).Split('\n')[1499..1501]), "edited content");
     }
 
     private sealed class NoRunner : IProcessRunner
