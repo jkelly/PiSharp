@@ -35,7 +35,8 @@ public interface IInvocationPreparedToolAdapter : IPreparedToolAdapter
 public sealed class ToolArgumentPreparationException(string message, Exception? innerException = null) : Exception(message, innerException);
 
 /// <summary>The error the source tool's execute throws for this input before it has any effect (for example Node rejecting a path with a
-/// NUL byte), found while preparing the action. The invoker returns it as the error result without authorizing or executing anything.</summary>
+/// NUL byte), found while preparing the action. The invoker returns it as the error result without authorizing or executing anything.
+/// User shell commands raise it for Node's spawn errors, which the source reports with this message.</summary>
 public sealed class ToolSourceErrorException(string message) : Exception(message);
 
 /// <summary>Trusted, initial-only argument preparation. Hook replacements never invoke this capability.</summary>

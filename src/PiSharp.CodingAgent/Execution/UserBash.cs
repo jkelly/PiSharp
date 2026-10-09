@@ -33,7 +33,9 @@ public static class UserBash
     public static void Validate(UserBashExecutionRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (!Scalar(request.Command) || request.Command.Length > 12_000 || !Absolute(request.WorkingDirectory) ||
+        // Source executeBash has no command length limit: the operating system's spawn limit applies. The bound only caps memory,
+        // as the model's bash tool does (BashToolOptions.MaximumCommandCharacters).
+        if (!Scalar(request.Command) || request.Command.Length > 96_000 || !Absolute(request.WorkingDirectory) ||
             request.Id is not null && (!Scalar(request.Id) || request.Id.Length > 4096))
             throw new ArgumentException("User Bash request exceeds the admitted text/path profile.", nameof(request));
     }

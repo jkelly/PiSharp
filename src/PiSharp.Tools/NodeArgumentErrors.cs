@@ -25,6 +25,15 @@ public static class NodeArgumentErrors
         return null;
     }
 
+    /// <summary>child_process.spawn's error when the operating system refuses the command line: on Windows CreateProcess takes at most
+    /// 32,767 characters (libuv reports ENAMETOOLONG); on Unix one argument is at most 128 KiB (E2BIG). Null when it fits.</summary>
+    public static string? SpawnLimit(string executable, IReadOnlyList<string> arguments)
+    {
+        if (OperatingSystem.IsWindows())
+            return Processes.WindowsProcessLifetime.CommandLineLength(executable, arguments) > 32_766 ? "spawn ENAMETOOLONG" : null;
+        return arguments.Any(argument => Encoding.UTF8.GetByteCount(argument) + 1 > 128 * 1024) ? "spawn E2BIG" : null;
+    }
+
     private static string Received(string value)
     {
         var inspected = Inspect(value);

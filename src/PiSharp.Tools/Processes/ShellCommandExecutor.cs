@@ -126,6 +126,9 @@ public sealed class NativeShellOperations : IShellOperations
     public async ValueTask<int?> ExecuteAsync(string command, string workingDirectory, ProcessRawOutputCallback onData,
         CancellationToken cancellationToken)
     {
+        // Source operations.exec spawns the shell: the operating system's command-line limit fails as Node's spawn error.
+        if (_shell.CommandTransport == ShellCommandTransport.Argv && NodeArgumentErrors.SpawnLimit(_shell.Shell, _shell.CommandArguments(command)) is { } spawnError)
+            throw new PiSharp.Agent.ToolSourceErrorException(spawnError);
         var request = new ProcessRequest(_shell.Shell, _shell.CommandArguments(command), workingDirectory, _environment,
             Path.Combine(_scratchDirectory, "pi-bash-discarded-" + Guid.NewGuid().ToString("N") + ".log"))
         { StandardInput = _shell.CommandTransport == ShellCommandTransport.Stdin ? Encoding.UTF8.GetBytes(command) : null };

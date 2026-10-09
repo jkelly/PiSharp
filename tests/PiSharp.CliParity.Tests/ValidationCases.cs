@@ -107,6 +107,31 @@ internal static partial class Program
             Equal(true, isError, "invalid MCP arguments are an error result");
             Equal("Validation failed for tool \"mcp__proj__count\":\n  - n: must be integer\n\nReceived arguments:\n{\n  \"n\": \"five\"\n}", text, "upstream validation message");
         }),
+        // rpc-mode.ts "bash" -> executeBash: no command length limit of its own (the native cap was 12,000 characters); the operating
+        // system's spawn limit fails as Node's spawn error, which the response carries.
+        ("validation.rpc-user-bash-runs-long-commands", async () =>
+        {
+            using var sandbox = new Sandbox("validation-rpc-bash");
+            sandbox.Vars["PI_OFFLINE"] = "1";
+            var commands = new[] { "echo " + new string('y', 20_000), "echo " + new string('z', 40_000) };
+            var lines = string.Concat(commands.Select((command, index) =>
+                System.Text.Json.JsonSerializer.Serialize(new { id = "b" + index, type = "bash", command }) + "\n"));
+            var gate = new GatedInput(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(lines)));
+            using var output = new SignalingStream("\"id\":\"b1\"", gate.Release);
+            using var stdout = new StringWriter(); using var stderr = new StringWriter();
+            var host = sandbox.Host(stdout, stderr, null, rpcInput: gate, rpcOutput: output) with { StdoutIsTty = false };
+            Equal(0, await PiCommand.RunAsync(["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"], host, CancellationToken.None), "exit; " + stderr);
+            var responses = System.Text.Encoding.UTF8.GetString(output.ToArray()).Split('\n')
+                .Where(line => line.Contains("\"command\":\"bash\"", StringComparison.Ordinal)).Select(line => JsonDocument.Parse(line).RootElement).ToArray();
+            var first = responses.Single(response => response.GetProperty("id").GetString() == "b0");
+            Check(first.GetProperty("success").GetBoolean() && first.GetProperty("data").GetProperty("output").GetString()!.StartsWith("yyyy", StringComparison.Ordinal),
+                "20k user command runs: " + first.GetRawText()[..Math.Min(300, first.GetRawText().Length)]);
+            var second = responses.Single(response => response.GetProperty("id").GetString() == "b1");
+            if (OperatingSystem.IsWindows())
+                Check(!second.GetProperty("success").GetBoolean() && second.GetProperty("error").GetString() == "spawn ENAMETOOLONG",
+                    "40k user command: " + second.GetRawText()[..Math.Min(300, second.GetRawText().Length)]);
+            else Check(second.GetProperty("success").GetBoolean(), "40k user command runs on Unix");
+        }),
         // bash.ts execute: an empty command runs, resolveTimeoutMs rejects a non-positive timeout and accepts a fractional one, and only
         // the operating system bounds the command length (captured from the installed Pi 1.1.0 bash tool on Windows).
         ("validation.bash-admits-what-the-source-schema-admits", async () =>

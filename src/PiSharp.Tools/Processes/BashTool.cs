@@ -101,12 +101,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
 
     /// <summary>Node's child_process.spawn error when the operating system refuses the command line: on Windows CreateProcess takes at
     /// most 32,767 characters (libuv reports ENAMETOOLONG); on Unix one argument is at most 128 KiB (E2BIG).</summary>
-    private static string? SpawnLimitError(PreparedToolAction action)
-    {
-        if (OperatingSystem.IsWindows())
-            return WindowsProcessLifetime.CommandLineLength(action.Target, action.CommandArguments) > 32_766 ? "spawn ENAMETOOLONG" : null;
-        return action.CommandArguments.Any(argument => System.Text.Encoding.UTF8.GetByteCount(argument) + 1 > 128 * 1024) ? "spawn E2BIG" : null;
-    }
+    private static string? SpawnLimitError(PreparedToolAction action) => NodeArgumentErrors.SpawnLimit(action.Target, action.CommandArguments);
     /// <summary>Source <c>commandPrefix ? `${commandPrefix}\n${command}` : command</c>.</summary>
     private string Resolve(string command) => string.IsNullOrEmpty(_options.CommandPrefix) ? command : _options.CommandPrefix + "\n" + command;
 

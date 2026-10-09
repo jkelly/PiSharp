@@ -41,7 +41,10 @@ public sealed partial class RpcSessionDispatcher
             return null;
         }
         var excluded = command.Mode switch { "exclude" => true, "include" => (bool?)false, _ => null };
-        var result = await session.ExecuteUserBashAsync(command.Message!, excluded, command.Id, token).ConfigureAwait(false);
+        UserBashResult result;
+        // Source rpc-mode.ts answers a failed executeBash with the error's message (for example Node's spawn error).
+        try { result = await session.ExecuteUserBashAsync(command.Message!, excluded, command.Id, token).ConfigureAwait(false); }
+        catch (PiSharp.Agent.ToolSourceErrorException error) { throw new RpcCommandException(command.Id, command.Type, error.Message); }
         return UserBash.RpcData(result);
     }
 }
