@@ -12,6 +12,9 @@ namespace PiSharp.CodingAgent;
 
 public sealed partial class PersistentAgentSession
 {
+    /// <summary>Tree queries under this session's context bounds (session-manager.ts reads every entry of the file).</summary>
+    public SessionTreeQueries CreateTreeQueries() => new(SessionTreeQueryOptions.For(_projector.Options));
+
     internal SessionTreeNavigationRevision CaptureTreeRevision(AgentSessionAttachment attachment, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -19,7 +22,7 @@ public sealed partial class PersistentAgentSession
         {
             ThrowAvailable();
             return new(attachment, this, _acknowledgedLog, _context, _configuration,
-                new SessionTreeQueries().Build(_acknowledgedLog.Entries, token), _activationEpoch);
+                new SessionTreeQueries(SessionTreeQueryOptions.For(_projector.Options)).Build(_acknowledgedLog.Entries, token), _activationEpoch);
         }
     }
 
@@ -210,7 +213,7 @@ public sealed partial class PersistentAgentSession
                     _pendingToolNames = pendingTools;
                     selected = new(SessionTreeNavigationDisposition.Selected,
                         new(revision.Attachment, this, publishedLog, prospective, configuration,
-                            new SessionTreeQueries().Build(publishedLog.Entries), _activationEpoch), _agent.Snapshot, editorText)
+                            new SessionTreeQueries(SessionTreeQueryOptions.For(_projector.Options)).Build(publishedLog.Entries), _activationEpoch), _agent.Snapshot, editorText)
                         { Checkpoint = checkpoint, OriginalOwner = originals };
                 }
             });

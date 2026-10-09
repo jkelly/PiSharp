@@ -431,7 +431,7 @@ internal sealed partial class PiExtensionHost
 
     private static JsonNode? SessionName(AgentSessionAttachment attached)
     {
-        var tree = new SessionTreeQueries().Build(attached.Session.Snapshot.Log.Entries, attached.LifetimeToken);
+        var tree = attached.Session.CreateTreeQueries().Build(attached.Session.Snapshot.Log.Entries, attached.LifetimeToken);
         return tree.SessionNameAvailable && tree.SessionName is { Length: > 0 } name ? name : null;
     }
 
@@ -573,7 +573,7 @@ internal sealed partial class PiExtensionHost
         var attached = Attached;
         if (attached is null) return op is "getEntries" or "getBranch" or "getTree" ? new JsonArray() : null;
         var state = attached.Session.Snapshot;
-        SessionTreeSnapshot Tree() => new SessionTreeQueries().Build(state.Log.Entries, attached.LifetimeToken);
+        SessionTreeSnapshot Tree() => attached.Session.CreateTreeQueries().Build(state.Log.Entries, attached.LifetimeToken);
         string? Arg(int index) => args.ValueKind == JsonValueKind.Array && args.GetArrayLength() > index && args[index].ValueKind == JsonValueKind.String ? args[index].GetString() : null;
         static JsonNode Node(JsonData value) => JsonNode.Parse(value.ToString())!;
         switch (op)

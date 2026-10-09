@@ -342,7 +342,8 @@ public static class RpcSessionCommand
             // Events and responses carry tool results with Pi-sized images (owner decision 0004).
             // pi --mode rpc reads each line as rpc-mode.ts handleInputLine does (StringDecoder + JSON.parse). JSON.parse and
             // JSON.stringify have no depth limit; 64 levels is what an owned JsonData holds.
-            var framing = javaScriptInput ? Framing with { MaximumJsonDepth = 64, JavaScriptInput = true } : Framing;
+            // The in-process print, json and interactive connections carry the same values (a custom entry or message of any depth).
+            var framing = javaScriptInput ? Framing with { MaximumJsonDepth = 64, JavaScriptInput = true } : pi is not null ? Framing with { MaximumJsonDepth = 64 } : Framing;
             // Every frame Pi writes is serializeJsonLine, JSON.stringify(value) + "\n".
             var outputFraming = framing with { MaximumFrameBytes = PiPayloadBudget.OutputRecordBytes, JavaScriptInput = false, JavaScriptOutput = javaScriptInput };
             observedOutput = new OutputObservation(stdout, gate, outputFraming.MaximumFrameBytes);

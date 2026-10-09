@@ -20,8 +20,7 @@ internal static class PiPayloadBudget
     public const int RequestEntryCharacters = 16 * 1024 * 1024;
     /// <summary>One provider request body, which replays every image of the context.</summary>
     public const int RequestPayloadBytes = 64 * 1024 * 1024;
-    /// <summary>One persisted session record and one JSONL line.</summary>
-    public const int SessionRecordCharacters = 16 * 1024 * 1024;
+    /// <summary>One persisted session record (one JSONL line).</summary>
     public const int SessionLineBytes = 64 * 1024 * 1024;
     /// <summary>A whole session file and its projected context (the session branch planner admits at most 64 MiB).</summary>
     public const int SessionFileBytes = 64 * 1024 * 1024;
@@ -118,7 +117,9 @@ internal static class PiPayloadBudget
         return bounds with
         {
             MaximumInputBytes = SessionFileBytes, MaximumLineBytes = SessionLineBytes,
-            CodecOptions = (bounds.CodecOptions ?? new()) with { MaximumRecordCharacters = SessionRecordCharacters, MaximumUtf8Bytes = SessionLineBytes }
+            // session-manager.ts writes and reads JSON.stringify lines of any size or depth: one record keeps only the line's memory bound
+            // (characters never exceed its UTF-8 bytes) and the 64 levels an owned JSON value holds.
+            CodecOptions = (bounds.CodecOptions ?? new()) with { MaximumRecordCharacters = SessionLineBytes, MaximumUtf8Bytes = SessionLineBytes, MaximumJsonDepth = 64 }
         };
     }
 }

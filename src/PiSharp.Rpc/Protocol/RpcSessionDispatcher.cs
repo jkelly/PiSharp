@@ -780,7 +780,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     {
         var state = _session.Snapshot;
         if (state.Log.Entries.Length > _options.MaximumReturnedEntries) throw new RpcDispatchException(RpcDispatchFailure.ResourceLimit);
-        var tree = new SessionTreeQueries(new(MaximumQueryEntries: _options.MaximumReturnedEntries)).Build(state.Log.Entries, token);
+        // The session's own context bounds (the Pi entry's admit every entry); the returned-entry bound above stays the command's.
+        var tree = _session.CreateTreeQueries().Build(state.Log.Entries, token);
         if (!tree.LabelsAvailable) throw new RpcCommandException(command.Id, command.Type, "Session tree metadata is unavailable under the native profile.");
         var data = RpcCommandCodec.Build(writer =>
         {

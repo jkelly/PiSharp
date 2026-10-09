@@ -19,6 +19,8 @@ public static class SessionExtensionEntryLimits
     public const int CurrentSchemaVersion = 1;
     public const int MaximumIdentifierCharacters = 128;
     public const int MaximumSessionIdCharacters = 4_096;
-    public const int MaximumDataCharacters = 65_536;
-    public const int MaximumDataUtf8Bytes = 262_144;
+    /// <summary>session-manager.ts appendCustomEntry stores data of any size: an extension entry's data is bounded only by the session
+    /// codec's record bound.</summary>
+    public const int MaximumDataCharacters = int.MaxValue;
+    public const int MaximumDataUtf8Bytes = int.MaxValue;
 }

@@ -15,6 +15,7 @@ internal static partial class Program
         ("caps.many-and-large-queued-follow-ups-from-an-extension", ManyFollowUps),
         ("caps.context-and-input-handlers-over-a-long-session", LongSessionHandlers),
         ("caps.extension-callbacks-in-a-large-session", LargeSessionCallbacks),
+        ("caps.large-and-deep-custom-entries-persist-and-reload", LargeCustomEntries),
     ];
 
     // agent.ts setTools / agent-loop.ts: every registered tool is declared and callable (formerly 128 per binding and per agent);
@@ -166,5 +167,41 @@ internal static partial class Program
         var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "--session", file, "count"]);
         Equal(0, code, "exit; " + stderr);
         Equal("entries=5003", ToolResultText(sandbox.Requests[1]), "the tool ran with the whole session");
+    }
+
+    // session-manager.ts appendCustomEntry writes JSON.stringify(entry) of any size or depth and loadEntriesFromFile reads it back: an
+    // entry of 20 MB and 50 levels (formerly 16 MiB per record and 32 levels) is written, and the session resumes with it.
+    private static async Task LargeCustomEntries()
+    {
+        using var sandbox = NodeSandbox("large-custom-entries");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "store.ts"), """
+            export default function (pi: any) {
+              pi.registerTool({ name: "store_big", label: "Store", description: "Stores a big entry",
+                parameters: { type: "object", properties: {} },
+                async execute() {
+                  let deep: any = { leaf: true };
+                  for (let level = 0; level < 50; level++) deep = { next: deep };
+                  pi.appendEntry("big-state", { blob: "x".repeat(20_000_000), deep });
+                  return { content: [{ type: "text", text: "stored" }], details: {} };
+                } });
+              pi.registerTool({ name: "read_big", label: "Read", description: "Reads the big entry",
+                parameters: { type: "object", properties: {} },
+                async execute(_id: string, _params: any, _signal: any, _onUpdate: any, ctx: any) {
+                  const entry = ctx.sessionManager.getEntries().find((item: any) => item.type === "custom" && item.customType === "big-state");
+                  let depth = 0; for (let node = entry?.data?.deep; node?.next; node = node.next) depth++;
+                  return { content: [{ type: "text", text: "blob=" + (entry?.data?.blob?.length ?? -1) + " depth=" + depth }], details: {} };
+                } });
+            }
+            """);
+        sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("store_big", new { }) : AnthropicText("done");
+        var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "store"]);
+        Equal(0, code, "exit; " + stderr);
+        var file = sandbox.SessionFiles().Single();
+        Check(File.ReadLines(file).Any(line => line.Contains("\"customType\":\"big-state\"", StringComparison.Ordinal) && line.Length > 20_000_000), "the entry was written whole");
+        sandbox.Requests.Clear();
+        sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("read_big", new { }, "toolu_02") : AnthropicText("done");
+        (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "--session", file, "read"]);
+        Equal(0, code, "resume exit; " + stderr);
+        Equal("blob=20000000 depth=50", ToolResultText(sandbox.Requests[1]), "the resumed session holds the entry");
     }
 }
