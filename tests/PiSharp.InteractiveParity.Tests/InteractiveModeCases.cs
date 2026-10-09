@@ -409,6 +409,32 @@ internal static class InteractiveModeCases
             await pi.WaitFor("Hello from the fake model.");
             Equal(0, checks, "no package check with PI_OFFLINE");
         });
+        // main.ts: a resumed session whose stored cwd is gone asks to continue in the current cwd (Continue/Cancel); the session file
+        // keeps its header and receives the new entries.
+        foreach (var answer in new[] { "continue", "cancel" })
+            yield return ($"e2e.session.missing-cwd-{answer}", async () =>
+            {
+                await using var pi = new InteractiveHarness("missing-cwd-" + answer);
+                var missing = Path.Combine(pi.Root, "gone");
+                var sessionFile = pi.Write("old-sessions/2026-01-01T00-00-00-000Z_0198a2b0-0000-7000-8000-000000000001.jsonl",
+                    System.Text.Json.JsonSerializer.Serialize(new { type = "session", version = 3, id = "0198a2b0-0000-7000-8000-000000000001",
+                        timestamp = "2026-01-01T00:00:00.000Z", cwd = missing }) + "\n");
+                string? asked = null;
+                pi.MissingCwdAnswer = (prompt, fallback) => { asked = prompt; return answer == "continue" ? fallback : null; };
+                pi.Start([.. Regular, "--session", sessionFile]);
+                if (answer == "cancel")
+                {
+                    Equal(0, await pi.Exit(), "cancel exits 0");
+                    Equal($"cwd from session file does not exist\n{missing}\n\ncontinue in current cwd\n{pi.Cwd}", asked, "prompt text");
+                    return;
+                }
+                await pi.WaitFor("escape interrupt");
+                Contains(asked ?? "", "continue in current cwd", "prompted");
+                await pi.Submit("still here");
+                await pi.WaitFor("Hello from the fake model.");
+                await pi.WaitUntil(_ => InteractiveHarness.ReadShared(sessionFile).Contains("still here", StringComparison.Ordinal), "entries appended to the session file");
+                Contains(InteractiveHarness.ReadShared(sessionFile), missing.Replace("\\", "\\\\"), "header keeps the stored cwd");
+            });
         yield return ("e2e.autocomplete.at-file", Case("at-file", async pi =>
         {
             if (new PiSharp.Cli.Pi.PiToolsManager(Path.Join(pi.AgentDir, "bin"), Environment.GetEnvironmentVariable).GetToolPath("fd") is null)

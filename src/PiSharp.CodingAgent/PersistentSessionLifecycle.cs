@@ -32,6 +32,8 @@ public sealed class PersistentSessionLifecycle
     /// <summary>Configures a session a New creation staged (agent-session-runtime.ts newSession recreates the session through
     /// createAgentSession, which picks the default thinking level and records it) before it is attached.</summary>
     public Func<PersistentAgentSession, CancellationToken, ValueTask>? ConfigureNewSession { get; set; }
+    /// <summary>The cwd new sessions record when the attached session continues outside its stored cwd (SessionManager cwdOverride).</summary>
+    public string? WorkingDirectoryOverride { get; set; }
     public SessionLifecycleReadOnly ReadOnly { get; }
     public PersistentSessionLifecycle(SessionRuntimeRegistry registry, Func<long> clock, Func<string> nextEntryId,
         PersistentAgentSessionOptions? options = null, Func<string>? nextSessionId = null,
@@ -153,7 +155,7 @@ public sealed class PersistentSessionLifecycle
         var labelIds = ImmutableArray.CreateBuilder<string>(labels);
         for (var index = 0; index < labels; index++) { token.ThrowIfCancellationRequested(); labelIds.Add(nextEntryId()); token.ThrowIfCancellationRequested(); }
         var plan = request.Kind == AgentSessionCreationKind.New
-            ? planner.New(id, timestamp, previous.Session.WorkingDirectory, request.ParentSession, token)
+            ? planner.New(id, timestamp, WorkingDirectoryOverride ?? previous.Session.WorkingDirectory, request.ParentSession, token)
             : planner.Fork(new(state.Log.Header, state.Log.Entries, entry!, position, id, timestamp,
                 previous.Session.SessionFile, labelIds.MoveToImmutable()), token);
         var directory = System.IO.Path.GetDirectoryName(previous.Session.Path)!;

@@ -27,6 +27,8 @@ internal sealed class InteractiveHarness : IAsyncDisposable
     public Func<InteractiveModeContext, InteractiveModeContext>? Configure { get; set; }
     /// <summary>The fake GitHub the fd/rg tools manager downloads from (PiHost.ToolsHttp/ToolsReleaseBase).</summary>
     public Func<HttpMessageHandler>? ToolsHttp { get; set; }
+    /// <summary>Answers the missing-session-cwd prompt (PiHost.PromptMissingSessionCwd): prompt text and current cwd to the chosen cwd.</summary>
+    public Func<string, string, string?>? MissingCwdAnswer { get; set; }
 
     private InteractiveModeContext ConfigureContext(InteractiveModeContext context)
     {
@@ -97,7 +99,8 @@ internal sealed class InteractiveHarness : IAsyncDisposable
                 new PiSharp.Cli.Mcp.McpSessionHost(AgentDir, Home, () => []), new McpBinding(), Stdout, Stderr, token,
                 loop => new PiSharp.Tui.Pi.ProcessTerminal(loop, Terminal, name => Vars.GetValueOrDefault(name)), mode => Mode = mode, ConfigureContext),
             ApplicationDirectory = Path.Combine(Root, "app"), Now = () => DateTimeOffset.UtcNow,
-            ToolsHttp = ToolsHttp, ToolsReleaseBase = ToolsHttp is null ? "https://github.com" : "https://gh.test"
+            ToolsHttp = ToolsHttp, ToolsReleaseBase = ToolsHttp is null ? "https://github.com" : "https://gh.test",
+            PromptMissingSessionCwd = MissingCwdAnswer is null ? null : (prompt, fallback, _) => Task.FromResult(MissingCwdAnswer(prompt, fallback))
         };
         run = Task.Run(() => PiCommand.RunAsync(args, host, deadline.Token));
     }

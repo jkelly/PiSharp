@@ -41,6 +41,8 @@ internal sealed record PiEntryOptions
 
     internal required PiToolPolicy ToolPolicy { get; init; }
     internal required StartupSettingsSnapshot Settings { get; init; }
+    /// <summary>The cwd the session continues in when its stored cwd no longer exists (SessionManager.open cwdOverride).</summary>
+    internal string? SessionCwdOverride { get; init; }
     /// <summary>Re-reads the settings files (the SettingsManager the session runtime reads when it creates a new session).</summary>
     internal Func<CancellationToken, Task<StartupSettingsSnapshot>>? ReloadSettings { get; init; }
     internal required OriginalSystemPromptAdmission SystemPrompt { get; init; }

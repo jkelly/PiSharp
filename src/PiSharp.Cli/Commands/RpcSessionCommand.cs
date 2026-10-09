@@ -194,9 +194,13 @@ public static class RpcSessionCommand
                     { type = "session", version = 3, id = pi?.HeaderId ?? NextId(), timestamp = pi?.HeaderTimestamp ?? DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("O", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
                     profile.SelectedModel, cancellationToken).ConfigureAwait(false);
             if (parsed.SessionMode != "open") await session.ConfigureAsync(new(SystemMessage: new("system", profile.InitialSystem)), cancellationToken).ConfigureAwait(false);
-            if (!string.Equals(SessionCommands.Absolute(session.WorkingDirectory), profile.Workspace,
-                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            // A session whose stored cwd no longer exists continues in the cwd the user chose (main.ts promptForMissingSessionCwd).
+            var pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            var continuesElsewhere = pi?.SessionCwdOverride is { } cwdOverride && string.Equals(SessionCommands.Absolute(cwdOverride), profile.Workspace, pathComparison) &&
+                !Directory.Exists(session.WorkingDirectory);
+            if (!continuesElsewhere && !string.Equals(SessionCommands.Absolute(session.WorkingDirectory), profile.Workspace, pathComparison))
                 throw new SessionCommandException(SessionCommandFailure.WorkspaceMismatch);
+            if (continuesElsewhere) lifecycle.WorkingDirectoryOverride = profile.Workspace;
             var thinking = SettingsModelSelection.Thinking(settings, session.Snapshot.Agent.Model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel,
                 parsed.SessionMode == "open", session.GetSupportedThinkingLevels());
             if (thinking is not null && thinking != session.Snapshot.Context.ThinkingLevel)
