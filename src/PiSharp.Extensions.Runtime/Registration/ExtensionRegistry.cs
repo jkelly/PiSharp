@@ -472,7 +472,11 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             var prepare = ((ExtensionToolDescriptor)entry.Descriptor).PrepareInitialArgumentsAsync;
             if (prepare is null) return arguments;
             // Preparation receives no host/UI context and cannot advertise a result or authorize an effect.
-            var result = await prepare(arguments, linked.Token).ConfigureAwait(false);
+            JsonData result;
+            // Source prepareToolCall catches what prepareArguments throws and reports its message as the error result.
+            try { result = await prepare(arguments, linked.Token).ConfigureAwait(false); }
+            catch (Exception error) when (error is not (OperationCanceledException or ExtensionToolArgumentPreparationException))
+            { throw new ExtensionToolArgumentPreparationException(error.Message, error); }
             linked.Token.ThrowIfCancellationRequested();
             if (!RegistrationPolicy.Json(result, options, requireObject: true))
                 throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, scope.OwnerId, "prepared-tool-arguments");

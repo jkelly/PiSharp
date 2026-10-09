@@ -66,6 +66,9 @@ public interface IExtensionCommandCatalogContext : IExtensionCommandContext
 public delegate ValueTask<JsonData> ExtensionToolCallback(
     JsonData arguments, IExtensionToolContext context, CancellationToken cancellationToken);
 /// <summary>Pure trusted preparation, with cancellation but no host operation or UI context.</summary>
+/// <summary>Source agent-loop prepareToolCall: an error the tool's prepareArguments throws becomes the call's error result, whose text
+/// is the error's message. The registry raises it for any (non-cancellation) failure of a preparation callback.</summary>
+public sealed class ExtensionToolArgumentPreparationException(string message, Exception? innerException = null) : Exception(message, innerException);
 public delegate ValueTask<JsonData> ExtensionToolArgumentPreparationCallback(
     JsonData arguments, CancellationToken cancellationToken);
 public delegate ValueTask ExtensionCommandCallback(

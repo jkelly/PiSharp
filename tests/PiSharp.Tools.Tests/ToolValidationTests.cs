@@ -18,6 +18,7 @@ internal static class ToolValidationTests
         ("validation invoker passes coerced arguments and keeps the model's call", InvokerCoerces),
         ("validation invoker failure is the upstream error result without running the tool", InvokerFailure),
         ("validation edit prepareArguments runs before the schema check", EditPrepareArguments),
+        ("validation thrown prepareArguments error is the error result text", PreparationError),
     ];
 
     private static JsonElement Goldens()
@@ -153,6 +154,24 @@ internal static class ToolValidationTests
             EditTool.PrepareEditArguments(JsonData.Parse("""{"path":"e.txt","edits":{"oldText":"a","newText":"b"}}""")).ToString());
         var invalid = await tools.Edit.CreateInvoker(policy).ExecuteAsync(Invocation("edit", """{"path":"e.txt","edits":[{"oldText":"a"}]}"""), default);
         Equal("Validation failed for tool \"edit\":\n  - edits.0.newText: must have required properties newText\n\nReceived arguments:\n{\n  \"path\": \"e.txt\",\n  \"edits\": [\n    {\n      \"oldText\": \"a\"\n    }\n  ]\n}", Text(invalid));
+    }
+
+    private static async Task PreparationError()
+    {
+        var policy = new Recording();
+        var result = await new ToolInvoker([new ThrowingPreparation()], policy).ExecuteAsync(Invocation("prep", "{}"), default);
+        Equal("prepare refused", Text(result)); Check(result.IsError && result.Failure?.Kind == ToolFailureKind.InvalidArguments, "Not an error result.");
+        Equal("{}", result.Details.ToString()); Equal(0, policy.Actions.Count);
+    }
+
+    private sealed class ThrowingPreparation : IInitialToolArgumentPreparationAdapter
+    {
+        public string Name => "prep";
+        public ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken token) =>
+            throw new ToolArgumentPreparationException("prepare refused");
+        public ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token) => throw new InvalidOperationException("The tool ran.");
+        public ValueTask<bool> ValidateAsync(PreparedToolAction action, CancellationToken token) => throw new InvalidOperationException("The tool ran.");
+        public ValueTask<ToolResult> ExecuteAsync(PreparedToolAction action, CancellationToken token) => throw new InvalidOperationException("The tool ran.");
     }
 
     private sealed class BuiltinTools(string root)

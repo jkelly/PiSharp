@@ -159,6 +159,10 @@ internal static partial class Program
               pi.registerTool({ name: "raw", label: "Raw", description: "Raw JSON schema",
                 parameters: { type: "object", properties: { n: { type: "integer" }, tags: { type: "array", items: { type: "string" } } }, required: ["n"] },
                 async execute(_id: string, params: any) { log("raw", params); return { content: [{ type: "text", text: "raw ok" }], details: {} }; } });
+              pi.registerTool({ name: "prepared", label: "Prepared", description: "prepareArguments shim",
+                parameters: Type.Object({ n: Type.Number() }),
+                prepareArguments(args: any) { if (args.fail) throw new Error("prepare refused " + args.fail); return { n: args.count }; },
+                async execute(_id: string, params: any) { log("prepared", params); return { content: [{ type: "text", text: "prepared ok" }], details: {} }; } });
             }
             """);
         sandbox.Respond = (_, index) => index switch
@@ -167,16 +171,21 @@ internal static partial class Program
             1 => AnthropicToolCall("typed", new { n = "x" }, "toolu_2"),
             2 => AnthropicToolCall("raw", new { n = "7", tags = "a" }, "toolu_3"),
             3 => AnthropicToolCall("raw", new { n = "7" }, "toolu_4"),
+            4 => AnthropicToolCall("prepared", new { count = "3" }, "toolu_5"),
+            5 => AnthropicToolCall("prepared", new { fail = "x" }, "toolu_6"),
             _ => AnthropicText("done")
         };
         var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "Validate"]);
         Equal(0, code, "exit; " + stderr);
-        Equal("""[["typed",{"n":5,"when":true,"tags":["a"]}],["raw",{"n":7}]]""",
+        Equal("""[["typed",{"n":5,"when":true,"tags":["a"]}],["raw",{"n":7}],["prepared",{"n":3}]]""",
             new JsonArray([.. LogLines(sandbox).Select(line => JsonNode.Parse(line))]).ToJsonString(), "the tools received the coerced arguments");
         Equal("typed ok", ToolResultText(sandbox.Requests[1]), "typed result");
         Equal("Validation failed for tool \"typed\":\n  - n: must be number\n\nReceived arguments:\n{\n  \"n\": \"x\"\n}", ToolResultText(sandbox.Requests[2]), "typed failure");
         Equal("Validation failed for tool \"raw\":\n  - tags: must be array\n\nReceived arguments:\n{\n  \"n\": \"7\",\n  \"tags\": \"a\"\n}", ToolResultText(sandbox.Requests[3]), "raw failure");
         Equal("raw ok", ToolResultText(sandbox.Requests[4]), "raw result");
+        // prepareToolCall runs prepareArguments before the schema check, and an error it throws is the result's text.
+        Equal("prepared ok", ToolResultText(sandbox.Requests[5]), "prepared result");
+        Equal("prepare refused x", ToolResultText(sandbox.Requests[6]), "prepareArguments error");
     }
 
     private static string ToolResultText(Seen request)

@@ -17,13 +17,13 @@ internal sealed class ExtensionToolAdapter(ExtensionRegistry registry, Extension
     public string Name => tool.Name;
     /// <summary>Source validateToolArguments against the registration's parameters, after its prepareArguments.</summary>
     public ToolArgumentSchema? ArgumentSchema { get; } = new(tool.ValidationParameters ?? tool.Parameters, tool.ParametersOrigin);
-    public ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken cancellationToken)
+    public async ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested(); sessionToken.ThrowIfCancellationRequested();
         // Legacy registrations retain their original failure staging and do not gain a callback admission.
-        return tool.HasInitialArgumentPreparation
-            ? registry.PrepareToolArgumentsAsync(snapshot, Name, invocation.Call.Arguments, cancellationToken, sessionToken)
-            : ValueTask.FromResult(invocation.Call.Arguments);
+        if (!tool.HasInitialArgumentPreparation) return invocation.Call.Arguments;
+        try { return await registry.PrepareToolArgumentsAsync(snapshot, Name, invocation.Call.Arguments, cancellationToken, sessionToken).ConfigureAwait(false); }
+        catch (ExtensionToolArgumentPreparationException error) { throw new ToolArgumentPreparationException(error.Message, error); }
     }
     public ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken cancellationToken)
     {

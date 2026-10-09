@@ -30,6 +30,10 @@ public interface IInvocationPreparedToolAdapter : IPreparedToolAdapter
         ToolProgressCallback onProgress, CancellationToken cancellationToken);
 }
 
+/// <summary>Source agent-loop prepareToolCall: an error the tool's prepareArguments throws becomes the error result whose text is its
+/// message. Initial argument preparation raises it; any other preparation failure keeps the generic invalid-arguments result.</summary>
+public sealed class ToolArgumentPreparationException(string message, Exception? innerException = null) : Exception(message, innerException);
+
 /// <summary>Trusted, initial-only argument preparation. Hook replacements never invoke this capability.</summary>
 public interface IInitialToolArgumentPreparationAdapter : IPreparedToolAdapter
 {
@@ -311,7 +315,10 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
             var initialView = invocation;
             if (tool is IInitialToolArgumentPreparationAdapter initial)
             {
-                var arguments = await initial.PrepareInitialArgumentsAsync(invocation, cancellationToken).ConfigureAwait(false);
+                JsonData arguments;
+                try { arguments = await initial.PrepareInitialArgumentsAsync(invocation, cancellationToken).ConfigureAwait(false); }
+                catch (ToolArgumentPreparationException error) when (!cancellationToken.IsCancellationRequested)
+                { return CompleteResult(ToolResult.Error(ToolFailureKind.InvalidArguments, error.Message)); }
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!ValidArguments(arguments, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
                 if (!ReferenceEquals(arguments, invocation.Call.Arguments))
