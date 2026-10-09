@@ -54,7 +54,8 @@ public sealed class PersistentSessionLifecycle
             fileSystem = backend;
             catalog ??= new SessionCatalog([new("session-backend", backend.Directory)], fileSystem: backend);
         }
-        this.nextSessionId = nextSessionId ?? (() => Guid.NewGuid().ToString());
+        // session-manager.ts newSession/forkFrom: a uuidv7 session id.
+        this.nextSessionId = nextSessionId ?? (() => Guid.CreateVersion7(DateTimeOffset.FromUnixTimeMilliseconds(clock())).ToString());
         var bounds = this.options.SessionLogStoreOptions?.ReaderOptions ?? new();
         var graph = this.options.ContextOptions ?? new();
         planner = new(new(Math.Min(100_000, Math.Min(graph.MaximumEntries, Math.Max(1, bounds.MaximumRecords - 1))),

@@ -238,7 +238,7 @@ public static class RpcSessionCommand
             long Clock() => started + Interlocked.Increment(ref ticks);
             var options = new PersistentAgentSessionOptions(UseLatestLeaf: parsed.Latest, SelectedLeafId: parsed.Leaf,
                 AgentOptions: PiPayloadBudget.Agent(new(Loop: LoopOptions(pi is not null))),
-                SessionLogStoreOptions: new(ReaderOptions: ReaderOptions(pi is not null)),
+                SessionLogStoreOptions: new(ReaderOptions: ReaderOptions(pi is not null), JavaScriptSerialization: pi is not null),
                 ContextOptions: ContextOptions(pi is not null));
             // agent-session.ts prompt: Pi entries validate the model and its provider auth before each idle prompt.
             if (pi is not null)
@@ -260,7 +260,8 @@ public static class RpcSessionCommand
                     },
                     NewSessionThinkingLevel = (model, levels) => SettingsModelSelection.Thinking(pi.ReloadSettings is { } reloadThinking
                         ? reloadThinking(CancellationToken.None).GetAwaiter().GetResult() : settings, model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel, false, levels) };
-            string NextId() => "rpc-" + Guid.NewGuid().ToString("N");
+            // session-manager.ts generateId: randomUUID().slice(0, 8); PersistentAgentSession redraws an id already in use.
+            static string NextId() => Guid.NewGuid().ToString("N")[..8];
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);
             if (pi is not null)
@@ -302,7 +303,7 @@ public static class RpcSessionCommand
             session = parsed.SessionMode == "open"
                 ? await lifecycle.OpenAsync(new(parsed.Session, parsed.Latest, parsed.Leaf), profile.SelectedModel, cancellationToken).ConfigureAwait(false)
                 : await lifecycle.CreateAsync(parsed.Session, new PiSharp.Sessions.Serialization.SessionEntryCodec().Parse(JsonSerializer.Serialize(new
-                    { type = "session", version = 3, id = pi?.HeaderId ?? NextId(), timestamp = pi?.HeaderTimestamp ?? DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("O", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
+                    { type = "session", version = 3, id = pi?.HeaderId ?? NextId(), timestamp = pi?.HeaderTimestamp ?? DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
                     profile.SelectedModel, cancellationToken).ConfigureAwait(false);
             if (parsed.SessionMode != "open") await session.ConfigureAsync(new(SystemMessage: new("system", profile.InitialSystem)), cancellationToken).ConfigureAwait(false);
             // A session whose stored cwd no longer exists continues in the cwd the user chose (main.ts promptForMissingSessionCwd).

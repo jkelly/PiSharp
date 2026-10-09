@@ -1536,14 +1536,20 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     }
     private static string Identity(Func<string> nextEntryId, string headerId, ImmutableArray<SessionEntry> entries)
     {
-        string id;
-        try { id = nextEntryId(); } catch (Exception) { throw Error(PersistentAgentSessionFailure.InvalidCommit); }
-        if (string.IsNullOrWhiteSpace(id) || id == headerId || entries.Any(entry => entry.Id == id))
-            throw Error(PersistentAgentSessionFailure.InvalidCommit);
-        return id;
+        // session-manager.ts generateId: up to 100 draws of a short id that is not in use yet, then a full UUID.
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            string id;
+            try { id = nextEntryId(); } catch (Exception) { throw Error(PersistentAgentSessionFailure.InvalidCommit); }
+            if (string.IsNullOrWhiteSpace(id)) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+            if (id != headerId && !entries.Any(entry => entry.Id == id)) return id;
+        }
+        return Guid.NewGuid().ToString("D");
     }
+    /// <summary>session-manager.ts entry timestamps: <c>new Date().toISOString()</c> (UTC, milliseconds, Z).</summary>
+    internal const string IsoTimestampFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
     private static SessionEntry Record(SessionEntryCodec codec, string type, string id, string? parentId,
-        Func<long> clock, Action<Utf8JsonWriter> fields, string timestampFormat = "O")
+        Func<long> clock, Action<Utf8JsonWriter> fields, string timestampFormat = IsoTimestampFormat)
     {
         string timestamp;
         try { timestamp = DateTimeOffset.FromUnixTimeMilliseconds(clock()).ToString(timestampFormat, CultureInfo.InvariantCulture); }
@@ -1551,9 +1557,14 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         using var bytes = new MemoryStream();
         using (var writer = new Utf8JsonWriter(bytes))
         {
-            writer.WriteStartObject(); writer.WriteString("type", type); writer.WriteString("id", id);
-            writer.WriteString("parentId", parentId); writer.WriteString("timestamp", timestamp);
-            fields(writer); writer.WriteEndObject();
+            writer.WriteStartObject(); writer.WriteString("type", type);
+            // session-manager.ts appendCustomEntry and appendCustomMessageEntry build { type, customType, ..., id, parentId, timestamp };
+            // every other entry starts with its envelope.
+            var envelopeLast = type is "custom" or "custom_message";
+            if (!envelopeLast) { writer.WriteString("id", id); writer.WriteString("parentId", parentId); writer.WriteString("timestamp", timestamp); }
+            fields(writer);
+            if (envelopeLast) { writer.WriteString("id", id); writer.WriteString("parentId", parentId); writer.WriteString("timestamp", timestamp); }
+            writer.WriteEndObject();
         }
         return codec.Parse(Encoding.UTF8.GetString(bytes.ToArray()));
     }
