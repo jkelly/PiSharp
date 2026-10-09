@@ -93,7 +93,7 @@ internal static class PromptAuthCases
             pi.Type("\r");
             await pi.WaitFor("Attach a summary written by");
             pi.Type("\r");
-            await pi.WaitFor("Upload sends the report");
+            await pi.WaitFor("Open GitHub Issue writes");
             pi.Type("\u001b[B");
             await Task.Delay(100);
             pi.Type("\r");

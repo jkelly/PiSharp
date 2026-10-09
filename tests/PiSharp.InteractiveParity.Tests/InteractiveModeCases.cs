@@ -616,7 +616,7 @@ internal static class InteractiveModeCases
         yield return ("e2e.slash.bug-cancel", Case("bug", async pi =>
         {
             await pi.Submit("/bug");
-            await pi.WaitUntil(text => text.Contains("Pi developers", StringComparison.Ordinal) || text.Contains("bug", StringComparison.OrdinalIgnoreCase), "bug flow prompt");
+            await pi.WaitFor("Nothing is uploaded.");
             await Task.Delay(200);
             pi.Type("\u001b");
             await pi.WaitFor("Bug report cancelled");
@@ -638,7 +638,7 @@ internal static class InteractiveModeCases
             pi.Type("\r");
             await pi.WaitFor("Attach a summary written by");
             pi.Type("\r");
-            await pi.WaitFor("Upload sends the report");
+            await pi.WaitFor("Open GitHub Issue writes");
             pi.Type("\u001b[B");
             await Task.Delay(100);
             pi.Type("\r");
@@ -653,6 +653,84 @@ internal static class InteractiveModeCases
             var file = pi.SessionFiles().Single();
             await pi.WaitUntil(_ => InteractiveHarness.ReadShared(file).Contains("\"type\":\"custom\"", StringComparison.Ordinal), "bug report custom entry");
         }));
+        // Owner decision 11: /bug's "Open GitHub Issue" writes the zip and opens a prefilled issue at github.com/jkelly/PiSharp with
+        // the mode's URL opener (a fake here: no real browser). The only HTTP traffic is the prompt and the summary request to the
+        // fake provider; nothing is uploaded.
+        yield return ("e2e.slash.bug-github-issue", async () =>
+        {
+            var opened = new List<string>();
+            await using var pi = new InteractiveHarness("bug-issue", columns: 120, rows: 90);
+            pi.Vars["DISPLAY"] = ":0";
+            pi.Configure = context => context with { OpenUrl = url => { lock (opened) opened.Add(url); } };
+            pi.Start(Regular);
+            await pi.WaitFor("escape interrupt");
+            await pi.Submit("first message");
+            await pi.WaitFor("Hello from the fake model.");
+            pi.Respond = (_, _) => InteractiveHarness.AnthropicText("Summary: the agent misbehaved.");
+            await pi.Submit("/bug");
+            await pi.WaitFor("What went wrong?");
+            pi.Type("tool output vanished");
+            pi.Type("\r");
+            await pi.WaitFor("Include the session transcript?");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("Attach a summary written by");
+            pi.Type("\r");
+            await pi.WaitFor("Open GitHub Issue writes");
+            pi.Type("\r");
+            await pi.WaitFor("Opened a prefilled GitHub issue in your browser.");
+            var url = opened.Single();
+            var zip = Directory.GetFiles(pi.Cwd, "pi-bug-report-*.zip").Single();
+            var id = Path.GetFileNameWithoutExtension(zip)["pi-bug-report-".Length..];
+            Check(url.StartsWith("https://github.com/jkelly/PiSharp/issues/new?title=Bug%20report%3A%20tool%20output%20vanished&body=" +
+                "%23%23%20Description%0A%0Atool%20output%20vanished%0A%0A%23%23%20Summary%0A%0ASummary%3A%20the%20agent%20misbehaved.%0A%0A" +
+                "%23%23%20Environment%0A%0A-%20PiSharp%3A%20", StringComparison.Ordinal), "issue link: " + url);
+            var body = Uri.UnescapeDataString(url[(url.IndexOf("&body=", StringComparison.Ordinal) + "&body=".Length)..]);
+            Contains(body, "\n- Model: anthropic/claude-sonnet-4-5", "model in the issue");
+            Contains(body, $"Report ID: `{id}`. The full report is `pi-bug-report-{id}.zip` (report.json, diagnostics.json, summary.md)", "report to attach");
+            Check(!body.Contains(pi.Cwd, StringComparison.Ordinal) && !body.Contains("sk-test-key", StringComparison.Ordinal), "no paths or keys in the issue");
+            Check(url.Length <= 8000, "link length");
+            var screen = string.Join("", pi.Terminal.Text.Split('\n').Select(line => line.Trim()));
+            Contains(screen, Path.GetFileName(zip), "report path printed");
+            Contains(screen, url[..60], "link printed");
+            Equal(2, pi.Requests.Count, "only the prompt and the summary went over HTTP");
+            Check(pi.Requests.All(request => !request.Contains("bug_report", StringComparison.Ordinal) && !request.Contains("report.json", StringComparison.Ordinal)), "nothing uploaded");
+            Check(pi.CatalogRequests.All(request => !request.Contains("bug-reports", StringComparison.Ordinal)), "no upload endpoint");
+            var file = pi.SessionFiles().Single();
+            await pi.WaitUntil(_ => InteractiveHarness.ReadShared(file).Contains("\"delivery\":\"github-issue\"", StringComparison.Ordinal), "bug report custom entry");
+        });
+        // Without a browser the user can see (here an SSH session), the report path and the link are printed and nothing opens.
+        yield return ("e2e.slash.bug-github-issue-headless", async () =>
+        {
+            var opened = new List<string>();
+            await using var pi = new InteractiveHarness("bug-headless", columns: 220, rows: 60);
+            pi.Vars["SSH_CONNECTION"] = "10.0.0.1 50000 10.0.0.2 22";
+            pi.Vars["DISPLAY"] = ":0";
+            pi.Configure = context => context with { OpenUrl = url => { lock (opened) opened.Add(url); } };
+            pi.Start(Regular);
+            await pi.WaitFor("escape interrupt");
+            await pi.Submit("/bug");
+            await pi.WaitFor("What went wrong?");
+            pi.Type("\r");
+            await pi.WaitFor("Include the session transcript?");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("Attach a summary written by");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("Open GitHub Issue writes");
+            pi.Type("\r");
+            await pi.WaitFor("No browser could be opened.");
+            var zip = Directory.GetFiles(pi.Cwd, "pi-bug-report-*.zip").Single();
+            var screen = string.Join("", pi.Terminal.Text.Split('\n').Select(line => line.Trim()));
+            Contains(screen, "Bug report exported to: " + zip, "report path printed");
+            Contains(screen, "https://github.com/jkelly/PiSharp/issues/new?title=Bug%20report%20from%20PiSharp%20", "link printed");
+            Equal(0, opened.Count, "no browser opened");
+            Equal(0, pi.Requests.Count, "nothing sent");
+        });
         yield return ("e2e.autocomplete.slash-commands", Case("autocomplete", async pi =>
         {
             pi.Type("/hot");

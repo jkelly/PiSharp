@@ -203,7 +203,6 @@ internal static class InteractiveHostServices
             PiSharp.CodingAgent.Export.AgentSessionExport.Source(session),
             (parentId, timestamp) => new PiSharp.CodingAgent.Export.SessionShare().CreateShareTrailingEntries(
                 PiSharp.CodingAgent.Export.AgentSessionExport.State(session), parentId, timestamp));
-        public Task<string?> GetRadiusTokenAsync(CancellationToken cancellationToken) => Task.FromResult<string?>(null);
         public void AppendCustomEntry(string customType, PiSharp.Contracts.JsonData data) =>
             session.AppendCustomEntryAsync(customType, data).GetAwaiter().GetResult();
     }

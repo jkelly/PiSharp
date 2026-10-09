@@ -19,8 +19,8 @@ Type `/` to search the commands of the current session. PiSharp has all of Pi's 
 
 Extensions, prompt templates and skills add their own commands, as in Pi. Pi's [Slash commands](https://github.com/earendil-works/pi/blob/v1.1.0/packages/coding-agent/docs/slash-commands.md) page describes each one.
 
-:::caution[/bug]
-`/bug` is Pi's command, ported as is. Its upload sends the report to Pi's developers. For a problem with PiSharp, choose **Export as Zip** and open an issue on [GitHub](https://github.com/jkelly/PiSharp/issues) instead.
+:::note[/bug]
+`/bug` builds Pi's report, with the same prompts, zip and optional model-written summary, but never uploads it. Choose **Open GitHub Issue**: PiSharp writes `pi-bug-report-<id>.zip` to the current folder and opens a prefilled issue on [PiSharp's GitHub](https://github.com/jkelly/PiSharp/issues) with your description, the summary and your PiSharp version, OS, runtime and model. Attach the zip to the issue before you submit it, since a link can't carry files. If no browser can open, for example over SSH, PiSharp prints the zip's path and the issue link instead. **Export as Zip** writes only the zip.
 :::
 
 `!command` runs a shell command and adds its output to the context. `!!command` runs it without adding the output.

@@ -1211,8 +1211,10 @@ internal static class UtilityCases
     {
         public Queue<string?> Answers = [];
         public List<(string Kind, string Title, IReadOnlyList<string> Options, string? Description, string? Initial)> Prompts = [];
-        public List<string> Status = [], Errors = [], Loaders = [];
+        public List<string> Status = [], Errors = [], Loaders = [], Opened = [];
         public bool CancelLoaders;
+        /// <summary>The fake URL opener: records the link and answers whether a browser opened (never a real browser).</summary>
+        public Func<string, bool> Open = _ => true;
         public List<FakeLoader> LoaderInstances = [];
         public Task<string?> Input(string title, string description, string? initialValue)
         {
@@ -1227,6 +1229,7 @@ internal static class UtilityCases
         public IBugReportLoader ShowLoader(string message) { Loaders.Add(message); var loader = new FakeLoader(CancelLoaders); LoaderInstances.Add(loader); return loader; }
         public void ShowStatus(string message) => Status.Add(message);
         public void ShowError(string message) => Errors.Add(message);
+        public bool OpenUrl(string url) { Opened.Add(url); return Open(url); }
     }
 
     private sealed class FakeBugSession : IBugReportSession
@@ -1237,14 +1240,30 @@ internal static class UtilityCases
         public string? SummaryHint;
         public List<(string Type, JsonData Data)> CustomEntries = [];
         public int SerializeCalls;
+        public JsonData ReportEnvironment = JsonData.EmptyObject;
+        public JsonData? ReportModel;
         public string SessionId => "session-1";
         public Task<string> SummarizeForBugReportAsync(string? hint, CancellationToken cancellationToken) { SummaryHint = hint; return Summarize(hint, cancellationToken); }
         public BugReportMetadataOptions GetMetadataOptions() =>
-            new("session-1", "/work", false, false, 3, "medium", JsonData.EmptyObject, JsonData.EmptyObject) { Environment = JsonData.EmptyObject, Id = "report-1" };
+            new("session-1", "/work", false, false, 3, "medium", JsonData.EmptyObject, JsonData.EmptyObject) { Environment = ReportEnvironment, Model = ReportModel, Id = "report-1" };
         public IEnumerable<SessionEntry> GetEntries() => [];
         public string SerializeSessionBranch() { SerializeCalls++; return "{\"type\":\"session\"}\n"; }
-        public Task<string?> GetRadiusTokenAsync(CancellationToken cancellationToken) => Task.FromResult<string?>(null);
         public void AppendCustomEntry(string customType, JsonData data) => CustomEntries.Add((customType, data));
+    }
+
+    private static readonly JsonData BugEnvironment = JsonData.Parse(
+        """{"version":"1.1.0","userAgent":"pi/1.1.0 (linux; dotnet/10.0.0; x64)","runtime":"dotnet/10.0.0","platform":"linux","arch":"x64","osRelease":"6.8.0","osVersion":"Ubuntu 24.04.1 LTS","shell":"bash","terminal":{},"piEnvironmentVariables":["PI_OFFLINE"]}""");
+    private static readonly JsonData BugModel = JsonData.Parse(
+        """{"provider":"anthropic","id":"claude-test-1","name":"Claude Test","api":"anthropic-messages","baseUrl":"https://user:secret@api.example/v1"}""");
+
+    /// <summary>The issue link's decoded <c>title</c> and <c>body</c> query parameters.</summary>
+    private static (string Title, string Body) IssueQuery(string url)
+    {
+        Check(url.StartsWith(BugReportIssue.NewIssueUrl + "?title=", StringComparison.Ordinal), "issue link base: " + url);
+        var query = url[(url.IndexOf('?') + 1)..].Split('&');
+        Equal(2, query.Length, "two query parameters");
+        Check(query[0].StartsWith("title=", StringComparison.Ordinal) && query[1].StartsWith("body=", StringComparison.Ordinal), "title then body");
+        return (Uri.UnescapeDataString(query[0]["title=".Length..]), Uri.UnescapeDataString(query[1]["body=".Length..]));
     }
 
     private static IEnumerable<(string, Func<Task>)> BugReportCases()
@@ -1256,19 +1275,21 @@ internal static class UtilityCases
             await InteractiveBugReport.ReportBug(session, ui, new() { Env = _ => null });
             Equal("Report a bug", ui.Prompts[0].Title, "description editor");
             Equal($"{InteractiveBugReport.Disclaimer}\n\nWhat went wrong? (optional)", ui.Prompts[0].Description, "editor description");
+            Check(!InteractiveBugReport.Disclaimer.Contains("Earendil", StringComparison.Ordinal) && InteractiveBugReport.Disclaimer.StartsWith("Nothing is uploaded.", StringComparison.Ordinal), "consent names the new destination");
             Equal("Include the session transcript?", ui.Prompts[1].Title, "transcript selector");
             Seq(["Yes, include the transcript", "No"], ui.Prompts[1].Options, "transcript options");
             Equal(InteractiveBugReport.TranscriptNote, ui.Prompts[1].Description, "transcript note");
             Equal("Attach a summary written by the current model instead?", ui.Prompts[2].Title, "summary selector");
             Contains(ui.Prompts[2].Description!, "The transcript is sent to your provider with your credentials", "summary note");
             Equal("Bug report", ui.Prompts[3].Title, "delivery selector");
-            Seq(["Upload Report", "Export as Zip", "Cancel"], ui.Prompts[3].Options, "delivery options");
+            Seq(["Open GitHub Issue", "Export as Zip", "Cancel"], ui.Prompts[3].Options, "delivery options");
             var lines = ui.Prompts[3].Description!.Split('\n');
             Check(lines.Any(line => line.Contains("Description: Request failed", StringComparison.Ordinal)), "description line");
             Check(lines.Any(line => line.Contains("↳ pi exiting...", StringComparison.Ordinal)), "continuation line");
             Check(lines.Any(line => line.Contains("stack trace", StringComparison.Ordinal)), "stack line");
-            Contains(ui.Prompts[3].Description!, "Transcript: not included\nSummary: none\n\nUpload sends the report to radius.pi.dev. Export writes a zip archive to the current directory instead.", "delivery summary");
+            Contains(ui.Prompts[3].Description!, "Transcript: not included\nSummary: none\n\nOpen GitHub Issue writes a zip archive to the current directory and opens a prefilled issue at github.com/jkelly/PiSharp/issues; attach the zip there. Nothing is uploaded. Export writes only the zip archive.", "delivery summary");
             Seq(["Bug report cancelled"], ui.Status, "status");
+            Equal(0, ui.Opened.Count, "nothing opened");
         });
         yield return ("util.bug-report.cancel-at-description", async () =>
         {
@@ -1277,14 +1298,112 @@ internal static class UtilityCases
             Equal("initial hint", ui.Prompts.Single().Initial, "initial hint");
             Seq(["Bug report cancelled"], ui.Status, "status");
         });
-        yield return ("util.bug-report.upload-offline", async () =>
+        // Owner decision 11: "Open GitHub Issue" writes the zip, records the report and opens the prefilled issue with the URL
+        // opener; the link carries the description, the summary and the environment, exactly encoded. PI_OFFLINE does not
+        // matter: nothing goes over the network.
+        yield return ("util.bug-report.github-issue-opens-prefilled-link", async () =>
         {
-            var ui = new FakeBugUi { Answers = new(["", "Yes, include the transcript", "Upload Report"]) };
-            await InteractiveBugReport.ReportBug(new FakeBugSession(), ui, new() { Env = name => name == "PI_OFFLINE" ? "1" : null });
-            Equal(3, ui.Prompts.Count, "no summary prompt when the transcript is included");
-            Contains(ui.Prompts[2].Description!, "Description: none\nTranscript: included\nSummary: none", "delivery summary");
-            Seq(["Uploading bug reports requires online mode. Use Export as Zip instead."], ui.Errors, "error");
+            using var dir = new TempDir();
+            var ui = new FakeBugUi { Answers = new(["  it broke & stopped\nsecond line?  ", "No", "Yes, generate a summary", "Open GitHub Issue"]) };
+            var session = new FakeBugSession
+            {
+                ReportEnvironment = BugEnvironment, ReportModel = BugModel,
+                Summarize = (_, _) => Task.FromResult("## What went wrong\nThe `edit` tool failed: 100% #fail\n"),
+            };
+            await InteractiveBugReport.ReportBug(session, ui, new() { Env = name => name == "PI_OFFLINE" ? "1" : null, Cwd = () => dir.Path, Version = "1.1.0.2" });
+            Equal(0, ui.Errors.Count, "no error: " + string.Join("; ", ui.Errors));
+            var archive = Path.Combine(dir.Path, "pi-bug-report-report-1.zip");
+            Check(File.Exists(archive), "archive written");
+            var title = "Bug report: it broke & stopped";
+            var body =
+                "## Description\n\nit broke & stopped\nsecond line?\n\n" +
+                "## Summary\n\n## What went wrong\nThe `edit` tool failed: 100% #fail\n\n" +
+                "## Environment\n\n" +
+                "- PiSharp: 1.1.0.2\n- Pi baseline: 1.1.0\n- OS: Ubuntu 24.04.1 LTS (linux x64)\n- Runtime: dotnet/10.0.0\n" +
+                "- Model: anthropic/claude-test-1 (Claude Test)\n- API: anthropic-messages\n- Thinking level: medium\n" +
+                "- Extensions: 0 loaded, 0 failed\n- Failed or diagnosed turns: 0\n- Crashes: 0\n\n" +
+                "## Report\n\nReport ID: `report-1`. The full report is `pi-bug-report-report-1.zip` (report.json, diagnostics.json, summary.md) " +
+                "on the reporter's machine. Attach it to this issue: GitHub cannot attach files from a link.\n";
+            var url = ui.Opened.Single();
+            Equal("https://github.com/jkelly/PiSharp/issues/new?title=Bug%20report%3A%20it%20broke%20%26%20stopped&body=" +
+                "%23%23%20Description%0A%0Ait%20broke%20%26%20stopped%0Asecond%20line%3F%0A%0A%23%23%20Summary%0A%0A%23%23%20What%20went%20wrong%0A" +
+                "The%20%60edit%60%20tool%20failed%3A%20100%25%20%23fail%0A%0A%23%23%20Environment%0A%0A-%20PiSharp%3A%201.1.0.2%0A",
+                url[..url.IndexOf("-%20Pi%20baseline", StringComparison.Ordinal)], "exact encoding");
+            Equal(BugReportIssue.NewIssueUrl + "?title=" + Uri.EscapeDataString(title) + "&body=" + Uri.EscapeDataString(body), url, "issue link");
+            Equal((title, body), IssueQuery(url), "decoded title and body");
+            Check(!url.Contains("secret", StringComparison.Ordinal) && !url.Contains("api.example", StringComparison.Ordinal) && !url.Contains("%2Fwork", StringComparison.Ordinal),
+                "no base URL, credentials or paths in the link");
+            Seq([$"Bug report exported to: {archive}\nReport ID: report-1\nOpened a prefilled GitHub issue in your browser. Attach the zip to it before submitting. Issue link:\n{url}"],
+                ui.Status, "status prints the report path and the link");
+            var (type, data) = session.CustomEntries.Single();
+            Equal("pi.bug-report", type, "custom entry type");
+            Equal("github-issue", data.Value.GetProperty("delivery").GetString(), "delivery");
+            Equal(archive, data.Value.GetProperty("path").GetString(), "path");
+            using var zip = System.IO.Compression.ZipFile.OpenRead(archive);
+            Seq(["report.json", "diagnostics.json", "summary.md"], zip.Entries.Select(entry => entry.FullName), "zip contents unchanged");
         });
+        // Headless (no browser) and a failing opener: the report path and the link are printed instead.
+        yield return ("util.bug-report.github-issue-headless-prints-path", async () =>
+        {
+            foreach (var (label, open) in new (string, Func<string, bool>)[] { ("headless", _ => false), ("opener throws", _ => throw new InvalidOperationException("no launcher")) })
+            {
+                using var dir = new TempDir();
+                var ui = new FakeBugUi { Answers = new(["", "Yes, include the transcript", "Open GitHub Issue"]), Open = open };
+                var session = new FakeBugSession();
+                await InteractiveBugReport.ReportBug(session, ui, new() { Env = _ => null, Cwd = () => dir.Path, Version = "1.1.0.2" });
+                var archive = Path.Combine(dir.Path, "pi-bug-report-report-1.zip");
+                Check(File.Exists(archive), label + ": archive written");
+                var url = ui.Opened.Single();
+                Seq([$"Bug report exported to: {archive}\nReport ID: report-1\nNo browser could be opened. Open this link to file the issue, then attach the zip:\n{url}"],
+                    ui.Status, label + ": status");
+                var (title, body) = IssueQuery(url);
+                Equal("Bug report from PiSharp 1.1.0.2", title, label + ": title without a description");
+                Contains(body, "## Description\n\n_No description given._\n\n## Environment\n\n- PiSharp: 1.1.0.2\n- Pi baseline: 1.1.0\n- OS: unknown (unknown unknown)\n- Runtime: unknown\n- Model: none\n", label + ": body");
+                Contains(body, "(report.json, diagnostics.json, session.jsonl) on the reporter's machine. Attach it to this issue: GitHub cannot attach files from a link. It contains the session transcript; review it before attaching.\n", label + ": transcript warning");
+                Check(!body.Contains("{\"type\":\"session\"}", StringComparison.Ordinal), label + ": transcript stays out of the link");
+                Equal(1, session.SerializeCalls, label + ": transcript in the zip");
+            }
+        });
+        yield return ("util.bug-report.browser-availability", Sync(() =>
+        {
+            Func<string, string?> Env(params string[] set) => name => set.Contains(name) ? "x" : null;
+            Check(BrowserOpener.CanOpenBrowser(Env(), "win32"), "windows");
+            Check(BrowserOpener.CanOpenBrowser(Env(), "darwin"), "macOS");
+            Check(!BrowserOpener.CanOpenBrowser(Env(), "linux"), "linux without a display");
+            Check(BrowserOpener.CanOpenBrowser(Env("DISPLAY"), "linux"), "X11");
+            Check(BrowserOpener.CanOpenBrowser(Env("WAYLAND_DISPLAY"), "freebsd"), "Wayland");
+            foreach (var ssh in new[] { "SSH_CONNECTION", "SSH_CLIENT", "SSH_TTY" })
+            {
+                Check(!BrowserOpener.CanOpenBrowser(Env(ssh), "win32"), ssh + " on Windows");
+                Check(!BrowserOpener.CanOpenBrowser(Env(ssh, "DISPLAY"), "linux"), ssh + " with a display");
+            }
+        }));
+        // The link stays within GitHub's limit: the summary is cut first (with a note naming summary.md), then the description.
+        yield return ("util.bug-report.github-issue-truncates-long-text", Sync(() =>
+        {
+            JsonData Metadata(string? hint) => BugReport.CollectBugReportMetadata(
+                new("s", "/work", false, true, 1, "off", JsonData.EmptyObject, JsonData.EmptyObject) { Hint = hint, Id = "r", Environment = BugEnvironment, Model = BugModel });
+            var diagnostics = BugReport.CollectBugReportDiagnostics("s", []);
+            var summary = "Start. " + string.Concat(Enumerable.Repeat("data 😀 & more; ", 3000)) + "END";
+            var url = BugReportIssue.CreateIssueUrl(new(Metadata("short"), diagnostics, null, summary), "1.1.0.2", "pi-bug-report-r.zip");
+            Check(url.Length <= BugReportIssue.MaxUrlLength && url.Length > BugReportIssue.MaxUrlLength - 200, "summary cut close to the limit: " + url.Length);
+            var (title, body) = IssueQuery(url);
+            Equal("Bug report: short", title, "title");
+            Contains(body, "## Description\n\nshort\n\n## Summary\n\nStart. data 😀 & more; ", "summary kept from the start");
+            Contains(body, "\n\n" + BugReportIssue.SummaryTruncatedNote + "\n\n## Environment\n\n- PiSharp: 1.1.0.2\n", "summary note");
+            Check(!body.Contains("END", StringComparison.Ordinal) && !body.Contains('�'), "cut summary, no broken surrogate pair");
+            Contains(body, "## Report\n\nReport ID: `r`. The full report is `pi-bug-report-r.zip` (report.json, diagnostics.json, summary.md)", "report section kept");
+
+            var hint = "Huge " + string.Concat(Enumerable.Repeat("description line\n", 2000));
+            var both = BugReportIssue.CreateIssueUrl(new(Metadata(hint), diagnostics, null, summary), "1.1.0.2", "pi-bug-report-r.zip");
+            Check(both.Length <= BugReportIssue.MaxUrlLength, "description cut too: " + both.Length);
+            var (_, cutBody) = IssueQuery(both);
+            Contains(cutBody, "## Description\n\nHuge description line\n", "description kept from the start");
+            Contains(cutBody, "\n\n" + BugReportIssue.DescriptionTruncatedNote + "\n\n## Summary\n\n" + BugReportIssue.SummaryTruncatedNote + "\n\n## Environment\n\n", "both notes");
+
+            Equal("Bug report: " + new string('x', 85) + "...", BugReportIssue.Title(new string('x', 200) + "\nmore", "1"), "long title cut to 100 characters");
+            Equal("Bug report: first", BugReportIssue.Title("  first  \r\nsecond", "1"), "first line only");
+        }));
         yield return ("util.bug-report.zip-export-with-summary", async () =>
         {
             using var dir = new TempDir();
@@ -1299,6 +1418,7 @@ internal static class UtilityCases
             var archive = Path.Combine(dir.Path, "pi-bug-report-report-1.zip");
             Check(File.Exists(archive), "archive written");
             Seq([$"Bug report exported to: {archive}\nReport ID: report-1"], ui.Status, "status");
+            Equal(0, ui.Opened.Count, "no issue for a plain export");
             var (type, data) = session.CustomEntries.Single();
             Equal("pi.bug-report", type, "custom entry type");
             Equal("zip", data.Value.GetProperty("delivery").GetString(), "delivery");
@@ -1309,48 +1429,22 @@ internal static class UtilityCases
         });
         yield return ("util.bug-report.summary-cancelled-and-failed", async () =>
         {
-            var ui = new FakeBugUi { Answers = new(["x", "No", "Yes, generate a summary", "Export as Zip"]), CancelLoaders = true };
+            var ui = new FakeBugUi { Answers = new(["x", "No", "Yes, generate a summary", "Open GitHub Issue"]), CancelLoaders = true };
             await InteractiveBugReport.ReportBug(new FakeBugSession(), ui, new() { Env = _ => null });
             Seq(["Bug report cancelled"], ui.Status, "cancelled while summarizing");
-            var failing = new FakeBugUi { Answers = new(["x", "No", "Yes, generate a summary", "Export as Zip"]) };
+            var failing = new FakeBugUi { Answers = new(["x", "No", "Yes, generate a summary", "Open GitHub Issue"]) };
             var session = new FakeBugSession { Summarize = (_, _) => Task.FromException<string>(new InvalidOperationException("No model selected")) };
             await InteractiveBugReport.ReportBug(session, failing, new() { Env = _ => null });
             Seq(["Failed to write bug report summary: No model selected"], failing.Errors, "summary error");
             Check(failing.LoaderInstances[0].Disposed, "editor restored after failure");
+            Equal(0, ui.Opened.Count + failing.Opened.Count, "no issue opened");
         });
-        yield return ("util.bug-report.upload-success", async () =>
+        // Nothing uploads: Pi's uploader (bug-report-upload.ts, Radius) is not part of PiSharp.
+        yield return ("util.bug-report.no-uploader", Sync(() =>
         {
-            string? body = null;
-            var http = new FakeHttp(async (request, _) =>
-            {
-                body = await request.Content!.ReadAsStringAsync();
-                Equal("https://radius.pi.dev/v1/bug-reports", request.RequestUri!.ToString(), "upload url");
-                return Json("{\"ok\":true,\"bug_report\":{\"id\":\"srv-42\"}}");
-            });
-            var ui = new FakeBugUi { Answers = new(["hint", "Yes, include the transcript", "Upload Report"]) };
-            var session = new FakeBugSession();
-            await InteractiveBugReport.ReportBug(session, ui, new() { Env = _ => null, Http = new HttpMessageInvoker(http) });
-            Seq(["Uploading bug report..."], ui.Loaders, "loader");
-            Seq(["Bug report uploaded. Report ID: srv-42"], ui.Status, "status");
-            Contains(body!, "session.jsonl", "transcript part");
-            Equal(1, session.SerializeCalls, "transcript serialized");
-            Equal("upload", session.CustomEntries.Single().Data.Value.GetProperty("delivery").GetString(), "recorded");
-        });
-        yield return ("util.bug-report.upload-failure-falls-back-to-zip", async () =>
-        {
-            using var dir = new TempDir();
-            var http = new FakeHttp((_, _) => Task.FromResult(Json("{\"ok\":false,\"error\":\"quota exceeded\"}", HttpStatusCode.TooManyRequests)));
-            var ui = new FakeBugUi { Answers = new(["", "No", "No", "Upload Report", "Export as Zip"]) };
-            var session = new FakeBugSession();
-            await InteractiveBugReport.ReportBug(session, ui, new() { Env = _ => null, Http = new HttpMessageInvoker(http), Cwd = () => dir.Path });
-            Equal("Upload failed", ui.Prompts[4].Title, "fallback prompt");
-            Seq(["Export as Zip", "Cancel"], ui.Prompts[4].Options, "fallback options");
-            Equal("Bug report upload failed: quota exceeded\n\nExport the report as a zip archive instead?", ui.Prompts[4].Description, "fallback description");
-            Check(File.Exists(Path.Combine(dir.Path, "pi-bug-report-report-1.zip")), "archive written");
-            var declined = new FakeBugUi { Answers = new(["", "No", "No", "Upload Report", "Cancel"]) };
-            await InteractiveBugReport.ReportBug(new FakeBugSession(), declined, new() { Env = _ => null, Http = new HttpMessageInvoker(http) });
-            Seq(["Bug report cancelled"], declined.Status, "declined fallback");
-        });
+            Check(typeof(BugReport).Assembly.GetType("PiSharp.CodingAgent.Diagnostics.BugReportUpload") is null, "no bug report uploader");
+            Check(typeof(BugReportEnvironment).GetProperties().All(property => property.PropertyType != typeof(HttpMessageInvoker)), "the /bug flow has no HTTP client");
+        }));
         yield return ("util.bug-report.redaction", Sync(() =>
         {
             Equal("https://proxy.example.com:8080/", BugReportRedaction.RedactUrl("https://user:pass@proxy.example.com:8080/"), "credentials");

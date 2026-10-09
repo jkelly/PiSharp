@@ -964,9 +964,16 @@ internal sealed partial class InteractiveMode
         catch { }
     }
 
-    /// <summary>The /bug flow's UI seam: editor and selector prompts in the editor slot, and the bordered loader.</summary>
+    /// <summary>The /bug flow's UI seam: editor and selector prompts in the editor slot, the bordered loader, and the issue link
+    /// opened with the mode's URL opener (open-browser.ts openBrowser unless the host injects another).</summary>
     private sealed class BugReportUi(InteractiveMode mode) : IBugReportUi
     {
+        public bool OpenUrl(string url)
+        {
+            if (!BrowserOpener.CanOpenBrowser(mode.context.GetEnvironment)) return false;
+            try { mode.context.OpenUrl(url); return true; }
+            catch (Exception) { return false; }
+        }
         public void ShowStatus(string message) => mode.context.Loop.Post(() => mode.ShowStatus(message));
         public void ShowError(string message) => mode.context.Loop.Post(() => mode.ShowError(message));
         public Task<string?> Input(string title, string description, string? initialValue) =>
