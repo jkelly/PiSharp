@@ -296,10 +296,12 @@ public static class RpcSessionCommand
             await profile.ApplyInitialToolSelectionAsync(session, cancellationToken, resumed: parsed.SessionMode == "open").ConfigureAwait(false);
             observedInput = new InputObservation(stdin, gate);
             // Events and responses carry tool results with Pi-sized images (owner decision 0004).
-            var outputFraming = Framing with { MaximumFrameBytes = PiPayloadBudget.OutputRecordBytes };
+            // pi --mode rpc reads each line as rpc-mode.ts handleInputLine does (StringDecoder + JSON.parse). JSON.parse and
+            // JSON.stringify have no depth limit; 64 levels is what an owned JsonData holds.
+            var framing = javaScriptInput ? Framing with { MaximumJsonDepth = 64, JavaScriptInput = true } : Framing;
+            var outputFraming = framing with { MaximumFrameBytes = PiPayloadBudget.OutputRecordBytes, JavaScriptInput = false };
             observedOutput = new OutputObservation(stdout, gate, outputFraming.MaximumFrameBytes);
-            // pi --mode rpc reads each line as rpc-mode.ts handleInputLine does (StringDecoder + JSON.parse).
-            reader = new JsonlReader(observedInput, Framing with { JavaScriptInput = javaScriptInput });
+            reader = new JsonlReader(observedInput, framing);
             writer = new JsonlWriter(observedOutput, outputFraming);
             // The profile retains resource ownership across the terminal-stopped boundary. Dispatcher cleanup
             // already fences RPC/UI admission and joins its original run, reader, callbacks and writer.
@@ -319,7 +321,9 @@ public static class RpcSessionCommand
             };
             dispatcher = new(session, writer, Clock, [new(profile.SelectedModel, profile.SelectedModelWire)],
                 options: new(MaximumCommandBytes: PiPayloadBudget.RpcCommandBytes, MaximumOutputBytes: outputFraming.MaximumFrameBytes,
-                    MaximumModels: 4096, MaximumModelDefinitionBytes: 16 * 1024 * 1024),
+                    MaximumModels: 4096, MaximumModelDefinitionBytes: 16 * 1024 * 1024, MaximumJsonDepth: framing.MaximumJsonDepth,
+                    // rpc-mode.ts has no id or type length limit.
+                    MaximumIdCharacters: javaScriptInput ? int.MaxValue : 256, MaximumCommandTypeCharacters: javaScriptInput ? int.MaxValue : 128),
                 sessionOwnership: RpcSessionOwnership.Borrowed, inputAdmission: profile.InputAdmission, extensionUi: ui,
                 extensionCommandCatalog: profile, sessionOwner: profile.Sessions,
                 // main.ts: the initial runtime's session starts with reason "startup" in the Pi entry (new, continued or resumed alike).

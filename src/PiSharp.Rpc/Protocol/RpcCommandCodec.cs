@@ -42,14 +42,17 @@ internal static class RpcCommandCodec
         var body = input.Value; string? id = null;
         if (body.TryGetProperty("id", out var identity))
         {
-            if (identity.ValueKind != JsonValueKind.String || identity.GetString()!.Length > options.MaximumIdCharacters)
+            // rpc-mode.ts echoes command.id as it came: a non-string id is written back as that JSON value.
+            if (identity.ValueKind != JsonValueKind.String) id = RawJson(identity);
+            else if (identity.GetString()!.Length > options.MaximumIdCharacters)
                 throw new RpcCommandException(null, "parse", "Command id must be a bounded string when present.");
-            id = identity.GetString();
+            else id = identity.GetString();
         }
         // An object without a type reaches the same default branch: "Unknown command: undefined", with its id.
         if (!body.TryGetProperty("type", out var type)) throw new RpcCommandException(id, null, "Unknown command: undefined");
-        if (type.ValueKind != JsonValueKind.String ||
-            type.GetString()!.Length > options.MaximumCommandTypeCharacters)
+        // A non-string type matches no case: error(id, type, `Unknown command: ${type}`), the type echoed as its JSON value.
+        if (type.ValueKind != JsonValueKind.String) throw new RpcCommandException(id, RawJson(type), "Unknown command: " + JsString(type));
+        if (type.GetString()!.Length > options.MaximumCommandTypeCharacters)
             throw new RpcCommandException(id, "parse", "Command type must be a bounded string.");
         var name = type.GetString()!;
         try { _ = ErrorCore(id, name, "RPC command failed.", options); }
@@ -252,7 +255,30 @@ internal static class RpcCommandCodec
     { Header(writer, id, command); writer.WriteBoolean("success", false); writer.WriteString("error", error); }, options.MaximumOutputBytes);
     // JSON.stringify omits an undefined command (the type of a non-object or type-less command).
     private static void Header(Utf8JsonWriter writer, string? id, string? command)
-    { if (id is not null) writer.WriteString("id", id); writer.WriteString("type", "response"); if (command is not null) writer.WriteString("command", command); }
+    {
+        if (id is not null) { writer.WritePropertyName("id"); WriteEchoed(writer, id); }
+        writer.WriteString("type", "response");
+        if (command is not null) { writer.WritePropertyName("command"); WriteEchoed(writer, command); }
+    }
+
+    // A non-string id or type travels through the dispatcher's string-typed identity as this marker plus its JSON text, and is written
+    // back as that JSON value. The process-unique NUL-led prefix cannot be produced by an ordinary command string in practice.
+    private static readonly string RawPrefix = "\0pisharp-raw-json:" + Guid.NewGuid().ToString("N") + ":";
+    private static string RawJson(JsonElement value) => RawPrefix + value.GetRawText();
+    private static void WriteEchoed(Utf8JsonWriter writer, string value)
+    {
+        if (value.StartsWith(RawPrefix, StringComparison.Ordinal)) writer.WriteRawValue(value[RawPrefix.Length..]);
+        else writer.WriteStringValue(value);
+    }
+    // String(value) for a JSON value, as a template literal converts it.
+    private static string JsString(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.String => value.GetString()!,
+        JsonValueKind.Null => "null", JsonValueKind.True => "true", JsonValueKind.False => "false",
+        JsonValueKind.Number => PiSharp.AI.StreamingJson.ParseToJson(value.GetRawText()),
+        JsonValueKind.Array => string.Join(",", value.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.Null ? "" : JsString(item))),
+        _ => "[object Object]"
+    };
     internal static JsonData Event(string type, Action<Utf8JsonWriter>? fields, RpcDispatchOptions options) => Build(writer =>
     { writer.WriteString("type", type); fields?.Invoke(writer); }, options.MaximumOutputBytes);
     internal static JsonData Build(Action<Utf8JsonWriter> fields, int maximum)

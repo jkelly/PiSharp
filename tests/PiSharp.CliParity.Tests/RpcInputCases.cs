@@ -45,6 +45,35 @@ internal static partial class Program
             Equal(Canonical(expected), Canonical(frames.Code), "rpc responses");
             Equal(0, frames.Exit, "rpc exit; " + frames.Stderr);
         }),
+        ("rpc-input.non-string-ids-and-types-echo-and-no-length-or-depth-32-caps", async () =>
+        {
+            byte[] Line(string text) => [.. Encoding.UTF8.GetBytes(text), (byte)'\n'];
+            var longType = new string('t', 300);
+            var frames = await RunRpc(
+            [
+                Line("{\"id\":5,\"type\":\"nope\"}"), Line("{\"id\":\"t\",\"type\":5}"), Line("{\"id\":null,\"type\":true}"),
+                Line("{\"type\":[1,null,\"a\",[2,3]]}"), Line("{\"id\":{\"k\":[1]},\"type\":{\"a\":1}}"), Line("{\"id\":\"n\",\"type\":null}"),
+                Line("{\"id\":\"L\",\"type\":\"" + longType + "\"}"),
+                Line("{\"id\":\"deep\",\"type\":\"bogus\",\"x\":" + new string('[', 60) + new string(']', 60) + "}"),
+                Line("{\"id\":[1.50,-0],\"type\":\"get_state\"}"),
+            ]);
+            string[] expected =
+            [
+                """{"id":5,"type":"response","command":"nope","success":false,"error":"Unknown command: nope"}""",
+                """{"id":"t","type":"response","command":5,"success":false,"error":"Unknown command: 5"}""",
+                """{"id":null,"type":"response","command":true,"success":false,"error":"Unknown command: true"}""",
+                """{"type":"response","command":[1,null,"a",[2,3]],"success":false,"error":"Unknown command: 1,,a,2,3"}""",
+                """{"id":{"k":[1]},"type":"response","command":{"a":1},"success":false,"error":"Unknown command: [object Object]"}""",
+                """{"id":"n","type":"response","command":null,"success":false,"error":"Unknown command: null"}""",
+                "{\"id\":\"L\",\"type\":\"response\",\"command\":\"" + longType + "\",\"success\":false,\"error\":\"Unknown command: " + longType + "\"}",
+                """{"id":"deep","type":"response","command":"bogus","success":false,"error":"Unknown command: bogus"}""",
+            ];
+            Equal(string.Join("\n", expected.Order(StringComparer.Ordinal)),
+                string.Join("\n", frames.Code.Where(frame => !frame.Contains("\"command\":\"get_state\"", StringComparison.Ordinal)).Order(StringComparer.Ordinal)), "rpc responses");
+            var state = JsonDocument.Parse(frames.Code.Single(frame => frame.Contains("\"command\":\"get_state\"", StringComparison.Ordinal))).RootElement;
+            Equal("[1.5,0]", state.GetProperty("id").GetRawText(), "array id");
+            Check(state.GetProperty("success").GetBoolean(), "get_state with an array id failed");
+        }),
         ("rpc-input.null-command-is-an-unhandled-type-error", async () =>
         {
             // handleCommand(null) reads null.id, and so does its catch block: Node prints the TypeError and exits 1 with no response.
