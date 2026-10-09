@@ -122,7 +122,9 @@ internal static class SettledTests
             .Select(record => record.GetProperty("message")).ToArray();
         Equal(2, assistants.Length);
         Equal(1500, assistants[0].GetProperty("durationMs").GetInt32()); Equal(20, assistants[1].GetProperty("durationMs").GetInt32());
-        Check(assistants.All(message => LastProperty(message) == "durationMs"), "assistant durationMs placement");
+        // event-stream.ts end() sets durationMs after the finished fields; agent-loop.ts then adds thinkingLevel (Object.assign).
+        Check(assistants.All(message => message.EnumerateObject().Select(property => property.Name).TakeLast(2).SequenceEqual(["durationMs", "thinkingLevel"]) ||
+            LastProperty(message) == "durationMs"), "assistant durationMs placement");
         Equal("""{"type":"agent_settled","aborted":false}""", records.Single(record => Type(record) == "agent_settled").GetRawText());
         Check(fixture.Settled.Count == 1 && !fixture.Settled[0].Aborted, "session settlement reported an abort");
 

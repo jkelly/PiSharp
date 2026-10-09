@@ -30,6 +30,9 @@ public sealed record ProviderRouteOptions(Func<CancellationToken, ValueTask<Prov
     public int MaxTokens { get; init; } = 1024;
     /// <summary>A summary route: no prompt caching and thinking off.</summary>
     public bool Summary { get; init; }
+    /// <summary>With <see cref="Summary"/>: the summary keeps the main route's thinking binding and follows each request's level
+    /// (compaction.ts completeSummarization); only caching stays off.</summary>
+    public bool SummaryThinking { get; init; }
     public string? SessionId { get; init; }
     /// <summary>Caller request headers (options.headers), applied after model and provider headers; null removes.</summary>
     public ImmutableDictionary<string, string?>? Headers { get; init; }
@@ -86,6 +89,16 @@ public static class ProviderHeaderPolicies
     /// <summary>cloudflareAIGatewayAuth: the token in cf-aig-authorization, with Authorization and x-api-key removed.</summary>
     public static ImmutableDictionary<string, string?> CloudflareGatewayHeaders(string apiKey) => ImmutableDictionary.CreateRange(StringComparer.Ordinal,
         new KeyValuePair<string, string?>[] { new("cf-aig-authorization", "Bearer " + apiKey), new("Authorization", null), new("x-api-key", null) });
+
+    /// <summary>provider-attribution.ts getSessionHeaders (and opencode-headers.ts withOpenCodeSessionHeader): an OpenCode request
+    /// (provider opencode or opencode-go, or an opencode.ai base URL) carries x-opencode-session with the session id and
+    /// x-opencode-client naming the client (PiSharp, which does not identify as Pi). Caller headers applied later override them.</summary>
+    public static IEnumerable<KeyValuePair<string, string>> OpenCodeSessionHeaders(string provider, Uri endpoint, string? sessionId)
+    {
+        if (string.IsNullOrEmpty(sessionId) || !(provider is "opencode" or "opencode-go" || endpoint.Host.Equals("opencode.ai", StringComparison.OrdinalIgnoreCase))) yield break;
+        yield return new("x-opencode-session", sessionId);
+        yield return new("x-opencode-client", "pisharp");
+    }
 
     /// <summary>withOpenCodeSessionHeader: x-opencode-session carries the session id unless the caller already sets it.</summary>
     public static ImmutableDictionary<string, string?>? WithOpenCodeSessionHeader(string? sessionId, ImmutableDictionary<string, string?>? headers)
@@ -163,7 +176,7 @@ public static partial class NativeProviderFactory
         var key = auth.ApiKey is { Length: > 0 } apiKey ? apiKey : rewrites.Values.Any(value => value is not null) ? "header-owned-auth" : null;
         if (key is null) throw new InvalidOperationException($"No API key for provider: {model.Provider}");
         var handler = client is null ? null : new RouteHandler(client, rewrites);
-        var maximum = options.MaxTokens; var summary = options.Summary;
+        var maximum = options.MaxTokens; var summary = options.Summary; var plain = summary && !options.SummaryThinking;
         var sessionId = options.Summary ? null : options.SessionId;
         // Pi has no request-size cap: projection budgets follow the configured payload limit (images of ~4.5 MB reach the provider).
         var budget = options.MaximumPayloadBytes;
@@ -178,7 +191,7 @@ public static partial class NativeProviderFactory
                         MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget)) { ModelSupportsImages = images };
                 var request = new CompletionsKeyAuthRequestOptions(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
                     MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId) { ModelMetadata = metadata };
-                return BindCompletions(model, endpoint, key, projection, request with { ModelHeaders = modelHeaders }, handler, summary ? null : metadata);
+                return BindCompletions(model, endpoint, key, projection, request with { ModelHeaders = modelHeaders }, handler, plain ? null : metadata);
             }
             case "openai-responses":
             {
@@ -187,17 +200,17 @@ public static partial class NativeProviderFactory
                     MaximumInputCharacters: budget, MaximumOutputCharacters: budget,
                     ToolDeclarations: new(MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
                         MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget)) { ModelSupportsImages = images },
-                    new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId) { ModelHeaders = modelHeaders },
-                    handler, summary ? null : metadata);
+                    new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId, CacheRetention: summary ? "none" : null) { ModelHeaders = modelHeaders },
+                    handler, plain ? null : metadata);
             }
             default:
                 return BindRouteAnthropic(model, new Uri(baseUrl), key, RouteAnthropicProjection(raw, new(MaximumTokens: maximum, ModelReasoning: reasoning,
                     ModelSupportsImages: images, ThinkingEnabled: false, MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
                     MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget,
-                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), summary),
+                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), plain),
                     new(MaxTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, ModelHeaders: modelHeaders, SessionId: sessionId)
                     { BearerAuthorization = model.Provider == "github-copilot" },
-                    handler, summary ? null : metadata);
+                    handler, plain ? null : metadata);
         }
     }
 
@@ -210,7 +223,8 @@ public static partial class NativeProviderFactory
         {
             SupportsMidConversationEffort = value.TryGetProperty("compat", out var compat) && compat.ValueKind == JsonValueKind.Object &&
                 compat.TryGetProperty("supportsMidConvoEffort", out var mid) && mid.ValueKind == JsonValueKind.True,
-            SupportsThinkingOff = supportsOff, ModelReasoning = projection.ModelReasoning && (supportsOff || !summary)
+            SupportsThinkingOff = supportsOff, ModelReasoning = projection.ModelReasoning && (supportsOff || !summary),
+            AllowedFallbackModels = AnthropicFallbackModels(value)
         };
     }
 

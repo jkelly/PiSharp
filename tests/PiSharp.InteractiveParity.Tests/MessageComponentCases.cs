@@ -632,6 +632,8 @@ internal static class MessageComponentCases
             var previous = EarendilAnnouncementComponent.GetBundledInteractiveAssetPath;
             try
             {
+                // config.ts getBundledInteractiveAssetPath: the shipped asset is found by default.
+                Check(previous is not null && File.Exists(previous("clankolas.png")), "the bundled clankolas.png ships with the application");
                 EarendilAnnouncementComponent.GetBundledInteractiveAssetPath = null;
                 EarendilAnnouncementComponent.ResetImageCacheForTests();
                 var lines = new EarendilAnnouncementComponent().Render(80);

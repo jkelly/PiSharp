@@ -7,6 +7,9 @@ public sealed record ChatRequest(ModelDescriptor Model, ImmutableArray<Transcrip
 {
     /// <summary>Explicit native control; null retains a direct transport's existing options.</summary>
     public string? ThinkingLevel { get; init; }
+    /// <summary>Source StreamOptions.sessionId (agent.sessionId): the session the request belongs to, for prompt-cache keys, session
+    /// affinity headers and provider session headers. A transport configured with its own session id keeps it.</summary>
+    public string? SessionId { get; init; }
 }
 
 /// <summary>Explicit per-model native request support, independent of catalog/UI claims.</summary>

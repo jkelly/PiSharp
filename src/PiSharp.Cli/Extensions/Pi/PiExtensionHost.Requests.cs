@@ -217,7 +217,16 @@ internal sealed partial class PiExtensionHost
                 }
                 return await Compact(customInstructions, token).ConfigureAwait(false);
             case "command.waitForIdle": await RequireAttached().Session.WaitForIdleAsync(token).ConfigureAwait(false); return null;
-            case "command.session": return await SessionCommandAsync(p, token).ConfigureAwait(false);
+            case "command.session":
+                // ctx.navigateTree/newSession/fork/switchSession: the native command context answers only inside the command callback
+                // that created it, so the action runs in that callback's execution context (as the command awaits it upstream).
+                if (FlowOf(p) is { } commandFlow)
+                {
+                    Task<JsonNode?> action = null!;
+                    ExecutionContext.Run(commandFlow, _ => action = SessionCommandAsync(p, token), null);
+                    return await action.ConfigureAwait(false);
+                }
+                return await SessionCommandAsync(p, token).ConfigureAwait(false);
             case "command.reload":
                 // ctx.reload(): the mode's reload; the command's pi and ctx objects are stale afterwards.
                 if (Reload is null) throw new NotSupportedException("ctx.reload() needs a session host that reloads (RPC, interactive)");
@@ -361,8 +370,8 @@ internal sealed partial class PiExtensionHost
         var message = p.GetProperty("message");
         var options = p.TryGetProperty("options", out var o) && o.ValueKind == JsonValueKind.Object ? o : default;
         var deliverAs = options.ValueKind == JsonValueKind.Object && options.TryGetProperty("deliverAs", out var d) ? d.GetString() : null;
-        // agent-session.ts sendCustomMessage: an idle session appends (and emits) the message at once. A command's own input admission
-        // is still settling while its handler runs, so the append waits for that admission to finish.
+        // agent-session.ts sendCustomMessage: an idle session appends (and emits) the message at once, also while a command's handler
+        // runs inside its prompt's input admission. A message that triggers a turn waits for that admission to finish.
         for (var attempt = 0; ; attempt++)
         {
             try { await Send().ConfigureAwait(false); return; }
@@ -422,7 +431,7 @@ internal sealed partial class PiExtensionHost
 
     private static JsonNode? SessionName(AgentSessionAttachment attached)
     {
-        var tree = new SessionTreeQueries().Build(attached.Session.Snapshot.Log.Entries, attached.LifetimeToken);
+        var tree = attached.Session.CreateTreeQueries().Build(attached.Session.Snapshot.Log.Entries, attached.LifetimeToken);
         return tree.SessionNameAvailable && tree.SessionName is { Length: > 0 } name ? name : null;
     }
 
@@ -521,7 +530,8 @@ internal sealed partial class PiExtensionHost
             case "systemPrompt":
                 // agent-session.ts: during a run the prompt is the one before_agent_start handlers produced (agent.state.systemPrompt).
                 if (state is { Agent.IsRunning: true } && RunSystemPrompt is { } runPrompt) return runPrompt;
-                return state is null ? "" : new PiSharp.Sessions.Context.SessionSystemReplay().Replay(state.Agent.Messages, CancellationToken.None).Prompt;
+                // Between runs: the prompt of the in-memory loadout (_baseSystemPromptOptions after _rebuildSystemPrompt).
+                return state is null ? "" : attached?.Session.GetSystemPrompt() ?? new PiSharp.Sessions.Context.SessionSystemReplay().Replay(state.Agent.Messages, CancellationToken.None).Prompt;
             case "contextUsage":
             {
                 if (ContextUsage?.Invoke() is { } supplied) return supplied;
@@ -563,7 +573,7 @@ internal sealed partial class PiExtensionHost
         var attached = Attached;
         if (attached is null) return op is "getEntries" or "getBranch" or "getTree" ? new JsonArray() : null;
         var state = attached.Session.Snapshot;
-        SessionTreeSnapshot Tree() => new SessionTreeQueries().Build(state.Log.Entries, attached.LifetimeToken);
+        SessionTreeSnapshot Tree() => attached.Session.CreateTreeQueries().Build(state.Log.Entries, attached.LifetimeToken);
         string? Arg(int index) => args.ValueKind == JsonValueKind.Array && args.GetArrayLength() > index && args[index].ValueKind == JsonValueKind.String ? args[index].GetString() : null;
         static JsonNode Node(JsonData value) => JsonNode.Parse(value.ToString())!;
         switch (op)

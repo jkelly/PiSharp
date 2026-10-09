@@ -103,6 +103,9 @@ internal sealed class AnthropicLiveAuthentication
         if (store is not null) { refresh = new(this); lifecycle = new(store, refresh, time); }
     }
 
+    /// <summary>The models.json apiKey for anthropic, used when nothing is stored (provider-composer composeApiKeyAuth).</summary>
+    public Func<string?>? ConfiguredApiKey { get; init; }
+
     public async ValueTask<AuthenticationResolution> ResolveAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -117,6 +120,8 @@ internal sealed class AnthropicLiveAuthentication
         }
         if (stored is not null && stored.Type != "api_key") return new(AuthenticationDiagnostic.Missing);
         StoredApiKeyCredential? apiKey = null;
+        // provider-composer composeApiKeyAuth: without a stored credential, a models.json apiKey resolves as a credential key.
+        if (stored is null && ConfiguredApiKey?.Invoke() is { Length: > 0 } configured) apiKey = new(configured);
         if (stored is not null)
         {
             apiKey = new(stored.Key is null ? null : ConfigValueTemplate.Resolve(stored.Key, stored.Environment, environment.Get),

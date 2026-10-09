@@ -232,6 +232,9 @@ internal sealed class ModelRegistry
         !options.StoredCredentials.TryGetValue(provider, out var stored) ? null :
         stored is { Type: "api_key", Key: { } key } ? stored with { Key = Values.Resolve(key, stored.Environment) } : stored;
 
+    /// <summary>Source isUsingOAuth: the provider's stored credential is an OAuth credential.</summary>
+    internal bool IsUsingOAuth(string provider) => options.StoredCredentials.TryGetValue(provider, out var stored) && stored.Type == "oauth";
+
     /// <summary>Source hasConfiguredAuth: the provider's auth check passes. Checks are cached until the next rebuild.</summary>
     internal bool HasConfiguredAuth(string provider) => CheckAuth(provider) is not null;
 
@@ -353,6 +356,22 @@ internal sealed class ModelRegistry
             error = failure.Message == "authHeader requires a resolved API key" ? $"No API key found for \"{providerId}\"" : failure.Message;
             return null;
         }
+    }
+
+    /// <summary>composeApiKeyAuth for a provider with its own auth resolution (Anthropic): the models.json <c>apiKey</c> (config value
+    /// resolved, !command run), used when nothing is stored for the provider. Null when none is configured.</summary>
+    internal string? ConfiguredApiKey(string providerId) =>
+        ModelProviderComposer.ApiKey(ProviderConfig(providerId)) is { } rawKey ? Values.ResolveOrThrow(rawKey, $"API key for provider \"{providerId}\"", null) : null;
+
+    /// <summary>composeApiKeyAuth withConfiguredAuth plus getAuth's resolveConfiguredModelHeaders: the models.json provider headers
+    /// (and <c>authHeader</c> with the resolved key), then the model's configured headers. Null when nothing is configured.</summary>
+    internal IReadOnlyDictionary<string, string>? ConfiguredRequestHeaders(RegistryModel model, string? key)
+    {
+        var providerConfig = ProviderConfig(model.Provider);
+        var headers = Values.ResolveHeadersOrThrow(ModelProviderComposer.ConfiguredHeaders(providerConfig), $"provider \"{model.Provider}\"", null);
+        var auth = ModelProviderComposer.WithConfiguredAuth(key, null, headers, ModelProviderComposer.AuthHeader(providerConfig) && key is not null);
+        var modelHeaders = Values.ResolveHeadersOrThrow(ModelProviderComposer.RawModelHeaders(model, providerConfig), $"model \"{model.Reference}\"", null);
+        return ModelProviderComposer.MergeHeaders(auth, modelHeaders);
     }
 
     /// <summary>Source registerVirtualModel: re-registering replaces; a physical model with the same provider and id conflicts.</summary>

@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/session-manager.ts (createSessionId,
 // assertValidSessionId, getDefaultSessionDir, readSessionHeader, findMostRecentSession, buildSessionInfo, SessionManager.create, open,
-// continueRecent, forkFrom, findById, list, listAll) and packages/coding-agent/src/core/session-cwd.ts.
+// continueRecent, forkFrom, findById, list, listAll) and packages/coding-agent/src/core/session-cwd.ts; getBranch with packages/coding-agent/src/core/virtual-models.ts getBranchSelection.
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -112,6 +112,52 @@ internal static partial class PiSessions
     }
 
     internal static string? Text(JsonObject entry, string name) => entry[name] is JsonValue value && value.GetValueKind() == JsonValueKind.String ? value.GetValue<string>() : null;
+
+    /// <summary>Source SessionManager getBranch after open (_buildIndex): the entries from the root to the leaf, the last entry of the
+    /// file; empty for an unreadable file. Malformed lines are skipped as loadEntriesFromFile does.</summary>
+    internal static ImmutableArray<JsonObject> ReadBranch(string path)
+    {
+        var byId = new Dictionary<string, JsonObject>(StringComparer.Ordinal);
+        string? leaf = null;
+        try
+        {
+            foreach (var line in File.ReadLines(path))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                JsonNode? node;
+                try { node = JsonNode.Parse(line); } catch (JsonException) { continue; }
+                if (node is not JsonObject entry || Text(entry, "type") is null or "session" || Text(entry, "id") is not { } id) continue;
+                byId[id] = entry; leaf = id;
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return []; }
+        var branch = new List<JsonObject>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (var current = leaf; current is not null && seen.Add(current) && byId.TryGetValue(current, out var entry); current = Text(entry, "parentId"))
+            branch.Add(entry);
+        branch.Reverse();
+        return [.. branch];
+    }
+
+    /// <summary>Source getBranchSelection (virtual-models.ts): the latest model_change, or the latest physical assistant response unless
+    /// a virtual model_change before it still holds.</summary>
+    internal static (string Provider, string ModelId)? BranchSelection(IReadOnlyList<JsonObject> branch, Func<string, string, bool> isVirtualModel)
+    {
+        static (string, string)? Change(JsonObject entry) => Text(entry, "provider") is { } provider && Text(entry, "modelId") is { } modelId ? (provider, modelId) : null;
+        for (var index = branch.Count - 1; index >= 0; index--)
+        {
+            var entry = branch[index];
+            if (Text(entry, "type") == "model_change") return Change(entry);
+            if (Text(entry, "type") != "message" || entry["message"] is not JsonObject message || Text(message, "role") != "assistant" ||
+                Text(message, "api") == PiSharp.CodingAgent.SessionBranchSelection.VirtualApi) continue;
+            if (Text(message, "provider") is not { } provider || Text(message, "model") is not { } model) return null;
+            for (var before = index - 1; before >= 0; before--)
+                if (Text(branch[before], "type") == "model_change")
+                    return Change(branch[before]) is { } change && isVirtualModel(change.Item1, change.Item2) ? change : (provider, model);
+            return (provider, model);
+        }
+        return null;
+    }
 
     private static bool CwdMatches(string? cwd, string resolvedCwd) => !string.IsNullOrEmpty(cwd) && Path.GetFullPath(cwd) == resolvedCwd;
 

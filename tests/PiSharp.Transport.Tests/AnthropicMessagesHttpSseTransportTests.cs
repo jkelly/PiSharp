@@ -297,7 +297,9 @@ internal static class AnthropicMessagesHttpSseTransportTests
             var effects = new Executor(); var outcome = await new TurnRunner(new ChatClient(fixture.Transport), new ToolBatchScheduler([new("inspect", effects)]))
                 .RunAsync(Request(), new Sink(_ => Task.CompletedTask));
             Failed(outcome.Chat, category); Equal(0, effects.Calls); Check(fixture.Response.Disposed, "Admission failure retained response.");
-            Check(!outcome.Chat.Failure!.Message.Contains("private", StringComparison.Ordinal), "Rejected source text entered a diagnostic.");
+            // anthropic-messages.ts iterateAnthropicEvents: a named error event is shown as its raw data (new Error(sse.data)).
+            if (category == "ProviderError") Equal("private provider body; intentionally not JSON", Metadata(outcome.Chat.Message, "errorMessage"));
+            else Check(!outcome.Chat.Failure!.Message.Contains("private", StringComparison.Ordinal), "Rejected source text entered a diagnostic.");
         }
         using (var fixture = new Fixture(new ProbeStream([.. Bytes("event: message_start\ndata: "), 0xff, .. Bytes("\n\n")])))
             Failed(await new ChatClient(fixture.Transport).CompleteAsync(Request()), "SourceFailed");
@@ -403,7 +405,9 @@ internal static class AnthropicMessagesHttpSseTransportTests
         await ThrowsAsync<ObjectDisposedException>(() => requests.Single().Content!.ReadAsStringAsync()); Check(!handler.Disposed, "Send fault disposed borrowed client.");
         using (var rejection = new Fixture(new ProbeStream(Bytes("private response body")), status: HttpStatusCode.TooManyRequests))
         {
-            Failed(await new ChatClient(rejection.Transport).CompleteAsync(Request()), "SourceFailed"); Equal(0, rejection.Response.AcquireCalls);
+            // The SDK reads a rejected body into its APIError message: makeMessage(status, safeJSON(text), text).
+            var rejected = await new ChatClient(rejection.Transport).CompleteAsync(Request());
+            Failed(rejected, "SourceFailed"); Equal("429 private response body", Metadata(rejected.Message, "errorMessage")); Equal(1, rejection.Response.AcquireCalls);
             Equal(0, rejection.Response.SerializeCalls); Equal(1, rejection.Handler.SendCalls); Check(rejection.Response.Disposed, "Rejected response retained ownership.");
         }
         foreach (var stream in new Stream[] { new ReadFailureStream(), new HttpCleanupFailureStream() })

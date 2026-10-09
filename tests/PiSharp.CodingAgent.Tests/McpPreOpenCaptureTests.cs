@@ -220,7 +220,7 @@ internal static class McpPreOpenCaptureTests
         }
     }
     // Pi 1.1.0 _restoreToolsFromTranscript restores by name with the current binding: the historical schema is replaced by the
-    // actual discovery schema (recorded before use) instead of failing the open.
+    // actual discovery schema instead of failing the open. It is applied in memory: the open writes nothing (the next request records it).
     private static async Task RestoredHistoricalSchema()
     {
         var f = await Fixture.Create(); var capture = await f.Acquire(); var session = await f.Open(capture, wrongSchema: true);
@@ -230,7 +230,7 @@ internal static class McpPreOpenCaptureTests
         {
             Check(session.GetActiveTools().SequenceEqual(["mcp__demo__a"]) && f.Channel.Calls == 0 && f.Channel.Closes == 0);
             var recorded = session.Snapshot.Log.Entries[^1].WireBody.Value.GetProperty("message").GetProperty("toolsAdded")[0];
-            Check(recorded.GetProperty("parameters").GetProperty("properties").GetProperty("value").GetProperty("type").GetString() == "string");        }
+            Check(recorded.GetProperty("parameters").GetProperty("properties").GetProperty("value").GetProperty("type").GetString() == "integer");        }
         catch (Exception error) { primary = error; }
         finally { await Join(primary, capture.CloseAsync, () => owner.DisposeAsync().AsTask(), () => f.Extensions.DisposeAsync().AsTask()); }
     }

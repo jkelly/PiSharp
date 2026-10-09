@@ -15,7 +15,7 @@ public sealed record JsonlFrameAdmission
     internal JsonlFrameAdmission(JsonData record, bool final)
     { Record = record; IsFinalFrame = final; }
     internal JsonlFrameAdmission(JsonlTransportException error, bool final)
-    { Failure = error.Failure; FailureMessage = error.Message; IsFinalFrame = final; }
+    { Failure = error.Failure; FailureMessage = error.SyntaxError ?? error.Message; IsFinalFrame = final; }
 }
 
 /// <summary>Pull-driven LF-only JSON-object reader. One instance supports one enumeration.</summary>

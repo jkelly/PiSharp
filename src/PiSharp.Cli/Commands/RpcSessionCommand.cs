@@ -29,7 +29,26 @@ public static class RpcSessionCommand
         "(--offline-script <absolute JSON> | --live [--provider <provider>] [--model <pattern>[:<thinking>]] [--models <patterns>] [--max-output-tokens 1..8192]) [--thinking off|minimal|low|medium|high|xhigh|max] [--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
         "[[--bash-executable <absolute file>] --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]] " + NativeExtensionConfiguration.Flags + " " + SessionCatalogCommand.Flags + " " + CreationFlags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags;
     public const string CreationFlags = "[--session-mode open|new-memory|new-lazy]";
-    private static readonly JsonlTransportOptions Framing = new(MaximumFrameBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
+    /// <summary>agent-loop.ts runs tool turns until the model stops, with the whole transcript: the Pi entry has no turn or
+    /// transcript-message cap; the explicit verbs keep 64 turns and 1024 messages.</summary>
+    internal static AgentLoopOptions LoopOptions(bool pi) => pi ? new(MaximumTurns: int.MaxValue, MaximumTranscriptMessages: int.MaxValue)
+        : new(MaximumTurns: 64, MaximumTranscriptMessages: 1024);
+    /// <summary>agent.ts holds every tool, subscriber, queued message and progress update: the Pi entry has no count bound on them
+    /// (the explicit verbs keep the profile defaults).</summary>
+    internal static PiSharp.Agent.AgentOptions AgentOptions(bool pi) => pi
+        ? PiPayloadBudget.PiAgent(new(Loop: LoopOptions(true))) : PiPayloadBudget.Agent(new(Loop: LoopOptions(false)));
+    /// <summary>session-manager.ts loads every line of the file: the Pi entry has no line or record cap (the explicit verbs keep 10,000).</summary>
+    internal static PiSharp.Sessions.Storage.SessionLogReaderOptions ReaderOptions(bool pi) =>
+        PiPayloadBudget.SessionReader(pi ? new(MaximumLines: int.MaxValue, MaximumRecords: int.MaxValue) : new(MaximumLines: 10_000, MaximumRecords: 10_000));
+    /// <summary>buildSessionContext walks every entry of the branch: the Pi entry has no entry, ancestor or message cap.</summary>
+    internal static PiSharp.Sessions.Context.SessionContextProjectionOptions ContextOptions(bool pi) => pi
+        ? PiPayloadBudget.Context with { MaximumEntries = int.MaxValue, MaximumAncestorSteps = int.MaxValue, MaximumOutputMessages = int.MaxValue }
+        : PiPayloadBudget.Context;
+    /// <summary>Pi-entry prompt bounds: no text length or image count limit; the images and the message stay within one RPC frame.</summary>
+    private static readonly PromptInputAdmissionOptions PiPromptBounds = new(MaximumTextCharacters: int.MaxValue, MaximumImages: int.MaxValue,
+        MaximumImageCharacters: PiPayloadBudget.RpcCommandBytes, MaximumImageBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 64,
+        MaximumMessageCharacters: PiPayloadBudget.RpcCommandBytes);
+    private static readonly JsonlTransportOptions Framing =new(MaximumFrameBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
     private sealed record Arguments(string Session, string Workspace, string? Script, bool Latest, string? Leaf,
         ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi, OfflineBashAuthorization? Bash,
         NativeExtensionConfiguration? Extension, bool SupportsImages, ImmutableArray<SessionCatalogStore> Stores, string SessionMode, SettingsModelSelection? Live,
@@ -66,8 +85,9 @@ public static class RpcSessionCommand
         LiveSessionRuntime? liveRuntime = null, PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
         Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null, PiSharp.Cli.Reloading.NativeHostReloadAdmission? reloadAdmission = null,
         TerminalExtensionInputAdmission? terminalInputAdmission = null,
-        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null) =>
-        RunCoreAsync(args, stdin, stdout, stderr, presentation, cancellationToken, userShutdown, stopTerminalAndJoin, liveRuntime, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission, terminalInputAdmission: terminalInputAdmission, decorateTerminalUi: decorateTerminalUi, mcpHost: mcpHost);
+        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null,
+        bool javaScriptInput = false) =>
+        RunCoreAsync(args, stdin, stdout, stderr, presentation, cancellationToken, userShutdown, stopTerminalAndJoin, liveRuntime, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission, terminalInputAdmission: terminalInputAdmission, decorateTerminalUi: decorateTerminalUi, mcpHost: mcpHost, javaScriptInput: javaScriptInput);
 
     /// <summary>agent-session.ts _getThinkingLevelForModelSwitch: the settings' per-model level (modelThinkingLevels), else
     /// defaultThinkingLevel, else null (the current level stays).</summary>
@@ -122,7 +142,8 @@ public static class RpcSessionCommand
         PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
         Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null, PiSharp.Cli.Reloading.NativeHostReloadAdmission? reloadAdmission = null,
         TerminalExtensionInputAdmission? terminalInputAdmission = null,
-        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null)
+        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null,
+        bool javaScriptInput = false)
     {
         ArgumentNullException.ThrowIfNull(stdin); ArgumentNullException.ThrowIfNull(stdout); ArgumentNullException.ThrowIfNull(stderr);
         OfflineSessionProfile? profile = null; PersistentAgentSession? session = null;
@@ -140,6 +161,8 @@ public static class RpcSessionCommand
             if (!Directory.Exists(parsed.Workspace)) throw new SessionCommandException(SessionCommandFailure.WorkspaceMissing);
             // A Pi-style entry (plain pisharp, -p, --mode json|rpc) already resolved settings, model, prompt and tool policy.
             var pi = PiSharp.Cli.Pi.PiEntryOptions.Current;
+            // Pi has no prompt length or image count limit; template, skill and extension input admission use these bounds too.
+            using var piPromptBounds = pi is null ? null : PromptInputAdmissionOptions.UseAsDefault(PiPromptBounds);
             liveRuntime ??= pi?.LiveRuntime;
             var settings = pi?.Settings ?? await SettingsStartupConfiguration.LoadAsync(parsed.Settings, stderr, settingsFileSystem, cancellationToken).ConfigureAwait(false);
             var liveSelection = pi?.Selection ?? (parsed.Live is null ? null : await parsed.Live.ResolveAsync(settings, liveRuntime ?? LiveSessionRuntime.Default, stderr,
@@ -157,7 +180,14 @@ public static class RpcSessionCommand
             // Pi extensions (IMPL-E) get a UI in the modes upstream gives one (tui and rpc); print and json run without (hasUI false).
             var piExtensions = pi?.Extensions;
             ui = parsed.Extension is null && (piExtensions is null || pi!.ExtensionMode is not ("rpc" or "tui")) ? null
-                : new(new RpcExtensionUiOptions(MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes), presentationObserver: presentation);
+                : new(pi is null ? new RpcExtensionUiOptions(MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes)
+                    // rpc-mode.ts createExtensionUIContext: dialogs, their texts, choices and responses have no limits of their own;
+                    // requests and responses stay within one frame and a bounded number of open dialogs.
+                    : new RpcExtensionUiOptions(MaximumOutstandingRequests: 4096, MaximumRequestBytes: PiPayloadBudget.OutputRecordBytes,
+                        MaximumResponseBytes: PiPayloadBudget.RpcCommandBytes, MaximumRetainedBytes: 4 * PiPayloadBudget.RpcCommandBytes,
+                        MaximumTextCharacters: int.MaxValue, MaximumChoices: int.MaxValue, MaximumJsonDepth: 64, MaximumIdCharacters: int.MaxValue,
+                        MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes),
+                    presentationObserver: presentation);
             if (piExtensions is not null)
             {
                 // Source emitError: print and json modes write "Extension error (<path>): <error>"; RPC publishes an extension_error record.
@@ -196,7 +226,8 @@ public static class RpcSessionCommand
                 originalSystemPrompt: pi?.SystemPrompt, toolPolicy: pi?.ToolPolicy ?? (parsed.ToolPolicy == "pi"
                     ? new PiSharp.Cli.Pi.PiToolPolicy(PiSharp.Cli.Pi.PiToolPolicyMode.Pi) { ProtectedDirectories = [Path.GetDirectoryName(parsed.Session)!] } : null),
                 // With --no-mcp extensions still register servers; nothing connects them, which is reported (reportUnhandledMcpServers).
-                mcpRegistrations: hostAdmission ? mcpHost!.Registrations : null, piExtensions: pi?.Extensions).ConfigureAwait(false);
+                mcpRegistrations: hostAdmission ? mcpHost!.Registrations : null, piExtensions: pi?.Extensions,
+                deferMissingCredentials: pi is not null, piEntry: pi is not null).ConfigureAwait(false);
             // A virtual selection's router reads this profile's session branch and records its state there.
             if (liveSelection is { IsVirtual: true } virtualSelection) virtualSelection.VirtualSession = profile.CurrentVirtualModelSession;
             if (pi?.Extensions is { } modelsHost) await PiSharp.Cli.Extensions.Pi.PiExtensionModels.CreateAsync(modelsHost, liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false);
@@ -210,13 +241,51 @@ public static class RpcSessionCommand
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);
             var options = new PersistentAgentSessionOptions(UseLatestLeaf: parsed.Latest, SelectedLeafId: parsed.Leaf,
-                AgentOptions: PiPayloadBudget.Agent(new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024))),
-                SessionLogStoreOptions: new(ReaderOptions: PiPayloadBudget.SessionReader(new(MaximumLines: 10_000, MaximumRecords: 10_000))),
-                ContextOptions: PiPayloadBudget.Context);
-            string NextId() => "rpc-" + Guid.NewGuid().ToString("N");
+                AgentOptions: AgentOptions(pi is not null),
+                SessionLogStoreOptions: new(ReaderOptions: ReaderOptions(pi is not null), JavaScriptSerialization: pi is not null),
+                ContextOptions: ContextOptions(pi is not null));
+            // agent-session.ts prompt: Pi entries validate the model and its provider auth before each idle prompt.
+            if (pi is not null)
+                options = options with { PromptPreflight = PromptPreflight(liveRuntime ?? LiveSessionRuntime.Default), UnselectedModel = LiveSessionSelection.UnselectedModel,
+                    // main.ts buildSessionOptions: --model is the model of every session the run creates or opens.
+                    SelectedModel = liveSelection is { FromCliModel: true } fromCli ? fromCli.Model : null,
+                    // sdk.ts: a session without messages starts with the CLI level, else the per-model or default setting, clamped.
+                    // main.ts createRuntime for a session without messages: the scoped pick, else findInitialModel (no model: none).
+                    NewSessionModel = async token =>
+                    {
+                        var current = pi.ReloadSettings is { } reloadModel ? await reloadModel(token).ConfigureAwait(false) : settings;
+                        try
+                        {
+                            return (await new SettingsModelSelection(null, null, null) { ModelPatterns = pi.ModelPatterns, UseModelMaximumTokens = true }
+                                .ResolveAsync(current, liveRuntime ?? LiveSessionRuntime.Default, null, false, token).ConfigureAwait(false)).Model;
+                        }
+                        catch (LiveSessionException error) when (error.Code == "NoLiveModel") { return LiveSessionSelection.UnselectedModel; }
+                        catch (Exception error) when (error is LiveSessionException or SessionCommandException) { return null; }
+                    },
+                    NewSessionThinkingLevel = (model, levels) => SettingsModelSelection.Thinking(pi.ReloadSettings is { } reloadThinking
+                        ? reloadThinking(CancellationToken.None).GetAwaiter().GetResult() : settings, model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel, false, levels) };
+            // session-manager.ts generateId: randomUUID().slice(0, 8); PersistentAgentSession redraws an id already in use.
+            static string NextId() => Guid.NewGuid().ToString("N")[..8];
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);
+            if (pi is not null)
+            {
+                // sdk.ts createAgentSession restore: a session whose branch model is not available runs on the fallback model. At startup
+                // the entry already chose it (the profile's model); a session switched to later (/resume) gets findInitialModel's pick
+                // over the current available snapshot as a continued session.
+                var restoring = profile;
+                restoring.RestoreFallback = (_, fallback) =>
+                {
+                    if (restoring.LiveModels is not { CurrentRegistry: { } registry } models) return fallback;
+                    var current = pi.ReloadSettings is { } reload ? reload(CancellationToken.None).GetAwaiter().GetResult() : settings;
+                    return SettingsModelSelection.ContinuingInitialModel(registry, current) is { } initial &&
+                        models.Available.FirstOrDefault(definition => definition.Model.Provider == initial.Provider && definition.Model.Id == initial.Id) is { } bound
+                        ? bound.Model : fallback;
+                };
+            }
             var lifecycle = profile.CreateLifecycle(Clock, NextId, options, catalog: catalog, backend: backend);
+            // agent-session.ts switches sessions, reloads and holds MCP servers any number of times in one process.
+            if (pi is not null) { lifecycle.MaximumOwnerAttachments = int.MaxValue; lifecycle.MaximumOwnedResources = int.MaxValue; }
             // sdk.ts createAgentSession for a new session (/new, new_session): the CLI level, else the per-model or global default
             // the settings files hold now, clamped to the model.
             lifecycle.ConfigureNewSession = async (created, token) =>
@@ -240,9 +309,13 @@ public static class RpcSessionCommand
             session = parsed.SessionMode == "open"
                 ? await lifecycle.OpenAsync(new(parsed.Session, parsed.Latest, parsed.Leaf), profile.SelectedModel, cancellationToken).ConfigureAwait(false)
                 : await lifecycle.CreateAsync(parsed.Session, new PiSharp.Sessions.Serialization.SessionEntryCodec().Parse(JsonSerializer.Serialize(new
-                    { type = "session", version = 3, id = pi?.HeaderId ?? NextId(), timestamp = pi?.HeaderTimestamp ?? DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("O", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
+                    { type = "session", version = 3, id = pi?.HeaderId ?? NextId(), timestamp = pi?.HeaderTimestamp ?? DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
                     profile.SelectedModel, cancellationToken).ConfigureAwait(false);
-            if (parsed.SessionMode != "open") await session.ConfigureAsync(new(SystemMessage: new("system", profile.InitialSystem)), cancellationToken).ConfigureAwait(false);
+            // sdk.ts createAgentSession writes only model_change and thinking_level_change for a new session; its prompt sections and
+            // tool loadout are recorded by the first request (agent-session.ts _preparePromptAndToolLoadout, agent-loop.ts
+            // declareToolChanges: one system message before the prompt). The Pi entry applies the loadout in memory until then.
+            if (parsed.SessionMode != "open" && pi is null) await session.ConfigureAsync(new(SystemMessage: new("system", profile.InitialSystem)), cancellationToken).ConfigureAwait(false);
+            else if (parsed.SessionMode != "open") await session.ApplyInitialToolsAsync(profile.InitialToolNames, cancellationToken).ConfigureAwait(false);
             // A session whose stored cwd no longer exists continues in the cwd the user chose (main.ts promptForMissingSessionCwd).
             var pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
             var continuesElsewhere = pi?.SessionCwdOverride is { } cwdOverride && string.Equals(SessionCommands.Absolute(cwdOverride), profile.Workspace, pathComparison) &&
@@ -252,20 +325,29 @@ public static class RpcSessionCommand
             if (continuesElsewhere) lifecycle.WorkingDirectoryOverride = profile.Workspace;
             var thinking = SettingsModelSelection.Thinking(settings, session.Snapshot.Agent.Model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel,
                 parsed.SessionMode == "open", session.GetSupportedThinkingLevels());
+            // sdk.ts: an existing session takes the CLI level in memory (no thinking_level_change; the Pi entry), a new one recorded it.
             if (thinking is not null && thinking != session.Snapshot.Context.ThinkingLevel)
-                await session.ConfigureAsync(new(ThinkingLevel: thinking), cancellationToken).ConfigureAwait(false);
+            {
+                if (pi is not null && parsed.SessionMode == "open") await session.ApplyInitialThinkingLevelAsync(thinking, cancellationToken).ConfigureAwait(false);
+                else await session.ConfigureAsync(new(ThinkingLevel: thinking), cancellationToken).ConfigureAwait(false);
+            }
             await profile.LoadPromptTemplatesAsync(pi?.PromptTemplates ?? parsed.Prompts, pi is null ? stderr : TextWriter.Null, cancellationToken).ConfigureAwait(false);
             if (pi?.SessionName is { } sessionName) await session.SetSessionNameAsync(session.Snapshot.Log.Header.Id, sessionName, cancellationToken).ConfigureAwait(false);
             if (parsed.SessionMode == "open") await profile.ApplySkillsAsync(session, cancellationToken).ConfigureAwait(false);
             if (settings is not null) { session.SteeringMode = settings.SteeringMode; session.FollowUpMode = settings.FollowUpMode; }
             await profile.AttachOwnerAsync(session, options, Clock, NextId, parsed.Stores.IsEmpty ? null : parsed.Stores, lifecycle).ConfigureAwait(false);
             if (reloadAdmission is not null) profile.ConfigureReload(reloadAdmission);
-            await profile.ApplyInitialToolSelectionAsync(session, cancellationToken).ConfigureAwait(false);
+            await profile.ApplyInitialToolSelectionAsync(session, cancellationToken, resumed: parsed.SessionMode == "open" || pi is not null).ConfigureAwait(false);
             observedInput = new InputObservation(stdin, gate);
             // Events and responses carry tool results with Pi-sized images (owner decision 0004).
-            var outputFraming = Framing with { MaximumFrameBytes = PiPayloadBudget.OutputRecordBytes };
+            // pi --mode rpc reads each line as rpc-mode.ts handleInputLine does (StringDecoder + JSON.parse). JSON.parse and
+            // JSON.stringify have no depth limit; 64 levels is what an owned JsonData holds.
+            // The in-process print, json and interactive connections carry the same values (a custom entry or message of any depth).
+            var framing = javaScriptInput ? Framing with { MaximumJsonDepth = 64, JavaScriptInput = true } : pi is not null ? Framing with { MaximumJsonDepth = 64 } : Framing;
+            // Every frame Pi writes is serializeJsonLine, JSON.stringify(value) + "\n".
+            var outputFraming = framing with { MaximumFrameBytes = PiPayloadBudget.OutputRecordBytes, JavaScriptInput = false, JavaScriptOutput = javaScriptInput };
             observedOutput = new OutputObservation(stdout, gate, outputFraming.MaximumFrameBytes);
-            reader = new JsonlReader(observedInput, Framing);
+            reader = new JsonlReader(observedInput, framing);
             writer = new JsonlWriter(observedOutput, outputFraming);
             // The profile retains resource ownership across the terminal-stopped boundary. Dispatcher cleanup
             // already fences RPC/UI admission and joins its original run, reader, callbacks and writer.
@@ -284,8 +366,17 @@ public static class RpcSessionCommand
                 SwitchThinkingLevel = model => ModelSwitchThinkingLevel(pi?.ReloadSettings is { } reload ? reload(CancellationToken.None).GetAwaiter().GetResult() : settings, model)
             };
             dispatcher = new(session, writer, Clock, [new(profile.SelectedModel, profile.SelectedModelWire)],
-                options: new(MaximumCommandBytes: PiPayloadBudget.RpcCommandBytes, MaximumOutputBytes: outputFraming.MaximumFrameBytes,
-                    MaximumModels: 4096, MaximumModelDefinitionBytes: 16 * 1024 * 1024),
+                options: new PiSharp.Rpc.Protocol.RpcDispatchOptions(MaximumCommandBytes: PiPayloadBudget.RpcCommandBytes, MaximumOutputBytes: outputFraming.MaximumFrameBytes,
+                    MaximumModels: 4096, MaximumModelDefinitionBytes: 16 * 1024 * 1024, MaximumJsonDepth: framing.MaximumJsonDepth,
+                    // rpc-mode.ts has no id or type length limit.
+                    MaximumIdCharacters: javaScriptInput ? int.MaxValue : 256, MaximumCommandTypeCharacters: javaScriptInput ? int.MaxValue : 128,
+                    // Pi has no prompt, steer, follow_up or bash text limit and no image count limit (the frame bound stays).
+                    MaximumPromptCharacters: pi is null ? 65_536 : int.MaxValue, MaximumImages: pi is null ? 16 : int.MaxValue)
+                    // rpc-mode.ts answers get_messages/get_entries with the whole session, handles every command as it arrives, reports every
+                    // started tool and continues while input is queued: the Pi entry has no count bound on them (frames stay the memory bound).
+                    with { MaximumModels = pi is null ? 4096 : int.MaxValue, MaximumReturnedMessages = pi is null ? 1024 : int.MaxValue,
+                        MaximumReturnedEntries = pi is null ? 4096 : int.MaxValue, MaximumPendingToolMessages = pi is null ? 128 : int.MaxValue,
+                        MaximumContinuationRuns = pi is null ? 16 : int.MaxValue, MaximumConcurrentCommands = pi is null ? 8 : int.MaxValue },
                 sessionOwnership: RpcSessionOwnership.Borrowed, inputAdmission: profile.InputAdmission, extensionUi: ui,
                 extensionCommandCatalog: profile, sessionOwner: profile.Sessions,
                 // main.ts: the initial runtime's session starts with reason "startup" in the Pi entry (new, continued or resumed alike).
@@ -296,7 +387,9 @@ public static class RpcSessionCommand
                 postInputSettlement: profile.DrainLifecycleHandoffsAsync,
                 postRunSettlement: profile.DrainLifecycleHandoffsAsync, userBash: profile.UserBash, modelRuntime: modelRuntime,
                 compactionSettings: pi is null ? null : model => CompactionSettings(pi.ReloadSettings is { } reloadCompaction
-                    ? reloadCompaction(CancellationToken.None).GetAwaiter().GetResult() : settings, model));
+                    ? reloadCompaction(CancellationToken.None).GetAwaiter().GetResult() : settings, model),
+                // agent-session-runtime.ts switchSession: SessionManager.open(sessionPath) for the Pi entry.
+                prepareSessionPath: pi is null ? null : (path, token) => PrepareSessionPathAsync(path, backend, profile.Workspace, token));
             profile.ConfigureLifecycleModeStop(lifecycleStop.CancelAsync);
             if (pi?.Extensions is { } compactingExtensions)
             {
@@ -389,6 +482,13 @@ public static class RpcSessionCommand
         }
         catch (Exception error) { cleanupFailures.Add(error); }
         settlement?.Complete((operationFailure is null ? cleanupFailures : cleanupFailures.Prepend(operationFailure)).ToImmutableArray());
+        // rpc-mode.ts: a null command line is an unhandled TypeError; Node prints it and the process exits 1.
+        if (operationFailure is RpcDispatchException { InnerException: RpcInputTypeError typeError })
+        {
+            await stderr.WriteAsync("TypeError: " + typeError.Message + "\n").ConfigureAwait(false);
+            await stderr.FlushAsync().ConfigureAwait(false);
+            return 1;
+        }
         if (cleanupFailures.Count > 0)
         {
             if (Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1") await stderr.WriteAsync(string.Join(Environment.NewLine, cleanupFailures) + Environment.NewLine).ConfigureAwait(false);
@@ -427,6 +527,95 @@ public static class RpcSessionCommand
             await stderr.WriteAsync(JsonSerializer.Serialize(new { schemaVersion = 1, status = "failed", code, message,
                 effectsMayHaveCompleted = true, cleanupFailureCount = cleanupFailures.Count }) + "\n").ConfigureAwait(false);
             await stderr.FlushAsync().ConfigureAwait(false); return result;
+        }
+    }
+
+    /// <summary>agent-session.ts prompt: a model whose provider has no configured auth (the registry read now: auth.json, models.json and
+    /// the environment, so a credential added since startup counts) refuses with the OAuth re-login text or formatNoApiKeyFoundMessage.
+    /// A session without a model runs with Agent's DEFAULT_MODEL (provider "unknown"), refused as "the selected model"; the
+    /// formatNoModelSelectedMessage branch is unreachable upstream (session.model is never undefined).</summary>
+    internal static Func<ModelDescriptor, CancellationToken, ValueTask> PromptPreflight(LiveSessionRuntime runtime) => async (model, token) =>
+    {
+        var registry = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false);
+        if (registry.HasConfiguredAuth(model.Provider)) return;
+        throw new SessionPromptRejectedException(registry.IsUsingOAuth(model.Provider)
+            ? PiSharp.Cli.Models.ModelListing.OAuthAuthenticationFailedMessage(model.Provider)
+            : PiSharp.Cli.Models.ModelListing.NoApiKeyFoundMessage(model.Provider));
+    };
+
+    /// <summary>session-manager.ts SessionManager.open and _setSessionFile before a switch: a session file opens wherever it is; an
+    /// empty file is initialized with a session header; a non-empty file that does not parse as a session is refused (unchanged); a
+    /// missing file is a new session at that path, written once it has a conversation (the lazy store holds its header until then).
+    /// The header's cwd is the host's (process.cwd()). Upstream opens the path only after the session_before_switch veto, so the
+    /// returned undo puts the path back as it was (opening a session without messages also records its model and level).</summary>
+    internal static async ValueTask<Func<ValueTask>?> PrepareSessionPathAsync(string path, SessionStorageBackend? backend, string cwd, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) return null;
+        var full = Path.GetFullPath(path);
+        // The backend (lazy local, or memory under --no-session) serves a file outside its namespace as a lazy local file.
+        var lazy = backend is { Mode: SessionStorageMode.LazyLocal } || backend is not null &&
+            !string.Equals(Path.GetDirectoryName(full), backend.Directory, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+        // A session of this run that is not written yet: its pending bytes come back on undo.
+        if (backend is not null && !File.Exists(full) && backend.FileExists(full))
+        {
+            byte[] pending;
+            var read = await backend.OpenReadAsync(full, token).ConfigureAwait(false);
+            await using (read.ConfigureAwait(false))
+            {
+                using var copy = new MemoryStream();
+                await read.CopyToAsync(copy, token).ConfigureAwait(false);
+                pending = copy.ToArray();
+            }
+            return async () =>
+            {
+                if (File.Exists(full)) return; // Written since: a conversation is no longer the prepared state.
+                await backend.DeleteOwnedAsync(full).ConfigureAwait(false);
+                await StageAsync(backend, full, pending, CancellationToken.None).ConfigureAwait(false);
+            };
+        }
+        if (Directory.Exists(full)) return null;
+        if (File.Exists(full))
+        {
+            var length = new FileInfo(full).Length;
+            if (length > 0)
+            {
+                if (PiSharp.Cli.Pi.PiSessions.ReadHeader(full) is null)
+                    throw new InvalidDataException($"Session file is not a valid {PiSharp.Cli.Pi.PiConfig.AppName} session: {full}");
+            }
+            else await File.WriteAllTextAsync(full, NewHeader() + "\n", new UTF8Encoding(false), token).ConfigureAwait(false);
+            return () =>
+            {
+                if (File.Exists(full))
+                {
+                    using var stream = new FileStream(full, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                    if (stream.Length > length) stream.SetLength(length);
+                }
+                return ValueTask.CompletedTask;
+            };
+        }
+        if (lazy)
+        {
+            await StageAsync(backend!, full, Encoding.UTF8.GetBytes(NewHeader() + "\n"), token).ConfigureAwait(false);
+            return async () => { if (!File.Exists(full)) await backend!.DeleteOwnedAsync(full).ConfigureAwait(false); };
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        await File.WriteAllTextAsync(full, NewHeader() + "\n", new UTF8Encoding(false), token).ConfigureAwait(false);
+        return () => { if (File.Exists(full)) File.Delete(full); return ValueTask.CompletedTask; };
+
+        string NewHeader()
+        {
+            var (_, id, timestamp) = PiSharp.Cli.Pi.PiSessions.NewSessionFile(Path.GetDirectoryName(full)!, null, DateTimeOffset.UtcNow);
+            return PiSharp.Cli.Pi.PiJson.Stringify(new System.Text.Json.Nodes.JsonObject
+            { ["type"] = "session", ["version"] = PiSharp.Cli.Pi.PiSessions.CurrentSessionVersion, ["id"] = id, ["timestamp"] = timestamp, ["cwd"] = cwd });
+        }
+        static async ValueTask StageAsync(SessionStorageBackend backend, string path, byte[] bytes, CancellationToken token)
+        {
+            var storage = await backend.OpenAsync(path, true, token).ConfigureAwait(false);
+            await using (storage.ConfigureAwait(false))
+            {
+                await storage.WriteAsync(bytes).ConfigureAwait(false);
+                await storage.BeforeCheckpointAsync().ConfigureAwait(false);
+            }
         }
     }
 

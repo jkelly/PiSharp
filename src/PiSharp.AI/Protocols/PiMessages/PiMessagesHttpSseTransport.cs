@@ -139,7 +139,7 @@ public sealed class PiMessagesHttpSseTransport : IChatTransport
         var details = new JsonObject { ["version"] = 1, ["provider"] = _model.Provider, ["model"] = _model.Id,
             ["url"] = _factory.Endpoint.ToString(), ["status"] = (int)response.StatusCode, ["statusText"] = response.ReasonPhrase };
         if (errorBody is not null) details["error"] = errorBody.DeepClone();
-        else details["body"] = body.Length > 8192 ? body[..8192] + "." : body;
+        else details["body"] = body.Length > 8192 ? body[..8192] + "…" : body; // pi-messages.ts truncateDiagnosticString
         details["timestampMs"] = timestamp;
         return new(PiMessagesFailure.ProviderError, publicMessage, PiMessagesData.Admit(JsonData.Parse(details.ToJsonString()), _options), code);
     }

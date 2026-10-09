@@ -71,7 +71,7 @@ public sealed class ExtensionAgentBinding
         this.registry = registry; this.sessionCancellationToken = sessionCancellationToken;
         this.options = options ?? new();
         if (this.options.MaximumTools <= 0 || this.options.MaximumDeclarationCharacters < 2 ||
-            this.options.MaximumDeclarationBytes < 2 || this.options.MaximumToolEventHandlers is < 1 or > 4096)
+            this.options.MaximumDeclarationBytes < 2 || this.options.MaximumToolEventHandlers < 1)
             throw new ArgumentOutOfRangeException(nameof(options));
         ArgumentNullException.ThrowIfNull(this.options.ResultValues);
         _ = ToolResultValueCodec.Read(JsonData.EmptyObject, this.options.ResultValues);

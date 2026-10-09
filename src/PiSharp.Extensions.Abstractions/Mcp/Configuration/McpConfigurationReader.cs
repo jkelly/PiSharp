@@ -105,7 +105,7 @@ public static class McpConfigurationReader
             if (input is null) return;
             JsonDocument document;
             try { document = JsonDocument.Parse(input.Text); }
-            catch (JsonException error) { errors.Add($"{input.Source}: {error.Message}"); return; }
+            catch (JsonException error) { errors.Add($"{input.Source}: {PiSharp.Contracts.Compatibility.JsJsonSyntax.Describe(input.Text, error.Message)}"); return; }
             using (document)
             {
                 var root = document.RootElement;

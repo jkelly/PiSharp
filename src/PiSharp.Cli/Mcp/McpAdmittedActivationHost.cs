@@ -19,7 +19,8 @@ public delegate McpPreparedDiscoveryCatalog McpDiscoveryCatalogPreparation(McpTo
 /// permission, credentials, registry or semantic executor is acquired here.</summary>
 public sealed class McpAdmittedActivationHost : IAsyncDisposable
 {
-    public const int MaximumServers = 128;
+    /// <summary>mcp/config.ts and index.ts connect every configured and registered server: no server-count bound.</summary>
+    public const int MaximumServers = int.MaxValue;
     private readonly ImmutableArray<McpPreOpenServerCapture> captures;
     private readonly ImmutableArray<McpPreparedDiscoveryIdentity> identities;
     private readonly McpAdmittedResourceRegistration? resources;

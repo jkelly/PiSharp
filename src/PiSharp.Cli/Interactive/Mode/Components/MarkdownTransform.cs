@@ -1,7 +1,7 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/markdown-transform.ts.
 // MarkdownTransformContext and MarkdownTransformer are declared in core/extensions/types.ts; they live here until the extension
-// runner port declares them. A Mermaid transformer (mermaid.ts, not ported: grok-mermaid has no .NET equivalent) is a
-// MarkdownTransformer like any other.
+// runner port declares them. The Mermaid transformer (MermaidTransformer.cs, over the grok-mermaid port) is a MarkdownTransformer
+// like any other.
 namespace PiSharp.Cli.Interactive.Mode.Components;
 
 /// <summary>The kinds of Markdown a transformer sees (<see cref="MarkdownTransformContext.MessageType"/>).</summary>

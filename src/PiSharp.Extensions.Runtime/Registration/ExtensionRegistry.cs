@@ -113,7 +113,8 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             descriptor.PromptGuidelines.Any(guideline => !RegistrationPolicy.Description(guideline, options)) ||
             descriptor.Renderers is { } renderers && (renderers.RenderShell is { } shell && !Enum.IsDefined(shell) ||
                 renderers.RenderCall?.GetInvocationList().Length > 1 || renderers.RenderResult?.GetInvocationList().Length > 1) ||
-            !RegistrationPolicy.Json(descriptor.Parameters, options, requireObject: true) ||
+            !RegistrationPolicy.Json(descriptor.Parameters, options, requireObject: true) || !Enum.IsDefined(descriptor.ParametersOrigin) ||
+            descriptor.ValidationParameters is { } validation && !RegistrationPolicy.Json(validation, options, requireObject: true) ||
             descriptor.ConstrainedSampling is { } sampling && !RegistrationPolicy.Json(sampling, options, requireObject: true))
             throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, scope.OwnerId, operation);
         return Add(scope, descriptor.RegistrationId, descriptor.Name, RegistrationKind.Tool, descriptor,
@@ -348,7 +349,8 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             var reserved = kind == RegistrationKind.Tool ? options.ReservedToolNames : options.ReservedCommandNames;
             if ((kind is RegistrationKind.Tool or RegistrationKind.Command) && reserved.Contains(name, StringComparer.Ordinal))
                 throw Failure(ExtensionRegistrationFailure.ReservedName, scope.OwnerId, operation);
-            if ((kind is RegistrationKind.Tool or RegistrationKind.Command) && ownerOrder.Any(owner => owner.Staged.ContainsName(kind, name)))
+            if ((kind is RegistrationKind.Tool or RegistrationKind.Command) &&
+                (kind == RegistrationKind.Command && options.SuffixDuplicateCommandNames ? scope.Staged.ContainsName(kind, name) : ownerOrder.Any(owner => owner.Staged.ContainsName(kind, name))))
                 throw Failure(ExtensionRegistrationFailure.DuplicateName, scope.OwnerId, operation);
             if (chargedRegistrations >= options.MaximumRegistrations ||
                 scope.ChargedRegistrations >= options.MaximumRegistrationsPerOwner ||
@@ -431,7 +433,29 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
     {
         var entries = ownerOrder.Where(owner => owner.State == RegistrationScopeState.Active)
             .SelectMany(owner => owner.Staged.Entries).ToImmutableArray();
-        Volatile.Write(ref snapshot, new(identity, checked(++revision), entries));
+        Volatile.Write(ref snapshot, new(identity, checked(++revision), entries, CommandInvocationNames(entries)));
+    }
+
+    /// <summary>Pi runner resolveRegisteredCommands over the published commands (when <see cref="ExtensionRegistryOptions.SuffixDuplicateCommandNames"/>).</summary>
+    internal ImmutableDictionary<RegistrationEntry, string>? CommandInvocationNames(ImmutableArray<RegistrationEntry> entries)
+    {
+        if (!options.SuffixDuplicateCommandNames) return null;
+        var commands = entries.Where(entry => entry.Kind == RegistrationKind.Command).ToArray();
+        var counts = commands.GroupBy(entry => entry.Name, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        var seen = new Dictionary<string, int>(StringComparer.Ordinal); var taken = new HashSet<string>(StringComparer.Ordinal);
+        var names = ImmutableDictionary.CreateBuilder<RegistrationEntry, string>(ReferenceEqualityComparer.Instance);
+        foreach (var command in commands)
+        {
+            var occurrence = seen[command.Name] = seen.GetValueOrDefault(command.Name) + 1;
+            var invocation = counts[command.Name] > 1 ? $"{command.Name}:{occurrence}" : command.Name;
+            if (taken.Contains(invocation))
+            {
+                var suffix = occurrence;
+                do { suffix++; invocation = $"{command.Name}:{suffix}"; } while (taken.Contains(invocation));
+            }
+            taken.Add(invocation); names[command] = invocation;
+        }
+        return names.ToImmutable();
     }
 
     /// <summary>Initial-only pure argument preparation under the same owner/snapshot lease as execution.</summary>
@@ -448,7 +472,11 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             var prepare = ((ExtensionToolDescriptor)entry.Descriptor).PrepareInitialArgumentsAsync;
             if (prepare is null) return arguments;
             // Preparation receives no host/UI context and cannot advertise a result or authorize an effect.
-            var result = await prepare(arguments, linked.Token).ConfigureAwait(false);
+            JsonData result;
+            // Source prepareToolCall catches what prepareArguments throws and reports its message as the error result.
+            try { result = await prepare(arguments, linked.Token).ConfigureAwait(false); }
+            catch (Exception error) when (error is not (OperationCanceledException or ExtensionToolArgumentPreparationException))
+            { throw new ExtensionToolArgumentPreparationException(error.Message, error); }
             linked.Token.ThrowIfCancellationRequested();
             if (!RegistrationPolicy.Json(result, options, requireObject: true))
                 throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, scope.OwnerId, "prepared-tool-arguments");
@@ -833,7 +861,7 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
                 !RegistrationPolicy.Identifier(captured.SelectedLeafId, options.MaximumIdentifierCharacters) ||
             captured.BranchEntries.IsDefault || !Enum.IsDefined(captured.Persistence))
             throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, ownerId, operation);
-        if (captured.BranchEntries.Length > ExtensionSessionSnapshotLimits.MaximumBranchEntries)
+        if (captured.BranchEntries.Length > options.MaximumSessionBranchEntries)
             throw Failure(ExtensionRegistrationFailure.LimitExceeded, ownerId, operation);
         long characters = (long)captured.SessionId.Length + (captured.SelectedLeafId?.Length ?? 0);
         long bytes = Encoding.UTF8.GetByteCount(captured.SessionId) +
@@ -847,8 +875,8 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             characters += raw.Length;
             bytes += Encoding.UTF8.GetByteCount(raw);
             if (raw.Length > options.MaximumJsonCharacters ||
-                characters > ExtensionSessionSnapshotLimits.MaximumCharacters ||
-                bytes > ExtensionSessionSnapshotLimits.MaximumUtf8Bytes)
+                characters > options.MaximumSessionCharacters ||
+                bytes > options.MaximumSessionUtf8Bytes)
                 throw Failure(ExtensionRegistrationFailure.LimitExceeded, ownerId, operation);
             if (!RegistrationPolicy.Json(entry, options, requireObject: true,
                 retainOpaqueNumbers: sessionProvider is IExtensionSessionOpaqueViewProvider))
@@ -856,8 +884,8 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             // JsonData owns its document. Copying the array also severs a host's mutable backing-array alias.
             owned.Add(entry);
         }
-        if (characters > ExtensionSessionSnapshotLimits.MaximumCharacters ||
-            bytes > ExtensionSessionSnapshotLimits.MaximumUtf8Bytes)
+        if (characters > options.MaximumSessionCharacters ||
+            bytes > options.MaximumSessionUtf8Bytes)
             throw Failure(ExtensionRegistrationFailure.LimitExceeded, ownerId, operation);
         return new(captured.SessionId, captured.Generation, captured.SelectedLeafId, owned.MoveToImmutable())
             { Persistence = captured.Persistence };
@@ -897,7 +925,7 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             if (!ReferenceEquals(captured.RegistryIdentity, identity))
                 throw Failure(ExtensionRegistrationFailure.StaleSnapshot, "registry", operation);
             if (options.FollowCurrentSnapshot) captured = snapshot;
-            var selected = captured.Entries.Where(entry => entry.Kind == kind && entry.Name == name).ToArray();
+            var selected = captured.Entries.Where(entry => entry.Kind == kind && captured.NameOf(entry) == name).ToArray();
             if ((kind is RegistrationKind.Tool or RegistrationKind.Command) && selected.Length != 1)
                 throw Failure(ExtensionRegistrationFailure.StaleSnapshot, "registry", operation);
             if (selected.Length > maximumSelected)

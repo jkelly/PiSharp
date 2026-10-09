@@ -3,4 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="JsonSyntax/*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="SessionFormat/*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

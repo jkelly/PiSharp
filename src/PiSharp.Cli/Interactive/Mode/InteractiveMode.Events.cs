@@ -450,7 +450,13 @@ internal sealed partial class InteractiveMode
     /// <summary>A `{ truncated: true }` truncation result for bash output (interactive-mode.ts).</summary>
     private static PiSharp.Agent.Tools.ToolOutputTruncationResult TruncatedOutput(string? content) => new(content ?? "", true, null, 0, 0, 0, 0, false, false, 0, 0);
 
-    private IReadOnlyList<MarkdownTransformer> GetMarkdownTransformers() => context.MarkdownTransformers?.Invoke() ?? [];
+    // interactive-mode.ts getMarkdownTransformers: the Mermaid transformer, then the extensions' transformers.
+    private MarkdownTransformer? mermaidMarkdownTransformer;
+    private IReadOnlyList<MarkdownTransformer> GetMarkdownTransformers() =>
+    [
+        mermaidMarkdownTransformer ??= MermaidTransformer.Create(() => settings.MermaidRenderingMode, () => Themes.IsInitialized ? Themes.Current : null),
+        .. context.MarkdownTransformers?.Invoke() ?? []
+    ];
 
     // =========================================================================
     // Chat rendering

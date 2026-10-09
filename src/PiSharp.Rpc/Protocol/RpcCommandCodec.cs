@@ -14,8 +14,8 @@ internal sealed record RpcCommandEnvelope(string? Id, string Type, string? Messa
     string? StreamingBehavior = null, string? Mode = null, string? Since = null, SessionCatalogQuery? CatalogQuery = null,
     string? TargetId = null, JsonData? Replacement = null, long? ExpectedGeneration = null,
     SessionCompactionRequest? Compaction = null, SessionBranchSummaryRequest? BranchSummary = null, string? Provider = null, string? ModelId = null, string? ThinkingLevel = null);
-internal sealed class RpcCommandException(string? id, string command, string message) : Exception(message)
-{ public string? Id { get; } = id; public string Command { get; } = command; }
+internal sealed class RpcCommandException(string? id, string? command, string message) : Exception(message)
+{ public string? Id { get; } = id; public string? Command { get; } = command; }
 
 internal static class RpcCommandCodec
 {
@@ -34,19 +34,36 @@ internal static class RpcCommandCodec
 
     internal static RpcCommandEnvelope Decode(JsonData input, RpcDispatchOptions options)
     {
+        // rpc-mode.ts handleCommand(JSON.parse(line)): a number, string, boolean or array has no id or type, so the switch falls to
+        // default and answers error(undefined, undefined, "Unknown command: undefined").
+        if (input.Value.ValueKind != JsonValueKind.Object) throw new RpcCommandException(null, null, "Unknown command: undefined");
         try { Strict(input, options.MaximumCommandBytes, options.MaximumJsonDepth); }
         catch (JsonlTransportException) { throw new RpcCommandException(null, "parse", "Failed to parse command: invalid strict JSON object."); }
         var body = input.Value; string? id = null;
+        // An id or type with a lone surrogate is echoed exactly (the owned record holds U+FFFD there).
+        JsonlRecordCodec.ExactMembers.TryGetValue(input, out var exact);
+        string Exact(string field, JsonElement value) => exact is not null && exact.TryGetValue(field, out var text) ? text : value.GetString()!;
         if (body.TryGetProperty("id", out var identity))
         {
-            if (identity.ValueKind != JsonValueKind.String || identity.GetString()!.Length > options.MaximumIdCharacters)
+            // rpc-mode.ts echoes command.id as it came: a non-string id is written back as that JSON value.
+            if (identity.ValueKind != JsonValueKind.String) id = RawJson(identity);
+            else if (identity.GetString()!.Length > options.MaximumIdCharacters)
                 throw new RpcCommandException(null, "parse", "Command id must be a bounded string when present.");
-            id = identity.GetString();
+            else id = Exact("id", identity);
         }
-        if (!body.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String ||
-            type.GetString()!.Length > options.MaximumCommandTypeCharacters)
+        // An object without a type reaches the same default branch: "Unknown command: undefined", with its id.
+        if (!body.TryGetProperty("type", out var type)) throw new RpcCommandException(id, null, "Unknown command: undefined");
+        // A non-string type matches no case: error(id, type, `Unknown command: ${type}`), the type echoed as its JSON value.
+        if (type.ValueKind != JsonValueKind.String)
+        {
+            // 1e999 parses to Infinity: JSON.stringify writes null (the owned value), String(Infinity) is "Infinity".
+            var text = JsonlRecordCodec.NonFiniteMembers.TryGetValue(input, out var nonFinite) && nonFinite.TryGetValue("type", out var number)
+                ? double.IsPositiveInfinity(number) ? "Infinity" : "-Infinity" : JsString(type);
+            throw new RpcCommandException(id, RawJson(type), "Unknown command: " + text);
+        }
+        if (type.GetString()!.Length > options.MaximumCommandTypeCharacters)
             throw new RpcCommandException(id, "parse", "Command type must be a bounded string.");
-        var name = type.GetString()!;
+        var name = Exact("type", type);
         try { _ = ErrorCore(id, name, "RPC command failed.", options); }
         catch (RpcDispatchException) { throw new RpcCommandException(null, "parse", "Command identity exceeds response limits."); }
         string Required(string field, int maximum)
@@ -81,7 +98,7 @@ internal static class RpcCommandCodec
         if (name == "export_html") return new(id, name, Message: body.TryGetProperty("outputPath", out var output) && output.ValueKind == JsonValueKind.Null
             ? null : Optional("outputPath", Math.Min(options.MaximumPromptCharacters, 4096)));
         if (name == "compact") return new(id, name,
-            Compaction: new(SummaryOptions: new(CustomInstructions: Optional("customInstructions", Math.Min(options.MaximumPromptCharacters, 65_536)))));
+            Compaction: new(SummaryOptions: new(CustomInstructions: Optional("customInstructions", options.MaximumPromptCharacters))));
         if (name is "set_auto_compaction" or "set_auto_retry")
         {
             if (!body.TryGetProperty("enabled", out var enabled) || enabled.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
@@ -105,7 +122,7 @@ internal static class RpcCommandCodec
                 if (value.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new RpcCommandException(id, name, "Summary flags must be booleans.");
                 return value.GetBoolean();
             }
-            var focus = Optional("customInstructions", Math.Min(options.MaximumPromptCharacters, 65_536));
+            var focus = Optional("customInstructions", options.MaximumPromptCharacters);
             var summaryOptions = new SessionSummaryRequestOptions(CustomInstructions: focus);
             if (name == "pisharp_set_auto_compaction")
             {
@@ -196,7 +213,7 @@ internal static class RpcCommandCodec
                 throw new RpcCommandException(id, name, "Command excludeFromContext must be a boolean when present.");
             return new(id, name, Message: shellCommand, Mode: excluded.GetBoolean() ? "exclude" : "include");
         }
-        if (name == "set_session_name") return new(id, name, Message: Required("name", Math.Min(options.MaximumPromptCharacters, 65_536)));
+        if (name == "set_session_name") return new(id, name, Message: Required("name", options.MaximumPromptCharacters));
         if (name == "set_model")
         {
             var provider = Required("provider", options.MaximumCommandBytes);
@@ -238,15 +255,50 @@ internal static class RpcCommandCodec
         Header(writer, command.Id, command.Type); writer.WriteBoolean("success", true);
         if (data is not null) { writer.WritePropertyName("data"); writer.WriteRawValue(data.ToString()); }
     }, options.MaximumOutputBytes);
-    internal static JsonData Error(string? id, string command, string error, RpcDispatchOptions options)
+    internal static JsonData Error(string? id, string? command, string error, RpcDispatchOptions options)
     {
         try { return ErrorCore(id, command, error, options); }
         catch (RpcDispatchException) { return ErrorCore(id, command, "RPC command failed.", options); }
     }
-    private static JsonData ErrorCore(string? id, string command, string error, RpcDispatchOptions options) => Build(writer =>
-    { Header(writer, id, command); writer.WriteBoolean("success", false); writer.WriteString("error", error); }, options.MaximumOutputBytes);
-    private static void Header(Utf8JsonWriter writer, string? id, string command)
-    { if (id is not null) writer.WriteString("id", id); writer.WriteString("type", "response"); writer.WriteString("command", command); }
+    private static JsonData ErrorCore(string? id, string? command, string error, RpcDispatchOptions options) => Build(writer =>
+    { Header(writer, id, command); writer.WriteBoolean("success", false); writer.WritePropertyName("error"); WriteEchoed(writer, error); }, options.MaximumOutputBytes);
+    // JSON.stringify omits an undefined command (the type of a non-object or type-less command).
+    private static void Header(Utf8JsonWriter writer, string? id, string? command)
+    {
+        if (id is not null) { writer.WritePropertyName("id"); WriteEchoed(writer, id); }
+        writer.WriteString("type", "response");
+        if (command is not null) { writer.WritePropertyName("command"); WriteEchoed(writer, command); }
+    }
+
+    // A non-string id or type travels through the dispatcher's string-typed identity as this marker plus its JSON text, and is written
+    // back as that JSON value. The process-unique NUL-led prefix cannot be produced by an ordinary command string in practice.
+    private static readonly string RawPrefix = "\0pisharp-raw-json:" + Guid.NewGuid().ToString("N") + ":";
+    private static string RawJson(JsonElement value) => RawPrefix + value.GetRawText();
+    private static void WriteEchoed(Utf8JsonWriter writer, string value)
+    {
+        if (value.StartsWith(RawPrefix, StringComparison.Ordinal)) writer.WriteRawValue(value[RawPrefix.Length..]);
+        // Utf8JsonWriter refuses a lone surrogate; JSON.stringify writes it as an escape.
+        else if (HasLoneSurrogate(value)) writer.WriteRawValue(PiSharp.AI.StreamingJson.JsonQuote(value), skipInputValidation: true);
+        else writer.WriteStringValue(value);
+    }
+    private static bool HasLoneSurrogate(string value)
+    {
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (char.IsHighSurrogate(value[index]) && index + 1 < value.Length && char.IsLowSurrogate(value[index + 1])) index++;
+            else if (char.IsSurrogate(value[index])) return true;
+        }
+        return false;
+    }
+    // String(value) for a JSON value, as a template literal converts it.
+    private static string JsString(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.String => value.GetString()!,
+        JsonValueKind.Null => "null", JsonValueKind.True => "true", JsonValueKind.False => "false",
+        JsonValueKind.Number => PiSharp.AI.StreamingJson.ParseToJson(value.GetRawText()),
+        JsonValueKind.Array => string.Join(",", value.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.Null ? "" : JsString(item))),
+        _ => "[object Object]"
+    };
     internal static JsonData Event(string type, Action<Utf8JsonWriter>? fields, RpcDispatchOptions options) => Build(writer =>
     { writer.WriteString("type", type); fields?.Invoke(writer); }, options.MaximumOutputBytes);
     internal static JsonData Build(Action<Utf8JsonWriter> fields, int maximum)

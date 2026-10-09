@@ -42,6 +42,16 @@ namespace PiSharp.Cli.Mcp;
 internal sealed record McpSessionHost(string AgentDirectory, string HomeDirectory, Func<IEnumerable<KeyValuePair<string, string>>> ProcessEnvironment)
 {
     internal const string ClientVersion = "1.1.0";
+    /// <summary>mcp/index.ts registers every tool of every server (runtime.ts lists every page) and calls any number of them at once;
+    /// a tool schema or description is bounded only by its 16 MiB tools/list message (transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES).</summary>
+    internal static ExtensionRegistryOptions RegistryOptions { get; } = new()
+    {
+        MaximumRegistrations = int.MaxValue, MaximumRegistrationsPerOwner = int.MaxValue, MaximumConcurrentDispatches = int.MaxValue,
+        MaximumMetadataCharacters = int.MaxValue, MaximumDescriptionCharacters = 16 * 1024 * 1024, MaximumJsonCharacters = 16 * 1024 * 1024,
+        MaximumJsonDepth = 64
+    };
+    /// <summary>The binding of one server's (or the resource tools') registrations admits every tool it lists.</summary>
+    internal static ToolInvokerOptions BindingInvokerOptions { get; } = new(MaximumTools: int.MaxValue);
     private static readonly TimeSpan OAuthRequestTimeout = TimeSpan.FromSeconds(15);
 
     /// <summary>Physical HTTP for HTTP servers and their OAuth refreshes; defaults to a socket handler without redirects.</summary>
@@ -173,7 +183,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                 var challenges = new System.Collections.Concurrent.ConcurrentDictionary<string, McpOAuthChallenge>(StringComparer.Ordinal);
                 McpAdmittedChannelFactory Channels(McpServerEntry entry, McpNotificationHandler? notification) =>
                     Channel(entry, currentCwd, options, () => owned.Client, environment, notification, challenge => challenges[entry.Name] = challenge);
-                var resourceRegistry = owned.Track(new ExtensionRegistry());
+                var resourceRegistry = owned.Track(new ExtensionRegistry(RegistryOptions));
                 var resourceScope = await resourceRegistry.ActivateAsync("mcp-resources", new EmptyExtension(), token).ConfigureAwait(false);
                 McpServerManager? manager = null;
                 // index.ts tool_call: tool_search and the resource tools reach every server, so they wait for all of them; a codemode
@@ -184,7 +194,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                 { WaitForServers = cancellation => WaitForServers(_ => true, cancellation) };
                 async ValueTask<McpPreparedServer> Bind(McpServerEntry actual, ReplaceableAgentSession owner, AgentSessionAttachment attachment, CancellationToken cancellation)
                 {
-                    var registry = owned.Track(new ExtensionRegistry());
+                    var registry = owned.Track(new ExtensionRegistry(RegistryOptions));
                     var scope = await registry.ActivateAsync("mcp-" + actual.Name, new EmptyExtension(), cancellation).ConfigureAwait(false);
                     grants.AdmitServer(scope);
                     McpPreparedServer? prepared = null;
@@ -238,7 +248,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
                     reporter.Notice($"MCP tools are only reachable from the codemode or tool_search tool, but neither is active{(codemodeOff ? " (autoEnableCodemode is false)" : "")}; they cannot be called.");
                 if (!definitions.IsEmpty)
                 {
-                    var discoveryRegistry = new ExtensionRegistry();
+                    var discoveryRegistry = new ExtensionRegistry(RegistryOptions);
                     discovery = new Disposer(() => discoveryRegistry.DisposeAsync());
                     var scope = await discoveryRegistry.ActivateAsync("mcp-discovery", new EmptyExtension(), token).ConfigureAwait(false);
                     prepare = new McpRegisteredProfileDiscoveryAdmission(discoveryRegistry, scope, definitions, exactPolicy, generation,

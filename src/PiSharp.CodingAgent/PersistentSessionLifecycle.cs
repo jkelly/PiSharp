@@ -16,6 +16,11 @@ public sealed record AgentSessionCreationRequest(AgentSessionCreationKind Kind, 
 /// It owns no default home or provider. Destinations are fresh siblings in the attached backend namespace.</summary>
 public sealed class PersistentSessionLifecycle
 {
+    /// <summary>The attachments (session switches) and reload attempts an owner this lifecycle attaches admits. A host following Pi,
+    /// whose agent-session.ts switches and reloads any number of times in one process, sets int.MaxValue.</summary>
+    public int MaximumOwnerAttachments { get; set; } = ReplaceableAgentSession.MaximumAttachments;
+    /// <summary>The owned resources (MCP servers, extension bindings) such an owner admits at once; int.MaxValue follows Pi.</summary>
+    public int MaximumOwnedResources { get; set; } = ReplaceableAgentSession.MaximumOwnedResources;
     private readonly SessionRuntimeRegistry registry;
     private readonly Func<long> clock;
     private readonly Func<string> nextEntryId;
@@ -54,11 +59,13 @@ public sealed class PersistentSessionLifecycle
             fileSystem = backend;
             catalog ??= new SessionCatalog([new("session-backend", backend.Directory)], fileSystem: backend);
         }
-        this.nextSessionId = nextSessionId ?? (() => Guid.NewGuid().ToString());
+        // session-manager.ts newSession/forkFrom: a uuidv7 session id.
+        this.nextSessionId = nextSessionId ?? (() => Guid.CreateVersion7(DateTimeOffset.FromUnixTimeMilliseconds(clock())).ToString());
         var bounds = this.options.SessionLogStoreOptions?.ReaderOptions ?? new();
         var graph = this.options.ContextOptions ?? new();
         planner = new(new(Math.Min(100_000, Math.Min(graph.MaximumEntries, Math.Max(1, bounds.MaximumRecords - 1))),
-            bounds.MaximumInputBytes, bounds.CodecOptions, graph.MaximumInputCharacters));
+            bounds.MaximumInputBytes, bounds.CodecOptions, graph.MaximumInputCharacters,
+            JavaScriptSerialization: this.options.SessionLogStoreOptions?.JavaScriptSerialization == true));
         publisher = new(new(bounds, graph), fileSystem);
         Catalog = catalog;
         this.registryForWorkingDirectory = registryForWorkingDirectory;

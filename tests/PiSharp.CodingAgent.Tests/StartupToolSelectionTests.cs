@@ -139,7 +139,8 @@ internal static class StartupToolSelectionTests
             Names([], restored.GetActiveTools()); Names(["bash"], restored.PendingToolNames);
         }
         var afterRegistry = await File.ReadAllBytesAsync(path);
-        Equal(true, afterRegistry.Length > original.Length && afterRegistry.Take(original.Length).SequenceEqual(original));
+        // The restored loadout is applied in memory; the open writes nothing (the next request records it).
+        Equal(true, afterRegistry.SequenceEqual(original));
         await File.WriteAllBytesAsync(path, original);
         await File.WriteAllTextAsync(fixture.User, "{\"defaultTools\":[\"read\"]}");
         foreach (var flags in new[] { new[] { "--tools", "read" }, new[] { "--tools", "" }, new[] { "--user-settings", fixture.User } })

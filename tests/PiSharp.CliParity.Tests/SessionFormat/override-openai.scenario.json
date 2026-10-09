@@ -1,0 +1,53 @@
+{
+ "name": "override-openai",
+ "extensions": false,
+ "files": {},
+ "models": {
+  "providers": {
+   "openai": {
+    "baseUrl": "{base}/proxy/v1"
+   }
+  }
+ },
+ "settings": null,
+ "responses": [
+  {
+   "status": 200,
+   "contentType": "text/event-stream",
+   "body": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_1\",\"object\":\"response\",\"status\":\"in_progress\",\"model\":\"gpt-4o-mini\",\"output\":[]}}\n\nevent: response.output_item.added\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_r1\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[]}}\n\nevent: response.content_part.added\ndata: {\"type\":\"response.content_part.added\",\"output_index\":0,\"item_id\":\"msg_r1\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[]}}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"item_id\":\"msg_r1\",\"content_index\":0,\"delta\":\"Proxied.\"}\n\nevent: response.output_text.done\ndata: {\"type\":\"response.output_text.done\",\"output_index\":0,\"item_id\":\"msg_r1\",\"content_index\":0,\"text\":\"Proxied.\"}\n\nevent: response.content_part.done\ndata: {\"type\":\"response.content_part.done\",\"output_index\":0,\"item_id\":\"msg_r1\",\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"Proxied.\",\"annotations\":[]}}\n\nevent: response.output_item.done\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_r1\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Proxied.\",\"annotations\":[]}]}}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_1\",\"object\":\"response\",\"status\":\"completed\",\"model\":\"gpt-4o-mini\",\"output\":[{\"id\":\"msg_r1\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Proxied.\",\"annotations\":[]}]}],\"usage\":{\"input_tokens\":5,\"output_tokens\":2,\"total_tokens\":7,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens_details\":{\"reasoning_tokens\":0}}}}\n\n"
+  }
+ ],
+ "env": {},
+ "requests": [
+  {
+   "method": "POST",
+   "url": "/proxy/v1/responses"
+  }
+ ],
+ "runs": [
+  {
+   "args": [
+    "--provider",
+    "openai",
+    "--model",
+    "gpt-4o-mini"
+   ],
+   "steps": [
+    {
+     "type": "prompt",
+     "message": "hi"
+    }
+   ]
+  }
+ ],
+ "expected": [
+  [
+   "{\"type\":\"session\",\"version\":3,\"id\":\"01a12249-0a47-725f-bf43-ac925a9db77d\",\"timestamp\":\"2026-10-09T20:09:34.536Z\",\"cwd\":\"<ROOT>\\\\project\"}",
+   "{\"type\":\"model_change\",\"id\":\"1908c126\",\"parentId\":null,\"timestamp\":\"2026-10-09T20:09:34.634Z\",\"provider\":\"openai\",\"modelId\":\"gpt-4o-mini\"}",
+   "{\"type\":\"thinking_level_change\",\"id\":\"07a934df\",\"parentId\":\"1908c126\",\"timestamp\":\"2026-10-09T20:09:34.634Z\",\"thinkingLevel\":\"off\"}",
+   "{\"type\":\"message\",\"id\":\"b35c77ae\",\"parentId\":\"07a934df\",\"timestamp\":\"2026-10-09T20:09:34.641Z\",\"message\":{\"role\":\"system\",\"content\":\"\",\"sections\":{\"preamble\":\"You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.\",\"tools\":\"<tools>\\n- read: Read file contents\\n- bash: Execute bash commands (ls, grep, find, etc.)\\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\\n- write: Create or overwrite files\\n\\nIn addition to the tools above, you may have access to other custom tools depending on the project.\\n</tools>\",\"rules\":\"<rules>\\n- Use bash for file operations like ls, rg, find\\n- Use read to examine files instead of cat or sed.\\n- You can inspect PI_* environment variables for current model and session details.\\n- Use edit for precise changes (edits[].oldText must match exactly)\\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\\n- Use write only for new files or complete rewrites.\\n- Be concise in your responses\\n- Show file paths clearly when working with files\\n</rules>\",\"docs\":\"<docs>\\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\\n- Main documentation: <PIPKG>\\\\@earendil-works\\\\pi-coding-agent\\\\README.md\\n- Additional docs: <PIPKG>\\\\@earendil-works\\\\pi-coding-agent\\\\docs\\n- Examples: <PIPKG>\\\\@earendil-works\\\\pi-coding-agent\\\\examples (extensions, custom tools, SDK)\\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\\n</docs>\",\"cwd\":\"<cwd>\\n<ROOT>/project\\n</cwd>\"},\"timestamp\":1791576574640,\"toolsAdded\":[{\"name\":\"read\",\"description\":\"Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.\",\"parameters\":{\"type\":\"object\",\"required\":[\"path\"],\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"Path to the file to read (relative or absolute)\"},\"offset\":{\"type\":\"number\",\"description\":\"Line number to start reading from (1-indexed)\"},\"limit\":{\"type\":\"number\",\"description\":\"Maximum number of lines to read\"}}},\"constrainedSampling\":{\"type\":\"json_schema\",\"strict\":\"prefer\"}},{\"name\":\"bash\",\"description\":\"Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.\",\"parameters\":{\"type\":\"object\",\"required\":[\"command\"],\"properties\":{\"command\":{\"type\":\"string\",\"description\":\"Shell command to execute\"},\"timeout\":{\"type\":\"number\",\"description\":\"Timeout in seconds (optional, no default timeout)\"}}},\"constrainedSampling\":{\"type\":\"json_schema\",\"strict\":\"prefer\"}},{\"name\":\"edit\",\"description\":\"Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.\",\"parameters\":{\"type\":\"object\",\"required\":[\"path\",\"edits\"],\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"Path to the file to edit (relative or absolute)\"},\"edits\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"oldText\",\"newText\"],\"properties\":{\"oldText\":{\"type\":\"string\",\"description\":\"Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call.\"},\"newText\":{\"type\":\"string\",\"description\":\"Replacement text for this targeted edit.\"}}},\"description\":\"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead.\"}}},\"constrainedSampling\":{\"type\":\"json_schema\",\"strict\":\"prefer\"}},{\"name\":\"write\",\"description\":\"Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.\",\"parameters\":{\"type\":\"object\",\"required\":[\"path\",\"content\"],\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"Path to the file to write (relative or absolute)\"},\"content\":{\"type\":\"string\",\"description\":\"Content to write to the file\"}}},\"constrainedSampling\":{\"type\":\"json_schema\",\"strict\":\"prefer\"}}]}}",
+   "{\"type\":\"message\",\"id\":\"c28a2ea1\",\"parentId\":\"b35c77ae\",\"timestamp\":\"2026-10-09T20:09:34.642Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hi\"}],\"timestamp\":1791576574639}}",
+   "{\"type\":\"message\",\"id\":\"48c57348\",\"parentId\":\"c28a2ea1\",\"timestamp\":\"2026-10-09T20:09:34.733Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Proxied.\",\"textSignature\":\"{\\\"v\\\":1,\\\"id\\\":\\\"msg_r1\\\"}\"}],\"api\":\"openai-responses\",\"provider\":\"openai\",\"model\":\"gpt-4o-mini\",\"usage\":{\"input\":5,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"reasoning\":0,\"totalTokens\":7,\"cost\":{\"input\":7.5e-7,\"output\":0.0000012,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0.00000195}},\"stopReason\":\"stop\",\"timestamp\":1791576574710,\"responseId\":\"resp_1\",\"rawStopReason\":\"completed\",\"durationMs\":21,\"thinkingLevel\":\"off\"}}"
+  ]
+ ]
+}

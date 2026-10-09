@@ -33,7 +33,10 @@ public static class UserBash
     public static void Validate(UserBashExecutionRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (!Scalar(request.Command) || request.Command.Length > 12_000 || !Absolute(request.WorkingDirectory) ||
+        // Source executeBash has no command length limit: the operating system's spawn limit applies. The bound only caps memory,
+        // as the model's bash tool does (BashToolOptions.MaximumCommandCharacters).
+        // A NUL byte reaches the shell operations, which fail with Node's spawn argument error as the source does.
+        if (!Scalar(request.Command, allowNul: true) || request.Command.Length > 96_000 || !Absolute(request.WorkingDirectory) ||
             request.Id is not null && (!Scalar(request.Id) || request.Id.Length > 4096))
             throw new ArgumentException("User Bash request exceeds the admitted text/path profile.", nameof(request));
     }
@@ -77,9 +80,9 @@ public static class UserBash
     }
     private static bool Sanitized(string? text) => Scalar(text) && !text!.Any(character =>
         character is <= '\x08' or '\x0b' or '\x0c' or '\r' or >= '\x0e' and <= '\x1f' or '\x9b' or >= '\ufff9' and <= '\ufffb');
-    private static bool Scalar(string? text)
+    private static bool Scalar(string? text, bool allowNul = false)
     {
-        if (text is null || text.Contains('\0')) return false;
+        if (text is null || !allowNul && text.Contains('\0')) return false;
         for (var index = 0; index < text.Length; index++)
         {
             if (char.IsHighSurrogate(text[index]))

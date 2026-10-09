@@ -123,7 +123,10 @@ internal static class CompletionsPreparationOwnershipTests
                 var frames = new List<StreamEvent>(); await Collect(transport.StreamAsync(Request), frames).WaitAsync(Deadline);
                 Check(!frames.OfType<StreamStarted>().Any() && frames[^1] is StreamError, "Canonical rejection changed Start order.");
             }
-            Check(content.AcquireCalls == 0 && content.SerializeCalls == 0 && observed.Count == 0 && body.Reads == 0 && body.AsyncCloses == 0 &&
+            // A rejected status is read once into the openai SDK APIError message (response.text()); a hook rejection never opens the body.
+            var statusRejected = status != HttpStatusCode.OK;
+            Check(content.AcquireCalls == (statusRejected ? 1 : 0) && content.SerializeCalls == 0 && observed.Count == 0 &&
+                (statusRejected || body.Reads == 0 && body.AsyncCloses == 0) &&
                 content.DisposeCalls == 1 && hookCalls == (status == HttpStatusCode.OK ? 1 : 0),
                 "Canonical hook/status rejection opened, prefetched or buffered the rejected body.");
         }

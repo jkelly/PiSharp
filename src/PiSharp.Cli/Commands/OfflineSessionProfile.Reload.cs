@@ -88,7 +88,8 @@ internal sealed partial class OfflineSessionProfile
     {
         public async ValueTask<PromptInputDecision> ReduceAsync(PromptInput input, CancellationToken token)
         {
-            input = PromptInputValue.Own(input);
+            // The submitting session admits the input under its own options; routing adds no bound of its own.
+            input = PromptInputValue.Own(input, PromptInputAdmissionOptions.Unbounded);
             token.ThrowIfCancellationRequested();
             // The extensions' pending registrations were joined by the session's input gate before this input was admitted.
             var text = input.Text;

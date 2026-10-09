@@ -31,8 +31,24 @@ internal static class SessionBranchPlannerTests
         ("session fork JSONL reload preserves label-remapped compaction context and physical leaf", CompactionJsonlReload),
         ("session fork before extracts concatenated user text and creates empty root branch", Before),
         ("session fork admission rejects invalid graph selection metadata and identity reuse", Admission),
-        ("session branch bounds cancellation and eager bytes retain immutable source", BoundsAndBytes)
+        ("session branch bounds cancellation and eager bytes retain immutable source", BoundsAndBytes),
+        ("session fork JavaScript serialization writes JSON.stringify records", JavaScriptFork)
     ];
+    // session-manager.ts createBranchedSession writes the header, the path and the rewritten labels with JSON.stringify.
+    private static Task JavaScriptFork()
+    {
+        var label = "caf" + (char)0xE9 + " <&>+";
+        var source = ImmutableArray.Create(Entry("root"), Label("old", "root", "root", label));
+        var plan = new SessionBranchPlanner(new(JavaScriptSerialization: true)).Fork(Request(source, "root", labels: ["fresh-label"]));
+        var lines = Encoding.UTF8.GetString(plan.JsonlBytes.AsSpan()).Split('\n');
+        Equal("{\"type\":\"label\",\"id\":\"fresh-label\",\"parentId\":\"root\",\"timestamp\":\"" + Time + "\",\"targetId\":\"root\",\"label\":\"" + label + "\"}", lines[2]);
+        // A copied 1e400 is JSON.parse's Infinity, which JSON.stringify writes as null.
+        Check(lines[1].Contains("\"number\":null", StringComparison.Ordinal), "Copied record not written as JSON.stringify: " + lines[1]);
+        Equal(lines[2], plan.Entries[^1].WireBody.ToString());
+        var native = Encoding.UTF8.GetString(new SessionBranchPlanner().Fork(Request(source, "root", labels: ["fresh-label"])).JsonlBytes.AsSpan());
+        Check(native.Contains("1.00e400", StringComparison.Ordinal), "The default plan rewrote record tokens.");
+        return Task.CompletedTask;
+    }
     private static Task OpaqueAncestry()
     {
         var source = ImmutableArray.Create(Entry("root"), Label("old-label", "root", "root", "title"),

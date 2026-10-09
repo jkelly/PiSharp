@@ -227,7 +227,8 @@ internal static partial class Program
         for (var turn = 0; turn < 3; turn++) { BodyEqual(expected[turn], endpoint.Requests[turn].Body); Equal(KeyHeaders(MidBetas), endpoint.Requests[turn].Headers); }
     }
 
-    // anthropic_input_transformations: the last reported array is a diagnostic on a completed response (timestamp: the request's).
+    // anthropic_input_transformations: the last reported array is a diagnostic on a completed response, stamped Date.now() at completion
+    // (anthropic-messages.ts ~871-882), not the request timestamp.
     private static async Task MidEffortInputTransformations()
     {
         const string id = "claude-fable-5-1"; var model = new ModelDescriptor(id, "anthropic-messages", "anthropic");
@@ -235,10 +236,48 @@ internal static partial class Program
             startTransformations: new[] { new { type = "thinking_dropped", path = "messages.1.content.0", reason = "prefix_binding_mismatch" } },
             deltaTransformations: new object[] { new { type = "thinking_dropped", path = "messages.3.content.0", reason = "model_binding_mismatch" }, new { type = "thinking_dropped" } }));
         using var provider = NativeAnthropic(id, 4096, endpoint);
+        var before = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var message = (await new ChatClient(provider.Transport).CompleteAsync(new(model, [Ask], 42) { ThinkingLevel = "high" }).WaitAsync(Deadline)).Message;
+        var after = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         Equal(StopReason.Stop, message.StopReason); Equal("high", Level(message));
-        Equal("""[{"type":"anthropic_input_transformations","timestamp":42,"details":{"transformations":[{"type":"thinking_dropped","path":"messages.3.content.0","reason":"model_binding_mismatch"},{"type":"thinking_dropped"}]}}]""",
-            message.ExtraProperties!.TryGet("diagnostics", out var diagnostics) ? diagnostics!.ToString() : null);
+        var diagnostics = message.ExtraProperties!.TryGet("diagnostics", out var value) ? value!.Value : throw new InvalidOperationException("No diagnostics.");
+        var stamp = diagnostics[0].GetProperty("timestamp").GetInt64();
+        Check(stamp >= before && stamp <= after, "The diagnostic was not stamped at completion.");
+        Equal("""[{"type":"anthropic_input_transformations","timestamp":0,"details":{"transformations":[{"type":"thinking_dropped","path":"messages.3.content.0","reason":"model_binding_mismatch"},{"type":"thinking_dropped"}]}}]""",
+            diagnostics.ToString().Replace("\"timestamp\":" + stamp, "\"timestamp\":0", StringComparison.Ordinal));
+    }
+
+    private sealed class FixedClock(long milliseconds) : TimeProvider
+    { public override DateTimeOffset GetUtcNow() => DateTimeOffset.FromUnixTimeMilliseconds(milliseconds); }
+
+    // Captured from the installed pi-ai 1.1.0 stream() against a local SSE server: a non-array input_transformations is ignored
+    // (Array.isArray), entries map `type/path/reason ?? undefined` unchecked (values copied, null omitted, non-objects -> {}),
+    // an empty last array reports nothing, and a null entry fails with the TypeError text.
+    private static async Task AnthropicInputTransformationsUnchecked()
+    {
+        const string id = "claude-sonnet-4-5"; var model = new ModelDescriptor(id, "anthropic-messages", "anthropic");
+        async Task<AssistantMessage> Run(object? start, object? delta)
+        {
+            var events = MessagesStream(id, "ok", startTransformations: start, deltaTransformations: delta)
+                .Split("\n\n", StringSplitOptions.RemoveEmptyEntries).Select(frame => JsonData.Parse(frame.Split("\ndata: ")[1])).ToArray();
+            async IAsyncEnumerable<JsonData> Source() { foreach (var item in events) { await Task.Yield(); yield return item; } }
+            var transport = new AnthropicMessagesTransport((_, _) => Source(), new AnthropicMessagesOptions { Clock = new FixedClock(1791560882073) });
+            return (await new ChatClient(transport).CompleteAsync(new(model, [Ask], 42)).WaitAsync(Deadline)).Message;
+        }
+        static string? Text(AssistantMessage message, string name) => message.ExtraProperties?.TryGet(name, out var value) == true ? value!.ToString() : null;
+        var mixed = await Run(new[] { new { type = "a" } }, new object?[] { new Dictionary<string, object?> { ["type"] = 1, ["path"] = null, ["reason"] = new { x = true } },
+            "str", 5, new[] { 1 }, new { path = "p", extra = 9 }, new { } });
+        Equal(StopReason.Stop, mixed.StopReason);
+        Equal("""[{"type":"anthropic_input_transformations","timestamp":1791560882073,"details":{"transformations":[{"type":1,"reason":{"x":true}},{},{},{},{"path":"p"},{}]}}]""",
+            Text(mixed, "diagnostics"));
+        var kept = await Run(new[] { new { type = "kept" } }, new { type = "unsupported" });
+        Equal(StopReason.Stop, kept.StopReason);
+        Equal("""[{"type":"anthropic_input_transformations","timestamp":1791560882073,"details":{"transformations":[{"type":"kept"}]}}]""", Text(kept, "diagnostics"));
+        var ignored = await Run("nope", null); Equal(StopReason.Stop, ignored.StopReason); Equal(null, Text(ignored, "diagnostics"));
+        var empty = await Run(new[] { new { type = "x" } }, Array.Empty<object>()); Equal(StopReason.Stop, empty.StopReason); Equal(null, Text(empty, "diagnostics"));
+        var nullEntry = await Run(null, new object?[] { new { type = "t" }, null });
+        Equal(StopReason.Error, nullEntry.StopReason); Equal(null, Text(nullEntry, "diagnostics"));
+        Equal("Cannot read properties of null (reading 'type')", nullEntry.ExtraProperties!.TryGet("errorMessage", out var error) ? error!.Value.GetString() : null);
     }
 
     // Unmanaged models are unchanged: claude-fable-5 (adaptive, off:null, fallbacks) keeps top-level effort without markers even when a

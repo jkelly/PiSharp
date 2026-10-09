@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
   <ItemGroup><ProjectReference Include="../../src/PiSharp.CodingAgent/PiSharp.CodingAgent.csproj" /></ItemGroup>
+  <ItemGroup><None Include="StreamingJson/*.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>

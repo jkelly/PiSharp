@@ -62,7 +62,11 @@ internal sealed class FileModelsStore(string path) : IModelsStore
         if (!File.Exists(Path)) return [];
         var text = File.ReadAllText(Path, Encoding.UTF8);
         if (text.Length > 0 && text[0] == '﻿') text = text[1..];
-        return text.Length == 0 ? [] : JsonTree.Parse(text) as JsonObject ?? throw new InvalidDataException("Invalid models-store.json: expected an object");
+        if (text.Length == 0) return [];
+        JsonNode? parsed;
+        try { parsed = JsonTree.Parse(text); }
+        catch (System.Text.Json.JsonException error) { throw new System.Text.Json.JsonException(PiSharp.Contracts.Compatibility.JsJsonSyntax.Describe(text, error.Message), error); }
+        return parsed as JsonObject ?? throw new InvalidDataException("Invalid models-store.json: expected an object");
     }
 
     public async Task<ModelsStoreEntry?> ReadAsync(string providerId, CancellationToken cancellationToken)

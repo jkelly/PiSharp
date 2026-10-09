@@ -31,7 +31,6 @@ internal sealed class BedrockEventState
     private readonly ChatRequest _request;
     private readonly AssistantStreamReducer _reducer;
     private readonly List<Block> _blocks = [];
-    private readonly StreamingJsonPreview _preview = new(new(MaximumCharacters: 4 * 1024 * 1024, MaximumDepth: 64));
     private StopReason _stopReason = StopReason.Pending;
     private string? _rawStopReason, _stopError;
     private TokenUsage _usage = TokenUsage.Zero;
@@ -178,16 +177,8 @@ internal sealed class BedrockEventState
         block.RedactedChunks = null;
     }
 
-    private JsonData Arguments(Block block)
-    {
-        if (block.PartialJson.Length == 0) return JsonData.EmptyObject;
-        try
-        {
-            var value = _preview.Parse(block.PartialJson.ToString()).Value;
-            return value.Value.ValueKind == JsonValueKind.Object ? value : JsonData.EmptyObject;
-        }
-        catch (StreamingJsonPreviewException) { return JsonData.EmptyObject; }
-    }
+    // bedrock-converse-stream.ts: block.arguments = parseStreamingJson(block.partialJson), whatever JSON value that is.
+    private static JsonData Arguments(Block block) => StreamingJson.Parse(block.PartialJson.ToString());
 
     private static JsonFields Signature(string value) => JsonFields.Empty.Set("thinkingSignature", JsonData.Parse(JsonSerializer.Serialize(value)));
     private static JsonFields ThinkingProperties(Block block)
@@ -220,9 +211,20 @@ internal sealed class BedrockEventState
         if (_stopReason == StopReason.Pending) throw new InvalidOperationException("Bedrock stream ended without a stop reason");
         if (_stopReason == StopReason.Error) throw new InvalidOperationException(_stopError ?? "An unknown error occurred");
         EnsureStarted(output);
-        // Upstream finalizes blocks that never received contentBlockStop without an end event; a native successful settlement
-        // requires every block ended, so their end frames are emitted here.
-        for (var index = 0; index < _blocks.Count; index++) if (!_blocks[index].Ended) End(index, output);
+        // Source finalizeStreamingBlock: blocks that never received contentBlockStop are finalized (redacted content flushed, the
+        // streamed arguments kept) without an end event.
+        for (var index = 0; index < _blocks.Count; index++)
+        {
+            var block = _blocks[index];
+            if (block.Ended) continue;
+            Flush(block); block.Ended = true;
+            Emit(new ContentBlockFinalized(index, block.Kind switch
+            {
+                "text" => new TextContent(block.Text.ToString()),
+                "thinking" => new ThinkingContent(block.Text.ToString(), ThinkingProperties(block)),
+                _ => new ToolCallContent(block.Id, block.Name, Arguments(block))
+            }), output);
+        }
         var properties = JsonFields.Empty;
         if (_rawStopReason is not null) properties = properties.Set("rawStopReason", JsonData.Parse(JsonSerializer.Serialize(_rawStopReason)));
         var message = _reducer.Snapshot() with { Usage = _usage, StopReason = _stopReason, ExtraProperties = properties };

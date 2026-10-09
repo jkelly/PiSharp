@@ -196,7 +196,8 @@ internal static partial class Program
             EventMessage("messageStop", """{"stopReason":"end_turn"}""")
         ]));
         var events = await Collect(fixture.Transport, new(fixture.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 5));
-        Equal("StreamStarted,ThinkingStarted,ThinkingDelta,TextStarted,TextDelta,ThinkingEnded,TextEnded,StreamDone", string.Join(",", events.Select(frame => frame.GetType().Name)), "events");
+        // Source finalizeStreamingBlock: the unstopped blocks are finalized without thinking_end/text_end (native-only finalization).
+        Equal("StreamStarted,ThinkingStarted,ThinkingDelta,TextStarted,TextDelta,ContentBlockFinalized,ContentBlockFinalized,StreamDone", string.Join(",", events.Select(frame => frame.GetType().Name)), "events");
         var done = (StreamDone)events[^1];
         JsonSame($$"""[{"type":"thinking","thinking":"[Reasoning redacted]","thinkingSignature":"{{Convert.ToBase64String([1, 2, 3, 4, 5])}}","redacted":true},{"type":"text","text":"answer"}]""",
             JsonDocument.Parse(Wire(done.Message)).RootElement.GetProperty("content").GetRawText(), "redacted content");
@@ -209,6 +210,48 @@ internal static partial class Program
         var other = Bedrock(GptOssRow);
         using var otherRequest = await other.Transport.CreateRequestAsync(new(other.Model, replay, 10));
         JsonEqual("""{"content":[{"text":"answer"}],"role":"assistant"}""", JsonDocument.Parse(await otherRequest.Content!.ReadAsStringAsync()).RootElement.GetProperty("messages")[1].GetRawText(), "cross-model drop");
+        // An unstopped tool call keeps the arguments streamed so far (parseStreamingJson of the partial JSON) and emits no toolcall_end.
+        var tool = Bedrock(SonnetRow);
+        tool.Http.OnUrl("https://", _ => EventStream(messages:
+        [
+            EventMessage("messageStart", """{"role":"assistant"}"""),
+            EventMessage("contentBlockStart", """{"contentBlockIndex":0,"start":{"toolUse":{"toolUseId":"t9","name":"read"}}}"""),
+            EventMessage("contentBlockDelta", """{"contentBlockIndex":0,"delta":{"toolUse":{"input":"{\"path\":\"b.txt\""}}}"""),
+            EventMessage("messageStop", """{"stopReason":"tool_use"}""")
+        ]));
+        var toolEvents = await Collect(tool.Transport, new(tool.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 6));
+        Equal("StreamStarted,ToolCallStarted,ToolCallDelta,ContentBlockFinalized,StreamDone", string.Join(",", toolEvents.Select(frame => frame.GetType().Name)), "tool events");
+        JsonSame("""[{"type":"toolCall","id":"t9","name":"read","arguments":{"path":"b.txt"}}]""",
+            JsonDocument.Parse(Wire(((StreamDone)toolEvents[^1]).Message)).RootElement.GetProperty("content").GetRawText(), "unstopped tool arguments");
+    }
+
+    private static async Task BedrockToolArguments()
+    {
+        // bedrock-converse-stream.ts finalizes every tool call, stopped or not, with block.arguments = parseStreamingJson(block.partialJson):
+        // malformed input never fails the turn and any JSON value is kept.
+        foreach (var (input, expected) in new[]
+        {
+            ("{\"path\":\"a\",\"path\":\"b\",\"n\":1.50}", "{\"path\":\"b\",\"n\":1.5}"), ("[1,2", "[1,2]"), ("\"text\"", "\"text\""), ("not json", "{}"),
+            ("{\"p\":\"C:\\x\\y\"", "{}"), ("{\"p\":\"C:\\x\\y\"}", "{\"p\":\"C:\\\\x\\\\y\"}"), ("{\"a\":\"x\u0001", "{}"),
+            ("{\"a\":\"x\u0001\"}", "{\"a\":\"x\\u0001\"}"), ("null", "null"), ("", "{}"),
+        })
+            foreach (var stopped in new[] { true, false })
+            {
+                var tool = Bedrock(SonnetRow);
+                var messages = new List<byte[]>
+                {
+                    EventMessage("messageStart", """{"role":"assistant"}"""),
+                    EventMessage("contentBlockStart", """{"contentBlockIndex":0,"start":{"toolUse":{"toolUseId":"t1","name":"read"}}}"""),
+                };
+                if (input.Length > 0) messages.Add(EventMessage("contentBlockDelta", "{\"contentBlockIndex\":0,\"delta\":{\"toolUse\":{\"input\":" + JsonSerializer.Serialize(input) + "}}}"));
+                if (stopped) messages.Add(EventMessage("contentBlockStop", """{"contentBlockIndex":0}"""));
+                messages.Add(EventMessage("messageStop", """{"stopReason":"tool_use"}"""));
+                tool.Http.OnUrl("https://", _ => EventStream(messages: [.. messages]));
+                var events = await Collect(tool.Transport, new(tool.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 6));
+                var done = (StreamDone)events[^1];
+                Equal(StopReason.ToolUse, done.Reason, input);
+                Equal(expected, done.Message.Content.OfType<ToolCallContent>().Single().Arguments.ToString(), (stopped ? "stopped " : "unstopped ") + input);
+            }
     }
 
     private static async Task BedrockErrors()

@@ -179,10 +179,15 @@ public static class Js
     public static object? ParseJson(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        var parser = new Parser(text); parser.SkipWhitespace();
-        var value = parser.Value(); parser.SkipWhitespace();
-        if (parser.Position != text.Length) throw parser.Error();
-        return value;
+        try
+        {
+            var parser = new Parser(text); parser.SkipWhitespace();
+            var value = parser.Value(); parser.SkipWhitespace();
+            if (parser.Position != text.Length) throw parser.Error();
+            return value;
+        }
+        // V8's SyntaxError message (Node >= 22.19, as Pi requires).
+        catch (FormatException error) { throw new FormatException(PiSharp.Contracts.Compatibility.JsJsonSyntax.Describe(text, error.Message), error); }
     }
 
     private sealed class Parser(string text)

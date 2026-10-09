@@ -59,7 +59,8 @@ public sealed partial class PersistentAgentSession
         try
         {
             presentation = delta is null ? null : registry.PrepareActiveLoadout(normalized, cancellationToken);
-            if (delta is not null) _ = registry.Resolve(configuration.Model, context.LlmMessages.Add(delta), configuration.ThinkingLevel, cancellationToken: cancellationToken,
+            if (delta is not null) _ = registry.Resolve(configuration.Model, WithUnrecordedLoadout(context.LlmMessages,
+                configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), cancellationToken).Add(delta), configuration.ThinkingLevel, cancellationToken: cancellationToken,
                 prepareLoadout: false, preparedLoadout: presentation);
         }
         finally { _activationPreparation.Value = false; }
@@ -97,31 +98,35 @@ public sealed partial class PersistentAgentSession
     private async ValueTask<AgentRequestPreparation?> PrepareActivationRequestAsync(AgentRequestBoundary boundary, CancellationToken token)
     {
         await DrainLoadoutDiagnosticsAsync(token).ConfigureAwait(false);
-        PendingActivation? pending; SessionLogStoreSnapshot log; SessionContextProjection context;
+        PendingActivation? pending; SessionLogStoreSnapshot log; SessionContextProjection context; bool unrecorded;
         TaskCompletionSource operation; long epoch; SessionRuntimeRegistry registry; object? priorPromptRevision;
         lock (_gate)
         {
             ThrowAvailable(); token.ThrowIfCancellationRequested();
-            pending = _pendingActivation;
-            if (pending is null && _registry?.HasPromptSectionPreparation != true) return null;
+            pending = _pendingActivation; unrecorded = _unrecordedLoadout;
+            if (pending is null && !unrecorded && _registry?.HasPromptSectionPreparation != true) return null;
             operation = _active ?? throw new InvalidOperationException("Activation publication requires an owned run.");
             registry = _registry!; log = _acknowledgedLog; context = _context; epoch = _activationEpoch;
             priorPromptRevision = _acknowledgedPromptRevision;
         }
         var names = pending?.Names ?? _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
-        var delta = pending is null ? null : registry.CreateActivationMessage(names,
-            _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), _clock(), token, replaceDeclarations: pending.ReplaceDeclarations);
+        // Source agent-loop declareToolChanges: before each request the loadout's difference from the tools the transcript declares
+        // (pi-ai getToolStateChanges) is recorded in the system message that precedes the prompt's messages: a selection, a catalog
+        // change, or a loadout applied in memory (session open, tree navigation). A loadout that only reorders the tools records none.
+        var presentation = pending?.Presentation ?? registry.PrepareActiveLoadout(names, token, report: false);
+        var changesTools = pending is not null || unrecorded;
+        var delta = changesTools ? registry.CreateToolChangeMessage(context.LlmMessages, names, _clock(), token, presentation) : null;
         SessionPromptSectionPreparation? promptPreparation;
         _activationPreparation.Value = true;
-        try { (delta, promptPreparation) = registry.PreparePromptSectionMessage(names, context.Messages, delta, _clock(), token, pending?.Presentation); }
+        try { (delta, promptPreparation) = registry.PreparePromptSectionMessage(names, context.Messages, delta, _clock(), token, presentation); }
         finally { _activationPreparation.Value = false; }
-        if (delta is null) { promptPreparation?.ValidateSource(); token.ThrowIfCancellationRequested(); return null; }
-        var entry = Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,
+        if (delta is null && !changesTools) { promptPreparation?.ValidateSource(); token.ThrowIfCancellationRequested(); return null; }
+        var entry = delta is null ? null : Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,
             writer => { writer.WritePropertyName("message"); writer.WriteRawValue(delta.WireBody.Value.GetRawText()); });
-        var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, token);
+        var prospective = entry is null ? context : _projector.Project(log.Entries.Add(entry), entry.Id, token);
         var verified = registry.Resolve(_configuration.Model, prospective.LlmMessages, _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false,
-            preparedLoadout: pending?.Presentation);
-        ValidateRuntimeContext(prospective, verified.Configuration);
+            preparedLoadout: presentation, activeOrder: names);
+        ValidateRuntimeContext(prospective, verified.Configuration, _toleratedSelection, _toleratedThinking);
         if (!verified.Configuration.Tools.Select(tool => tool.Name).SequenceEqual(names, StringComparer.Ordinal))
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
         var projectedInputs = boundary.PendingInputs.Select(message =>
@@ -132,7 +137,7 @@ public sealed partial class PersistentAgentSession
                 .ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
             return new TranscriptEntry("system", JsonData.Parse(JsonSerializer.Serialize(fields)));
         }).ToImmutableArray();
-        return new(RecoveryConfiguration(verified.Configuration), [delta], Publish)
+        return new(RecoveryConfiguration(verified.Configuration), delta is null ? [] : [delta], Publish)
             { ProjectedPendingInputs = projectedInputs };
 
         async ValueTask Publish(Action publishAgent, CancellationToken cancellation)
@@ -147,19 +152,22 @@ public sealed partial class PersistentAgentSession
                     ThrowAvailable(); cancellation.ThrowIfCancellationRequested();
                     if (_activationEpoch != epoch || !ReferenceEquals(_pendingActivation, pending) || !ReferenceEquals(_active, operation) ||
                         !ReferenceEquals(_context, context) || !ReferenceEquals(_acknowledgedLog, log) ||
-                        !ReferenceEquals(_registry, registry) || !ReferenceEquals(_acknowledgedPromptRevision, priorPromptRevision))
+                        !ReferenceEquals(_registry, registry) || !ReferenceEquals(_acknowledgedPromptRevision, priorPromptRevision) ||
+                        _unrecordedLoadout != unrecorded)
                         throw new AgentRequestBoundaryStaleException();
-                    _activationPublishing = true; writeAdmitted = true;
+                    _activationPublishing = true; writeAdmitted = entry is not null;
                 }
                 // Once admitted, finish the original append and retain its actual acknowledgment even if the run aborts.
-                var acknowledged = await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
-                if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+                var acknowledged = entry is null ? null : await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
+                if (acknowledged is { CheckpointAcknowledged: false }) throw Error(PersistentAgentSessionFailure.InvalidCommit);
                 lock (_gate)
                 {
                     // No trusted callbacks/output/cancellation checks between acknowledgment and matching publication.
-                    _configuration = verified.Configuration; _context = prospective; _acknowledgedLog = acknowledged.Snapshot;
+                    _configuration = verified.Configuration;
+                    if (acknowledged is not null) { _context = prospective; _acknowledgedLog = acknowledged.Snapshot; }
                     _acknowledgedPromptRevision = promptPreparation?.Revision ?? _acknowledgedPromptRevision;
                     if (_activationEpoch == epoch && ReferenceEquals(_pendingActivation, pending)) _pendingActivation = null;
+                    _unrecordedLoadout = false;
                     publishAgent();
                 }
             }
@@ -171,7 +179,7 @@ public sealed partial class PersistentAgentSession
                 throw new PersistentAgentSessionException(fault);
             }
             catch { if (writeAdmitted) lock (_gate) _fault ??= new(PersistentAgentSessionFailure.InvalidCommit); throw; }
-            finally { if (writeAdmitted) lock (_gate) _activationPublishing = false; _commits.Release(); }
+            finally { lock (_gate) _activationPublishing = false; _commits.Release(); }
         }
     }
 }

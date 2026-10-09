@@ -18,7 +18,7 @@ public static class AnthropicResolvedProviderFactory
         ArgumentNullException.ThrowIfNull(authentication);
         // Existing fixed endpoint/model/key admission remains authoritative and unchanged. Federation has no key.
         Validate(model, endpoint, authentication.Kind == AuthenticationKind.WorkloadIdentityFederation ? null : authentication.Authentication.Secret,
-            "anthropic", "anthropic-messages", "https://api.anthropic.com/");
+            "anthropic", "anthropic-messages");
         var factory = new AnthropicMessagesAuthenticatedRequestFactory(endpoint, model, projectionOptions, authentication, requestOptions);
         var maximum = requestOptions?.MaxTokens ?? projectionOptions.MaximumTokens;
         if (modelMetadata is not null && (maximum != Math.Truncate(maximum) || maximum is <= 0 or > int.MaxValue))
@@ -44,14 +44,16 @@ public static class AnthropicResolvedProviderFactory
             });
         });
     }
-    private static void Validate(ModelDescriptor model, Uri endpoint, string? key, string provider, string api, string address)
+    private static void Validate(ModelDescriptor model, Uri endpoint, string? key, string provider, string api)
     {
         ArgumentNullException.ThrowIfNull(model);
-        // Fixed diagnostics intentionally exclude keys, supplied identities, endpoints and request content.
+        // Fixed diagnostics intentionally exclude keys, supplied identities, endpoints and request content. models.json may point a
+        // built-in provider at another base URL (model-registry.ts provider baseUrl), as the SDK clients take any baseURL; the
+        // provider's own address is only the default.
         if (model.Provider != provider || model.Api != api || string.IsNullOrWhiteSpace(model.Id) ||
             model.Id.Length > 1024 || model.Id.Any(char.IsControl) || endpoint is null ||
             !endpoint.IsAbsoluteUri || endpoint.UserInfo.Length != 0 || endpoint.Fragment.Length != 0 ||
-            endpoint.Query.Length != 0 || endpoint != new Uri(address))
+            endpoint.Query.Length != 0 || endpoint.Scheme is not ("http" or "https"))
             throw new ArgumentException("Unsupported native model or endpoint selection.");
         if (key is not null && (key.Length is 0 or > 4096 || key.Any(value => value is < '!' or > '~')))
             throw new ArgumentException("Invalid explicit native API key.");

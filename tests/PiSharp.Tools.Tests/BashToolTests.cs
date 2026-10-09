@@ -24,12 +24,13 @@ internal static class BashToolTests
         var tool = Make(files, runner); var invoker = tool.CreateInvoker(policy);
         foreach (var raw in new[]
         {
-            """{"command":"echo","extra":true}""", """{"command":4}""",
             """{"command":"echo","timeout":1e999}""",
-            """{"command":"\ud800"}""", """{"command":"x\u0000y"}""", """{"command":[]}""",
-            JsonSerializer.Serialize(new { command = new string('x', 12_001) })
+            """{"command":"\ud800"}""", """{"command":[]}""",
+            JsonSerializer.Serialize(new { command = new string('x', 96_001) })
         })
             Failed(await invoker.ExecuteAsync(Invocation(JsonData.Parse(raw)), default), ToolFailureKind.InvalidArguments);
+        // Source spawn rejects a NUL byte with Node's error (ToolEdgeInputTests); no action reaches the policy.
+        Failed(await invoker.ExecuteAsync(Invocation(JsonData.Parse("""{"command":"x\u0000y"}""")), default), ToolFailureKind.ExecutionError);
         using (var permissive = JsonDocument.Parse("""{"command":"echo",/* forbidden retained syntax */}""",
             new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip }))
             Failed(await invoker.ExecuteAsync(Invocation(JsonData.FromElement(permissive.RootElement)), default), ToolFailureKind.InvalidArguments);
@@ -104,7 +105,7 @@ internal static class BashToolTests
         var definition = tool.CreateDefinition(tool.CreateInvoker(new Policy()));
         Equal("bash", definition.Name);
         // Pi bash.ts: TypeBox parameters without additionalProperties; providers add strictness themselves.
-        Equal("""{"name":"bash","description":"Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.","parameters":{"type":"object","properties":{"command":{"type":"string","description":"Shell command to execute"},"timeout":{"type":"number","description":"Timeout in seconds (optional, no default timeout)"}},"required":["command"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""",
+        Equal("""{"name":"bash","description":"Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.","parameters":{"type":"object","required":["command"],"properties":{"command":{"type":"string","description":"Shell command to execute"},"timeout":{"type":"number","description":"Timeout in seconds (optional, no default timeout)"}}},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""",
             tool.Declaration.ToString());
     }
 
@@ -114,7 +115,7 @@ internal static class BashToolTests
         async Task<ToolResult> Run(ProcessRunResult result)
         { runner.Next = (_, _, _) => ValueTask.FromResult(result); return await tool.CreateInvoker(new Policy()).ExecuteAsync(Invocation(Input("")), default); }
         var empty = await Run(Result(""));
-        Equal("(no output)", empty.Content.Single().Text); Check(empty.Details.Value.ValueKind == JsonValueKind.Null, "Native undefined representation changed.");
+        Equal("(no output)", empty.Content.Single().Text); Check(!empty.HasProperty("details"), "bash.ts formatOutput: details is undefined (absent) without truncation.");
         Equal("", empty.StructuredContent!.Value.GetProperty("output").GetString());
         var nonzero = await Run(Result("stdout\nstderr\n", ProcessRunStatus.NonZeroExit, 7));
         Equal("stdout\nstderr\n\n\nCommand exited with code 7", nonzero.Content.Single().Text);

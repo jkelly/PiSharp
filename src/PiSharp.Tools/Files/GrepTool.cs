@@ -25,7 +25,7 @@ public sealed class GrepTool
     private readonly IDirectoryFileOperations _files;
     private readonly PathResolver _paths;
     public IPreparedToolAdapter Adapter { get; }
-    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"grep","description":"Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.","parameters":{"type":"object","properties":{"pattern":{"type":"string","description":"Search pattern (regex or literal string)"},"path":{"type":"string","description":"Directory or file to search (default: current directory)"},"glob":{"type":"string","description":"Filter files by glob pattern, e.g. '*.ts' or '**/*.spec.ts'"},"ignoreCase":{"type":"boolean","description":"Case-insensitive search (default: false)"},"literal":{"type":"boolean","description":"Treat pattern as literal string instead of regex (default: false)"},"context":{"type":"number","description":"Number of lines to show before and after each match (default: 0)"},"limit":{"type":"number","description":"Maximum number of matches to return (default: 100)"}},"required":["pattern"]}}""");
+    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"grep","description":"Search file contents for a pattern. Returns matching lines with file paths and line numbers. Respects .gitignore. Output is truncated to 100 matches or 50KB (whichever is hit first). Long lines are truncated to 500 chars.","parameters":{"type":"object","required":["pattern"],"properties":{"pattern":{"type":"string","description":"Search pattern (regex or literal string)"},"path":{"type":"string","description":"Directory or file to search (default: current directory)"},"glob":{"type":"string","description":"Filter files by glob pattern, e.g. '*.ts' or '**/*.spec.ts'"},"ignoreCase":{"type":"boolean","description":"Case-insensitive search (default: false)"},"literal":{"type":"boolean","description":"Treat pattern as literal string instead of regex (default: false)"},"context":{"type":"number","description":"Number of lines to show before and after each match (default: 0)"},"limit":{"type":"number","description":"Maximum number of matches to return (default: 100)"}}}}""");
     public GrepTool(string workingDirectory, string homeDirectory, IGrepExecutor executor, IDirectoryFileOperations? files = null,
         IGrepContextReader? contextReader = null)
     {
@@ -71,8 +71,10 @@ public sealed class GrepTool
         var relative = Path.GetRelativePath(root, path);
         return !Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal);
     }
-    private sealed class SearchAdapter(GrepTool owner) : IPreparedToolAdapter
+    private sealed class SearchAdapter(GrepTool owner) : IToolArgumentSchemaAdapter
     {
+        /// <summary>Source TypeBox parameters, checked by validateToolArguments before the tool runs.</summary>
+        public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(owner.Declaration, ToolSchemaOrigin.TypeBox);
         public string Name => "grep";
         public async ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token)
         {

@@ -63,10 +63,15 @@ internal static class InteractiveHostServices
             RefreshModelCatalogs = async token =>
             {
                 await registryLoad.ConfigureAwait(false);
+                // model-runtime.ts refresh(): models.json and the providers are re-read, and the network is used unless PI_OFFLINE
+                // is set (allowNetwork ?? modelNetworkEnabled).
+                try { registry = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false); }
+                catch (Exception error) when (error is not OperationCanceledException) { /* The registry of the last load stays. */ }
+                catch (OperationCanceledException) { return new ModelsRefreshResult(true, []); }
                 if (registry is null) return new ModelsRefreshResult(false, []);
                 try
                 {
-                    var errors = await registry.RefreshAsync(allowNetwork: true, force: null, providers: null, token).ConfigureAwait(false);
+                    var errors = await registry.RefreshAsync(allowNetwork: runtime.ReadEnvironment("PI_OFFLINE") is null, force: null, providers: null, token).ConfigureAwait(false);
                     if (Profile()?.LiveModels is { } models) await models.RefreshAsync(token).ConfigureAwait(false);
                     return new ModelsRefreshResult(false, [.. errors.Select(error => KeyValuePair.Create(error.Key, error.Value.Message))]);
                 }
@@ -162,15 +167,15 @@ internal static class InteractiveHostServices
             var options = new BugReportSummaryOptions(session.Snapshot.Context.Messages, Number(model["contextWindow"]), Number(model["maxTokens"]),
                 model["reasoning"] is JsonValue reasoning && reasoning.TryGetValue<bool>(out var reasons) && reasons)
             { Hint = hint, ThinkingLevel = state.ThinkingLevel, SessionId = SessionId };
-            // completeSummarization through the host's summary transport (the session model, cacheRetention none). It runs without
-            // reasoning: the summary transport admits no thinking level.
+            // completeSummarization through the host's summary transport (the session model, cacheRetention none), with
+            // bug-report.ts's reasoning (the session level on a reasoning model) and the session id.
             return BugReport.GenerateBugReportSummaryAsync(options, async (request, token) =>
             {
                 var maximum = double.IsFinite(request.MaxTokens) ? Math.Floor(request.MaxTokens) : 4096;
                 try
                 {
                     var summary = await generator.GenerateAsync(new(PiSharp.Sessions.Compaction.SessionSummaryKind.History, descriptor,
-                        request.SystemPrompt, request.Prompt, maximum, null, request.SessionId), token).ConfigureAwait(false);
+                        request.SystemPrompt, request.Prompt, maximum, request.Reasoning, request.SessionId), token).ConfigureAwait(false);
                     return new PiSharp.Contracts.AssistantMessage(descriptor.Api, descriptor.Provider, descriptor.Id, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                         [new PiSharp.Contracts.TextContent(summary.Text)], summary.Usage ?? PiSharp.Contracts.TokenUsage.Zero, PiSharp.Contracts.StopReason.Stop);
                 }

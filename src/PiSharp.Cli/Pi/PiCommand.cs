@@ -265,7 +265,7 @@ internal static class PiCommand
             {
                 Scope = path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
                 ReportMissingPath = path.ReportMissing
-            })]), token: token).ConfigureAwait(false);
+            })]), options: PiSharp.Cli.Commands.PiPayloadBudget.PiSkills, token: token).ConfigureAwait(false);
         var prompts = new PromptTemplateCliConfiguration([.. resources.PromptPaths.Select(path => new PromptTemplatePathSelection(path.Path,
             new(path.Path, path.Source, path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
                 PromptTemplateSourceOrigin.TopLevel), ReportMissingPath: path.ReportMissing))]);
@@ -295,7 +295,7 @@ internal static class PiCommand
             {
                 Scope = path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
                 ReportMissingPath = path.ReportMissing
-            })]), token: reloadToken).ConfigureAwait(false);
+            })]), options: PiSharp.Cli.Commands.PiPayloadBudget.PiSkills, token: reloadToken).ConfigureAwait(false);
             var reloadPrompts = new PromptTemplateCliConfiguration([.. reloaded.PromptPaths.Select(path => new PromptTemplatePathSelection(path.Path,
                 new(path.Path, path.Source, path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
                     PromptTemplateSourceOrigin.TopLevel), ReportMissingPath: path.ReportMissing))]);
@@ -324,11 +324,11 @@ internal static class PiCommand
         LiveSessionSelection selection;
         try
         {
-            selection = await ResolveModelAsync(parsed, startupSnapshot, runtime, plan.HasMessages, runtimeDiagnostics, token).ConfigureAwait(false);
+            selection = await ResolveModelAsync(parsed, startupSnapshot, runtime, plan.HasMessages, runtimeDiagnostics, token, ContinuedSession(plan)).ConfigureAwait(false);
             if (parsed.ApiKey is { } apiKey)
             {
                 runtime = WithRuntimeApiKey(runtime, selection.Model.Provider, apiKey);
-                selection = await ResolveModelAsync(parsed, startupSnapshot, runtime, plan.HasMessages, [], token).ConfigureAwait(false);
+                selection = await ResolveModelAsync(parsed, startupSnapshot, runtime, plan.HasMessages, [], token, ContinuedSession(plan)).ConfigureAwait(false);
             }
         }
         catch (LiveSessionException) when (parsed.ApiKey is not null && parsed.Model is null && parsed.Models is null)
@@ -340,9 +340,11 @@ internal static class PiCommand
         }
         catch (LiveSessionException error) when (error.Code is "NoLiveModel")
         {
-            await Report([.. startupDiagnostics, .. runtimeDiagnostics]).ConfigureAwait(false);
-            await Line(err, Paint(Red, error.Message)).ConfigureAwait(false);
-            return 1;
+            // sdk.ts createAgentSession: no model is not an error. The session keeps the Agent's DEFAULT_MODEL ("unknown"), so
+            // the `!session.model` exit in main.ts never applies: every mode starts, and the prompt preflight refuses each prompt until a
+            // model is selected (interactive mode also warns with formatNoModelsAvailableMessage).
+            selection = LiveSessionSelection.Unselected();
+            selection.FallbackMessage = PiSharp.Cli.Models.ModelListing.NoModelsAvailableMessage();
         }
         catch (LiveSessionException error)
         {
@@ -395,7 +397,8 @@ internal static class PiCommand
             // tools-manager.ts: rg and fd from <agentDir>/bin or PATH, downloaded into <agentDir>/bin on first use.
             Search = new PiToolsManager(Path.Join(agentDir, "bin"), host.GetEnvironment, host.ToolsHttp, host.ToolsReleaseBase),
             ProtectedDirectories = [.. new[] { plan.SessionDirectory, Path.GetDirectoryName(plan.SessionPath) }.OfType<string>().Select(Path.GetFullPath).Distinct(PiPaths.Comparer)],
-            ProtectedTrees = [Path.GetFullPath(Path.Join(agentDir, "sessions"))]
+            ProtectedTrees = [Path.GetFullPath(Path.Join(agentDir, "sessions"))],
+            Home = Path.GetFullPath(home)
         };
         var trustedDirectories = new Dictionary<string, bool>(PiPaths.Comparer) { [Path.GetFullPath(sessionCwd)] = projectTrusted };
         var options = new PiEntryOptions
@@ -407,6 +410,7 @@ internal static class PiCommand
             SystemPrompt = PiSystemPrompt.Admission(resources, skills?.Resources, host.ApplicationDirectory ?? packageDir),
             HeaderId = plan.HeaderId, HeaderTimestamp = plan.HeaderTimestamp, SessionName = sessionName,
             Skills = skills, PromptTemplates = prompts, ThinkingLevel = parsed.Thinking, ThinkingFromCli = parsed.Thinking is not null,
+            ModelPatterns = parsed.Models is { } modelPatterns ? [.. modelPatterns] : null,
             InitialMessage = initialMessage, InitialImages = [.. initialImages.Select(image => image.ToJson())], InitialMessages = [.. parsed.Messages],
             Theme = startupSettings.Theme, TuiMode = parsed.TuiMode, Verbose = parsed.Verbose, Themes = resources.Themes,
             // interactive-mode.ts: the header hides only for quietStartup true, the details for true or "header"; --verbose shows both.
@@ -442,7 +446,7 @@ internal static class PiCommand
                 await using (input.ConfigureAwait(false))
                 {
                     var code = await RpcSessionCommand.RunWithPresentationAsync(["session", "rpc", .. sessionArgs], input, output, err, null!, runToken,
-                        userShutdown: userShutdown, mcpHost: mcpHost).ConfigureAwait(false);
+                        userShutdown: userShutdown, mcpHost: mcpHost, javaScriptInput: true).ConfigureAwait(false);
                     return signals?.Exit(code) ?? code;
                 }
             }
@@ -543,12 +547,15 @@ internal static class PiCommand
     /// <summary>Source buildSessionOptions over the registry: <c>--provider</c> requires <c>--model</c>; the CLI model, else the scoped
     /// models for a new session, else the saved default, else the first available model. Warnings join the run's diagnostics.</summary>
     private static async Task<LiveSessionSelection> ResolveModelAsync(PiArgs parsed, PiSharp.CodingAgent.Configuration.StartupSettingsSnapshot settings,
-        LiveSessionRuntime runtime, bool hasExistingSession, List<PiDiagnostic> diagnostics, CancellationToken token)
+        LiveSessionRuntime runtime, bool hasExistingSession, List<PiDiagnostic> diagnostics, CancellationToken token, string? sessionPath = null)
     {
         if (parsed.Provider is { } provider && parsed.Model is null)
             throw new LiveSessionException("ProviderRequiresModel", $"--provider requires --model (for example: --provider {provider} --model <pattern>)");
         var request = new SettingsModelSelection(parsed.Provider, parsed.Model, null)
-        { ModelPatterns = parsed.Models is { } models ? [.. models] : null, CliThinking = parsed.Thinking, UseModelMaximumTokens = true };
+        {
+            ModelPatterns = parsed.Models is { } models ? [.. models] : null, CliThinking = parsed.Thinking, UseModelMaximumTokens = true,
+            SessionBranch = sessionPath is null ? null : PiSessions.ReadBranch(sessionPath)
+        };
         using var warnings = new StringWriter();
         try { return await request.ResolveAsync(settings, runtime, warnings, hasExistingSession, token).ConfigureAwait(false); }
         finally
@@ -557,6 +564,9 @@ internal static class PiCommand
                 if (JsonNode.Parse(line)?["message"]?.GetValue<string>() is { } message) diagnostics.Add(new("warning", message));
         }
     }
+
+    /// <summary>The session file whose model sdk.ts restores: an opened session with messages (-c, --session, --resume, --fork).</summary>
+    private static string? ContinuedSession(PiSessionPlan plan) => plan.Mode == "open" && plan.HasMessages ? plan.SessionPath : null;
 
     /// <summary>Source modelRuntime.setRuntimeApiKey: the key answers for the provider's API key variables, and the stored auth.json
     /// credentials step aside so the key wins.</summary>

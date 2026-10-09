@@ -57,10 +57,17 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
 {
     internal static ExtensionRegistryOptions RegistryOptions { get; } = new()
     {
-        MaximumOwners = 1024, MaximumRegistrations = 16_384, MaximumRegistrationsPerOwner = 2_048, MaximumMetadataCharacters = 64 * 1024 * 1024,
+        // loader.ts/runner.ts keep every extension and every registration, and run any number of handlers and tools at once: no count
+        // bound. The metadata and JSON character bounds stay memory bounds.
+        MaximumOwners = int.MaxValue, MaximumRegistrations = int.MaxValue, MaximumRegistrationsPerOwner = int.MaxValue,
+        MaximumConcurrentDispatches = int.MaxValue, MaximumMetadataCharacters = 64 * 1024 * 1024,
+        // runner.ts createContext: every handler reads the whole session, whatever its length.
+        MaximumSessionBranchEntries = int.MaxValue, MaximumSessionCharacters = long.MaxValue, MaximumSessionUtf8Bytes = long.MaxValue,
         MaximumDescriptionCharacters = 1024 * 1024, MaximumJsonCharacters = 64 * 1024 * 1024, MaximumJsonDepth = 64,
         // Pi extensions may replace built-in tools (registerTool with a built-in name) and register any command name.
         ReservedToolNames = [], ReservedCommandNames = [], AllowAnyCommandName = true,
+        // runner.ts resolveRegisteredCommands: a command name registered by several extensions (Node or native) is invoked as name:N.
+        SuffixDuplicateCommandNames = true,
         // runner.ts reads the extensions' live handler maps: owners and handlers added after the session bound take part at once.
         FollowCurrentSnapshot = true
     };

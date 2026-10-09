@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Sessions.Context;
 using PiSharp.Sessions.Serialization;
@@ -17,8 +18,9 @@ public sealed partial class PersistentAgentSession
             SessionLogStoreSnapshot log; SessionContextProjection previous;
             lock (_gate) { reservation.ValidateCatalogAuthority(this); if (_setupAppending) throw new InvalidOperationException("Setup selection cannot overlap an append."); log = _acknowledgedLog; previous = _context; }
             var projected = _projector.Project(log.Entries, leaf, token);
-            var configuration = _registry?.Resolve(projected, _configuration.Model, token).Configuration ?? _configuration;
-            ValidateRuntimeContext(projected, configuration);
+            var current = _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+            var configuration = _registry?.Resolve(WithUnrecordedLoadout(projected, current, token), _configuration.Model, token, activeOrder: current).Configuration ?? _configuration;
+            ValidateRuntimeContext(projected, configuration, _toleratedSelection, _toleratedThinking);
             lock (_gate)
             {
                 reservation.ValidateCatalogAuthority(this);
@@ -56,11 +58,15 @@ public sealed partial class PersistentAgentSession
                 }
             });
             var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, token);
+            // A restored loadout that awaits its record (the next request writes it) precedes the setup record.
+            var resolved = prospective with { LlmMessages = WithUnrecordedLoadout(prospective.LlmMessages,
+                _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), token, previous.LlmMessages.Length) };
             var configuration = _registry is { } registry
-                ? (await SessionLoadoutDiagnosticBoundary.RunAsync(() => registry.Resolve(prospective, _configuration.Model, token),
+                ? (await SessionLoadoutDiagnosticBoundary.RunAsync(() => registry.Resolve(resolved, _configuration.Model, token, tolerated: _toleratedSelection, thinkingLevel: KeptThinking(_configuration),
+                    activeOrder: _configuration.Tools.Select(tool => tool.Name).ToImmutableArray()),
                     () => new ValueTask(reservation.DrainLoadoutDiagnosticsAsync(token))).ConfigureAwait(false)).Configuration
                 : _configuration;
-            ValidateRuntimeContext(prospective, configuration);
+            ValidateRuntimeContext(prospective, configuration, _toleratedSelection, _toleratedThinking);
             await using (var probe = new PiSharp.Agent.Agent(configuration, _clock, new NoopSink(), _agentOptions))
                 probe.ConfigureAndReplaceMessages(configuration, SessionContextProjector.AgentMessages(prospective));
             token.ThrowIfCancellationRequested(); writing = true;

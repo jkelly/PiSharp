@@ -18,7 +18,8 @@ public sealed class RegisteredExtensionEventDispatcher
         Func<ImmutableArray<TranscriptEntry>, CancellationToken, TranscriptEntry?>? restoreSystemMessage = null)
     {
         ArgumentNullException.ThrowIfNull(registry);
-        if (maximumHandlersPerDispatch is < 1 or > 4096)
+        // The registry admits at most this many handlers per dispatch; a host may pass int.MaxValue (Pi runs every handler).
+        if (maximumHandlersPerDispatch < 1)
             throw new ArgumentOutOfRangeException(nameof(maximumHandlersPerDispatch));
         this.registry = registry;
         this.maximumHandlersPerDispatch = maximumHandlersPerDispatch;

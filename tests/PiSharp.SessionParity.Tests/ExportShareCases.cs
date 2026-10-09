@@ -221,14 +221,16 @@ internal static partial class Program
             var empty = Path.Combine(root, "empty.jsonl"); await File.WriteAllBytesAsync(empty, []);
             var page = await File.ReadAllTextAsync(Path.Combine(root, await SessionHtmlExport.ExportFromFileAsync(empty, null, Themes(), root)));
             Check(SessionDataJson(page).Contains("\"entries\":[],\"leafId\":null}", StringComparison.Ordinal), "empty file exports a new header");
+            // _setSessionFile: an empty file is initialized with the new header.
+            var written = File.ReadAllText(empty);
+            Check(written.StartsWith("{\"type\":\"session\",\"version\":3,\"id\":", StringComparison.Ordinal) && written.EndsWith("}\n", StringComparison.Ordinal) && written.Count(c => c == '\n') == 1, "empty file initialized: " + written);
         }),
 
-        Case("export-share.html.legacy-session-is-migrated-in-memory", () =>
+        Case("export-share.html.legacy-session-is-migrated-and-rewritten", () =>
         {
             var root = Temp("legacy"); var path = Path.Combine(root, "v1.jsonl");
             File.WriteAllText(path, "{\"type\":\"session\",\"id\":\"old\",\"timestamp\":\"t\",\"cwd\":\"/w\"}\n{\"type\":\"message\",\"timestamp\":\"t\",\"message\":{\"role\":\"hookMessage\",\"content\":\"h\"}}\n" +
                 "{\"type\":\"compaction\",\"timestamp\":\"t\",\"summary\":\"s\",\"firstKeptEntryIndex\":1}\n");
-            var before = File.ReadAllBytes(path);
             var source = SessionExportSource.Open(path);
             var header = Js.Stringify(source.Header); var entries = source.Entries.Cast<JsObject>().ToArray();
             Equal("{\"type\":\"session\",\"id\":\"old\",\"timestamp\":\"t\",\"cwd\":\"/w\",\"version\":3}", header, "migrated header");
@@ -236,7 +238,8 @@ internal static partial class Program
             Equal(entries[0]["id"], entries[1]["parentId"], "v1 parent links");
             Equal(entries[0]["id"], entries[1]["firstKeptEntryId"], "compaction index to id");
             Check(!entries[1].Has("firstKeptEntryIndex") && (string)entries[1]["id"]! == (string)source.LeafId! && ((string)entries[0]["id"]!).Length == 8, "ids");
-            Check(before.SequenceEqual(File.ReadAllBytes(path)), "export never rewrites the source");
+            // session-manager.ts _loadEntries: a migrated file is rewritten (_rewriteFile, JSON.stringify per line).
+            Equal(string.Concat(new[] { header }.Concat(entries.Select(entry => Js.Stringify(entry))).Select(line => line + "\n")), File.ReadAllText(path), "rewritten in the current version");
         }),
 
         Case("export-share.jsonl.branch-export-matches-upstream-bytes", () =>

@@ -12,11 +12,14 @@ namespace PiSharp.AI.Protocols.OpenAICompletions;
 /// <summary>Explicit public data, never inferred from an arbitrary exception's message.</summary>
 public sealed class CompletionsPublicFailure
 {
+    /// <summary>Inclusive character and UTF-8 byte bound. Provider status errors carry the whole response text upstream
+    /// (a gateway page is often larger than a few kilobytes).</summary>
+    public const int MaximumCharacters = 1_048_576;
     public string Message { get; }
     public CompletionsPublicFailure(string message)
     {
         ArgumentNullException.ThrowIfNull(message);
-        if (message.Length is 0 or > 8192 || Encoding.UTF8.GetByteCount(message) > 8192 || message.Contains('\0'))
+        if (message.Length is 0 or > MaximumCharacters || Encoding.UTF8.GetByteCount(message) > MaximumCharacters || message.Contains('\0'))
             throw new ArgumentException("Invalid public Completions failure data.", nameof(message));
         CompletionsJson.Unicode(message); Message = message;
     }

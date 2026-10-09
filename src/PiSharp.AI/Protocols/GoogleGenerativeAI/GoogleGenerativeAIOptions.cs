@@ -24,9 +24,9 @@ public sealed record GoogleGenerativeAIOptions(JsonData ModelMetadata, string? A
     public int ReadBufferBytes { get; init; } = 4096;
     public int MaximumFrameCharacters { get; init; } = PiRequestBudget.StreamCharacters;
     public int MaximumPayloadBytes { get; init; } = PiRequestBudget.RequestPayloadBytes;
-    public int MaximumEvents { get; init; } = 4096;
+    public int MaximumEvents { get; init; } = int.MaxValue;
     public long MaximumStreamCharacters { get; init; } = PiRequestBudget.StreamTotalCharacters;
-    public int MaximumContentSlots { get; init; } = 256;
+    public int MaximumContentSlots { get; init; } = int.MaxValue;
     public int MaximumContentCharacters { get; init; } = PiRequestBudget.StreamCharacters;
     public int MaximumHeaders { get; init; } = 128;
     public int MaximumHeaderCharacters { get; init; } = 8192;
@@ -38,8 +38,8 @@ public sealed record GoogleGenerativeAIOptions(JsonData ModelMetadata, string? A
             RetryTimeProvider is null || RetryJitterSample is null || NoRetryStatuses.IsDefault || NoRetryStatuses.Length > 4096 ||
             ReadBufferBytes is < 1 or > 65536 ||
             MaximumFrameCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumPayloadBytes is < 1 or > PiRequestBudget.MaximumBound ||
-            MaximumEvents is < 1 or > 65536 || MaximumStreamCharacters is < 1 or > 67108864 ||
-            MaximumContentSlots is < 1 or > 256 || MaximumContentCharacters is < 1 or > PiRequestBudget.MaximumBound ||
+            MaximumEvents < 1 || MaximumStreamCharacters is < 1 or > 67108864 ||
+            MaximumContentSlots < 1 || MaximumContentCharacters is < 1 or > PiRequestBudget.MaximumBound ||
             MaximumHeaders is < 1 or > 4096 || MaximumHeaderCharacters is < 1 or > 65536 ||
             MaximumErrorBytes is < 1 or > 8388608)
             throw new ArgumentOutOfRangeException(nameof(GoogleGenerativeAIOptions));

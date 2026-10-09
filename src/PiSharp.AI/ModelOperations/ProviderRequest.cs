@@ -253,7 +253,7 @@ internal static partial class ProviderRequest
     /// them (lower-cased names in sorted order, repeated values joined with ", ").</summary>
     internal static async Task<(ProviderResponseInfo Response, string Body)> PostAsync(HttpMessageInvoker http, Uri url,
         ImmutableArray<KeyValuePair<string, string>> headers, string body, ModelRequestOptions? options, CancellationToken signal,
-        Func<Exception, Exception>? mapTransportFailure = null)
+        Func<Exception, Exception>? mapTransportFailure = null, string? timeoutMessage = null)
     {
         using var timeout = options?.TimeoutMs is { } milliseconds
             ? new CancellationTokenSource(TimeSpan.FromMilliseconds(Math.Max(0, milliseconds)), options.TimeProvider) : null;
@@ -276,7 +276,7 @@ internal static partial class ProviderRequest
         catch (Exception error) when (timeout?.IsCancellationRequested == true && !signal.IsCancellationRequested && error is OperationCanceledException)
         {
             // AbortSignal.timeout fired without the caller's signal: a timeout, not a cancellation.
-            throw new ProviderRequestException($"Request timed out after {options!.TimeoutMs}ms", null, [], body: "", timeout: true);
+            throw new ProviderRequestException(timeoutMessage ?? $"Request timed out after {options!.TimeoutMs}ms", null, [], body: "", timeout: true);
         }
         catch (Exception error) when (mapTransportFailure is not null && !signal.IsCancellationRequested && error is HttpRequestException)
         {
@@ -298,11 +298,15 @@ internal static partial class ProviderRequest
 
     internal static bool IsSuccess(int status) => status is >= 200 and <= 299;
 
+    /// <summary>undici fetch's network failure: <c>TypeError: fetch failed</c> (the cause carries the socket error).</summary>
+    internal static Exception FetchFailed(Exception error) => new HttpRequestException("fetch failed", error);
+
     /// <summary><c>response.json()</c>.</summary>
     internal static JsonElement ParseJson(string label, string text)
     {
         try { using var document = JsonDocument.Parse(text); return document.RootElement.Clone(); }
-        catch (JsonException) { throw new InvalidDataException($"{label} returned invalid JSON"); }
+        // undici's response.json() throws JSON.parse's SyntaxError (classifier-shared.ts, llama-cpp-classify.ts).
+        catch (JsonException) { throw new InvalidDataException(PiSharp.Contracts.Compatibility.JsJsonSyntax.Describe(text, $"{label} returned invalid JSON")); }
     }
 
     /// <summary>A usage record priced with <see cref="ModelCost.Calculate"/>; the exact binary64 costs travel as the

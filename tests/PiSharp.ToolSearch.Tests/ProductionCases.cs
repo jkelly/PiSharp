@@ -240,7 +240,7 @@ internal static partial class Program
         var history = string.Join(" | ", recorded.Select(names => string.Join(",", names)));
         // IMPL-H: like upstream (session_shutdown records nothing), closing the session no longer withdraws the background server's
         // tools durably, so the file's last loadout still names the loaded tool.
-        Names(["read", "write", "tool_search", "mcp__docs__search"], recorded[^1], "loaded tool recorded in the session file, not withdrawn at shutdown: " + history);
+        Names(["mcp__docs__search"], recorded[^1], "loaded tool recorded in the session file, not withdrawn at shutdown: " + history);
         Equal(1, fixture.Servers.Single().Closes, "server closed with the session");
     });
 

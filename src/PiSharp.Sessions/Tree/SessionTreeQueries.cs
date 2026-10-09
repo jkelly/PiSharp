@@ -7,7 +7,12 @@ using PiSharp.Sessions.Serialization;
 namespace PiSharp.Sessions.Tree;
 
 public sealed record SessionTreeQueryOptions(SessionContextProjectionOptions? GraphOptions = null,
-    int MaximumQueryEntries = 100_000, int MaximumMetadataDiagnostics = 256);
+    int MaximumQueryEntries = 100_000, int MaximumMetadataDiagnostics = 256)
+{
+    /// <summary>Tree queries under a session's own context bounds (its entry count and characters), not the profile defaults.</summary>
+    public static SessionTreeQueryOptions For(SessionContextProjectionOptions? graph) =>
+        new(graph, graph?.MaximumEntries ?? 100_000);
+}
 public enum SessionTreeQueryFailure { ResourceLimit, MissingEntry, MetadataUnavailable }
 public sealed class SessionTreeQueryException : Exception
 {

@@ -15,6 +15,9 @@ public sealed record ExtensionToolRegistrationInfo(string OwnerId, long OwnerGen
     string RegistrationId, string Name, string Description, JsonData Parameters)
 {
     public bool HasInitialArgumentPreparation { get; init; }
+    /// <summary>The descriptor's parameter schema origin and validation schema (source validateToolArguments).</summary>
+    public ToolSchemaOrigin ParametersOrigin { get; init; } = ToolSchemaOrigin.JsonSchema;
+    public JsonData? ValidationParameters { get; init; }
     public ToolExposure Exposure { get; init; } = ToolExposure.Direct;
     public ToolNamespace? Namespace { get; init; }
     public bool DefaultActive { get; init; } = true;
@@ -52,13 +55,19 @@ public sealed class ExtensionRegistrySnapshot
     internal object RegistryIdentity { get; }
     internal ImmutableArray<RegistrationEntry> Entries { get; }
 
-    internal ExtensionRegistrySnapshot(object identity, long revision, ImmutableArray<RegistrationEntry> entries)
+    private readonly ImmutableDictionary<RegistrationEntry, string>? _commandNames;
+    /// <summary>The name a registration is invoked by: a duplicated command's <c>name:N</c> (Pi resolveRegisteredCommands), else its name.</summary>
+    internal string NameOf(RegistrationEntry entry) => _commandNames is not null && _commandNames.TryGetValue(entry, out var invocation) ? invocation : entry.Name;
+
+    internal ExtensionRegistrySnapshot(object identity, long revision, ImmutableArray<RegistrationEntry> entries,
+        ImmutableDictionary<RegistrationEntry, string>? commandNames = null)
     {
         RegistryIdentity = identity;
         Revision = revision;
         Entries = entries;
+        _commandNames = commandNames;
         Registrations = entries.Where(entry => entry.Kind != RegistrationKind.EventBus).Select(entry => new ExtensionRegistrationInfo(entry.OwnerId,
-            entry.OwnerGeneration, entry.RegistrationId, entry.Kind.ToString(), entry.Name)).ToImmutableArray();
+            entry.OwnerGeneration, entry.RegistrationId, entry.Kind.ToString(), NameOf(entry))).ToImmutableArray();
         BeforeAgentStartHandlers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.BeforeAgentStartHandler)).ToImmutableArray();
         ContextHandlers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.ContextHandler)).ToImmutableArray();
         ContextWithSystemHandlers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.ContextWithSystemHandler)).ToImmutableArray();
@@ -69,7 +78,7 @@ public sealed class ExtensionRegistrySnapshot
         {
             var descriptor = (ExtensionCommandDescriptor)entry.Descriptor;
             return new ExtensionCommandRegistrationInfo(entry.OwnerId, entry.OwnerGeneration, entry.RegistrationId,
-                entry.Name, descriptor.Description, descriptor.GetArgumentCompletionsAsync is not null, descriptor.SourcePath);
+                NameOf(entry), descriptor.Description, descriptor.GetArgumentCompletionsAsync is not null, descriptor.SourcePath);
         }).ToImmutableArray();
         CommandCatalog = JsonData.Parse(JsonSerializer.Serialize(Commands.Select(command => new
         {
@@ -83,6 +92,7 @@ public sealed class ExtensionRegistrySnapshot
             return new ExtensionToolRegistrationInfo(entry.OwnerId, entry.OwnerGeneration,
                 entry.RegistrationId, entry.Name, descriptor.Description, descriptor.Parameters)
                 { HasInitialArgumentPreparation = descriptor.PrepareInitialArgumentsAsync is not null,
+                    ParametersOrigin = descriptor.ParametersOrigin, ValidationParameters = descriptor.ValidationParameters,
                     Exposure = descriptor.Exposure, Namespace = descriptor.Namespace, DefaultActive = descriptor.DefaultActive,
                     HasLoadoutPreparation = descriptor.PrepareLoadout is not null, PromptGuidelines = descriptor.PromptGuidelines,
                     ConstrainedSampling = descriptor.ConstrainedSampling, Annotations = descriptor.Annotations,

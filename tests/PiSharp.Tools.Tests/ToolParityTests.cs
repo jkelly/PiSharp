@@ -47,7 +47,7 @@ internal static class ToolParityTests
         var tools = new ReadWriteTools(temp.Root, temp.Root);
         await File.WriteAllTextAsync(temp.File("test.txt"), "Hello, world!\nLine 2\nLine 3");
         var result = await Read(tools, "test.txt");
-        Equal("Hello, world!\nLine 2\nLine 3", Text(result)); Equal(JsonValueKind.Null, result.Details.Value.ValueKind);
+        Equal("Hello, world!\nLine 2\nLine 3", Text(result)); Equal(false, result.HasProperty("details"));
         Equal("\"Hello, world!\\nLine 2\\nLine 3\"", result.StructuredContent!.ToString());
         // Pi normalizeOptionalNulls: strict schemas make optional properties nullable, and a null is the property's absence.
         var nulls = await tools.CreateInvoker(new Allow()).ExecuteAsync(Invocation("read", new { path = "test.txt", offset = (int?)null, limit = (int?)null }), default);
@@ -265,6 +265,11 @@ internal static class ToolParityTests
         var result = await stdin.CreateInvoker(new Allow()).ExecuteAsync(Invocation("bash", new { command = "pwd" }), default);
         Check(!result.IsError, "Stdin action failed.");
         Equal("export TEST_VAR=hello\npwd", Encoding.UTF8.GetString(runner.Requests.Single().StandardInput!));
+        // Source stdin.end(command): a NUL byte is standard-input data, not a spawn argument, so the command runs.
+        var nul = await stdin.CreateInvoker(new Allow()).ExecuteAsync(Invocation("bash", new { command = "echo a\0b" }), default);
+        Check(!nul.IsError, "Stdin NUL command failed: " + Text(nul));
+        Equal("export TEST_VAR=hello\necho a\0b", Encoding.UTF8.GetString(runner.Requests[^1].StandardInput!));
+        Check(runner.Requests[^1].Arguments.SequenceEqual(["-s"]), "NUL reached argv.");
     }
 
     private static async Task BashSessionEnvironment()
@@ -379,7 +384,7 @@ internal static class ToolParityTests
     {
         using var temp = new Temp();
         var edit = new EditTool(temp.Root, temp.Root, new PiSharp.Agent.Tools.FileMutationQueue((path, _) => ValueTask.FromResult(path)));
-        Equal("""{"name":"edit","description":"Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to edit (relative or absolute)"},"edits":{"type":"array","items":{"type":"object","properties":{"oldText":{"type":"string","description":"Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."},"newText":{"type":"string","description":"Replacement text for this targeted edit."}},"required":["oldText","newText"]},"description":"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."}},"required":["path","edits"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""",
+        Equal("""{"name":"edit","description":"Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.","parameters":{"type":"object","required":["path","edits"],"properties":{"path":{"type":"string","description":"Path to the file to edit (relative or absolute)"},"edits":{"type":"array","items":{"type":"object","required":["oldText","newText"],"properties":{"oldText":{"type":"string","description":"Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."},"newText":{"type":"string","description":"Replacement text for this targeted edit."}}},"description":"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."}}},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""",
             edit.Declaration.ToString());
         Equal("""{"name":"ls","description":"List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Output is truncated to 500 entries or 50KB (whichever is hit first).","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Directory to list (default: current directory)"},"limit":{"type":"number","description":"Maximum number of entries to return (default: 500)"}}}}""",
             new LsTool(temp.Root, temp.Root).Declaration.ToString());

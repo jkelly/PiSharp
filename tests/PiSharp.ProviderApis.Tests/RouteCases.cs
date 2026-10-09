@@ -115,6 +115,23 @@ internal static partial class Program
         }
     }
 
+    // agent.sessionId reaches every request (StreamOptions.sessionId): an OpenCode request carries x-opencode-session and the
+    // client header (provider-attribution getSessionHeaders, opencode-headers withOpenCodeSessionHeader); a caller header wins.
+    private static async Task OpenCodeSessionFromRequest()
+    {
+        foreach (var (caller, expected) in new[] { ((string?)null, "s-77"), ("mine", "mine") })
+        {
+            var row = CatalogRow("opencode", "big-pickle"); var http = new FakeHttp();
+            http.OnUrl("https://", _ => Json("""{"error":{"message":"fake peer refuses"}}""", HttpStatusCode.BadRequest));
+            using var route = NativeProviderFactory.CreateProviderRoute(Descriptor(row), row.Raw, new(_ => ValueTask.FromResult(new ProviderRequestAuth("oc-key", null, null)))
+            { MaxTokens = 512, Headers = caller is null ? null : ImmutableDictionary<string, string?>.Empty.Add("x-opencode-session", caller) }, http);
+            _ = await Collect(route, new(Descriptor(row), UserTurn(), 1) { SessionId = "s-77" });
+            var sent = http.All.Single();
+            Equal(expected, sent.Header("x-opencode-session"), "x-opencode-session");
+            Equal("pisharp", sent.Header("x-opencode-client"), "x-opencode-client");
+        }
+    }
+
     private static void OpenCodeHeaders()
     {
         Equal("s-1", ProviderHeaderPolicies.WithOpenCodeSessionHeader("s-1", null)!["x-opencode-session"], "added");

@@ -17,6 +17,11 @@ public sealed record TokenUsage(long Input, long Output, long CacheRead, long Ca
     UsageCost Cost, JsonFields? ExtraProperties = null)
 {
     public static TokenUsage Zero { get; } = new(0, 0, 0, 0, 0, new(0, 0, 0, 0, 0));
+    /// <summary>Pi builds some usage objects as one literal with the optional splits (<c>reasoning</c>) between <c>cacheWrite</c> and
+    /// <c>totalTokens</c> (openai-completions.ts parseChunkUsage, openai-responses-shared.ts, google-generative-ai.ts,
+    /// usage-totals.ts combineUsage); others assign them after <c>cost</c> (anthropic-messages.ts, bedrock-converse-stream.ts).
+    /// The wire keeps that key order.</summary>
+    public bool ExtrasBeforeTotal { get; init; }
 }
 
 /// <summary>Native value contract. Pi wire casing and optional fields are owned by PiWireJson.</summary>

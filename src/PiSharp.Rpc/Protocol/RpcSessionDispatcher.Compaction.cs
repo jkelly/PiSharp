@@ -38,11 +38,15 @@ public sealed partial class RpcSessionDispatcher
                 command.Mode == "enabled" ? _summaryGenerator : null, request, token, _recoveryDesiredMaxOutput).ConfigureAwait(false);
             return null;
         }
-        // The native transaction requires idle admission; unlike upstream compact(), this command does not implicitly abort a run.
+        // agent-session.ts compact(): `await this.abort()` first, which aborts a running agent loop and waits for idle, so the
+        // native transaction is admitted idle. An extension command that awaits ctx.compact runs outside the agent loop (no run
+        // to abort). A callback of the running loop itself cannot wait for that loop's settlement, so it is still refused.
         if (manualWire)
         {
-            lock (_gate) if (_run is not null)
+            bool running; lock (_gate) running = _run is not null;
+            if (running && _inCallback.Value)
                 throw new RpcCommandException(command.Id, command.Type, "Session is processing or settling; manual compaction requires idle admission.");
+            if (running) await AbortAsync(token).ConfigureAwait(false);
         }
         var operation = new ContextEditCommand(); lock (_gate) { ThrowOpen(); _contextEdits.Add(operation); }
         try

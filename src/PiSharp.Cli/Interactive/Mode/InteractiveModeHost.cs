@@ -93,7 +93,9 @@ internal static class InteractiveModeHost
                 Verbose = options.Verbose,
                 TuiMode = options.TuiMode,
                 InitialThemeSetting = options.Theme,
-                ScopedModels = [.. options.Selection.ScopedModels.Select(scoped => new ScopedModel(scoped.Model.CloneJson(), scoped.ThinkingLevel))]
+                ScopedModels = [.. options.Selection.ScopedModels.Select(scoped => new ScopedModel(scoped.Model.CloneJson(), scoped.ThinkingLevel))],
+                // sdk.ts modelFallbackMessage: a model a continued session could not restore, or formatNoModelsAvailableMessage.
+                ModelFallbackMessage = options.Selection.FallbackMessage
             }));
             observeMode?.Invoke(mode);
             host = Task.Run(() => RpcSessionCommand.RunWithPresentationAsync(rpcArgs, connection.Input, connection.Output, hostDiagnostics, mode,

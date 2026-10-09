@@ -111,6 +111,10 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     private readonly ImmutableDictionary<ModelDescriptor, JsonData> _models;
     private readonly ImmutableArray<ModelDescriptor> _modelOrder;
     private readonly RpcModelRuntime? _modelRuntime;
+    /// <summary>The host's SessionManager.open preparation of a session path before switch_session opens it (an empty file gets its
+    /// header, a missing one becomes a new session); an InvalidDataException refuses the switch with its message. The returned undo
+    /// runs when the switch does not happen (an extension veto), so a cancelled switch leaves the path as it was.</summary>
+    private readonly Func<string, CancellationToken, ValueTask<Func<ValueTask>?>>? _prepareSessionPath;
     private readonly Func<ModelDescriptor, PiSharp.Sessions.Compaction.SessionCompactionSettings?>? _compactionSettings;
     /// <summary>The definition of a model: the startup definitions, then the host's current runtime models.</summary>
     private bool TryGetModel(ModelDescriptor model, out JsonData wire)
@@ -192,8 +196,10 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         Func<PersistentAgentSession, Task>? postInputSettlement = null,
         Func<PersistentAgentSession, Task>? postRunSettlement = null,
         PiSharp.CodingAgent.Execution.IUserBashExecutor? userBash = null, RpcModelRuntime? modelRuntime = null,
-        Func<ModelDescriptor, PiSharp.Sessions.Compaction.SessionCompactionSettings?>? compactionSettings = null)
+        Func<ModelDescriptor, PiSharp.Sessions.Compaction.SessionCompactionSettings?>? compactionSettings = null,
+        Func<string, CancellationToken, ValueTask<Func<ValueTask>?>>? prepareSessionPath = null)
     {
+        _prepareSessionPath = prepareSessionPath;
         ArgumentNullException.ThrowIfNull(session); ArgumentNullException.ThrowIfNull(output); ArgumentNullException.ThrowIfNull(clock);
         if (selectedTreePublisher is not null && selectedTreePublisher.GetInvocationList().Length != 1)
             throw new ArgumentException("Selected tree publication requires one owned callback.", nameof(selectedTreePublisher));
@@ -404,6 +410,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 await WriteAsync(RpcCommandCodec.Error(null, "parse", "Failed to parse command: " + parseFailure, _options)).ConfigureAwait(false);
                 return;
             }
+            if (raw.Value.ValueKind == JsonValueKind.Null) { SignalFatal(RpcDispatchFailure.SessionRunFailed, new RpcInputTypeError()); return; }
             command = RpcCommandCodec.Decode(raw, _options);
             // With no native dialogs registered there is no pending request to resolve. These are never ordinary commands/responses.
             if (command.Type == "extension_ui_response") return;
@@ -441,6 +448,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 SessionCatalogException catalog => catalog.Message,
                 SessionContextEditException edit => edit.Message,
                 PromptInputAdmissionException admission => admission.Message,
+                // rpc-mode.ts prompt: a prompt refused by its preflight answers with the refusal's message.
+                SessionPromptRejectedException rejected => rejected.Message,
                 OperationCanceledException when originatingAttachment is not null && !ReferenceEquals(originatingAttachment, _sessionOwner!.Current) =>
                     "Command canceled after session replacement committed; inspect the current session and durable state.",
                 OperationCanceledException => "Command canceled before acceptance.",
@@ -653,14 +662,28 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             case "switch_session":
             {
                 if (_sessionOwner is null) throw new RpcCommandException(command.Id, command.Type, "Session replacement is unavailable from this host.");
-                var expected = _sessionOwner.Current;
-                var replacement = await _sessionOwner.SwitchAsync(expected, new(command.Message!, command.Mode != "selected", command.Since),
+                var owner = _sessionOwner; var expected = owner.Current;
+                Func<ValueTask>? undoPreparation = null;
+                if (_prepareSessionPath is { } prepare)
+                {
+                    try { undoPreparation = await prepare(command.Message!, startupCancellation.Token).ConfigureAwait(false); }
+                    catch (InvalidDataException error) { throw new RpcCommandException(command.Id, command.Type, error.Message); }
+                }
+                AgentSessionReplacement? replacement;
+                try { replacement = await SwitchWithPreparationAsync().ConfigureAwait(false); }
+                catch when (undoPreparation is not null && ReferenceEquals(owner.Current, expected))
+                {
+                    // agent-session-runtime.ts switchSession: SessionManager.open runs after the session_before_switch veto.
+                    await undoPreparation().ConfigureAwait(false); throw;
+                }
+                if (replacement is null && undoPreparation is not null) await undoPreparation().ConfigureAwait(false);
+                Task<AgentSessionReplacement?> SwitchWithPreparationAsync() => owner.SwitchAsync(expected, new(command.Message!, command.Mode != "selected", command.Since),
                     beforeSwitch: async (previous, target, cancellation) =>
                     {
                         cancellation.ThrowIfCancellationRequested(); PreflightReplacement(command, target, checked(expected.Generation + 1));
-                        return _sessionOwner.BeforeReplacement is not { } veto || await veto(previous, target, cancellation).ConfigureAwait(false);
+                        return owner.BeforeReplacement is not { } veto || await veto(previous, target, cancellation).ConfigureAwait(false);
                     },
-                    cancellationToken: startupCancellation.Token).ConfigureAwait(false);
+                    cancellationToken: startupCancellation.Token);
                 data = RpcCommandCodec.Build(writer =>
                 {
                     writer.WriteBoolean("cancelled", replacement is null);
@@ -757,7 +780,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     {
         var state = _session.Snapshot;
         if (state.Log.Entries.Length > _options.MaximumReturnedEntries) throw new RpcDispatchException(RpcDispatchFailure.ResourceLimit);
-        var tree = new SessionTreeQueries(new(MaximumQueryEntries: _options.MaximumReturnedEntries)).Build(state.Log.Entries, token);
+        // The session's own context bounds (the Pi entry's admit every entry); the returned-entry bound above stays the command's.
+        var tree = _session.CreateTreeQueries().Build(state.Log.Entries, token);
         if (!tree.LabelsAvailable) throw new RpcCommandException(command.Id, command.Type, "Session tree metadata is unavailable under the native profile.");
         var data = RpcCommandCodec.Build(writer =>
         {

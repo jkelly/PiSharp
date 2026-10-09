@@ -67,7 +67,7 @@ internal sealed class PiSettings
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             WithFileLock(path, () =>
             {
-                var current = File.Exists(path) ? JsonNode.Parse(PiPaths.ReadText(path), documentOptions: new JsonDocumentOptions { MaxDepth = 256 }) as JsonObject
+                var current = File.Exists(path) ? PiJson.Parse(PiPaths.ReadText(path)) as JsonObject
                     ?? throw new JsonException("Settings must be a JSON object") : [];
                 Migrate(current);
                 if (value is null) current.Remove(field); else current[field] = value.DeepClone();
@@ -110,7 +110,7 @@ internal sealed class PiSettings
             if (!File.Exists(path)) return [];
             var text = PiPaths.ReadText(path);
             if (text.Length == 0) return [];
-            var node = JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { MaxDepth = 256 });
+            var node = PiJson.Parse(text);
             if (node is not JsonObject settings) throw new JsonException("Settings must be a JSON object");
             return Migrate(settings);
         }

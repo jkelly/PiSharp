@@ -15,6 +15,8 @@ internal sealed class InteractiveHarness : IAsyncDisposable
     public string Cwd { get; }
     public Dictionary<string, string?> Vars { get; } = new(StringComparer.Ordinal);
     public List<string> Requests { get; } = [];
+    /// <summary>Requests to the remote model catalog (https://catalog.test, answered 404); none while PI_OFFLINE is set.</summary>
+    public List<string> CatalogRequests { get; } = [];
     public Func<string, int, HttpResponseMessage> Respond { get; set; } = (_, _) => AnthropicText("Hello from the fake model.");
     public VirtualTerminal Terminal { get; }
     public StringWriter Stdout { get; } = new() { NewLine = "\n" };
@@ -84,12 +86,22 @@ internal sealed class InteractiveHarness : IAsyncDisposable
         }
     }
 
+    private sealed class Catalog(InteractiveHarness harness) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            lock (harness.CatalogRequests) harness.CatalogRequests.Add(request.RequestUri!.AbsoluteUri);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+    }
+
     /// <summary>Starts <c>pi</c> with <paramref name="args"/> in interactive mode.</summary>
     public void Start(params string[] args)
     {
         Themes.Environment = name => Vars.GetValueOrDefault(name);
         var runtime = new LiveSessionRuntime(name => Vars.GetValueOrDefault(name), () => new Endpoint(this), Path.Combine(AgentDir, "auth.json"),
-            ModelsPath: Path.Combine(AgentDir, "models.json"));
+            ModelsPath: Path.Combine(AgentDir, "models.json"))
+        { CatalogBaseUrl = "https://catalog.test", CreateCatalogClient = () => new HttpClient(new Catalog(this)) };
         var host = new PiHost
         {
             Cwd = Cwd, Home = Home, GetEnvironment = name => Vars.GetValueOrDefault(name), SetEnvironment = (name, value) => Vars[name] = value,

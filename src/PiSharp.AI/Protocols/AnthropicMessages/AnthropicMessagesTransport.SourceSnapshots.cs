@@ -39,9 +39,8 @@ public sealed partial class AnthropicMessagesTransport
                             // Initial input survives until the first input_json_delta.
                             // Empty fragments still replace input with {} in Pi.
                             var arguments = _sourceToolDeltaIndices.Contains(slot.Index)
-                                ? new StreamingJsonPreview(new(_options.MaximumContentCharacters, _options.MaximumJsonDepth)).Parse(raw).Value
+                                ? StreamingJson.Parse(raw)
                                 : tool.Arguments;
-                            if (arguments.Value.ValueKind != JsonValueKind.Object) return frame;
                             block = new ToolCallContent(tool.Id, tool.Name, arguments, properties);
                         }
                         else block = new ToolCallContent(tool.Id, tool.Name, tool.Arguments, properties);
@@ -62,7 +61,6 @@ public sealed partial class AnthropicMessagesTransport
                 };
                 return frame with { SourceEmissionSnapshot = WithOriginalCost(PiWireJson.WriteSourceEvent(projection, partial), "partial", partial.Usage) };
             }
-            catch (StreamingJsonPreviewException) { return frame; }
             catch (JsonException) { return frame; }
             // Absence is an explicit unsupported observation, never a fabricated
             // empty snapshot or a change to native stream failure/cancellation.

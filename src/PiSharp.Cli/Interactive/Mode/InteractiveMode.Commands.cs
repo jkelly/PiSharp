@@ -879,9 +879,8 @@ internal sealed partial class InteractiveMode
         catch (RpcCommandFailedException error)
         {
             // Compaction failures arrive as compaction_end events (shown once, as upstream ignores the rejection); only a refusal that
-            // starts no compaction (admission, invalid compaction settings) is shown here.
-            if (!state.IsCompacting && (error.Message is "Session is processing or settling; manual compaction requires idle admission." ||
-                error.Message.StartsWith("Compaction failed: Invalid compaction", StringComparison.Ordinal))) ShowError(error.Message);
+            // starts no compaction (invalid compaction settings) is shown here; compact() aborts a running turn first, as upstream.
+            if (!state.IsCompacting && error.Message.StartsWith("Compaction failed: Invalid compaction", StringComparison.Ordinal)) ShowError(error.Message);
         }
     }
 

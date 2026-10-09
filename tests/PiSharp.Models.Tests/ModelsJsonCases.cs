@@ -174,7 +174,8 @@ internal static partial class Program
             ModelsJsonConfig.Parse("""{"providers":{"x":{"compat":5}}}""", "/p").Error, "union");
         Equal("Invalid models.json schema:\n  - providers: must have required properties providers\n\nFile: /p", ModelsJsonConfig.Parse("{}", "/p").Error, "root required");
         Equal("Invalid models.json schema:\n  - root: must be object\n\nFile: /p", ModelsJsonConfig.Parse("[]", "/p").Error, "root type");
-        Check(ModelsJsonConfig.Parse("{", "/p").Error!.StartsWith("Failed to parse models.json: ", StringComparison.Ordinal), "parse error prefix");
+        // model-config.ts interpolates JSON.parse's SyntaxError (Node 22 / V8 12.4 wording).
+        Equal("Failed to parse models.json: Expected property name or '}' in JSON at position 1 (line 1 column 2)\n\nFile: /p", ModelsJsonConfig.Parse("{", "/p").Error, "parse error");
         Check(ModelsJsonConfig.Parse("{\"providers\":{}}", "/p").Error is null, "empty providers");
         var extra = ModelsJsonConfig.Parse("""{"providers":{"x":{"baseUrl":"https://x","unknownKey":1,"models":[{"id":"m","whatever":true}]}},"other":1}""", "/p");
         Check(extra.Error is null && extra.ProviderIds.Single() == "x", "additional properties are allowed");

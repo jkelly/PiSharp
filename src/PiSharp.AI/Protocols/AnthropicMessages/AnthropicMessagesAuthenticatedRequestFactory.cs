@@ -28,6 +28,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         AnthropicMessagesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
+        _withSession = session => new(baseUri, expectedModel, projectionOptions, authentication, _options with { SessionId = session });
         ArgumentNullException.ThrowIfNull(authentication); _authentication = authentication;
         if (authentication.Kind == AuthenticationKind.WorkloadIdentityFederation
                 ? authentication.Authentication.Secret.Length != 0 || authentication.Federation is null
@@ -100,11 +101,23 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         catch (ArgumentException) { throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidConfiguration); }
     }
 
+    // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id).
+    private readonly Func<string, AnthropicMessagesAuthenticatedRequestFactory> _withSession;
+    private sealed record SessionScoped(string Id, AnthropicMessagesAuthenticatedRequestFactory Factory);
+    private SessionScoped? _sessionScoped;
+    private AnthropicMessagesAuthenticatedRequestFactory? ScopedTo(ChatRequest? request)
+    {
+        if (request?.SessionId is not { } id || _options.SessionId is not null) return null;
+        if (Volatile.Read(ref _sessionScoped) is { } cached && cached.Id == id) return cached.Factory;
+        var created = _withSession(id); Volatile.Write(ref _sessionScoped, new(id, created)); return created;
+    }
+
     public HttpRequestMessage Create(ChatRequest request, CancellationToken cancellationToken = default)
-        => CreateCore(request, cancellationToken, null);
+        => ScopedTo(request) is { } scoped ? scoped.Create(request, cancellationToken) : CreateCore(request, cancellationToken, null);
 
     public AnthropicMessagesPreparedRequest Prepare(ChatRequest request, CancellationToken cancellationToken = default)
     {
+        if (ScopedTo(request) is { } scoped) return scoped.Prepare(request, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
         var projected = AnthropicMessagesPreparedRequest.Project(_projector.Project(request, cancellationToken), Raw, cancellationToken);

@@ -1,0 +1,6464 @@
+{
+ "description": "Differential fixtures for PiSharp ToolArgumentValidation, recorded from the real upstream validateToolArguments (@earendil-works/pi-ai dist/utils/validation.js). schemas[name].typeBox: built with TypeBox 1.x (hidden '~kind' metadata serialized as visible keys); origin 'legacy': schema carried Symbol.for('TypeBox.Kind'). cases[].argsJson: JSON.stringify(arguments); expected.resultJson: JSON.stringify(result) or expected.error: Error.message. Regenerate: node gen-tool-validation-goldens.mjs <node_modules> [out.json] [--full]",
+ "piAi": "1.1.0",
+ "typebox": "1.3.27",
+ "schemas": {
+  "builtin_read": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Path to the file to read (relative or absolute)",
+      "~kind": "String"
+     },
+     "offset": {
+      "type": "number",
+      "description": "Line number to start reading from (1-indexed)",
+      "~kind": "Number",
+      "~optional": true
+     },
+     "limit": {
+      "type": "number",
+      "description": "Maximum number of lines to read",
+      "~kind": "Number",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "builtin_bash": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "command"
+    ],
+    "properties": {
+     "command": {
+      "type": "string",
+      "description": "Shell command to execute",
+      "~kind": "String"
+     },
+     "timeout": {
+      "type": "number",
+      "description": "Timeout in seconds (optional, no default timeout)",
+      "~kind": "Number",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "builtin_powershell": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "command"
+    ],
+    "properties": {
+     "command": {
+      "type": "string",
+      "description": "Shell command to execute",
+      "~kind": "String"
+     },
+     "timeout": {
+      "type": "number",
+      "description": "Timeout in seconds (optional, no default timeout)",
+      "~kind": "Number",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "builtin_edit": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "path",
+     "edits"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Path to the file to edit (relative or absolute)",
+      "~kind": "String"
+     },
+     "edits": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "oldText",
+        "newText"
+       ],
+       "properties": {
+        "oldText": {
+         "type": "string",
+         "description": "Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call.",
+         "~kind": "String"
+        },
+        "newText": {
+         "type": "string",
+         "description": "Replacement text for this targeted edit.",
+         "~kind": "String"
+        }
+       },
+       "~kind": "Object"
+      },
+      "description": "One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead.",
+      "~kind": "Array"
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "builtin_write": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "path",
+     "content"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Path to the file to write (relative or absolute)",
+      "~kind": "String"
+     },
+     "content": {
+      "type": "string",
+      "description": "Content to write to the file",
+      "~kind": "String"
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "builtin_grep": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "pattern"
+    ],
+    "properties": {
+     "pattern": {
+      "type": "string",
+      "description": "Search pattern (regex or literal string)",
+      "~kind": "String"
+     },
+     "path": {
+      "type": "string",
+      "description": "Directory or file to search (default: current directory)",
+      "~kind": "String",
+      "~optional": true
+     },
+     "glob": {
+      "type": "string",
+      "description": "Filter files by glob pattern, e.g. '*.ts' or '**/*.spec.ts'",
+      "~kind": "String",
+      "~optional": true
+     },
+     "ignoreCase": {
+      "type": "boolean",
+      "description": "Case-insensitive search (default: false)",
+      "~kind": "Boolean",
+      "~optional": true
+     },
+     "literal": {
+      "type": "boolean",
+      "description": "Treat pattern as literal string instead of regex (default: false)",
+      "~kind": "Boolean",
+      "~optional": true
+     },
+     "context": {
+      "type": "number",
+      "description": "Number of lines to show before and after each match (default: 0)",
+      "~kind": "Number",
+      "~optional": true
+     },
+     "limit": {
+      "type": "number",
+      "description": "Maximum number of matches to return (default: 100)",
+      "~kind": "Number",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "builtin_find": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "pattern"
+    ],
+    "properties": {
+     "pattern": {
+      "type": "string",
+      "description": "Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'",
+      "~kind": "String"
+     },
+     "path": {
+      "type": "string",
+      "description": "Directory to search in (default: current directory)",
+      "~kind": "String",
+      "~optional": true
+     },
+     "limit": {
+      "type": "number",
+      "description": "Maximum number of results (default: 1000)",
+      "~kind": "Number",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "builtin_ls": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Directory to list (default: current directory)",
+      "~kind": "String",
+      "~optional": true
+     },
+     "limit": {
+      "type": "number",
+      "description": "Maximum number of entries to return (default: 500)",
+      "~kind": "Number",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_union_num_str": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "v"
+    ],
+    "properties": {
+     "v": {
+      "anyOf": [
+       {
+        "type": "number",
+        "~kind": "Number"
+       },
+       {
+        "type": "string",
+        "~kind": "String"
+       }
+      ],
+      "~kind": "Union"
+     },
+     "o": {
+      "anyOf": [
+       {
+        "type": "boolean",
+        "~kind": "Boolean"
+       },
+       {
+        "type": "null",
+        "~kind": "Null"
+       }
+      ],
+      "~kind": "Union",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_literals": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "mode",
+     "n"
+    ],
+    "properties": {
+     "mode": {
+      "anyOf": [
+       {
+        "type": "string",
+        "const": "fast",
+        "~kind": "Literal"
+       },
+       {
+        "type": "string",
+        "const": "slow",
+        "~kind": "Literal"
+       }
+      ],
+      "~kind": "Union"
+     },
+     "n": {
+      "type": "number",
+      "const": 3,
+      "~kind": "Literal"
+     },
+     "b": {
+      "type": "boolean",
+      "const": true,
+      "~kind": "Literal",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_enum": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "e",
+     "s"
+    ],
+    "properties": {
+     "e": {
+      "enum": [
+       "a",
+       "b",
+       3
+      ],
+      "~kind": "Enum"
+     },
+     "s": {
+      "type": "string",
+      "enum": [
+       "x",
+       "y"
+      ],
+      "~unsafe": null
+     },
+     "k": {
+      "anyOf": [
+       {
+        "type": "string",
+        "const": "alpha",
+        "~kind": "Literal"
+       },
+       {
+        "type": "string",
+        "const": "beta",
+        "~kind": "Literal"
+       }
+      ],
+      "~kind": "Union",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_int": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "i"
+    ],
+    "properties": {
+     "i": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10,
+      "~kind": "Integer"
+     },
+     "m": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "multipleOf": 0.5,
+      "~kind": "Number",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_arrays": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "nums"
+    ],
+    "properties": {
+     "nums": {
+      "type": "array",
+      "items": {
+       "type": "number",
+       "~kind": "Number"
+      },
+      "~kind": "Array"
+     },
+     "bools": {
+      "type": "array",
+      "items": {
+       "type": "boolean",
+       "~kind": "Boolean"
+      },
+      "minItems": 1,
+      "maxItems": 3,
+      "~kind": "Array",
+      "~optional": true
+     },
+     "uniq": {
+      "type": "array",
+      "items": {
+       "~kind": "Any"
+      },
+      "uniqueItems": true,
+      "~kind": "Array",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_nested": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "cfg"
+    ],
+    "properties": {
+     "cfg": {
+      "type": "object",
+      "required": [
+       "depth"
+      ],
+      "properties": {
+       "depth": {
+        "type": "integer",
+        "~kind": "Integer"
+       },
+       "name": {
+        "type": "string",
+        "~kind": "String",
+        "~optional": true
+       },
+       "flags": {
+        "type": "object",
+        "required": [
+         "x"
+        ],
+        "properties": {
+         "x": {
+          "type": "boolean",
+          "~kind": "Boolean"
+         }
+        },
+        "~kind": "Object",
+        "~optional": true
+       }
+      },
+      "~kind": "Object"
+     },
+     "list": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "required": [
+        "id"
+       ],
+       "properties": {
+        "id": {
+         "type": "number",
+         "~kind": "Number"
+        },
+        "tag": {
+         "type": "string",
+         "~kind": "String",
+         "~optional": true
+        }
+       },
+       "~kind": "Object"
+      },
+      "~kind": "Array",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_tuple": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "pair"
+    ],
+    "properties": {
+     "pair": {
+      "type": "array",
+      "additionalItems": false,
+      "items": [
+       {
+        "type": "string",
+        "~kind": "String"
+       },
+       {
+        "type": "number",
+        "~kind": "Number"
+       }
+      ],
+      "minItems": 2,
+      "~kind": "Tuple"
+     },
+     "opt": {
+      "type": "array",
+      "additionalItems": false,
+      "items": [
+       {
+        "type": "boolean",
+        "~kind": "Boolean"
+       },
+       {
+        "type": "integer",
+        "~kind": "Integer"
+       },
+       {
+        "type": "null",
+        "~kind": "Null"
+       }
+      ],
+      "minItems": 3,
+      "~kind": "Tuple",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_record": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "env"
+    ],
+    "properties": {
+     "env": {
+      "type": "object",
+      "patternProperties": {
+       "^.*$": {
+        "type": "string",
+        "~kind": "String"
+       }
+      },
+      "~kind": "Record"
+     },
+     "counts": {
+      "type": "object",
+      "patternProperties": {
+       "^.*$": {
+        "type": "integer",
+        "~kind": "Integer"
+       }
+      },
+      "~kind": "Record",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_strict": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "a"
+    ],
+    "properties": {
+     "a": {
+      "type": "string",
+      "~kind": "String"
+     },
+     "b": {
+      "type": "number",
+      "~kind": "Number",
+      "~optional": true
+     }
+    },
+    "additionalProperties": false,
+    "~kind": "Object"
+   }
+  },
+  "tb_strict_allreq": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "a",
+     "b"
+    ],
+    "properties": {
+     "a": {
+      "type": "string",
+      "~kind": "String"
+     },
+     "b": {
+      "type": "number",
+      "~kind": "Number"
+     }
+    },
+    "additionalProperties": false,
+    "~kind": "Object"
+   }
+  },
+  "tb_addl_schema": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "a"
+    ],
+    "properties": {
+     "a": {
+      "type": "string",
+      "~kind": "String"
+     },
+     "b": {
+      "type": "boolean",
+      "~kind": "Boolean",
+      "~optional": true
+     }
+    },
+    "additionalProperties": {
+     "type": "number",
+     "~kind": "Number"
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_intersect_nested": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "both"
+    ],
+    "properties": {
+     "both": {
+      "allOf": [
+       {
+        "type": "object",
+        "required": [
+         "a"
+        ],
+        "properties": {
+         "a": {
+          "type": "string",
+          "~kind": "String"
+         }
+        },
+        "~kind": "Object"
+       },
+       {
+        "type": "object",
+        "required": [
+         "b"
+        ],
+        "properties": {
+         "b": {
+          "type": "number",
+          "~kind": "Number"
+         }
+        },
+        "~kind": "Object"
+       }
+      ],
+      "~kind": "Intersect"
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_intersect_root": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "allOf": [
+     {
+      "type": "object",
+      "required": [
+       "a"
+      ],
+      "properties": {
+       "a": {
+        "type": "number",
+        "~kind": "Number"
+       }
+      },
+      "~kind": "Object"
+     },
+     {
+      "type": "object",
+      "properties": {
+       "b": {
+        "type": "boolean",
+        "~kind": "Boolean",
+        "~optional": true
+       }
+      },
+      "~kind": "Object"
+     }
+    ],
+    "~kind": "Intersect"
+   }
+  },
+  "tb_null": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "n"
+    ],
+    "properties": {
+     "n": {
+      "type": "null",
+      "~kind": "Null"
+     },
+     "u": {
+      "anyOf": [
+       {
+        "type": "string",
+        "~kind": "String"
+       },
+       {
+        "type": "null",
+        "~kind": "Null"
+       }
+      ],
+      "~kind": "Union",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_strings": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "s"
+    ],
+    "properties": {
+     "s": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 5,
+      "~kind": "String"
+     },
+     "p": {
+      "type": "string",
+      "pattern": "^[a-z]+$",
+      "~kind": "String",
+      "~optional": true
+     },
+     "f": {
+      "type": "string",
+      "format": "email",
+      "~kind": "String",
+      "~optional": true
+     },
+     "d": {
+      "type": "string",
+      "format": "date-time",
+      "~kind": "String",
+      "~optional": true
+     },
+     "u": {
+      "type": "string",
+      "format": "uuid",
+      "~kind": "String",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_any_unknown": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "a"
+    ],
+    "properties": {
+     "a": {
+      "~kind": "Any"
+     },
+     "u": {
+      "~kind": "Unknown",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_union_objects": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "op"
+    ],
+    "properties": {
+     "op": {
+      "anyOf": [
+       {
+        "type": "object",
+        "required": [
+         "kind",
+         "value"
+        ],
+        "properties": {
+         "kind": {
+          "type": "string",
+          "const": "add",
+          "~kind": "Literal"
+         },
+         "value": {
+          "type": "number",
+          "~kind": "Number"
+         }
+        },
+        "~kind": "Object"
+       },
+       {
+        "type": "object",
+        "required": [
+         "kind",
+         "id"
+        ],
+        "properties": {
+         "kind": {
+          "type": "string",
+          "const": "remove",
+          "~kind": "Literal"
+         },
+         "id": {
+          "type": "string",
+          "~kind": "String"
+         }
+        },
+        "~kind": "Object"
+       }
+      ],
+      "~kind": "Union"
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_opt_array_union": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "items": {
+      "anyOf": [
+       {
+        "type": "array",
+        "items": {
+         "type": "string",
+         "~kind": "String"
+        },
+        "~kind": "Array"
+       },
+       {
+        "type": "string",
+        "~kind": "String"
+       }
+      ],
+      "~kind": "Union",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_keys": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "0",
+     "1"
+    ],
+    "properties": {
+     "0": {
+      "type": "string",
+      "~kind": "String"
+     },
+     "1": {
+      "type": "number",
+      "~kind": "Number"
+     },
+     "a.b": {
+      "type": "number",
+      "~kind": "Number",
+      "~optional": true
+     },
+     "x+": {
+      "type": "boolean",
+      "~kind": "Boolean",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_bool_num": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "flag",
+     "count"
+    ],
+    "properties": {
+     "flag": {
+      "type": "boolean",
+      "~kind": "Boolean"
+     },
+     "count": {
+      "type": "number",
+      "~kind": "Number"
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_root_union": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "anyOf": [
+     {
+      "type": "object",
+      "required": [
+       "a"
+      ],
+      "properties": {
+       "a": {
+        "type": "string",
+        "~kind": "String"
+       }
+      },
+      "~kind": "Object"
+     },
+     {
+      "type": "object",
+      "required": [
+       "b"
+      ],
+      "properties": {
+       "b": {
+        "type": "number",
+        "~kind": "Number"
+       }
+      },
+      "~kind": "Object"
+     }
+    ],
+    "~kind": "Union"
+   }
+  },
+  "tb_integer_array": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "ids"
+    ],
+    "properties": {
+     "ids": {
+      "type": "array",
+      "items": {
+       "type": "integer",
+       "~kind": "Integer"
+      },
+      "~kind": "Array"
+     },
+     "grid": {
+      "type": "array",
+      "items": {
+       "type": "array",
+       "items": {
+        "type": "number",
+        "~kind": "Number"
+       },
+       "~kind": "Array"
+      },
+      "~kind": "Array",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_literal_num_union": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "level"
+    ],
+    "properties": {
+     "level": {
+      "anyOf": [
+       {
+        "type": "number",
+        "const": 1,
+        "~kind": "Literal"
+       },
+       {
+        "type": "number",
+        "const": 2,
+        "~kind": "Literal"
+       },
+       {
+        "type": "number",
+        "const": 3,
+        "~kind": "Literal"
+       }
+      ],
+      "~kind": "Union"
+     },
+     "on": {
+      "anyOf": [
+       {
+        "type": "boolean",
+        "const": true,
+        "~kind": "Literal"
+       },
+       {
+        "type": "string",
+        "const": "auto",
+        "~kind": "Literal"
+       }
+      ],
+      "~kind": "Union",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_union_int_bool": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "v"
+    ],
+    "properties": {
+     "v": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "~kind": "Integer"
+       },
+       {
+        "type": "boolean",
+        "~kind": "Boolean"
+       }
+      ],
+      "~kind": "Union"
+     },
+     "w": {
+      "anyOf": [
+       {
+        "type": "null",
+        "~kind": "Null"
+       },
+       {
+        "type": "number",
+        "~kind": "Number"
+       }
+      ],
+      "~kind": "Union",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_unsafe_obj": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "raw"
+    ],
+    "properties": {
+     "raw": {
+      "type": "object",
+      "properties": {
+       "n": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "n"
+      ],
+      "~unsafe": null
+     },
+     "e": {
+      "type": "string",
+      "enum": [
+       "low",
+       "high"
+      ],
+      "~unsafe": null,
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_record_num_keys": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "m"
+    ],
+    "properties": {
+     "m": {
+      "type": "object",
+      "patternProperties": {
+       "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$": {
+        "type": "boolean",
+        "~kind": "Boolean"
+       }
+      },
+      "~kind": "Record"
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_array_of_unions": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "vals"
+    ],
+    "properties": {
+     "vals": {
+      "type": "array",
+      "items": {
+       "anyOf": [
+        {
+         "type": "number",
+         "~kind": "Number"
+        },
+        {
+         "type": "boolean",
+         "~kind": "Boolean"
+        },
+        {
+         "type": "null",
+         "~kind": "Null"
+        }
+       ],
+       "~kind": "Union"
+      },
+      "~kind": "Array"
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_optional_objects": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "outer": {
+      "type": "object",
+      "required": [
+       "s"
+      ],
+      "properties": {
+       "inner": {
+        "type": "object",
+        "required": [
+         "leaf"
+        ],
+        "properties": {
+         "leaf": {
+          "type": "number",
+          "~kind": "Number"
+         }
+        },
+        "~kind": "Object",
+        "~optional": true
+       },
+       "s": {
+        "type": "string",
+        "~kind": "String"
+       }
+      },
+      "~kind": "Object",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "tb_number_constraints": {
+   "origin": "typebox",
+   "typeBox": true,
+   "schema": {
+    "type": "object",
+    "required": [
+     "pct"
+    ],
+    "properties": {
+     "pct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "~kind": "Number"
+     },
+     "step": {
+      "type": "integer",
+      "multipleOf": 5,
+      "exclusiveMaximum": 50,
+      "~kind": "Integer",
+      "~optional": true
+     }
+    },
+    "~kind": "Object"
+   }
+  },
+  "json_mcp_basic": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "query": {
+      "type": "string",
+      "description": "q"
+     },
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+     },
+     "verbose": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "query"
+    ]
+   }
+  },
+  "json_mcp_no_type": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "properties": {
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "x"
+    ],
+    "type": "object"
+   }
+  },
+  "json_mcp_empty": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {}
+   }
+  },
+  "json_type_arrays": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "b": {
+      "type": [
+       "number",
+       "string"
+      ]
+     },
+     "c": {
+      "type": [
+       "integer",
+       "boolean"
+      ]
+     },
+     "d": {
+      "type": [
+       "null",
+       "number"
+      ]
+     },
+     "e": {
+      "type": [
+       "array",
+       "string"
+      ],
+      "items": {
+       "type": "number"
+      }
+     },
+     "f": {
+      "type": [
+       "boolean"
+      ]
+     }
+    }
+   }
+  },
+  "json_nullable_anyof": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "b": {
+      "oneOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "string",
+        "enum": [
+         "auto"
+        ]
+       }
+      ]
+     },
+     "c": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "array",
+        "items": {
+         "type": "integer"
+        }
+       }
+      ]
+     }
+    },
+    "required": [
+     "a"
+    ]
+   }
+  },
+  "json_allof_root": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "allOf": [
+     {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "a"
+      ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "b": {
+        "type": "boolean"
+       }
+      }
+     }
+    ]
+   }
+  },
+  "json_allof_typed": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "allOf": [
+     {
+      "properties": {
+       "a": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "a"
+      ]
+     },
+     {
+      "properties": {
+       "a": {
+        "minimum": 2
+       },
+       "s": {
+        "type": "string",
+        "minLength": 1
+       }
+      }
+     }
+    ]
+   }
+  },
+  "json_not": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "not": {
+       "type": "string"
+      }
+     },
+     "b": {
+      "type": "number",
+      "not": {
+       "const": 0
+      }
+     },
+     "c": {
+      "not": {}
+     }
+    }
+   }
+  },
+  "json_enum_const": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "color": {
+      "enum": [
+       "red",
+       "green",
+       1,
+       null
+      ]
+     },
+     "ver": {
+      "const": 2
+     },
+     "obj": {
+      "const": {
+       "x": [
+        1,
+        2
+       ]
+      }
+     },
+     "arr": {
+      "enum": [
+       [
+        1,
+        2
+       ],
+       {
+        "a": 1
+       }
+      ]
+     },
+     "s": {
+      "type": "string",
+      "enum": [
+       "on",
+       "off"
+      ]
+     }
+    }
+   }
+  },
+  "json_numbers": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "n": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+     },
+     "x": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 10
+     },
+     "m": {
+      "type": "number",
+      "multipleOf": 0.1
+     },
+     "i": {
+      "type": "integer",
+      "multipleOf": 3
+     },
+     "big": {
+      "type": "number",
+      "maximum": 1e+21
+     },
+     "tiny": {
+      "minimum": 1e-7
+     }
+    }
+   }
+  },
+  "json_strings": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "s": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 4
+     },
+     "digits": {
+      "type": "string",
+      "pattern": "^\\d+$"
+     },
+     "word": {
+      "type": "string",
+      "pattern": "\\w+\\s\\w+"
+     },
+     "end": {
+      "type": "string",
+      "pattern": "end$"
+     },
+     "dot": {
+      "type": "string",
+      "pattern": "^.$"
+     },
+     "uni": {
+      "type": "string",
+      "pattern": "^\\p{Lu}"
+     },
+     "unanch": {
+      "pattern": "b"
+     }
+    }
+   }
+  },
+  "json_formats": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "date": {
+      "type": "string",
+      "format": "date"
+     },
+     "time": {
+      "type": "string",
+      "format": "time"
+     },
+     "dt": {
+      "type": "string",
+      "format": "date-time"
+     },
+     "ip4": {
+      "type": "string",
+      "format": "ipv4"
+     },
+     "ip6": {
+      "type": "string",
+      "format": "ipv6"
+     },
+     "uri": {
+      "type": "string",
+      "format": "uri"
+     },
+     "uriref": {
+      "type": "string",
+      "format": "uri-reference"
+     },
+     "email": {
+      "type": "string",
+      "format": "email"
+     },
+     "uuid": {
+      "type": "string",
+      "format": "uuid"
+     },
+     "jp": {
+      "type": "string",
+      "format": "json-pointer"
+     },
+     "rjp": {
+      "type": "string",
+      "format": "relative-json-pointer"
+     },
+     "dur": {
+      "type": "string",
+      "format": "duration"
+     },
+     "tpl": {
+      "type": "string",
+      "format": "uri-template"
+     },
+     "custom": {
+      "type": "string",
+      "format": "custom-thing"
+     },
+     "frag": {
+      "type": "string",
+      "format": "json-pointer-uri-fragment"
+     }
+    }
+   }
+  },
+  "json_arrays": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "list": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 1,
+      "maxItems": 3
+     },
+     "uniq": {
+      "type": "array",
+      "uniqueItems": true
+     },
+     "notuniq": {
+      "type": "array",
+      "uniqueItems": false
+     },
+     "has": {
+      "type": "array",
+      "contains": {
+       "type": "string"
+      }
+     },
+     "few": {
+      "type": "array",
+      "contains": {
+       "type": "number"
+      },
+      "minContains": 2,
+      "maxContains": 3
+     },
+     "zero": {
+      "type": "array",
+      "contains": {
+       "type": "number"
+      },
+      "minContains": 0
+     }
+    }
+   }
+  },
+  "json_tuples": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "pre": {
+      "type": "array",
+      "prefixItems": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "items": {
+       "type": "boolean"
+      }
+     },
+     "old": {
+      "type": "array",
+      "items": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "boolean"
+       }
+      ],
+      "additionalItems": false
+     },
+     "oldext": {
+      "type": "array",
+      "items": [
+       {
+        "type": "string"
+       }
+      ],
+      "additionalItems": {
+       "type": "integer"
+      }
+     },
+     "none": {
+      "type": "array",
+      "items": false
+     }
+    }
+   }
+  },
+  "json_objects": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "type": "string"
+     },
+     "b": {
+      "type": "number"
+     },
+     "c": {}
+    },
+    "additionalProperties": {
+     "type": "number"
+    },
+    "patternProperties": {
+     "^x-": {
+      "type": "string"
+     },
+     "^n_": {
+      "type": "integer"
+     }
+    },
+    "propertyNames": {
+     "pattern": "^[a-z_-]+$",
+     "maxLength": 8
+    },
+    "minProperties": 1,
+    "maxProperties": 4
+   }
+  },
+  "json_dependencies": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {},
+     "b": {},
+     "c": {},
+     "x": {},
+     "y": {},
+     "z": {},
+     "w": {
+      "type": "number"
+     }
+    },
+    "dependentRequired": {
+     "a": [
+      "b",
+      "c"
+     ]
+    },
+    "dependencies": {
+     "x": [
+      "y"
+     ],
+     "z": {
+      "required": [
+       "w"
+      ]
+     }
+    }
+   }
+  },
+  "json_ref": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "$defs": {
+     "pos": {
+      "type": "integer",
+      "minimum": 0
+     },
+     "node": {
+      "type": "object",
+      "properties": {
+       "name": {
+        "type": "string"
+       },
+       "child": {
+        "$ref": "#/$defs/node"
+       }
+      },
+      "required": [
+       "name"
+      ]
+     }
+    },
+    "definitions": {
+     "flag": {
+      "type": "boolean"
+     }
+    },
+    "properties": {
+     "p": {
+      "$ref": "#/$defs/pos"
+     },
+     "tree": {
+      "$ref": "#/$defs/node"
+     },
+     "opt": {
+      "$ref": "#/$defs/pos"
+     },
+     "f": {
+      "$ref": "#/definitions/flag"
+     },
+     "bad": {
+      "$ref": "#/$defs/missing"
+     },
+     "self": {
+      "type": "object",
+      "properties": {
+       "again": {
+        "$ref": "#"
+       }
+      }
+     }
+    },
+    "required": [
+     "p"
+    ]
+   }
+  },
+  "json_if": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string"
+     },
+     "n": {}
+    },
+    "if": {
+     "properties": {
+      "kind": {
+       "const": "num"
+      }
+     }
+    },
+    "then": {
+     "properties": {
+      "n": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "n"
+     ]
+    },
+    "else": {
+     "properties": {
+      "n": {
+       "type": "string"
+      }
+     }
+    }
+   }
+  },
+  "json_unevaluated": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "type": "string"
+     }
+    },
+    "allOf": [
+     {
+      "properties": {
+       "b": {
+        "type": "number"
+       }
+      }
+     }
+    ],
+    "unevaluatedProperties": false
+   }
+  },
+  "json_unevaluated_items": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "t": {
+      "type": "array",
+      "prefixItems": [
+       {
+        "type": "string"
+       }
+      ],
+      "unevaluatedItems": {
+       "type": "number"
+      }
+     }
+    }
+   }
+  },
+  "json_bool_schemas": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "t": true,
+     "f": false,
+     "n": {
+      "type": "number"
+     }
+    },
+    "additionalProperties": true
+   }
+  },
+  "json_required_only": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "required": [
+     "a",
+     "b"
+    ]
+   }
+  },
+  "json_proto_names": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "toString": {
+      "type": "string"
+     },
+     "constructor": {},
+     "hasOwnProperty": {
+      "type": "number"
+     },
+     "normal": {
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "valueOf"
+    ]
+   }
+  },
+  "json_nested_deep": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "level1": {
+      "type": "object",
+      "properties": {
+       "level2": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "id": {
+           "type": "integer"
+          },
+          "tags": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          },
+          "meta": {
+           "type": "object",
+           "additionalProperties": false,
+           "properties": {
+            "ok": {
+             "type": "boolean"
+            }
+           }
+          }
+         },
+         "required": [
+          "id"
+         ]
+        }
+       }
+      },
+      "required": [
+       "level2"
+      ]
+     }
+    },
+    "required": [
+     "level1"
+    ]
+   }
+  },
+  "json_many_errors": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "type": "integer"
+     },
+     "b": {
+      "type": "integer"
+     },
+     "c": {
+      "type": "integer"
+     },
+     "d": {
+      "type": "integer"
+     },
+     "e": {
+      "type": "integer"
+     },
+     "f": {
+      "type": "integer"
+     },
+     "g": {
+      "type": "integer"
+     },
+     "h": {
+      "type": "integer"
+     },
+     "i": {
+      "type": "integer"
+     },
+     "j": {
+      "type": "integer"
+     },
+     "k": {
+      "type": "integer"
+     },
+     "l": {
+      "type": "integer"
+     }
+    },
+    "required": [
+     "a",
+     "b",
+     "c",
+     "d",
+     "e",
+     "f",
+     "g",
+     "h",
+     "i",
+     "j",
+     "k",
+     "l"
+    ]
+   }
+  },
+  "json_keys_order": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "1": {
+      "type": "null"
+     },
+     "2": {
+      "type": "string"
+     },
+     "10": {
+      "type": "number"
+     },
+     "b": {
+      "type": "boolean"
+     },
+     "a": {
+      "type": "integer"
+     }
+    },
+    "required": [
+     "b",
+     "10",
+     "a"
+    ]
+   }
+  },
+  "json_weird_keys": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a/b": {
+      "type": "number"
+     },
+     "": {
+      "type": "string"
+     },
+     "a.b": {
+      "type": "boolean"
+     },
+     "x y": {
+      "type": "integer"
+     },
+     "~0": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "a/b"
+    ]
+   }
+  },
+  "json_items_tuple_coerce": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "list": {
+      "type": "array",
+      "items": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "json_root_anyof": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "anyOf": [
+     {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "a"
+      ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "b": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "b"
+      ]
+     }
+    ]
+   }
+  },
+  "json_root_oneof": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "oneOf": [
+     {
+      "type": "object",
+      "properties": {
+       "kind": {
+        "const": "a"
+       },
+       "n": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "kind",
+       "n"
+      ]
+     },
+     {
+      "type": "object",
+      "properties": {
+       "kind": {
+        "const": "b"
+       },
+       "s": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "kind"
+      ]
+     }
+    ]
+   }
+  },
+  "json_root_string": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "string"
+   }
+  },
+  "json_root_number": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "number",
+    "minimum": 3
+   }
+  },
+  "json_root_nullable_obj": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": [
+     "object",
+     "null"
+    ],
+    "properties": {
+     "a": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "a"
+    ]
+   }
+  },
+  "json_multi_type": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "v": {
+      "type": [
+       "number",
+       "boolean"
+      ]
+     },
+     "w": {
+      "type": [
+       "boolean",
+       "number"
+      ]
+     },
+     "s": {
+      "type": [
+       "string",
+       "number"
+      ]
+     },
+     "n": {
+      "type": [
+       "null",
+       "string"
+      ]
+     },
+     "i": {
+      "type": [
+       "integer",
+       "string"
+      ]
+     },
+     "o": {
+      "type": [
+       "object",
+       "string"
+      ],
+      "properties": {
+       "q": {
+        "type": "number"
+       }
+      }
+     }
+    }
+   }
+  },
+  "json_oneof_objects": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "shape": {
+      "oneOf": [
+       {
+        "type": "object",
+        "properties": {
+         "r": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "r"
+        ],
+        "additionalProperties": false
+       },
+       {
+        "type": "object",
+        "properties": {
+         "w": {
+          "type": "number"
+         },
+         "h": {
+          "type": "number"
+         }
+        },
+        "required": [
+         "w",
+         "h"
+        ],
+        "additionalProperties": false
+       }
+      ]
+     }
+    },
+    "required": [
+     "shape"
+    ]
+   }
+  },
+  "json_nullable_keyword": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "a": {
+      "type": "string",
+      "nullable": true
+     },
+     "b": {
+      "type": "integer",
+      "nullable": true
+     }
+    },
+    "required": [
+     "a"
+    ]
+   }
+  },
+  "json_additional_false_nested": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "opts": {
+      "type": "object",
+      "properties": {
+       "x": {
+        "type": "number"
+       },
+       "y": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "x",
+       "y"
+      ],
+      "additionalProperties": false
+     },
+     "more": {
+      "type": "object",
+      "properties": {
+       "x": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "y"
+      ],
+      "additionalProperties": false
+     }
+    }
+   }
+  },
+  "json_additional_false_root": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "cmd": {
+      "type": "string"
+     },
+     "n": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "cmd"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "json_anyof_coerce": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "v": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "boolean"
+       }
+      ]
+     },
+     "w": {
+      "oneOf": [
+       {
+        "type": "string",
+        "maxLength": 3
+       },
+       {
+        "type": "number"
+       }
+      ]
+     },
+     "x": {
+      "anyOf": [
+       {
+        "type": "array",
+        "items": {
+         "type": "number"
+        }
+       },
+       {
+        "type": "string"
+       }
+      ]
+     }
+    }
+   }
+  },
+  "json_null_type": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "z": {
+      "type": "null"
+     },
+     "zz": {
+      "type": [
+       "null"
+      ]
+     }
+    }
+   }
+  },
+  "json_additional_coerce": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "fixed": {
+      "type": "string"
+     }
+    },
+    "additionalProperties": {
+     "type": "integer"
+    }
+   }
+  },
+  "json_string_lengths_unicode": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "g": {
+      "type": "string",
+      "maxLength": 2
+     },
+     "h": {
+      "type": "string",
+      "minLength": 3
+     }
+    }
+   }
+  },
+  "json_nested_union_in_array": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "rows": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "v": {
+         "type": [
+          "number",
+          "null"
+         ]
+        },
+        "k": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "number"
+          }
+         ]
+        }
+       },
+       "required": [
+        "k"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "json_root_anyof_array": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "anyOf": [
+     {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     {
+      "type": "object",
+      "properties": {
+       "n": {
+        "type": "number"
+       }
+      }
+     }
+    ]
+   }
+  },
+  "json_self_ref": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "$ref": "#"
+   }
+  },
+  "json_anchor_ref": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "$defs": {
+     "pos": {
+      "$anchor": "pos",
+      "type": "integer",
+      "minimum": 0
+     }
+    },
+    "properties": {
+     "p": {
+      "$ref": "#pos"
+     },
+     "q": {
+      "$ref": "other.json#/$defs/pos"
+     },
+     "r": {
+      "$ref": "other.json"
+     },
+     "s": {
+      "$ref": "x#"
+     }
+    }
+   }
+  },
+  "json_codemode_like": {
+   "origin": "json",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "code": {
+      "type": "string",
+      "description": "JS"
+     },
+     "timeoutMs": {
+      "type": "integer",
+      "minimum": 1
+     },
+     "dryRun": {
+      "type": "boolean",
+      "default": false
+     }
+    },
+    "required": [
+     "code"
+    ],
+    "additionalProperties": false
+   }
+  },
+  "legacy_basic": {
+   "origin": "legacy",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "n": {
+      "type": "number"
+     },
+     "b": {
+      "type": "boolean"
+     },
+     "s": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "n"
+    ]
+   }
+  },
+  "legacy_nested": {
+   "origin": "legacy",
+   "typeBox": false,
+   "schema": {
+    "type": "object",
+    "properties": {
+     "o": {
+      "type": "object",
+      "properties": {
+       "i": {
+        "type": "integer"
+       }
+      }
+     },
+     "a": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      }
+     }
+    }
+   }
+  }
+ },
+ "cases": [
+  {
+   "schema": "builtin_read",
+   "tag": "hand",
+   "argsJson": "{\"path\":\"a.txt\",\"offset\":\"10\",\"limit\":\"20\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"a.txt\",\"offset\":10,\"limit\":20}"
+   }
+  },
+  {
+   "schema": "builtin_read",
+   "tag": "hand",
+   "argsJson": "{\"path\":\"a.txt\",\"offset\":null,\"limit\":null}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"a.txt\"}"
+   }
+  },
+  {
+   "schema": "builtin_read",
+   "tag": "hand",
+   "argsJson": "{\"path\":123}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"123\"}"
+   }
+  },
+  {
+   "schema": "builtin_read",
+   "tag": "hand",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_read\":\n  - path: must have required properties path\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_bash",
+   "tag": "hand",
+   "argsJson": "{\"command\":\"ls\",\"timeout\":\"30\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"command\":\"ls\",\"timeout\":30}"
+   }
+  },
+  {
+   "schema": "builtin_bash",
+   "tag": "hand",
+   "argsJson": "{\"command\":[\"ls\"],\"timeout\":true}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_bash\":\n  - command: must be string\n\nReceived arguments:\n{\n  \"command\": [\n    \"ls\"\n  ],\n  \"timeout\": true\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_edit",
+   "tag": "hand",
+   "argsJson": "{\"path\":\"f\",\"edits\":[{\"oldText\":\"a\",\"newText\":\"b\"}]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"f\",\"edits\":[{\"oldText\":\"a\",\"newText\":\"b\"}]}"
+   }
+  },
+  {
+   "schema": "builtin_edit",
+   "tag": "hand",
+   "argsJson": "{\"path\":\"f\",\"edits\":{\"oldText\":\"a\",\"newText\":\"b\"}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"f\",\"edits\":[{\"oldText\":\"a\",\"newText\":\"b\"}]}"
+   }
+  },
+  {
+   "schema": "builtin_edit",
+   "tag": "hand",
+   "argsJson": "{\"path\":\"f\",\"edits\":[{\"oldText\":1,\"newText\":null},{\"oldText\":\"a\"}]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_edit\":\n  - edits.1.newText: must have required properties newText\n\nReceived arguments:\n{\n  \"path\": \"f\",\n  \"edits\": [\n    {\n      \"oldText\": 1,\n      \"newText\": null\n    },\n    {\n      \"oldText\": \"a\"\n    }\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_edit",
+   "tag": "hand",
+   "argsJson": "{\"path\":\"f\",\"edits\":\"[{\\\"oldText\\\":\\\"a\\\",\\\"newText\\\":\\\"b\\\"}]\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_edit\":\n  - edits.0: must be object\n\nReceived arguments:\n{\n  \"path\": \"f\",\n  \"edits\": \"[{\\\"oldText\\\":\\\"a\\\",\\\"newText\\\":\\\"b\\\"}]\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_grep",
+   "tag": "hand",
+   "argsJson": "{\"pattern\":\"x\",\"ignoreCase\":\"true\",\"literal\":\"false\",\"context\":\"2\",\"limit\":\"1e2\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"pattern\":\"x\",\"ignoreCase\":true,\"literal\":false,\"context\":2,\"limit\":100}"
+   }
+  },
+  {
+   "schema": "builtin_grep",
+   "tag": "hand",
+   "argsJson": "{\"pattern\":\"x\",\"ignoreCase\":\"yes\",\"literal\":1,\"context\":\"two\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_grep\":\n  - ignoreCase: must be boolean\n  - context: must be number\n\nReceived arguments:\n{\n  \"pattern\": \"x\",\n  \"ignoreCase\": \"yes\",\n  \"literal\": 1,\n  \"context\": \"two\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_ls",
+   "tag": "hand",
+   "argsJson": "{\"path\":null,\"limit\":null}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "builtin_ls",
+   "tag": "hand",
+   "argsJson": "{\"limit\":\"Infinity\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_ls\":\n  - limit: must be number\n\nReceived arguments:\n{\n  \"limit\": \"Infinity\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_write",
+   "tag": "hand",
+   "argsJson": "{\"path\":\"p\",\"content\":{\"text\":\"x\"}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_write\":\n  - content: must be string\n\nReceived arguments:\n{\n  \"path\": \"p\",\n  \"content\": {\n    \"text\": \"x\"\n  }\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_find",
+   "tag": "hand",
+   "argsJson": "{\"pattern\":\"*.ts\",\"limit\":1e+21}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"pattern\":\"*.ts\",\"limit\":1e+21}"
+   }
+  },
+  {
+   "schema": "json_many_errors",
+   "tag": "hand",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_many_errors\":\n  - a: must have required properties a, b, c, d, e, f, g, h, i, j, k, l\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_many_errors",
+   "tag": "hand",
+   "argsJson": "{\"a\":\"xa\",\"b\":\"xb\",\"c\":\"xc\",\"d\":\"xd\",\"e\":\"xe\",\"f\":\"xf\",\"g\":\"xg\",\"h\":\"xh\",\"i\":\"xi\",\"j\":\"xj\",\"k\":\"xk\",\"l\":\"xl\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_many_errors\":\n  - a: must be integer\n  - b: must be integer\n  - c: must be integer\n  - d: must be integer\n  - e: must be integer\n  - f: must be integer\n  - g: must be integer\n  - h: must be integer\n\nReceived arguments:\n{\n  \"a\": \"xa\",\n  \"b\": \"xb\",\n  \"c\": \"xc\",\n  \"d\": \"xd\",\n  \"e\": \"xe\",\n  \"f\": \"xf\",\n  \"g\": \"xg\",\n  \"h\": \"xh\",\n  \"i\": \"xi\",\n  \"j\": \"xj\",\n  \"k\": \"xk\",\n  \"l\": \"xl\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_string",
+   "tag": "hand",
+   "argsJson": "null",
+   "expected": {
+    "ok": true,
+    "resultJson": "\"\""
+   }
+  },
+  {
+   "schema": "json_root_string",
+   "tag": "hand",
+   "argsJson": "5",
+   "expected": {
+    "ok": true,
+    "resultJson": "\"5\""
+   }
+  },
+  {
+   "schema": "json_root_anyof",
+   "tag": "hand",
+   "argsJson": "{\"a\":\"5\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":5}"
+   }
+  },
+  {
+   "schema": "json_root_anyof",
+   "tag": "hand",
+   "argsJson": "{\"b\":5}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"b\":\"5\"}"
+   }
+  },
+  {
+   "schema": "json_proto_names",
+   "tag": "hand",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_proto_names\":\n  - toString: must be string\n  - hasOwnProperty: must be number\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_proto_names",
+   "tag": "hand",
+   "argsJson": "{\"toString\":5,\"normal\":\"true\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_proto_names\":\n  - hasOwnProperty: must be number\n\nReceived arguments:\n{\n  \"toString\": 5,\n  \"normal\": \"true\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_keys_order",
+   "tag": "hand",
+   "argsJson": "{\"1\":\"\",\"2\":3,\"10\":\"7\",\"a\":\"1\",\"b\":\"false\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"1\":null,\"2\":\"3\",\"10\":7,\"a\":1,\"b\":false}"
+   }
+  },
+  {
+   "schema": "json_weird_keys",
+   "tag": "hand",
+   "argsJson": "{\"a/b\":\"x\",\"\":1,\"a.b\":\"true\",\"x y\":\"2.5\",\"~0\":\"1\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_weird_keys\":\n  - a.b: must be number\n  - x y: must be integer\n\nReceived arguments:\n{\n  \"a/b\": \"x\",\n  \"\": 1,\n  \"a.b\": \"true\",\n  \"x y\": \"2.5\",\n  \"~0\": \"1\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_formats",
+   "tag": "hand",
+   "argsJson": "{\"date\":\"2024-02-29\",\"time\":\"23:59:60Z\",\"dt\":\"2023-02-29T00:00:00Z\",\"ip4\":\"1.2.3\",\"ip6\":\"1::2::3\",\"uri\":\"http://a b\",\"uriref\":\"//host/path\",\"email\":\"a@b\",\"uuid\":\"xyz\",\"jp\":\"a/b\",\"rjp\":\"1#\",\"dur\":\"P1W\",\"tpl\":\"{x\",\"custom\":5,\"frag\":\"#/x%2\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_formats\":\n  - dt: must match format \"date-time\"\n  - ip4: must match format \"ipv4\"\n  - ip6: must match format \"ipv6\"\n  - uri: must match format \"uri\"\n  - uuid: must match format \"uuid\"\n  - jp: must match format \"json-pointer\"\n  - tpl: must match format \"uri-template\"\n  - frag: must match format \"json-pointer-uri-fragment\"\n\nReceived arguments:\n{\n  \"date\": \"2024-02-29\",\n  \"time\": \"23:59:60Z\",\n  \"dt\": \"2023-02-29T00:00:00Z\",\n  \"ip4\": \"1.2.3\",\n  \"ip6\": \"1::2::3\",\n  \"uri\": \"http://a b\",\n  \"uriref\": \"//host/path\",\n  \"email\": \"a@b\",\n  \"uuid\": \"xyz\",\n  \"jp\": \"a/b\",\n  \"rjp\": \"1#\",\n  \"dur\": \"P1W\",\n  \"tpl\": \"{x\",\n  \"custom\": 5,\n  \"frag\": \"#/x%2\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_strings",
+   "tag": "hand",
+   "argsJson": "{\"s\":\"👍🏽👍\",\"digits\":\"١٢\",\"word\":\"hello world\",\"end\":\"the end\\n\",\"dot\":\"😀\",\"uni\":\"Été\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_strings\":\n  - digits: must match pattern \"^\\d+$\"\n  - end: must match pattern \"end$\"\n\nReceived arguments:\n{\n  \"s\": \"👍🏽👍\",\n  \"digits\": \"١٢\",\n  \"word\": \"hello world\",\n  \"end\": \"the end\\n\",\n  \"dot\": \"😀\",\n  \"uni\": \"Été\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_unevaluated",
+   "tag": "hand",
+   "argsJson": "{\"a\":\"x\",\"b\":1,\"c\":2}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_unevaluated\":\n  - root: must not have unevaluated properties\n\nReceived arguments:\n{\n  \"a\": \"x\",\n  \"b\": 1,\n  \"c\": 2\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_unevaluated",
+   "tag": "hand",
+   "argsJson": "{\"a\":1,\"b\":\"x\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_unevaluated\":\n  - b: must be number\n  - root: must not have unevaluated properties\n\nReceived arguments:\n{\n  \"a\": 1,\n  \"b\": \"x\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_dependencies",
+   "tag": "hand",
+   "argsJson": "{\"a\":1,\"x\":1,\"z\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_dependencies\":\n  - root: must have properties y when property x is present\n  - w: must have required properties w\n  - root: must have properties b, c when property a is present\n  - root: must have properties b, c when property a is present\n\nReceived arguments:\n{\n  \"a\": 1,\n  \"x\": 1,\n  \"z\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_objects",
+   "tag": "hand",
+   "argsJson": "{\"a\":\"1\",\"b\":\"2\",\"x-id\":5,\"n_count\":\"3\",\"UPPER\":1,\"toolongpropertyname\":2}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_objects\":\n  - x-id: must be string\n  - UPPER: must match pattern \"^[a-z_-]+$\"\n  - toolongpropertyname: must not have more than 8 characters\n  - root: property names UPPER, toolongpropertyname are invalid\n  - root: must not have more than 4 properties\n\nReceived arguments:\n{\n  \"a\": \"1\",\n  \"b\": \"2\",\n  \"x-id\": 5,\n  \"n_count\": \"3\",\n  \"UPPER\": 1,\n  \"toolongpropertyname\": 2\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_ref",
+   "tag": "hand",
+   "argsJson": "{\"p\":\"5\",\"tree\":{\"name\":\"a\",\"child\":{\"name\":1}},\"opt\":null,\"f\":\"true\",\"bad\":1,\"self\":{\"again\":{}}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_ref\":\n  - p: must be integer\n  - tree.child.name: must be string\n  - opt: must be integer\n  - f: must be boolean\n  - bad: schema is false\n  - self.again.p: must have required properties p\n\nReceived arguments:\n{\n  \"p\": \"5\",\n  \"tree\": {\n    \"name\": \"a\",\n    \"child\": {\n      \"name\": 1\n    }\n  },\n  \"opt\": null,\n  \"f\": \"true\",\n  \"bad\": 1,\n  \"self\": {\n    \"again\": {}\n  }\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_additional_false_nested",
+   "tag": "hand",
+   "argsJson": "{\"opts\":{\"x\":1,\"y\":2},\"more\":{\"y\":1}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"opts\":{\"x\":1,\"y\":2},\"more\":{\"y\":1}}"
+   }
+  },
+  {
+   "schema": "json_nested_deep",
+   "tag": "hand",
+   "argsJson": "{\"level1\":{\"level2\":[{\"id\":\"1\",\"tags\":[1,null],\"meta\":{\"ok\":\"true\",\"extra\":1}},{\"tags\":\"x\"}]}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_nested_deep\":\n  - level1.level2.0.meta.extra: schema is false\n  - level1.level2.0.meta: must not have additional properties\n  - level1.level2.1.id: must have required properties id\n  - level1.level2.1.tags: must be array\n\nReceived arguments:\n{\n  \"level1\": {\n    \"level2\": [\n      {\n        \"id\": \"1\",\n        \"tags\": [\n          1,\n          null\n        ],\n        \"meta\": {\n          \"ok\": \"true\",\n          \"extra\": 1\n        }\n      },\n      {\n        \"tags\": \"x\"\n      }\n    ]\n  }\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_root_union",
+   "tag": "hand",
+   "argsJson": "{\"a\":5}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"5\"}"
+   }
+  },
+  {
+   "schema": "tb_intersect_root",
+   "tag": "hand",
+   "argsJson": "{\"a\":\"5\",\"b\":\"true\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":5,\"b\":true}"
+   }
+  },
+  {
+   "schema": "tb_tuple",
+   "tag": "hand",
+   "argsJson": "{\"pair\":[1,\"2\"],\"opt\":[\"true\",\"3.7\",\"null\"]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"pair\":[\"1\",2],\"opt\":[true,3,null]}"
+   }
+  },
+  {
+   "schema": "tb_arrays",
+   "tag": "hand",
+   "argsJson": "{\"nums\":\"5\",\"bools\":\"true\",\"uniq\":[1,1]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_arrays\":\n  - uniq: must not have duplicate items\n\nReceived arguments:\n{\n  \"nums\": \"5\",\n  \"bools\": \"true\",\n  \"uniq\": [\n    1,\n    1\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_record",
+   "tag": "hand",
+   "argsJson": "{\"env\":{\"HOME\":1,\"PATH\":null},\"counts\":{\"a\":\"2.9\",\"b\":\"x\"}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_record\":\n  - counts.b: must be integer\n\nReceived arguments:\n{\n  \"env\": {\n    \"HOME\": 1,\n    \"PATH\": null\n  },\n  \"counts\": {\n    \"a\": \"2.9\",\n    \"b\": \"x\"\n  }\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_keys",
+   "tag": "hand",
+   "argsJson": "{\"0\":5,\"1\":\"7\",\"a.b\":\"3\",\"axb\":\"4\",\"x+\":\"true\",\"xx\":\"1\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"0\":\"5\",\"1\":7,\"a.b\":3,\"axb\":4,\"x+\":true,\"xx\":true}"
+   }
+  },
+  {
+   "schema": "tb_enum",
+   "tag": "hand",
+   "argsJson": "{\"e\":\"3\",\"s\":1,\"k\":\"alpha\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_enum\":\n  - s: must be equal to one of the allowed values\n\nReceived arguments:\n{\n  \"e\": \"3\",\n  \"s\": 1,\n  \"k\": \"alpha\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_literals",
+   "tag": "hand",
+   "argsJson": "{\"mode\":\"FAST\",\"n\":\"3\",\"b\":\"true\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_literals\":\n  - mode: must be equal to constant\n  - mode: must be equal to constant\n  - mode: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"mode\": \"FAST\",\n  \"n\": \"3\",\n  \"b\": \"true\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_union_objects",
+   "tag": "hand",
+   "argsJson": "{\"op\":{\"kind\":\"add\",\"value\":\"5\"}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"op\":{\"kind\":\"add\",\"value\":5}}"
+   }
+  },
+  {
+   "schema": "json_root_anyof_array",
+   "tag": "hand",
+   "argsJson": "[1,true]",
+   "expected": {
+    "ok": true,
+    "resultJson": "[\"1\",\"true\"]"
+   }
+  },
+  {
+   "schema": "json_root_anyof_array",
+   "tag": "hand",
+   "argsJson": "[\"a\"]",
+   "expected": {
+    "ok": true,
+    "resultJson": "[\"a\"]"
+   }
+  },
+  {
+   "schema": "json_root_anyof_array",
+   "tag": "hand",
+   "argsJson": "{\"n\":\"4\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"n\":4}"
+   }
+  },
+  {
+   "schema": "json_self_ref",
+   "tag": "hand",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Maximum call stack size exceeded",
+    "errorType": "RangeError"
+   }
+  },
+  {
+   "schema": "json_anchor_ref",
+   "tag": "hand",
+   "argsJson": "{\"p\":\"3\",\"q\":-1,\"r\":\"x\",\"s\":{\"p\":1}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_anchor_ref\":\n  - p: must be integer\n  - q: must be >= 0\n  - r: schema is false\n\nReceived arguments:\n{\n  \"p\": \"3\",\n  \"q\": -1,\n  \"r\": \"x\",\n  \"s\": {\n    \"p\": 1\n  }\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_anchor_ref",
+   "tag": "hand",
+   "argsJson": "{\"p\":-2,\"q\":\"1\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_anchor_ref\":\n  - p: must be >= 0\n  - q: must be integer\n\nReceived arguments:\n{\n  \"p\": -2,\n  \"q\": \"1\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "legacy_basic",
+   "tag": "hand",
+   "argsJson": "{\"n\":\"5\",\"b\":\"true\",\"s\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"legacy_basic\":\n  - n: must be number\n  - b: must be boolean\n  - s: must be string\n\nReceived arguments:\n{\n  \"n\": \"5\",\n  \"b\": \"true\",\n  \"s\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "legacy_nested",
+   "tag": "hand",
+   "argsJson": "{\"o\":{\"i\":\"2\"},\"a\":[\"1\"]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"legacy_nested\":\n  - o.i: must be integer\n  - a.0: must be number\n\nReceived arguments:\n{\n  \"o\": {\n    \"i\": \"2\"\n  },\n  \"a\": [\n    \"1\"\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_read",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_read\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_read",
+   "tag": "sample",
+   "argsJson": "{\"path\":\"ls -la\",\"offset\":1,\"limit\":0.5}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"ls -la\",\"offset\":1,\"limit\":0.5}"
+   }
+  },
+  {
+   "schema": "builtin_read",
+   "tag": "prop-pool",
+   "argsJson": "{\"path\":2,\"limit\":-1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"2\",\"limit\":-1}"
+   }
+  },
+  {
+   "schema": "builtin_read",
+   "tag": "prop-pool",
+   "argsJson": "{\"path\":[\"a\",\"b\"],\"limit\":-1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_read\":\n  - path: must be string\n\nReceived arguments:\n{\n  \"path\": [\n    \"a\",\n    \"b\"\n  ],\n  \"limit\": -1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_bash",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_bash\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_bash",
+   "tag": "sample",
+   "argsJson": "{\"command\":\"README.md\",\"timeout\":99.9}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"command\":\"README.md\",\"timeout\":99.9}"
+   }
+  },
+  {
+   "schema": "builtin_bash",
+   "tag": "prop-pool",
+   "argsJson": "{\"command\":0,\"timeout\":0}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"command\":\"0\",\"timeout\":0}"
+   }
+  },
+  {
+   "schema": "builtin_bash",
+   "tag": "prop-pool",
+   "argsJson": "{\"command\":[],\"timeout\":0}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_bash\":\n  - command: must be string\n\nReceived arguments:\n{\n  \"command\": [],\n  \"timeout\": 0\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_powershell",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_powershell\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_powershell",
+   "tag": "sample",
+   "argsJson": "{\"command\":\"README.md\",\"timeout\":0.5}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"command\":\"README.md\",\"timeout\":0.5}"
+   }
+  },
+  {
+   "schema": "builtin_powershell",
+   "tag": "prop-pool",
+   "argsJson": "{\"command\":true}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"command\":\"true\"}"
+   }
+  },
+  {
+   "schema": "builtin_powershell",
+   "tag": "prop-pool",
+   "argsJson": "{\"command\":[{\"a\":1},{\"a\":1}]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_powershell\":\n  - command: must be string\n\nReceived arguments:\n{\n  \"command\": [\n    {\n      \"a\": 1\n    },\n    {\n      \"a\": 1\n    }\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_edit",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_edit\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_edit",
+   "tag": "sample",
+   "argsJson": "{\"path\":\"README.md\",\"edits\":[{\"oldText\":\"README.md\",\"newText\":\"src/main.ts\"},{\"oldText\":\"ls -la\",\"newText\":\"hello\"},{\"oldText\":\"hello\",\"newText\":\"x\"}]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"README.md\",\"edits\":[{\"oldText\":\"README.md\",\"newText\":\"src/main.ts\"},{\"oldText\":\"ls -la\",\"newText\":\"hello\"},{\"oldText\":\"hello\",\"newText\":\"x\"}]}"
+   }
+  },
+  {
+   "schema": "builtin_edit",
+   "tag": "prop-pool",
+   "argsJson": "{\"path\":1,\"edits\":[{\"oldText\":\"x\",\"newText\":\"hello\"}]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"1\",\"edits\":[{\"oldText\":\"x\",\"newText\":\"hello\"}]}"
+   }
+  },
+  {
+   "schema": "builtin_edit",
+   "tag": "prop-pool",
+   "argsJson": "{\"path\":[1],\"edits\":[{\"oldText\":\"x\",\"newText\":\"hello\"}]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_edit\":\n  - path: must be string\n\nReceived arguments:\n{\n  \"path\": [\n    1\n  ],\n  \"edits\": [\n    {\n      \"oldText\": \"x\",\n      \"newText\": \"hello\"\n    }\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_write",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_write\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_write",
+   "tag": "sample",
+   "argsJson": "{\"path\":\"ls -la\",\"content\":\"hello\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"ls -la\",\"content\":\"hello\"}"
+   }
+  },
+  {
+   "schema": "builtin_write",
+   "tag": "prop-pool",
+   "argsJson": "{\"path\":3,\"content\":\"foo bar\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"3\",\"content\":\"foo bar\"}"
+   }
+  },
+  {
+   "schema": "builtin_write",
+   "tag": "prop-pool",
+   "argsJson": "{\"path\":[1,\"2\",true,null],\"content\":\"foo bar\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_write\":\n  - path: must be string\n\nReceived arguments:\n{\n  \"path\": [\n    1,\n    \"2\",\n    true,\n    null\n  ],\n  \"content\": \"foo bar\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_grep",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_grep\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_grep",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_grep\":\n  - pattern: must have required properties pattern\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_grep",
+   "tag": "sample",
+   "argsJson": "{\"pattern\":\"x\",\"path\":\"src/main.ts\",\"glob\":\"README.md\",\"ignoreCase\":false,\"literal\":true,\"limit\":-1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"pattern\":\"x\",\"path\":\"src/main.ts\",\"glob\":\"README.md\",\"ignoreCase\":false,\"literal\":true,\"limit\":-1}"
+   }
+  },
+  {
+   "schema": "builtin_grep",
+   "tag": "prop-pool",
+   "argsJson": "{\"pattern\":2,\"glob\":\"foo bar\",\"ignoreCase\":true,\"context\":0.5}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"pattern\":\"2\",\"glob\":\"foo bar\",\"ignoreCase\":true,\"context\":0.5}"
+   }
+  },
+  {
+   "schema": "builtin_find",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_find\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_find",
+   "tag": "sample",
+   "argsJson": "{\"pattern\":\"foo bar\",\"limit\":-1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"pattern\":\"foo bar\",\"limit\":-1}"
+   }
+  },
+  {
+   "schema": "builtin_find",
+   "tag": "prop-pool",
+   "argsJson": "{\"pattern\":0,\"limit\":99.9}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"pattern\":\"0\",\"limit\":99.9}"
+   }
+  },
+  {
+   "schema": "builtin_find",
+   "tag": "prop-pool",
+   "argsJson": "{\"pattern\":[],\"limit\":99.9}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_find\":\n  - pattern: must be string\n\nReceived arguments:\n{\n  \"pattern\": [],\n  \"limit\": 99.9\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_ls",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"extra\":1}"
+   }
+  },
+  {
+   "schema": "builtin_ls",
+   "tag": "root",
+   "argsJson": "0",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_ls\":\n  - root: must be object\n\nReceived arguments:\n0",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "builtin_ls",
+   "tag": "prop-pool",
+   "argsJson": "{\"path\":-1,\"limit\":-1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"path\":\"-1\",\"limit\":-1}"
+   }
+  },
+  {
+   "schema": "builtin_ls",
+   "tag": "prop-pool",
+   "argsJson": "{\"path\":[1,2],\"limit\":-1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"builtin_ls\":\n  - path: must be string\n\nReceived arguments:\n{\n  \"path\": [\n    1,\n    2\n  ],\n  \"limit\": -1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_union_num_str",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_union_num_str\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_union_num_str",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_union_num_str\":\n  - v: must have required properties v\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_union_num_str",
+   "tag": "sample",
+   "argsJson": "{\"v\":99.9}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"v\":99.9}"
+   }
+  },
+  {
+   "schema": "tb_union_num_str",
+   "tag": "prop-pool",
+   "argsJson": "{\"v\":[1,2],\"o\":null}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_union_num_str\":\n  - v: must be number\n  - v: must be string\n  - v: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"v\": [\n    1,\n    2\n  ],\n  \"o\": null\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_literals",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_literals\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_literals",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_literals\":\n  - mode: must have required properties mode, n\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_literals",
+   "tag": "sample",
+   "argsJson": "{\"mode\":\"fast\",\"n\":3}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"mode\":\"fast\",\"n\":3}"
+   }
+  },
+  {
+   "schema": "tb_literals",
+   "tag": "prop-pool",
+   "argsJson": "{\"mode\":0,\"n\":3,\"b\":true}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_literals\":\n  - mode: must be string\n  - mode: must be equal to constant\n  - mode: must be string\n  - mode: must be equal to constant\n  - mode: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"mode\": 0,\n  \"n\": 3,\n  \"b\": true\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_enum",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_enum\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_enum",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_enum\":\n  - e: must have required properties e, s\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_enum",
+   "tag": "sample",
+   "argsJson": "{\"e\":\"b\",\"s\":\"x\",\"k\":\"alpha\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"e\":\"b\",\"s\":\"x\",\"k\":\"alpha\"}"
+   }
+  },
+  {
+   "schema": "tb_enum",
+   "tag": "prop-pool",
+   "argsJson": "{\"e\":5e-324,\"s\":\"x\",\"k\":\"alpha\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_enum\":\n  - e: must be equal to one of the allowed values\n\nReceived arguments:\n{\n  \"e\": 5e-324,\n  \"s\": \"x\",\n  \"k\": \"alpha\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_int",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_int\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_int",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_int\":\n  - i: must have required properties i\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_int",
+   "tag": "sample",
+   "argsJson": "{\"i\":10}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"i\":10}"
+   }
+  },
+  {
+   "schema": "tb_int",
+   "tag": "sample",
+   "argsJson": "{\"i\":42}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_int\":\n  - i: must be <= 10\n\nReceived arguments:\n{\n  \"i\": 42\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_arrays",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_arrays\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_arrays",
+   "tag": "sample",
+   "argsJson": "{\"nums\":[10,-1],\"bools\":[]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_arrays\":\n  - bools: must not have fewer than 1 items\n\nReceived arguments:\n{\n  \"nums\": [\n    10,\n    -1\n  ],\n  \"bools\": []\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_arrays",
+   "tag": "sample",
+   "argsJson": "{\"nums\":[0.5,2.25],\"bools\":[false],\"uniq\":[\"-45n\"]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"nums\":[0.5,2.25],\"bools\":[false],\"uniq\":[\"-45n\"]}"
+   }
+  },
+  {
+   "schema": "tb_arrays",
+   "tag": "prop-pool",
+   "argsJson": "{\"nums\":true,\"bools\":[true]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"nums\":[1],\"bools\":[true]}"
+   }
+  },
+  {
+   "schema": "tb_nested",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_nested\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_nested",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_nested\":\n  - cfg: must have required properties cfg\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_nested",
+   "tag": "sample",
+   "argsJson": "{\"cfg\":{\"depth\":42,\"name\":\"foo bar\",\"flags\":{\"x\":true}},\"list\":[{\"id\":0,\"tag\":\"src/main.ts\"}]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"cfg\":{\"depth\":42,\"name\":\"foo bar\",\"flags\":{\"x\":true}},\"list\":[{\"id\":0,\"tag\":\"src/main.ts\"}]}"
+   }
+  },
+  {
+   "schema": "tb_nested",
+   "tag": "prop-null",
+   "argsJson": "{\"cfg\":{\"depth\":42,\"name\":\"ls -la\"},\"list\":null}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"cfg\":{\"depth\":42,\"name\":\"ls -la\"}}"
+   }
+  },
+  {
+   "schema": "tb_tuple",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_tuple\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_tuple",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_tuple\":\n  - pair: must have required properties pair\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_tuple",
+   "tag": "sample",
+   "argsJson": "{\"pair\":[\"ls -la\",-1]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"pair\":[\"ls -la\",-1]}"
+   }
+  },
+  {
+   "schema": "tb_tuple",
+   "tag": "prop-pool",
+   "argsJson": "{\"pair\":3}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_tuple\":\n  - pair: must be array\n\nReceived arguments:\n{\n  \"pair\": 3\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_record",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_record\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_record",
+   "tag": "sample",
+   "argsJson": "{\"env\":{}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"env\":{}}"
+   }
+  },
+  {
+   "schema": "tb_record",
+   "tag": "prop-pool",
+   "argsJson": "{\"env\":{\"0\":\"z\",\"1\":\"y\",\"b\":2},\"counts\":{\"HOME\":1}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"env\":{\"0\":\"z\",\"1\":\"y\",\"b\":\"2\"},\"counts\":{\"HOME\":1}}"
+   }
+  },
+  {
+   "schema": "tb_record",
+   "tag": "prop-missing",
+   "argsJson": "{\"counts\":{\"HOME\":1}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_record\":\n  - env: must have required properties env\n\nReceived arguments:\n{\n  \"counts\": {\n    \"HOME\": 1\n  }\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_strict",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_strict\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_strict",
+   "tag": "sample",
+   "argsJson": "{\"a\":\"ls -la\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"ls -la\"}"
+   }
+  },
+  {
+   "schema": "tb_strict",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":1.5}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"1.5\"}"
+   }
+  },
+  {
+   "schema": "tb_strict",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":[[1]]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_strict\":\n  - a: must be string\n\nReceived arguments:\n{\n  \"a\": [\n    [\n      1\n    ]\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_strict_allreq",
+   "tag": "root",
+   "argsJson": "[]",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_strict_allreq\":\n  - root: must be object\n\nReceived arguments:\n[]",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_strict_allreq",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_strict_allreq\":\n  - a: must have required properties a, b\n  - extra: schema is false\n  - root: must not have additional properties\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_strict_allreq",
+   "tag": "sample",
+   "argsJson": "{\"a\":\"x\",\"b\":0}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"x\",\"b\":0}"
+   }
+  },
+  {
+   "schema": "tb_strict_allreq",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":1,\"b\":10}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"1\",\"b\":10}"
+   }
+  },
+  {
+   "schema": "tb_addl_schema",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_addl_schema\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_addl_schema",
+   "tag": "sample",
+   "argsJson": "{\"a\":\"foo bar\",\"b\":false}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"foo bar\",\"b\":false}"
+   }
+  },
+  {
+   "schema": "tb_addl_schema",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":1,\"b\":false}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"1\",\"b\":false}"
+   }
+  },
+  {
+   "schema": "tb_addl_schema",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":[1],\"b\":false}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_addl_schema\":\n  - a: must be string\n\nReceived arguments:\n{\n  \"a\": [\n    1\n  ],\n  \"b\": false\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_intersect_nested",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_intersect_nested\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_intersect_nested",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_intersect_nested\":\n  - both: must have required properties both\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_intersect_nested",
+   "tag": "sample",
+   "argsJson": "{\"both\":{\"a\":\"README.md\",\"b\":99.9}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"both\":{\"a\":\"README.md\",\"b\":99.9}}"
+   }
+  },
+  {
+   "schema": "tb_intersect_root",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_intersect_root\":\n  - root: must be object\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_intersect_root",
+   "tag": "sample",
+   "argsJson": "{\"a\":1,\"b\":true}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":1,\"b\":true}"
+   }
+  },
+  {
+   "schema": "tb_intersect_root",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":\"\\t7\\n\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":7}"
+   }
+  },
+  {
+   "schema": "tb_intersect_root",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":\"abc\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_intersect_root\":\n  - a: must be number\n\nReceived arguments:\n{\n  \"a\": \"abc\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_null",
+   "tag": "root",
+   "argsJson": "[]",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_null\":\n  - root: must be object\n\nReceived arguments:\n[]",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_null",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_null\":\n  - n: must have required properties n\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_null",
+   "tag": "sample",
+   "argsJson": "{\"n\":null}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"n\":null}"
+   }
+  },
+  {
+   "schema": "tb_null",
+   "tag": "prop-pool",
+   "argsJson": "{\"n\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_null\":\n  - n: must be null\n\nReceived arguments:\n{\n  \"n\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_strings",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_strings\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_strings",
+   "tag": "sample",
+   "argsJson": "{\"s\":\"ls -la\",\"f\":\"nope\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_strings\":\n  - s: must not have more than 5 characters\n  - f: must match format \"email\"\n\nReceived arguments:\n{\n  \"s\": \"ls -la\",\n  \"f\": \"nope\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_strings",
+   "tag": "sample",
+   "argsJson": "{\"s\":\"xx\",\"p\":\"trend\",\"f\":\"nope\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_strings\":\n  - f: must match format \"email\"\n\nReceived arguments:\n{\n  \"s\": \"xx\",\n  \"p\": \"trend\",\n  \"f\": \"nope\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_strings",
+   "tag": "prop-pool",
+   "argsJson": "{\"s\":false,\"p\":\"x y\",\"f\":\"a@b.co\",\"u\":\"123e4567-e89b-12d3-a456-426614174000\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_strings\":\n  - p: must match pattern \"^[a-z]+$\"\n\nReceived arguments:\n{\n  \"s\": false,\n  \"p\": \"x y\",\n  \"f\": \"a@b.co\",\n  \"u\": \"123e4567-e89b-12d3-a456-426614174000\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_any_unknown",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_any_unknown\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_any_unknown",
+   "tag": "sample",
+   "argsJson": "{\"a\":\"👍🏽\",\"u\":\"🇺🇸🇬🇧\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"👍🏽\",\"u\":\"🇺🇸🇬🇧\"}"
+   }
+  },
+  {
+   "schema": "tb_any_unknown",
+   "tag": "prop-missing",
+   "argsJson": "{\"u\":\"123e4567-e89b-12d3-a456-426614174000\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_any_unknown\":\n  - a: must have required properties a\n\nReceived arguments:\n{\n  \"u\": \"123e4567-e89b-12d3-a456-426614174000\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_union_objects",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_union_objects\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_union_objects",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_union_objects\":\n  - op: must have required properties op\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_union_objects",
+   "tag": "sample",
+   "argsJson": "{\"op\":{\"kind\":\"remove\",\"id\":\"foo bar\"}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"op\":{\"kind\":\"remove\",\"id\":\"foo bar\"}}"
+   }
+  },
+  {
+   "schema": "tb_union_objects",
+   "tag": "prop-pool",
+   "argsJson": "{\"op\":false}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_union_objects\":\n  - op: must be object\n  - op: must be object\n  - op: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"op\": false\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_opt_array_union",
+   "tag": "root",
+   "argsJson": "[]",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_opt_array_union\":\n  - root: must be object\n\nReceived arguments:\n[]",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_opt_array_union",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"extra\":1}"
+   }
+  },
+  {
+   "schema": "tb_opt_array_union",
+   "tag": "prop-pool",
+   "argsJson": "{\"items\":0}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"items\":[\"0\"]}"
+   }
+  },
+  {
+   "schema": "tb_opt_array_union",
+   "tag": "prop-pool",
+   "argsJson": "{\"items\":{\"r\":\"2\"}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_opt_array_union\":\n  - items: must be array\n  - items: must be string\n  - items: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"items\": {\n    \"r\": \"2\"\n  }\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_keys",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_keys\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_keys",
+   "tag": "sample",
+   "argsJson": "{\"0\":\"x\",\"1\":10}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"0\":\"x\",\"1\":10}"
+   }
+  },
+  {
+   "schema": "tb_keys",
+   "tag": "prop-pool",
+   "argsJson": "{\"0\":3,\"1\":10,\"a.b\":-1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"0\":\"3\",\"1\":10,\"a.b\":-1}"
+   }
+  },
+  {
+   "schema": "tb_keys",
+   "tag": "prop-pool",
+   "argsJson": "{\"0\":[1,\"2\",true,null],\"1\":10,\"a.b\":-1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_keys\":\n  - 0: must be string\n\nReceived arguments:\n{\n  \"0\": [\n    1,\n    \"2\",\n    true,\n    null\n  ],\n  \"1\": 10,\n  \"a.b\": -1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_bool_num",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_bool_num\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_bool_num",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_bool_num\":\n  - flag: must have required properties flag, count\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_bool_num",
+   "tag": "sample",
+   "argsJson": "{\"flag\":true,\"count\":0}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"flag\":true,\"count\":0}"
+   }
+  },
+  {
+   "schema": "tb_bool_num",
+   "tag": "prop-pool",
+   "argsJson": "{\"flag\":3,\"count\":10}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_bool_num\":\n  - flag: must be boolean\n\nReceived arguments:\n{\n  \"flag\": 3,\n  \"count\": 10\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_root_union",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_root_union\":\n  - root: must be object\n  - root: must be object\n  - root: must match a schema in anyOf\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_root_union",
+   "tag": "sample",
+   "argsJson": "{\"a\":\"ls -la\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"ls -la\"}"
+   }
+  },
+  {
+   "schema": "tb_root_union",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":0}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"0\"}"
+   }
+  },
+  {
+   "schema": "tb_root_union",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":[]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_root_union\":\n  - a: must be string\n  - b: must have required properties b\n  - root: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"a\": []\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_integer_array",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_integer_array\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_integer_array",
+   "tag": "sample",
+   "argsJson": "{\"ids\":[],\"grid\":[]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"ids\":[],\"grid\":[]}"
+   }
+  },
+  {
+   "schema": "tb_integer_array",
+   "tag": "prop-pool",
+   "argsJson": "{\"ids\":-1,\"grid\":[]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"ids\":[-1],\"grid\":[]}"
+   }
+  },
+  {
+   "schema": "tb_integer_array",
+   "tag": "prop-pool",
+   "argsJson": "{\"ids\":\"-Infinity\",\"grid\":[]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_integer_array\":\n  - ids.0: must be integer\n\nReceived arguments:\n{\n  \"ids\": \"-Infinity\",\n  \"grid\": []\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_literal_num_union",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_literal_num_union\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_literal_num_union",
+   "tag": "sample",
+   "argsJson": "{\"level\":2,\"on\":\"auto\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"level\":2,\"on\":\"auto\"}"
+   }
+  },
+  {
+   "schema": "tb_literal_num_union",
+   "tag": "prop-pool",
+   "argsJson": "{\"level\":123456789.123}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_literal_num_union\":\n  - level: must be equal to constant\n  - level: must be equal to constant\n  - level: must be equal to constant\n  - level: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"level\": 123456789.123\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_literal_num_union",
+   "tag": "prop-pool",
+   "argsJson": "{\"level\":\"-1\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_literal_num_union\":\n  - level: must be number\n  - level: must be equal to constant\n  - level: must be number\n  - level: must be equal to constant\n  - level: must be number\n  - level: must be equal to constant\n  - level: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"level\": \"-1\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_union_int_bool",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_union_int_bool\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_union_int_bool",
+   "tag": "sample",
+   "argsJson": "{\"v\":2}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"v\":2}"
+   }
+  },
+  {
+   "schema": "tb_union_int_bool",
+   "tag": "prop-pool",
+   "argsJson": "{\"v\":\"0\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"v\":0}"
+   }
+  },
+  {
+   "schema": "tb_union_int_bool",
+   "tag": "prop-pool",
+   "argsJson": "{\"v\":\"\\ud800\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_union_int_bool\":\n  - v: must be integer\n  - v: must be boolean\n  - v: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"v\": \"\\ud800\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_unsafe_obj",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_unsafe_obj\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_unsafe_obj",
+   "tag": "sample",
+   "argsJson": "{\"raw\":{\"n\":0},\"e\":\"high\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"raw\":{\"n\":0},\"e\":\"high\"}"
+   }
+  },
+  {
+   "schema": "tb_unsafe_obj",
+   "tag": "prop-pool",
+   "argsJson": "{\"raw\":{}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_unsafe_obj\":\n  - raw.n: must have required properties n\n\nReceived arguments:\n{\n  \"raw\": {}\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_unsafe_obj",
+   "tag": "prop-pool",
+   "argsJson": "{\"raw\":{\"n\":-1},\"e\":true}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_unsafe_obj\":\n  - e: must be equal to one of the allowed values\n\nReceived arguments:\n{\n  \"raw\": {\n    \"n\": -1\n  },\n  \"e\": true\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_record_num_keys",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_record_num_keys\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_record_num_keys",
+   "tag": "sample",
+   "argsJson": "{\"m\":{\"1\":\"true\"}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"m\":{\"1\":true}}"
+   }
+  },
+  {
+   "schema": "tb_record_num_keys",
+   "tag": "prop-pool",
+   "argsJson": "{\"m\":{\"name\":\"n\",\"child\":{\"name\":5}}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"m\":{\"name\":\"n\",\"child\":{\"name\":5}}}"
+   }
+  },
+  {
+   "schema": "tb_record_num_keys",
+   "tag": "prop-missing",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_record_num_keys\":\n  - m: must have required properties m\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_array_of_unions",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_array_of_unions\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_array_of_unions",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_array_of_unions\":\n  - vals: must have required properties vals\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_array_of_unions",
+   "tag": "sample",
+   "argsJson": "{\"vals\":[null]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"vals\":[null]}"
+   }
+  },
+  {
+   "schema": "tb_array_of_unions",
+   "tag": "prop-pool",
+   "argsJson": "{\"vals\":2}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"vals\":[2]}"
+   }
+  },
+  {
+   "schema": "tb_optional_objects",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_optional_objects\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_optional_objects",
+   "tag": "sample",
+   "argsJson": "{\"outer\":{\"inner\":{\"leaf\":0},\"s\":\"src/main.ts\"}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"outer\":{\"inner\":{\"leaf\":0},\"s\":\"src/main.ts\"}}"
+   }
+  },
+  {
+   "schema": "tb_optional_objects",
+   "tag": "prop-pool",
+   "argsJson": "{\"outer\":{\"kind\":\"add\",\"value\":\"5\"}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_optional_objects\":\n  - outer.s: must have required properties s\n\nReceived arguments:\n{\n  \"outer\": {\n    \"kind\": \"add\",\n    \"value\": \"5\"\n  }\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_optional_objects",
+   "tag": "prop-null",
+   "argsJson": "{\"outer\":null}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "tb_number_constraints",
+   "tag": "root",
+   "argsJson": "\"null\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_number_constraints\":\n  - root: must be object\n\nReceived arguments:\n\"null\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_number_constraints",
+   "tag": "sample",
+   "argsJson": "{\"pct\":10,\"step\":-3}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_number_constraints\":\n  - step: must be multiple of 5\n\nReceived arguments:\n{\n  \"pct\": 10,\n  \"step\": -3\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_number_constraints",
+   "tag": "sample",
+   "argsJson": "{\"pct\":-1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"tb_number_constraints\":\n  - pct: must be >= 0\n\nReceived arguments:\n{\n  \"pct\": -1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "tb_number_constraints",
+   "tag": "prop-pool",
+   "argsJson": "{\"pct\":1.5,\"step\":5}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"pct\":1.5,\"step\":5}"
+   }
+  },
+  {
+   "schema": "json_mcp_basic",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_mcp_basic\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_mcp_basic",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_mcp_basic\":\n  - query: must have required properties query\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_mcp_basic",
+   "tag": "sample",
+   "argsJson": "{\"query\":\"hello\",\"limit\":5,\"verbose\":false}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"query\":\"hello\",\"limit\":5,\"verbose\":false}"
+   }
+  },
+  {
+   "schema": "json_mcp_basic",
+   "tag": "prop-pool",
+   "argsJson": "{\"query\":-1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"query\":\"-1\"}"
+   }
+  },
+  {
+   "schema": "json_mcp_no_type",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_mcp_no_type\":\n  - x: must have required properties x\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_mcp_no_type",
+   "tag": "root",
+   "argsJson": "[{\"a\":1}]",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_mcp_no_type\":\n  - root: must be object\n\nReceived arguments:\n[\n  {\n    \"a\": 1\n  }\n]",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_mcp_no_type",
+   "tag": "sample",
+   "argsJson": "{\"x\":0,\"y\":\"x\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"x\":0,\"y\":\"x\"}"
+   }
+  },
+  {
+   "schema": "json_mcp_no_type",
+   "tag": "prop-pool",
+   "argsJson": "{\"x\":true}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"x\":1}"
+   }
+  },
+  {
+   "schema": "json_mcp_empty",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_mcp_empty\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_mcp_empty",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_type_arrays",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_type_arrays\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_type_arrays",
+   "tag": "sample",
+   "argsJson": "{\"a\":null,\"e\":[-1]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":null,\"e\":[-1]}"
+   }
+  },
+  {
+   "schema": "json_type_arrays",
+   "tag": "prop-pool",
+   "argsJson": "{\"c\":10,\"d\":null,\"e\":\"README.md\",\"f\":false,\"a\":0}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"c\":10,\"d\":null,\"e\":\"README.md\",\"f\":false,\"a\":\"0\"}"
+   }
+  },
+  {
+   "schema": "json_type_arrays",
+   "tag": "prop-pool",
+   "argsJson": "{\"c\":10,\"d\":null,\"e\":\"README.md\",\"f\":false,\"a\":[]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_type_arrays\":\n  - a: must be either string or null\n\nReceived arguments:\n{\n  \"c\": 10,\n  \"d\": null,\n  \"e\": \"README.md\",\n  \"f\": false,\n  \"a\": []\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_nullable_anyof",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_nullable_anyof\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_nullable_anyof",
+   "tag": "sample",
+   "argsJson": "{\"a\":0.5,\"c\":[]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":0.5,\"c\":[]}"
+   }
+  },
+  {
+   "schema": "json_nullable_anyof",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":\"1.5\",\"b\":7,\"c\":true}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":1.5,\"b\":7,\"c\":true}"
+   }
+  },
+  {
+   "schema": "json_nullable_anyof",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":\"-Infinity\",\"b\":7,\"c\":true}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_nullable_anyof\":\n  - a: must be number\n  - a: must be null\n  - a: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"a\": \"-Infinity\",\n  \"b\": 7,\n  \"c\": true\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_allof_root",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_allof_root\":\n  - root: must be object\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_allof_root",
+   "tag": "sample",
+   "argsJson": "{\"a\":-1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":-1}"
+   }
+  },
+  {
+   "schema": "json_allof_root",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":\"-1\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":-1}"
+   }
+  },
+  {
+   "schema": "json_allof_root",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":\"Infinity\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_allof_root\":\n  - a: must be number\n\nReceived arguments:\n{\n  \"a\": \"Infinity\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_allof_typed",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_allof_typed\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_allof_typed",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_allof_typed\":\n  - a: must have required properties a\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_allof_typed",
+   "tag": "sample",
+   "argsJson": "{\"a\":\"1e3\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_allof_typed\":\n  - a: must be integer\n\nReceived arguments:\n{\n  \"a\": \"1e3\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_allof_typed",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":-2.5,\"s\":\"hello\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_allof_typed\":\n  - a: must be integer\n  - a: must be >= 2\n\nReceived arguments:\n{\n  \"a\": -2.5,\n  \"s\": \"hello\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_not",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_not\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_not",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_not",
+   "tag": "sample",
+   "argsJson": "{\"a\":\"23:59:60Z\",\"b\":99.9}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_not\":\n  - a: must not be valid\n\nReceived arguments:\n{\n  \"a\": \"23:59:60Z\",\n  \"b\": 99.9\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_not",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":\" 42 \",\"b\":\"true\",\"c\":\"\\ud800\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_not\":\n  - a: must not be valid\n  - b: must be number\n  - c: must not be valid\n\nReceived arguments:\n{\n  \"a\": \" 42 \",\n  \"b\": \"true\",\n  \"c\": \"\\ud800\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_enum_const",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_enum_const\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_enum_const",
+   "tag": "sample",
+   "argsJson": "{\"color\":null,\"obj\":{\"x\":[1,2]},\"arr\":[1,2],\"s\":\"on\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"color\":null,\"obj\":{\"x\":[1,2]},\"arr\":[1,2],\"s\":\"on\"}"
+   }
+  },
+  {
+   "schema": "json_enum_const",
+   "tag": "prop-pool",
+   "argsJson": "{\"obj\":{\"x\":[1,2]},\"color\":-2.5}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_enum_const\":\n  - color: must be equal to one of the allowed values\n\nReceived arguments:\n{\n  \"obj\": {\n    \"x\": [\n      1,\n      2\n    ]\n  },\n  \"color\": -2.5\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_enum_const",
+   "tag": "prop-pool",
+   "argsJson": "{\"obj\":{\"x\":[1,2]},\"ver\":3}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_enum_const\":\n  - ver: must be equal to constant\n\nReceived arguments:\n{\n  \"obj\": {\n    \"x\": [\n      1,\n      2\n    ]\n  },\n  \"ver\": 3\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_numbers",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_numbers\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_numbers",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_numbers",
+   "tag": "sample",
+   "argsJson": "{\"n\":10,\"x\":99.9,\"m\":-1,\"i\":7,\"big\":1,\"tiny\":\"fe80::1%eth0\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_numbers\":\n  - n: must be <= 1\n  - x: must be < 10\n  - i: must be multiple of 3\n\nReceived arguments:\n{\n  \"n\": 10,\n  \"x\": 99.9,\n  \"m\": -1,\n  \"i\": 7,\n  \"big\": 1,\n  \"tiny\": \"fe80::1%eth0\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_numbers",
+   "tag": "sample",
+   "argsJson": "{\"x\":99.9,\"m\":2.25,\"big\":1,\"tiny\":-1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_numbers\":\n  - x: must be < 10\n  - m: must be multiple of 0.1\n  - tiny: must be >= 1e-7\n\nReceived arguments:\n{\n  \"x\": 99.9,\n  \"m\": 2.25,\n  \"big\": 1,\n  \"tiny\": -1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_strings",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_strings\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_strings",
+   "tag": "sample",
+   "argsJson": "{\"s\":\"hello\",\"dot\":\"ok\",\"uni\":\"Q\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_strings\":\n  - s: must not have more than 4 characters\n  - dot: must match pattern \"^.$\"\n\nReceived arguments:\n{\n  \"s\": \"hello\",\n  \"dot\": \"ok\",\n  \"uni\": \"Q\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_strings",
+   "tag": "sample",
+   "argsJson": "{\"s\":\"xx\",\"digits\":\"trend\",\"word\":\"123\",\"unanch\":\"NULL\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_strings\":\n  - digits: must match pattern \"^\\d+$\"\n  - word: must match pattern \"\\w+\\s\\w+\"\n  - unanch: must match pattern \"b\"\n\nReceived arguments:\n{\n  \"s\": \"xx\",\n  \"digits\": \"trend\",\n  \"word\": \"123\",\n  \"unanch\": \"NULL\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_strings",
+   "tag": "prop-pool",
+   "argsJson": "{\"s\":1.5,\"digits\":\"trend\",\"dot\":\"x y\",\"uni\":\"trend\",\"unanch\":{\"nested\":{\"deep\":[1,{\"e\":null}]}}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_strings\":\n  - digits: must match pattern \"^\\d+$\"\n  - dot: must match pattern \"^.$\"\n  - uni: must match pattern \"^\\p{Lu}\"\n\nReceived arguments:\n{\n  \"s\": 1.5,\n  \"digits\": \"trend\",\n  \"dot\": \"x y\",\n  \"uni\": \"trend\",\n  \"unanch\": {\n    \"nested\": {\n      \"deep\": [\n        1,\n        {\n          \"e\": null\n        }\n      ]\n    }\n  }\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_formats",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_formats\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_formats",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_formats",
+   "tag": "sample",
+   "argsJson": "{\"date\":\"true\",\"dt\":\"2024-13-01T00:00:00Z\",\"ip4\":\"123e4567-e89b-12d3-a456-426614174000\",\"uriref\":\" 42 \",\"email\":\"nope\",\"rjp\":\"0.0\",\"tpl\":\"PT\",\"custom\":\"a\",\"frag\":\"toolong-name\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_formats\":\n  - date: must match format \"date\"\n  - dt: must match format \"date-time\"\n  - ip4: must match format \"ipv4\"\n  - uriref: must match format \"uri-reference\"\n  - email: must match format \"email\"\n  - rjp: must match format \"relative-json-pointer\"\n  - frag: must match format \"json-pointer-uri-fragment\"\n\nReceived arguments:\n{\n  \"date\": \"true\",\n  \"dt\": \"2024-13-01T00:00:00Z\",\n  \"ip4\": \"123e4567-e89b-12d3-a456-426614174000\",\n  \"uriref\": \" 42 \",\n  \"email\": \"nope\",\n  \"rjp\": \"0.0\",\n  \"tpl\": \"PT\",\n  \"custom\": \"a\",\n  \"frag\": \"toolong-name\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_formats",
+   "tag": "sample",
+   "argsJson": "{\"date\":\"user@example.com\",\"time\":\"2024-01-02T03:04:05Z\",\"dt\":\"2024-01-02T03:04:05Z\",\"ip4\":\"false\",\"ip6\":\"https://example.com/a?b=c#d\",\"uri\":\"slow\",\"uriref\":\"0o17\",\"email\":\"a@b.co\",\"uuid\":\"123e4567-e89b-12d3-a456-426614174000\",\"jp\":\"12.50\",\"dur\":\"-0\",\"tpl\":\"red\",\"frag\":\"lo\\udc00ne\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_formats\":\n  - date: must match format \"date\"\n  - time: must match format \"time\"\n  - ip4: must match format \"ipv4\"\n  - ip6: must match format \"ipv6\"\n  - uri: must match format \"uri\"\n  - jp: must match format \"json-pointer\"\n  - dur: must match format \"duration\"\n  - frag: must match format \"json-pointer-uri-fragment\"\n\nReceived arguments:\n{\n  \"date\": \"user@example.com\",\n  \"time\": \"2024-01-02T03:04:05Z\",\n  \"dt\": \"2024-01-02T03:04:05Z\",\n  \"ip4\": \"false\",\n  \"ip6\": \"https://example.com/a?b=c#d\",\n  \"uri\": \"slow\",\n  \"uriref\": \"0o17\",\n  \"email\": \"a@b.co\",\n  \"uuid\": \"123e4567-e89b-12d3-a456-426614174000\",\n  \"jp\": \"12.50\",\n  \"dur\": \"-0\",\n  \"tpl\": \"red\",\n  \"frag\": \"lo\\udc00ne\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_arrays",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_arrays\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_arrays",
+   "tag": "sample",
+   "argsJson": "{\"list\":[10,1],\"uniq\":[],\"notuniq\":[[\"true\",\"0\"]],\"has\":[\" 42 \",\"toolong-name\"],\"zero\":[]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"list\":[10,1],\"uniq\":[],\"notuniq\":[[\"true\",\"0\"]],\"has\":[\" 42 \",\"toolong-name\"],\"zero\":[]}"
+   }
+  },
+  {
+   "schema": "json_arrays",
+   "tag": "sample",
+   "argsJson": "{\"list\":[],\"uniq\":[\".5\",\"1.5\",5e-324],\"few\":[],\"zero\":[[],\"  3  \"]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_arrays\":\n  - list: must not have fewer than 1 items\n  - few: must contain at least 1 valid item\n  - few: must contain at least 1 valid item\n\nReceived arguments:\n{\n  \"list\": [],\n  \"uniq\": [\n    \".5\",\n    \"1.5\",\n    5e-324\n  ],\n  \"few\": [],\n  \"zero\": [\n    [],\n    \"  3  \"\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_arrays",
+   "tag": "prop-pool",
+   "argsJson": "{\"list\":0,\"uniq\":[{\"nested\":{\"deep\":[1,{\"e\":null}]}},\"1e3\"],\"zero\":[\"9\",[1,1]]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_arrays\":\n  - list: must be array\n\nReceived arguments:\n{\n  \"list\": 0,\n  \"uniq\": [\n    {\n      \"nested\": {\n        \"deep\": [\n          1,\n          {\n            \"e\": null\n          }\n        ]\n      }\n    },\n    \"1e3\"\n  ],\n  \"zero\": [\n    \"9\",\n    [\n      1,\n      1\n    ]\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_tuples",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_tuples\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_tuples",
+   "tag": "sample",
+   "argsJson": "{\"pre\":[\"x\",99.9]}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"pre\":[\"x\",99.9]}"
+   }
+  },
+  {
+   "schema": "json_tuples",
+   "tag": "sample",
+   "argsJson": "{\"old\":[0,false],\"oldext\":[\"src/main.ts\"],\"none\":[{\"depth\":\"3\"},{\"depth\":\"3\"},\"0b101\"]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_tuples\":\n  - none.0: schema is false\n  - none.1: schema is false\n  - none.2: schema is false\n\nReceived arguments:\n{\n  \"old\": [\n    0,\n    false\n  ],\n  \"oldext\": [\n    \"src/main.ts\"\n  ],\n  \"none\": [\n    {\n      \"depth\": \"3\"\n    },\n    {\n      \"depth\": \"3\"\n    },\n    \"0b101\"\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_tuples",
+   "tag": "prop-pool",
+   "argsJson": "{\"pre\":2,\"none\":[\"fast\",[1,2],\"1e3\"]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_tuples\":\n  - pre: must be array\n  - none.0: schema is false\n  - none.1: schema is false\n  - none.2: schema is false\n\nReceived arguments:\n{\n  \"pre\": 2,\n  \"none\": [\n    \"fast\",\n    [\n      1,\n      2\n    ],\n    \"1e3\"\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_objects",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_objects\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_objects",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"extra\":1}"
+   }
+  },
+  {
+   "schema": "json_objects",
+   "tag": "sample",
+   "argsJson": "{\"b\":0.5,\"c\":\"-0x10\",\"n_count\":\"2\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"b\":0.5,\"c\":\"-0x10\",\"n_count\":2}"
+   }
+  },
+  {
+   "schema": "json_objects",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":null}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_objects\":\n  - root: must not have fewer than 1 properties\n\nReceived arguments:\n{\n  \"a\": null\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_dependencies",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_dependencies\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_dependencies",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_dependencies",
+   "tag": "sample",
+   "argsJson": "{\"a\":\"0.0\",\"c\":{\"oldText\":\"x\",\"newText\":\"y\"},\"x\":\"ABC\",\"y\":\"true\",\"w\":0}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_dependencies\":\n  - root: must have properties b, c when property a is present\n\nReceived arguments:\n{\n  \"a\": \"0.0\",\n  \"c\": {\n    \"oldText\": \"x\",\n    \"newText\": \"y\"\n  },\n  \"x\": \"ABC\",\n  \"y\": \"true\",\n  \"w\": 0\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_dependencies",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":1.5,\"c\":\".5\",\"z\":\"-0\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_dependencies\":\n  - w: must have required properties w\n  - root: must have properties b, c when property a is present\n\nReceived arguments:\n{\n  \"a\": 1.5,\n  \"c\": \".5\",\n  \"z\": \"-0\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_ref",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_ref\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_ref",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_ref\":\n  - p: must have required properties p\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_ref",
+   "tag": "sample",
+   "argsJson": "{\"p\":-3,\"tree\":{\"name\":\"foo bar\",\"child\":{\"name\":null}},\"opt\":2,\"f\":true,\"bad\":\"0\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_ref\":\n  - p: must be >= 0\n  - tree.child.name: must be string\n  - bad: schema is false\n\nReceived arguments:\n{\n  \"p\": -3,\n  \"tree\": {\n    \"name\": \"foo bar\",\n    \"child\": {\n      \"name\": null\n    }\n  },\n  \"opt\": 2,\n  \"f\": true,\n  \"bad\": \"0\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_ref",
+   "tag": "sample",
+   "argsJson": "{\"p\":5,\"tree\":{\"name\":\"src/main.ts\",\"child\":{\"name\":null}},\"opt\":-3,\"f\":false,\"self\":{}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_ref\":\n  - tree.child.name: must be string\n  - opt: must be >= 0\n\nReceived arguments:\n{\n  \"p\": 5,\n  \"tree\": {\n    \"name\": \"src/main.ts\",\n    \"child\": {\n      \"name\": null\n    }\n  },\n  \"opt\": -3,\n  \"f\": false,\n  \"self\": {}\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_if",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_if\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_if",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_if\":\n  - root: must match \"then\" schema\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_if",
+   "tag": "sample",
+   "argsJson": "{\"kind\":\"src/main.ts\",\"n\":\"123e4567-e89b-12d3-a456-426614174000\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"kind\":\"src/main.ts\",\"n\":\"123e4567-e89b-12d3-a456-426614174000\"}"
+   }
+  },
+  {
+   "schema": "json_if",
+   "tag": "prop-pool",
+   "argsJson": "{\"kind\":2,\"n\":\"１２\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"kind\":\"2\",\"n\":\"１２\"}"
+   }
+  },
+  {
+   "schema": "json_unevaluated",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_unevaluated\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_unevaluated",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_unevaluated",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":1.5}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"1.5\"}"
+   }
+  },
+  {
+   "schema": "json_unevaluated",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":[[1]]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_unevaluated\":\n  - a: must be string\n  - root: must not have unevaluated properties\n\nReceived arguments:\n{\n  \"a\": [\n    [\n      1\n    ]\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_unevaluated_items",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_unevaluated_items\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_unevaluated_items",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"extra\":1}"
+   }
+  },
+  {
+   "schema": "json_unevaluated_items",
+   "tag": "prop-pool",
+   "argsJson": "{\"t\":true}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_unevaluated_items\":\n  - t: must be array\n\nReceived arguments:\n{\n  \"t\": true\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_unevaluated_items",
+   "tag": "prop-pool",
+   "argsJson": "{\"t\":[{\"a\":1},{\"a\":1}]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_unevaluated_items\":\n  - t.0: must be string\n  - t: must not have unevaluated items\n\nReceived arguments:\n{\n  \"t\": [\n    {\n      \"a\": 1\n    },\n    {\n      \"a\": 1\n    }\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_bool_schemas",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_bool_schemas\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_bool_schemas",
+   "tag": "sample",
+   "argsJson": "{\"t\":\"http://x/{id}\",\"f\":\"ABC\",\"n\":-1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_bool_schemas\":\n  - f: schema is false\n\nReceived arguments:\n{\n  \"t\": \"http://x/{id}\",\n  \"f\": \"ABC\",\n  \"n\": -1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_bool_schemas",
+   "tag": "sample",
+   "argsJson": "{\"n\":1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"n\":1}"
+   }
+  },
+  {
+   "schema": "json_bool_schemas",
+   "tag": "prop-pool",
+   "argsJson": "{\"f\":{\"depth\":\"3\"},\"n\":\"-0x10\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_bool_schemas\":\n  - f: schema is false\n  - n: must be number\n\nReceived arguments:\n{\n  \"f\": {\n    \"depth\": \"3\"\n  },\n  \"n\": \"-0x10\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_required_only",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_required_only\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_required_only",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_required_only\":\n  - a: must have required properties a, b\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_proto_names",
+   "tag": "root",
+   "argsJson": "42",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_proto_names\":\n  - root: must be object\n\nReceived arguments:\n42",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_proto_names",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_proto_names\":\n  - toString: must be string\n  - hasOwnProperty: must be number\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_proto_names",
+   "tag": "sample",
+   "argsJson": "{\"constructor\":[0,-1],\"hasOwnProperty\":2.25}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_proto_names\":\n  - toString: must be string\n\nReceived arguments:\n{\n  \"constructor\": [\n    0,\n    -1\n  ],\n  \"hasOwnProperty\": 2.25\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_proto_names",
+   "tag": "sample",
+   "argsJson": "{\"toString\":\"hello\",\"hasOwnProperty\":0,\"normal\":false}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"toString\":\"hello\",\"hasOwnProperty\":0,\"normal\":false}"
+   }
+  },
+  {
+   "schema": "json_nested_deep",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_nested_deep\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_nested_deep",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_nested_deep\":\n  - level1: must have required properties level1\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_nested_deep",
+   "tag": "sample",
+   "argsJson": "{\"level1\":{\"level2\":[{\"id\":1,\"meta\":{\"ok\":null}},{\"id\":5,\"tags\":[null]},{\"id\":7,\"tags\":[null,null],\"meta\":{\"ok\":null}}]}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"level1\":{\"level2\":[{\"id\":1,\"meta\":{}},{\"id\":5,\"tags\":[\"\"]},{\"id\":7,\"tags\":[\"\",\"\"],\"meta\":{}}]}}"
+   }
+  },
+  {
+   "schema": "json_many_errors",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_many_errors\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_many_errors",
+   "tag": "sample",
+   "argsJson": "{\"a\":5,\"b\":42,\"c\":5,\"d\":2,\"e\":1,\"f\":2,\"g\":0,\"h\":0,\"i\":7,\"j\":42,\"k\":10,\"l\":0}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":5,\"b\":42,\"c\":5,\"d\":2,\"e\":1,\"f\":2,\"g\":0,\"h\":0,\"i\":7,\"j\":42,\"k\":10,\"l\":0}"
+   }
+  },
+  {
+   "schema": "json_many_errors",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":1.5,\"b\":10,\"c\":0,\"d\":2,\"e\":1,\"f\":5,\"g\":0,\"h\":0,\"i\":1,\"j\":7,\"k\":5,\"l\":5}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_many_errors\":\n  - a: must be integer\n\nReceived arguments:\n{\n  \"a\": 1.5,\n  \"b\": 10,\n  \"c\": 0,\n  \"d\": 2,\n  \"e\": 1,\n  \"f\": 5,\n  \"g\": 0,\n  \"h\": 0,\n  \"i\": 1,\n  \"j\": 7,\n  \"k\": 5,\n  \"l\": 5\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_many_errors",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":\"1e3\",\"b\":10,\"c\":0,\"d\":2,\"e\":1,\"f\":5,\"g\":0,\"h\":0,\"i\":1,\"j\":7,\"k\":5,\"l\":5}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":1000,\"b\":10,\"c\":0,\"d\":2,\"e\":1,\"f\":5,\"g\":0,\"h\":0,\"i\":1,\"j\":7,\"k\":5,\"l\":5}"
+   }
+  },
+  {
+   "schema": "json_keys_order",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_keys_order\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_keys_order",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_keys_order\":\n  - b: must have required properties b, 10, a\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_keys_order",
+   "tag": "sample",
+   "argsJson": "{\"1\":null,\"10\":10,\"b\":true,\"a\":0}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"1\":null,\"10\":10,\"b\":true,\"a\":0}"
+   }
+  },
+  {
+   "schema": "json_keys_order",
+   "tag": "prop-pool",
+   "argsJson": "{\"1\":2,\"10\":0.5,\"b\":true,\"a\":-3}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_keys_order\":\n  - 1: must be null\n\nReceived arguments:\n{\n  \"1\": 2,\n  \"10\": 0.5,\n  \"b\": true,\n  \"a\": -3\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_weird_keys",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_weird_keys\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_weird_keys",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_weird_keys\":\n  - a/b: must have required properties a/b\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_weird_keys",
+   "tag": "sample",
+   "argsJson": "{\"a/b\":99.9,\"\":\"hello\",\"a.b\":false,\"x y\":1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a/b\":99.9,\"\":\"hello\",\"a.b\":false,\"x y\":1}"
+   }
+  },
+  {
+   "schema": "json_weird_keys",
+   "tag": "prop-pool",
+   "argsJson": "{\"a/b\":\"1\",\"~0\":0.5}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a/b\":1,\"~0\":0.5}"
+   }
+  },
+  {
+   "schema": "json_items_tuple_coerce",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_items_tuple_coerce\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_items_tuple_coerce",
+   "tag": "sample",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_items_tuple_coerce",
+   "tag": "prop-pool",
+   "argsJson": "{\"list\":3}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_items_tuple_coerce\":\n  - list: must be array\n\nReceived arguments:\n{\n  \"list\": 3\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_items_tuple_coerce",
+   "tag": "prop-pool",
+   "argsJson": "{\"list\":[1,\"2\",true,null]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_items_tuple_coerce\":\n  - list.1: must be boolean\n  - list.2: must be null\n\nReceived arguments:\n{\n  \"list\": [\n    1,\n    \"2\",\n    true,\n    null\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_anyof",
+   "tag": "sample",
+   "argsJson": "{\"a\":1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":1}"
+   }
+  },
+  {
+   "schema": "json_root_anyof",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":true}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":1}"
+   }
+  },
+  {
+   "schema": "json_root_anyof",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":\" \"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_anyof\":\n  - a: must be number\n  - b: must have required properties b\n  - root: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"a\": \" \"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_anyof",
+   "tag": "prop-missing",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_anyof\":\n  - a: must have required properties a\n  - b: must have required properties b\n  - root: must match a schema in anyOf\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_oneof",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_oneof\":\n  - root: must be object\n  - root: must be object\n  - root: must match exactly one schema in oneOf\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_oneof",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_oneof\":\n  - kind: must have required properties kind, n\n  - kind: must have required properties kind\n  - root: must match exactly one schema in oneOf\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_oneof",
+   "tag": "sample",
+   "argsJson": "{\"kind\":\"a\",\"n\":7}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"kind\":\"a\",\"n\":7}"
+   }
+  },
+  {
+   "schema": "json_root_oneof",
+   "tag": "prop-pool",
+   "argsJson": "{\"kind\":2,\"n\":5}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_oneof\":\n  - kind: must be equal to constant\n  - kind: must be equal to constant\n  - root: must match exactly one schema in oneOf\n\nReceived arguments:\n{\n  \"kind\": 2,\n  \"n\": 5\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_string",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": true,
+    "resultJson": "\"string\""
+   }
+  },
+  {
+   "schema": "json_root_string",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": true,
+    "resultJson": "\"true\""
+   }
+  },
+  {
+   "schema": "json_root_string",
+   "tag": "extra",
+   "argsJson": "{\"2\":\"two\",\"10\":1,\"extra\":\"x\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_string\":\n  - root: must be string\n\nReceived arguments:\n{\n  \"2\": \"two\",\n  \"10\": 1,\n  \"extra\": \"x\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_number",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_number\":\n  - root: must be number\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_number",
+   "tag": "root",
+   "argsJson": "false",
+   "expected": {
+    "ok": true,
+    "resultJson": "false"
+   }
+  },
+  {
+   "schema": "json_root_number",
+   "tag": "sample",
+   "argsJson": "0",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_number\":\n  - root: must be >= 3\n\nReceived arguments:\n0",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_nullable_obj",
+   "tag": "root",
+   "argsJson": "[1,2]",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_nullable_obj\":\n  - root: must be either object or null\n\nReceived arguments:\n[\n  1,\n  2\n]",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_nullable_obj",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_nullable_obj\":\n  - a: must have required properties a\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_nullable_obj",
+   "tag": "root",
+   "argsJson": "0",
+   "expected": {
+    "ok": true,
+    "resultJson": "null"
+   }
+  },
+  {
+   "schema": "json_root_nullable_obj",
+   "tag": "sample",
+   "argsJson": "{\"a\":-1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":-1}"
+   }
+  },
+  {
+   "schema": "json_multi_type",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_multi_type",
+   "tag": "prop-pool",
+   "argsJson": "{\"s\":0,\"n\":null,\"i\":\"README.md\",\"v\":\"1.5\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"s\":0,\"n\":null,\"i\":\"README.md\",\"v\":1.5}"
+   }
+  },
+  {
+   "schema": "json_multi_type",
+   "tag": "prop-pool",
+   "argsJson": "{\"s\":0,\"n\":null,\"i\":\"README.md\",\"v\":\"-Infinity\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_multi_type\":\n  - v: must be either number or boolean\n\nReceived arguments:\n{\n  \"s\": 0,\n  \"n\": null,\n  \"i\": \"README.md\",\n  \"v\": \"-Infinity\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_multi_type",
+   "tag": "prop-pool",
+   "argsJson": "{\"s\":0,\"n\":null,\"i\":\"README.md\",\"w\":\"-0x10\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_multi_type\":\n  - w: must be either boolean or number\n\nReceived arguments:\n{\n  \"s\": 0,\n  \"n\": null,\n  \"i\": \"README.md\",\n  \"w\": \"-0x10\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_oneof_objects",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_oneof_objects\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_oneof_objects",
+   "tag": "sample",
+   "argsJson": "{\"shape\":{\"w\":1,\"h\":99.9}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"shape\":{\"w\":1,\"h\":99.9}}"
+   }
+  },
+  {
+   "schema": "json_oneof_objects",
+   "tag": "prop-pool",
+   "argsJson": "{\"shape\":2}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_oneof_objects\":\n  - shape: must be object\n  - shape: must be object\n  - shape: must match exactly one schema in oneOf\n\nReceived arguments:\n{\n  \"shape\": 2\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_oneof_objects",
+   "tag": "prop-pool",
+   "argsJson": "{\"shape\":{}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_oneof_objects\":\n  - shape.r: must have required properties r\n  - shape.w: must have required properties w, h\n  - shape: must match exactly one schema in oneOf\n\nReceived arguments:\n{\n  \"shape\": {}\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_nullable_keyword",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_nullable_keyword\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_nullable_keyword",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_nullable_keyword\":\n  - a: must have required properties a\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_nullable_keyword",
+   "tag": "sample",
+   "argsJson": "{\"a\":\"foo bar\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"foo bar\"}"
+   }
+  },
+  {
+   "schema": "json_nullable_keyword",
+   "tag": "prop-pool",
+   "argsJson": "{\"a\":3,\"b\":10}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"a\":\"3\",\"b\":10}"
+   }
+  },
+  {
+   "schema": "json_additional_false_nested",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_additional_false_nested\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_additional_false_nested",
+   "tag": "sample",
+   "argsJson": "{\"opts\":{\"x\":10,\"y\":2.25}}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"opts\":{\"x\":10,\"y\":2.25}}"
+   }
+  },
+  {
+   "schema": "json_additional_false_nested",
+   "tag": "prop-pool",
+   "argsJson": "{\"opts\":1,\"more\":{\"x\":1}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_additional_false_nested\":\n  - opts: must be object\n  - more.y: must have required properties y\n\nReceived arguments:\n{\n  \"opts\": 1,\n  \"more\": {\n    \"x\": 1\n  }\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_additional_false_nested",
+   "tag": "prop-pool",
+   "argsJson": "{\"opts\":{\"w\":1,\"h\":2},\"more\":{\"x\":1}}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_additional_false_nested\":\n  - opts.x: must have required properties x, y\n  - opts.w: schema is false\n  - opts.h: schema is false\n  - opts: must not have additional properties\n  - more.y: must have required properties y\n\nReceived arguments:\n{\n  \"opts\": {\n    \"w\": 1,\n    \"h\": 2\n  },\n  \"more\": {\n    \"x\": 1\n  }\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_additional_false_root",
+   "tag": "root",
+   "argsJson": "[{\"a\":1}]",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_additional_false_root\":\n  - root: must be object\n\nReceived arguments:\n[\n  {\n    \"a\": 1\n  }\n]",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_additional_false_root",
+   "tag": "sample",
+   "argsJson": "{\"cmd\":\"ls -la\",\"n\":99.9}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"cmd\":\"ls -la\",\"n\":99.9}"
+   }
+  },
+  {
+   "schema": "json_additional_false_root",
+   "tag": "prop-pool",
+   "argsJson": "{\"cmd\":false,\"n\":99.9}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"cmd\":\"false\",\"n\":99.9}"
+   }
+  },
+  {
+   "schema": "json_additional_false_root",
+   "tag": "prop-pool",
+   "argsJson": "{\"cmd\":[{\"a\":1,\"b\":2},{\"b\":2,\"a\":1}],\"n\":99.9}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_additional_false_root\":\n  - cmd: must be string\n\nReceived arguments:\n{\n  \"cmd\": [\n    {\n      \"a\": 1,\n      \"b\": 2\n    },\n    {\n      \"b\": 2,\n      \"a\": 1\n    }\n  ],\n  \"n\": 99.9\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_anyof_coerce",
+   "tag": "root",
+   "argsJson": "null",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_anyof_coerce\":\n  - root: must be object\n\nReceived arguments:\nnull",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_anyof_coerce",
+   "tag": "sample",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_anyof_coerce",
+   "tag": "prop-pool",
+   "argsJson": "{\"w\":\"ls -la\",\"x\":\"hello\",\"v\":3}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_anyof_coerce\":\n  - w: must not have more than 3 characters\n  - w: must be number\n  - w: must match exactly one schema in oneOf\n\nReceived arguments:\n{\n  \"w\": \"ls -la\",\n  \"x\": \"hello\",\n  \"v\": 3\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_anyof_coerce",
+   "tag": "prop-pool",
+   "argsJson": "{\"w\":\"ls -la\",\"x\":\"hello\",\"v\":5e-324}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_anyof_coerce\":\n  - v: must be integer\n  - v: must be boolean\n  - v: must match a schema in anyOf\n  - w: must not have more than 3 characters\n  - w: must be number\n  - w: must match exactly one schema in oneOf\n\nReceived arguments:\n{\n  \"w\": \"ls -la\",\n  \"x\": \"hello\",\n  \"v\": 5e-324\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_null_type",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_null_type\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_null_type",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_null_type",
+   "tag": "prop-pool",
+   "argsJson": "{\"z\":-1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_null_type\":\n  - z: must be null\n\nReceived arguments:\n{\n  \"z\": -1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_null_type",
+   "tag": "prop-pool",
+   "argsJson": "{\"z\":null,\"zz\":3}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_null_type\":\n  - zz: must be either null\n\nReceived arguments:\n{\n  \"z\": null,\n  \"zz\": 3\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_additional_coerce",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_additional_coerce\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_additional_coerce",
+   "tag": "sample",
+   "argsJson": "{\"fixed\":\"src/main.ts\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"fixed\":\"src/main.ts\"}"
+   }
+  },
+  {
+   "schema": "json_additional_coerce",
+   "tag": "prop-pool",
+   "argsJson": "{\"fixed\":0}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"fixed\":\"0\"}"
+   }
+  },
+  {
+   "schema": "json_additional_coerce",
+   "tag": "prop-pool",
+   "argsJson": "{\"fixed\":[]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_additional_coerce\":\n  - fixed: must be string\n\nReceived arguments:\n{\n  \"fixed\": []\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_string_lengths_unicode",
+   "tag": "sample",
+   "argsJson": "{\"h\":\"ls -la\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"h\":\"ls -la\"}"
+   }
+  },
+  {
+   "schema": "json_string_lengths_unicode",
+   "tag": "prop-pool",
+   "argsJson": "{\"h\":\"README.md\",\"g\":-1}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"h\":\"README.md\",\"g\":\"-1\"}"
+   }
+  },
+  {
+   "schema": "json_string_lengths_unicode",
+   "tag": "prop-pool",
+   "argsJson": "{\"h\":\"README.md\",\"g\":9007199254740992}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_string_lengths_unicode\":\n  - g: must not have more than 2 characters\n\nReceived arguments:\n{\n  \"h\": \"README.md\",\n  \"g\": 9007199254740992\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_string_lengths_unicode",
+   "tag": "prop-pool",
+   "argsJson": "{\"h\":\"README.md\",\"g\":[1,2]}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_string_lengths_unicode\":\n  - g: must be string\n\nReceived arguments:\n{\n  \"h\": \"README.md\",\n  \"g\": [\n    1,\n    2\n  ]\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_nested_union_in_array",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_nested_union_in_array\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_nested_union_in_array",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_nested_union_in_array",
+   "tag": "prop-pool",
+   "argsJson": "{\"rows\":1.5}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_nested_union_in_array\":\n  - rows: must be array\n\nReceived arguments:\n{\n  \"rows\": 1.5\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_nested_union_in_array",
+   "tag": "prop-null",
+   "argsJson": "{\"rows\":null}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_root_anyof_array",
+   "tag": "root",
+   "argsJson": "[]",
+   "expected": {
+    "ok": true,
+    "resultJson": "[]"
+   }
+  },
+  {
+   "schema": "json_root_anyof_array",
+   "tag": "root",
+   "argsJson": "0",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_anyof_array\":\n  - root: must be array\n  - root: must be object\n  - root: must match a schema in anyOf\n\nReceived arguments:\n0",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_root_anyof_array",
+   "tag": "prop-pool",
+   "argsJson": "{\"n\":\"-1\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"n\":-1}"
+   }
+  },
+  {
+   "schema": "json_root_anyof_array",
+   "tag": "prop-pool",
+   "argsJson": "{\"n\":\"Infinity\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_root_anyof_array\":\n  - root: must be array\n  - n: must be number\n  - root: must match a schema in anyOf\n\nReceived arguments:\n{\n  \"n\": \"Infinity\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_self_ref",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Maximum call stack size exceeded",
+    "errorType": "RangeError"
+   }
+  },
+  {
+   "schema": "json_anchor_ref",
+   "tag": "root",
+   "argsJson": "\"string\"",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_anchor_ref\":\n  - root: must be object\n\nReceived arguments:\n\"string\"",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_anchor_ref",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "json_anchor_ref",
+   "tag": "sample",
+   "argsJson": "{\"p\":\"abc def\",\"q\":\"\",\"s\":\"abc\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_anchor_ref\":\n  - p: must be integer\n  - q: must be integer\n  - s: must be object\n\nReceived arguments:\n{\n  \"p\": \"abc def\",\n  \"q\": \"\",\n  \"s\": \"abc\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_anchor_ref",
+   "tag": "sample",
+   "argsJson": "{\"p\":\"é\",\"q\":{},\"r\":\"bad@\"}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_anchor_ref\":\n  - p: must be integer\n  - q: must be integer\n  - r: schema is false\n\nReceived arguments:\n{\n  \"p\": \"é\",\n  \"q\": {},\n  \"r\": \"bad@\"\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_codemode_like",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_codemode_like\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_codemode_like",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"json_codemode_like\":\n  - code: must have required properties code\n\nReceived arguments:\n{}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "json_codemode_like",
+   "tag": "sample",
+   "argsJson": "{\"code\":\"x\",\"dryRun\":true}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"code\":\"x\",\"dryRun\":true}"
+   }
+  },
+  {
+   "schema": "json_codemode_like",
+   "tag": "prop-pool",
+   "argsJson": "{\"code\":true,\"dryRun\":false}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"code\":\"true\",\"dryRun\":false}"
+   }
+  },
+  {
+   "schema": "legacy_basic",
+   "tag": "root",
+   "argsJson": "[1,2]",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"legacy_basic\":\n  - root: must be object\n\nReceived arguments:\n[\n  1,\n  2\n]",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "legacy_basic",
+   "tag": "root",
+   "argsJson": "{\"extra\":1}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"legacy_basic\":\n  - n: must have required properties n\n\nReceived arguments:\n{\n  \"extra\": 1\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "legacy_basic",
+   "tag": "sample",
+   "argsJson": "{\"n\":0,\"b\":true,\"s\":\"x\"}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{\"n\":0,\"b\":true,\"s\":\"x\"}"
+   }
+  },
+  {
+   "schema": "legacy_basic",
+   "tag": "prop-pool",
+   "argsJson": "{\"n\":false,\"b\":false}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"legacy_basic\":\n  - n: must be number\n\nReceived arguments:\n{\n  \"n\": false,\n  \"b\": false\n}",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "legacy_nested",
+   "tag": "root",
+   "argsJson": "true",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"legacy_nested\":\n  - root: must be object\n\nReceived arguments:\ntrue",
+    "errorType": "Error"
+   }
+  },
+  {
+   "schema": "legacy_nested",
+   "tag": "root",
+   "argsJson": "{}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "legacy_nested",
+   "tag": "prop-pool",
+   "argsJson": "{\"o\":null}",
+   "expected": {
+    "ok": true,
+    "resultJson": "{}"
+   }
+  },
+  {
+   "schema": "legacy_nested",
+   "tag": "prop-pool",
+   "argsJson": "{\"o\":{},\"a\":2}",
+   "expected": {
+    "ok": false,
+    "error": "Validation failed for tool \"legacy_nested\":\n  - a: must be array\n\nReceived arguments:\n{\n  \"o\": {},\n  \"a\": 2\n}",
+    "errorType": "Error"
+   }
+  }
+ ]
+}

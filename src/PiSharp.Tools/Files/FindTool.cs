@@ -18,7 +18,7 @@ public sealed class FindTool
     private readonly IFileOperations _files;
     private readonly PathResolver _paths;
     public IPreparedToolAdapter Adapter { get; }
-    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"find","description":"Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).","parameters":{"type":"object","properties":{"pattern":{"type":"string","description":"Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'"},"path":{"type":"string","description":"Directory to search in (default: current directory)"},"limit":{"type":"number","description":"Maximum number of results (default: 1000)"}},"required":["pattern"]}}""");
+    public JsonData Declaration { get; } = JsonData.Parse("""{"name":"find","description":"Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to 1000 results or 50KB (whichever is hit first).","parameters":{"type":"object","required":["pattern"],"properties":{"pattern":{"type":"string","description":"Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'"},"path":{"type":"string","description":"Directory to search in (default: current directory)"},"limit":{"type":"number","description":"Maximum number of results (default: 1000)"}}}}""");
 
     public FindTool(string workingDirectory, string homeDirectory, IFindExecutor executor, IFileOperations? files = null)
     {
@@ -54,8 +54,10 @@ public sealed class FindTool
             throw new ArgumentException("Unsupported find glob pattern.");
         return new(pattern, path.Length == 0 ? "." : path, limit);
     }
-    private sealed class SearchAdapter(FindTool owner) : IPreparedToolAdapter
+    private sealed class SearchAdapter(FindTool owner) : IToolArgumentSchemaAdapter
     {
+        /// <summary>Source TypeBox parameters, checked by validateToolArguments before the tool runs.</summary>
+        public ToolArgumentSchema? ArgumentSchema => ToolArgumentSchema.FromDeclaration(owner.Declaration, ToolSchemaOrigin.TypeBox);
         public string Name => "find";
         public async ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token)
         {

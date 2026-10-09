@@ -37,15 +37,23 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Models/*.json" LogicalName="PiSharp.Cli.Models.%(Filename)%(Extension)" />
+    <!-- The highlight.js 10.7.3 grammars (tools/HljsGrammars/extract-grammars.mjs), read by HljsGrammarData. -->
+    <EmbeddedResource Include="Interactive/Mode/Theme/Highlight/hljs-grammars.json.gz" LogicalName="PiSharp.Cli.Hljs.grammars.json.gz" />
   </ItemGroup>
   <ItemGroup>
     <!-- The read tool's SkiaSharp image codec (owner decision 0004) and its native Skia components. -->
     <None Include="../../third-party/SkiaSharp.LICENSE.txt" Link="licenses/SkiaSharp.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <None Include="../../third-party/SkiaSharp.THIRD-PARTY-NOTICES.txt" Link="licenses/SkiaSharp.THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <!-- The interactive syntax highlighter ports highlight.js 10.7.3 (BSD-3-Clause). -->
+    <None Include="../../third-party/highlight.js.LICENSE.txt" Link="licenses/highlight.js.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <!-- The interactive Mermaid renderer ports grok-mermaid 0.2.3 (Apache-2.0). -->
+    <None Include="../../third-party/google-auth-library.LICENSE.txt" Link="licenses/google-auth-library.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <None Include="../../third-party/grok-mermaid.LICENSE.txt" Link="licenses/grok-mermaid.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
   <ItemGroup Condition="'$(EnablePromptTemplateYaml)' == 'true'">
     <None Include="../../third-party/YamlDotNet.LICENSE.txt" Link="licenses/YamlDotNet.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <!-- The codemode tool's description names this reference (CodemodeToolDefinition.DocsPath). -->
+    <None Include="Interactive/Mode/Assets/*.png" Link="assets/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <None Include="docs/codemode.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <!-- What's New and /changelog read CHANGELOG.md next to the executable (built from website/src/content/changelog). -->
     <None Include="../../CHANGELOG.md" Link="CHANGELOG.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />

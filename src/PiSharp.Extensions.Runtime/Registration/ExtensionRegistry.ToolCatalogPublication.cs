@@ -59,7 +59,8 @@ public sealed partial class ExtensionRegistry
                     descriptor.PrepareLoadout?.GetInvocationList().Length > 1 || !Enum.IsDefined(descriptor.Exposure) ||
                     descriptor.Namespace is { } grouping && (!RegistrationPolicy.Description(grouping.Name, options) ||
                         grouping.Description is not null && !RegistrationPolicy.Description(grouping.Description, options)) ||
-                    !RegistrationPolicy.Json(descriptor.Parameters, options, requireObject: true))
+                    !RegistrationPolicy.Json(descriptor.Parameters, options, requireObject: true) || !Enum.IsDefined(descriptor.ParametersOrigin) ||
+                    descriptor.ValidationParameters is { } validation && !RegistrationPolicy.Json(validation, options, requireObject: true))
                     throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, scope.OwnerId, operation);
                 if (staged.ContainsId(descriptor.RegistrationId))
                     throw Failure(ExtensionRegistrationFailure.DuplicateRegistrationId, scope.OwnerId, operation);
@@ -80,7 +81,7 @@ public sealed partial class ExtensionRegistry
             }
             var futureEntries = ownerOrder.Where(owner => owner.State == RegistrationScopeState.Active)
                 .SelectMany(owner => ReferenceEquals(owner, scope) ? staged.Entries : owner.Staged.Entries).ToImmutableArray();
-            var preview = new ExtensionRegistrySnapshot(identity, checked(revision + 1), futureEntries);
+            var preview = new ExtensionRegistrySnapshot(identity, checked(revision + 1), futureEntries, CommandInvocationNames(futureEntries));
             var plan = new ToolCatalogReplacementPlan(this, scope, expectedSnapshot, old, added.MoveToImmutable(),
                 staged, preview, addedCharacters);
             plan.ValidateCharges();

@@ -9,6 +9,14 @@ namespace PiSharp.Cli.Pi;
 /// escaped, so files Pi writes and files PiSharp writes have the same bytes. <paramref name="indent"/> is <c>JSON.stringify(x, null, 2)</c>.</summary>
 internal static class PiJson
 {
+    /// <summary><c>JSON.parse</c>: a malformed text throws a <see cref="JsonException"/> carrying V8's SyntaxError message, the
+    /// text Pi interpolates into its "Failed to ..." and "Invalid settings file ..." errors.</summary>
+    internal static JsonNode? Parse(string text, int maximumDepth = 256)
+    {
+        try { return JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { MaxDepth = maximumDepth }); }
+        catch (JsonException error) { throw new JsonException(PiSharp.Contracts.Compatibility.JsJsonSyntax.Describe(text, error.Message), error); }
+    }
+
     internal static string Stringify(JsonNode? node, bool indent = false)
     {
         var builder = new StringBuilder();

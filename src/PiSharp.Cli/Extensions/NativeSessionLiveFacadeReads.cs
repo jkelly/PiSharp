@@ -51,5 +51,6 @@ internal sealed class NativeSessionLiveFacadeReads(Func<ReplaceableAgentSession?
         return !queues.SteeringMessages.IsEmpty || !queues.FollowUpMessages.IsEmpty || !captured.State.Agent.PendingInputs.IsEmpty;
     }
     public string GetSystemPrompt(IExtensionContext context)
-        => new SessionSystemReplay().Replay(Capture(context).State.Agent.Messages, context.OperationCancellationToken).Prompt;
+        // agent-session.ts systemPrompt: the prompt of the in-memory loadout (a selection or catalog change since the last request).
+        => Capture(context).Attached.Session.GetSystemPrompt(context.OperationCancellationToken);
 }

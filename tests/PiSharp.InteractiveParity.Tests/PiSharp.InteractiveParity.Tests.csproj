@@ -3,4 +3,10 @@
   <ItemGroup>
     <ProjectReference Include="../../src/PiSharp.Cli/PiSharp.Cli.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- grok-mermaid goldens produced by the original library (tools/GrokMermaid/gen-goldens.mjs). -->
+    <None Include="Mermaid/*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- highlight.js corpus and goldens produced by the original library (tools/HljsGrammars/generate-goldens.mjs). -->
+    <None Include="Highlight/*.json.gz" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

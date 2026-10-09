@@ -2,16 +2,18 @@
 using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using PiSharp.Agent;
 using PiSharp.Agent.Tools;
 using PiSharp.Contracts;
 
 namespace PiSharp.Tools.Files;
 
-/// <summary>Memory bounds for the edit tool. Pi has no size limits; the defaults are the largest admitted values. The display
+/// <summary>Memory bounds for the edit tool. Pi has no size or replacement-count limits; the defaults are the largest admitted values
+/// (the number of edits is bounded only by the argument size). The display
 /// diff is bounded separately: an edit whose diff exceeds <see cref="DiffOptions"/> still succeeds, with the diff omitted.</summary>
 public sealed record EditToolOptions(int MaximumInputBytes = 64 * 1024 * 1024, int MaximumOutputBytes = 64 * 1024 * 1024,
-    int MaximumArgumentCharacters = 8 * 1024 * 1024, int MaximumPathCharacters = 4096, int MaximumEdits = 1024,
+    int MaximumArgumentCharacters = 8 * 1024 * 1024, int MaximumPathCharacters = 4096, int MaximumEdits = int.MaxValue,
     DiffFormatterOptions? DiffOptions = null)
 {
     /// <summary>The diff bounds used when <see cref="DiffOptions"/> is absent.</summary>
@@ -20,7 +22,7 @@ public sealed record EditToolOptions(int MaximumInputBytes = 64 * 1024 * 1024, i
 }
 
 /// <summary>Prepared edit adapter. Hosts share its required mutation queue with all coordinated writers and route it through policy.</summary>
-public sealed class EditTool : IPreparedToolAdapter
+public sealed class EditTool : IToolArgumentSchemaAdapter, IInitialToolArgumentPreparationAdapter
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly IFileOperations _operations;
@@ -31,6 +33,8 @@ public sealed class EditTool : IPreparedToolAdapter
     private readonly DiffFormatterOptions _diffOptions;
     public string Name => "edit";
     public JsonData Declaration { get; }
+    /// <summary>Source editSchema (TypeBox), checked by validateToolArguments after prepareEditArguments.</summary>
+    public ToolArgumentSchema? ArgumentSchema { get; } = ToolArgumentSchema.FromDeclaration(SourceDeclaration, ToolSchemaOrigin.TypeBox);
     public FileMutationQueueSnapshot MutationSnapshot => _mutations.Snapshot;
 
     public EditTool(string workingDirectory, string homeDirectory, FileMutationQueue mutationQueue,
@@ -39,7 +43,7 @@ public sealed class EditTool : IPreparedToolAdapter
         ArgumentNullException.ThrowIfNull(mutationQueue);
         _options = options ?? new(); _diffOptions = _options.DiffOptions ?? EditToolOptions.DefaultDiffOptions;
         if (_options.MaximumInputBytes is < 1 or > 64 * 1024 * 1024 || _options.MaximumOutputBytes is < 1 or > 64 * 1024 * 1024 ||
-            _options.MaximumArgumentCharacters is < 1 or > 8 * 1024 * 1024 || _options.MaximumPathCharacters is < 1 or > 65_536 || _options.MaximumEdits is < 1 or > 1024 ||
+            _options.MaximumArgumentCharacters is < 1 or > 8 * 1024 * 1024 || _options.MaximumPathCharacters is < 1 or > 65_536 || _options.MaximumEdits < 1 ||
             _diffOptions.MaximumOutputCharacters is < 1 or > 1_048_576)
             throw new ArgumentOutOfRangeException(nameof(options));
         DiffFormatter.ValidateOptions(_diffOptions);
@@ -50,7 +54,7 @@ public sealed class EditTool : IPreparedToolAdapter
     }
 
     /// <summary>Source createEditToolDefinition name, description, TypeBox parameters and constrainedSampling.</summary>
-    public static JsonData SourceDeclaration { get; } = JsonData.Parse("""{"name":"edit","description":"Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to edit (relative or absolute)"},"edits":{"type":"array","items":{"type":"object","properties":{"oldText":{"type":"string","description":"Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."},"newText":{"type":"string","description":"Replacement text for this targeted edit."}},"required":["oldText","newText"]},"description":"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."}},"required":["path","edits"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""");
+    public static JsonData SourceDeclaration { get; } = JsonData.Parse("""{"name":"edit","description":"Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.","parameters":{"type":"object","required":["path","edits"],"properties":{"path":{"type":"string","description":"Path to the file to edit (relative or absolute)"},"edits":{"type":"array","items":{"type":"object","required":["oldText","newText"],"properties":{"oldText":{"type":"string","description":"Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call."},"newText":{"type":"string","description":"Replacement text for this targeted edit."}}},"description":"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead."}}},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""");
 
     public ToolInvoker CreateInvoker(IToolActionPolicy policy, IEnumerable<ToolActionTransform>? transforms = null,
         IEnumerable<ToolResultTransform>? resultTransforms = null) => new([this], policy, transforms, resultTransforms,
@@ -59,9 +63,51 @@ public sealed class EditTool : IPreparedToolAdapter
                 MaximumResultCharacters: checked(_diffOptions.MaximumOutputCharacters * 12 + _options.MaximumPathCharacters * 6 + 1024)));
     public ToolDefinition CreateDefinition(ToolInvoker invoker) => new(Name, invoker ?? throw new ArgumentNullException(nameof(invoker)));
 
+    /// <summary>Source prepareArguments (prepareEditArguments), run before validateToolArguments checks the schema.</summary>
+    public ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(PrepareEditArguments(invocation.Call.Arguments));
+    }
+
+    /// <summary>Source prepareEditArguments: edits sent as a JSON string or as a single edit object become an edits array, and a
+    /// legacy top-level oldText/newText pair is appended to the edits.</summary>
+    public static JsonData PrepareEditArguments(JsonData arguments)
+    {
+        if (arguments is null || arguments.Value.ValueKind != JsonValueKind.Object) return arguments!;
+        JsonObject args;
+        try { args = JsonNode.Parse(arguments.ToString())!.AsObject(); }
+        catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException) { return arguments; }
+        var changed = false;
+        if (args["edits"] is JsonValue encoded && encoded.GetValueKind() == JsonValueKind.String)
+        {
+            try
+            {
+                var parsed = JsonNode.Parse(encoded.GetValue<string>());
+                if (parsed is JsonArray) { args["edits"] = parsed; changed = true; }
+                else if (IsSingleEdit(parsed)) { args["edits"] = new JsonArray(parsed); changed = true; }
+            }
+            catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException) { }
+        }
+        else if (IsSingleEdit(args["edits"])) { args["edits"] = new JsonArray(args["edits"]!.DeepClone()); changed = true; }
+        if (IsString(args["oldText"]) && IsString(args["newText"]))
+        {
+            var edits = args["edits"] is JsonArray existing ? existing.DeepClone().AsArray() : new JsonArray();
+            edits.Add(new JsonObject { ["oldText"] = args["oldText"]!.DeepClone(), ["newText"] = args["newText"]!.DeepClone() });
+            args.Remove("oldText"); args.Remove("newText");
+            args["edits"] = edits; changed = true;
+        }
+        return changed ? JsonData.Parse(args.ToJsonString()) : arguments;
+
+        static bool IsString(JsonNode? value) => value is JsonValue text && text.GetValueKind() == JsonValueKind.String;
+        static bool IsSingleEdit(JsonNode? value) => value is JsonObject edit && IsString(edit["oldText"]) && IsString(edit["newText"]);
+    }
+
     public async ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token)
     {
         token.ThrowIfCancellationRequested(); var input = Parse(invocation.Call.Arguments, normalized: false);
+        // Source ops.access(path): Node rejects a path with a NUL byte.
+        if (input.Path.Contains('\0')) throw new ToolSourceErrorException(NodeArgumentErrors.NullBytePath(_paths.ResolveWithNul(input.Path)));
         var target = _paths.Absolute(await _operations.CanonicalizeAsync(_paths.Resolve(input.Path), token).ConfigureAwait(false));
         token.ThrowIfCancellationRequested();
         var arguments = JsonData.Parse(JsonSerializer.Serialize(new { path = target, displayPath = input.Path,
@@ -107,7 +153,13 @@ public sealed class EditTool : IPreparedToolAdapter
                         "EditAccessFailure", false, false);
                 }
                 operationToken.ThrowIfCancellationRequested();
-                var original = await ReadOwnedAsync(action.Target, operationToken).ConfigureAwait(false);
+                byte[] original;
+                try { original = await ReadOwnedAsync(action.Target, operationToken).ConfigureAwait(false); }
+                catch (Exception error) when (error is UnauthorizedAccessException or IOException && Directory.Exists(action.Target))
+                {
+                    // Source ops.readFile of a directory (an empty path is the working directory): Node's EISDIR error.
+                    return Failure(ToolFailureKind.ExecutionError, "EISDIR: illegal operation on a directory, read", "EditIsDirectory", false, false);
+                }
                 operationToken.ThrowIfCancellationRequested(); var text = DecodeText(original);
                 var plan = EditPlan.Create(text, input.Edits, input.DisplayPath,
                     new(MaximumCharacters: Math.Max(_options.MaximumInputBytes, _options.MaximumOutputBytes), MaximumEdits: _options.MaximumEdits));
@@ -150,10 +202,11 @@ public sealed class EditTool : IPreparedToolAdapter
             throw new ArgumentException("Invalid edit arguments.");
         var value = arguments.Value;
         foreach (var property in value.EnumerateObject())
-            if (property.Name is not ("path" or "edits") && !(normalized ? property.Name == "displayPath" : property.Name is "oldText" or "newText"))
+            // Source editSchema admits additional properties; execute reads only path and edits.
+            if (normalized && property.Name is not ("path" or "edits" or "displayPath"))
                 throw new ArgumentException("Unsupported edit argument.");
         var path = Text(value.GetProperty("path")); var display = normalized ? Text(value.GetProperty("displayPath")) : path;
-        if (path.Length == 0 || display.Length == 0 || path.Length > _options.MaximumPathCharacters || display.Length > _options.MaximumPathCharacters)
+        if (normalized && path.Length == 0 || path.Length > _options.MaximumPathCharacters || display.Length > _options.MaximumPathCharacters)
             throw new ArgumentException("Invalid edit path.");
         var edits = ImmutableArray.CreateBuilder<TextEdit>();
         var hasArray = false;
@@ -209,13 +262,10 @@ public sealed class EditTool : IPreparedToolAdapter
         token.ThrowIfCancellationRequested(); if (memory.Length > _options.MaximumInputBytes) throw new FileToolException(FileToolFailure.ResourceLimit);
         return memory.ToArray();
     }
-    /// <summary>Source buffer.toString("utf-8"). Control characters and NUL are ordinary text; a file that is not valid UTF-8
-    /// is refused, because writing the lossy decode back would replace its undecodable bytes (native data-loss guard).</summary>
-    private static string DecodeText(byte[] bytes)
-    {
-        try { return Utf8.GetString(bytes); }
-        catch (DecoderFallbackException) { throw new FileToolException(FileToolFailure.UnsupportedContent); }
-    }
+    /// <summary>Source buffer.toString("utf-8"): control characters and NUL are ordinary text, and each undecodable sequence becomes
+    /// U+FFFD (WHATWG maximal subparts, as Node decodes), so the edited file is written back as UTF-8 with those replacements.</summary>
+    internal static string DecodeText(byte[] bytes) => LossyUtf8.GetString(bytes);
+    private static readonly UTF8Encoding LossyUtf8 = new(false, false);
     private static ToolResult Failure(ToolFailureKind kind, string message, string code, bool writeAttempted, bool writeCompleted) =>
         new([new TextContent(message)], JsonData.Parse(JsonSerializer.Serialize(new { fileOperation = new { code, writeAttempted, writeCompleted } })), true, Failure: new(kind, message));
 }

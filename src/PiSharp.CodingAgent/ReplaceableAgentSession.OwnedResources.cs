@@ -24,7 +24,7 @@ public sealed partial class ReplaceableAgentSession
         lock (gate)
         {
             ValidateAttachment(attachment);
-            if (ownedResources.Count >= MaximumOwnedResources) throw new InvalidOperationException("Owned resource bound reached.");
+            if (ownedResources.Count >= ownedResourceLimit) throw new InvalidOperationException("Owned resource bound reached.");
             var lease = new OwnedResourceLease(this, attachment, closeBody, stopBody); ownedResources.Add(lease); return lease;
         }
     }

@@ -62,6 +62,7 @@ internal static partial class Program
         ("live.one-model-per-provider-against-fake-http", LiveEveryProvider),
         ("live.provider-api-routes-are-available-before-any-request", LiveUnsupported),
         ("live.models-json-custom-provider-headers-and-auth-header", LiveCustomProvider),
+        ("live.models-json-key-and-headers-for-anthropic-azure-and-mistral", LiveConfiguredHeaders),
         ("live.cli-patterns-fallback-thinking-and-ambiguity", LivePatterns),
         ("live.scoped-models-and-settings-defaults", LiveScoped),
         ("live.legacy-pinned-parse-still-exact", Sync(LiveLegacyParse)),
@@ -146,6 +147,31 @@ internal static partial class Program
         Check(classifier.Code == "UnknownLiveModel" && classifier.Message == "Unknown provider \"typesafe\". Use --list-models to see available providers/models.", classifier.Message);
     }
 
+    // provider-composer composeApiKeyAuth and model-runtime getAuth: a models.json apiKey authenticates a provider with nothing stored
+    // (anthropic included), and the configured provider and model headers reach every request (anthropic, azure and mistral included).
+    private static Task LiveConfiguredHeaders() => WithTemp("live-configured", async root =>
+    {
+        var models = Path.Combine(root, "models.json");
+        await File.WriteAllTextAsync(models, """
+            {"providers":{"anthropic":{"apiKey":"cfg-anthropic-key","headers":{"X-Proxy":"p1"}},"azure":{"headers":{"X-Az":"a1"}},"mistral":{"headers":{"X-Mi":"m1"}}}}
+            """);
+        var endpoint = new LiveEndpoint(_ => new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("""{"error":{"message":"refused"}}""") });
+        var runtime = new LiveSessionRuntime(Env(("AZURE_OPENAI_API_KEY", "az-key"), ("AZURE_OPENAI_BASE_URL", "https://az.invalid/openai/v1"), ("MISTRAL_API_KEY", "mi-key")),
+            () => endpoint, ModelsPath: models);
+        var anthropic = await new SettingsModelSelection("anthropic", LiveModelFor("anthropic"), null).ResolveAsync(null, runtime, null, false, CancellationToken.None);
+        var (authentication, handler, reresolve) = await anthropic.ResolveAnthropicAsync(runtime, CancellationToken.None);
+        await using (var connection = await anthropic.ConnectResolvedAnthropicAsync(authentication, handler, CancellationToken.None, reresolve))
+            await Drive(connection.CreateTransport(), anthropic.Model);
+        var sent = endpoint.Snapshot()[^1];
+        Equal("cfg-anthropic-key", sent.Headers["x-api-key"], "models.json apiKey for anthropic"); Equal("p1", sent.Headers["X-Proxy"], "anthropic provider header");
+        foreach (var (provider, header, value) in new[] { ("azure", "X-Az", "a1"), ("mistral", "X-Mi", "m1") })
+        {
+            var selection = await new SettingsModelSelection(provider, LiveModelFor(provider), null).ResolveAsync(null, runtime, null, false, CancellationToken.None);
+            using (var connection = selection.Connect(runtime)) await Drive(connection.CreateTransport(), selection.Model);
+            Equal(value, endpoint.Snapshot()[^1].Headers.GetValueOrDefault(header), provider + " configured header");
+        }
+    });
+
     private static Task LiveCustomProvider() => WithTemp("live-custom", async root =>
     {
         var models = Path.Combine(root, "models.json");
@@ -209,6 +235,13 @@ internal static partial class Program
             .Replace("\n", Environment.NewLine), fallback.Diagnostics, "warning diagnostic");
         using (var connection = fallback.Selection.Connect(runtime)) await Drive(connection.CreateTransport(), fallback.Selection.Model);
         using (var body = JsonDocument.Parse(endpoint.Snapshot()[^1].Body!)) Equal("brand-new-model", body.RootElement.GetProperty("model").GetString(), "custom id sent");
+        // Azure resolves a custom deployment id the same way (buildFallbackModel), not only exact catalog ids.
+        var azureRuntime = new LiveSessionRuntime(Env(("AZURE_OPENAI_API_KEY", "az"), ("AZURE_OPENAI_BASE_URL", "https://pisharp-res.openai.azure.com/openai/v1")), () => endpoint);
+        var azureFallback = await Select(new("azure", "my-deployment", null), azureRuntime);
+        Equal("my-deployment", azureFallback.Selection.Model.Id, "custom id on azure");
+        Check(azureFallback.Diagnostics.Contains("Model \\u0022my-deployment\\u0022 not found for provider \\u0022azure\\u0022. Using custom model id.", StringComparison.Ordinal), azureFallback.Diagnostics);
+        using (var connection = azureFallback.Selection.Connect(azureRuntime)) await Drive(connection.CreateTransport(), azureFallback.Selection.Model);
+        Check(endpoint.Snapshot()[^1].Body!.Contains("\"my-deployment\"", StringComparison.Ordinal), "azure custom id sent: " + endpoint.Snapshot()[^1].Body);
         var unknown = await ThrowsAsync<LiveSessionException>(() => Select(new(null, "no-such-model-anywhere", null)), "unknown");
         Check(unknown.Code == "UnknownLiveModel" && unknown.Message == "Model \"no-such-model-anywhere\" not found. Use --list-models to see available models.", unknown.Message);
         Equal("LiveOutputLimit", (await ThrowsAsync<LiveSessionException>(() => Select(new("openai", "gpt-4-turbo", "8192")), "limit")).Code, "output limit");
@@ -232,6 +265,15 @@ internal static partial class Program
         Equal("openai/gpt-oss-20b", continuing.Model.Id, "continuing sessions use the saved default");
         var initial = await new SettingsModelSelection(null, null, null).ResolveAsync(null, runtime, null, false, CancellationToken.None);
         Equal("openai/gpt-5.5", initial.Model.Provider + "/" + initial.Model.Id, "first available provider default");
+        // findInitialModel: a saved default that does not exist, or whose provider has no configured auth, falls back to the first
+        // available model instead of being refused.
+        foreach (var (provider, id, what) in new[] { ("openai", "no-such-model", "unknown default"), ("anthropic", "claude-sonnet-4-5", "default without auth") })
+        {
+            var saved = new PiSharp.CodingAgent.Configuration.StartupSettingsSnapshot(JsonData.Parse(JsonSerializer.Serialize(new { defaultProvider = provider, defaultModel = id })),
+                PiSharp.Agent.AgentPendingInputMode.OneAtATime, PiSharp.Agent.AgentPendingInputMode.OneAtATime, []);
+            var fallen = await new SettingsModelSelection(null, null, null).ResolveAsync(saved, runtime, null, false, CancellationToken.None);
+            Equal("openai/gpt-5.5", fallen.Model.Provider + "/" + fallen.Model.Id, what);
+        }
         var none = await ThrowsAsync<LiveSessionException>(() => new SettingsModelSelection(null, null, null)
             .ResolveAsync(null, new LiveSessionRuntime(Env(), () => null), null, false, CancellationToken.None), "nothing available");
         Check(none.Code == "NoLiveModel" && none.Message.StartsWith("No models available. Use /login", StringComparison.Ordinal), none.Message);

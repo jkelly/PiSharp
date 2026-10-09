@@ -55,7 +55,8 @@ public sealed partial class OpenRouterImages : IImagesApi
             var (response, body) = await ProviderRequest.RetryAsync(async () =>
             {
                 var (info, responseText) = await ProviderRequest.PostAsync(http, url, headers, text, options, cancellationToken,
-                    error => new ProviderRequestException("Connection error.", null, [])).ConfigureAwait(false);
+                    error => new ProviderRequestException("Connection error.", null, []),
+                    timeoutMessage: "Request timed out.").ConfigureAwait(false);
                 if (!ProviderRequest.IsSuccess(info.Status)) throw ApiError(info, responseText);
                 return (info, ProviderRequest.ParseJson("OpenRouter", responseText));
             }, options.MaxRetries ?? 0, options, null, cancellationToken).ConfigureAwait(false);
@@ -148,26 +149,13 @@ public sealed partial class OpenRouterImages : IImagesApi
     {
         JsonElement? parsed = null;
         try { using var document = JsonDocument.Parse(text); parsed = document.RootElement.Clone(); } catch (JsonException) { }
-        var error = parsed is { ValueKind: JsonValueKind.Object } body ? ClassifierShared.Field(body, "error") : null;
-        if (error is { ValueKind: JsonValueKind.Null }) error = null;
-        var fallback = parsed is null ? text : null;
-        string? message;
-        if (error is { } value && ClassifierShared.Field(value, "message") is { } nested && Truthy(nested))
-            message = nested.ValueKind == JsonValueKind.String ? nested.GetString() : ProviderRequest.Stringify(JsonNode.Parse(nested.GetRawText()));
-        else if (error is { } present && Truthy(present)) message = ProviderRequest.Stringify(JsonNode.Parse(present.GetRawText()));
-        else message = fallback;
-        var status = response.Status;
-        var composed = !string.IsNullOrEmpty(message) ? $"{status} {message}" : $"{status} status code (no body)";
-        return new ProviderRequestException(composed, status, response.Headers, sdkError: error);
+        // openai makeStatusError: an object or array body whose `error` is null or undefined is itself the error ({ error: body }).
+        JsonElement? error = parsed is { ValueKind: JsonValueKind.Object or JsonValueKind.Array } body
+            ? body.ValueKind == JsonValueKind.Object && ClassifierShared.Field(body, "error") is { ValueKind: not JsonValueKind.Null } member ? member : body
+            : null;
+        var composed = PiSharp.AI.Protocols.ProviderShared.ProviderErrorText.OpenAIStatus(response.Status, text).Message;
+        return new ProviderRequestException(composed, response.Status, response.Headers, sdkError: error);
     }
-
-    private static bool Truthy(JsonElement value) => value.ValueKind switch
-    {
-        JsonValueKind.Null or JsonValueKind.False or JsonValueKind.Undefined => false,
-        JsonValueKind.String => value.GetString()!.Length != 0,
-        JsonValueKind.Number => value.TryGetDouble(out var number) && number != 0 && !double.IsNaN(number),
-        _ => true
-    };
 
     // JavaScript's `.` excludes \n, \r, U+2028 and U+2029; `$` without the m flag is the end of the input.
     [GeneratedRegex("^data:([^;]+);base64,([^\\n\\r\\u2028\\u2029]+)\\z", RegexOptions.CultureInvariant)]

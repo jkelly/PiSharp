@@ -37,11 +37,15 @@ internal sealed class LiveModelCatalog : IAsyncDisposable
     {
         this.runtime = runtime; this.runtimeFor = runtimeFor; this.bind = bind; this.registry = registry;
         this.primary = primary; this.primaryWire = primaryWire;
-        available = [new(primary, primaryWire)];
+        // A session without a model (LiveSessionSelection.Unselected) offers only the registry's available models.
+        available = primary == LiveSessionSelection.UnselectedModel ? [] : [new(primary, primaryWire)];
     }
 
     /// <summary>getAvailableSnapshot: the selectable models in the registry's order (the session's own model included).</summary>
     internal ImmutableArray<RpcModelDefinition> Available { get { lock (transports) return available; } }
+
+    /// <summary>The registry of the latest refresh (the available snapshot), or null before the first.</summary>
+    internal ModelRegistry? CurrentRegistry => Volatile.Read(ref current);
 
     internal JsonData? Wire(ModelDescriptor model) => Available.FirstOrDefault(definition => definition.Model == model)?.WireBody;
 
@@ -71,7 +75,7 @@ internal sealed class LiveModelCatalog : IAsyncDisposable
                 definitions.Add(new(descriptor, wire));
                 if (descriptor != primary) entries.Add((entry, descriptor));
             }
-            if (!definitions.Any(definition => definition.Model == primary)) definitions.Insert(0, new(primary, primaryWire));
+            if (primary != LiveSessionSelection.UnselectedModel && !definitions.Any(definition => definition.Model == primary)) definitions.Insert(0, new(primary, primaryWire));
             var catalog = registry.CaptureModelCatalog();
             var bound = catalog.Bindings.Select(binding => (binding.Model.Provider, binding.Model.Id)).ToHashSet();
             var additions = new List<SessionModelBinding>();
@@ -168,15 +172,16 @@ internal sealed class LazyModelTransport(RegistryModel entry, ModelDescriptor mo
     }
 
     /// <summary>The summarization route of this model (compaction, branch and bug report summaries) at <paramref name="maximum"/> tokens.</summary>
-    internal IChatTransport Summary(int maximum) => new SummaryRoute(this, maximum);
+    /// <param name="level">The summary's reasoning level (compaction: the session's thinking level), applied when the model reasons.</param>
+    internal IChatTransport Summary(int maximum, string? level = null, bool carriesLevel = true) => new SummaryRoute(this, maximum, level, carriesLevel);
 
-    private sealed class SummaryRoute(LazyModelTransport owner, int maximum) : IChatTransport, IThinkingLevelTransport
+    private sealed class SummaryRoute(LazyModelTransport owner, int maximum, string? level, bool carriesLevel) : IChatTransport, IThinkingLevelTransport
     {
         public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor descriptor) => ["off"];
         public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             var live = await owner.ConnectAsync(cancellationToken).ConfigureAwait(false);
-            await foreach (var observation in live.CreateTransport(Math.Min(maximum, live.MaximumOutputTokens), summary: true)
+            await foreach (var observation in live.CreateSummaryTransport(live.IsVirtual ? maximum : Math.Min(maximum, live.MaximumOutputTokens), level, carriesLevel)
                 .StreamAsync(request, cancellationToken).ConfigureAwait(false)) yield return observation;
         }
     }

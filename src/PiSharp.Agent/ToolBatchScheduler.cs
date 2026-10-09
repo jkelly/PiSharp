@@ -57,12 +57,26 @@ public sealed class ToolBatchScheduler
 
         // Failed snapshots can retain unfinished tool identities as nonexecutable history.
         // Their authoritative assistant commit is still awaited; executable preflight is not admitted.
-        if (message.StopReason is StopReason.Error or StopReason.Aborted)
+        var failed = message.StopReason is StopReason.Error or StopReason.Aborted;
+        var invocations = failed ? [] : Invocations(message, sink);
+        // The caller can commit the assistant here. Preflight cannot run until that work settles.
+        var ended = new AssistantMessageEnded(message);
+        await sink.EmitAsync(ended, cancellationToken).ConfigureAwait(false);
+        // Source: message_end handlers mutate the finalized message in place before the loop reads its stop reason and tool calls.
+        AssistantMessage? replaced = null;
+        if (AgentMessageReplacement.Get(ended) is { } replacement)
         {
-            await sink.EmitAsync(new AssistantMessageEnded(message), cancellationToken).ConfigureAwait(false);
-            return new([], [], message.StopReason == StopReason.Aborted || cancellationToken.IsCancellationRequested);
+            message = replaced = PiWireJson.ReadMessage(replacement.WireBody.Value);
+            failed = message.StopReason is StopReason.Error or StopReason.Aborted or StopReason.Pending or StopReason.Deferred;
+            invocations = failed ? [] : Invocations(message, sink);
         }
+        if (failed) return new([], [], message.StopReason == StopReason.Aborted || cancellationToken.IsCancellationRequested) { Assistant = replaced };
+        if (cancellationToken.IsCancellationRequested) return new([], [], true) { Assistant = replaced };
+        return await RunInvocationsAsync(invocations, sink, cancellationToken).ConfigureAwait(false) with { Assistant = replaced };
+    }
 
+    private static ImmutableArray<ToolInvocation> Invocations(AssistantMessage message, IAgentEventSink sink)
+    {
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var invocations = message.Content.Select((content, index) => (content, index))
             .Where(entry => entry.content is ToolCallContent)
@@ -75,10 +89,12 @@ public sealed class ToolBatchScheduler
             if (!ids.Add(invocation.Call.Id))
                 throw new ArgumentException($"Duplicate tool call ID: {invocation.Call.Id}", nameof(message));
         }
+        return invocations;
+    }
 
-        // The caller can commit the assistant here. Preflight cannot run until that work settles.
-        await sink.EmitAsync(new AssistantMessageEnded(message), cancellationToken).ConfigureAwait(false);
-        if (cancellationToken.IsCancellationRequested) return new([], [], true);
+    private async Task<ToolBatchResult> RunInvocationsAsync(ImmutableArray<ToolInvocation> invocations, IAgentEventSink sink,
+        CancellationToken cancellationToken)
+    {
 
         var sequential = executionMode == ToolExecutionMode.Sequential || invocations.Any(invocation =>
             tools.TryGetValue(invocation.Call.Name, out var tool) && tool.ExecutionMode == ToolExecutionMode.Sequential);
@@ -309,15 +325,14 @@ public sealed class ToolBatchScheduler
         catch (ChannelClosedException) { /* The consumer fault path owns cancellation and joins this execution. */ }
     }
 
-    // This is the sole preflight path for both execution modes. Only complete JSON objects are admitted.
+    // This is the sole preflight path for both execution modes. Arguments of any JSON kind reach the executor, whose
+    // validateToolArguments gives upstream's result for a non-object.
     private async ValueTask<Preparation> PrepareAsync(ToolInvocation invocation, CancellationToken cancellationToken)
     {
         if (invocation.AssistantMessage.StopReason == StopReason.Length)
             return Immediate(ToolFailureKind.Truncated, "Tool call came from an output-length-truncated assistant message.");
         if (!tools.TryGetValue(invocation.Call.Name, out var tool))
             return Immediate(ToolFailureKind.UnknownTool, $"Tool {invocation.Call.Name} not found");
-        if (invocation.Call.Arguments.Value.ValueKind != JsonValueKind.Object)
-            return Immediate(ToolFailureKind.InvalidArguments, "Final tool arguments must be a JSON object.");
         if (cancellationToken.IsCancellationRequested) return Immediate(ToolFailureKind.Canceled, "Operation aborted");
         try
         {

@@ -23,6 +23,8 @@ internal sealed partial class OfflineSessionProfile
     private sealed class VirtualSession(PiSharp.CodingAgent.PersistentAgentSession session) : PiSharp.Cli.Models.IVirtualModelSession
     {
         public IReadOnlyList<PiSharp.Sessions.Serialization.SessionEntry> Branch => session.Snapshot.Context.Ancestry;
+        public IReadOnlyList<PiSharp.Contracts.TranscriptEntry> Messages => session.Snapshot.Agent.Messages;
+        public string ThinkingLevel => session.Snapshot.Context.ThinkingLevel;
         public Task AppendStateAsync(PiSharp.Contracts.JsonData data, CancellationToken cancellationToken) =>
             session.AppendRunCustomEntryAsync(PiSharp.Cli.Models.VirtualModels.StateEntry, data, cancellationToken);
     }

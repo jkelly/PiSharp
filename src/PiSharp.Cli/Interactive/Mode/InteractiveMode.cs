@@ -393,6 +393,12 @@ internal sealed partial class InteractiveMode
         footerDataProvider.OnBranchChange(() => context.Loop.Post(() => ui.RequestRender()));
         UpdateAvailableProviderCount();
         ui.RenderNow();
+        // Flush the completed startup state before loading the remaining syntax grammars (loadAllHighlightLanguages).
+        _ = Task.Run(() =>
+        {
+            try { SyntaxHighlight.LoadAllLanguages(); } catch (Exception) { return; } // Eager languages and plaintext remain available.
+            context.Loop.Post(() => { if (!isInitialized) return; ui.Invalidate(); ui.RequestRender(); });
+        });
     }
 
     private static ScrollViewScrollbar ToScrollbar(string value) => value switch

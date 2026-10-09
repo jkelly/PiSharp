@@ -16,7 +16,42 @@ internal static partial class Program
         ("native.cli-extension-runs-without-node", NativeWithoutNode),
         ("native.shares-the-session-with-node-extensions", NativeWithNode),
         ("native.reload-loads-native-extensions-again", NativeReload),
+        ("native.command-named-like-another-extensions-becomes-name-n", NativeDuplicateCommand),
     ];
+
+    // runner.ts resolveRegisteredCommands over every extension (Node and native, load order): a name two extensions register is
+    // invoked as name:1 and name:2; neither extension fails to load.
+    private static async Task NativeDuplicateCommand()
+    {
+        using var sandbox = NodeSandbox("native-duplicate-command");
+        Environment.SetEnvironmentVariable(NativeLogVariable, Path.Combine(sandbox.Root, "native.log"));
+        NativeExtensionFolder(Path.Combine(sandbox.Cwd, ".pi", "extensions", "native-hello"));
+        var node = sandbox.Write(Path.Combine(sandbox.Cwd, "node.ts"), Probe + """
+            export default function (pi: any) {
+              pi.registerCommand("native-hello", { description: "Node hello", handler: async (args: string) => log("node", args) });
+              pi.registerCommand("list", { description: "List", handler: async () =>
+                log("commands", pi.getCommands().filter((c: any) => c.source === "extension").map((c: any) => c.name)) });
+            }
+            """);
+        var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", node, "/list"]);
+        Equal(0, code, "exit; " + stderr);
+        var commands = LogLines(sandbox).Single(line => line.StartsWith("[\"commands\"", StringComparison.Ordinal));
+        Check(commands.Contains("\"native-hello:1\"", StringComparison.Ordinal) && commands.Contains("\"native-hello:2\"", StringComparison.Ordinal) &&
+            !commands.Contains("\"native-hello\"", StringComparison.Ordinal), "invocation names: " + commands + " stderr " + stderr);
+        Check(!stderr.Contains("native-hello", StringComparison.Ordinal), "no load failure: " + stderr);
+        File.Delete(Path.Combine(sandbox.Cwd, "probe.log"));
+        foreach (var (suffix, text) in new[] { ("1", "first"), ("2", "second") })
+        {
+            (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", node, $"/native-hello:{suffix} {text}"]);
+            Equal(0, code, "exit; " + stderr);
+        }
+        var native = NativeLog(sandbox).Where(line => line.StartsWith("command ", StringComparison.Ordinal)).ToArray();
+        var nodeRuns = LogLines(sandbox).Where(line => line.StartsWith("[\"node\"", StringComparison.Ordinal)).ToArray();
+        Check(native.Length == 1 && nodeRuns.Length == 1 && (native[0] == "command first" ? nodeRuns[0] == """["node","second"]""" :
+            native[0] == "command second" && nodeRuns[0] == """["node","first"]"""), "each name:N runs one extension: native " +
+            string.Join("|", native) + " node " + string.Join("|", nodeRuns));
+        Equal(0, sandbox.Requests.Count, "commands handled without a model request");
+    }
 
     private const string NativeLogVariable = "PISHARP_EXTENSION_PARITY_NATIVE_LOG";
 

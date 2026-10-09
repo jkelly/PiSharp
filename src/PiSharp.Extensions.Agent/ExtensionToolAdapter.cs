@@ -10,17 +10,20 @@ namespace PiSharp.Extensions.Agent;
 /// <summary>Executes only the captured extension registration through its registry's owned dispatch.</summary>
 internal sealed class ExtensionToolAdapter(ExtensionRegistry registry, ExtensionRegistrySnapshot snapshot,
     ExtensionToolRegistrationInfo tool, ExtensionToolArgumentValidator validateArguments,
-    ToolResultValueOptions resultValues, CancellationToken sessionToken) : IInvocationPreparedToolAdapter, IInitialToolArgumentPreparationAdapter
+    ToolResultValueOptions resultValues, CancellationToken sessionToken) : IInvocationPreparedToolAdapter, IInitialToolArgumentPreparationAdapter,
+    IToolArgumentSchemaAdapter
 {
     private readonly string target = tool.OwnerId + "/" + tool.OwnerGeneration.ToString(CultureInfo.InvariantCulture) + "/" + tool.RegistrationId;
     public string Name => tool.Name;
-    public ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken cancellationToken)
+    /// <summary>Source validateToolArguments against the registration's parameters, after its prepareArguments.</summary>
+    public ToolArgumentSchema? ArgumentSchema { get; } = new(tool.ValidationParameters ?? tool.Parameters, tool.ParametersOrigin);
+    public async ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested(); sessionToken.ThrowIfCancellationRequested();
         // Legacy registrations retain their original failure staging and do not gain a callback admission.
-        return tool.HasInitialArgumentPreparation
-            ? registry.PrepareToolArgumentsAsync(snapshot, Name, invocation.Call.Arguments, cancellationToken, sessionToken)
-            : ValueTask.FromResult(invocation.Call.Arguments);
+        if (!tool.HasInitialArgumentPreparation) return invocation.Call.Arguments;
+        try { return await registry.PrepareToolArgumentsAsync(snapshot, Name, invocation.Call.Arguments, cancellationToken, sessionToken).ConfigureAwait(false); }
+        catch (ExtensionToolArgumentPreparationException error) { throw new ToolArgumentPreparationException(error.Message, error); }
     }
     public ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken cancellationToken)
     {

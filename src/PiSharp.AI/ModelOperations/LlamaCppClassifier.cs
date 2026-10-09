@@ -181,7 +181,7 @@ public sealed class LlamaCppClassifier : IClassifierApi
         var url = new Uri(root + path);
         var (response, json) = await ProviderRequest.RetryAsync(async () =>
         {
-            var (info, responseText) = await ProviderRequest.PostAsync(http, url, headers, text, options, signal).ConfigureAwait(false);
+            var (info, responseText) = await ProviderRequest.PostAsync(http, url, headers, text, options, signal, ProviderRequest.FetchFailed).ConfigureAwait(false);
             if (!ProviderRequest.IsSuccess(info.Status))
                 throw new ProviderRequestException($"{Label} returned {info.Status}", info.Status, info.Headers, responseText);
             return (info, ProviderRequest.ParseJson(Label, responseText));

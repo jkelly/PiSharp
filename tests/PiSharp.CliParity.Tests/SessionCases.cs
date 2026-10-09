@@ -114,5 +114,98 @@ internal static partial class Program
             Equal(1, code, "exit");
             Equal($"Stored session working directory does not exist: {gone}\nSession file: {file}\nCurrent working directory: {sandbox.Cwd}\n", stderr, "message");
         }),
+        ("sessions.resume-applies-the-tool-loadout-in-memory-and-the-next-prompt-records-it", ResumeRecordsLoadoutAtNextPrompt),
+        // agent-loop.ts runs tool turns until the model stops and session-manager.ts loads every entry of the file: the Pi entry
+        // has no turn, transcript-message, line or record cap (formerly 64 turns, 1024 messages and 10,000 lines/records).
+        ("sessions.pi-entry-has-no-turn-transcript-or-record-caps", async () =>
+        {
+            Equal(int.MaxValue, PiSharp.Cli.Commands.RpcSessionCommand.LoopOptions(pi: true).MaximumTurns, "turns");
+            Equal(int.MaxValue, PiSharp.Cli.Commands.RpcSessionCommand.LoopOptions(pi: true).MaximumTranscriptMessages, "transcript messages");
+            Equal(int.MaxValue, PiSharp.Cli.Commands.RpcSessionCommand.ReaderOptions(pi: true).MaximumRecords, "records");
+            Equal(int.MaxValue, PiSharp.Cli.Commands.RpcSessionCommand.ContextOptions(pi: true).MaximumEntries, "context entries");
+            using var sandbox = new Sandbox("no-caps");
+            var model = new[] { "--provider", "anthropic", "--model", "claude-sonnet-4-5" };
+            const int toolTurns = 70;
+            sandbox.Respond = (_, index) => index < toolTurns ? AnthropicToolCall("ls", new { path = "." }, "toolu_" + index) : AnthropicText("done");
+            var (code, stdout, stderr) = await sandbox.Run(["-p", "--tools", "ls", .. model, "list"]);
+            Equal(0, code, "exit; " + stderr);
+            Equal(toolTurns + 1, sandbox.Requests.Count, "every tool turn ran");
+            Equal("done\n", stdout, "final text");
+            // A session of more than 10,000 records resumes.
+            var lines = new List<string> { new JsonObject { ["type"] = "session", ["version"] = 3, ["id"] = "long-session",
+                ["timestamp"] = "2026-01-01T00:00:00.000Z", ["cwd"] = sandbox.Cwd }.ToJsonString() };
+            lines.Add(new JsonObject { ["type"] = "message", ["id"] = "m0", ["parentId"] = null, ["timestamp"] = "2026-01-01T00:00:00.000Z",
+                ["message"] = new JsonObject { ["role"] = "user", ["content"] = "first question", ["timestamp"] = 0 } }.ToJsonString());
+            for (var index = 1; index <= 10_050; index++)
+                lines.Add(new JsonObject { ["type"] = "custom", ["customType"] = "note", ["data"] = new JsonObject { ["n"] = index },
+                    ["id"] = "c" + index, ["parentId"] = index == 1 ? "m0" : "c" + (index - 1), ["timestamp"] = "2026-01-01T00:00:00.000Z" }.ToJsonString());
+            var file = sandbox.Write("long.jsonl", string.Join("\n", lines) + "\n");
+            sandbox.Requests.Clear(); sandbox.Respond = (_, _) => AnthropicText("resumed");
+            (code, stdout, stderr) = await sandbox.Run(["-p", "--session", file, .. model, "again"]);
+            Equal(0, code, "resume exit; " + stderr);
+            var messages = sandbox.Requests.Single().Json.GetProperty("messages");
+            Check(messages.GetArrayLength() == 2 && messages[0].GetRawText().Contains("first question", StringComparison.Ordinal), "history replayed: " + messages);
+            Check(File.ReadLines(file).Count() > 10_052, "the resumed session was appended to");
+        }),
     ];
+
+    // sdk.ts createAgentSession passes the selected tool names (initialActiveToolNames) and the AgentSession constructor applies them
+    // in memory with the current tool definitions (_buildRuntime); agent-loop.ts declareToolChanges records the loadout at the next
+    // prompt, in a system message before the user message. Opening the session over RPC, reading its state and quitting leaves the
+    // file untouched, although its recorded loadout is stale.
+    private static async Task ResumeRecordsLoadoutAtNextPrompt()
+    {
+        using var sandbox = new Sandbox("restored-loadout");
+        var model = new[] { "--provider", "anthropic", "--model", "claude-sonnet-4-5" };
+        Equal(0, (await sandbox.Run(["-p", "--tools", "read,ls", .. model, "first"])).Code, "first run");
+        var file = sandbox.SessionFiles().Single();
+        // The recorded loadout is stale: ls was declared differently and an MCP server's tool is no longer registered.
+        var lines = File.ReadAllLines(file);
+        var index = Array.FindLastIndex(lines, line => JsonNode.Parse(line)!["message"]?["toolsAdded"] is not null);
+        Check(index > 0, "the first run recorded its loadout");
+        var record = JsonNode.Parse(lines[index])!.AsObject();
+        var declared = record["message"]!["toolsAdded"]!.AsArray();
+        Names(["read", "ls"], declared.Select(tool => tool!["name"]!.GetValue<string>()), "first run loadout");
+        declared.Single(tool => tool!["name"]!.GetValue<string>() == "ls")!["description"] = "an older ls";
+        declared.Add(new JsonObject { ["name"] = "mcp__gone__search", ["description"] = "gone", ["parameters"] = new JsonObject { ["type"] = "object" } });
+        lines[index] = record.ToJsonString();
+        File.WriteAllText(file, string.Join("\n", lines) + "\n");
+        var before = File.ReadAllBytes(file);
+
+        async Task<JsonNode[]> Rpc(string commands, bool settles, bool selected = true)
+        {
+            var gate = new GatedInput(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(commands)));
+            if (!settles) gate.Release();
+            using var output = new SignalingStream("\"type\":\"agent_settled\"", gate.Release);
+            using var stdout = new StringWriter(); using var stderr = new StringWriter();
+            var host = sandbox.Host(stdout, stderr, null, rpcInput: gate, rpcOutput: output) with { StdoutIsTty = false };
+            Equal(0, await PiCommand.RunAsync(["--mode", "rpc", "--session", file, .. selected ? new[] { "--tools", "read,ls" } : [], .. model], host, CancellationToken.None), "rpc exit; " + stderr);
+            return [.. System.Text.Encoding.UTF8.GetString(output.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => JsonNode.Parse(line)!)];
+        }
+        // With the default tools and with --tools.
+        foreach (var selected in new[] { false, true })
+        {
+            var state = (await Rpc("""{"id":"1","type":"get_state"}""" + "\n", settles: false, selected)).Single(line => line["id"]?.GetValue<string>() == "1");
+            Check(state["success"]!.GetValue<bool>(), "get_state: " + state.ToJsonString());
+            Check(File.ReadAllBytes(file).SequenceEqual(before), "opening the session, reading its state and quitting wrote to its file: " +
+                string.Join("\n", File.ReadAllLines(file).Skip(lines.Length)));
+        }
+
+        await Rpc("""{"id":"2","type":"prompt","message":"second"}""" + "\n", settles: true);
+        var added = File.ReadAllLines(file).Skip(lines.Length).Select(line => JsonNode.Parse(line)!).ToArray();
+        Check(added.Length >= 3, "the prompt appended its entries");
+        var loadout = added[0]["message"]!;
+        Equal("system", loadout["role"]!.GetValue<string>(), "the loadout record comes first");
+        // declareToolChanges/withToolChanges field order (Pi 1.1.0 writes role, content, sections, timestamp, toolsAdded, toolsRemoved).
+        Names(new[] { "role", "content", "sections", "timestamp", "toolsAdded", "toolsRemoved" }.Where(loadout.AsObject().ContainsKey),
+            loadout.AsObject().Select(field => field.Key), "record fields");
+        Equal(JsonNode.Parse(lines[^1])!["id"]!.GetValue<string>(), added[0]["parentId"]!.GetValue<string>(), "the record continues the resumed leaf");
+        Names(["ls", "mcp__gone__search"], loadout["toolsRemoved"]!.AsArray().Select(tool => tool!["name"]!.GetValue<string>()), "recorded names removed");
+        var current = loadout["toolsAdded"]!.AsArray();
+        Names(["ls"], current.Select(tool => tool!["name"]!.GetValue<string>()), "the changed declaration is added again");
+        Check(current.Single(tool => tool!["name"]!.GetValue<string>() == "ls")!["description"]!.GetValue<string>() != "an older ls", "the current ls declaration is recorded");
+        Equal("user", added[1]["message"]!["role"]!.GetValue<string>(), "the user message follows the record");
+        Equal(added[0]["id"]!.GetValue<string>(), added[1]["parentId"]!.GetValue<string>(), "the user message continues the record");
+        Names(["read", "ls"], sandbox.Requests[^1].Json.GetProperty("tools").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!), "the request declares the selected loadout");
+    }
 }
