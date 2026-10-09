@@ -256,6 +256,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         if (extension is not null)
         {
             policy.ExtensionTargets = extension.Targets;
+            if (extension.Pi is not null) policy.ExtensionGrant = extension.IsCurrentToolTarget;
             extension.Bind(policy, invokerOptions);
             // A Pi extension tool with a built-in name replaces the built-in (agent-session.ts: custom definitions override the base ones).
             if (extension.Pi is not null)
@@ -687,6 +688,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         private static StringComparison Comparison => OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         public readonly List<object> Actions = [];
         public ImmutableDictionary<string, string> ExtensionTargets { get; set; } = ImmutableDictionary<string, string>.Empty;
+        /// <summary>Pi extension tools registered after the session bound (a later registerTool, a reload): granted by exact target.</summary>
+        public Func<string, string, bool>? ExtensionGrant { get; set; }
         /// <summary>MCP call grants by session generation (Pi trusts the servers of mcp.json): an invoke action is admitted only
         /// for a tool of a server admitted in the invocation's own generation, or for that generation's host tool_search.</summary>
         private ImmutableDictionary<long, PiSharp.Cli.Mcp.McpCallGrants> mcpGrants = ImmutableDictionary<long, PiSharp.Cli.Mcp.McpCallGrants>.Empty;
@@ -749,6 +752,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             if (action.Kind == PreparedToolActionKind.Extension)
             {
                 var granted = (ExtensionTargets.TryGetValue(action.ToolName, out var exactTarget) && action.Target == exactTarget ||
+                        ExtensionGrant?.Invoke(action.ToolName, action.Target) == true ||
                         invocation.Context?.SessionGeneration is { } generation && mcpGrants.TryGetValue(generation, out var grants) &&
                         grants.Allows(action.ToolName, action.Target)) &&
                     action.Operation == "invoke" && action.WorkingDirectory is null && !action.CommandArguments.IsDefault &&

@@ -51,6 +51,51 @@ internal sealed partial class PiExtensionHost
     }
 
     private PiSharp.Extensions.Runtime.ExtensionEventBus? _eventBus;
+    private ImmutableArray<PiNodeOwner> _owners = [];
+    private readonly SemaphoreSlim _sync = new(1, 1);
+
+    private readonly object _commandSync = new();
+    private void SyncCommands()
+    {
+        lock (_commandSync)
+        {
+            ImmutableArray<PiNodeOwner> owners;
+            lock (_extensions) owners = _owners;
+            if (owners.IsEmpty) return;
+            var names = CommandInvocationNames();
+            try
+            {
+                foreach (var owner in owners) owner.RetireStaleCommands(names);
+                foreach (var owner in owners) owner.RegisterMissingCommands(names);
+            }
+            catch (Exception error) when (error is InvalidOperationException or PiSharp.Extensions.Runtime.ExtensionRegistrationException) { }
+        }
+    }
+
+    /// <summary>Brings the session's registrations in line with the extensions' current ones: commands of every extension (their
+    /// name:N invocation names may change), then the tools of <paramref name="index"/> (all extensions with -1) in the live catalog.</summary>
+    internal async Task SyncRegistrationsAsync(int index, bool force)
+    {
+        // Commands first, synchronously: the notification is processed before the callback that registered them returns.
+        SyncCommands();
+        await _sync.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            ImmutableArray<PiNodeOwner> owners;
+            lock (_extensions) owners = _owners;
+            if (owners.IsEmpty) return;
+            if (_activation is { } activation && _owner is { } session)
+                foreach (var owner in owners.Where(owner => index < 0 || owner.Index == index))
+                    await owner.SyncToolsAsync(activation, session, force, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is InvalidOperationException or PiSharp.Extensions.Runtime.ExtensionRegistrationException or
+            PiSharp.CodingAgent.SessionRuntimeRegistryException or OperationCanceledException or ObjectDisposedException)
+        {
+            var path = Extensions.FirstOrDefault(extension => extension.Index == index)?.Path ?? "<runtime>";
+            await ReportAsync(path, "register", error.Message).ConfigureAwait(false);
+        }
+        finally { _sync.Release(); }
+    }
     [ThreadStatic] private static bool _deliveringFromNode;
 
     /// <summary>A Node extension's pi.events.emit: the native extensions' listeners receive the data as <see cref="JsonData"/>.</summary>
@@ -177,6 +222,8 @@ internal sealed partial class PiExtensionHost
                 var index = parameters.GetProperty("ext").GetInt32();
                 lock (_extensions) foreach (var extension in _extensions.Where(item => item.Index == index))
                         extension.Descriptor = JsonNode.Parse(parameters.GetProperty("extension").GetRawText())!.AsObject();
+                // Registrations made after the factory returned take effect in the running session (commands, tools, handlers).
+                _ = SyncRegistrationsAsync(index, force: false);
                 RegistrationsChanged?.Invoke();
                 return;
             }

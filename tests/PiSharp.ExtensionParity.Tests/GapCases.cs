@@ -20,6 +20,7 @@ internal static partial class Program
         ("gap.pi-events-shared-with-native-extensions", EventsBridge),
         ("gap.send-message-from-an-idle-command-appends-and-displays", SendMessageWhileIdle),
         ("gap.shortcuts-run-with-a-fresh-context", ShortcutContext),
+        ("gap.registrations-after-the-factory-take-effect", LateRegistrations),
     ];
 
     // agent-session.ts sendCustomMessage: idle and without triggerTurn, the message is appended and emitted (message_start/_end) at once.
@@ -284,5 +285,33 @@ internal static partial class Program
         var data = await received.Task.WaitAsync(TimeSpan.FromSeconds(30));
         Equal("""{"echo":42}""", ((PiSharp.Contracts.JsonData)data!).ToString(), "native listener got the Node emission");
         Equal("""["node got",{"n":41}]""", LogLines(sandbox).Single(), "Node listener got the native emission once");
+    }
+
+    // loader.ts runtime actions after loading / runner.ts: registerTool, registerCommand and pi.on after the factory returned take
+    // effect in the running session (refreshTools).
+    private static async Task LateRegistrations()
+    {
+        using var sandbox = NodeSandbox("late-registrations");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "late.ts"), Probe + """
+            export default function (pi: any) {
+              pi.on("session_start", async () => {
+                pi.registerCommand("late", { description: "Late", handler: async (args: string) => log("late command", args) });
+                pi.registerTool({ name: "late_tool", label: "Late", description: "Late tool", promptSnippet: "A tool registered late",
+                  parameters: { type: "object", properties: {} },
+                  async execute() { return { content: [{ type: "text", text: "late tool ran" }] }; } });
+                pi.on("agent_end", async () => log("late handler"));
+              });
+            }
+            """);
+        var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "/late now"]);
+        Equal(0, code, "exit; " + stderr);
+        Equal("""["late command","now"]""", LogLines(sandbox).Single(), "late command");
+        File.Delete(Path.Combine(sandbox.Cwd, "probe.log"));
+        sandbox.Respond = (_, index) => index == 0 ? AnthropicToolCall("late_tool", new { }) : AnthropicText("done");
+        (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "go"]);
+        Equal(0, code, "exit; " + stderr);
+        Check(sandbox.Requests[0].Json.GetProperty("tools").EnumerateArray().Any(tool => tool.GetProperty("name").GetString() == "late_tool"), "late tool declared");
+        Equal("late tool ran", ToolResultText(sandbox.Requests[1]), "late tool executed");
+        Check(LogLines(sandbox).Contains("""["late handler"]"""), "late handler ran: " + string.Join("|", LogLines(sandbox)));
     }
 }

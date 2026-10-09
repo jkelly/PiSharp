@@ -158,6 +158,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
     internal void Bind(IToolActionPolicy policy, ToolInvokerOptions limits)
     {
         if (Binding is not null) throw new InvalidOperationException("Native generation is already bound.");
+        _boundPolicy = policy; _boundLimits = limits;
         Binding = new(_registry, policy, (tool, arguments, token) =>
         {
             token.ThrowIfCancellationRequested(); _closing.Token.ThrowIfCancellationRequested();
@@ -244,7 +245,10 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
     internal ImmutableArray<IPreparedToolAdapter> EnabledAdapters => Binding.Adapters
         .Where(adapter => IsEnabledTool(adapter.Name)).ToImmutableArray();
     private bool IsEnabledTool(string name) => Pi is not null || _configuration.EnabledTools.Contains(name, StringComparer.Ordinal);
-    private bool IsEnabledCommand(string name) => Pi is not null ? Binding.Snapshot.Commands.Any(command => command.Name == name)
+    /// <summary>Pi extensions register commands after their factory returned (and on reload): commands resolve in the registry's
+    /// current snapshot. A published native generation keeps its bound snapshot.</summary>
+    private ExtensionRegistrySnapshot CommandSnapshot => Pi is not null ? _registry.CaptureSnapshot() : Binding.Snapshot;
+    private bool IsEnabledCommand(string name) => Pi is not null ? CommandSnapshot.Commands.Any(command => command.Name == name)
         : _configuration.EnabledCommands.Contains(name, StringComparer.Ordinal);
 
     internal ExtensionSessionSnapshot? CaptureShutdownSessionSnapshot(AgentSessionAttachment? attached)
@@ -267,11 +271,11 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             JsonData.Parse(JsonSerializer.Serialize(new { name = tool.Name, description = tool.Description, parameters = tool.Parameters.Value })))
         .ToImmutableArray();
 
-    public JsonData CommandCatalog => Binding.Snapshot.CommandCatalog;
+    public JsonData CommandCatalog => CommandSnapshot.CommandCatalog;
     public ValueTask<JsonData> CompleteCommandAsync(string name, string prefix, CancellationToken token)
     {
         if (!IsEnabledCommand(name)) throw new NativeExtensionException(NativeExtensionFailure.InvalidConfiguration);
-        return _registry.CompleteCommandAsync(Binding.Snapshot, name, prefix, token, _closing.Token);
+        return _registry.CompleteCommandAsync(CommandSnapshot, name, prefix, token, _closing.Token);
     }
 
     public bool IsRegisteredCommand(string text)
@@ -292,7 +296,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         Task? invocationOriginal = null; Exception? invocationDirect = null;
         try
         {
-            invocationOriginal = _registry.InvokeCommandAsync(Binding.Snapshot, name,
+            invocationOriginal = _registry.InvokeCommandAsync(CommandSnapshot, name,
                 JsonData.Parse(JsonSerializer.Serialize(arguments)), token, _closing.Token).AsTask();
             await invocationOriginal.ConfigureAwait(false);
             return true;

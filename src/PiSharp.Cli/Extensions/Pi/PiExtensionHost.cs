@@ -218,8 +218,14 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     internal async Task ActivateAsync(ExtensionRegistry registry, CancellationToken token)
     {
         var names = CommandInvocationNames();
+        var owners = new List<PiNodeOwner>();
         foreach (var extension in Extensions)
-            await registry.ActivateAsync(extension.OwnerId, new PiNodeOwner(this, extension, names), token).ConfigureAwait(false);
+        {
+            var owner = new PiNodeOwner(this, extension, names);
+            owners.Add(owner);
+            await registry.ActivateAsync(extension.OwnerId, owner, token).ConfigureAwait(false);
+        }
+        lock (_extensions) _owners = [.. owners];
     }
 
     /// <summary>Source resolveRegisteredCommands: a command name registered more than once (across extensions, in load order) is
