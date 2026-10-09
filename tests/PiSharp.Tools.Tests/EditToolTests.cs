@@ -51,8 +51,11 @@ internal static class EditToolTests
         }
         var before = operations.WriteCalls;
         foreach (var input in new[] { "{}", "{\"path\":\"file\",\"edits\":[]}", "{\"path\":\"file\",\"edits\":\"invalid json\"}",
-            "{\"path\":\"file\",\"edits\":[{\"oldText\":1,\"newText\":\"x\"}]}", "{\"path\":\"file\",\"oldText\":\"a\"}" })
+            "{\"path\":\"file\",\"oldText\":\"a\"}" })
             Failure(await Invoke(tool, JsonData.Parse(input)), ToolFailureKind.InvalidArguments);
+        // Source validateToolArguments coerces a number oldText to its string: the edit runs (and finds no "1").
+        Check((await Invoke(tool, JsonData.Parse("{\"path\":\"file\",\"edits\":[{\"oldText\":1,\"newText\":\"x\"}]}"))).Failure?.Kind
+            == ToolFailureKind.ExecutionError, "Number oldText was not coerced.");
         Equal(before, operations.WriteCalls); Throws<ArgumentNullException>(() => tool.CreateInvoker(null!));
     }
 
@@ -273,8 +276,13 @@ internal static class EditToolTests
         await File.WriteAllTextAsync(temp.File("file"), "abcdefghi"); var oversized = await Invoke(small, Input("file", new TextEdit("a", "A"))); Failure(oversized, ToolFailureKind.ExecutionError); Code(oversized, "ResourceLimit");
         await File.WriteAllTextAsync(temp.File("file"), "a\nb\n");
         var oneEdit = Tool(temp, operations, options: new(MaximumEdits: 1)); Failure(await Invoke(oneEdit, Input("file", new TextEdit("a", "A"), new TextEdit("b", "B"))), ToolFailureKind.InvalidArguments);
-        foreach (var bytes in new byte[][] { [0xff, 0xfe, 0x41, 0x00], [0xc3, 0x28] })
-        { await File.WriteAllBytesAsync(temp.File("file"), bytes); var failure = await Invoke(Tool(temp, operations), Input("file", new TextEdit("a", "A"))); Code(failure, "UnsupportedContent"); Equal(0, operations.WriteCalls); }
+        // Source buffer.toString("utf-8") then writeFile(..., "utf-8"): undecodable bytes become U+FFFD (EF BF BD) per maximal subpart.
+        foreach (var (bytes, expected) in new (byte[], byte[])[] { ([0xff, 0xfe, 0x61, 0x00], [0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd, 0x41, 0x00]),
+            ([0xc3, 0x28, 0x61], [0xef, 0xbf, 0xbd, 0x28, 0x41]), ([0xe2, 0x82, 0x61], [0xef, 0xbf, 0xbd, 0x41]) })
+        {
+            await File.WriteAllBytesAsync(temp.File("file"), bytes); Success(await Invoke(Tool(temp, operations), Input("file", new TextEdit("a", "A"))));
+            Equal(Convert.ToHexString(expected), Convert.ToHexString(await File.ReadAllBytesAsync(temp.File("file"))));
+        }
         // Pi edits any file: only the display diff is bounded natively, so an oversized diff is omitted and the edit is written.
         foreach (var diff in new DiffFormatterOptions[] { new(MaximumOutputCharacters: 16), new(MaximumTraceCells: 1) })
         {

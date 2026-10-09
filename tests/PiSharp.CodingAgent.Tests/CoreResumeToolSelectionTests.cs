@@ -38,25 +38,26 @@ internal static class CoreResumeToolSelectionTests
             var registry = Registry(profile, f.Root, new() { InitialActiveToolNames = initial }); var ids = 0;
             await using var session = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "effective-" + ++ids, fallbackModel: profile.SelectedModel);
             Names(session, initial.ToArray()); Check(session.Snapshot.Agent.Tools.Select(tool => tool.Name).SequenceEqual(initial), "Effective selection was not installed in actual scheduler.");
-            var after = await Bytes(path); Check(after.Length > before.Length && after.Take(before.Length).SequenceEqual(before), "Initial selection rewrote historical bytes or skipped its checkpoint.");
+            // Pi 1.1.0 constructor (_buildRuntime): the initial names are applied in memory; the next request records them.
+            var after = await Bytes(path); Check(after.SequenceEqual(before), "Opening with initial names wrote to the session file.");
             Check(profile.UsedTurns == 0 && profile.Actions.Length == 0, "Resume selection inferred or executed a tool.");
         }
     }
     private static async Task Rejection()
     {
         // Pi 0.99.2 _restoreToolsFromTranscript: without initial names an unbound restored tool is left out and pending,
-        // not rejected. The restored loadout is recorded before use; historical bytes stay a prefix.
+        // not rejected. The restored loadout is applied in memory; the open writes nothing (the next request records it).
         {
             using var f = new StartupSettingsTests.Fixture(); await using var profile = await Profile(f);
             var path = Path.Combine(f.Root, "old.jsonl"); await Seed(path, f.Root, "legacy"); var before = await Bytes(path);
             var registry = Registry(profile, f.Root, new()); var ids = 0;
             await using var session = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "pending-" + ++ids, fallbackModel: profile.SelectedModel);
             Names(session); Check(session.PendingToolNames.SequenceEqual(["legacy"]), "Unbound restored tool was not kept pending.");
-            var after = await Bytes(path); Check(after.Length > before.Length && after.Take(before.Length).SequenceEqual(before), "Restored loadout rewrote history or skipped its record.");
+            var after = await Bytes(path); Check(after.SequenceEqual(before), "Restored loadout was written at open.");
             Check(profile.UsedTurns == 0 && profile.Actions.Length == 0, "Resume restoration inferred or executed a tool.");
         }
         // Pi 1.1.0 restores by name with the current binding: a recorded declaration that differs from it is replaced, with
-        // or without initial names, and the current declaration is recorded before use.
+        // or without initial names, in memory: the open writes nothing and the next request records the current declaration.
         foreach (var initial in new ImmutableArray<string>?[] { null, ["read"] })
         {
             using var f = new StartupSettingsTests.Fixture(); await using var profile = await Profile(f);
@@ -64,21 +65,17 @@ internal static class CoreResumeToolSelectionTests
             var registry = Registry(profile, f.Root, new() { InitialActiveToolNames = initial }); var ids = 0;
             await using var session = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "replaced-" + ++ids, fallbackModel: profile.SelectedModel);
             Names(session, "read"); Check(session.PendingToolNames.IsEmpty, "Registered restored tool became pending.");
-            var record = session.Snapshot.Log.Entries[^1].WireBody.Value.GetProperty("message");
-            Check(record.GetProperty("toolsAdded").EnumerateArray().Single().GetProperty("description").GetString() ==
-                registry.RegisteredTools.Single(tool => tool.Adapter.Name == "read").Declaration.Value.GetProperty("description").GetString(),
-                "Restored loadout did not record the current declaration.");
-            var after = await Bytes(path); Check(after.Length > before.Length && after.Take(before.Length).SequenceEqual(before), "Replaced declaration rewrote history or skipped its record.");
+            var after = await Bytes(path); Check(after.SequenceEqual(before), "Replaced declaration was written at open.");
         }
         // Pi 1.1.0 _buildRuntime/_applyToolLoadout: initial names that are not registered are dropped, not rejected, and unlike
-        // restored names they do not become pending. The initial selection replaces the recorded loadout before use.
+        // restored names they do not become pending. The initial selection replaces the recorded loadout at the next request.
         {
             using var f = new StartupSettingsTests.Fixture(); await using var profile = await Profile(f);
             var path = Path.Combine(f.Root, "old.jsonl"); await Seed(path, f.Root, "legacy"); var before = await Bytes(path);
             var registry = Registry(profile, f.Root, new() { InitialActiveToolNames = ["missing", "read"] }); var ids = 0;
             await using var session = await PersistentAgentSession.OpenWithRegistryAsync(path, registry, () => 1, () => "ignored-" + ++ids, fallbackModel: profile.SelectedModel);
             Names(session, "read"); Check(session.PendingToolNames.IsEmpty, "Unknown initial name became pending.");
-            var after = await Bytes(path); Check(after.Length > before.Length && after.Take(before.Length).SequenceEqual(before), "Initial selection rewrote history or skipped its record.");
+            var after = await Bytes(path); Check(after.SequenceEqual(before), "Initial selection was written at open.");
         }
     }
     private static async Task Reporter()

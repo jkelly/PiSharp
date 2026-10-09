@@ -24,7 +24,10 @@ public sealed class TransportSessionSummaryGenerator(Func<SessionSummaryRequest,
             { role = "user", content = new[] { new { type = "text", text = request.Prompt } }, timestamp }))));
         var source = transport(request) ?? throw new SessionCompactionException(SessionCompactionFailure.SummaryFailed);
         AssistantMessage? final = null; var count = 0; var cleanupFailed = false;
-        await foreach (var observation in source.StreamAsync(new(request.Model, messages, timestamp), cancellationToken).ConfigureAwait(false))
+        // compaction.ts completeSummarization: the request carries the summary's reasoning level (createSummarizationOptions) and its
+        // routing session id; the bound route applies model.reasoning and the cache retention.
+        var chatRequest = new ChatRequest(request.Model, messages, timestamp) { ThinkingLevel = request.ThinkingLevel, SessionId = request.SessionId };
+        await foreach (var observation in source.StreamAsync(chatRequest, cancellationToken).ConfigureAwait(false))
         {
             if (++count > maximumEvents || final is not null) throw new SessionCompactionException(SessionCompactionFailure.ResourceLimit);
             if (observation is StreamTerminalEvent terminal)
@@ -35,7 +38,7 @@ public sealed class TransportSessionSummaryGenerator(Func<SessionSummaryRequest,
                 // Provider errors and unrequested aborted terminals remain failed summaries.
                 if (terminal.Reason != terminal.Message.StopReason || terminal is StreamError &&
                     !(terminal.Reason == StopReason.Aborted && cancellationToken.IsCancellationRequested))
-                    throw Failed(terminal.Message);
+                    throw Failed(terminal.Message, request.Kind);
                 final = terminal.Message;
             }
         }
@@ -45,7 +48,7 @@ public sealed class TransportSessionSummaryGenerator(Func<SessionSummaryRequest,
         cancellationToken.ThrowIfCancellationRequested();
         if (final is null || final.StopReason is StopReason.Error or StopReason.Length or StopReason.Aborted or StopReason.Pending or StopReason.Deferred ||
             final.Content.IsDefault || final.Content.Any(content => content is ToolCallContent))
-            throw final is null ? new SessionCompactionException(SessionCompactionFailure.SummaryFailed) : Failed(final);
+            throw final is null ? new SessionCompactionException(SessionCompactionFailure.SummaryFailed) : Failed(final, request.Kind);
         // Validate owned usage and final wire envelope without persisting the assistant itself.
         _ = PiWireJson.WriteMessage(final);
         var text = string.Join('\n', final.Content.OfType<TextContent>().Select(content => content.Text));
@@ -54,12 +57,20 @@ public sealed class TransportSessionSummaryGenerator(Func<SessionSummaryRequest,
     }
 
     /// <summary>Carries the response's provider error text so summarization retry can classify it as Pi does.</summary>
-    private static SessionCompactionException Failed(AssistantMessage message)
+    private static SessionCompactionException Failed(AssistantMessage message, SessionSummaryKind kind)
     {
         string? error = null;
         if (message.StopReason == StopReason.Error && message.ExtraProperties?.TryGet("errorMessage", out var value) == true &&
             value is { Value.ValueKind: JsonValueKind.String }) error = value.Value.GetString();
+        // compaction.ts getSummarizationFailure with the label of the summary (compaction.ts, branch-summarization.ts).
+        var label = kind switch { SessionSummaryKind.TurnPrefix => "Turn prefix summarization", SessionSummaryKind.Branch => "Branch summarization", _ => "Summarization" };
+        var text = message.StopReason switch
+        {
+            StopReason.Error => $"{label} failed: {(string.IsNullOrEmpty(error) ? "Unknown error" : error)}",
+            StopReason.Length => $"{label} failed: generation hit the token cap and the summary is incomplete",
+            _ => null
+        };
         return new(SessionCompactionFailure.SummaryFailed)
-        { ProviderErrorMessage = message.StopReason == StopReason.Error ? error ?? "" : null, ProviderAborted = message.StopReason == StopReason.Aborted };
+        { ProviderErrorMessage = message.StopReason == StopReason.Error ? error ?? "" : null, ProviderAborted = message.StopReason == StopReason.Aborted, FailureText = text };
     }
 }

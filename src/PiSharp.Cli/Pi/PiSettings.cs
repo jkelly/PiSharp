@@ -38,12 +38,70 @@ internal sealed class PiSettings
         var project = projectTrusted ? LoadLayer(projectPath, "project", loadErrors) : [];
         var settings = new PiSettings(globalPath, projectPath, projectTrusted, global, project);
         settings.errors.AddRange(loadErrors);
+        settings.loadFailures.UnionWith(loadErrors);
         return settings;
     }
 
     /// <summary>Settings from explicit JSON objects (tests and in-memory composition).</summary>
     internal static PiSettings FromObjects(JsonObject global, JsonObject? project = null, bool projectTrusted = true) =>
-        new("<memory>/settings.json", "<memory>/.pi/settings.json", projectTrusted, Migrate(global), projectTrusted && project is not null ? Migrate(project) : []);
+        new("<memory>/settings.json", "<memory>/.pi/settings.json", projectTrusted, Migrate(global), projectTrusted && project is not null ? Migrate(project) : []) { inMemory = true };
+
+    private bool inMemory;
+
+    /// <summary>Source SettingsManager's single-field setters (setPackages, setProjectPackages, setExtensionPaths, …) and
+    /// persistScopedSettings: the field changes in the layer and the merged view, then the file is re-read under its
+    /// <c>settings.json.lock</c>, migrated, given the field (other keys kept, a null value removes it) and written as
+    /// <c>JSON.stringify(settings, null, 2)</c>. A layer that failed to load is not written; write failures are recorded as errors.
+    /// The project layer refuses writes when the project is untrusted.</summary>
+    internal void SetField(string scope, string field, JsonNode? value)
+    {
+        var project = scope == "project";
+        if (project && !ProjectTrusted) throw new InvalidOperationException("Project is not trusted; refusing to write project settings");
+        var layer = project ? Project : Global;
+        if (value is null) layer.Remove(field); else layer[field] = value.DeepClone();
+        Merged = Merge(Global, Project);
+        var path = project ? ProjectPath : GlobalPath;
+        if (inMemory || loadFailures.Any(error => error.Scope == (project ? "project" : "global"))) return;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            WithFileLock(path, () =>
+            {
+                var current = File.Exists(path) ? PiJson.Parse(PiPaths.ReadText(path)) as JsonObject
+                    ?? throw new JsonException("Settings must be a JSON object") : [];
+                Migrate(current);
+                if (value is null) current.Remove(field); else current[field] = value.DeepClone();
+                File.WriteAllText(path, PiJson.Stringify(current, indent: true), new System.Text.UTF8Encoding(false));
+            });
+        }
+        catch (Exception error) when (error is JsonException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        { errors.Add(new(project ? "project" : "global", path, error.Message)); }
+    }
+
+    private readonly HashSet<PiSettingsError> loadFailures = [];
+
+    /// <summary>proper-lockfile's lockSync as SettingsManager retries it: an exclusive <c>mkdir</c> of <c>&lt;file&gt;.lock</c>, ten
+    /// attempts 20 ms apart, stale after 10 s.</summary>
+    private static void WithFileLock(string path, Action run)
+    {
+        var lockPath = path + ".lock";
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                if (Directory.Exists(lockPath))
+                {
+                    if (DateTime.UtcNow - Directory.GetLastWriteTimeUtc(lockPath) > TimeSpan.FromSeconds(10)) Directory.Delete(lockPath);
+                    else throw new IOException("Lock file is already being held");
+                }
+                Directory.CreateDirectory(lockPath);
+                break;
+            }
+            catch (IOException) when (attempt < 10) { Thread.Sleep(20); }
+        }
+        try { run(); }
+        finally { try { Directory.Delete(lockPath); } catch (IOException) { } }
+    }
 
     private static JsonObject LoadLayer(string path, string scope, List<PiSettingsError> errors)
     {
@@ -52,7 +110,7 @@ internal sealed class PiSettings
             if (!File.Exists(path)) return [];
             var text = PiPaths.ReadText(path);
             if (text.Length == 0) return [];
-            var node = JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { MaxDepth = 256 });
+            var node = PiJson.Parse(text);
             if (node is not JsonObject settings) throw new JsonException("Settings must be a JSON object");
             return Migrate(settings);
         }

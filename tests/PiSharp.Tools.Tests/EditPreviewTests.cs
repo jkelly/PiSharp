@@ -209,7 +209,7 @@ internal static class EditPreviewTests
         using var temp = new TemporaryFiles(); var target = temp.Child("file"); await WriteNew(target, Encoding.UTF8.GetBytes("a\n"));
         var invalidPolicy = new Policy(target); var invalidOperations = new Operations(); var invalidProbe = new Probe();
         var limited = new EditPreview(temp.Root, temp.Root, invalidPolicy, invalidOperations, new(MaximumEdits: 1), invalidProbe);
-        foreach (var edits in new ImmutableArray<TextEdit>[] { default, [new("a", "A"), new("b", "B")], [new("\ud800", "x")], [new("a", "\0")] })
+        foreach (var edits in new ImmutableArray<TextEdit>[] { default, [new("a", "A"), new("b", "B")], [new("\ud800", "x")] })
             NativeFailure(await limited.ComputeAsync("file", edits), ToolFailureKind.InvalidArguments);
         Equal(0, invalidPolicy.Actions.Count); Equal(0, invalidProbe.Calls); Equal(0, invalidOperations.ReadCalls);
         foreach (var sample in new (byte[] Bytes, EditPreviewOptions Options, TextEdit Edit, string Error)[]
@@ -217,14 +217,20 @@ internal static class EditPreviewTests
             (Encoding.UTF8.GetBytes("123456789"), new(MaximumReadBytes: 8), new("1", "a"), new FileToolException(FileToolFailure.ResourceLimit).Message),
             (Encoding.UTF8.GetBytes("a\n"), new(MaximumPlanCharacters: 2), new("a", "long"), "Edit plan exceeds a configured logical limit."),
             (Encoding.UTF8.GetBytes("a\nb\n"), new(DiffOptions: new(MaximumLines: 1)), new("a", "A"), "Edit plan exceeds a configured logical limit."),
-            (Encoding.UTF8.GetBytes("a\n"), new(DiffOptions: new(MaximumOutputCharacters: 8)), new("a", "A"), "Edit plan exceeds a configured logical limit."),
-            ([0xFF, 0xFE], new(), new("a", "A"), new FileToolException(FileToolFailure.UnsupportedContent).Message),
-            ([0x61, 0x00], new(), new("a", "A"), new FileToolException(FileToolFailure.UnsupportedContent).Message)
+            (Encoding.UTF8.GetBytes("a\n"), new(DiffOptions: new(MaximumOutputCharacters: 8)), new("a", "A"), "Edit plan exceeds a configured logical limit.")
         })
         {
             var operations = new Operations { Read = (_, _, _) => ValueTask.FromResult<ReadOnlyMemory<byte>>(sample.Bytes) };
             var outcome = await new EditPreview(temp.Root, temp.Root, new Policy(target), operations, sample.Options).ComputeAsync("file", [sample.Edit]);
             Fulfilled(outcome); Equal(sample.Error, outcome.Preview!.Value.GetProperty("error").GetString()); Equal(0, operations.WriteCalls);
+        }
+        // Source computeEditsDiff reads with readFile(path, "utf-8"): undecodable bytes preview as U+FFFD; NUL and control characters are text.
+        foreach (var (bytes, edit, line) in new (byte[], TextEdit, string)[] { ([0xFF, 0xFE, 0x61], new("a", "A"), "+1 \ufffd\ufffdA"), ([0x61, 0x00], new("a", "\0"), "+1 \0\0") })
+        {
+            var operations = new Operations { Read = (_, _, _) => ValueTask.FromResult<ReadOnlyMemory<byte>>(bytes) };
+            var outcome = await new EditPreview(temp.Root, temp.Root, new Policy(target), operations).ComputeAsync("file", [edit]);
+            Fulfilled(outcome); Check(outcome.Preview!.Value.TryGetProperty("diff", out var diff) && diff.GetString()!.Contains(line, StringComparison.Ordinal),
+                "lossy preview: " + outcome.Preview.Value.GetRawText());
         }
         var unicode = "\ufeffuntouched\r\nvalue=\uff26\uff4f\uff4f-cafe\u0301 \ud83d\ude00\rEND";
         var unicodeBytes = Encoding.UTF8.GetBytes(unicode); var unicodeOperations = new Operations { Read = (_, _, _) => ValueTask.FromResult<ReadOnlyMemory<byte>>(unicodeBytes) };

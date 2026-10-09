@@ -17,15 +17,48 @@ internal interface IVirtualModelSession
 {
     IReadOnlyList<SessionEntry> Branch { get; }
     Task AppendStateAsync(JsonData data, CancellationToken cancellationToken);
+    /// <summary>The session's messages (agent-session.ts convertToLlm(this.messages)), routed for a summary.</summary>
+    IReadOnlyList<TranscriptEntry> Messages => [];
+    /// <summary>The session's thinking level (agent-session.ts this.thinkingLevel), routed for a summary.</summary>
+    string ThinkingLevel => "off";
 }
 
 /// <summary>The transport of a virtual selection: each request asks the router for its physical model and thinking level, records
 /// a changed router state on the branch, and streams through the physical model's own live route. The selection stays virtual;
 /// responses name the physical model that produced them.</summary>
 internal sealed class VirtualModelRoutingTransport(ModelRegistry registry, RegistryModel model, Func<RegistryModel, IChatTransport> physical,
-    Func<IVirtualModelSession?> session) : IChatTransport, IThinkingLevelTransport
+    Func<IVirtualModelSession?> session, Func<RegistryModel, int, string?, IChatTransport>? physicalSummary = null) : IChatTransport, IThinkingLevelTransport
 {
     private readonly ConcurrentDictionary<string, IChatTransport> _routes = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// agent-session.ts _getSummarizationRequestAuth for a virtual selection: one routing per summary with reason "direct", the
+    /// session's messages and thinking level and no router state (model-runtime.ts resolveModel); the summary then goes to the routed
+    /// physical model's summary route at <paramref name="maximum"/> (clamped there to its own cap) with the routed thinking level when
+    /// the summary carries one (compaction and bug reports, not branch summaries). The router's new state is not recorded.
+    /// </summary>
+    internal IChatTransport Summary(int maximum, bool carriesLevel) => new SummaryRoute(this, maximum, carriesLevel);
+
+    private sealed class SummaryRoute(VirtualModelRoutingTransport owner, int maximum, bool carriesLevel) : IChatTransport
+    {
+        public IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default) =>
+            owner.SummaryStreamAsync(request, maximum, carriesLevel, cancellationToken);
+    }
+
+    private async IAsyncEnumerable<StreamEvent> SummaryStreamAsync(ChatRequest request, int maximum, bool carriesLevel,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var target = physicalSummary ?? throw new InvalidOperationException("This virtual route has no summary route.");
+        var current = session();
+        var branch = (current?.Branch ?? []).Select(Entry).ToList();
+        var messages = (current?.Messages ?? []).Select(message => message.WireBody.Value.ValueKind == JsonValueKind.Object
+            ? JsonNode.Parse(message.WireBody.Value.GetRawText())!.AsObject() : new JsonObject()).ToList();
+        var route = await registry.ResolveVirtualAsync(model, branch, messages, ModelRouteReason.Direct, current?.ThinkingLevel ?? "off",
+            null, null, cancellationToken).ConfigureAwait(false);
+        var routed = request with { Model = new(route.Model.Id, route.Model.Api, route.Model.Provider) };
+        await foreach (var observation in target(route.Model, maximum, carriesLevel ? route.ThinkingLevel : null)
+            .StreamAsync(routed, cancellationToken).ConfigureAwait(false)) yield return observation;
+    }
 
     /// <summary>IMPL-E seam for the live route of a virtual selection. Upstream registers virtual models only through the extension
     /// API (pi.registerVirtualModel), so no live session selects one yet; a host that admits that registration builds the session
@@ -36,12 +69,19 @@ internal sealed class VirtualModelRoutingTransport(ModelRegistry registry, Regis
     {
         ArgumentNullException.ThrowIfNull(registry); ArgumentNullException.ThrowIfNull(connections);
         if (!VirtualModels.IsVirtual(model)) throw new ArgumentException("A virtual route needs a virtual model.", nameof(model));
-        return new(registry, model, physical =>
+        // One live connection per physical model serves both its requests and its summaries.
+        var live = new ConcurrentDictionary<string, Lazy<Commands.LiveSessionConnection>>(StringComparer.Ordinal);
+        Commands.LiveSessionConnection Connect(RegistryModel physical) => live.GetOrAdd(physical.Reference, _ => new(() =>
         {
-            var connection = Commands.LiveSessionSelection.FromEntry(physical, registry, maximumTokens).Connect(runtime);
+            var connection = Commands.LiveSessionSelection.FromEntry(physical, registry, maximumTokens, useModelMaximum: maximumTokens is null).Connect(runtime);
             lock (connections) connections.Add(connection);
-            return connection.CreateTransport();
-        }, session);
+            return connection;
+        })).Value;
+        return new(registry, model, physical => Connect(physical).CreateTransport(), session, (physical, maximum, level) =>
+        {
+            var connection = Connect(physical);
+            return connection.CreateSummaryTransport(Math.Min(maximum, connection.MaximumOutputTokens), level);
+        });
     }
 
     public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor descriptor) => VirtualModels.SupportedThinkingLevels(model);

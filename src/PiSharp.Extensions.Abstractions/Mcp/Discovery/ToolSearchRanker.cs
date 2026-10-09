@@ -24,7 +24,7 @@ public static partial class ToolSearch
     public const string Description = "# Tool discovery\n\nSearches over deferred tool metadata with BM25 and exposes matching tools for the next model call.\n\n" +
         "Some of the tools, such as tools of MCP servers, may not have been provided to you upfront, and you should use this tool (`tool_search`) " +
         "to search for the required tools. For MCP tool discovery, always use `tool_search`.";
-    /// <summary>The tool's promptSnippet. PiSharp's system prompt does not list tool snippets yet, so nothing renders it.</summary>
+    /// <summary>The tool's promptSnippet, listed in the system prompt (PiSystemPrompt.ToolSnippets) while tool_search is active.</summary>
     public const string PromptSnippet = "Search for tools that are not loaded yet and load the matches";
     public const string NoMatches = "No matching tools found.";
 

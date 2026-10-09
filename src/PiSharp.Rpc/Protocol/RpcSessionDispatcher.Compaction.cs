@@ -22,20 +22,31 @@ public sealed partial class RpcSessionDispatcher
         if (!manualWire && !upstreamToggle && command.ExpectedGeneration != attachment.Generation)
             throw new RpcCommandException(command.Id, command.Type, command.Type == "pisharp_set_auto_compaction"
                 ? "Automatic summary configuration generation is stale." : "Summary session generation is stale.");
+        // agent-session.ts compact/_runAutoCompaction: settingsManager.getCompactionSettings(model) for the upstream commands.
+        SessionCompactionSettings? hostSettings = null;
+        if ((manualWire || upstreamToggle) && _compactionSettings is not null)
+        {
+            try { hostSettings = _compactionSettings(attachment.Session.Snapshot.Agent.Model); }
+            catch (InvalidOperationException error) { throw new RpcCommandException(command.Id, command.Type, "Compaction failed: " + error.Message); }
+        }
         if (upstreamToggle || command.Type == "pisharp_set_auto_compaction")
         {
-            var request = upstreamToggle ? new SessionCompactionRequest(ContextWindow: SummaryContextWindow(command, attachment), Automatic: true)
+            var request = upstreamToggle ? new SessionCompactionRequest(hostSettings, ContextWindow: SummaryContextWindow(command, attachment), Automatic: true)
                 : command.Compaction!;
             _ = RpcCommandCodec.Success(command, null, _options);
             await _sessionOwner.ConfigureAutomaticCompactionAsync(attachment,
                 command.Mode == "enabled" ? _summaryGenerator : null, request, token, _recoveryDesiredMaxOutput).ConfigureAwait(false);
             return null;
         }
-        // The native transaction requires idle admission; unlike upstream compact(), this command does not implicitly abort a run.
+        // agent-session.ts compact(): `await this.abort()` first, which aborts a running agent loop and waits for idle, so the
+        // native transaction is admitted idle. An extension command that awaits ctx.compact runs outside the agent loop (no run
+        // to abort). A callback of the running loop itself cannot wait for that loop's settlement, so it is still refused.
         if (manualWire)
         {
-            lock (_gate) if (_run is not null)
+            bool running; lock (_gate) running = _run is not null;
+            if (running && _inCallback.Value)
                 throw new RpcCommandException(command.Id, command.Type, "Session is processing or settling; manual compaction requires idle admission.");
+            if (running) await AbortAsync(token).ConfigureAwait(false);
         }
         var operation = new ContextEditCommand(); lock (_gate) { ThrowOpen(); _contextEdits.Add(operation); }
         try
@@ -64,8 +75,10 @@ public sealed partial class RpcSessionDispatcher
                     _ = RpcCommandCodec.Success(command, data, _options);
                     return ValueTask.CompletedTask;
                 }
-                var receipt = command.Compaction is not null
-                    ? await _sessionOwner.CompactAsync(attachment, command.Compaction, _summaryGenerator!, cancellation.Token, Validate).ConfigureAwait(false)
+                var compaction = manualWire && hostSettings is not null && command.Compaction is not null
+                    ? command.Compaction with { Settings = hostSettings } : command.Compaction;
+                var receipt = compaction is not null
+                    ? await _sessionOwner.CompactAsync(attachment, compaction, _summaryGenerator!, cancellation.Token, Validate).ConfigureAwait(false)
                     : await _sessionOwner.SummarizeBranchAsync(attachment, command.BranchSummary!, _summaryGenerator!, cancellation.Token, Validate).ConfigureAwait(false);
                 if (!manualWire) return NativeResponse(receipt?.Entry);
                 if (receipt is null)
@@ -99,9 +112,26 @@ public sealed partial class RpcSessionDispatcher
         }
     }
 
+    /// <summary>Pi ExtensionContext.compact(): the current session's manual compaction as the <c>compact</c> command runs it (its
+    /// compaction events included), with no response record; upstream's compact() first aborts a run in progress. Returns the
+    /// CompactionResult data; failures throw with the command's message.</summary>
+    public async Task<JsonData> CompactForExtensionAsync(SessionCompactionRequest request, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        // From a command's own input (ctx.compact awaited by the command) the compaction runs within that input; otherwise it aborts a
+        // run and waits for the session to settle.
+        if (_sessionOwner?.Current.Session.IsExecutingInputCallback != true)
+        {
+            lock (_gate) if (_run is not null) _session.Abort();
+            await WaitForIdleAsync(token).ConfigureAwait(false);
+        }
+        var command = new RpcCommandEnvelope(null, "compact", Compaction: request);
+        return (await SummaryCommandAsync(command, _sessionOwner?.Current, token).ConfigureAwait(false))!;
+    }
+
     private double SummaryContextWindow(RpcCommandEnvelope command, AgentSessionAttachment attachment)
     {
-        if (!_models.TryGetValue(attachment.Session.Snapshot.Agent.Model, out var model) ||
+        if (!TryGetModel(attachment.Session.Snapshot.Agent.Model, out var model) ||
             !model.Value.GetProperty("contextWindow").TryGetDouble(out var window) || !double.IsFinite(window) || window <= 0)
             throw new RpcCommandException(command.Id, command.Type, "Automatic compaction requires a positive finite model context window.");
         return window;

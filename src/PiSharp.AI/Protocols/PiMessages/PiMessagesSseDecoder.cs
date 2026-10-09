@@ -55,7 +55,8 @@ public sealed class PiMessagesSseDecoder
         {
             if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
             var data = TrimJs(line[5..]);
-            return data.Length == 0 || data == "[DONE]" ? null : PiMessagesData.Admit(JsonData.Parse(data), _options);
+            // pi-messages.ts parseEvent: JSON.parse(data), so duplicate names keep the last value.
+            return data.Length == 0 || data == "[DONE]" ? null : PiMessagesData.Admit(StreamingJson.JsonParse(data), _options);
         }
         return null;
     }

@@ -97,10 +97,11 @@ internal sealed class LiveProviderRoute
         await authentication.ResolveAsync(token).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Provider is not configured: " + selection.Model.Provider);
 
-    /// <summary>Binds the provider's protocol for the main route or a summary (no caching, thinking off).</summary>
-    internal NativeHttpModelProvider Create(HttpMessageHandler? handler, int maximum, bool summary)
+    /// <summary>Binds the provider's protocol for the main route or a summary (no caching; thinking off unless <paramref name="thinking"/>,
+    /// a summary carrying a reasoning level, keeps the route's thinking binding).</summary>
+    internal NativeHttpModelProvider Create(HttpMessageHandler? handler, int maximum, bool summary, bool thinking = false)
     {
-        var model = selection.Model; var definition = selection.Definition;
+        var model = selection.Model; var definition = selection.Definition; var plain = summary && !thinking;
         switch (model.Provider)
         {
             case "amazon-bedrock":
@@ -109,14 +110,14 @@ internal sealed class LiveProviderRoute
                     MaxTokens = maximum, CacheRetention = summary ? "none" : null,
                     Auth = async token => { var auth = await CurrentAsync(token).ConfigureAwait(false); return (auth.ApiKey, auth.Environment); }
                 }, new AwsEnvironment(environment.Get, runtime.HomeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    credentialHttp.Value, runtime.Time) { RunCredentialProcess = AwsCredentialProcess.RunAsync }, handler, summary && Levels(definition).Contains("off") ? "off" : null);
+                    credentialHttp.Value, runtime.Time) { RunCredentialProcess = AwsCredentialProcess.RunAsync }, handler, plain && Levels(definition).Contains("off") ? "off" : null);
             case "openai-codex":
                 return NativeProviderFactory.CreateCodexResponses(model, definition.Raw, new OpenAICodexResponsesOptions
                 {
                     CacheRetention = summary ? "none" : null,
                     ModelHeaders = Headers(definition)
                 }, async token => (await CurrentAsync(token).ConfigureAwait(false)).ApiKey ?? throw new InvalidOperationException("No API key for provider: openai-codex"),
-                    handler, summary && Levels(definition).Contains("off") ? "off" : null);
+                    handler, plain && Levels(definition).Contains("off") ? "off" : null);
             case "google-vertex":
             {
                 var adc = new PiSharp.AI.Protocols.GoogleVertex.GoogleApplicationDefaultCredentials(credentialHttp.Value, environment.Get,
@@ -133,7 +134,7 @@ internal sealed class LiveProviderRoute
                     if (location is null) throw new InvalidOperationException("Vertex AI requires a location. Set GOOGLE_CLOUD_LOCATION or pass location in options.");
                     var access = await adc.AccessTokenAsync(auth.Environment?.GetValueOrDefault("GOOGLE_APPLICATION_CREDENTIALS"), token).ConfigureAwait(false);
                     return new(PiSharp.AI.Protocols.GoogleVertex.GoogleVertexEndpoints.Adc(model.Id, project, location, definition.BaseUrl), access, false, project, location);
-                }, maximum, summary, handler);
+                }, maximum, plain, handler);
             }
             default:
                 return NativeProviderFactory.CreateProviderRoute(model, definition.Raw, new ProviderRouteOptions(async token =>
@@ -142,7 +143,7 @@ internal sealed class LiveProviderRoute
                     var baseUrl = ProviderHeaderPolicies.ResolveCloudflareBaseUrl(auth.BaseUrl ?? definition.BaseUrl, auth.Environment);
                     return new ProviderRequestAuth(auth.ApiKey, baseUrl, auth.Headers);
                 })
-                { MaxTokens = maximum, Summary = summary, MaximumMessages = PiRequestBudget.RequestMessages }, handler);
+                { MaxTokens = maximum, Summary = summary, SummaryThinking = thinking, MaximumMessages = PiRequestBudget.RequestMessages }, handler);
         }
     }
 

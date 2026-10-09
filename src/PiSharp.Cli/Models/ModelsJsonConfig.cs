@@ -44,8 +44,10 @@ internal sealed partial class ModelsJsonConfig
     internal static ModelsJsonConfig Parse(string content, string path)
     {
         JsonNode? parsed;
-        try { parsed = JsonTree.Parse(StripJsonComments(StripBom(content))); }
-        catch (JsonException error) { return new([], $"Failed to parse models.json: {error.Message}\n\nFile: {path}"); }
+        var stripped = StripJsonComments(StripBom(content));
+        try { parsed = JsonTree.Parse(stripped); }
+        catch (JsonException error)
+        { return new([], $"Failed to parse models.json: {PiSharp.Contracts.Compatibility.JsJsonSyntax.Describe(stripped, error.Message)}\n\nFile: {path}"); }
         var errors = new List<string>();
         ModelsConfigSchema.Validate(parsed, "", errors);
         if (errors.Count > 0)

@@ -95,17 +95,24 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     internal async ValueTask AttachSessionAsync(PersistentAgentSession session, string reason, CancellationToken token)
     { await AttachOwnerAsync(session).ConfigureAwait(false); await StartLifecycleAsync(reason, token).ConfigureAwait(false); }
     private readonly ImmutableArray<string>? _initialActiveTools;
-    internal async Task ApplyInitialToolSelectionAsync(PersistentAgentSession session, CancellationToken token)
+    /// <summary>sdk.ts createAgentSession initialActiveToolNames. For a resumed session (<paramref name="resumed"/>) the names are applied
+    /// in memory, as the AgentSession constructor applies them, and the next prompt records the loadout: opening a session writes nothing.</summary>
+    internal async Task ApplyInitialToolSelectionAsync(PersistentAgentSession session, CancellationToken token, bool resumed = false)
     {
+        ImmutableArray<string>? initial = null;
         if (mcpRuntime is not null)
         {
             var registry = session.CaptureToolCatalogRegistry();
             var selection = registry.LifetimeToolSelection ?? throw new InvalidOperationException("Admitted catalog requires an explicit lifetime selection.");
-            var selectedNames = selection.SelectInitial(registry.RegisteredTools.Select(tool => new PiSharp.CodingAgent.ToolSelection.ToolSelectionDescriptor(
+            initial = selection.SelectInitial(registry.RegisteredTools.Select(tool => new PiSharp.CodingAgent.ToolSelection.ToolSelectionDescriptor(
                 tool.Adapter.Name, tool.Exposure, tool.DefaultActive, tool.IsExtension)).ToImmutableArray());
-            await session.SetActiveToolsAsync(selectedNames, token).ConfigureAwait(false);
         }
-        else if (_initialActiveTools is { } names) await session.SetActiveToolsAsync(names, token).ConfigureAwait(false);
+        else if (_initialActiveTools is { } names) initial = names;
+        if (initial is { } selected)
+        {
+            if (resumed) await session.ApplyInitialToolsAsync(selected, token).ConfigureAwait(false);
+            else await session.SetActiveToolsAsync(selected, token).ConfigureAwait(false);
+        }
         await DrainLoadoutDiagnosticsAsync(token).ConfigureAwait(false);
     }
     private readonly SessionRuntimeRegistry _startupRegistry;
@@ -114,11 +121,31 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     internal ToolInvoker ExportHtmlWriter { get; }
     public ModelDescriptor SelectedModel { get; }
     internal bool IsLive => _live is not null;
+    private LiveModelCatalog? _liveModels;
+    /// <summary>The models this live session can switch to (null until <see cref="EnableModelSwitchingAsync"/>).</summary>
+    internal LiveModelCatalog? LiveModels => _liveModels;
+    /// <summary>sdk.ts restore fallback: the model a restored session runs with when its branch's model is not bound (null refuses).</summary>
+    internal Func<PiSharp.Sessions.Context.SessionContextModel, ModelDescriptor?, ModelDescriptor?>? RestoreFallback { get; set; }
+
+    /// <summary>agent-session.ts setModel/cycleModel: binds the run registry's available models to this session's runtime (each
+    /// connects on first use, with the extensions' provider request hooks for its model).</summary>
+    internal async Task<LiveModelCatalog?> EnableModelSwitchingAsync(LiveSessionRuntime runtime, CancellationToken token)
+    {
+        if (_live is null || _liveModels is not null) return _liveModels;
+        LiveSessionRuntime RuntimeFor(ModelDescriptor model) => _extension?.ProviderHttpHooks(model) is { } hooks
+            ? runtime with { CreateHttpHandler = () => hooks(runtime.CreateHttpHandler()) } : runtime;
+        var catalog = new LiveModelCatalog(runtime, RuntimeFor,
+            binding => DecorateOriginalPromptBinding(binding with { Hooks = _extension?.Binding.ContextHooks }), _startupRegistry, SelectedModel, SelectedModelWire);
+        _liveModels = catalog;
+        await catalog.RefreshAsync(token).ConfigureAwait(false);
+        return catalog;
+    }
     internal FrozenCatalogModel SelectedModelDefinition { get; }
     internal JsonData SelectedModelWire
     {
         get
         {
+            if (SelectedModel == LiveSessionSelection.UnselectedModel) return LiveSessionSelection.UnselectedWire;
             using var bytes = new MemoryStream();
             using (var writer = new Utf8JsonWriter(bytes))
             {
@@ -134,6 +161,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     internal double OriginalDesiredMaxOutput => _live?.MaximumOutputTokens ?? 8192;
     public string Workspace { get; }
     public JsonData InitialSystem { get; private set; }
+    /// <summary>The names <see cref="InitialSystem"/> declares, in order: a new session's initial loadout.</summary>
+    internal ImmutableArray<string> InitialToolNames => InitialSystem.Value.TryGetProperty("toolsAdded", out var tools) && tools.ValueKind == JsonValueKind.Array
+        ? tools.EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!).ToImmutableArray() : [];
     public object[] Requests => _handler.Requests.ToArray();
     public object[] Actions => _policy.Actions.ToArray();
     public int UsedTurns => _handler.Requests.Count;
@@ -145,10 +175,24 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
 
     private IChatTransport SummaryTransport(SessionSummaryRequest summary)
     {
-        if (summary.Model != SelectedModel || summary.ThinkingLevel is not null || summary.CacheRetention != "none" ||
+        // A model the session switched to summarizes through its own live route.
+        if (summary.Model != SelectedModel && _liveModels?.Transport(summary.Model) is { } switched &&
+            summary.CacheRetention == "none" && summary.MaximumOutputTokens is > 0 and <= 1_000_000 && summary.MaximumOutputTokens == Math.Floor(summary.MaximumOutputTokens))
+            return switched.Summary((int)summary.MaximumOutputTokens, summary.ThinkingLevel, summary.Kind != SessionSummaryKind.Branch);
+        if (summary.Model != SelectedModel || summary.CacheRetention != "none" ||
             summary.MaximumOutputTokens is <= 0 or > 1_000_000 || summary.MaximumOutputTokens != Math.Floor(summary.MaximumOutputTokens))
             throw new SessionCompactionException(SessionCompactionFailure.InvalidSettings);
-        if (_live is not null) return _live.CreateTransport((int)summary.MaximumOutputTokens, summary: true);
+        // compaction.ts: maxTokens = min(budget, model.maxTokens); the live route's cap is the model's (a virtual selection's
+        // routed physical model applies its own).
+        if (_live is not null)
+            return _live.CreateSummaryTransport(_live.IsVirtual ? (int)summary.MaximumOutputTokens : Math.Min((int)summary.MaximumOutputTokens, _live.MaximumOutputTokens),
+                summary.ThinkingLevel, summary.Kind != SessionSummaryKind.Branch);
+        // The offline profile's own requests never reason (its transports project reasoning off), so its summaries do not either.
+        return new LiveSessionConnection.SummaryLevelTransport(OfflineSummaryTransport(summary), null, offWhenOffered: false);
+    }
+
+    private IChatTransport OfflineSummaryTransport(SessionSummaryRequest summary)
+    {
         if (SelectedModel.Api == "anthropic-messages")
         {
             var factory = new AnthropicMessagesKeyAuthRequestFactory(AnthropicBase, SelectedModel,
@@ -182,7 +226,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     private OfflineSessionProfile(string workspace, BuiltinToolCatalog tools, FilePolicy policy, Handler handler, ModelDescriptor model,
         BashTool? bash, NativeExtensionActivation? extension, FrozenCatalogModel modelDefinition, OwnedProcessCleanup? processCleanup, LiveSessionConnection? live = null,
         InitialToolSelection? toolSelection = null, bool deferCatalogValidation = false,
-        OriginalSystemPromptAdmission? originalSystemPrompt = null)
+        OriginalSystemPromptAdmission? originalSystemPrompt = null, bool piEntry = false)
     {
         if (live is null) RequireSelectedModelDefinition(model, modelDefinition);
         Workspace = workspace; _policy = policy; _handler = handler; SelectedModel = model; _extension = extension;
@@ -231,16 +275,25 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             : new ToolInvokerOptions(MaximumArgumentCharacters: 96_000, MaximumActionCharacters: 192_000,
                 MaximumResultCharacters: PiPayloadBudget.ToolResultCharacters, MaximumActionEntries: 1026)) with
             { MaximumStructuredContentCharacters = PiPayloadBudget.ToolResultCharacters + 65_536 };
+        // The Pi entry declares and calls every registered tool and keeps every content block (agent.ts/agent-loop.ts have no count bound).
+        if (piEntry) invokerOptions = PiPayloadBudget.PiInvoker(invokerOptions);
         _profileInvokerOptions = invokerOptions;
         if (extension is not null)
         {
             policy.ExtensionTargets = extension.Targets;
+            if (extension.Pi is not null) policy.ExtensionGrant = extension.IsCurrentToolTarget;
             extension.Bind(policy, invokerOptions);
+            // A Pi extension tool with a built-in name replaces the built-in (agent-session.ts: custom definitions override the base ones).
+            if (extension.Pi is not null)
+                registrations = registrations.RemoveAll(tool => extension.EnabledAdapters.Any(adapter => adapter.Name == tool.Adapter.Name));
             registrations = registrations.AddRange(extension.EnabledAdapters.Select((adapter, index) =>
-                new SessionRegisteredTool(extension.EnabledDeclarations[index], adapter, ToolExecutionMode.Sequential)
+                // Pi extension tools run in parallel batches unless one declares executionMode "sequential" (agent-loop.ts).
+                new SessionRegisteredTool(extension.EnabledDeclarations[index], adapter,
+                    extension.Pi is null || extension.EnabledRegistrations[index].SequentialExecution ? ToolExecutionMode.Sequential : ToolExecutionMode.Parallel)
                 { IsExtension = true, Exposure = extension.EnabledRegistrations[index].Exposure, Namespace = extension.EnabledRegistrations[index].Namespace,
                     DefaultActive = extension.EnabledRegistrations[index].DefaultActive,
-                    PromptGuidelines = extension.EnabledRegistrations[index].PromptGuidelines,
+                    PromptGuidelines = extension.EnabledRegistrations[index].PromptGuidelines, Annotations = extension.EnabledRegistrations[index].Annotations,
+                    PromptSnippet = extension.EnabledRegistrations[index].PromptSnippet, OutputSchema = extension.EnabledRegistrations[index].OutputSchema,
                     PrepareLoadout = extension.Binding.GetLoadoutPreparation(adapter.Name) }));
         }
         if (toolSelection is not null)
@@ -282,12 +335,19 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             .Select(value => value.Adapter.Name).ToImmutableArray();
         startupOriginalPrompt = OriginalSystemPromptBuilder.Capture(originalSystemPrompt ?? new() { CustomPrompt = literalSystem },
             workspace, initialTools, literal: originalSystemPrompt is null);
-        _startupRegistry = new([DecorateOriginalPromptBinding(new(model, transport, ExecutionMode: ToolExecutionMode.Sequential, Hooks: extension?.Binding.ContextHooks))], registrations, policy,
-            new SessionRuntimeRegistryOptions(MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
+        if (originalSystemPrompt is not null && extension?.Pi is { } piHost)
+            startupOriginalPrompt = WithExtensionToolPrompts(startupOriginalPrompt, registrations, piHost.Extensions
+                .SelectMany(loaded => (loaded.Descriptor["tools"] as System.Text.Json.Nodes.JsonArray ?? []).OfType<System.Text.Json.Nodes.JsonObject>())
+                .Select(tool => tool["name"]!.GetValue<string>()).ToHashSet(StringComparer.Ordinal));
+        // Pi runs a turn's tool calls in parallel (Agent toolExecution "parallel"); other profiles keep their sequential batches.
+        _startupRegistry = new([DecorateOriginalPromptBinding(new(model, transport, ExecutionMode: policy.Pi is not null ? ToolExecutionMode.Parallel : ToolExecutionMode.Sequential,
+            Hooks: extension?.Binding.ContextHooks))], registrations, policy,
+            new SessionRuntimeRegistryOptions(MaximumModels: piEntry ? int.MaxValue : 4096, MaximumTools: piEntry ? int.MaxValue : 128,
+                MaximumMessages: piEntry ? int.MaxValue : PiRequestBudget.RequestMessages, MaximumDeclarations: piEntry ? int.MaxValue : PiRequestBudget.RequestItems, MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
                 LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
                 BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
                 DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync,
-                PreparePromptSections = PrepareDurablePromptSections });
+                PreparePromptSections = PrepareDurablePromptSections, RestoreFallbackModel = (saved, fallback) => RestoreFallback?.Invoke(saved, fallback) });
         // Publish installed metadata into the exact native baseline before any session/model resolution.
         // MCP runtime clones retain this catalog holder through the actual WithToolCatalog pipeline.
         extension?.RegistrationInstallation?.ConfigureModelCatalog(_startupRegistry, _startupRegistry.CaptureModelCatalog().Bindings, DecorateOriginalPromptBinding);
@@ -311,6 +371,27 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             InitialSystem = JsonData.Parse(built.ToJsonString());
         }
     }
+
+    /// <summary>A selected model's route that connects on its first request, over a registry read at that moment (model-runtime.ts
+    /// prepareRequest resolves auth per request). Anthropic resolves as <see cref="LiveSessionSelection.ResolveAnthropicAsync"/> does.</summary>
+    private static LiveSessionConnection DeferredConnection(LiveSessionSelection selection, LiveSessionRuntime runtime) =>
+        LiveSessionConnection.Deferred(selection, selection.Entry is { } entry ? PiSharp.Cli.Models.VirtualModels.SupportedThinkingLevels(entry)
+            : PiSharp.AI.Protocols.ProviderShared.ProviderTranscriptAccess.SupportedThinkingLevels(selection.Definition.Raw), async token =>
+            {
+                var fresh = selection.WithRegistry(await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false));
+                try
+                {
+                    if (fresh.Model.Provider == "anthropic" && fresh.Model.Api == "anthropic-messages")
+                    {
+                        var (authentication, handler, reresolve) = await fresh.ResolveAnthropicAsync(runtime, token).ConfigureAwait(false);
+                        return await fresh.ConnectResolvedAnthropicAsync(authentication, handler, token, reresolve).ConfigureAwait(false);
+                    }
+                    return fresh.Connect(runtime);
+                }
+                // model-runtime.ts prepareRequest: no auth resolution for the provider.
+                catch (LiveSessionException error) when (error.Code == "MissingLiveApiKey")
+                { throw new LiveSessionConnection.ProviderNotConfiguredException("Provider is not configured: " + fresh.Model.Provider); }
+            });
 
     internal static ModelDescriptor SelectModel(string? offlineApi) => offlineApi switch
     {
@@ -356,7 +437,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         ImmutableArray<string> commands, string? timeout)
     {
         if (executable is null && spillRoot is null && commands.IsEmpty && timeout is null) return null;
-        if (!OperatingSystem.IsWindows()) throw new SessionCommandException(SessionCommandFailure.UnsupportedBashPlatform);
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) throw new SessionCommandException(SessionCommandFailure.UnsupportedBashPlatform);
         if (spillRoot is null || commands.Length is < 1 or > 16)
             throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
         var exact = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal); long characters = 0;
@@ -391,8 +472,10 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null,
         OriginalSystemPromptAdmission? originalSystemPrompt = null, BuiltinToolSettings? toolSettings = null,
         PiSharp.Cli.Mcp.McpRegisteredServers? mcpRegistrations = null,
-        PiSharp.Cli.Pi.PiToolPolicy? toolPolicy = null)
+        PiSharp.Cli.Pi.PiToolPolicy? toolPolicy = null, PiSharp.Cli.Extensions.Pi.PiExtensionHost? piExtensions = null,
+        bool deferMissingCredentials = false, bool piEntry = false)
     {
+        if (piExtensions is not null && extension is not null) throw new ArgumentException("A published native extension and Pi extensions cannot share one profile.");
         toolSettings ??= BuiltinToolSettings.Default;
         if (configuredExecInstallation is not null && (extension is null || configuredExecInstallation.GetInvocationList().Length != 1))
             throw new ArgumentException("One native extension and one explicit execution installation factory required.");
@@ -478,7 +561,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         if (bash is not null)
         {
             token.ThrowIfCancellationRequested();
-            if (!OperatingSystem.IsWindows()) throw new SessionCommandException(SessionCommandFailure.UnsupportedBashPlatform);
+            // Windows runs the native job-object runner; Linux and macOS the POSIX process-group admission, as the pi policy does.
+            if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+                throw new SessionCommandException(SessionCommandFailure.UnsupportedBashPlatform);
             // Pi getShellConfig: the explicit shell (--bash-executable, like settings shellPath), else platform discovery.
             ShellConfiguration shell;
             try { shell = bash.Executable is { } configured ? ShellDiscovery.ForBash(configured) : ShellDiscovery.Resolve(toolSettings.ShellPath); }
@@ -490,8 +575,12 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 !(FilePolicy.Comparer.Equals(spillRoot, canonicalWorkspace) || FilePolicy.Within(canonicalWorkspace, spillRoot)) ||
                 reserved.Contains(spillRoot))
                 throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
-            var windows = SessionCommands.Absolute(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
-            if (!Directory.Exists(windows)) throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
+            string? windows = null;
+            if (OperatingSystem.IsWindows())
+            {
+                windows = SessionCommands.Absolute(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
+                if (!Directory.Exists(windows)) throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
+            }
             var spillDirectory = Path.Combine(spillRoot, "pisharp-bash-" + Guid.NewGuid().ToString("N"));
             if (File.Exists(spillDirectory) || Directory.Exists(spillDirectory))
                 throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
@@ -499,26 +588,36 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             var canonicalSpill = SessionCommands.Absolute(await files.CanonicalizeAsync(spillDirectory, token));
             if (!FilePolicy.Comparer.Equals(spillDirectory, canonicalSpill))
                 throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
-            var environment = ImmutableDictionary<string, string>.Empty.Add("SystemRoot", windows)
+            // The explicit grant keeps a minimal environment: the system root (Windows) or the standard PATH (POSIX), the spill
+            // directory as the temporary directory, and a UTF-8 locale.
+            var environment = (windows is not null ? ImmutableDictionary<string, string>.Empty.Add("SystemRoot", windows)
+                    : ImmutableDictionary<string, string>.Empty.Add("PATH", "/usr/local/bin:/usr/bin:/bin").Add("TMPDIR", canonicalSpill))
                 .Add("TEMP", canonicalSpill).Add("TMP", canonicalSpill).Add("LANG", "C.UTF-8").Add("LC_ALL", "C.UTF-8");
             grant = new(shell, toolSettings.ShellCommandPrefix, canonicalWorkspace, canonicalSpill, environment, bash.Commands, bash.Timeout, files);
             // Pi spills any amount of command output to its file; only the in-memory tail is bounded.
             var unboundedOutput = new ProcessRunnerOptions(MaximumRawBytes: int.MaxValue);
-            processCleanup = new(new NativeProcessRunner(unboundedOutput));
+            processCleanup = new(OperatingSystem.IsWindows() ? new NativeProcessRunner(unboundedOutput)
+                : new PiSharp.Tools.Processes.Unix.UnixProcessRunner(new PiSharp.Tools.Processes.Unix.PosixSpawnProcessAdmission(), unboundedOutput));
             // Pi exposes PI_SESSION_ID, PI_SESSION_FILE, PI_PROVIDER, PI_MODEL and PI_REASONING_LEVEL to model bash commands.
             bashTool = new(processCleanup, BashToolOptions.FromShell(shell, canonicalWorkspace, environment, canonicalSpill) with
             { CommandPrefix = toolSettings.ShellCommandPrefix, SessionEnvironment = () => CurrentBashSession(bashOwner) });
-            userBash = new(new(new NativeShellOperations(shell, environment, canonicalSpill, unboundedOutput), canonicalSpill), toolSettings.ShellCommandPrefix);
+            IShellOperations operations = OperatingSystem.IsWindows() ? new NativeShellOperations(shell, environment, canonicalSpill, unboundedOutput)
+                : new PiSharp.Tools.Processes.Unix.PosixShellOperations(shell, environment, canonicalSpill);
+            userBash = new(new(operations, canonicalSpill), toolSettings.ShellCommandPrefix);
         }
         var piPolicy = toolPolicy is { Mode: PiSharp.Cli.Pi.PiToolPolicyMode.Pi } ? toolPolicy : null;
         string? piShell = null;
         if (piPolicy is not null && bashTool is null)
             (bashTool, userBash, processCleanup, piShell) = PiBash(piPolicy, toolSettings, canonicalWorkspace, () => CurrentBashSession(bashOwner));
-        // Pi's grep and find over rg/fd from <agentDir>/bin or PATH, downloaded on first use (tools-manager.ts).
-        var piSearch = piPolicy?.Search is { } toolsManager && grepHost is null
-            ? new PiSharp.Cli.Pi.PiSearchTools(toolsManager, canonicalWorkspace, PiProcessRunner, piPolicy.Environment ?? ProcessEnvironment(), piPolicy.ReportToolStatus) : null;
         var policy = new FilePolicy(canonicalWorkspace, reads, writes, reserved, grant, grepHost)
         { Pi = piPolicy, PiShell = piShell, ProtectedRoots = [.. extension is null ? [] : new[] { extension.Package, extension.SnapshotRoot }] };
+        // The pi tool policy resolves ~ to the user's home directory (path-utils.ts expandPath uses os.homedir()).
+        var toolHome = piPolicy is null ? canonicalWorkspace : Path.TrimEndingDirectorySeparator(Path.GetFullPath(
+            piPolicy.Home ?? (Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) is { Length: > 0 } userHome ? userHome : canonicalWorkspace)));
+        // Pi's grep and find over rg/fd from <agentDir>/bin or PATH, downloaded on first use (tools-manager.ts), over any path.
+        var piSearch = piPolicy?.Search is { } toolsManager && grepHost is null
+            ? new PiSharp.Cli.Pi.PiSearchTools(toolsManager, canonicalWorkspace, toolHome, piPolicy.Environment ?? ProcessEnvironment(), piPolicy.ReportToolStatus,
+                (path, token) => policy.AuthorizeGrepContextAsync(path, int.MaxValue, token)) : null;
         var grepReader = grepHost is null ? null : new AdmittedGrepContextReader(canonicalWorkspace,
             grepHost.ContextOperations, policy.AuthorizeGrepContextAsync);
         NativeExtensionActivation? activation = null;
@@ -528,39 +627,58 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         {
             if (extensionPreflight is not null) activation = await NativeExtensionActivation.LoadAsync(extensionPreflight, token, extensionUi, reportInputDiagnostic,
                 configuredInitializerInstallation: configuredInitializerInstallation, configuredExecInstallation: configuredExecInstallation, mcpServers: mcpRegistrations).ConfigureAwait(false);
+            else if (piExtensions is not null)
+                activation = await NativeExtensionActivation.LoadPiAsync(piExtensions, token, extensionUi, reportInputDiagnostic, mcpRegistrations).ConfigureAwait(false);
             // Pi provider request hooks (before_provider_request/headers, after_provider_response, provider_stream_event).
             if (liveSelection is not null && activation?.ProviderHttpHooks(liveSelection.Model) is { } providerHooks)
             {
                 var hooked = liveRuntime ?? LiveSessionRuntime.Default;
                 liveRuntime = hooked with { CreateHttpHandler = () => providerHooks(hooked.CreateHttpHandler()) };
             }
-            if (resolvedAnthropicAuthentication is null && liveSelection is { Model.Provider: "anthropic" })
-            {
-                var (anthropic, anthropicHandler, reresolve) = await liveSelection.ResolveAnthropicAsync(liveRuntime, token).ConfigureAwait(false);
-                connectionOriginal = liveSelection.ConnectResolvedAnthropicAsync(anthropic, anthropicHandler, token, reresolve).AsTask();
-                connection = await connectionOriginal.ConfigureAwait(false);
-            }
-            else if (resolvedAnthropicAuthentication is null) connection = liveSelection?.Connect(liveRuntime);
+            // sdk.ts: a session without a model keeps the Agent's DEFAULT_MODEL; its provider has no auth, so nothing is ever sent to it.
+            if (liveSelection is { IsUnselected: true })
+                connection = LiveSessionConnection.Deferred(liveSelection, ["off"], _ => throw new LiveSessionConnection.ProviderNotConfiguredException("Unknown provider: " + liveSelection.Model.Provider));
             else
-            {
-                connectionOriginal = (liveSelection ?? throw new InvalidOperationException("Validated Anthropic selection is absent."))
-                    .ConnectResolvedAnthropicAsync(resolvedAnthropicAuthentication, resolvedAnthropicHandler, token).AsTask();
-                connection = await connectionOriginal.ConfigureAwait(false);
-            }
-            var profile = new OfflineSessionProfile(canonicalWorkspace, new BuiltinToolCatalog(canonicalWorkspace, canonicalWorkspace, files,
+                try
+                {
+                    if (resolvedAnthropicAuthentication is null && liveSelection is { Model.Provider: "anthropic" })
+                    {
+                        var (anthropic, anthropicHandler, reresolve) = await liveSelection.ResolveAnthropicAsync(liveRuntime, token).ConfigureAwait(false);
+                        connectionOriginal = liveSelection.ConnectResolvedAnthropicAsync(anthropic, anthropicHandler, token, reresolve).AsTask();
+                        connection = await connectionOriginal.ConfigureAwait(false);
+                    }
+                    else if (resolvedAnthropicAuthentication is null) connection = liveSelection?.Connect(liveRuntime);
+                    else
+                    {
+                        connectionOriginal = (liveSelection ?? throw new InvalidOperationException("Validated Anthropic selection is absent."))
+                            .ConnectResolvedAnthropicAsync(resolvedAnthropicAuthentication, resolvedAnthropicHandler, token).AsTask();
+                        connection = await connectionOriginal.ConfigureAwait(false);
+                    }
+                }
+                catch (LiveSessionException error) when (deferMissingCredentials && error.Code == "MissingLiveApiKey" && liveSelection is not null &&
+                    connection is null && connectionOriginal is null)
+                {
+                    // main.ts/agent-session.ts: a selected model whose provider has no credentials does not stop startup; the prompt
+                    // preflight refuses prompts until a credential appears (/login, auth.json, the environment), and the route then
+                    // connects with the credential sources as they are at that request.
+                    connection = DeferredConnection(liveSelection, liveRuntime ?? LiveSessionRuntime.Default);
+                }
+            var profile = new OfflineSessionProfile(canonicalWorkspace, new BuiltinToolCatalog(canonicalWorkspace, toolHome, files,
                 readWriteOptions: ReadOptions(toolSettings, modelDefinition.DeclaresImageInput),
                 // Pi edits files of any size; only the edit arguments and the display diff keep the profile bounds.
                 editOptions: new(MaximumInputBytes: 64 * 1024 * 1024, MaximumOutputBytes: 64 * 1024 * 1024, MaximumArgumentCharacters: 65_536,
                     DiffOptions: new(MaximumOutputCharacters: 4096)), bash: bashTool,
-                grep: grepHost?.Executor ?? piSearch?.Grep, find: piSearch?.Find,
-                grepContextReader: grepReader ?? (piSearch is null ? null : new AdmittedGrepContextReader(canonicalWorkspace, files, policy.AuthorizeGrepContextAsync))), policy,
+                grep: grepHost?.Executor, grepContextReader: grepReader,
+                piGrep: piSearch?.Grep(files), piFind: piSearch?.Find(files), pi: piPolicy is not null), policy,
                 new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup, connection, toolSelection,
                 deferCatalogValidation: mcpAdmission is not null || registeredMcpAdmission is not null || readApplicationHost is not null,
-                originalSystemPrompt: originalSystemPrompt);
+                originalSystemPrompt: originalSystemPrompt, piEntry: piEntry);
             profile.UserBash = userBash; bashOwner = profile; profile.ImageSettings = toolSettings;
             if (readApplicationHost is not null) profile.ConfigureMcpRegistrationRuntime(readApplicationHost().CreateRegisteredAdmission());
             else if (registeredMcpAdmission is not null) profile.ConfigureMcpRegistrationRuntime(registeredMcpAdmission);
             else if (mcpAdmission is not null) profile.ConfigureMcpRuntime(mcpAdmission);
+            // pi.getCommands(): extension commands, prompt templates and skills, as the session's command catalog lists them.
+            if (piExtensions is not null) { piExtensions.CommandCatalog = () => profile.CommandCatalog; piExtensions.ShutdownRequested = profile.RequestPiShutdown; }
             return profile;
         }
         catch (Exception original)
@@ -624,6 +742,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         Task? liveCleanup = null;
         try { if (_live is not null) { liveCleanup = _live.DisposeAsync().AsTask(); await liveCleanup.ConfigureAwait(false); } }
         catch (Exception error) { failures.Add((Exception?)liveCleanup?.Exception ?? error); }
+        try { if (_liveModels is not null) await _liveModels.DisposeAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
         try { _client?.Dispose(); } catch (Exception error) { failures.Add(error); }
         try { await CloseProfileViewsAsync().ConfigureAwait(false); } catch (Exception error) { failures.Add(error); }
         if (failures.Count > 0) settlement.TrySetException(new NativeExtensionException(NativeExtensionFailure.CleanupFailed, new AggregateException(failures)));
@@ -648,6 +767,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         private static StringComparison Comparison => OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         public readonly List<object> Actions = [];
         public ImmutableDictionary<string, string> ExtensionTargets { get; set; } = ImmutableDictionary<string, string>.Empty;
+        /// <summary>Pi extension tools registered after the session bound (a later registerTool, a reload): granted by exact target.</summary>
+        public Func<string, string, bool>? ExtensionGrant { get; set; }
         /// <summary>MCP call grants by session generation (Pi trusts the servers of mcp.json): an invoke action is admitted only
         /// for a tool of a server admitted in the invocation's own generation, or for that generation's host tool_search.</summary>
         private ImmutableDictionary<long, PiSharp.Cli.Mcp.McpCallGrants> mcpGrants = ImmutableDictionary<long, PiSharp.Cli.Mcp.McpCallGrants>.Empty;
@@ -697,7 +818,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             token.ThrowIfCancellationRequested();
             var allowed = Pi is not null ? !IsPiProtected(path) && !IsPiProtected(PiSharp.Cli.Pi.PiPaths.Canonicalize(path)) :
                 grepHost is not null && Within(workspace, path) && reads.Contains(path) && !IsReserved(path);
-            if (allowed) allowed = await grepHost!.ContextAdmission(path, maximumBytes, token).ConfigureAwait(false);
+            if (allowed && grepHost is not null) allowed = await grepHost.ContextAdmission(path, maximumBytes, token).ConfigureAwait(false);
             // An awaited grant may span a session transition; recheck its reserved target before returning.
             token.ThrowIfCancellationRequested();
             allowed = allowed && !IsReserved(path);
@@ -710,6 +831,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             if (action.Kind == PreparedToolActionKind.Extension)
             {
                 var granted = (ExtensionTargets.TryGetValue(action.ToolName, out var exactTarget) && action.Target == exactTarget ||
+                        ExtensionGrant?.Invoke(action.ToolName, action.Target) == true ||
                         invocation.Context?.SessionGeneration is { } generation && mcpGrants.TryGetValue(generation, out var grants) &&
                         grants.Allows(action.ToolName, action.Target)) &&
                     action.Operation == "invoke" && action.WorkingDirectory is null && !action.CommandArguments.IsDefault &&

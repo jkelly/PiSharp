@@ -5,7 +5,9 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI;
 
-public sealed record StreamLimits(int MaximumBlocks = 256, int MaximumCharacters = PiRequestBudget.StreamCharacters);
+/// <summary>An assistant message keeps every content block its stream opens (pi-ai builds output.content without a count bound);
+/// the accumulated characters stay the memory bound.</summary>
+public sealed record StreamLimits(int MaximumBlocks = int.MaxValue, int MaximumCharacters = PiRequestBudget.StreamCharacters);
 
 /// <summary>One stream owns one reducer. Events remain immutable; only per-block accumulators change.</summary>
 public sealed class AssistantStreamReducer
@@ -162,11 +164,27 @@ public sealed class AssistantStreamReducer
                 if ((original.Id != end.ToolCall.Id || original.Name != end.ToolCall.Name) &&
                     !(_allowPiMessagesIdentityReplacement && _start!.Api == "pi-messages"))
                     throw new StreamProtocolException("Tool-call identity changes at its end.");
-                FinalToolArguments.ParseStrict(end.ToolCall.Arguments.ToString());
                 if (_blocks.Where(block => !ReferenceEquals(block, call)).Any(block => block.Content is ToolCallContent tool && tool.Id == end.ToolCall.Id))
                     throw new StreamProtocolException("Duplicate final tool-call ID.");
                 CheckSize(ContentCharacters(end.ToolCall) - ContentCharacters(original));
                 call.Content = end.ToolCall; call.Ended = true; break;
+            case ContentBlockFinalized finalized:
+            {
+                if (finalized.ContentIndex < 0 || finalized.ContentIndex >= _blocks.Count || _blocks[finalized.ContentIndex].Ended ||
+                    _blocks[finalized.ContentIndex].Content.GetType() != finalized.Content.GetType())
+                    throw new StreamProtocolException("A finalized block must be an open block of the same kind.");
+                var block = _blocks[finalized.ContentIndex];
+                if (finalized.Content is ToolCallContent tool)
+                {
+                    var started = (ToolCallContent)block.Content;
+                    if (started.Id != tool.Id || started.Name != tool.Name)
+                        throw new StreamProtocolException("Tool-call identity changes at its end.");
+                    CheckSize(ContentCharacters(tool) - ContentCharacters(started));
+                }
+                var finalText = finalized.Content switch { TextContent finalTextContent => finalTextContent.Text, ThinkingContent finalThinking => finalThinking.Thinking, _ => null };
+                if (finalText is not null) { CheckSize(finalText.Length - block.Text.Length); block.Text.Clear(); block.Text.Append(finalText); }
+                block.Content = finalized.Content; block.Ended = true; break;
+            }
             default: throw new StreamProtocolException("Unknown progress event.");
         }
     }
@@ -256,8 +274,8 @@ public sealed class AssistantStreamReducer
     {
         if (string.IsNullOrWhiteSpace(call.Id) || string.IsNullOrWhiteSpace(call.Name))
             throw new StreamProtocolException("Tool-call ID and name are required.");
-        if (call.Arguments.Value.ValueKind != JsonValueKind.Object)
-            throw new StreamProtocolException("Tool-call arguments must be an object.");
+        // Arguments are any JSON value: parseStreamingJson, a provider SDK or a pi-messages toolCall may produce an array, a
+        // string, a number, a boolean or null, and upstream keeps it.
     }
     private static JsonFields EndProperties(JsonFields? initial, JsonFields? final, params string[] names)
     {

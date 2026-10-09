@@ -337,7 +337,7 @@ internal static class McpCommand
     internal static void EditMcpServers(string path, Func<JsonObject?, JsonObject, bool> edit)
     {
         var text = File.Exists(path) ? File.ReadAllText(path) : null;
-        var parsed = text is null ? new JsonObject() : JsonNode.Parse(text);
+        var parsed = text is null ? new JsonObject() : PiSharp.Cli.Pi.PiJson.Parse(text);
         if (parsed is not JsonObject root || root.TryGetPropertyValue("mcpServers", out var servers) && servers is not (null or JsonObject))
             throw new InvalidDataException($"{path}: expected an object with an \"mcpServers\" object");
         if (!edit(servers as JsonObject, root)) return;

@@ -16,7 +16,13 @@ public sealed class TurnRunner
     private readonly ToolBatchScheduler scheduler;
     private readonly string? thinkingLevel;
 
-    public TurnRunner(ChatClient client, ToolBatchScheduler scheduler, string? thinkingLevel = null)
+    private readonly string? sessionId;
+
+    /// <param name="sessionId">Source agent.sessionId: stamped on every request that has none (prompt-cache keys, session headers).</param>
+    public TurnRunner(ChatClient client, ToolBatchScheduler scheduler, string? thinkingLevel = null, string? sessionId = null)
+        : this(client, scheduler, thinkingLevel) => this.sessionId = sessionId;
+
+    public TurnRunner(ChatClient client, ToolBatchScheduler scheduler, string? thinkingLevel)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(scheduler);
@@ -42,6 +48,7 @@ public sealed class TurnRunner
         ArgumentNullException.ThrowIfNull(sink);
         // High-level configuration owns this control, including cancellation fallback requests.
         if (thinkingLevel is not null) request = request with { ThinkingLevel = thinkingLevel };
+        if (sessionId is not null && request.SessionId is null) request = request with { SessionId = sessionId };
         ChatResult chat;
         var deliveryToken = settleAbort ? CancellationToken.None : cancellationToken;
         var assistantStarted = false;
@@ -78,6 +85,8 @@ public sealed class TurnRunner
                 await sink.EmitAsync(new AssistantMessageStarted(chat.Message), deliveryToken).ConfigureAwait(false);
         }
         var tools = await scheduler.RunAsync(chat.Message, settleAbort ? new SettlementSink(sink) : sink, cancellationToken).ConfigureAwait(false);
+        // A message_end replacement is the turn's assistant from here on (source in-place mutation).
+        if (tools.Assistant is { } replaced) chat = chat with { Message = replaced };
         return new(chat, tools, run.CleanupFailure);
     }
 

@@ -31,6 +31,9 @@ public sealed record ToolCallDelta(int ContentIndex, string Delta, JsonFields? P
 /// the normal finalized-tool policy are still required.
 /// </summary>
 public sealed record ToolCallEnded(int ContentIndex, ToolCallContent ToolCall, JsonFields? Properties = null) : StreamEvent(Properties);
+/// <summary>Closes a block the provider never stopped with its final content and no source push (Bedrock finalizeStreamingBlock:
+/// a stream can settle without stopping every block; no *_end event is emitted for it). Native-only progress.</summary>
+public sealed record ContentBlockFinalized(int ContentIndex, AssistantContent Content, JsonFields? Properties = null) : StreamEvent(Properties);
 public abstract record StreamTerminalEvent(StopReason Reason, AssistantMessage Message, JsonFields? Properties = null)
     : StreamEvent(Properties)
 {

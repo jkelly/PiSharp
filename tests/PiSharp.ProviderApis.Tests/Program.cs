@@ -31,6 +31,7 @@ internal static partial class Program
             ("bedrock.adaptive-opus-gpt-oss-gpt-and-govcloud-request-fields", BedrockReasoningFields),
             ("bedrock.stream-text-thinking-tool-usage-cost-and-stop-reasons", BedrockStreamEvents),
             ("bedrock.redacted-reasoning-and-blocks-without-stop", BedrockRedactedReasoning),
+            ("bedrock.tool-arguments-finalize-through-parse-streaming-json", BedrockToolArguments),
             ("bedrock.http-errors-retries-stream-exceptions-and-diagnostics", BedrockErrors),
             ("bedrock.bearer-token-region-arn-and-endpoint-selection", BedrockEndpoints),
             ("aws.credential-chain-env-profiles-assume-role-sso-container-imds", AwsCredentialChainCases),
@@ -44,6 +45,7 @@ internal static partial class Program
             ("copilot.dynamic-headers-and-bearer-auth-on-every-api", CopilotRequests),
             ("cloudflare.workers-ai-and-gateway-urls-and-auth", CloudflareRequests),
             ("opencode.session-header-policy", Sync(OpenCodeHeaders)),
+            ("opencode.request-session-id-sets-the-session-headers", OpenCodeSessionFromRequest),
             ("budget.4-5-mb-images-reach-copilot-bedrock-and-codex", LargeImageRequests),
             ("authjson.json-provider-fields-and-api-key-entries", AuthJsonFields),
             ("authjson.stored-command-keys-resolve-for-every-provider", StoredCommandKeys),
@@ -51,6 +53,7 @@ internal static partial class Program
             ("live.long-transcript-2000-messages-with-loadout-records-every-family", LongTranscriptEveryFamily),
             ("login.every-provider-cli-flow-api-key-and-oauth", CliLogin),
         };
+        cases = [.. cases, .. GoogleAdcCases];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {

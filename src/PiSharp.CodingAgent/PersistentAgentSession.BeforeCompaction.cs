@@ -49,7 +49,7 @@ public sealed partial class PersistentAgentSession
     /// when it starts, so a later binding never changes a compaction in progress.</summary>
     public void ConfigureBeforeCompaction(SessionBeforeCompactHandler? handler)
     {
-        lock (_gate) { ThrowAvailable(); _beforeCompaction = handler; }
+        lock (_gate) { ThrowBindable(); _beforeCompaction = handler; }
     }
 
     private static JsonData PreparationJson(SessionCompactionPlan plan, string? firstKept)

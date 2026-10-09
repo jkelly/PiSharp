@@ -32,6 +32,9 @@ public sealed class SessionCompactionException(SessionCompactionFailure failure)
     public string? ProviderErrorMessage { get; init; }
     /// <summary>True when the summarization response was aborted rather than failed.</summary>
     public bool ProviderAborted { get; init; }
+    /// <summary>compaction.ts getSummarizationFailure: the failure as upstream words it ("&lt;label&gt; failed: …"), when known.</summary>
+    public string? FailureText { get; init; }
+    public override string Message => FailureText ?? base.Message;
 }
 public sealed record SessionContextUsageEstimate(double Tokens, double UsageTokens, double TrailingTokens, int? LastUsageIndex);
 public sealed record SessionFileOperations(ImmutableArray<string> Read, ImmutableArray<string> Written, ImmutableArray<string> Edited)

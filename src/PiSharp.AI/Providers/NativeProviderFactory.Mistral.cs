@@ -25,7 +25,7 @@ public static partial class NativeProviderFactory
     private static void ValidateMistral(ModelDescriptor model, Uri endpoint, string key, MistralTextOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        Validate(model, endpoint, key, "mistral", "mistral-conversations", "https://api.mistral.ai/");
+        Validate(model, endpoint, key, "mistral", "mistral-conversations");
         if (options.BaseUrl != endpoint) throw new ArgumentException("Mistral options must retain the selected endpoint.");
         options.Validate();
     }

@@ -26,7 +26,7 @@ internal static class RpcUpstreamCompactionTests
         (Prefix + "abort-joins-original-summary-and-emits-aborted-end", Abort),
         (Prefix + "admitted-checkpoint-wins-late-abort-and-end-observes-idle", Checkpoint),
         (Prefix + "EOF-joins-original-summary-and-borrowed-owner-survives", Eof),
-        (Prefix + "active-run-refuses-manual-alias-without-implicit-abort", Active)
+        (Prefix + "active-run-is-aborted-before-manual-compaction", Active)
     ];
     private static void Check(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
     private static void Success(JsonElement value) => Check(value.GetProperty("success").GetBoolean(), value.GetRawText());
@@ -159,13 +159,19 @@ internal static class RpcUpstreamCompactionTests
             !f.Session.Snapshot.IsCompacting && f.Session.Snapshot.Fault is null, "EOF did not settle borrowed session without append.");
         await f.Owner.AppendExtensionEntryAsync(f.Owner.Current, new("fixture", "after-eof", 1, JsonData.EmptyObject));
     }
+    // agent-session.ts compact(): `await this.abort()` aborts the running turn and waits for idle, then compacts.
     private static async Task Active()
     {
         await using var f = await Fixture.Create(); f.Transport.Hold = true;
         Success(await f.Send(new { id = "prompt", type = "prompt", message = "held" })); await f.Transport.Entered.Task.WaitAsync(Bound);
-        var compact = await f.Send(new { id = "busy", type = "compact" });
-        Check(!compact.GetProperty("success").GetBoolean() && f.Transport.Active == 1 && !f.Transport.LastToken.IsCancellationRequested && !f.Transport.Joined.Task.IsCompleted && f.Summary.Calls == 0 &&
-            !f.Records.Any(value => value.GetProperty("type").GetString() == "compaction_start"), "Manual alias implicitly aborted or started inference despite native idle refusal.");
+        var compact = f.Send(new { id = "busy", type = "compact" });
+        var deadline = DateTime.UtcNow + Bound;
+        while (!f.Transport.LastToken.IsCancellationRequested && DateTime.UtcNow < deadline) await Task.Delay(10);
+        Check(f.Transport.LastToken.IsCancellationRequested && !compact.IsCompleted && f.Summary.Calls == 0, "compact did not abort the running turn first.");
+        f.Transport.Release.TrySetResult();
+        var response = await compact.WaitAsync(Bound); Success(response);
+        Check(f.Transport.Joined.Task.IsCompleted && f.Summary.Calls == 1 &&
+            f.Records.Any(value => value.GetProperty("type").GetString() == "compaction_start"), "The aborted run was not joined before compaction.");
     }
     private static async Task<byte[]> Bytes(Fixture f)
     {

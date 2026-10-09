@@ -42,6 +42,8 @@ public sealed partial class MistralTextHttpSseTransport : IChatTransport, IModel
     {
         using var timeout = new CancellationTokenSource();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(caller, timeout.Token);
+        // StreamOptions.sessionId: the request's session, unless the transport was configured with one.
+        var options = request.SessionId is { } session && this.options.SessionId is null ? this.options with { SessionId = session } : this.options;
         var token = linked.Token; var state = new TextState(request, options);
         HttpRequestMessage? send = null; HttpResponseMessage? response = null; Stream? body = null; IAsyncEnumerator<JsonData>? reader = null;
         Exception? failure = null, cleanup = null; var completed = false;

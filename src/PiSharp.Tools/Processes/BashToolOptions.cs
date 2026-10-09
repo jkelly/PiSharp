@@ -4,10 +4,11 @@ using System.Collections.Immutable;
 
 namespace PiSharp.Tools.Processes;
 
-/// <summary>Trusted explicit configuration. Environment is the complete child environment, not an overlay.</summary>
+/// <summary>Trusted explicit configuration. Environment is the complete child environment, not an overlay. The source has no command
+/// length limit (the operating system's spawn limit applies, reported as Node's spawn error); the character bounds here only cap memory.</summary>
 public sealed record BashToolOptions(string Executable, string WorkingDirectory,
     ImmutableDictionary<string, string> Environment, string SpillDirectory,
-    int MaximumCommandCharacters = 12_000, int MaximumArgumentCharacters = 96_000)
+    int MaximumCommandCharacters = 96_000, int MaximumArgumentCharacters = 96_000)
 {
     /// <summary>Source ShellConfig.args: the arguments before the command. Default <c>-c</c>.</summary>
     public ImmutableArray<string> ShellArguments { get; init; } = ["-c"];

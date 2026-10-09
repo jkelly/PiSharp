@@ -71,7 +71,7 @@ public sealed class ExtensionAgentBinding
         this.registry = registry; this.sessionCancellationToken = sessionCancellationToken;
         this.options = options ?? new();
         if (this.options.MaximumTools <= 0 || this.options.MaximumDeclarationCharacters < 2 ||
-            this.options.MaximumDeclarationBytes < 2 || this.options.MaximumToolEventHandlers is < 1 or > 4096)
+            this.options.MaximumDeclarationBytes < 2 || this.options.MaximumToolEventHandlers < 1)
             throw new ArgumentOutOfRangeException(nameof(options));
         ArgumentNullException.ThrowIfNull(this.options.ResultValues);
         _ = ToolResultValueCodec.Read(JsonData.EmptyObject, this.options.ResultValues);
@@ -98,7 +98,7 @@ public sealed class ExtensionAgentBinding
                 .Select(tool => tool.Name).ToImmutableHashSet(StringComparer.Ordinal) };
         Adapters = Snapshot.Tools.Select(tool => (IPreparedToolAdapter)new ExtensionToolAdapter(registry,
             Snapshot, tool, validateArguments, this.options.ResultValues, sessionCancellationToken)).ToImmutableArray();
-        PreparedHooks = Snapshot.ToolCallHandlers.IsEmpty && Snapshot.ToolResultHandlers.IsEmpty ? null :
+        PreparedHooks = !registry.FollowsCurrentSnapshot && Snapshot.ToolCallHandlers.IsEmpty && Snapshot.ToolResultHandlers.IsEmpty ? null :
             new RegisteredExtensionToolHooks(registry, Snapshot, this.options.ResultValues, this.options.ToolEventDispatch,
                 this.options.MaximumToolEventHandlers, sessionCancellationToken, this.options.ReportEventDiagnostic);
         var contextHooks = new RegisteredExtensionContextHooks(registry, this.options, sessionCancellationToken);

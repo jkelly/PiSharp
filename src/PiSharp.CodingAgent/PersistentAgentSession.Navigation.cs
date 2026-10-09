@@ -12,6 +12,9 @@ namespace PiSharp.CodingAgent;
 
 public sealed partial class PersistentAgentSession
 {
+    /// <summary>Tree queries under this session's context bounds (session-manager.ts reads every entry of the file).</summary>
+    public SessionTreeQueries CreateTreeQueries() => new(SessionTreeQueryOptions.For(_projector.Options));
+
     internal SessionTreeNavigationRevision CaptureTreeRevision(AgentSessionAttachment attachment, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -19,7 +22,7 @@ public sealed partial class PersistentAgentSession
         {
             ThrowAvailable();
             return new(attachment, this, _acknowledgedLog, _context, _configuration,
-                new SessionTreeQueries().Build(_acknowledgedLog.Entries, token), _activationEpoch);
+                new SessionTreeQueries(SessionTreeQueryOptions.For(_projector.Options)).Build(_acknowledgedLog.Entries, token), _activationEpoch);
         }
     }
 
@@ -104,28 +107,33 @@ public sealed partial class PersistentAgentSession
             }
             var prospective = _projector.Project(revision.Log.Entries, newLeaf, work);
             // Source navigateTree -> _restoreToolsFromTranscript: the target's loadout is restored by name with the current
-            // bindings, and left-out tools stay pending (when allowed). A restored loadout that differs from the record is
-            // recorded with the navigation. A target with no system message keeps the current tools (`if (!current) return`):
-            // nothing is written; they stay the logical selection and are recorded at the next request, as the source does.
-            ImmutableArray<string> pendingTools = []; PiSharp.Contracts.TranscriptEntry? restoredRecord = null;
+            // bindings, and left-out tools stay pending (when allowed). The navigation writes no record of the restored loadout: one
+            // that differs from the recorded one is recorded at the next request (_unrecordedLoadout), as the source records it at
+            // the next prompt. A target with no system message keeps the current tools (`if (!current) return`): they stay the
+            // logical selection and are recorded at the next request, as the source does.
+            ImmutableArray<string> pendingTools = []; var unrecorded = false;
             PendingActivation? keptTools = null;
             var configuration = revision.Configuration;
+            // Source navigateTree: the leaf moves and the tools are restored, while agent.state.model and thinkingLevel stay as they
+            // are; the target branch's recorded model and thinking level are tolerated until a response or a change names the session's.
+            var kept = revision.Configuration;
+            var toleratedModel = Divergent(prospective, kept.Model);
+            var toleratedThinking = prospective.ThinkingLevel != kept.ThinkingLevel ? prospective.ThinkingLevel : null;
             if (_registry is { } registry)
             {
                 var current = GetToolActivationSelection().Names;
                 var keepCurrent = !current.IsEmpty && !prospective.LlmMessages.Any(message => message.Role == "system");
-                var (restoredLoadout, keptPresentation) = await PrepareAndDrainLoadoutAsync(() => (registry.ResolveRestored(prospective, revision.Configuration.Model, work),
+                var (restoredLoadout, keptPresentation) = await PrepareAndDrainLoadoutAsync(() => (registry.ResolveRestored(prospective, kept.Model, work, selectedModel: kept.Model, thinkingLevel: kept.ThinkingLevel),
                     keepCurrent ? registry.PrepareActiveLoadout(registry.NormalizeActiveTools(current, work), work) : null), work).ConfigureAwait(false);
                 configuration = restoredLoadout.Selection.Configuration;
                 if (keepCurrent) keptTools = new(0, registry.NormalizeActiveTools(current, work), keptPresentation);
                 else
                 {
                     pendingTools = restoredLoadout.Pending;
-                    if (restoredLoadout.RequiresRecord) restoredRecord = registry.CreateActivationMessage(configuration.Tools.Select(tool => tool.Name).ToImmutableArray(),
-                        RecordedActiveToolNames(prospective, work), _clock(), work, replaceDeclarations: true);
+                    unrecorded = restoredLoadout.RequiresRecord;
                 }
             }
-            ValidateRuntimeContext(prospective, configuration);
+            ValidateRuntimeContext(prospective, configuration, toleratedModel, toleratedThinking);
             var messages = SessionContextProjector.AgentMessages(prospective);
             await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
                 probe.ConfigureAndReplaceMessages(configuration, messages);
@@ -155,9 +163,6 @@ public sealed partial class PersistentAgentSession
                 }
             }
             var records = await PrepareTreeRecordsAsync(revision, preview, options, provided, request.Execution, work, originals).ConfigureAwait(false);
-            if (restoredRecord is { } loadout)
-                records = records.Add(Record(_codec, "message", Identity(_nextEntryId, revision.Log.Header.Id, revision.Log.Entries.AddRange(records)),
-                    records.IsEmpty ? newLeaf : records[^1].Id, _clock, writer => { writer.WritePropertyName("message"); writer.WriteRawValue(loadout.WireBody.Value.GetRawText()); }));
             var publishedLog = revision.Log;
             if (!records.IsEmpty)
             {
@@ -166,10 +171,16 @@ public sealed partial class PersistentAgentSession
                 var summary = records.FirstOrDefault(entry => entry.Kind == SessionEntryKind.BranchSummary);
                 var projectedLeaf = records[^1].Id;
                 prospective = _projector.Project(revision.Log.Entries.AddRange(records), projectedLeaf, work);
+                // A restored loadout that awaits its record stays the agent's loadout over the summary and label records.
+                var restoredNames = configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
                 configuration = _registry is { } changedRegistry
-                    ? (await PrepareAndDrainLoadoutAsync(() => changedRegistry.Resolve(prospective, revision.Configuration.Model, work), work).ConfigureAwait(false)).Configuration
+                    ? (await PrepareAndDrainLoadoutAsync(() => changedRegistry.Resolve(unrecorded ? prospective with { LlmMessages =
+                        WithLoadoutRecord(changedRegistry, prospective.LlmMessages, restoredNames, work) } : prospective,
+                        kept.Model, work, tolerated: Divergent(prospective, kept.Model), thinkingLevel: kept.ThinkingLevel, activeOrder: restoredNames), work).ConfigureAwait(false)).Configuration
                     : revision.Configuration;
-                ValidateRuntimeContext(prospective, configuration);
+                toleratedModel = Divergent(prospective, kept.Model);
+                toleratedThinking = prospective.ThinkingLevel != kept.ThinkingLevel ? prospective.ThinkingLevel : null;
+                ValidateRuntimeContext(prospective, configuration, toleratedModel, toleratedThinking);
                 messages = SessionContextProjector.AgentMessages(prospective);
                 await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
                     probe.ConfigureAndReplaceMessages(configuration, messages);
@@ -193,14 +204,16 @@ public sealed partial class PersistentAgentSession
                     var restoreActivation = PrepareActivationRestoration(configuration);
                     _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(configuration), messages);
                     _configuration = configuration; _context = prospective; _acknowledgedLog = publishedLog;
+                    _toleratedSelection = toleratedModel; _toleratedThinking = toleratedThinking;
                     restoreActivation();
+                    _unrecordedLoadout = unrecorded;
                     // The kept tools remain the logical selection; the next request boundary records them.
                     if (keptTools is not null) _pendingActivation = keptTools with { Epoch = _activationEpoch };
                     // Source _restoreToolsFromTranscript replaces the pending set with the target's unregistered tools.
                     _pendingToolNames = pendingTools;
                     selected = new(SessionTreeNavigationDisposition.Selected,
                         new(revision.Attachment, this, publishedLog, prospective, configuration,
-                            new SessionTreeQueries().Build(publishedLog.Entries), _activationEpoch), _agent.Snapshot, editorText)
+                            new SessionTreeQueries(SessionTreeQueryOptions.For(_projector.Options)).Build(publishedLog.Entries), _activationEpoch), _agent.Snapshot, editorText)
                         { Checkpoint = checkpoint, OriginalOwner = originals };
                 }
             });

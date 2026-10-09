@@ -27,7 +27,7 @@ public sealed class SystemSkillResourceFileSystem : ISkillResourceFileSystem
     {
         CheckPath(path); if (maximumEntries < 1) throw new ArgumentOutOfRangeException(nameof(maximumEntries));
         var result = ImmutableArray.CreateBuilder<PromptTemplateDirectoryEntry>();
-        foreach (var entry in new DirectoryInfo(path).EnumerateFileSystemInfos())
+        foreach (var entry in PiSharp.Contracts.Compatibility.NodeDirectoryOrder.Order(new DirectoryInfo(path).EnumerateFileSystemInfos()))
         {
             if (result.Count == maximumEntries) throw new IOException("Skill directory entry limit.");
             var attributes = entry.Attributes;
@@ -39,14 +39,17 @@ public sealed class SystemSkillResourceFileSystem : ISkillResourceFileSystem
     public async ValueTask<byte[]> ReadFileAsync(string path, int maximumBytes, CancellationToken token)
     {
         token.ThrowIfCancellationRequested(); CheckPath(path);
-        if (maximumBytes is < 1 or > 1_048_576) throw new ArgumentOutOfRangeException(nameof(maximumBytes));
+        if (maximumBytes < 1) throw new ArgumentOutOfRangeException(nameof(maximumBytes));
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
-        var buffer = new byte[maximumBytes + 1]; int count = 0;
-        while (count < buffer.Length)
+        // Sized by the file, not the bound: a host may admit files of any size without allocating its bound up front.
+        if (stream.Length > maximumBytes) throw new IOException("Skill file byte limit.");
+        using var output = new MemoryStream((int)stream.Length);
+        var chunk = new byte[81_920]; long total = 0; int read;
+        while ((read = await stream.ReadAsync(chunk, token).ConfigureAwait(false)) > 0)
         {
-            var read = await stream.ReadAsync(buffer.AsMemory(count), token).ConfigureAwait(false); if (read == 0) break; count += read;
+            total += read; if (total > maximumBytes) throw new IOException("Skill file byte limit.");
+            output.Write(chunk, 0, read);
         }
-        if (count > maximumBytes) throw new IOException("Skill file byte limit.");
-        return buffer[..count];
+        return output.ToArray();
     }
 }

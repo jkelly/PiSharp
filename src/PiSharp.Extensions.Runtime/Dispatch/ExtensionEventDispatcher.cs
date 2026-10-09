@@ -9,7 +9,7 @@ namespace PiSharp.Extensions.Runtime.Dispatch;
 public sealed record ExtensionEventDispatchOptions(int MaximumTextCharacters = 65_536,
     int MaximumJsonCharacters = 8 * 1024 * 1024, int MaximumJsonBytes = 32 * 1024 * 1024,
     int MaximumJsonDepth = 32, int MaximumImages = 128, int MaximumConcurrentDispatches = 32,
-    int MaximumDispatchDepth = 8);
+    int MaximumDispatchDepth = 8, int MaximumContextMessages = 1_000_000); // PiRequestBudget.RequestMessages: runner.ts emits the whole context.
 
 /// <summary>Typed event reducers. Complete tool-result admission is supplied by the host's pure codec.
 /// This standalone dispatcher does not activate extensions, invoke tools, authorize calls, or persist entries.</summary>
@@ -39,7 +39,7 @@ public sealed class ExtensionEventDispatcher
         if (this.options.MaximumTextCharacters <= 0 || this.options.MaximumJsonCharacters <= 0 ||
             this.options.MaximumJsonBytes <= 0 || this.options.MaximumJsonDepth is < 1 or > 64 ||
             this.options.MaximumImages <= 0 || this.options.MaximumConcurrentDispatches <= 0 ||
-            this.options.MaximumDispatchDepth <= 0)
+            this.options.MaximumDispatchDepth <= 0 || this.options.MaximumContextMessages <= 0)
             throw new ArgumentOutOfRangeException(nameof(options));
     }
 
@@ -202,7 +202,7 @@ public sealed class ExtensionEventDispatcher
     private ImmutableArray<TranscriptEntry> AdmitMessages(ImmutableArray<TranscriptEntry> messages)
     {
         if (admitContextMessages is null) throw new InvalidOperationException("Context message admission requires a host validator.");
-        if (messages.IsDefault || messages.Length > 1024) throw new ArgumentException("Invalid context message count.");
+        if (messages.IsDefault || messages.Length > options.MaximumContextMessages) throw new ArgumentException("Invalid context message count.");
         long characters = 0, bytes = 0;
         foreach (var message in messages)
         {

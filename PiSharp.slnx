@@ -166,7 +166,13 @@
   <Folder Name="/tests/parity/PiSharp.CliParity.Tests/">
     <Project Path="tests/PiSharp.CliParity.Tests/PiSharp.CliParity.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/parity/PiSharp.ExtensionParity.Tests/">
+    <Project Path="tests/PiSharp.ExtensionParity.Tests/PiSharp.ExtensionParity.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/parity/PiSharp.SessionParity.Tests/">
     <Project Path="tests/PiSharp.SessionParity.Tests/PiSharp.SessionParity.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/parity/PiSharp.InteractiveParity.Tests/">
+    <Project Path="tests/PiSharp.InteractiveParity.Tests/PiSharp.InteractiveParity.Tests.csproj" />
   </Folder>
 </Solution>

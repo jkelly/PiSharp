@@ -74,7 +74,7 @@ public sealed class McpJsonRpcRequestChannel : IMcpAdmittedRequestChannel, IMcpN
             Check();
             if (started || roots is not null || dynamicRoots is not null)
                 throw new InvalidOperationException("Install one roots mode before MCP start.");
-            var handler = new McpDynamicRootsHandler(provider, limits.MaximumFrameBytes);
+            var handler = new McpDynamicRootsHandler(provider, limits.MaximumFrameBytes, maximumRequests: limits.MaximumCallbacks);
             EnsureIncoming().SetRequestHandler("roots/list", async (_, token) => await handler.HandleRootsListAsync(token).ConfigureAwait(false));
             dynamicRoots = handler;
         }

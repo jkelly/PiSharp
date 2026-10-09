@@ -181,8 +181,8 @@ internal sealed class AuthJsonCredentialStore : IAdmittedOAuthCredentialSource
         try { text = await File.ReadAllTextAsync(AuthPath, Encoding.UTF8, token).ConfigureAwait(false); }
         catch (FileNotFoundException) { return []; }
         if (text.StartsWith((char)0xFEFF)) text = text[1..];
-        if (text.Length == 0) return [];
-        try { return JsonNode.Parse(text) as JsonObject ?? throw new InvalidDataException("Invalid auth.json: expected an object"); }
+        // auth-storage.ts load: JSON.parse of the whole file, so an empty file fails ("Unexpected end of JSON input").
+        try { return PiSharp.Cli.Pi.PiJson.Parse(text, 64) as JsonObject ?? throw new InvalidDataException("Invalid auth.json: expected an object"); }
         catch (JsonException error) { throw new InvalidDataException("Failed to read auth.json: " + error.Message, error); }
     }
 

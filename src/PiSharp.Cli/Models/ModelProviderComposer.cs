@@ -87,7 +87,7 @@ internal static class ModelProviderComposer
 
     /// <summary>Source findModelDefaults: the same chat id, else a model of the requested api, else an openai-completions model, else the
     /// first chat model.</summary>
-    private static RegistryModel? FindDefaults(IReadOnlyList<RegistryModel> models, string id, string? api)
+    internal static RegistryModel? FindDefaults(IReadOnlyList<RegistryModel> models, string id, string? api)
     {
         var chat = models.Where(model => model.Type == CatalogModelType.Chat).ToList();
         return chat.FirstOrDefault(model => model.Id == id) ?? (api is null ? null : chat.FirstOrDefault(model => model.Api == api)) ??
@@ -95,7 +95,7 @@ internal static class ModelProviderComposer
     }
 
     /// <summary>Source modelFromJson.</summary>
-    private static RegistryModel ModelFromJson(string providerId, JsonObject definition, JsonObject config, RegistryModel? defaults)
+    internal static RegistryModel ModelFromJson(string providerId, JsonObject definition, JsonObject config, RegistryModel? defaults)
     {
         var id = JsonTree.String(definition, "id")!;
         var api = JsonTree.String(definition, "api") ?? JsonTree.String(config, "api") ?? (defaults?.Api is { Length: > 0 } inherited ? inherited : null);
@@ -153,6 +153,17 @@ internal static class ModelProviderComposer
             if (existing >= 0) models[existing] = model; else models.Add(model);
         }
         return models;
+    }
+
+    /// <summary>Source applyExtension (provider-composer.ts): an extension's registerProvider config replaces the provider's models with its
+    /// own definitions (defaults from a same-id model), or, without models, sets their baseUrl.</summary>
+    internal static List<RegistryModel> ApplyExtension(string providerId, IReadOnlyList<RegistryModel> models, JsonObject? config)
+    {
+        if (config is null) return [.. models];
+        if (Get(config, "models") is not JsonArray definitions)
+            return JsonTree.String(config, "baseUrl") is { } baseUrl ? [.. models.Select(model => model.With(json => json["baseUrl"] = baseUrl))] : [.. models];
+        return [.. definitions.OfType<JsonObject>().Select(definition => ModelFromJson(providerId, definition, config,
+            FindDefaults(models, JsonTree.String(definition, "id")!, JsonTree.String(definition, "api") ?? JsonTree.String(config, "api"))))];
     }
 
     /// <summary>Source composeModelProvider getAllModels for the models.json layer: applyModelsJson, then modelOverrides on chat models.</summary>

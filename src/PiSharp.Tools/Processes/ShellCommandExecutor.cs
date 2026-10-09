@@ -126,6 +126,14 @@ public sealed class NativeShellOperations : IShellOperations
     public async ValueTask<int?> ExecuteAsync(string command, string workingDirectory, ProcessRawOutputCallback onData,
         CancellationToken cancellationToken)
     {
+        // Source createLocalShellOperations exec: the working-directory check, then spawn, whose argument check, command-line limit
+        // and missing shell fail as Node's errors. Executors report these messages as the command's failure.
+        if (!Directory.Exists(workingDirectory))
+            throw new PiSharp.Agent.ToolSourceErrorException($"Working directory does not exist: {workingDirectory}\nCannot execute bash commands.");
+        if (_shell.CommandTransport == ShellCommandTransport.Argv && (NodeArgumentErrors.SpawnArguments(_shell.CommandArguments(command)) ??
+            NodeArgumentErrors.SpawnLimit(_shell.Shell, _shell.CommandArguments(command))) is { } spawnError)
+            throw new PiSharp.Agent.ToolSourceErrorException(spawnError);
+        if (!File.Exists(_shell.Shell)) throw new PiSharp.Agent.ToolSourceErrorException($"spawn {_shell.Shell} ENOENT");
         var request = new ProcessRequest(_shell.Shell, _shell.CommandArguments(command), workingDirectory, _environment,
             Path.Combine(_scratchDirectory, "pi-bash-discarded-" + Guid.NewGuid().ToString("N") + ".log"))
         { StandardInput = _shell.CommandTransport == ShellCommandTransport.Stdin ? Encoding.UTF8.GetBytes(command) : null };

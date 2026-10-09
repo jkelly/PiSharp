@@ -21,8 +21,10 @@ public sealed class SessionBranchPlanException : Exception
         _ => "Session branch request is invalid."
     }) => Failure = failure;
 }
+/// <param name="JavaScriptSerialization">Write the new file as session-manager.ts createBranchedSession does, every record
+/// <c>JSON.stringify(entry)</c> (see <see cref="Storage.SessionLogStoreOptions"/>); the plan's entries hold the same text.</param>
 public sealed record SessionBranchPlanOptions(int MaximumEntries = 100_000, int MaximumOutputBytes = 16_777_216,
-    SessionEntryCodecOptions? CodecOptions = null, int MaximumInputCharacters = 16_777_216);
+    SessionEntryCodecOptions? CodecOptions = null, int MaximumInputCharacters = 16_777_216, bool JavaScriptSerialization = false);
 public sealed record SessionForkPlanRequest(SessionEntry SourceHeader, ImmutableArray<SessionEntry> SourceEntries,
     string EntryId, SessionForkPosition Position, string NewSessionId, string Timestamp, string? ParentSession,
     ImmutableArray<string> LabelEntryIds = default);
@@ -210,6 +212,11 @@ public sealed class SessionBranchPlanner
         string? selectedText, CancellationToken token)
     {
         if (entries.Length > options.MaximumEntries) throw Error(SessionBranchPlanFailure.ResourceLimit);
+        if (options.JavaScriptSerialization)
+        {
+            header = Stringify(header);
+            entries = entries.Select(entry => { token.ThrowIfCancellationRequested(); return Stringify(entry); }).ToImmutableArray();
+        }
         using var bytes = new MemoryStream(); Append(header);
         foreach (var entry in entries) { token.ThrowIfCancellationRequested(); Append(entry); }
         token.ThrowIfCancellationRequested();
@@ -217,6 +224,12 @@ public sealed class SessionBranchPlanner
             entries.Any(entry => entry.Kind == SessionEntryKind.Message &&
                 entry.WireBody.Value.GetProperty("message").GetProperty("role").GetString() is "user" or "assistant"),
             bytes.ToArray().ToImmutableArray());
+        SessionEntry Stringify(SessionEntry entry)
+        {
+            try { return SessionJavaScriptJson.Stringify(codec, entry); }
+            catch (Exception error) when (error is PiSharp.Contracts.Compatibility.EcmaScriptJsonProjectionException or SessionEntryCodecException)
+            { throw Error(SessionBranchPlanFailure.ResourceLimit); }
+        }
         void Append(SessionEntry entry)
         {
             var encoded = Utf8.GetBytes(codec.Serialize(entry));

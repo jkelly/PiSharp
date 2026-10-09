@@ -18,7 +18,7 @@ The adapter forwards an arguments-done suffix when the authoritative string exte
 
 ## Strict final authority and unsupported input
 
-Final tool JSON uses `FinalToolArguments.ParseStrict`: it must be a complete JSON object with unique property names. An empty item-end argument string uses the accumulated raw argument string, or `{}` if that is also empty, before strict validation. Truncated JSON, repaired invalid escapes, arrays, scalars, null and duplicate properties cannot authorize execution. Upstream accepts repaired/partial values through `parseStreamingJson`; the strict native rule is deliberate hardening. Schema validation and actual authorization remain the tool pipeline's responsibility.
+Final tool JSON is `parseStreamingJson(item.arguments || partialJson || "{}")` (`StreamingJson.Parse`), as openai-responses-shared.ts does: truncated JSON, repaired escapes, arrays, scalars, null and duplicate properties are kept as upstream returns them. Schema validation and actual authorization remain the tool pipeline's responsibility.
 
 EOF before a supported completed response and completion with any unfinished content throw fixed `StreamProtocolException` diagnostics. Through `ChatRun`, these become `MalformedStream` and an error message, never a successful `ToolUse` terminal. This is an authored classification. All unfinished text is rejected as well as unfinished tools; it does not inherit the helper's narrower tool-use check.
 

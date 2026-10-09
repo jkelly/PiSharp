@@ -45,6 +45,11 @@ public sealed partial class RegistrationScope : IExtensionSessionCreationRegistr
     public IExtensionRegistration RegisterSessionCreationHandler(ExtensionSessionCreationHandlerDescriptor descriptor) => Registry.Register(this, descriptor);
     public IExtensionRegistration RegisterToolRenderer(ExtensionToolRendererDescriptor descriptor) => Registry.Register(this, descriptor);
 
+    /// <summary>Withdraws every registration of this owner in one publication, keeping its tools when <paramref name="keepTools"/> (they
+    /// leave through a tool catalog replacement), as a rebuilt extension runtime drops the previous runtime's handlers and commands.
+    /// Callbacks already admitted finish; disposal still settles the owner.</summary>
+    public void WithdrawRegistrations(bool keepTools) => Registry.Withdraw(this, keepTools);
+
     /// <summary>Stops new callback admission and waits for all callbacks already leased to this owner.
     /// Cancellation rolls the pause back without cancelling those callbacks. Dispose the returned lease
     /// to resume admission, or dispose this scope while holding it to proceed with shutdown.</summary>

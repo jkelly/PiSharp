@@ -68,11 +68,7 @@ public sealed class EditPreview
         }
         catch (ArgumentException) { return JsonData.Parse("{}"); }
     }
-    private static string CheckText(string text)
-    {
-        if (text.Contains('\0')) throw new ArgumentException("Unsupported preview text.");
-        _ = Utf8.GetByteCount(text); return text;
-    }
+    private static string CheckText(string text) { _ = Utf8.GetByteCount(text); return text; }
 
     private sealed class Adapter(string cwd, string home, IFileOperations operations, IFileAccessProbe access,
         EditPreviewOptions options, DiffFormatterOptions diff) : IPreparedToolAdapter
@@ -160,17 +156,8 @@ public sealed class EditPreview
             return new(path, display, edits.ToImmutable());
         }
         private static string Text(JsonElement value) => value.ValueKind == JsonValueKind.String ? CheckText(value.GetString()!) : throw new ArgumentException("Preview text is required.");
-        private static string Decode(byte[] bytes)
-        {
-            try
-            {
-                var text = Utf8.GetString(bytes);
-                if (text.Any(value => char.IsControl(value) && value is not ('\t' or '\r' or '\n')) || text.StartsWith("GIF87a", StringComparison.Ordinal) || text.StartsWith("GIF89a", StringComparison.Ordinal) ||
-                    (text.Length >= 12 && text.StartsWith("RIFF", StringComparison.Ordinal) && text[8..12] == "WEBP")) throw new FileToolException(FileToolFailure.UnsupportedContent);
-                return text;
-            }
-            catch (DecoderFallbackException) { throw new FileToolException(FileToolFailure.UnsupportedContent); }
-        }
+        // Source readFile(path, "utf-8"): any content previews, undecodable bytes as U+FFFD.
+        private static string Decode(byte[] bytes) => EditTool.DecodeText(bytes);
         private static ToolResult Error(string message) => new([], JsonData.Parse(JsonSerializer.Serialize(new { error = message })));
     }
 }

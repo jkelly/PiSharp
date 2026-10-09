@@ -35,9 +35,9 @@ internal static class ReadWriteToolsTests
         Sequence(["read", "write"], tools.Adapters.Select(value => value.Name));
         Equal(2, tools.ToolsAdded.Value.GetArrayLength());
         // Pi read.ts/write.ts: description, TypeBox parameters (no additionalProperties; offset/limit are numbers) and strict-prefer sampling.
-        Equal("""{"name":"read","description":"Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to read (relative or absolute)"},"offset":{"type":"number","description":"Line number to start reading from (1-indexed)"},"limit":{"type":"number","description":"Maximum number of lines to read"}},"required":["path"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""",
+        Equal("""{"name":"read","description":"Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.","parameters":{"type":"object","required":["path"],"properties":{"path":{"type":"string","description":"Path to the file to read (relative or absolute)"},"offset":{"type":"number","description":"Line number to start reading from (1-indexed)"},"limit":{"type":"number","description":"Maximum number of lines to read"}}},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""",
             tools.Declarations[0].ToString());
-        Equal("""{"name":"write","description":"Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.","parameters":{"type":"object","properties":{"path":{"type":"string","description":"Path to the file to write (relative or absolute)"},"content":{"type":"string","description":"Content to write to the file"}},"required":["path","content"]},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""",
+        Equal("""{"name":"write","description":"Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.","parameters":{"type":"object","required":["path","content"],"properties":{"path":{"type":"string","description":"Path to the file to write (relative or absolute)"},"content":{"type":"string","description":"Content to write to the file"}}},"constrainedSampling":{"type":"json_schema","strict":"prefer"}}""",
             tools.Declarations[1].ToString());
         var invoker = tools.CreateInvoker(new Policy());
         Check(tools.CreateDefinitions(invoker).All(value => ReferenceEquals(value.Executor, invoker)), "Definitions bypass the invoker.");
@@ -53,7 +53,7 @@ internal static class ReadWriteToolsTests
         const string relative = "nested space/\u6587.txt";
         const string text = "\ufeff\u03b1\U0001f642\r\nsecond\n";
         var written = await Invoke(tools, "write", new { path = relative, content = text });
-        Success(written); Equal("Successfully wrote to " + relative, written.Content.Single().Text); Equal(JsonValueKind.Null, written.Details.Value.ValueKind);
+        Success(written); Equal("Successfully wrote to " + relative, written.Content.Single().Text); Equal(false, written.HasProperty("details")); // write.ts: details: undefined
         var target = Path.Combine(temp.Root, "nested space", "\u6587.txt");
         var actualBytes = await File.ReadAllBytesAsync(target);
         Check(Encoding.UTF8.GetBytes(text).SequenceEqual(actualBytes), "Write changed BOM/Unicode/newline bytes.");
@@ -70,7 +70,7 @@ internal static class ReadWriteToolsTests
         await File.WriteAllBytesAsync(temp.File("lines.txt"), Encoding.UTF8.GetBytes("first\r\n\u754c\nlast\n"));
         var selected = await Invoke(tools, "read", new { path = "lines.txt", offset = 2, limit = 1 });
         Success(selected); Equal("\u754c\n\n[2 more lines in file. Use offset=3 to continue.]", selected.Content.Single().Text);
-        Equal(JsonValueKind.Null, selected.Details.Value.ValueKind);
+        Equal(false, selected.HasProperty("details")); // read.ts: details is undefined without truncation
         Equal("", (await Invoke(tools, "read", new { path = "lines.txt", offset = 4 })).Content.Single().Text);
         Equal("\n\n[4 more lines in file. Use offset=1 to continue.]", (await Invoke(tools, "read", new { path = "lines.txt", limit = 0 })).Content.Single().Text);
         var beyond = await Invoke(tools, "read", new { path = "lines.txt", offset = 5 });
@@ -151,12 +151,20 @@ internal static class ReadWriteToolsTests
     private static async Task AdmissionAndDenial()
     {
         using var temp = new TemporaryFiles(); var operations = new Operations(); var tools = new ReadWriteTools(temp.Root, temp.Root, operations);
-        // Pi offset is a number; 0 and negative offsets start at line 1, so only non-integral values are refused natively.
-        foreach (var raw in new[] { "{}", "{\"path\":\"x\",\"offset\":1.5}",
-            "{\"path\":\"x\",\"limit\":-1}", "{\"path\":\"x\",\"unknown\":1}" })
+        foreach (var raw in new[] { "{}" })
             Failure(await tools.CreateInvoker(new Policy()).ExecuteAsync(Invocation("read", JsonData.Parse(raw)), default), ToolFailureKind.InvalidArguments);
-        foreach (var raw in new[] { "{\"path\":\"x\"}", "{\"path\":\"x\",\"content\":1}", "{\"path\":\"x\\u0000\",\"content\":\"valid\"}" })
+        // A NUL path reaches Node in the source, which rejects it (ToolEdgeInputTests); nothing is authorized or written.
+        Failure(await tools.CreateInvoker(new Policy()).ExecuteAsync(Invocation("write", JsonData.Parse("{\"path\":\"x\\u0000\",\"content\":\"valid\"}")), default), ToolFailureKind.ExecutionError);
+        foreach (var raw in new[] { "{\"path\":\"x\"}" })
             Failure(await tools.CreateInvoker(new Policy()).ExecuteAsync(Invocation("write", JsonData.Parse(raw)), default), ToolFailureKind.InvalidArguments);
+        // Source validateToolArguments admits additional properties and coerces a number content to its string.
+        var admitted = new ReadWriteTools(temp.Root, temp.Root, new Operations());
+        // Pi offset and limit are any numbers, used with JavaScript arithmetic by execute (see ToolEdgeInputTests).
+        foreach (var raw in new[] { "{\"path\":\"x\",\"unknown\":1}", "{\"path\":\"x\",\"offset\":1.5}", "{\"path\":\"x\",\"limit\":-1}" })
+            Check((await admitted.CreateInvoker(new Policy()).ExecuteAsync(Invocation("read", JsonData.Parse(raw)), default)).Failure?.Kind
+                != ToolFailureKind.InvalidArguments, "Admitted read input was refused: " + raw);
+        Check((await admitted.CreateInvoker(new Policy()).ExecuteAsync(Invocation("write", JsonData.Parse("{\"path\":\"x\",\"content\":1}")), default)).Failure?.Kind
+            != ToolFailureKind.InvalidArguments, "Number write content was not coerced.");
         var original = Invocation("write", Arguments(new { path = "original", content = "text" }));
         var policy = new Policy();
         var mismatched = tools.CreateInvoker(policy, [(_, action, _) => ValueTask.FromResult(action with { Target = temp.File("other") })]);
@@ -278,8 +286,10 @@ internal static class ReadWriteToolsTests
     {
         using var temp = new TemporaryFiles(); var operations = new Operations(); var policy = new Policy();
         var tools = new ReadWriteTools(temp.Root, temp.Root, operations);
-        Failure(await tools.CreateInvoker(policy).ExecuteAsync(Invocation("write", Arguments(new { path = "bad\0path", content = "allowed\0data" })), default), ToolFailureKind.InvalidArguments);
-        Failure(await tools.CreateInvoker(policy).ExecuteAsync(Invocation("read", Arguments(new { path = "bad\0path" })), default), ToolFailureKind.InvalidArguments);
+        // Source: Node rejects the NUL path with ERR_INVALID_ARG_VALUE before any effect; the policy sees no action.
+        var badWrite = await tools.CreateInvoker(policy).ExecuteAsync(Invocation("write", Arguments(new { path = "bad\0path", content = "allowed\0data" })), default);
+        Failure(badWrite, ToolFailureKind.ExecutionError); Check(badWrite.Content.Single().Text.StartsWith("The argument 'path' must be a string", StringComparison.Ordinal), "write NUL path text");
+        Failure(await tools.CreateInvoker(policy).ExecuteAsync(Invocation("read", Arguments(new { path = "bad\0path" })), default), ToolFailureKind.ExecutionError);
         var original = Invocation("write", Arguments(new { path = "untouched.txt", content = "allowed\0data" }));
         var originalRaw = original.Call.Arguments.ToString();
         var pathNul = tools.CreateInvoker(policy, [(_, action, _) =>

@@ -13,7 +13,7 @@
     { "scenario": "http-error", "code": "ProviderError", "sends": 1 },
     { "scenario": "invalid-json", "code": "MalformedStream", "sends": 1 },
     { "scenario": "invalid-shape", "code": "MalformedStream", "sends": 1 },
-    { "scenario": "invalid-tool-args", "code": "MalformedStream", "sends": 1 },
+    { "scenario": "invalid-tool-args-accepted", "code": null, "sends": 1 },
     { "scenario": "missing-finish", "code": "UnexpectedEof", "sends": 1 },
     { "scenario": "frame-limit", "code": "ResourceLimit", "sends": 1 },
     { "scenario": "unsupported-usage", "code": "UnsupportedFeature", "sends": 1 },

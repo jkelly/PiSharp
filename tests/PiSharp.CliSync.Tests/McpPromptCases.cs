@@ -14,6 +14,8 @@ internal static partial class Program
     private static McpServerEntry McpEntry(string name, string json) =>
         new(name, McpConfigurationReader.Validate(name, JsonData.Parse(json).Value).Config!, "mcp.json", McpConfigurationScope.Global);
 
+    private static readonly JsonSerializerOptions Relaxed = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
     private static async Task McpServersPromptSection()
     {
         var root = Temp("mcp-prompt-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
@@ -37,7 +39,7 @@ internal static partial class Program
             var firstSection = Wrap("mcp_servers", Intro + "\n- mcp__docs (codemode): Docs search.\n- mcp__later_server (tool_search)");
             var first = registry.PreparePromptSectionMessage([], [], null, 0, default).Message!;
             Equal("system", first.Role, "first prompt role");
-            Names(["role", "content", "timestamp", "sections"], first.WireBody.Value.EnumerateObject().Select(property => property.Name), "first prompt fields");
+            Names(["role", "content", "sections", "timestamp"], first.WireBody.Value.EnumerateObject().Select(property => property.Name), "first prompt fields");
             Equal("", first.WireBody.Value.GetProperty("content").GetString(), "first prompt content");
             SectionsEqual([("preamble", "Custom."), ("cwd", cwd), ("mcp_servers", firstSection)],
                 [.. first.WireBody.Value.GetProperty("sections").EnumerateObject().Select(property => KeyValuePair.Create(property.Name, property.Value.GetString()!))],
@@ -52,14 +54,15 @@ internal static partial class Program
             Check(!source.Connected(2, new(later, [], "Other generation.")), "unknown generation ignored");
             var changed = registry.PreparePromptSectionMessage([], [first], null, 5, default).Message!;
             var changedSection = Wrap("mcp_servers", Intro + "\n- mcp__docs (codemode): Docs search.\n- mcp__later_server (tool_search): Searches later.");
-            Equal("{\"role\":\"system\",\"content\":\"\",\"timestamp\":5,\"sections\":{\"mcp_servers\":" + JsonSerializer.Serialize(changedSection) + "}}",
+            // JSON.stringify order and escaping: role, content, sections, timestamp; markup characters are not escaped.
+            Equal("{\"role\":\"system\",\"content\":\"\",\"sections\":{\"mcp_servers\":" + JsonSerializer.Serialize(changedSection, Relaxed) + "},\"timestamp\":5}",
                 changed.WireBody.ToString(), "appended change message");
             Equal(changedSection, changed.WireBody.Value.GetProperty("sections").GetProperty("mcp_servers").GetString(), "appended section text");
 
             // The servers left: the section is removed with a null value.
             source.Publish(2, new([direct], []), []);
             var removed = registry.PreparePromptSectionMessage([], [first, changed], null, 9, default).Message!;
-            Equal("{\"role\":\"system\",\"content\":\"\",\"timestamp\":9,\"sections\":{\"mcp_servers\":null}}", removed.WireBody.ToString(), "removal message");
+            Equal("{\"role\":\"system\",\"content\":\"\",\"sections\":{\"mcp_servers\":null},\"timestamp\":9}", removed.WireBody.ToString(), "removal message");
             var (afterRemoval, _) = registry.PreparePromptSectionMessage([], [first, changed, removed], null, 10, default);
             Equal(null, afterRemoval, "removed section stays removed");
             // Replayed in order, the transcript's current sections end without the section.

@@ -41,6 +41,17 @@ Earlier decisions stand: MCP servers in `mcp.json` are trusted and their tools c
    does (confirmed separately because an agent's permission check had blocked the change).
 7. **Codemode deadline** starts when the script starts running in its worker, not when the
    worker launches; Pi's worker starts in milliseconds, so the user-visible budget matches.
+8. **Extensions run as in Pi:** discovered TypeScript/JavaScript extensions run in the
+   user's Node with the user's privileges, gated only by project trust; `pisharp install`
+   and startup package resolution use the user's npm and git.
+9. **Pi's own Node packages** (the exact Pi 1.1.0 releases, pinned, verified against the
+   npm registry integrity) are installed into the agent directory on first extension use
+   and extensions load through Pi's jiti setup; the ported shims are only the offline
+   fallback. Owner: IMPL-E.
+10. **Native C# extensions in the Pi entry** are discovered like Pi extensions (global and
+    project extension folders, settings, packages, `-e`), gated only by project trust,
+    on every platform; the per-package approval and preflight files are not required
+    there. Owner: IMPL-E.
 
 Install telemetry (`core/telemetry.ts`, which reports installs to Pi's servers) is not
 ported: PiSharp is not Pi and must not report as it.

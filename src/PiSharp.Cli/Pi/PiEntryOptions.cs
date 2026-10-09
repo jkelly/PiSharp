@@ -19,6 +19,8 @@ internal sealed record PiToolPolicy(PiToolPolicyMode Mode)
     /// <summary>Directories whose <c>.jsonl</c> files are protected at any depth (the agent directory's <c>sessions</c> tree).</summary>
     internal ImmutableArray<string> ProtectedTrees { get; init; } = [];
     internal IReadOnlyDictionary<string, string>? Environment { get; init; }
+    /// <summary>The home directory the file tools expand <c>~</c> to (path-utils.ts expandPath: os.homedir()).</summary>
+    internal string? Home { get; init; }
     /// <summary>The rg/fd tools manager the grep and find tools use (null: no search tools); status messages go to the reporter.</summary>
     internal PiToolsManager? Search { get; init; }
     internal Action<PiToolStatus>? ReportToolStatus { get; init; }
@@ -41,6 +43,13 @@ internal sealed record PiEntryOptions
 
     internal required PiToolPolicy ToolPolicy { get; init; }
     internal required StartupSettingsSnapshot Settings { get; init; }
+    /// <summary>The cwd the session continues in when its stored cwd no longer exists (SessionManager.open cwdOverride).</summary>
+    internal string? SessionCwdOverride { get; init; }
+    /// <summary>Re-reads the settings files (the SettingsManager the session runtime reads when it creates a new session).</summary>
+    internal Func<CancellationToken, Task<StartupSettingsSnapshot>>? ReloadSettings { get; init; }
+    /// <summary>resourceLoader.reload() for /reload and ctx.reload(): skills, prompt templates and the system prompt inputs (context
+    /// files, SYSTEM.md, APPEND_SYSTEM.md), with resources_discover (reason "reload") asked of the session's extensions.</summary>
+    internal Func<PiSharp.Cli.Extensions.NativeExtensionActivation?, CancellationToken, Task<PiReloadedResources>>? ReloadResources { get; init; }
     internal required OriginalSystemPromptAdmission SystemPrompt { get; init; }
     internal required LiveSessionSelection Selection { get; init; }
     internal required LiveSessionRuntime LiveRuntime { get; init; }
@@ -53,6 +62,8 @@ internal sealed record PiEntryOptions
     internal PromptTemplateCliConfiguration PromptTemplates { get; init; } = new([]);
     internal string? ThinkingLevel { get; init; }
     internal bool ThinkingFromCli { get; init; }
+    /// <summary>The --models patterns (null: settings enabledModels), which main.ts resolves again for every session it creates.</summary>
+    internal ImmutableArray<string>? ModelPatterns { get; init; }
     /// <summary>Messages and images the interactive frontend submits at startup (IMPL-I): source initialMessage/initialImages/initialMessages.</summary>
     internal string? InitialMessage { get; init; }
     internal ImmutableArray<JsonData> InitialImages { get; init; } = [];
@@ -74,4 +85,10 @@ internal sealed record PiEntryOptions
     internal ImmutableArray<string> ExtensionPaths { get; init; } = [];
     internal bool NoExtensions { get; init; }
     internal ImmutableDictionary<string, string?> ExtensionFlagValues { get; init; } = ImmutableDictionary<string, string?>.Empty;
+    /// <summary>The extensions the run loaded (TypeScript/JavaScript in the Node host), bound to the session by the RPC host; null without.</summary>
+    internal PiSharp.Cli.Extensions.Pi.PiExtensionHost? Extensions { get; init; }
+    /// <summary>Source ExtensionMode of the run: <c>tui</c>, <c>rpc</c>, <c>json</c> or <c>print</c>.</summary>
+    internal string ExtensionMode { get; init; } = "print";
+    /// <summary>Interactive mode inputs (IMPL-I): directories, resources and the live host link.</summary>
+    internal PiSharp.Cli.Interactive.Mode.InteractiveStartup? Interactive { get; init; }
 }

@@ -175,7 +175,7 @@ internal sealed class PiResources
         if (!Directory.Exists(directory)) return [];
         try
         {
-            return [.. new DirectoryInfo(directory).EnumerateFileSystemInfos()
+            return [.. PiSharp.Contracts.Compatibility.NodeDirectoryOrder.Order(new DirectoryInfo(directory).EnumerateFileSystemInfos())
                 .Where(entry => !entry.Name.StartsWith('.') && entry.Name != "node_modules" && entry.Name.EndsWith(extension, StringComparison.Ordinal) &&
                     (entry is FileInfo || entry.LinkTarget is not null && File.Exists(entry.FullName)))
                 .Select(entry => entry.FullName)];
@@ -192,9 +192,14 @@ internal sealed class PiResources
         var projectBase = Path.Join(cwd, PiConfig.ConfigDirName);
         var userAgentsSkills = Path.Join(home, ".agents", "skills");
 
+        // Source reload over the package manager (IMPL-E): enabled -e source resources lead, enabled settings-package resources (rank 4)
+        // follow the run's top-level ones.
+        static IEnumerable<PiResourcePath> Resolved(PiSharp.Cli.Packages.PiResolvedPaths? resolved, string type, bool packagesOnly) =>
+            resolved is null ? [] : resolved.Get(type).Where(resource => resource.Enabled && (!packagesOnly || resource.Metadata.Origin == "package"))
+                .Select(resource => new PiResourcePath(resource.Path, resource.Metadata.Scope, resource.Metadata.Source, false));
         ImmutableArray<PiResourcePath> Collect(string type, ImmutableArray<string> cliPaths, bool disabled)
         {
-            var list = new List<PiResourcePath>();
+            var list = new List<PiResourcePath>(Resolved(request.ExtensionSources, type, false));
             void Settings(JsonObject layer, string baseDir, string scope)
             {
                 foreach (var entry in Strings(layer, type))
@@ -220,6 +225,7 @@ internal sealed class PiResources
                     list.Add(new(userAgentsSkills, "user", "auto", false));
                 }
                 else list.AddRange(CollectTopLevelFiles(Path.Join(agentDir, type), type == "prompts" ? ".md" : ".json").Select(path => new PiResourcePath(path, "user", "auto", false)));
+                list.AddRange(Resolved(request.Packages, type, true));
             }
             // Source mergePaths(primary, additional): CLI paths last, duplicates (by canonical path) dropped.
             list.AddRange(cliPaths.Select(path => new PiResourcePath(PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home, trim: true) : path, "temporary", "cli", true)));
@@ -317,4 +323,8 @@ internal sealed record PiResourceRequest(string Cwd, string AgentDir, string Hom
     internal bool NoContextFiles { get; init; }
     internal string? SystemPrompt { get; init; }
     internal ImmutableArray<string> AppendSystemPrompt { get; init; }
+    /// <summary>The package manager's resolve() result (IMPL-E); its enabled package resources join the run's skills, prompts and themes.</summary>
+    internal PiSharp.Cli.Packages.PiResolvedPaths? Packages { get; init; }
+    /// <summary>The package manager's resolveExtensionSources() result for <c>-e</c> (IMPL-E); its enabled resources come first.</summary>
+    internal PiSharp.Cli.Packages.PiResolvedPaths? ExtensionSources { get; init; }
 }

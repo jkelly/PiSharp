@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.AnthropicMessages;
@@ -11,15 +12,17 @@ namespace PiSharp.AI.Protocols.AnthropicMessages;
 public sealed record AnthropicTokenRates(decimal Input = 0, decimal Output = 0, decimal CacheRead = 0, decimal CacheWrite = 0)
 { public ImmutableArray<TokenRateTier> Tiers { get; init; } = []; }
 public sealed record AnthropicFallbackModel(string Provider, string Model, AnthropicTokenRates Rates);
-public sealed record AnthropicMessagesOptions(int MaximumEvents = 4096, int MaximumEventCharacters = 65_536,
-    int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = 64, int MaximumContentCharacters = PiRequestBudget.StreamCharacters,
+public sealed record AnthropicMessagesOptions(int MaximumEvents = int.MaxValue, int MaximumEventCharacters = PiRequestBudget.StreamCharacters,
+    int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = int.MaxValue, int MaximumContentCharacters = PiRequestBudget.StreamCharacters,
     int MaximumSignatureCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = 32, AnthropicTokenRates? Rates = null,
     ImmutableArray<AnthropicFallbackModel> AllowedFallbackModels = default, bool OAuthToolNames = false,
-    int MaximumToolDeclarations = 1024, int MaximumActiveTools = 128)
+    int MaximumToolDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue)
 {
     public bool CaptureSourceEmissionSnapshots { get; init; }
     /// <summary>Exact native effort recorded on every message of a managed (compat.supportsMidConvoEffort) request; null when unmanaged.</summary>
     public string? ProviderThinkingLevel { get; init; }
+    /// <summary>Read when a completed response receives its anthropic_input_transformations diagnostic (upstream: Date.now()).</summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
 }
 public enum AnthropicMessagesFailure { SourceFailed, MalformedStream, UnexpectedEof, ResourceLimit, ProviderError, Cancelled, CleanupFailed }
 
@@ -34,7 +37,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         ArgumentNullException.ThrowIfNull(source); _source = source; _options = options ?? new();
         if (_options.MaximumEvents <= 0 || _options.MaximumEventCharacters <= 0 || _options.MaximumInputCharacters <= 0 ||
             _options.MaximumContentSlots <= 0 || _options.MaximumContentCharacters <= 0 || _options.MaximumSignatureCharacters <= 0 ||
-            _options.MaximumJsonDepth is < 1 or > 64 || _options.MaximumToolDeclarations <= 0 || _options.MaximumActiveTools <= 0) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic stream limits.");
+            _options.MaximumJsonDepth is < 1 or > 64 || _options.MaximumToolDeclarations <= 0 || _options.MaximumActiveTools <= 0 || _options.Clock is null) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic stream limits.");
         if (_options.ProviderThinkingLevel is not (null or "low" or "medium" or "high" or "xhigh" or "max"))
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid Anthropic provider thinking level.");
         ValidateRates(_options.Rates ?? new());
@@ -82,7 +85,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 if (cancellationToken.IsCancellationRequested) { failure = AnthropicMessagesFailure.Cancelled; break; }
                 var moved = false;
                 try { moved = await enumerator.MoveNextAsync().ConfigureAwait(false); }
-                catch (Exception) { failure = cancellationToken.IsCancellationRequested ? AnthropicMessagesFailure.Cancelled : AnthropicMessagesFailure.SourceFailed; }
+                catch (Exception error) { failure = SourceFailure(state, error, cancellationToken); }
                 if (failure is not null || !moved) break;
                 if (cancellationToken.IsCancellationRequested) { failure = AnthropicMessagesFailure.Cancelled; break; }
                 // Source value acquisition has its own failure boundary: no DTO has
@@ -110,6 +113,16 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         }
         if (cancellationToken.IsCancellationRequested) failure = AnthropicMessagesFailure.Cancelled;
         yield return state.Finish(failure);
+    }
+
+    /// <summary>A source failure. Provider error text the source surfaces (a rejected response's SDK message, or a named
+    /// error event's data) is what anthropic-messages.ts shows as errorMessage.</summary>
+    private static AnthropicMessagesFailure SourceFailure(State state, Exception error, CancellationToken token)
+    {
+        if (token.IsCancellationRequested) return AnthropicMessagesFailure.Cancelled;
+        if (error is not ProviderDisplayException shown) return AnthropicMessagesFailure.SourceFailed;
+        state.SourceMessage ??= shown.Message;
+        return shown.InStream ? AnthropicMessagesFailure.ProviderError : AnthropicMessagesFailure.SourceFailed;
     }
 
     private static AnthropicMessagesFailure Classify(Exception error, CancellationToken token) =>
@@ -141,7 +154,6 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         private readonly HashSet<int> _endedFallbackIndices = [];
         private JsonFields _properties = JsonFields.Empty;
         private JsonElement _transformations;
-        private readonly long _timestamp;
         private TokenUsage _usage = TokenUsage.Zero;
         private long _cacheWrite1h;
         private long? _reasoning;
@@ -152,6 +164,7 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
         private bool _messageStopped;
         private StopReason _reason = StopReason.Pending;
         private string? _stopErrorMessage;
+        internal string? SourceMessage;
         public StreamStarted Start { get; }
         public State(ChatRequest request, AnthropicMessagesOptions options)
         {
@@ -161,7 +174,6 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             _options = options; _rates = options.Rates ?? new();
             _currentToolNames = options.OAuthToolNames ? CurrentTools(request, options) : [];
             if (options.ProviderThinkingLevel is { } level) _properties = _properties.Set("providerThinkingLevel", TextData(level));
-            _timestamp = request.Timestamp;
             Start = new(new(request.Model.Api, request.Model.Provider, request.Model.Id, request.Timestamp, [], TokenUsage.Zero, StopReason.Pending,
                 options.ProviderThinkingLevel is null ? null : _properties));
             _reducer = new(Start.Partial, new(options.MaximumContentSlots, options.MaximumContentCharacters)); _reducer.Apply(Start);
@@ -301,9 +313,8 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                         ended.Properties.Set("thinkingSignature", TextData(ended.Signature.ToString()))));
                     else if (content is ToolCallContent tool)
                     {
-                        var preview = _reducer.GetToolJsonPreview(ended.Index);
-                        var arguments = FinalToolArguments.ParseStrict(preview.Length == 0 ? "{}" : preview).Json;
-                        CheckJson(arguments.Value, 0);
+                        // anthropic-messages.ts content_block_stop: block.arguments = parseStreamingJson(block.partialJson).
+                        var arguments = StreamingJson.Parse(_reducer.GetToolJsonPreview(ended.Index));
                         Emit(new ToolCallEnded(ended.Index, tool with { Arguments = arguments }));
                     }
                     else throw Protocol();
@@ -349,24 +360,35 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                 if (content[slot.Index] is ThinkingContent thinking)
                     content[slot.Index] = new ThinkingContent(thinking.Thinking,
                         slot.Properties.Set("thinkingSignature", TextData(slot.Signature.ToString())));
-            var reason = failure is null ? _reason : failure == AnthropicMessagesFailure.Cancelled ? StopReason.Aborted : StopReason.Error;
             var properties = _properties;
-            // Diagnostics are appended only to a completed response, as upstream does after its error checks; the timestamp is the request's.
+            // Diagnostics are appended only to a completed response, as upstream does after its error checks, stamped with Date.now() at
+            // completion. Upstream maps each entry's `type/path/reason ?? undefined` without type checks: values are copied as-is, null
+            // ones are omitted, a non-object entry projects to {}, and a null entry's property read throws its TypeError (an error result).
             if (failure is null && _transformations.ValueKind == JsonValueKind.Array && _transformations.GetArrayLength() > 0)
             {
                 var transformations = new System.Text.Json.Nodes.JsonArray();
                 foreach (var item in _transformations.EnumerateArray())
                 {
+                    if (item.ValueKind == JsonValueKind.Null)
+                    { failure = AnthropicMessagesFailure.MalformedStream; SourceMessage ??= "Cannot read properties of null (reading 'type')"; break; }
                     var projected = new System.Text.Json.Nodes.JsonObject();
-                    foreach (var name in new[] { "type", "path", "reason" }) if (OptionalString(item, name) is { } text) projected[name] = text;
+                    if (item.ValueKind == JsonValueKind.Object)
+                        foreach (var name in new[] { "type", "path", "reason" })
+                            if (item.TryGetProperty(name, out var field) && field.ValueKind != JsonValueKind.Null)
+                                projected[name] = System.Text.Json.Nodes.JsonNode.Parse(field.GetRawText());
                     transformations.Add(projected);
                 }
-                var diagnostics = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["type"] = "anthropic_input_transformations",
-                    ["timestamp"] = _timestamp, ["details"] = new System.Text.Json.Nodes.JsonObject { ["transformations"] = transformations } });
-                properties = properties.Set("diagnostics", JsonData.Parse(diagnostics.ToJsonString()));
+                if (failure is null)
+                {
+                    var diagnostics = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["type"] = "anthropic_input_transformations",
+                        ["timestamp"] = _options.Clock.GetUtcNow().ToUnixTimeMilliseconds(),
+                        ["details"] = new System.Text.Json.Nodes.JsonObject { ["transformations"] = transformations } });
+                    properties = properties.Set("diagnostics", JsonData.Parse(diagnostics.ToJsonString()));
+                }
             }
+            var reason = failure is null ? _reason : failure == AnthropicMessagesFailure.Cancelled ? StopReason.Aborted : StopReason.Error;
             if (failure is not null) properties = properties.Set("errorMessage", TextData(failure == AnthropicMessagesFailure.Cancelled
-                ? "Anthropic stream was cancelled." : failure == AnthropicMessagesFailure.ProviderError && _reason == StopReason.Error && _stopErrorMessage is not null
+                ? "Anthropic stream was cancelled." : SourceMessage is not null ? SourceMessage : failure == AnthropicMessagesFailure.ProviderError && _reason == StopReason.Error && _stopErrorMessage is not null
                     ? _stopErrorMessage : "Anthropic stream did not complete."))
                 .Set("anthropicFailure", TextData(failure.Value.ToString()));
             var final = snapshot with { Content = content.ToImmutable(), Usage = _usage, StopReason = reason, ExtraProperties = properties };
@@ -388,22 +410,25 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             if (_cacheWrite1h > write || _reasoning > output) throw Protocol();
             var total = checked(input + output + read + write);
             // Pi abe508 models.ts calculateCost: prompt-length tiers price the whole request, 1h writes at 2x the tier input.
-            var rates = PromptLengthPricing.Select(_rates.Input, _rates.Output, _rates.CacheRead, _rates.CacheWrite, _rates.Tiers, input, read, write);
-            var costInput = checked(rates.Input / 1_000_000m * input); var costOutput = checked(rates.Output / 1_000_000m * output);
-            var costRead = checked(rates.CacheRead / 1_000_000m * read);
-            var costWrite = checked((rates.CacheWrite * (write - _cacheWrite1h) + rates.Input * 2 * _cacheWrite1h) / 1_000_000m);
+            // Pi abe508 models.ts calculateCost runs in binary64 Numbers (prompt-length tiers price the whole request, 1h writes at 2x
+            // the tier input), so the costs are those Numbers: 5 / 1e6 * 3 is 0.000015000000000000002, as Pi records it.
             var extras = JsonFields.Empty.Set("cacheWrite1h", JsonData.Parse(_cacheWrite1h.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             if (_reasoning is { } tokens) extras = extras.Set("reasoning", JsonData.Parse(tokens.ToString(System.Globalization.CultureInfo.InvariantCulture)));
-            _usage = new(input, output, read, write, total, new(costInput, costOutput, costRead, costWrite,
-                checked(costInput + costOutput + costRead + costWrite)), extras);
+            var counts = new TokenUsage(input, output, read, write, total, new(0, 0, 0, 0, 0));
+            var binary64 = JsonData.Parse(Contracts.Compatibility.EcmaScriptJsonProjection.Project(
+                OriginalAnthropicUsageCostProjection.Create(_rates, counts, _cacheWrite1h)));
+            var cost = binary64.Value;
+            if (cost.EnumerateObject().Any(field => !field.Value.TryGetDouble(out var number) || !double.IsFinite(number))) throw Protocol();
+            _usage = new(input, output, read, write, total, new(cost.GetProperty("input").GetDecimal(), cost.GetProperty("output").GetDecimal(),
+                cost.GetProperty("cacheRead").GetDecimal(), cost.GetProperty("cacheWrite").GetDecimal(), cost.GetProperty("total").GetDecimal(),
+                SourceBinary64Cost: binary64), extras);
         }
         private void Transformations(JsonElement value)
         {
-            if (!value.TryGetProperty("input_transformations", out var transformations) || transformations.ValueKind == JsonValueKind.Null) return;
-            if (transformations.ValueKind != JsonValueKind.Array) throw Protocol();
+            // Upstream: `if (Array.isArray(transformations)) inputTransformations = transformations;` anything else is ignored and the
+            // last array seen (message_start, then message_delta) is reported; entries are not validated here.
+            if (!value.TryGetProperty("input_transformations", out var transformations) || transformations.ValueKind != JsonValueKind.Array) return;
             if (transformations.GetArrayLength() > _options.MaximumContentSlots) throw Limit();
-            // The last array seen (message_start, then message_delta) is reported; entries carry optional string type/path/reason.
-            foreach (var item in transformations.EnumerateArray()) { Object(item); foreach (var name in new[] { "type", "path", "reason" }) _ = OptionalString(item, name); }
             _transformations = transformations.Clone();
         }
         private void RequireMessage() { if (!_messageStarted) throw Protocol(); }

@@ -22,6 +22,8 @@ public sealed record AgentConfiguration(ModelDescriptor Model, IChatTransport Tr
     IToolHooks? ToolHooks = null, ToolExecutionMode ExecutionMode = ToolExecutionMode.Parallel, AgentHooks? Hooks = null)
 {
     public string ThinkingLevel { get; init; } = "off";
+    /// <summary>Source agent.sessionId: the session id every request carries (<see cref="ChatRequest.SessionId"/>).</summary>
+    public string? SessionId { get; init; }
 }
 public enum AgentCancellationBehavior { Propagate, SettleAborted }
 public sealed record AgentOptions(AgentLoopOptions? Loop = null, AgentPendingInputQueueOptions? Queue = null,
@@ -92,6 +94,7 @@ public sealed class Agent : IAsyncDisposable
         public readonly TaskCompletionSource Idle = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public CancellationTokenRegistration Registration;
         public bool SkipInitialSteering = skipInitialSteering;
+        public ImmutableArray<TranscriptEntry>? TranscriptReplacement;
         public long Timestamp;
         public int CancelUsers;
         public bool Done, Settling, CallbackFailed;
@@ -162,6 +165,21 @@ public sealed class Agent : IAsyncDisposable
             ValidateMessages(messages, inputsOnly: false);
             _messages = messages;
             _failure = null;
+        }
+    }
+    /// <summary>Source _refreshFinalizedContext during a run (agent.state.messages = projection): replaces the history from the active
+    /// run's own callback, for example after committing turn_end drafts. The loop continues from it at the turn boundary, in the same
+    /// run, with no further lifecycle events.</summary>
+    public void ReplaceRunMessages(ImmutableArray<TranscriptEntry> messages)
+    {
+        lock (_gate)
+        {
+            ThrowDisposed();
+            var run = _active ?? throw new InvalidOperationException("Run messages are replaced only during a run.");
+            if (_callbackGeneration.Value != run.Generation || run.Done || run.Settling)
+                throw new InvalidOperationException("Run messages are replaced only from the run's own callbacks.");
+            ValidateMessages(messages, inputsOnly: false);
+            _messages = messages; run.TranscriptReplacement = messages;
         }
     }
     public void Steer(TranscriptEntry message, CancellationToken cancellationToken = default)
@@ -319,7 +337,7 @@ public sealed class Agent : IAsyncDisposable
             }
             var turn = new TurnRunner(new ChatClient(config.Transport, _options.StreamCapacity) { TimeProvider = _options.TimeProvider },
                 new ToolBatchScheduler(config.Tools, config.ToolHooks, config.ExecutionMode, _progressOptions, _options.ResultValues)
-                { TimeProvider = _options.TimeProvider }, config.ThinkingLevel);
+                { TimeProvider = _options.TimeProvider }, config.ThinkingLevel, config.SessionId);
             async ValueTask<AgentLoopRequestPreparation?> PrepareBoundary(AgentRequestBoundary boundary, CancellationToken cancellation, int attempt = 0)
             {
                 if (attempt >= 16) throw new InvalidOperationException("Request boundary revision retry limit exceeded.");
@@ -345,7 +363,7 @@ public sealed class Agent : IAsyncDisposable
                     throw new ArgumentException("Invalid boundary system update.");
                 var nextRunner = new TurnRunner(new ChatClient(admitted.Transport, _options.StreamCapacity) { TimeProvider = _options.TimeProvider },
                     new ToolBatchScheduler(admitted.Tools, admitted.ToolHooks, admitted.ExecutionMode, _progressOptions, _options.ResultValues)
-                    { TimeProvider = _options.TimeProvider }, admitted.ThinkingLevel);
+                    { TimeProvider = _options.TimeProvider }, admitted.ThinkingLevel, admitted.SessionId);
                 cancellation.ThrowIfCancellationRequested();
                 var published = false;
                 try { await InCallbackAsync(run, () => update.PublishAsync(() =>
@@ -387,7 +405,8 @@ public sealed class Agent : IAsyncDisposable
                 hooks.FinishTurnDecision is { } decision ? (completed, cancellation) => InCallbackAsync(run, () => decision(completed, cancellation)) : null)
             {
                 TransformRequestMessages = Project, PrepareRequestBoundary = (boundary, cancellation) => PrepareBoundary(boundary, cancellation),
-                GetContextOnlyMessages = cancellation => PollContextOnly(run, cancellation)
+                GetContextOnlyMessages = cancellation => PollContextOnly(run, cancellation),
+                TakeTranscriptReplacement = () => { lock (_gate) { var replaced = run.TranscriptReplacement; run.TranscriptReplacement = null; return replaced; } }
             };
             var eventSink = new EventSink((observation, cancellation) => CommitAndEmitAsync(run, observation, cancellation));
             run.Result = _options.CancellationBehavior == AgentCancellationBehavior.SettleAborted ?
@@ -521,6 +540,23 @@ public sealed class Agent : IAsyncDisposable
             subscriptions = _subscriptions;
         }
         await InCallbackAsync(run, () => _sink.EmitAsync(observation, token)).ConfigureAwait(false);
+        // Source _replaceMessageInPlace: the primary sink's message_end handlers replaced the finalized message; history and
+        // listeners see the replacement.
+        if (entry is not null && AgentMessageReplacement.Get(observation) is { } replacement)
+        {
+            lock (_gate)
+            {
+                if (!ReferenceEquals(_active, run)) throw new InvalidOperationException("Agent generation is no longer active.");
+                for (var index = _messages.Length - 1; index >= 0; index--)
+                    if (ReferenceEquals(_messages[index], entry)) { _messages = _messages.SetItem(index, replacement); break; }
+            }
+            observation = observation switch
+            {
+                AgentLoopInputMessageEnded => new AgentLoopInputMessageEnded(replacement),
+                AssistantMessageEnded => new AssistantMessageEnded(PiWireJson.ReadMessage(replacement.WireBody.Value)),
+                _ => observation
+            };
+        }
         var listenerToken = _progressOptions.Mode == ToolProgressDeliveryMode.SourceCompatible ? run.Cancellation.Token : token;
         foreach (var subscription in subscriptions)
             await InCallbackAsync(run, () => subscription.Sink.EmitAsync(observation, listenerToken)).ConfigureAwait(false);

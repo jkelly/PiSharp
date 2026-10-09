@@ -112,11 +112,13 @@ public sealed class RpcAgentEventProjector
                 })];
             }
             case AgentLoopEnded end:
-                if (historyLength < 0 || historyLength > end.Result.Transcript.Length || _toolStarts.Count != 0)
+                // Source agent_end messages are the run's own messages (newMessages), kept exact when a turn boundary replaced the context.
+                if (end.Result.RunMessages.IsDefault && (historyLength < 0 || historyLength > end.Result.Transcript.Length) || _toolStarts.Count != 0)
                     throw new RpcDispatchException(RpcDispatchFailure.SessionRunFailed);
                 return [Event("agent_end", writer =>
                 {
-                    RpcCommandCodec.Messages(writer, "messages", end.Result.Transcript, options.MaximumReturnedMessages, historyLength);
+                    if (end.Result.RunMessages.IsDefault) RpcCommandCodec.Messages(writer, "messages", end.Result.Transcript, options.MaximumReturnedMessages, historyLength);
+                    else RpcCommandCodec.Messages(writer, "messages", end.Result.RunMessages, options.MaximumReturnedMessages);
                     writer.WriteBoolean("willRetry", willRetry);
                 })];
             case TurnStreamObserved stream:
@@ -154,7 +156,7 @@ public sealed class RpcAgentEventProjector
         // Native thinking/argument checkpoints and identity fills update reducer state
         // without a source push. Only the later public end is projected; no RPC event
         // is invented for a checkpoint. Final/aborted message bodies retain its state.
-        if (observation is ThinkingCheckpoint or ToolCallCheckpoint or ToolCallHeaderUpdated) return null;
+        if (observation is ThinkingCheckpoint or ToolCallCheckpoint or ToolCallHeaderUpdated or ContentBlockFinalized) return null;
         return RpcCommandCodec.Build(writer =>
         {
             var known = new HashSet<string>(StringComparer.Ordinal) { "type", "partial", "contentIndex" };

@@ -21,7 +21,7 @@ public sealed class PromptTemplateInputAdmission : IPromptInputAdmission
     private readonly bool expandTemplates;
     private readonly IPromptInputAdmission? inputHandlers;
     private readonly IPromptTemplateCommandAdmission? commands;
-    private readonly PromptInputAdmissionOptions? limits;
+    private readonly PromptInputAdmissionOptions limits;
 
     public PromptTemplateInputAdmission(PromptTemplateCatalogSnapshot snapshot, PromptTemplateInputOperation operation,
         IPromptInputAdmission? inputHandlers = null, IPromptTemplateCommandAdmission? commands = null,
@@ -34,7 +34,9 @@ public sealed class PromptTemplateInputAdmission : IPromptInputAdmission
         templates = snapshot.Resources.Select(resource => resource.Template).ToImmutableArray();
         this.operation = operation;
         this.expandTemplates = expandTemplates ?? operation != PromptTemplateInputOperation.ExtensionMessage;
-        this.inputHandlers = inputHandlers; this.commands = commands; this.limits = limits;
+        this.inputHandlers = inputHandlers; this.commands = commands;
+        // Without explicit limits the submitting session admits the input and the expansion under its own options.
+        this.limits = limits ?? PromptInputAdmissionOptions.Unbounded;
     }
 
     public async ValueTask<PromptInputDecision> ReduceAsync(PromptInput input, CancellationToken cancellationToken)

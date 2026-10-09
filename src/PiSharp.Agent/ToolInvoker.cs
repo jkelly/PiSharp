@@ -30,10 +30,38 @@ public interface IInvocationPreparedToolAdapter : IPreparedToolAdapter
         ToolProgressCallback onProgress, CancellationToken cancellationToken);
 }
 
+/// <summary>Source agent-loop prepareToolCall: an error the tool's prepareArguments throws becomes the error result whose text is its
+/// message. Initial argument preparation raises it; any other preparation failure keeps the generic invalid-arguments result.</summary>
+public sealed class ToolArgumentPreparationException(string message, Exception? innerException = null) : Exception(message, innerException);
+
+/// <summary>The error the source tool's execute throws for this input before it has any effect (for example Node rejecting a path with a
+/// NUL byte), found while preparing the action. The invoker returns it as the error result without authorizing or executing anything.
+/// User shell commands raise it for Node's spawn errors, which the source reports with this message.</summary>
+public sealed class ToolSourceErrorException(string message) : Exception(message);
+
 /// <summary>Trusted, initial-only argument preparation. Hook replacements never invoke this capability.</summary>
 public interface IInitialToolArgumentPreparationAdapter : IPreparedToolAdapter
 {
     ValueTask<JsonData> PrepareInitialArgumentsAsync(ToolInvocation invocation, CancellationToken cancellationToken);
+}
+
+/// <summary>The tool's parameter schema, checked by source validateToolArguments (packages/ai/src/utils/validation.ts).</summary>
+public sealed record ToolArgumentSchema(JsonData Parameters, ToolSchemaOrigin Origin)
+{
+    /// <summary>The <c>parameters</c> object of a model-facing declaration; null when the declaration has none.</summary>
+    public static ToolArgumentSchema? FromDeclaration(JsonData declaration, ToolSchemaOrigin origin) =>
+        declaration is not null && declaration.Value.ValueKind == JsonValueKind.Object &&
+        declaration.Value.TryGetProperty("parameters", out var parameters) && parameters.ValueKind == JsonValueKind.Object
+            ? new(JsonData.FromElement(parameters), origin) : null;
+}
+
+/// <summary>Source agent-loop prepareToolCall: after the tool's prepareArguments, validateToolArguments converts and coerces the
+/// arguments against the tool's parameter schema; the tool receives the coerced arguments, and a failure becomes the error result
+/// whose text is the validation message without running the tool.</summary>
+public interface IToolArgumentSchemaAdapter : IPreparedToolAdapter
+{
+    /// <summary>Null skips schema validation.</summary>
+    ToolArgumentSchema? ArgumentSchema { get; }
 }
 
 public sealed record ToolActionAuthorization(bool Allow, bool Terminate = false);
@@ -287,21 +315,49 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
             var reachable = invocation.Context?.CallDepth is > 0 ? _options.AllowedNestedTools : _options.AllowedRootTools;
             if (reachable is not null && !reachable.Contains(invocation.Call.Name))
                 return CompleteResult(Error(ToolFailureKind.UnknownTool));
-            if (!ValidArguments(invocation.Call.Arguments, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+            // parseStreamingJson may finalize an array, string, number, boolean or null: source prepareToolCall still runs the tool's
+            // prepareArguments and validateToolArguments on it, whose error result ("root: must be object") the model receives.
+            var schemaAdapter = tool as IToolArgumentSchemaAdapter;
+            if (!ValidArguments(invocation.Call.Arguments, cancellationToken, anyKind: schemaAdapter?.ArgumentSchema is not null))
+                return CompleteResult(Error(ToolFailureKind.InvalidArguments));
             cancellationToken.ThrowIfCancellationRequested();
             var initialView = invocation;
             if (tool is IInitialToolArgumentPreparationAdapter initial)
             {
-                var arguments = await initial.PrepareInitialArgumentsAsync(invocation, cancellationToken).ConfigureAwait(false);
+                JsonData arguments;
+                try { arguments = await initial.PrepareInitialArgumentsAsync(invocation, cancellationToken).ConfigureAwait(false); }
+                catch (ToolArgumentPreparationException error) when (!cancellationToken.IsCancellationRequested)
+                { return CompleteResult(ToolResult.Error(ToolFailureKind.InvalidArguments, error.Message)); }
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!ValidArguments(arguments, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+                if (!ValidArguments(arguments, cancellationToken, anyKind: schemaAdapter?.ArgumentSchema is not null)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
                 if (!ReferenceEquals(arguments, invocation.Call.Arguments))
                 {
                     var call = invocation.Call with { Arguments = arguments };
                     initialView = invocation with { AssistantMessage = assistant with { Content = assistant.Content.SetItem(invocation.SourceIndex, call) }, Call = call };
                 }
             }
-            var action = await tool.PrepareAsync(initialView, cancellationToken).ConfigureAwait(false);
+            // Source prepareToolCall: validateToolArguments(tool, preparedToolCall). The committed assistant message and the
+            // tool execution events keep the model's arguments; only preparation and execution see the coerced ones.
+            if (schemaAdapter is { ArgumentSchema: { } schema })
+            {
+                var validated = ToolArgumentValidation.ValidateJson(invocation.Call.Name, schema.Parameters.ToString(),
+                    initialView.Call.Arguments.ToString(), schema.Origin);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!validated.IsValid) return CompleteResult(ToolResult.Error(ToolFailureKind.InvalidArguments, validated.ErrorMessage!));
+                if (validated.ArgumentsJson is not { } coercedJson) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+                var coerced = JsonData.Parse(coercedJson);
+                if (!ValidArguments(coerced, cancellationToken)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+                if (!JsonElement.DeepEquals(coerced.Value, initialView.Call.Arguments.Value))
+                {
+                    var call = initialView.Call with { Arguments = coerced };
+                    initialView = initialView with { AssistantMessage = initialView.AssistantMessage with
+                        { Content = initialView.AssistantMessage.Content.SetItem(invocation.SourceIndex, call) }, Call = call };
+                }
+            }
+            PreparedToolAction action;
+            try { action = await tool.PrepareAsync(initialView, cancellationToken).ConfigureAwait(false); }
+            catch (ToolSourceErrorException error) when (!cancellationToken.IsCancellationRequested)
+            { return CompleteResult(ToolResult.Error(ToolFailureKind.ExecutionError, error.Message)); }
             cancellationToken.ThrowIfCancellationRequested();
             if (!ValidAction(action, invocation.Call.Name, cancellationToken))
                 return CompleteResult(Error(ToolFailureKind.InvalidArguments));
@@ -325,7 +381,9 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                     var replacedCall = invocation.Call with { Arguments = before.Arguments };
                     var replacedAssistant = assistant with { Content = assistant.Content.SetItem(invocation.SourceIndex, replacedCall) };
                     var prepareView = invocation with { AssistantMessage = replacedAssistant, Call = replacedCall };
-                    action = await tool.PrepareAsync(prepareView, cancellationToken).ConfigureAwait(false);
+                    try { action = await tool.PrepareAsync(prepareView, cancellationToken).ConfigureAwait(false); }
+                    catch (ToolSourceErrorException error) when (!cancellationToken.IsCancellationRequested)
+                    { return CompleteResult(ToolResult.Error(ToolFailureKind.ExecutionError, error.Message)); }
                     cancellationToken.ThrowIfCancellationRequested();
                     if (!ValidAction(action, invocation.Call.Name, cancellationToken)) return CompleteResult(Error(stage));
                 }
@@ -421,8 +479,8 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
         return result.ToImmutable();
     }
 
-    private bool ValidArguments(JsonData? arguments, CancellationToken token) =>
-        arguments is not null && arguments.Value.ValueKind == JsonValueKind.Object &&
+    private bool ValidArguments(JsonData? arguments, CancellationToken token, bool anyKind = false) =>
+        arguments is not null && (anyKind || arguments.Value.ValueKind == JsonValueKind.Object) &&
         arguments.ToString().Length <= _options.MaximumArgumentCharacters && ValidJson(arguments.Value, 0, token, allowNulData: true);
 
     private bool ValidAction(PreparedToolAction? action, string name, CancellationToken token)

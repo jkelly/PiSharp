@@ -45,6 +45,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         AnthropicMessagesRequestOptions projectionOptions, AnthropicMessagesKeyAuthRequestOptions? options = null)
     {
         _options = options ?? new();
+        _withSession = session => new(baseUri, expectedModel, projectionOptions, _options with { SessionId = session });
         if (baseUri is null || expectedModel is null || projectionOptions is null ||
             !double.IsFinite(_options.MaximumTokenMagnitude) || _options.MaximumTokenMagnitude <= 0 ||
             _options.MaxTokens is { } tokens && !double.IsFinite(tokens) || _options.MaximumKeyCharacters <= 0 || _options.MaximumBaseUriCharacters <= 0 ||
@@ -80,6 +81,7 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
                 configured[_options.SessionAffinityHeader] = _options.SessionId;
         }
         ReadHeaders(_options.ModelHeaders, configured, ref supplied);
+        foreach (var (name, value) in PiSharp.AI.Providers.ProviderHeaderPolicies.OpenCodeSessionHeaders(expectedModel.Provider, baseUri, _options.SessionId)) configured[name] = value;
         ReadHeaders(_options.Headers, configured, ref supplied);
         var betaFeatures = projectionOptions.BetaFeatures;
         // Pi getBetaFeatures scans each source in precedence order. A case-sensitive
@@ -107,11 +109,23 @@ public sealed class AnthropicMessagesKeyAuthRequestFactory
         catch (ArgumentException) { throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidConfiguration); }
     }
 
+    // StreamOptions.sessionId per request: a factory configured without a session id binds the request's (cached per id).
+    private readonly Func<string, AnthropicMessagesKeyAuthRequestFactory> _withSession;
+    private sealed record SessionScoped(string Id, AnthropicMessagesKeyAuthRequestFactory Factory);
+    private SessionScoped? _sessionScoped;
+    private AnthropicMessagesKeyAuthRequestFactory? ScopedTo(ChatRequest? request)
+    {
+        if (request?.SessionId is not { } id || _options.SessionId is not null) return null;
+        if (Volatile.Read(ref _sessionScoped) is { } cached && cached.Id == id) return cached.Factory;
+        var created = _withSession(id); Volatile.Write(ref _sessionScoped, new(id, created)); return created;
+    }
+
     public HttpRequestMessage Create(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
-        => CreateCore(request, explicitApiKey, cancellationToken, null);
+        => ScopedTo(request) is { } scoped ? scoped.Create(request, explicitApiKey, cancellationToken) : CreateCore(request, explicitApiKey, cancellationToken, null);
 
     public AnthropicMessagesPreparedRequest Prepare(ChatRequest request, string explicitApiKey, CancellationToken cancellationToken = default)
     {
+        if (ScopedTo(request) is { } scoped) return scoped.Prepare(request, explicitApiKey, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (request is null || request.Model != _model) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidRequest);
         if (string.IsNullOrEmpty(explicitApiKey)) throw Fail(AnthropicMessagesKeyAuthRequestFailure.InvalidKey);

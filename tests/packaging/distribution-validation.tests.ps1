@@ -239,7 +239,7 @@ try {
     $files['PiSharp.Cli.nuspec'] = [Text.Encoding]::UTF8.GetBytes($text)
     $bad = Write-Fixture -Files $files -Name 'nuspec-version'
     Test-Case 'nuspec version mismatch' { Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsTool } 'metadata mismatch: version' }
-    $files = New-FixtureFiles; $files['tools/net10.0/any/PiSharp.Cli.deps.json'] = [Text.Encoding]::UTF8.GetBytes('{"runtimeTarget":{"name":".NETCoreApp,Version=v10.0"},"libraries":{"PiSharp.Compatibility.Node/1.0.0":{"type":"project"}}}')
+    $files = New-FixtureFiles; $files['tools/net10.0/any/PiSharp.Cli.deps.json'] = [Text.Encoding]::UTF8.GetBytes('{"runtimeTarget":{"name":".NETCoreApp,Version=v10.0"},"libraries":{"nodejs/22.0.0":{"type":"package"}}}')
     $bad = Write-Fixture -Files $files -Name 'node-deps'
     Test-Case 'Node dependency manifest' { Assert-Rejected { Assert-PiSharpDistribution -Path $bad @argsTool } 'Node dependency' }
     $files = New-FixtureFiles -Standalone; $files['PiSharp.Cli.runtimeconfig.json'] = [Text.Encoding]::UTF8.GetBytes('{"runtimeOptions":{"tfm":"net10.0","framework":{"name":"Microsoft.NETCore.App","version":"10.0.0"}}}')

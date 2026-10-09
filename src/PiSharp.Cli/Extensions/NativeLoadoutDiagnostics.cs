@@ -8,7 +8,8 @@ namespace PiSharp.Cli.Extensions;
 internal sealed class NativeLoadoutDiagnostics(
     Func<ExtensionEventDiagnostic, CancellationToken, ValueTask> reporter, CancellationToken lifetime)
 {
-    private const int MaximumPending = 128;
+    // One diagnostic per failing prepareLoadout of a registered tool: bounded by the (unbounded, as in Pi) tool count, not by a constant.
+    private const int MaximumPending = int.MaxValue;
     private readonly object _gate = new();
     private readonly List<(string Name, Exception Failure)> _bootstrap = [];
     private LoadoutDiagnosticDelivery? _delivery;

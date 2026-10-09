@@ -150,6 +150,9 @@ public sealed record ToolBatchResult(
 {
     public bool Terminate => Outcomes.Length > 0 && Outcomes.All(outcome => outcome.Result.Terminate);
     public bool ShouldContinue => Outcomes.Length > 0 && !Terminate && !IsCanceled;
+    /// <summary>The assistant message as message_end handlers replaced it (<see cref="AgentMessageReplacement"/>); null when kept.
+    /// Its tool calls are the ones the batch ran.</summary>
+    public AssistantMessage? Assistant { get; init; }
 }
 
 public interface IToolExecutor

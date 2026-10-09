@@ -246,7 +246,8 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
                     await Publish("agent_end", () => Json(writer =>
                     {
                         writer.WriteString("type", "agent_end");
-                        Array(writer, "messages", end.Result.Transcript.Skip(Math.Min(_historyLength, end.Result.Transcript.Length)).Select(message => message.WireBody));
+                        Array(writer, "messages", (end.Result.RunMessages.IsDefault ? end.Result.Transcript.Skip(Math.Min(_historyLength, end.Result.Transcript.Length))
+                            : end.Result.RunMessages).Select(message => message.WireBody));
                     })).ConfigureAwait(false); break;
                 case AgentLoopTurnStarted:
                     await Publish("turn_start", () => Json(writer =>
@@ -332,7 +333,8 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
         {
             if (_partial is null || value is ThinkingCheckpoint or ToolCallCheckpoint or ToolCallHeaderUpdated) return;
             try { _partial.Apply(value); } catch (Exception) { _partial = null; return; }
-            if (value is StreamStarted or StreamTerminalEvent) return;
+            // A block finalized without a source push (Bedrock) has no message_update of its own.
+            if (value is StreamStarted or StreamTerminalEvent or ContentBlockFinalized) return;
             var partial = _partial.Snapshot();
             await binding.PublishAsync(owner, attached, "message_update", () => Json(writer =>
             {

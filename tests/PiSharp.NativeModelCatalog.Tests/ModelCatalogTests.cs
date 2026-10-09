@@ -19,7 +19,8 @@ internal static class ModelCatalogTests
         ("catalog validation and requested cancellation refuse before capability callbacks", Admission),
         ("reentrant capability publication cannot overwrite newer atomic binding thinking snapshot", Atomic),
         ("tool catalog and initial-selection copies share actual model publications without capability replay", Copies),
-        ("captured selection retains exact transport while later resolution uses replacement", Captured)
+        ("captured selection retains exact transport while later resolution uses replacement", Captured),
+        ("provider refresh keeps switchable model bindings published after the baseline", KeepsSwitchable)
     ];
     private static readonly ModelDescriptor Seed = new("known", "catalog-api", "baseline");
     private static readonly ModelDescriptor Late = new("late", "catalog-api", "registered");
@@ -157,6 +158,28 @@ internal static class ModelCatalogTests
         Check(repeatedFault is InvalidOperationException && repeated.IsFaulted && !repeated.IsCanceled &&
             runtime.CaptureModelCatalog().Revision == retiredRevision && runtime.CaptureModelCatalog().Bindings.SequenceEqual(baseline.Bindings),
             "Retired owner admission changed the actual catalog.");
+    }
+    // IMPL-I LiveModelCatalog publishes the session's switchable models after the baseline; a native provider's catalog refresh
+    // (registration, replacement, unregister, retirement) republishes the baseline and its rows but keeps those bindings.
+    private static async Task KeepsSwitchable()
+    {
+        await using var native = new ExtensionRegistry();
+        using var bridge = new NativeExtensionRegistrationBridge(native, new ExtensionHostFlagValues(new Dictionary<string, ExtensionFlagValue>()), [], new Configuration());
+        var runtime = Runtime(new(Seed, "seed", ["off"])); var baseline = runtime.CaptureModelCatalog(); bridge.ConfigureModelCatalog(runtime, baseline.Bindings);
+        var switchable = new ModelDescriptor("other", "catalog-api", "switchable");
+        runtime.PublishModelCatalog(baseline.Revision, [.. baseline.Bindings, new(switchable, new Transport(switchable, "other", ["off"]))]);
+        bool Has(ModelDescriptor model) => runtime.CaptureModelCatalog().Bindings.Any(binding => binding.Model == model);
+        NativeExtensionRegistrationFacade? facade = null;
+        var activation = bridge.ActivateOwnerAsync("late-owner", new Extension(_ => { facade!.RegisterProvider(Definition()); return ValueTask.CompletedTask; }), value => facade = value);
+        await Join("switchable-provider-activation", activation);
+        try
+        {
+            Check(Has(Late) && Has(switchable) && Has(Seed), "Registration dropped the switchable binding.");
+            facade!.UnregisterProvider(Late.Provider);
+            Check(!Has(Late) && Has(switchable) && Has(Seed), "Unregister dropped the switchable binding.");
+        }
+        finally { var close = bridge.RetireOwnerAsync(activation.Result.Scope); await Join("switchable-owner-close", close); }
+        Check(Has(switchable) && Has(Seed), "Retirement dropped the switchable binding.");
     }
     private static Task Admission()
     {

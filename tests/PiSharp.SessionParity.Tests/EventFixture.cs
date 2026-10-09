@@ -113,11 +113,14 @@ internal sealed class EventFixture : IAsyncDisposable
     {
         internal readonly Queue<AssistantMessage> Responses = new(); internal Func<long> Clock = () => 0; internal int Calls;
         internal NativeChatDiagnostic? ErrorDiagnostic; internal readonly List<ChatRequest> Requests = [];
+        /// <summary>Runs while a request is in its provider phase (before the response streams).</summary>
+        internal Func<Task>? DuringStream;
         public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor model) => ["off", "minimal", "low", "medium", "high"];
         public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken token = default)
         {
             token.ThrowIfCancellationRequested(); Calls++; lock (Requests) Requests.Add(request);
             var final = (Responses.Count == 0 ? Response() : Responses.Dequeue()) with { Timestamp = Clock() };
+            if (DuringStream is { } during) await during();
             await Task.CompletedTask;
             yield return new StreamStarted(final with { Content = [], StopReason = StopReason.Pending });
             if (final.StopReason == StopReason.Error) { yield return new StreamError(StopReason.Error, final) { NativeDiagnostic = ErrorDiagnostic }; yield break; }

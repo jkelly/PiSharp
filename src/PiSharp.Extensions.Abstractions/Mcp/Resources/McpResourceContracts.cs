@@ -13,8 +13,11 @@ public sealed record McpResourceServer(string Name, long Generation, double Time
 /// The host owns path policy and file lifetime; no ambient file writer is provided.</summary>
 public delegate ValueTask<string> McpResourceOutputSaver(ReadOnlyMemory<byte> data, string extension,
     McpInvocationIdentity identity, CancellationToken cancellationToken);
-public sealed record McpResourceLimits(int MaximumPages = 1000, int MaximumItems = 4096,
-    int MaximumResponseBytes = 1_048_576, int MaximumRetainedBytes = 8_388_608,
+/// <summary>Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/mcp/src/client.ts MAX_LIST_PAGES (1,000 pages) and
+/// transports/transport.ts DEFAULT_MAX_MESSAGE_BYTES (16 MiB per response); resources.ts keeps every listed item, and
+/// tools.ts MCP_OUTPUT_MAX_BYTES (20 KiB) bounds only the model-facing text.</summary>
+public sealed record McpResourceLimits(int MaximumPages = 1000, int MaximumItems = int.MaxValue,
+    int MaximumResponseBytes = 16 * 1024 * 1024, int MaximumRetainedBytes = int.MaxValue,
     int MaximumModelTextBytes = 20 * 1024);
 /// <summary>Preserves the exact original and its complete Exception aggregate. Faulted OCEs and
 /// cancellation without owned original/token provenance remain ordinary callback faults.</summary>

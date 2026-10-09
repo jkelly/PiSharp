@@ -14,7 +14,48 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> VirtualModelCases() =>
     [
         Case("virtual.per-request-route-state-entry-and-retry-reason", VirtualPerRequestRouting),
+        Case("virtual.summary-routes-direct-with-session-messages-and-level", VirtualSummaryRouting),
     ];
+
+    private sealed class SummarySession : IVirtualModelSession
+    {
+        internal readonly List<string> Appended = [];
+        public IReadOnlyList<SessionEntry> Branch => [];
+        public Task AppendStateAsync(JsonData data, CancellationToken token) { Appended.Add(data.ToString()); return Task.CompletedTask; }
+        public IReadOnlyList<TranscriptEntry> Messages { get; } =
+            [new("user", JsonData.Parse("""{"role":"user","content":"session question","timestamp":1}"""))];
+        public string ThinkingLevel => "medium";
+    }
+
+    // agent-session.ts _getSummarizationRequestAuth + model-runtime.ts resolveModel: a summary of a virtual selection routes once with
+    // reason "direct", the session's messages and thinking level and no router state; it goes to the routed physical model at the
+    // routed level (compaction) or with none (branch summaries), and the router's state is not recorded.
+    private static async Task VirtualSummaryRouting()
+    {
+        var registry = ModelRegistry.Create(new() { Environment = name => name == "GROQ_API_KEY" ? "k" : null });
+        var requests = new List<ModelRouteRequest>();
+        registry.RegisterVirtualModel(new("router", "auto", "Auto", request =>
+        {
+            requests.Add(request);
+            return ValueTask.FromResult(new ModelRoute(registry.Find("groq", "openai/gpt-oss-120b")!, "high", new JsonObject { ["count"] = 9 }));
+        }, ["off", "medium", "high"]));
+        var session = new SummarySession(); var physical = new PhysicalTransport(); var summaries = new List<(string Model, int Maximum, string? Level)>();
+        var transport = new VirtualModelRoutingTransport(registry, registry.Find("router", "auto")!, _ => throw new InvalidOperationException("Main route used."),
+            () => session, (target, maximum, level) => { summaries.Add((target.Reference, maximum, level)); return physical; });
+        var summary = new ChatRequest(new("auto", "pi-virtual", "router"), [new("user", JsonData.Parse("""{"role":"user","content":"PROMPT","timestamp":2}"""))], 2)
+        { ThinkingLevel = "medium", SessionId = "019a0000-0000-7000-8000-000000000001" };
+        foreach (var carriesLevel in new[] { true, false })
+            await foreach (var _ in transport.Summary(13107, carriesLevel).StreamAsync(summary)) { }
+        Check(requests.All(request => request.Reason == ModelRouteReason.Direct && request.ThinkingLevel == "medium" && request.State is null),
+            "summary routing request: " + string.Join(",", requests.Select(request => request.Reason + "/" + request.ThinkingLevel + "/" + request.State?.ToJsonString())));
+        Check(requests.All(request => request.Messages.Count == 1 && request.Messages[0]["content"]!.GetValue<string>() == "session question"),
+            "summary routing did not see the session's messages");
+        Check(summaries.SequenceEqual([("groq/openai/gpt-oss-120b", 13107, (string?)"high"), ("groq/openai/gpt-oss-120b", 13107, null)]),
+            "summary targets: " + string.Join(",", summaries));
+        Check(physical.Requests.All(request => request.Model.Provider == "groq" && request.Model.Id == "openai/gpt-oss-120b" &&
+            request.SessionId == "019a0000-0000-7000-8000-000000000001"), "summary request not sent to the physical model");
+        Equal(0, session.Appended.Count, "router state entries recorded by a summary");
+    }
 
     private sealed class FakeVirtualSession : IVirtualModelSession
     {

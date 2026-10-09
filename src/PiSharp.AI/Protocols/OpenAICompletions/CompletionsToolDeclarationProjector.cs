@@ -27,7 +27,8 @@ public sealed class CompletionsRequestException : Exception
 
 public sealed record CompletionsToolDeclarationProjectionOptions(bool SupportsStrictMode = false,
     int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
-    int MaximumDeclarations = PiRequestBudget.RequestItems, int MaximumActiveTools = 128, int MaximumJsonDepth = 32,
+    // openai-completions.ts convertTools declares every tool: no tool or declaration count bound (payload bytes bound the size).
+    int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue, int MaximumJsonDepth = 32,
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes)
 {
     public bool SupportsOpenAIGrammarTools { get; init; }

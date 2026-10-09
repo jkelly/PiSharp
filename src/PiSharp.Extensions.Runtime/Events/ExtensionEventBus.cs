@@ -40,9 +40,14 @@ public sealed class ExtensionEventBus : IAsyncExtensionEventBus
         return OnAsync(channel, data => { var original = handler(data); return original.AsTask(); });
     }
 
+    /// <summary>Observes every emission (channel and data) before its listeners run: a bridge to another runtime's bus, such as
+    /// the Node extension host's pi.events, which shares one bus with the native extensions.</summary>
+    public Action<string, object?>? Tap { get; set; }
+
     public void Emit(string channel, object? data)
     {
         ArgumentNullException.ThrowIfNull(channel);
+        Tap?.Invoke(channel, data);
         Subscription[] captured;
         lock (gate) captured = listeners.TryGetValue(channel, out var entries) ? entries.ToArray() : [];
         if (captured.Length == 0 && channel == "error")

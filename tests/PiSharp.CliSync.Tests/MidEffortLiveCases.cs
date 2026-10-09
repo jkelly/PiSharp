@@ -89,9 +89,12 @@ internal static partial class Program
             Equal(thinking, body.TryGetProperty("thinking", out var sent) ? sent.GetRawText() : null, model + " summary thinking");
             Equal(effort is null ? null : "[{\"role\":\"user\",\"content\":\"summarize\"}," + Marker(effort) + "]",
                 effort is null ? null : body.GetProperty("messages").GetRawText(), model + " summary messages");
+            // buildParams: compat.allowedFallbackModels (claude-fable-5) become fallbacks on every request, summaries included.
             if (effort is null)
                 Equal("{\"model\":\"" + model + "\",\"messages\":[{\"role\":\"user\",\"content\":\"summarize\"}],\"max_tokens\":" + connection.MaximumOutputTokens + ",\"stream\":true" +
-                    (thinking is null ? "" : ",\"thinking\":" + thinking) + "}", endpoint.Snapshot().Single().Body, model + " summary body");
+                    (thinking is null ? "" : ",\"thinking\":" + thinking) +
+                    (model == "claude-fable-5" ? ",\"fallbacks\":[{\"model\":\"claude-opus-4-8\"},{\"model\":\"claude-opus-5\"}]" : "") + "}",
+                    endpoint.Snapshot().Single().Body, model + " summary body");
         }
     });
 }

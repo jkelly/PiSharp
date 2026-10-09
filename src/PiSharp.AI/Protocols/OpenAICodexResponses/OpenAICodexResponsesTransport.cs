@@ -155,7 +155,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var projector = new ResponsesTranscriptProjector(projection);
         var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString());
         var tools = JsonNode.Parse(projector.ProjectTools(request, CancellationToken.None).ToString()) as JsonArray;
-        var cacheKey = _options.CacheRetention == "none" ? null : ClampCacheKey(_options.SessionId);
+        var cacheKey = _options.CacheRetention == "none" ? null : ClampCacheKey(_options.SessionId ?? request.SessionId);
         var body = new JsonObject
         {
             ["model"] = _model.Id, ["store"] = false, ["stream"] = true,
@@ -190,7 +190,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
 
     /// <summary>buildSSEHeaders: originator and user agent defaults, model then caller headers (null deletes), then the bearer token,
     /// the account id, OpenAI-Beta, accept, content-type and the session headers.</summary>
-    public List<KeyValuePair<string, string>> BuildHeaders(string token)
+    public List<KeyValuePair<string, string>> BuildHeaders(string token, string? sessionId = null)
     {
         var accountId = ExtractAccountId(token);
         var headers = new List<KeyValuePair<string, string>>();
@@ -204,7 +204,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         foreach (var (name, value) in _options.Headers ?? ImmutableDictionary<string, string?>.Empty) Set(name, value);
         Set("authorization", "Bearer " + token); Set("chatgpt-account-id", accountId);
         Set("openai-beta", "responses=experimental"); Set("accept", "text/event-stream"); Set("content-type", "application/json");
-        var session = _options.CacheRetention == "none" ? null : ClampCacheKey(_options.SessionId);
+        var session = _options.CacheRetention == "none" ? null : ClampCacheKey(_options.SessionId ?? sessionId);
         if (session is not null) { Set("session-id", session); Set("x-client-request-id", session); }
         return headers;
     }
@@ -223,8 +223,8 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     {
         var invocation = new Invocation();
         var inner = new ResponsesTextToolTransport((chat, cancellation, context) => PrepareAsync(chat, invocation, cancellation),
-            new ResponsesTextToolOptions(MaximumEvents: 65_536, MaximumEventCharacters: 16 * 1_048_576, MaximumInputCharacters: 64 * 1_048_576,
-                MaximumContentSlots: 256, MaximumContentCharacters: 16 * 1_048_576, MaximumJsonDepth: 64, Rates: _rates)
+            new ResponsesTextToolOptions(MaximumEvents: int.MaxValue, MaximumEventCharacters: 16 * 1_048_576, MaximumInputCharacters: 64 * 1_048_576,
+                MaximumContentSlots: int.MaxValue, MaximumContentCharacters: 16 * 1_048_576, MaximumJsonDepth: 64, Rates: _rates)
             { SupportsOpenAIGrammarTools = _grammar });
         await foreach (var frame in inner.StreamAsync(request, token).ConfigureAwait(false))
         {
@@ -242,7 +242,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     {
         var token0 = await _accessToken(token).ConfigureAwait(false);
         if (string.IsNullOrEmpty(token0)) throw new InvalidOperationException($"No API key for provider: {_model.Provider}");
-        var headers = BuildHeaders(token0);
+        var headers = BuildHeaders(token0, request.SessionId);
         var body = BuildBody(request);
         if (_options.OnPayload is { } hook && await hook(JsonData.Parse(body.ToJsonString(BodyJson)), _model, token).ConfigureAwait(false) is { } replaced)
             body = JsonNode.Parse(replaced.ToString()) as JsonObject ?? throw new InvalidOperationException("Codex payload must be an object.");

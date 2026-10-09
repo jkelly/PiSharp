@@ -336,7 +336,9 @@ internal static class RpcSessionDispatcherTests
                 fixture.Output.Records().Length == beforeAbort + 1 && !fixture.Session.IsRetrying && transport.Requests().Length == 0,
                 "Idle abort_retry lost original success correlation or fabricated retry lifecycle/provider work.");
             await fixture.Dispatcher.SubmitAsync(JsonData.Parse("""{"id":null,"type":"get_state"}"""));
-            var invalid = fixture.Output.Records().Last().Value; Equal("parse", invalid.GetProperty("command").GetString()); Check(!invalid.TryGetProperty("id", out _), "Invalid nullable ID was echoed.");
+            // rpc-mode.ts echoes command.id as it came: a null id is written back as null and the command still runs.
+            var nullId = fixture.Output.Records().Last().Value; Equal("get_state", nullId.GetProperty("command").GetString());
+            Equal(JsonValueKind.Null, nullId.GetProperty("id").ValueKind); Equal(true, nullId.GetProperty("success").GetBoolean());
             var count = fixture.Output.Records().Length;
             await fixture.Dispatcher.SubmitAsync(JsonData.Parse("""{"id":"stale-dialog","type":"extension_ui_response","confirmed":true}""")); Equal(count, fixture.Output.Records().Length);
             using var permissive = JsonDocument.Parse("""{"id":"private-rejected","type":"get_state",}""", new JsonDocumentOptions { AllowTrailingCommas = true });

@@ -76,7 +76,7 @@ internal static class ClassifierShared
         var http = ProviderRequest.Http(options);
         var (response, json) = await ProviderRequest.RetryAsync(async () =>
         {
-            var (info, responseText) = await ProviderRequest.PostAsync(http, url, headers, text, options, signal).ConfigureAwait(false);
+            var (info, responseText) = await ProviderRequest.PostAsync(http, url, headers, text, options, signal, ProviderRequest.FetchFailed).ConfigureAwait(false);
             if (!ProviderRequest.IsSuccess(info.Status))
                 throw new ProviderRequestException($"{label} returned {info.Status}", info.Status, info.Headers, responseText);
             return (info, ProviderRequest.ParseJson(label, responseText));

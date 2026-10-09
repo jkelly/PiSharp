@@ -131,10 +131,10 @@ static class Controls
         using (var handler = new Handler(() => throw supplied))
         using (var provider = Bind(handler, Options)) { var frames = await Drain(provider); var terminal = Error(frames); Check(frames.Count == 1 && ReferenceEquals(terminal.NativeSourceException, supplied) && Field(terminal, "errorMessage") == supplied.Message); }
         using (var handler = new Handler(() => new(HttpStatusCode.ServiceUnavailable) { Content = new StringContent(" fixture unavailable ") }))
-        using (var provider = Bind(handler, Options)) { var frames = await Drain(provider); Check(frames.Count == 1 && Field(Error(frames), "errorMessage") == "OpenAI API error (503): fixture unavailable"); }
+        using (var provider = Bind(handler, Options)) { var frames = await Drain(provider); Check(frames.Count == 1 && Field(Error(frames), "errorMessage") == "OpenAI API error (503): 503  fixture unavailable "); }
         foreach (var (body, expected) in new[] {
             ("{\"error\":{\"message\":\"blocked\",\"code\":\"fixture\"}}", "{\"message\":\"blocked\",\"code\":\"fixture\"}"),
-            (new string('x', 4005), new string('x', 4000) + "... [truncated 5 chars]") })
+            (new string('x', 4005), "403 " + new string('x', 4005)) })
         {
             using var handler = new Handler(() => new(HttpStatusCode.Forbidden) { Content = new StringContent(body) });
             using var provider = Bind(handler, Options);

@@ -45,24 +45,29 @@ public sealed class SessionStorageBackend : ISessionLogStorageFactory, ISessionC
         if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path) || path.Length > 4096)
             throw new ArgumentException("Session backend path is invalid.");
         var canonical = Path.GetFullPath(path);
-        if (!paths.Equals(Path.GetDirectoryName(canonical), Directory) || string.IsNullOrEmpty(Path.GetFileName(canonical)))
+        // session-manager.ts SessionManager.open: a session file may live in any directory (its directory becomes the session
+        // directory). A file outside this namespace is a local lazy file in either mode (memory storage, --no-session, keeps only
+        // its own namespace in memory).
+        if (string.IsNullOrEmpty(Path.GetFileName(canonical)))
             throw new ArgumentException("Session path is outside this explicit backend namespace.");
         return canonical;
     }
+    /// <summary>Whether an admitted path is a local file (lazy local storage, or any path outside this namespace).</summary>
+    private bool Local(string path) => Mode == SessionStorageMode.LazyLocal || !paths.Equals(Path.GetDirectoryName(path), Directory);
     public bool FileExists(string path)
     {
-        path = Admit(path); lock (gate) return files.ContainsKey(path) || Mode == SessionStorageMode.LazyLocal && File.Exists(path);
+        path = Admit(path); lock (gate) return files.ContainsKey(path) || Local(path) && File.Exists(path);
     }
     public bool DirectoryExists(string path) => paths.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)), Directory) ||
         Mode == SessionStorageMode.LazyLocal && paths.Equals(Path.GetDirectoryName(Path.GetFullPath(path)), Directory) && System.IO.Directory.Exists(path);
     public SessionLogStorageDurability GetDurability(string path)
     {
         path = Admit(path);
-        lock (gate) return files.ContainsKey(path) ? PendingDurability : Mode == SessionStorageMode.LazyLocal && File.Exists(path)
-            ? SessionLogStorageDurability.LocalFileFlush : PendingDurability;
+        lock (gate) return files.ContainsKey(path) ? PendingDurability(path) : Local(path) && File.Exists(path)
+            ? SessionLogStorageDurability.LocalFileFlush : PendingDurability(path);
     }
-    private SessionLogStorageDurability PendingDurability => Mode == SessionStorageMode.InMemory
-        ? SessionLogStorageDurability.VolatileMemory : SessionLogStorageDurability.DeferredLocalFile;
+    private SessionLogStorageDurability PendingDurability(string path) => Local(path)
+        ? SessionLogStorageDurability.DeferredLocalFile : SessionLogStorageDurability.VolatileMemory;
     // Count the entire direct-file namespace, including materialized and pre-existing files.
     // Stop at the admission bound rather than materializing an unbounded directory listing.
     private void AdmitNewFile()
@@ -82,9 +87,9 @@ public sealed class SessionStorageBackend : ISessionLogStorageFactory, ISessionC
         {
             if (writers.Contains(path)) throw new IOException("Session already has an owned writer.");
             var present = files.TryGetValue(path, out var stored);
-            if (createNew && (present || Mode == SessionStorageMode.LazyLocal && (File.Exists(path) || System.IO.Directory.Exists(path))))
+            if (createNew && (present || Local(path) && (File.Exists(path) || System.IO.Directory.Exists(path))))
                 throw new IOException("Session destination already exists.");
-            if (!present && !createNew && Mode == SessionStorageMode.InMemory) throw new FileNotFoundException();
+            if (!present && !createNew && !Local(path)) throw new FileNotFoundException();
             if (createNew)
             {
                 AdmitNewFile();
@@ -143,7 +148,7 @@ public sealed class SessionStorageBackend : ISessionLogStorageFactory, ISessionC
     {
         path = Admit(path);
         lock (gate) if (files.TryGetValue(path, out var stored)) return new(stored.Bytes.Length, stored.ModifiedUtcTicks, false);
-        if (Mode == SessionStorageMode.InMemory) throw new FileNotFoundException();
+        if (!Local(path)) throw new FileNotFoundException();
         var info = new FileInfo(path); return new(info.Length, info.LastWriteTimeUtc.Ticks, (info.Attributes & FileAttributes.ReparsePoint) != 0);
     }
     public ValueTask<Stream> OpenReadAsync(string path, CancellationToken cancellationToken)
@@ -151,7 +156,7 @@ public sealed class SessionStorageBackend : ISessionLogStorageFactory, ISessionC
         cancellationToken.ThrowIfCancellationRequested(); path = Admit(path);
         lock (gate) if (files.TryGetValue(path, out var stored))
             return ValueTask.FromResult<Stream>(new MemoryStream(stored.Bytes.ToArray(), writable: false));
-        if (Mode == SessionStorageMode.InMemory) throw new FileNotFoundException();
+        if (!Local(path)) throw new FileNotFoundException();
         return ValueTask.FromResult<Stream>(new FileStream(path, FileMode.Open, FileAccess.Read,
             FileShare.ReadWrite, 8192, FileOptions.Asynchronous | FileOptions.SequentialScan));
     }
@@ -165,10 +170,10 @@ public sealed class SessionStorageBackend : ISessionLogStorageFactory, ISessionC
         lock (gate)
         {
             if (writers.Contains(temporaryPath) || writers.Contains(destinationPath) || files.ContainsKey(destinationPath) ||
-                Mode == SessionStorageMode.LazyLocal && (File.Exists(destinationPath) || System.IO.Directory.Exists(destinationPath)))
+                Local(destinationPath) && (File.Exists(destinationPath) || System.IO.Directory.Exists(destinationPath)))
                 throw new IOException("Session publication requires closed source and a fresh destination.");
             if (files.Remove(temporaryPath, out var stored)) files.Add(destinationPath, stored);
-            else if (Mode == SessionStorageMode.LazyLocal) File.Move(temporaryPath, destinationPath, overwrite: false);
+            else if (Local(temporaryPath)) File.Move(temporaryPath, destinationPath, overwrite: false);
             else throw new FileNotFoundException();
         }
         return ValueTask.CompletedTask;
@@ -179,7 +184,7 @@ public sealed class SessionStorageBackend : ISessionLogStorageFactory, ISessionC
         lock (gate)
         {
             if (writers.Contains(path)) throw new IOException("Close session writer before owned deletion.");
-            if (!files.Remove(path) && Mode == SessionStorageMode.LazyLocal) File.Delete(path);
+            if (!files.Remove(path) && Local(path)) File.Delete(path);
         }
         return ValueTask.CompletedTask;
     }
@@ -194,7 +199,7 @@ public sealed class SessionStorageBackend : ISessionLogStorageFactory, ISessionC
         public Writer(SessionStorageBackend owner, string path, byte[] bytes, ISessionLogStorage? disk)
         { this.owner = owner; this.path = path; this.disk = disk; buffer.Write(bytes); buffer.Position = 0; }
         public Stream ReadStream => disk?.ReadStream ?? buffer;
-        public SessionLogStorageDurability Durability => disk?.Durability ?? owner.PendingDurability;
+        public SessionLogStorageDurability Durability => disk?.Durability ?? owner.PendingDurability(path);
         public long Length => disk?.Length ?? buffer.Length;
         public void PositionForAppend(long expectedLength)
         {
@@ -217,7 +222,7 @@ public sealed class SessionStorageBackend : ISessionLogStorageFactory, ISessionC
         }
         public async ValueTask FlushAsync()
         {
-            if (disk is null && owner.Mode == SessionStorageMode.LazyLocal && HasConversation(buffer))
+            if (disk is null && owner.Local(path) && HasConversation(buffer))
             {
                 // CreateNew is the cross-process arbitration barrier. A racing external destination is
                 // preserved. Once acquired, failure retains the uncertain file and closes the real lease.

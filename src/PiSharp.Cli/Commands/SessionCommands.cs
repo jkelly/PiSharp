@@ -38,7 +38,7 @@ public sealed class SessionCommandException : Exception
         SessionCommandFailure.ResourceLimit => "Session command exceeds configured bounds.",
         SessionCommandFailure.OfflineProviderMismatch => "Selected durable model has no binding in the requested authored offline API profile.",
         SessionCommandFailure.InvalidBashConfiguration => "Offline Bash requires explicit valid executable, workspace spill root and exact command authorization.",
-        SessionCommandFailure.UnsupportedBashPlatform => "The configured offline Bash backend requires Windows.",
+        SessionCommandFailure.UnsupportedBashPlatform => "The configured offline Bash backend requires Windows, Linux or macOS.",
         _ => "Session command failed; inspect durable state before retrying."
     }) => Failure = failure;
     /// <summary>A failure whose message mirrors upstream CLI diagnostic text exactly.</summary>
@@ -285,7 +285,7 @@ public static class SessionCommands
                 previousLeaf = session.Snapshot.Context.LeafId;
                 await profile.ApplySkillsAsync(session, token).ConfigureAwait(false);
                 await profile.AttachOwnerAsync(session, options, Clock, NextId, lifecycle: lifecycle).ConfigureAwait(false);
-                await profile.ApplyInitialToolSelectionAsync(session, token).ConfigureAwait(false);
+                await profile.ApplyInitialToolSelectionAsync(session, token, resumed: true).ConfigureAwait(false);
                 if (settings is not null) { session.SteeringMode = settings.SteeringMode; session.FollowUpMode = settings.FollowUpMode; }
                 await profile.StartLifecycleAsync("resume", token).ConfigureAwait(false);
                 profile.ConfigureLifecycleModeStop(() => null); // One-shot intent; existing finally owns actual cleanup.

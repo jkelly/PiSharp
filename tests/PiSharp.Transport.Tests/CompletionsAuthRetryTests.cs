@@ -211,7 +211,9 @@ internal static class CompletionsAuthRetryTests
     private static void Closed(Fixture fixture)
     { Check(fixture.Handler.Requests.All(request => IsClosed(request.Content!)) && fixture.Handler.Responses.All(response => response.Disposals == 1), "An HTTP attempt leaked or multiply disposed owned content."); }
     private static void Clean(ChatResult result)
-    { var json = PiWireJson.WriteMessage(result.Message).ToString(); Check(!json.Contains("PRIVATE", StringComparison.Ordinal) && !json.Contains(Key, StringComparison.Ordinal) && !json.Contains("openAICompletionsFailure", StringComparison.Ordinal), "Retry/private request data entered a Pi message."); }
+    {
+        // The rejected provider body is shown as upstream shows it (the openai SDK APIError message); no other private text may enter.
+        var json = PiWireJson.WriteMessage(result.Message).ToString().Replace("PRIVATE_RESPONSE_BODY", "", StringComparison.Ordinal); Check(!json.Contains("PRIVATE", StringComparison.Ordinal) && !json.Contains(Key, StringComparison.Ordinal) && !json.Contains("openAICompletionsFailure", StringComparison.Ordinal), "Retry/private request data entered a Pi message."); }
     private static void Check(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
     private static void Throws<T>(Action action) where T : Exception { try { action(); } catch (T) { return; } throw new InvalidOperationException("Expected " + typeof(T).Name); }
 

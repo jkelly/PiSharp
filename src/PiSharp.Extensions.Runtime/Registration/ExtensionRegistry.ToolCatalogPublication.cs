@@ -4,6 +4,19 @@ namespace PiSharp.Extensions.Runtime;
 
 public sealed partial class ExtensionRegistry
 {
+    /// <summary>The owner's current tool registrations (registration id and descriptor) in registration order, for a host that
+    /// publishes an owner activated after its session bound.</summary>
+    public ImmutableArray<(string RegistrationId, ExtensionToolDescriptor Descriptor)> CaptureOwnedTools(RegistrationScope scope)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        lock (gate)
+        {
+            EnsureScope(scope, "capture-owned-tools");
+            return [.. scope.Staged.Entries.Where(entry => entry.Kind == RegistrationKind.Tool)
+                .Select(entry => (entry.RegistrationId, (ExtensionToolDescriptor)entry.Descriptor))];
+        }
+    }
+
     /// <summary>Stages an exact owned tool subset replacement. Preview has future entries and cannot
     /// dispatch until committed. No callbacks, publication or current registration changes occur here.</summary>
     public ToolCatalogReplacementPlan PrepareToolCatalogReplacement(RegistrationScope scope,
@@ -15,9 +28,11 @@ public sealed partial class ExtensionRegistry
         lock (gate)
         {
             EnsureScope(scope, operation);
-            if (!ReferenceEquals(scope.Registry, this) || !ReferenceEquals(expectedSnapshot, snapshot) ||
-                !ReferenceEquals(expectedSnapshot.RegistryIdentity, identity))
+            if (!ReferenceEquals(scope.Registry, this) || !ReferenceEquals(expectedSnapshot.RegistryIdentity, identity) ||
+                !ReferenceEquals(expectedSnapshot, snapshot) && !options.FollowCurrentSnapshot)
                 throw Failure(ExtensionRegistrationFailure.StaleSnapshot, scope.OwnerId, operation);
+            // A registry that follows its current snapshot prepares over the current registrations (its commit rebases as well).
+            expectedSnapshot = snapshot;
             if (previousIds.IsDefault || descriptors.IsDefault || previousIds.Length > options.MaximumRegistrationsPerOwner ||
                 descriptors.Length > options.MaximumRegistrationsPerOwner)
                 throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, scope.OwnerId, operation);
@@ -44,7 +59,8 @@ public sealed partial class ExtensionRegistry
                     descriptor.PrepareLoadout?.GetInvocationList().Length > 1 || !Enum.IsDefined(descriptor.Exposure) ||
                     descriptor.Namespace is { } grouping && (!RegistrationPolicy.Description(grouping.Name, options) ||
                         grouping.Description is not null && !RegistrationPolicy.Description(grouping.Description, options)) ||
-                    !RegistrationPolicy.Json(descriptor.Parameters, options, requireObject: true))
+                    !RegistrationPolicy.Json(descriptor.Parameters, options, requireObject: true) || !Enum.IsDefined(descriptor.ParametersOrigin) ||
+                    descriptor.ValidationParameters is { } validation && !RegistrationPolicy.Json(validation, options, requireObject: true))
                     throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, scope.OwnerId, operation);
                 if (staged.ContainsId(descriptor.RegistrationId))
                     throw Failure(ExtensionRegistrationFailure.DuplicateRegistrationId, scope.OwnerId, operation);
@@ -65,7 +81,7 @@ public sealed partial class ExtensionRegistry
             }
             var futureEntries = ownerOrder.Where(owner => owner.State == RegistrationScopeState.Active)
                 .SelectMany(owner => ReferenceEquals(owner, scope) ? staged.Entries : owner.Staged.Entries).ToImmutableArray();
-            var preview = new ExtensionRegistrySnapshot(identity, checked(revision + 1), futureEntries);
+            var preview = new ExtensionRegistrySnapshot(identity, checked(revision + 1), futureEntries, CommandInvocationNames(futureEntries));
             var plan = new ToolCatalogReplacementPlan(this, scope, expectedSnapshot, old, added.MoveToImmutable(),
                 staged, preview, addedCharacters);
             plan.ValidateCharges();
@@ -121,9 +137,15 @@ public sealed partial class ExtensionRegistry
                 if (attempted) throw new InvalidOperationException("Tool catalog replacement has already failed an attempt.");
                 attempted = true;
                 registry.EnsureScope(scope, "commit-tool-catalog");
-                if (!ReferenceEquals(registry.snapshot, expected) || registry.revision != expected.Revision ||
-                    previous.Any(entry => !scope.Staged.Contains(entry)))
+                if (previous.Any(entry => !scope.Staged.Contains(entry)))
                     throw Failure(ExtensionRegistrationFailure.StaleSnapshot, scope.OwnerId, "commit-tool-catalog");
+                if (!ReferenceEquals(registry.snapshot, expected) || registry.revision != expected.Revision)
+                {
+                    // A registry that follows its current snapshot (Pi's live runner) keeps other registrations made meanwhile: the
+                    // replacement is rebased onto the owner's current entries when its tool names are still free.
+                    if (!registry.options.FollowCurrentSnapshot) throw Failure(ExtensionRegistrationFailure.StaleSnapshot, scope.OwnerId, "commit-tool-catalog");
+                    return CommitRebased();
+                }
                 var totals = ValidateCharges();
                 // All validation, arithmetic and allocations precede the first registry mutation.
                 for (var index = 0; index < previous.Length; index++)
@@ -138,6 +160,33 @@ public sealed partial class ExtensionRegistry
                 Volatile.Write(ref published, PreviewSnapshot);
                 return PreviewSnapshot;
             }
+        }
+
+        /// <summary>Commit over a registry that changed since preparation (called under the registry gate).</summary>
+        private ExtensionRegistrySnapshot CommitRebased()
+        {
+            var rebased = new StagedRegistrationSet();
+            foreach (var entry in scope.Staged.Entries) if (!previous.Contains(entry)) rebased.Add(entry);
+            foreach (var entry in added)
+            {
+                if (rebased.ContainsId(entry.RegistrationId))
+                    throw Failure(ExtensionRegistrationFailure.DuplicateRegistrationId, scope.OwnerId, "commit-tool-catalog");
+                if (registry.ownerOrder.Any(owner => !ReferenceEquals(owner, scope) && owner.Staged.ContainsName(RegistrationKind.Tool, entry.Name)) ||
+                    rebased.ContainsName(RegistrationKind.Tool, entry.Name))
+                    throw Failure(ExtensionRegistrationFailure.DuplicateName, scope.OwnerId, "commit-tool-catalog");
+                rebased.Add(entry);
+            }
+            var totals = ValidateCharges();
+            for (var index = 0; index < previous.Length; index++)
+            { previous[index].Registered = false; if (release[index]) previous[index].Charged = false; }
+            scope.Staged = rebased;
+            registry.chargedRegistrations = totals.Global;
+            scope.ChargedRegistrations = totals.Owner;
+            registry.metadataCharacters = totals.Characters;
+            registry.Publish();
+            var current = registry.snapshot;
+            Volatile.Write(ref published, current);
+            return current;
         }
     }
 }

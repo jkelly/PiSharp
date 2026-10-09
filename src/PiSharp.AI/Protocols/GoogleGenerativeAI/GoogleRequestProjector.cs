@@ -75,8 +75,10 @@ public static class GoogleRequestProjector
                     if (!strict && Text(sampling, "strict") == "require") throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
                     strictAny |= strict;
                 }
-                var declaration = new JsonObject { ["name"] = Text(tool, "name"), ["parametersJsonSchema"] = parameters };
+                // google-shared.ts convertTools: { name, description, parametersJsonSchema }.
+                var declaration = new JsonObject { ["name"] = Text(tool, "name") };
                 if (tool.ContainsKey("description")) declaration["description"] = tool["description"]?.DeepClone();
+                declaration["parametersJsonSchema"] = parameters;
                 declarations.Add(declaration);
             }
             config["tools"] = new JsonArray(new JsonObject { ["functionDeclarations"] = declarations });
@@ -120,22 +122,126 @@ public static class GoogleRequestProjector
         return GoogleData.Admit(JsonData.Parse(new JsonObject { ["model"] = request.Model.Id, ["contents"] = contents, ["config"] = config }.ToJsonString()), options);
     }
 
-    internal static JsonObject WireBody(JsonData parameters)
+    // @google/genai 2.21.0 generateContentConfigToMldev/ToVertex: generation fields in the converter's order (pass-through ones only).
+    private static readonly string[] GenerationFields = ["temperature", "topP", "topK", "candidateCount", "maxOutputTokens", "stopSequences",
+        "responseLogprobs", "logprobs", "presencePenalty", "frequencyPenalty", "seed", "responseMimeType", "responseModalities", "mediaResolution",
+        "thinkingConfig"];
+    private static readonly string[] BodyConfigFields = ["serviceTier", "systemInstruction", "tools", "toolConfig"];
+
+    /// <summary>
+    /// The REST body @google/genai 2.21.0 sends for the SDK parameters <c>{ model, contents, config }</c>
+    /// (generateContentParametersToMldev, or ToVertex for google-vertex): <c>contents</c>, then the config's body-level fields
+    /// (serviceTier, systemInstruction through tContent, tools, toolConfig) in the converter's order, then <c>generationConfig</c>
+    /// (always present). Content becomes <c>{parts, role}</c> and each part, tool and tool config is rebuilt in the converter's
+    /// field order (Gemini API: functionCall <c>{args, id, name}</c>, inlineData <c>{data, mimeType}</c>; Vertex keeps both as given).
+    /// Null fields are dropped. Fields the converters would transform further are refused rather than approximated.
+    /// </summary>
+    internal static JsonObject WireBody(JsonData parameters, bool vertex = false)
     {
         var root = JsonNode.Parse(parameters.ToString()) as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         var config = root["config"] as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
-        var body = new JsonObject { ["contents"] = root["contents"]?.DeepClone() ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue) };
-        var generation = new JsonObject();
+        // tContents: an array of Content objects (a parts array each); no other shape is projected here.
+        if (root["contents"] is not JsonArray { Count: > 0 } contents) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
         foreach (var field in config)
-        {
-            if (field.Key == "systemInstruction")
-                body[field.Key] = field.Value is JsonValue ? new JsonObject { ["parts"] = new JsonArray(new JsonObject { ["text"] = field.Value.GetValue<string>() }) } : field.Value?.DeepClone();
-            else if (field.Key is "tools" or "toolConfig") body[field.Key] = field.Value?.DeepClone();
-            else if (field.Key is "temperature" or "maxOutputTokens" or "thinkingConfig") generation[field.Key] = field.Value?.DeepClone();
-            else throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
-        }
-        if (generation.Count > 0) body["generationConfig"] = generation;
+            if (!GenerationFields.Contains(field.Key) && !BodyConfigFields.Contains(field.Key)) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        var body = new JsonObject { ["contents"] = new JsonArray([.. contents.Select(content => (JsonNode)WireContent(Content(content), vertex))]) };
+        if (Present(config, "serviceTier") is { } tier) body["serviceTier"] = tier.DeepClone();
+        if (Present(config, "systemInstruction") is { } system) body["systemInstruction"] = WireContent(SystemContent(system), vertex);
+        if (Present(config, "tools") is { } tools)
+            body["tools"] = tools is JsonArray list ? new JsonArray([.. list.Select(tool => (JsonNode)WireTool(tool as JsonObject, vertex))])
+                : throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        if (Present(config, "toolConfig") is { } toolConfig) body["toolConfig"] = WireToolConfig(toolConfig as JsonObject, vertex);
+        var generation = new JsonObject();
+        foreach (var name in GenerationFields) if (Present(config, name) is { } value) generation[name] = value.DeepClone();
+        body["generationConfig"] = generation;
         return body;
+    }
+    private static JsonNode? Present(JsonObject? value, string name) => value is not null && value.TryGetPropertyValue(name, out var node) ? node : null;
+    private static JsonObject Content(JsonNode? value) =>
+        value is JsonObject content && content["parts"] is JsonArray ? content : throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+    /// <summary>tContent: a Content as given; a string, part or list of parts becomes <c>{ role: "user", parts }</c>.</summary>
+    private static JsonObject SystemContent(JsonNode value)
+    {
+        static JsonNode Part(JsonNode? part) => part is JsonValue text && text.TryGetValue<string>(out var s) ? new JsonObject { ["text"] = s }
+            : part is JsonObject ? part.DeepClone() : throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        if (value is JsonObject content && content["parts"] is JsonArray) return content;
+        var parts = value is JsonArray list ? new JsonArray([.. list.Select(Part)]) : new JsonArray(Part(value));
+        if (parts.Count == 0) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        return new JsonObject { ["role"] = "user", ["parts"] = parts };
+    }
+    private static JsonObject WireContent(JsonObject content, bool vertex)
+    {
+        var wire = new JsonObject();
+        if (Present(content, "parts") is { } parts)
+            wire["parts"] = parts is JsonArray list ? new JsonArray([.. list.Select(part => (JsonNode)WirePart(part as JsonObject, vertex))]) : parts.DeepClone();
+        if (Present(content, "role") is { } role) wire["role"] = role.DeepClone();
+        return wire;
+    }
+    private static JsonObject WirePart(JsonObject? part, bool vertex)
+    {
+        var wire = new JsonObject(); if (part is null) return wire;
+        void Copy(string name) { if (Present(part, name) is { } value) wire[name] = value.DeepClone(); }
+        void Refuse(params string[] names) { foreach (var name in names) if (part.ContainsKey(name)) throw GoogleData.Fail(GoogleFailure.UnsupportedValue); }
+        JsonObject Ordered(JsonNode value, string[] names, string[] refused)
+        {
+            var source = value as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+            if (refused.Any(source.ContainsKey)) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+            var ordered = new JsonObject();
+            foreach (var name in names) if (Present(source, name) is { } field) ordered[name] = field.DeepClone();
+            return ordered;
+        }
+        Copy("mediaResolution");
+        if (vertex) Refuse("toolCall", "toolResponse"); else { Copy("toolCall"); Copy("toolResponse"); }
+        Copy("audioTranscription"); Copy("codeExecutionResult"); Copy("executableCode");
+        if (Present(part, "fileData") is { } file) wire["fileData"] = vertex ? file.DeepClone() : Ordered(file, ["fileUri", "mimeType"], ["displayName"]);
+        if (Present(part, "functionCall") is { } call)
+            wire["functionCall"] = vertex ? call.DeepClone() : Ordered(call, ["args", "id", "name"], ["partialArgs", "willContinue"]);
+        Copy("functionResponse");
+        if (Present(part, "inlineData") is { } inline) wire["inlineData"] = vertex ? inline.DeepClone() : Ordered(inline, ["data", "mimeType"], ["displayName"]);
+        Copy("text"); Copy("thought"); Copy("thoughtSignature"); Copy("videoMetadata");
+        if (vertex) Refuse("partMetadata"); else Copy("partMetadata");
+        Copy("mediaProcessing");
+        return wire;
+    }
+    private static JsonObject WireTool(JsonObject? tool, bool vertex)
+    {
+        if (tool is null) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        // tTool rewrites a declaration's `parameters`/`response` (processJsonSchema); Pi sends parametersJsonSchema only.
+        if (Present(tool, "functionDeclarations") is JsonArray declarations &&
+            declarations.Any(item => item is JsonObject declaration && (Present(declaration, "parameters") is not null || Present(declaration, "response") is not null)))
+            throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        // Fields whose converters transform them further are refused; the rest pass through in the converter's order.
+        var transformed = vertex ? new[] { "mcpServers", "computerUse" } : ["googleMaps", "googleSearch"];
+        var refused = vertex ? new[] { "fileSearch" } : ["retrieval", "enterpriseWebSearch", "exaAiSearch", "parallelAiSearch"];
+        if (transformed.Concat(refused).Any(tool.ContainsKey)) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        var order = vertex
+            ? new[] { "retrieval", "googleMaps", "codeExecution", "enterpriseWebSearch", "exaAiSearch", "functionDeclarations", "googleSearch",
+                "googleSearchRetrieval", "parallelAiSearch", "urlContext" }
+            : ["mcpServers", "codeExecution", "computerUse", "functionDeclarations", "googleSearchRetrieval", "urlContext", "fileSearch"];
+        var wire = new JsonObject();
+        foreach (var name in order) if (Present(tool, name) is { } value) wire[name] = value.DeepClone();
+        return wire;
+    }
+    private static JsonObject WireToolConfig(JsonObject? toolConfig, bool vertex)
+    {
+        if (toolConfig is null) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+        var wire = new JsonObject();
+        if (Present(toolConfig, "functionCallingConfig") is { } calling)
+        {
+            if (vertex) wire["functionCallingConfig"] = calling.DeepClone();
+            else
+            {
+                var source = calling as JsonObject ?? throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+                if (source.ContainsKey("streamFunctionCallArguments")) throw GoogleData.Fail(GoogleFailure.UnsupportedValue);
+                var mapped = new JsonObject();
+                foreach (var name in new[] { "allowedFunctionNames", "mode" }) if (Present(source, name) is { } value) mapped[name] = value.DeepClone();
+                wire["functionCallingConfig"] = mapped;
+            }
+        }
+        if (Present(toolConfig, "retrievalConfig") is { } retrieval) wire["retrievalConfig"] = retrieval.DeepClone();
+        if (vertex) { if (toolConfig.ContainsKey("includeServerSideToolInvocations")) throw GoogleData.Fail(GoogleFailure.UnsupportedValue); }
+        else if (Present(toolConfig, "includeServerSideToolInvocations") is { } include) wire["includeServerSideToolInvocations"] = include.DeepClone();
+        return wire;
     }
     private static JsonArray ConvertConversation(List<JsonObject> messages, ModelDescriptor model, JsonElement metadata)
     {

@@ -52,6 +52,10 @@ internal sealed class ExtensionProviderHttpHandler : DelegatingHandler
             }
         }
         if (_registry.HasEventHandlers(_captured, "before_provider_headers")) await ApplyHeadersAsync(request, cancellationToken).ConfigureAwait(false);
+        // A SigV4-signed request (Bedrock) is signed again over the payload and headers the hooks left, as the SDK signs after them.
+        if ((_registry.HasEventHandlers(_captured, "before_provider_request") || _registry.HasEventHandlers(_captured, "before_provider_headers")) &&
+            request.Options.TryGetValue(PiSharp.AI.Providers.ProviderRequestSigning.Resign, out var resign))
+            await resign(request, cancellationToken).ConfigureAwait(false);
         var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (_registry.HasObservers(_captured, "after_provider_response"))
             await Observe("after_provider_response", Event("after_provider_response", writer =>
@@ -68,6 +72,15 @@ internal sealed class ExtensionProviderHttpHandler : DelegatingHandler
             var original = response.Content;
             var stream = new StreamEventTee(await original.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), this);
             var tee = new StreamContent(stream);
+            foreach (var header in original.Headers) tee.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            response.Content = tee;
+        }
+        else if (_registry.HasObservers(_captured, "provider_stream_event") &&
+            response.Content.Headers.ContentType?.MediaType?.Equals("application/vnd.amazon.eventstream", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            // Bedrock ConverseStream: each decoded event-stream message is the SDK's output union member, { eventType: payload }.
+            var original = response.Content;
+            var tee = new StreamContent(new EventStreamTee(await original.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), this));
             foreach (var header in original.Headers) tee.Headers.TryAddWithoutValidation(header.Key, header.Value);
             response.Content = tee;
         }
@@ -106,6 +119,55 @@ internal sealed class ExtensionProviderHttpHandler : DelegatingHandler
     private static JsonData Event(string type, Action<Utf8JsonWriter> fields) => Json(writer => { writer.WriteString("type", type); fields(writer); });
     private static JsonData Json(Action<Utf8JsonWriter> write) => NativeSessionEventBinding.Json(write);
     private static void Raw(Utf8JsonWriter writer, string name, JsonData value) { writer.WritePropertyName(name); writer.WriteRawValue(value.ToString()); }
+
+    /// <summary>Passes Bedrock's AWS event-stream bytes through unchanged, decoding each complete message as it is read: an event is
+    /// <c>{ [:event-type]: payload }</c> and a modeled exception <c>{ [:exception-type]: payload }</c>, as the SDK's ConverseStream
+    /// output yields them (the deserializer drops the service's random padding member <c>p</c>).</summary>
+    private sealed class EventStreamTee(Stream inner, ExtensionProviderHttpHandler owner) : Stream
+    {
+        private readonly MemoryStream _pending = new(); private bool _broken;
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
+        {
+            var count = await inner.ReadAsync(buffer, token).ConfigureAwait(false);
+            if (_broken || count == 0) return count;
+            _pending.Write(buffer.Span[..count]);
+            while (!_broken && _pending.Length >= PiSharp.AI.Protocols.Bedrock.AwsEventStream.PreludeLength)
+            {
+                var bytes = _pending.GetBuffer();
+                var total = (int)System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(0, 4));
+                if (total < PiSharp.AI.Protocols.Bedrock.AwsEventStream.MinimumMessageLength || total > PiSharp.AI.Protocols.Bedrock.AwsEventStream.MaximumMessageLength)
+                { _broken = true; break; }
+                if (_pending.Length < total) break;
+                JsonData? data = null;
+                try
+                {
+                    var message = PiSharp.AI.Protocols.Bedrock.AwsEventStream.Decode(bytes.AsSpan(0, total));
+                    var kind = message.HeaderString(":message-type") switch
+                    {
+                        "event" => message.HeaderString(":event-type"),
+                        "exception" => message.HeaderString(":exception-type"),
+                        _ => null
+                    };
+                    if (kind is not null && (message.Payload.Length == 0 ? new JsonObject() : JsonNode.Parse(message.Payload)) is JsonObject payload)
+                    {
+                        if (message.HeaderString(":message-type") == "event") payload.Remove("p");
+                        data = JsonData.Parse(new JsonObject { [kind] = payload }.ToJsonString());
+                    }
+                }
+                catch (Exception error) when (error is PiSharp.AI.Protocols.Bedrock.AwsEventStreamException or JsonException) { _broken = true; }
+                var rest = _pending.Length - total;
+                Buffer.BlockCopy(bytes, total, bytes, 0, (int)rest); _pending.SetLength(rest);
+                if (data is not null) await owner.ObserveStreamEventAsync(data, token).ConfigureAwait(false);
+            }
+            return count;
+        }
+        public override int Read(byte[] buffer, int offset, int count) => ReadAsync(buffer.AsMemory(offset, count)).AsTask().GetAwaiter().GetResult();
+        public override bool CanRead => true; public override bool CanWrite => false; public override bool CanSeek => false;
+        public override long Length => throw new NotSupportedException(); public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { } public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException(); public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing) { if (disposing) { inner.Dispose(); _pending.Dispose(); } base.Dispose(disposing); }
+    }
 
     /// <summary>Passes the provider's SSE bytes through unchanged, parsing complete <c>data:</c> lines as they are read.</summary>
     private sealed class StreamEventTee(Stream inner, ExtensionProviderHttpHandler owner) : Stream

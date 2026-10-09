@@ -39,4 +39,22 @@ internal sealed partial class OfflineSessionProfile
                 SummaryOptions:new(CustomInstructions:instructions)),SummaryGenerator,token);
         });
     }
+
+    /// <summary>agent-session.ts compact(): the manual compaction request of the current session with the effective compaction
+    /// settings (reserveTokens, keepRecentTokens) and the model's context window, as a Pi extension's ctx.compact() runs it.</summary>
+    internal SessionCompactionRequest ManualCompactionRequest(string? instructions)
+    {
+        var attachment = Sessions?.Current ?? throw new InvalidOperationException("Compaction requires an admitted session owner.");
+        var settings = new SessionCompactionSettings();
+        if (CaptureEffectiveSettings(attachment) is { } snapshot && snapshot.Values.Value.TryGetProperty("compaction", out var compaction) &&
+            compaction.ValueKind == JsonValueKind.Object)
+        {
+            double Number(string name, double current) => compaction.TryGetProperty(name, out var value) && value.TryGetDouble(out var parsed) &&
+                double.IsFinite(parsed) && parsed >= 0 ? parsed : current;
+            settings = settings with { ReserveTokens = Number("reserveTokens", settings.ReserveTokens), KeepRecentTokens = Number("keepRecentTokens", settings.KeepRecentTokens) };
+        }
+        var contextWindow = SelectedModelDefinition.Raw.Value.TryGetProperty("contextWindow", out var window) && window.TryGetDouble(out var value) &&
+            double.IsFinite(value) && value > 0 ? value : 128_000;
+        return new(settings, ContextWindow: contextWindow, SummaryOptions: new(CustomInstructions: instructions));
+    }
 }

@@ -1,0 +1,83 @@
+{
+ "name": "extension",
+ "extensions": true,
+ "files": {
+  "mark.ts": "export default function (pi: any) {\n  pi.registerCommand(\"mark\", { description: \"Mark the session\", handler: async (_args: string, ctx: any) => {\n    const entries = ctx.sessionManager.getEntries();\n    const firstUser = entries.find((entry: any) => entry.type === \"message\" && entry.message.role === \"user\");\n    pi.appendEntry(\"probe\", { n: 1, text: \"caf\\u00e9 <&>\" });\n    pi.appendEntry(\"bare\");\n    pi.setLabel(firstUser.id, \"start\");\n    pi.setSessionName(\"Marked\");\n  } });\n}\n"
+ },
+ "models": {
+  "providers": {
+   "anthropic": {
+    "baseUrl": "{base}"
+   },
+   "openai": {
+    "baseUrl": "{base}/v1"
+   }
+  }
+ },
+ "settings": null,
+ "responses": [
+  {
+   "status": 200,
+   "contentType": "text/event-stream",
+   "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-4-5\",\"content\":[],\"stop_reason\":null,\"usage\":{\"input_tokens\":3,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"one\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":2}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+  },
+  {
+   "status": 200,
+   "contentType": "text/event-stream",
+   "body": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_2\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-4-5\",\"content\":[],\"stop_reason\":null,\"usage\":{\"input_tokens\":3,\"output_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"two\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":2}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+  }
+ ],
+ "env": {},
+ "requests": [
+  {
+   "method": "POST",
+   "url": "/v1/messages?beta=true"
+  },
+  {
+   "method": "POST",
+   "url": "/v1/messages?beta=true"
+  }
+ ],
+ "runs": [
+  {
+   "args": [
+    "--provider",
+    "anthropic",
+    "--model",
+    "claude-sonnet-4-5",
+    "-e",
+    "mark.ts"
+   ],
+   "steps": [
+    {
+     "type": "prompt",
+     "message": "first"
+    },
+    {
+     "type": "prompt",
+     "message": "/mark"
+    },
+    {
+     "type": "prompt",
+     "message": "again"
+    }
+   ]
+  }
+ ],
+ "expected": [
+  [
+   "{\"type\":\"session\",\"version\":3,\"id\":\"01a12248-e94c-72cd-8229-66e174b7aad2\",\"timestamp\":\"2026-10-09T20:09:26.092Z\",\"cwd\":\"<ROOT>\\\\project\"}",
+   "{\"type\":\"model_change\",\"id\":\"7f8b2208\",\"parentId\":null,\"timestamp\":\"2026-10-09T20:09:26.253Z\",\"provider\":\"anthropic\",\"modelId\":\"claude-sonnet-4-5\"}",
+   "{\"type\":\"thinking_level_change\",\"id\":\"d9517635\",\"parentId\":\"7f8b2208\",\"timestamp\":\"2026-10-09T20:09:26.253Z\",\"thinkingLevel\":\"medium\"}",
+   "{\"type\":\"message\",\"id\":\"089ab30b\",\"parentId\":\"d9517635\",\"timestamp\":\"2026-10-09T20:09:26.260Z\",\"message\":{\"role\":\"system\",\"content\":\"\",\"sections\":{\"preamble\":\"You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.\",\"tools\":\"<tools>\\n- read: Read file contents\\n- bash: Execute bash commands (ls, grep, find, etc.)\\n- edit: Make precise file edits with exact text replacement, including multiple disjoint edits in one call\\n- write: Create or overwrite files\\n\\nIn addition to the tools above, you may have access to other custom tools depending on the project.\\n</tools>\",\"rules\":\"<rules>\\n- Use bash for file operations like ls, rg, find\\n- Use read to examine files instead of cat or sed.\\n- You can inspect PI_* environment variables for current model and session details.\\n- Use edit for precise changes (edits[].oldText must match exactly)\\n- When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls\\n- Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.\\n- Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.\\n- Use write only for new files or complete rewrites.\\n- Be concise in your responses\\n- Show file paths clearly when working with files\\n</rules>\",\"docs\":\"<docs>\\nPi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):\\n- Main documentation: <PIPKG>\\\\@earendil-works\\\\pi-coding-agent\\\\README.md\\n- Additional docs: <PIPKG>\\\\@earendil-works\\\\pi-coding-agent\\\\docs\\n- Examples: <PIPKG>\\\\@earendil-works\\\\pi-coding-agent\\\\examples (extensions, custom tools, SDK)\\n- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory\\n- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)\\n- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing\\n- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)\\n</docs>\",\"cwd\":\"<cwd>\\n<ROOT>/project\\n</cwd>\"},\"timestamp\":1791576566259,\"toolsAdded\":[{\"name\":\"read\",\"description\":\"Read the contents of a file. Supports text files and images (jpg, png, gif, webp, bmp). Images are sent as attachments. For text files, output is truncated to 2000 lines or 50KB (whichever is hit first). Use offset/limit for large files. When you need the full file, continue with offset until complete.\",\"parameters\":{\"type\":\"object\",\"required\":[\"path\"],\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"Path to the file to read (relative or absolute)\"},\"offset\":{\"type\":\"number\",\"description\":\"Line number to start reading from (1-indexed)\"},\"limit\":{\"type\":\"number\",\"description\":\"Maximum number of lines to read\"}}},\"constrainedSampling\":{\"type\":\"json_schema\",\"strict\":\"prefer\"}},{\"name\":\"bash\",\"description\":\"Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds.\",\"parameters\":{\"type\":\"object\",\"required\":[\"command\"],\"properties\":{\"command\":{\"type\":\"string\",\"description\":\"Shell command to execute\"},\"timeout\":{\"type\":\"number\",\"description\":\"Timeout in seconds (optional, no default timeout)\"}}},\"constrainedSampling\":{\"type\":\"json_schema\",\"strict\":\"prefer\"}},{\"name\":\"edit\",\"description\":\"Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.\",\"parameters\":{\"type\":\"object\",\"required\":[\"path\",\"edits\"],\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"Path to the file to edit (relative or absolute)\"},\"edits\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"oldText\",\"newText\"],\"properties\":{\"oldText\":{\"type\":\"string\",\"description\":\"Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call.\"},\"newText\":{\"type\":\"string\",\"description\":\"Replacement text for this targeted edit.\"}}},\"description\":\"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead.\"}}},\"constrainedSampling\":{\"type\":\"json_schema\",\"strict\":\"prefer\"}},{\"name\":\"write\",\"description\":\"Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.\",\"parameters\":{\"type\":\"object\",\"required\":[\"path\",\"content\"],\"properties\":{\"path\":{\"type\":\"string\",\"description\":\"Path to the file to write (relative or absolute)\"},\"content\":{\"type\":\"string\",\"description\":\"Content to write to the file\"}}},\"constrainedSampling\":{\"type\":\"json_schema\",\"strict\":\"prefer\"}}]}}",
+   "{\"type\":\"message\",\"id\":\"8cc861d7\",\"parentId\":\"089ab30b\",\"timestamp\":\"2026-10-09T20:09:26.260Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"first\"}],\"timestamp\":1791576566258}}",
+   "{\"type\":\"message\",\"id\":\"5ea5798f\",\"parentId\":\"8cc861d7\",\"timestamp\":\"2026-10-09T20:09:26.335Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"one\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-sonnet-4-5\",\"usage\":{\"input\":3,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":5,\"cost\":{\"input\":0.000009,\"output\":0.00003,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0.000039},\"cacheWrite1h\":0},\"stopReason\":\"stop\",\"timestamp\":1791576566317,\"responseId\":\"msg_1\",\"rawStopReason\":\"end_turn\",\"durationMs\":18,\"thinkingLevel\":\"medium\"}}",
+   "{\"type\":\"custom\",\"customType\":\"probe\",\"data\":{\"n\":1,\"text\":\"café <&>\"},\"id\":\"6740f912\",\"parentId\":\"5ea5798f\",\"timestamp\":\"2026-10-09T20:09:26.337Z\"}",
+   "{\"type\":\"custom\",\"customType\":\"bare\",\"id\":\"7f53620b\",\"parentId\":\"6740f912\",\"timestamp\":\"2026-10-09T20:09:26.337Z\"}",
+   "{\"type\":\"label\",\"id\":\"007c41e1\",\"parentId\":\"7f53620b\",\"timestamp\":\"2026-10-09T20:09:26.337Z\",\"targetId\":\"8cc861d7\",\"label\":\"start\"}",
+   "{\"type\":\"session_info\",\"id\":\"8b189590\",\"parentId\":\"007c41e1\",\"timestamp\":\"2026-10-09T20:09:26.338Z\",\"name\":\"Marked\"}",
+   "{\"type\":\"message\",\"id\":\"8be1f9a7\",\"parentId\":\"8b189590\",\"timestamp\":\"2026-10-09T20:09:26.339Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"again\"}],\"timestamp\":1791576566338}}",
+   "{\"type\":\"message\",\"id\":\"2d8c9341\",\"parentId\":\"8be1f9a7\",\"timestamp\":\"2026-10-09T20:09:26.343Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"two\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-sonnet-4-5\",\"usage\":{\"input\":3,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":5,\"cost\":{\"input\":0.000009,\"output\":0.00003,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0.000039},\"cacheWrite1h\":0},\"stopReason\":\"stop\",\"timestamp\":1791576566340,\"responseId\":\"msg_2\",\"rawStopReason\":\"end_turn\",\"durationMs\":3,\"thinkingLevel\":\"medium\"}}"
+  ]
+ ]
+}

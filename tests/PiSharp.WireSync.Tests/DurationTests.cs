@@ -25,9 +25,10 @@ internal static class DurationTests
 
     private static Task AssistantJson()
     {
-        var legacy = "{\"role\":\"assistant\",\"api\":\"openai-responses\",\"provider\":\"authored-provider\",\"model\":\"wire-model\",\"timestamp\":1000," +
-            "\"stopReason\":\"stop\",\"content\":[{\"type\":\"text\",\"text\":\"hi\"}],\"usage\":" + Usage + "}";
-        Equal(legacy, PiWireJson.WriteMessage(Text(1000)).ToString(), "untimed message keeps its earlier bytes");
+        // pi-ai builds { role, content, api, provider, model, usage, stopReason, timestamp } and JSON.stringify keeps that order.
+        var legacy = "{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"hi\"}],\"api\":\"openai-responses\",\"provider\":\"authored-provider\"," +
+            "\"model\":\"wire-model\",\"usage\":" + Usage + ",\"stopReason\":\"stop\",\"timestamp\":1000}";
+        Equal(legacy, PiWireJson.WriteMessage(Text(1000)).ToString(), "untimed message in pi-ai key order");
         var timed = legacy[..^1] + ",\"durationMs\":1234}";
         Equal(timed, PiWireJson.WriteMessage(Text(1000) with { DurationMs = 1234 }).ToString(), "durationMs follows the finished fields");
         var read = PiWireJson.ReadMessage(JsonData.Parse(timed).Value);

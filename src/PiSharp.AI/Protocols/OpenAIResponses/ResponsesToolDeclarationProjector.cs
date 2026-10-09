@@ -10,7 +10,8 @@ namespace PiSharp.AI.Protocols.OpenAIResponses;
 public sealed record ResponsesToolDeclarationProjectionOptions(
     bool SupportsStrictMode = false, bool? Strict = false,
     int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
-    int MaximumDeclarations = PiRequestBudget.RequestItems, int MaximumActiveTools = 128, int MaximumJsonDepth = 32,
+    // openai-responses-shared.ts convertResponsesTools declares every tool: no tool or declaration count bound.
+    int MaximumDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue, int MaximumJsonDepth = 32,
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes)
 {
     /// <summary>Model compat <c>supportsOpenAIGrammarTools</c>: grammar tools become custom tools and replay as custom tool calls.</summary>

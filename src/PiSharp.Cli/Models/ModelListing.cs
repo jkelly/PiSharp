@@ -1,5 +1,5 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/cli/list-models.ts,
-// packages/coding-agent/src/core/auth-guidance.ts (formatNoModelsAvailableMessage) and packages/tui/src/fuzzy.ts.
+// packages/coding-agent/src/core/auth-guidance.ts (getProviderLoginHelp and its messages) and packages/tui/src/fuzzy.ts.
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -75,13 +75,24 @@ internal static class ModelListing
     /// <summary>Source getDocsPath: the installed package's <c>docs</c> folder (here the application directory's).</summary>
     internal static string DocsPath => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "docs"));
 
-    /// <summary>Source getProviderLoginHelp/formatNoModelsAvailableMessage.</summary>
-    internal static string NoModelsAvailableMessage(string? docsPath = null)
+    /// <summary>Source getProviderLoginHelp.</summary>
+    internal static string ProviderLoginHelp(string? docsPath = null)
     {
         var docs = docsPath ?? DocsPath;
-        return "No models available. Use /login to log into a provider via OAuth or API key. See:\n" +
+        return "Use /login to log into a provider via OAuth or API key. See:\n" +
             "  " + Path.Combine(docs, "providers.md") + "\n  " + Path.Combine(docs, "models.md");
     }
+
+    /// <summary>Source formatNoModelsAvailableMessage.</summary>
+    internal static string NoModelsAvailableMessage(string? docsPath = null) => "No models available. " + ProviderLoginHelp(docsPath);
+
+    /// <summary>Source formatNoApiKeyFoundMessage (agent-session.ts prompt for a provider without configured auth).</summary>
+    internal static string NoApiKeyFoundMessage(string provider, string? docsPath = null) =>
+        "No API key found for " + (provider == "unknown" ? "the selected model" : provider) + ".\n\n" + ProviderLoginHelp(docsPath);
+
+    /// <summary>agent-session.ts prompt: a provider whose stored OAuth credential no longer yields configured auth.</summary>
+    internal static string OAuthAuthenticationFailedMessage(string provider) =>
+        $"Authentication failed for \"{provider}\". Credentials may have expired or network is unavailable. Run '/login {provider}' to re-authenticate.";
 
     /// <summary>Source formatTokenCount: 200000 → 200K, 1000000 → 1M, one decimal otherwise.</summary>
     internal static string FormatTokenCount(double count)

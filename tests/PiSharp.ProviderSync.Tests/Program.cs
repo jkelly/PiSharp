@@ -42,6 +42,7 @@ internal static partial class Program
             ("anthropic.mid-effort-sonnet-5-5-every-level-full-requests-oauth-and-simple", MidEffortSonnetEveryLevel),
             ("anthropic.mid-effort-multi-turn-replay-preserves-per-turn-effort", MidEffortReplay),
             ("anthropic.mid-effort-input-transformations-diagnostic", MidEffortInputTransformations),
+            ("anthropic.input-transformations-unchecked-entries-and-completion-clock", AnthropicInputTransformationsUnchecked),
             ("anthropic.unmanaged-fable-5-and-budget-sonnet-4-5-unchanged", UnmanagedAnthropicModelsUnchanged),
             ("sampling.completions-model-level-request-precedence", CompletionsSampling),
             ("sampling.responses-model-level-request-precedence-and-metadata-binding", ResponsesSampling),
@@ -60,7 +61,19 @@ internal static partial class Program
             ("responses.ctc-replay-cross-provider", ResponsesCtcCrossProvider),
             ("responses.ctc-replay-grammar-then-function-call-and-support-switch", ResponsesCtcMixed),
             ("pricing.prompt-length-tier-anthropic-haiku-5-5-catalog-boundaries", AnthropicPromptLengthPricing),
-            ("pricing.prompt-length-tier-completions-responses-google-mistral-boundaries", SharedPromptLengthPricing)
+            ("pricing.prompt-length-tier-completions-responses-google-mistral-boundaries", SharedPromptLengthPricing),
+            ("errors.status-error-texts-completions-responses-anthropic-google", ProviderStatusErrorTexts),
+            ("errors.in-stream-error-texts-completions-anthropic", ProviderStreamErrorTexts),
+            ("errors.pi-messages-diagnostic-body-truncation-ellipsis", PiMessagesDiagnosticBodyTruncation),
+            ("tool-arguments.parse-streaming-json-matches-pi-ai-goldens", StreamingJsonGoldens),
+            ("tool-arguments.anthropic-finalizes-with-parse-streaming-json", AnthropicFinalArguments),
+            ("tool-arguments.completions-finalizes-with-parse-streaming-json", CompletionsFinalArguments),
+            ("tool-arguments.responses-finalizes-item-or-partial-arguments", ResponsesFinalArguments),
+            ("tool-arguments.mistral-fragments-and-non-string-arguments", MistralFinalArguments),
+            ("tool-arguments.google-args-of-any-json-kind", GoogleFinalArguments),
+            ("tool-arguments.pi-messages-object-assign-of-any-arguments", PiMessagesFinalArguments),
+            ("errors.in-stream-error-texts-google-and-vertex", GoogleStreamErrorTexts),
+            ("google.wire-body-matches-genai-for-gemini-and-vertex", GoogleWireBodies)
         };
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
@@ -456,7 +469,13 @@ internal static partial class Program
             ([429, 200], [("retry-after", "invalid-date")], [], [437.5]),
             ([429, 200], [("retry-after", "Infinity")], [], [437.5]),
             ([429, 200], [("retry-after-ms", "Infinity")], [], [437.5]),
-            ([429, 200], [("retry-after", "2")], [503], [2000]),
+            // google-shared.ts retryGoogleRequest sets headers = undefined on the @google/genai ApiError, so no retry header is read
+            // (captured: installed pi-ai 1.1.0 + @google/genai 2.21.0 retried after ~400 ms despite retry-after: 3 / x-should-retry: false).
+            ([429, 200], [("retry-after", "2")], [503], [437.5]),
+            ([429, 200], [("retry-after-ms", "2500")], [], [437.5]),
+            ([429, 200], [("retry-after", "999")], [], [437.5]),
+            ([429, 200], [("x-should-retry", "false")], [], [437.5]),
+            ([400], [("x-should-retry", "true")], [], []),
             ([429], [("x-should-retry", "true")], [429], []),
         })
         {
@@ -680,7 +699,7 @@ internal static partial class Program
 
     // models.ts calculateCost: inputTokens = input + cacheRead + cacheWrite; a tier applies only strictly above inputTokensAbove,
     // the greatest matching threshold prices the whole request (first of equal thresholds), and 1h cache writes cost 2x the
-    // selected input rate. Decimal paths are exact; binary64 paths equal Pi v1.1.0 calculateCost's Number results.
+    // selected input rate. Every path equals Pi v1.1.0 calculateCost's binary64 Number results.
     private static string RepositoryFile(params string[] parts)
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
@@ -721,10 +740,10 @@ internal static partial class Program
             0.0099m, 0.0005m, 0.00001m, 0m, 0.01041m);
         // One cache read more: the tier prices the whole request.
         Cost((await Usage(haiku, "claude-haiku-5-5", new { input_tokens = 99000, cache_read_input_tokens = 1001, output_tokens = 0 }, 1000)).Usage,
-            0.0495m, 0.0025m, 0.00005005m, 0m, 0.05205005m);
+            0.049499999999999995m, 0.0025m, 0.000050050000000000004m, 0m, 0.05205005m);
         // Cache writes count too; 1h writes cost twice the selected input rate (6000 x 0.125 + 4000 x 0.2 at base).
         Cost((await Usage(haiku, "claude-haiku-5-5", new { input_tokens = 90000, cache_creation_input_tokens = 10000, cache_creation = new { ephemeral_1h_input_tokens = 4000 }, output_tokens = 0 }, 500)).Usage,
-            0.009m, 0.00025m, 0m, 0.00155m, 0.0108m);
+            0.009000000000000001m, 0.00025m, 0m, 0.00155m, 0.0108m);
         // One write more: 6001 x 0.625 + 4000 x 1.0 per million.
         Cost((await Usage(haiku, "claude-haiku-5-5", new { input_tokens = 90000, cache_creation_input_tokens = 10001, cache_creation = new { ephemeral_1h_input_tokens = 4000 }, output_tokens = 0 }, 500)).Usage,
             0.045m, 0.00125m, 0m, 0.007750625m, 0.054000625m);
@@ -753,7 +772,7 @@ internal static partial class Program
         Cost(await Completions(100001, 1001, 0), 0.049499999999999995m, 0.0025m, 0.000050050000000000004m, 0m, 0.05205005m);
         Cost(await Completions(100001, 0, 10001), 0.045m, 0.0025m, 0m, 0.006250625m, 0.053750625m);
 
-        // Responses (decimal): GPT-5.4 at its 272000 threshold, cached tokens included in input_tokens.
+        // Responses (binary64): GPT-5.4 at its 272000 threshold, cached tokens included in input_tokens.
         var gpt = CatalogRow("openai", "gpt-5.4");
         var gptModel = new ModelDescriptor("gpt-5.4", "openai-responses", "openai");
         async Task<TokenUsage> Responses(int input, int cached)
@@ -764,8 +783,8 @@ internal static partial class Program
             using var provider = NativeProviderFactory.CreateResponses(gptModel, new("https://api.openai.com/v1/responses"), Key, new(true), null, handler, gpt);
             return (await new ChatClient(provider).CompleteAsync(new(gptModel, [Ask], 1)).WaitAsync(Deadline)).Message.Usage;
         }
-        Cost(await Responses(272000, 2000), 0.675m, 0.015m, 0.0005m, 0m, 0.6905m);
-        Cost(await Responses(272001, 2001), 1.35m, 0.0225m, 0.0010005m, 0m, 1.3735005m);
+        Cost(await Responses(272000, 2000), 0.675m, 0.015000000000000001m, 0.0005m, 0m, 0.6905m);
+        Cost(await Responses(272001, 2001), 1.35m, 0.022500000000000003m, 0.0010004999999999999m, 0m, 1.3735005m);
 
         // Authored tiers in source order [1000, 500, 1000]: exactly 1000 selects 500, 1001 selects the first 1000 tier, 501 selects 500.
         const string tiers = """[{"inputTokensAbove":1000,"input":4,"output":6,"cacheRead":1,"cacheWrite":0},{"inputTokensAbove":500,"input":9,"output":9,"cacheRead":9,"cacheWrite":0},{"inputTokensAbove":1000,"input":7,"output":7,"cacheRead":7,"cacheWrite":0}]""";

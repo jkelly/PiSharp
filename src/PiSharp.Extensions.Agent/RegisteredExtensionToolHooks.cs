@@ -12,6 +12,7 @@ namespace PiSharp.Extensions.Agent;
 internal sealed class RegisteredExtensionToolHooks : IPreparedToolHooks
 {
     private readonly ExtensionRegistrySnapshot snapshot;
+    private readonly ExtensionRegistry registry;
     private readonly RegisteredExtensionEventDispatcher dispatcher;
     private readonly ToolResultValueOptions resultValues;
     private readonly CancellationToken session;
@@ -21,7 +22,7 @@ internal sealed class RegisteredExtensionToolHooks : IPreparedToolHooks
         ToolResultValueOptions resultValues, ExtensionEventDispatchOptions? options, int maximumHandlers,
         CancellationToken session, Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? reportDiagnostic)
     {
-        this.snapshot = snapshot;
+        this.snapshot = snapshot; this.registry = registry;
         this.resultValues = resultValues;
         this.session = session;
         this.reportDiagnostic = reportDiagnostic;
@@ -32,7 +33,7 @@ internal sealed class RegisteredExtensionToolHooks : IPreparedToolHooks
         PreparedToolAction validatedAction, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested(); session.ThrowIfCancellationRequested();
-        if (snapshot.ToolCallHandlers.IsEmpty) return new();
+        if (registry.Current(snapshot).ToolCallHandlers.IsEmpty) return new();
         var reduced = await dispatcher.DispatchToolCallAsync(snapshot,
             new(invocation.Call.Name, invocation.Call.Id, validatedAction.Arguments, invocation.ParentToolCallId), cancellationToken, session).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested(); session.ThrowIfCancellationRequested();
@@ -46,7 +47,7 @@ internal sealed class RegisteredExtensionToolHooks : IPreparedToolHooks
         ToolResult result, bool isError, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested(); session.ThrowIfCancellationRequested();
-        if (snapshot.ToolResultHandlers.IsEmpty) return null;
+        if (registry.Current(snapshot).ToolResultHandlers.IsEmpty) return null;
         // Runner's event has execution disposition, not a tool's opaque own result isError.
         // Keep the original result intact for the existing after-hook's separate result/outcome merge.
         var supplied = result.WithProperty("isError", JsonData.Parse(isError ? "true" : "false")).ToJson(resultValues);

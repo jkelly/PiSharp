@@ -21,7 +21,9 @@ internal sealed class RegisteredExtensionContextHooks
         this.options = options; this.session = session; this.registry = registry;
         dispatcher = new(registry, value => { _ = ToolResultValueCodec.Read(value, options.ResultValues); },
             options.ToolEventDispatch, options.MaximumToolEventHandlers,
-            messages => AgentLoopRunner.ValidateRequestMessages(messages, options.ResultValues), options.RestoreSystemMessage);
+            // The context messages a handler returns are admitted with the same count bound the dispatch admits them with.
+            messages => AgentLoopRunner.ValidateRequestMessages(messages, options.ResultValues,
+                (options.ToolEventDispatch ?? new()).MaximumContextMessages), options.RestoreSystemMessage);
     }
 
     internal async ValueTask<AgentPromptPreparation> BeforePromptAsync(AgentPromptStart start, CancellationToken token)

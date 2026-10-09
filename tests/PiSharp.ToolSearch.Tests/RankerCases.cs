@@ -76,7 +76,8 @@ internal static partial class Program
         Equal("# Tool discovery\n\nSearches over deferred tool metadata with BM25 and exposes matching tools for the next model call.\n\n" +
             "Some of the tools, such as tools of MCP servers, may not have been provided to you upfront, and you should use this tool (`tool_search`) " +
             "to search for the required tools. For MCP tool discovery, always use `tool_search`.", ToolSearch.Description, "description");
-        Equal("""{"type":"object","properties":{"query":{"type":"string","description":"Search query for deferred tools."},"limit":{"type":"number","description":"Maximum number of tools to return. Defaults to 8."}},"required":["query"]}""",
+        // tool-search/tool.ts toolSearchSchema as TypeBox emits it: type, required, properties.
+        Equal("""{"type":"object","required":["query"],"properties":{"query":{"type":"string","description":"Search query for deferred tools."},"limit":{"type":"number","description":"Maximum number of tools to return. Defaults to 8."}}}""",
             McpDiscoveryToolIdentity.ToolSearchSchema.ToString(), "schema");
         Equal(8, ToolSearch.DefaultLimit, "default limit");
         var descriptor = McpToolSearch.Create().Descriptor;

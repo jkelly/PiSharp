@@ -59,12 +59,16 @@ public sealed partial class PersistentAgentSession
     public IDisposable SubscribeOperationEvents(ISessionOperationEventSink sink)
     {
         ArgumentNullException.ThrowIfNull(sink);
-        lock(_gate){ThrowAvailable();if(_operationSubscriptions.Length>=(_agentOptions?.MaximumSubscribers??128))throw new InvalidOperationException("Session subscriber limit reached.");var item=new OperationSubscription(sink);_operationSubscriptions=_operationSubscriptions.Add(item);return new OperationLease(this,item);}
+        // A runtime binding under a replacement reservation subscribes its observers (extension activations bind there too).
+        lock(_gate){ThrowBindable();if(_operationSubscriptions.Length>=(_agentOptions?.MaximumSubscribers??128))throw new InvalidOperationException("Session subscriber limit reached.");var item=new OperationSubscription(sink);_operationSubscriptions=_operationSubscriptions.Add(item);return new OperationLease(this,item);}
     }
     private AgentConfiguration RecoveryConfiguration(AgentConfiguration configuration)
     {
         var original=configuration.Hooks??new();
-        return configuration with { Hooks=original with { PrepareRequestBoundary=PrepareActivationRequestAsync, FinishTurnDecision=async (turn,token)=>
+        // agent.sessionId = sessionManager.getSessionId(): every provider request carries the session id.
+        // Source emitBeforeAgentStart(_baseSystemPromptOptions): before_agent_start sees the prompt of the in-memory loadout.
+        var before=original.BeforePrompt;
+        return configuration with { SessionId=configuration.SessionId??_store.Snapshot.Header.Id, Hooks=original with { BeforePrompt=before is null?null:(start,token)=>before(start with { History=WithPendingSystemRecord(start.History,token) },token), PrepareRequestBoundary=PrepareActivationRequestAsync, FinishTurnDecision=async (turn,token)=>
         {
             var decision=original.FinishTurnDecision is null?AgentLoopFinishAction.Default:await original.FinishTurnDecision(turn,token).ConfigureAwait(false);
             double? desired;lock(_gate)desired=_automaticCompaction is null?null:_recoveryDesiredOutput;
@@ -89,11 +93,6 @@ public sealed partial class PersistentAgentSession
         while(true)
         {
             allTurns.AddRange(result.Turns);
-            if (await SettleTurnBoundaryAsync(result, idle, token).ConfigureAwait(false))
-            {
-                if(runs>=(_agentOptions?.Loop?.MaximumTurns??16)){result=result with { Reason=AgentLoopStopReason.TurnLimit };break;}
-                SetOperationPhase(SessionOperationPhase.Provider);result=await _agent.ContinueAsync(token).ConfigureAwait(false);runs++;continue;
-            }
             if (!token.IsCancellationRequested && await TryAutomaticRetryAsync(result, idle, token).ConfigureAwait(false))
             { SetOperationPhase(SessionOperationPhase.Provider); result = await _agent.ContinueAsync(token).ConfigureAwait(false); runs++; continue; }
             var recovery=token.IsCancellationRequested?RecoveryDecision.None:await RunAutomaticBoundaryAsync(result,idle,token,operation,attempted).ConfigureAwait(false);
@@ -199,7 +198,7 @@ public sealed partial class PersistentAgentSession
                 token.ThrowIfCancellationRequested();var id=Identity(_nextEntryId,log.Header.Id,entries);token.ThrowIfCancellationRequested();
                 var entry=ContextEditRecord(target,replacement,id,parent,_clock);edits.Add(entry);entries=entries.Add(entry);parent=id;
             }
-            var prospective=_projector.Project(entries,parent,token);ValidateRuntimeContext(prospective,_configuration);
+            var prospective=_projector.Project(entries,parent,token);ValidateRuntimeContext(prospective, _configuration, _toleratedSelection, _toleratedThinking);
             await using(var probe=new NativeAgent(_configuration,_clock,new NoopSink(),_agentOptions))probe.ConfigureAndReplaceMessages(_configuration,SessionContextProjector.AgentMessages(prospective));
             token.ThrowIfCancellationRequested();admitted=true;var acknowledgment=await _store.AppendAsync(edits.ToImmutable(),token).ConfigureAwait(false);
             if(!acknowledgment.CheckpointAcknowledged)throw Error(PersistentAgentSessionFailure.InvalidCommit);

@@ -5,11 +5,21 @@ namespace PiSharp.Rpc.Protocol;
 public enum RpcSessionOwnership { Borrowed, Owned }
 /// <summary>Explicit configured full model metadata; executable runtime selection remains in the coordinator.</summary>
 public sealed record RpcModelDefinition(ModelDescriptor Model, JsonData WireBody);
+/// <summary>A host whose selectable models change while it runs (Pi's modelRuntime.getAvailableSnapshot): set_model, cycle_model and
+/// get_available_models read <see cref="Available"/> at each command; <see cref="Scoped"/> are the --models/enabledModels scope cycle_model
+/// walks first; <see cref="SwitchThinkingLevel"/> is the level a switch selects before clamping (_getThinkingLevelForModelSwitch: the
+/// per-model or default setting; null keeps the current level).</summary>
+public sealed record RpcModelRuntime(Func<System.Collections.Immutable.ImmutableArray<RpcModelDefinition>> Available)
+{
+    public Func<System.Collections.Immutable.ImmutableArray<RpcScopedModel>>? Scoped { get; init; }
+    public Func<ModelDescriptor, string?>? SwitchThinkingLevel { get; init; }
+}
+public sealed record RpcScopedModel(ModelDescriptor Model, string? ThinkingLevel);
 public sealed record RpcDispatchOptions(int MaximumConcurrentCommands = 8, int MaximumCommandBytes = 1_048_576,
     int MaximumOutputBytes = 1_048_576, int MaximumJsonDepth = 32, int MaximumIdCharacters = 256,
     int MaximumCommandTypeCharacters = 128, int MaximumPromptCharacters = 65_536, int MaximumImages = 16,
-    int MaximumModels = 128, int MaximumModelDefinitionBytes = 1_048_576, int MaximumReturnedMessages = 1024,
-    int MaximumReturnedEntries = 4096, int MaximumContinuationRuns = 16, int MaximumPendingToolMessages = 128)
+    int MaximumModels = 128, int MaximumModelDefinitionBytes = 1_048_576, int MaximumReturnedMessages = PiSharp.AI.PiRequestBudget.RequestMessages,
+    int MaximumReturnedEntries = 100_000, int MaximumContinuationRuns = 16, int MaximumPendingToolMessages = 128)
 {
     internal void Validate(RpcSessionOwnership ownership)
     {
@@ -35,4 +45,10 @@ public sealed class RpcDispatchException : IOException
         RpcDispatchFailure.Disposed => "RPC dispatcher is closing or disposed.",
         _ => "RPC dispatcher cleanup failed."
     }, inner) => Failure = failure;
+}
+/// <summary>rpc-mode.ts handleInputLine given the JSON value <c>null</c>: handleCommand reads <c>null.id</c>, its catch block reads it
+/// again, and the rejection is unhandled, so Node prints the TypeError and exits 1 without a response. The dispatcher stops as fatally.</summary>
+public sealed class RpcInputTypeError : Exception
+{
+    internal RpcInputTypeError() : base("Cannot read properties of null (reading 'id')") { }
 }

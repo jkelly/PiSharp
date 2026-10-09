@@ -71,7 +71,7 @@ internal static class GrepToolTests
     private static async Task Unsupported()
     {
         using var f = new Fixture();
-        foreach (var args in new object[] { new { pattern = "x", context = 1 }, new { pattern = "x", limit = 1.5 }, new { pattern = "x", limit = 10001 }, new { pattern = "x\0" }, new { pattern = "x", literal = "true" } })
+        foreach (var args in new object[] { new { pattern = "x", context = 1 }, new { pattern = "x", limit = 1.5 }, new { pattern = "x", limit = 10001 }, new { pattern = "x\0" } })
             Check((await Invoke(f.Tool(), args)).Failure?.Kind == ToolFailureKind.InvalidArguments, "Unsupported input was silently approximated.");
         Check((await Invoke(f.Tool(), new { pattern = "x", path = Path.GetDirectoryName(f.Root)! })).Failure?.Kind == ToolFailureKind.InvalidArguments, "Outside workspace target admitted.");
         Check(f.Runner.Calls == 0 && f.Spills.Calls == 0, "Invalid input reached executor.");

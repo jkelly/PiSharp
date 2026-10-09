@@ -61,7 +61,8 @@ internal static partial class Program
             Equal("""400: {"message":"Bad model","code":400}""", await Error(FakeHttp.Json("""{"error":{"message":"Bad model","code":400}}""", HttpStatusCode.BadRequest)), "json error object");
             Equal("502 Gateway down", await Error(FakeHttp.Text("Gateway down", HttpStatusCode.BadGateway)), "text body");
             Equal("500 status code (no body)", await Error(FakeHttp.Text("", HttpStatusCode.InternalServerError)), "empty body");
-            Equal("500 status code (no body)", await Error(FakeHttp.Json("""{"message":"x"}""", HttpStatusCode.InternalServerError)), "no error member");
+            // openai 7.19.0 makeStatusError: an object body without `error` is itself the error ({ error: body }).
+            Equal("""500: {"message":"x"}""", await Error(FakeHttp.Json("""{"message":"x"}""", HttpStatusCode.InternalServerError)), "no error member");
             Equal("400 \"bad\"", await Error(FakeHttp.Json("""{"error":"bad"}""", HttpStatusCode.BadRequest)), "string error member");
             var connection = new FakeHttp((_, _, _) => throw new HttpRequestException("refused"));
             var failed = await OpenRouterImages.Instance.GenerateImagesAsync(Flux, DogPrompt, new ImagesOptions { ApiKey = "test", Http = connection.Client });

@@ -1,11 +1,14 @@
 using System.Collections.Immutable;
 using System.Text;
+using PiSharp.Contracts.Compatibility;
 using PiSharp.Sessions.Serialization;
 
 namespace PiSharp.Sessions.Storage;
 
+/// <param name="JavaScriptSerialization">Write every record as Pi's session-manager.ts does, <c>JSON.stringify(entry)</c> (raw
+/// non-ASCII, only control characters and lone surrogates escaped, JavaScript number text); the owned entry holds the same text.</param>
 public sealed record SessionLogStoreOptions(SessionLogReaderOptions? ReaderOptions = null,
-    int MaximumBatchRecords = 256, ISessionLogStorageFactory? StorageFactory = null);
+    int MaximumBatchRecords = 256, ISessionLogStorageFactory? StorageFactory = null, bool JavaScriptSerialization = false);
 public enum SessionLogStorageDurability { Unsupported, LocalFileFlush, VolatileMemory, DeferredLocalFile }
 public enum SessionLogStoreFailure
 {
@@ -93,7 +96,7 @@ public sealed class SessionLogStore : IAsyncDisposable
         var configured = ValidateOptions(options);
         var bounds = configured.ReaderOptions ?? new(); var codec = new SessionEntryCodec(bounds.CodecOptions);
         SessionEntry header;
-        try { header = codec.Read(validatedHeader.WireBody.Value); }
+        try { header = Own(codec, validatedHeader, configured.JavaScriptSerialization); }
         catch (SessionEntryCodecException error) { throw EntryError(error); }
         if (!header.IsHeader || header.Id.Length == 0) throw Error(SessionLogStoreFailure.InvalidEntry);
         var bytes = Encode(codec, header, bounds);
@@ -179,7 +182,7 @@ public sealed class SessionLogStore : IAsyncDisposable
                 cancellationToken.ThrowIfCancellationRequested();
                 if (entry is null || entry.IsHeader) throw Error(SessionLogStoreFailure.InvalidEntry);
                 SessionEntry owned;
-                try { owned = _codec.Read(entry.WireBody.Value); }
+                try { owned = Own(_codec, entry, _options.JavaScriptSerialization); }
                 catch (SessionEntryCodecException error) { throw EntryError(error); }
                 ValidateIdentity(owned, index); index.Add(owned.Id, owned); canonical.Add(owned);
                 var bytes = Encode(_codec, owned, _readerOptions);
@@ -256,6 +259,13 @@ public sealed class SessionLogStore : IAsyncDisposable
         if (entry.Kind == SessionEntryKind.Message && entry.WireBody.Value.GetProperty("message").TryGetProperty("role", out var role) &&
             role.GetString() == "assistant" && entry.WireBody.Value.GetProperty("message").GetProperty("stopReason").GetString() == "pending")
             throw Error(SessionLogStoreFailure.InvalidEntry);
+    }
+    private static SessionEntry Own(SessionEntryCodec codec, SessionEntry entry, bool javaScript)
+    {
+        if (!javaScript) return codec.Read(entry.WireBody.Value);
+        try { return SessionJavaScriptJson.Stringify(codec, entry); }
+        catch (EcmaScriptJsonProjectionException error)
+        { throw Error(error.Failure == EcmaScriptJsonProjectionFailure.ResourceLimit ? SessionLogStoreFailure.ResourceLimit : SessionLogStoreFailure.InvalidEntry); }
     }
     private static byte[] Encode(SessionEntryCodec codec, SessionEntry entry, SessionLogReaderOptions bounds)
     {

@@ -52,6 +52,10 @@ public sealed class GoogleKeyAuthRequestFactory(ModelDescriptor model, GoogleGen
             }
         }
         if (options.ModelMetadata.Value.TryGetProperty("headers", out var modelHeaders)) Merge(modelHeaders);
+        // provider-attribution.ts getSessionHeaders (opencode-headers.ts for the bare provider): an OpenCode request carries the
+        // agent session id in x-opencode-session, below the caller's own headers.
+        foreach (var (header, value) in PiSharp.AI.Providers.ProviderHeaderPolicies.OpenCodeSessionHeaders(model.Provider, endpoint, request.SessionId))
+            headers[header] = value;
         if (options.Headers is { } extra) Merge(extra.Value);
         if (headers.Count > options.MaximumHeaders || headers.Any(h => h.Key.Length + (h.Value?.Length ?? 0) > options.MaximumHeaderCharacters))
             throw GoogleData.Fail(GoogleFailure.ResourceLimit);

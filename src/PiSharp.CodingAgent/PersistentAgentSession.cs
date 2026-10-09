@@ -18,7 +18,24 @@ public sealed record PersistentAgentSessionOptions(bool UseLatestLeaf = true, st
     SessionContextProjectionOptions? ContextOptions = null)
 {
     public PiSharp.CodingAgent.ToolSelection.AllowedToolSelection? LifetimeToolSelection { get; init; }
+    /// <summary>agent-session.ts prompt: run for an idle prompt after input handlers and expansion, before anything is persisted or a
+    /// run starts, with the session's current model. A <see cref="SessionPromptRejectedException"/> it throws rejects the prompt.</summary>
+    public Func<ModelDescriptor, CancellationToken, ValueTask>? PromptPreflight { get; init; }
+    /// <summary>The placeholder a session without a selected model runs with (sdk.ts createAgentSession with no model): a new session
+    /// records no <c>model_change</c> for it.</summary>
+    public ModelDescriptor? UnselectedModel { get; init; }
+    /// <summary>main.ts buildSessionOptions <c>options.model</c> (--model): the model every session opened or created through these
+    /// options runs on, instead of the one its branch records.</summary>
+    public ModelDescriptor? SelectedModel { get; init; }
+    /// <summary>sdk.ts createAgentSession for a session without messages: its thinking level for the model it runs on (given the
+    /// model's supported levels; null keeps the restored level). When set, opening such a session records the model and that level.</summary>
+    public Func<ModelDescriptor, ImmutableArray<string>, string?>? NewSessionThinkingLevel { get; init; }
+    /// <summary>sdk.ts findInitialModel (with main.ts's scoped pick) for a session without messages, when no <see cref="SelectedModel"/>
+    /// is set: the model it records and runs on (null, or a model without a binding, keeps the restored or current model).</summary>
+    public Func<CancellationToken, ValueTask<ModelDescriptor?>>? NewSessionModel { get; init; }
 }
+/// <summary>A prompt the session refused before admitting it (agent-session.ts prompt validation); nothing was persisted.</summary>
+public sealed class SessionPromptRejectedException(string message) : Exception(message);
 public enum PersistentAgentSessionFailure
 {
     InvalidConfiguration, UnsupportedThinkingLevel, ModelMismatch, InvalidCommit,
@@ -153,7 +170,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         return ThinkingLevels.GetSupported(configuration.Transport, selected);
     }
     /// <summary>Read-only self-wait detection for the current host call; this does not transfer input authority.</summary>
-    internal bool IsExecutingInputCallback
+    public bool IsExecutingInputCallback
     {
         get
         {
@@ -165,7 +182,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     {
         get
         {
-            lock (_gate) return new(_agent.Snapshot, _acknowledgedLog, _context, _fault, _disposed, _configuring)
+            // A kept thinking level (tree navigation) is the session's level, as agent.state.thinkingLevel is upstream.
+            lock (_gate) return new(_agent.Snapshot, _acknowledgedLog, _toleratedThinking is { } recorded && _context.ThinkingLevel == recorded
+                ? _context with { ThinkingLevel = _configuration.ThinkingLevel } : _context, _fault, _disposed, _configuring)
             { IsAdmittingInput = _inputSubmission is not null, InputCancellationCallbackFailed = _inputCancellationCallbackFailed,
                 IsAppendingExtensionEntry = _appendingExtensionEntry, IsEditingContext = _editingContext, IsCompacting = _compacting,
                 AutoCompactionEnabled = _automaticCompaction?.Request.Settings?.Enabled == true,
@@ -191,20 +210,21 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 !configured.UseLatestLeaf || configured.SelectedLeafId is not null)
                 throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
             cancellationToken.ThrowIfCancellationRequested();
-            var model = Record(codec, "model_change", Identity(nextEntryId, header.Id, []), null, clock, writer =>
+            // sdk.ts: a new session records its initial model (when there is one) and thinking level.
+            var model = configuration.Model == configured.UnselectedModel ? null : Record(codec, "model_change", Identity(nextEntryId, header.Id, []), null, clock, writer =>
             {
                 writer.WriteString("provider", configuration.Model.Provider);
                 writer.WriteString("modelId", configuration.Model.Id);
             });
-            var thinking = Record(codec, "thinking_level_change", Identity(nextEntryId, header.Id, [model]), model.Id,
+            var thinking = Record(codec, "thinking_level_change", Identity(nextEntryId, header.Id, model is null ? [] : [model]), model?.Id,
                 clock, writer => writer.WriteString("thinkingLevel", configuration.ThinkingLevel));
-            ImmutableArray<SessionEntry> initial = [model, thinking];
+            ImmutableArray<SessionEntry> initial = model is null ? [thinking] : [model, thinking];
             var context = projector.Project(initial, thinking.Id, cancellationToken);
             store = await SessionLogStore.CreateNewAsync(path, header, configured.SessionLogStoreOptions, cancellationToken).ConfigureAwait(false);
             // Once the file/header creation is admitted, complete the initial metadata checkpoint.
             await store.AppendAsync(initial, CancellationToken.None).ConfigureAwait(false);
             return new(path, store, agent, bridge, projector, codec, context, configuration, clock, nextEntryId,
-                configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions);
+                configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions) { PromptPreflight = configured.PromptPreflight };
         }
         catch
         {
@@ -230,7 +250,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             agent.ReplaceMessages(SessionContextProjector.AgentMessages(context));
             cancellationToken.ThrowIfCancellationRequested();
             return new(path, store, agent, bridge, projector, codec, context, configuration, clock, nextEntryId,
-                configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions);
+                configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions) { PromptPreflight = configured.PromptPreflight };
         }
         catch
         {
@@ -245,7 +265,14 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(registry);
         registry = registry.RetainToolSelection(options?.LifetimeToolSelection);
-        var selection = await registry.PrepareAndDrainAsync(() => registry.Resolve(initialModel, [], registry.GetDefaultThinkingLevel(initialModel), cancellationToken), cancellationToken).ConfigureAwait(false);
+        // sdk.ts createAgentSession: a new session's first thinking_level_change already holds the resolved level (the CLI level,
+        // else the per-model or default setting, clamped), not the model default followed by a second change.
+        string? thinkingLevel = null;
+        if (options?.NewSessionThinkingLevel is { } initialThinking)
+            try { thinkingLevel = initialThinking(initialModel, registry.GetSupportedThinkingLevels(initialModel)); }
+            catch (SessionRuntimeRegistryException error) when (error.Failure == SessionRuntimeRegistryFailure.UnknownModel) { }
+        thinkingLevel ??= registry.GetDefaultThinkingLevel(initialModel);
+        var selection = await registry.PrepareAndDrainAsync(() => registry.Resolve(initialModel, [], thinkingLevel, cancellationToken), cancellationToken).ConfigureAwait(false);
         var session = await CreateAsync(path, header, selection.Configuration, clock, nextEntryId, options, cancellationToken).ConfigureAwait(false);
         session._registry = registry;
         return session;
@@ -310,7 +337,35 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             cancellationToken.ThrowIfCancellationRequested();
             // Without initial names the transcript's loadout is restored by name with the current bindings (Pi 0.99.2).
             var loadout = await registry.PrepareAndDrainAsync(() => registry.ResolveRestored(context, fallbackModel, cancellationToken,
-                registry.InitialActiveToolNames), cancellationToken).ConfigureAwait(false);
+                registry.InitialActiveToolNames, configured.SelectedModel), cancellationToken).ConfigureAwait(false);
+            // sdk.ts createAgentSession: a session without messages (an empty or header-only file, a new session) records its model
+            // and thinking level at once (appendModelChange, appendThinkingLevelChange); a lazy store keeps them until it is written.
+            if (configured.NewSessionThinkingLevel is { } initialThinking && !context.Messages.Any(message => message.Role != "system"))
+            {
+                var model = loadout.Selection.Configuration.Model;
+                // main.ts buildSessionOptions + sdk.ts findInitialModel: without --model, a session without messages takes the scoped
+                // models' pick, else the saved default, else the first available model, not the model in use.
+                if (configured.SelectedModel is null && configured.NewSessionModel is { } choose && await choose(cancellationToken).ConfigureAwait(false) is { } chosen)
+                {
+                    try { _ = registry.GetSupportedThinkingLevels(chosen); model = chosen; }
+                    catch (SessionRuntimeRegistryException error) when (error.Failure == SessionRuntimeRegistryFailure.UnknownModel) { /* Not bound: keep. */ }
+                }
+                var level = initialThinking(model, registry.GetSupportedThinkingLevels(model)) ?? (model == loadout.Selection.Configuration.Model
+                    ? loadout.Selection.Configuration.ThinkingLevel : registry.GetDefaultThinkingLevel(model));
+                var header = store.Snapshot.Header; var existing = store.Snapshot.Entries;
+                var modelEntry = Record(codec, "model_change", Identity(nextEntryId, header.Id, existing), context.LeafId, clock, writer =>
+                {
+                    writer.WriteString("provider", model.Provider);
+                    writer.WriteString("modelId", model.Id);
+                });
+                var thinkingEntry = Record(codec, "thinking_level_change", Identity(nextEntryId, header.Id, existing.Add(modelEntry)), modelEntry.Id,
+                    clock, writer => writer.WriteString("thinkingLevel", level));
+                var appended = await store.AppendAsync([modelEntry, thinkingEntry], cancellationToken).ConfigureAwait(false);
+                if (!appended.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+                context = projector.Project(appended.Snapshot.Entries, thinkingEntry.Id, cancellationToken);
+                loadout = await registry.PrepareAndDrainAsync(() => registry.ResolveRestored(context, model, cancellationToken,
+                    registry.InitialActiveToolNames, model), cancellationToken).ConfigureAwait(false);
+            }
             var selection = loadout.Selection;
             var bridge = new Bridge();
             agent = new(selection.Configuration, clock, bridge, configured.AgentOptions);
@@ -318,13 +373,14 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             cancellationToken.ThrowIfCancellationRequested();
             opened = new(path, store, agent, bridge, projector, codec, context, selection.Configuration, clock, nextEntryId,
                 configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions)
-            { _registry = registry, _runtimeLease = runtime };
+            { _registry = registry, _runtimeLease = runtime, PromptPreflight = configured.PromptPreflight,
+                _toleratedSelection = Divergent(context, selection.Configuration.Model) };
             var restored = selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
-            if (registry.InitialActiveToolNames is not null)
-                await opened.ConfigureAsync(new() { ActiveToolNames = restored, ReplaceDeclarations = loadout.RequiresRecord }, cancellationToken).ConfigureAwait(false);
+            // Source constructor: the initial names (_buildRuntime) or the transcript's loadout (_restoreToolsFromTranscript) are
+            // applied in memory and the file is not written; the next request records a loadout that differs from the recorded one.
             // Restored tools that are not registered yet, such as MCP tools whose server is still connecting, stay pending.
-            else if (loadout.RequiresRecord)
-                await opened.RecordRestoredToolsAsync(restored, loadout.Pending, cancellationToken).ConfigureAwait(false);
+            opened.RestoreUnrecordedTools(loadout.RequiresRecord || !restored.SequenceEqual(opened.RecordedActiveToolNames(context, cancellationToken), StringComparer.Ordinal),
+                registry.InitialActiveToolNames is null ? loadout.Pending : []);
             return opened;
         }
         catch (Exception admission)
@@ -372,7 +428,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             // Pi sets no limit on the nested calls of codemode scripts.
             var registry = _registry.BindInvocationOwner(new(generation, linked.Token) { UncountedNestedCallTools = ["codemode"],
                 LateNestedTools = LateNestedInvoker });
-            var selection = registry.Resolve(_context, _configuration.Model);
+            var current = _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+            var selection = registry.Resolve(WithUnrecordedLoadout(_context, current, default), _configuration.Model, tolerated: _toleratedSelection,
+                thinkingLevel: KeptThinking(_configuration), activeOrder: current);
             _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(_context));
             _configuration = selection.Configuration;
             _registry = registry;
@@ -428,8 +486,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             var work = cancellation.Token;
             await _commits.WaitAsync(work).ConfigureAwait(false); commitHeld = true;
             await DrainLoadoutDiagnosticsAsync(work).ConfigureAwait(false);
-            SessionContextProjection context; SessionLogStoreSnapshot log; object? priorPromptRevision;
-            lock (_gate) { context = _context; log = _acknowledgedLog; priorPromptRevision = _acknowledgedPromptRevision; }
+            SessionContextProjection context; SessionLogStoreSnapshot log; object? priorPromptRevision; string effectiveThinking;
+            lock (_gate) { context = _context; log = _acknowledgedLog; priorPromptRevision = _acknowledgedPromptRevision; effectiveThinking = _configuration.ThinkingLevel; }
             var entries = ImmutableArray.CreateBuilder<SessionEntry>();
             var parent = context.LeafId;
             if (update.Model is { } model)
@@ -438,20 +496,14 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     writer.WriteString("provider", model.Provider);
                     writer.WriteString("modelId", model.Id);
                 });
-            if (update.ThinkingLevel is { } level && level != context.ThinkingLevel)
+            // Source setThinkingLevel: a change of the session's level (which tree navigation may have kept over the branch's).
+            if (update.ThinkingLevel is { } level && level != effectiveThinking)
                 Add("thinking_level_change", writer => writer.WriteString("thinkingLevel", level));
-            var systemUpdate = update.ActiveToolNames is { } activeNames
-                ? _registry!.CreateActivationMessage(activeNames, RecordedActiveToolNames(context, work), _clock(), work, update.ReplaceDeclarations)
-                : update.SystemMessage;
-            SessionPromptSectionPreparation? promptPreparation = null;
-            if (update.SystemMessage is null)
-            {
-                var names = update.ActiveToolNames ?? _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
-                _activationPreparation.Value = true;
-                try { (systemUpdate, promptPreparation) = _registry!.PreparePromptSectionMessage(names, context.Messages, systemUpdate, _clock(), work); }
-                finally { _activationPreparation.Value = false; }
-            }
-            if (systemUpdate is { } system)
+            // Source setActiveToolsByName: a selection applies in memory, and the next request records its difference from the declared
+            // tools (declareToolChanges) with the prompt sections it changes. setModel/setThinkingLevel write only their own entries.
+            var selectedTools = update.ActiveToolNames is { } activeNames ? _registry!.NormalizeActiveTools(activeNames, work) : (ImmutableArray<string>?)null;
+            var currentNames = _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+            if (update.SystemMessage is { } system)
             {
                 if (system.Role != "system" || system.WireBody is null)
                     throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -461,15 +513,23 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 });
             }
             var prospective = _projector.Project(log.Entries.AddRange(entries), parent, work);
-            if (entries.Count == 0)
+            if (entries.Count == 0 && (selectedTools is null || selectedTools.Value.SequenceEqual(currentNames, StringComparer.Ordinal)))
             {
-                promptPreparation?.ValidateSource();
                 work.ThrowIfCancellationRequested();
                 if (update.ActiveToolNames is not null) lock (_gate)
                 { work.ThrowIfCancellationRequested(); if (_pendingActivation is not null) PrepareActivationRestoration(_configuration)(); }
                 return Snapshot with { IsConfiguring = false };
             }
-            var selection = await PrepareAndDrainLoadoutAsync(() => _registry!.Resolve(prospective, update.Model ?? _configuration.Model, work), work).ConfigureAwait(false);
+            // The loadout the next request records precedes this update's entries in every resolution.
+            var resolved = prospective with { LlmMessages = selectedTools is { } selectedNames
+                ? WithLoadoutRecord(_registry!, prospective.LlmMessages, selectedNames, work, context.LlmMessages.Length)
+                : WithUnrecordedLoadout(prospective.LlmMessages, currentNames, work, context.LlmMessages.Length) };
+            var unrecordedAfter = selectedTools is { } loadout ? _registry!.CreateToolChangeMessage(context.LlmMessages, loadout, 0, work) is not null : (bool?)null;
+            var targetThinking = update.ThinkingLevel ?? effectiveThinking;
+            var selection = await PrepareAndDrainLoadoutAsync(() => _registry!.Resolve(resolved, update.Model ?? _configuration.Model, work,
+                thinkingLevel: resolved.ThinkingLevel != targetThinking ? targetThinking : null, activeOrder: selectedTools ?? currentNames), work).ConfigureAwait(false);
+            if (selectedTools is { } expected && !selection.Configuration.Tools.Select(tool => tool.Name).SequenceEqual(expected, StringComparer.Ordinal))
+                throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
             // A stored selection only carries provider/modelId; preserve exact API matching for an explicitly requested model.
             if (update.Model is { } requested && selection.Configuration.Model != requested)
                 throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -478,15 +538,14 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             work.ThrowIfCancellationRequested();
             Action restoreActivation;
             lock (_gate) restoreActivation = PrepareActivationRestoration(selection.Configuration);
-            promptPreparation?.ValidateSource();
             work.ThrowIfCancellationRequested();
             lock (_gate)
                 if (!ReferenceEquals(_context, context) || !ReferenceEquals(_acknowledgedLog, log) || !ReferenceEquals(_active, idle) ||
                     !ReferenceEquals(_acknowledgedPromptRevision, priorPromptRevision))
                     throw new InvalidOperationException("Prompt configuration reservation changed.");
-            writeAdmitted = true;
-            var acknowledged = await _store.AppendAsync(entries.ToImmutable(), work).ConfigureAwait(false);
-            if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+            writeAdmitted = entries.Count != 0;
+            var acknowledged = entries.Count == 0 ? null : await _store.AppendAsync(entries.ToImmutable(), work).ConfigureAwait(false);
+            if (acknowledged is { CheckpointAcknowledged: false }) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             ModelDescriptor previousModel; long generation;
             lock (_gate)
             {
@@ -496,16 +555,16 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     SelectPendingToolsLocked(_configuration.Tools.Select(tool => tool.Name).ToImmutableArray(),
                         selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray());
                 _configuration = selection.Configuration;
-                _acknowledgedLog = acknowledged.Snapshot;
-                _context = prospective;
-                _acknowledgedPromptRevision = promptPreparation?.Revision ?? _acknowledgedPromptRevision;
+                if (acknowledged is not null) { _acknowledgedLog = acknowledged.Snapshot; _context = prospective; }
+                _toleratedThinking = prospective.ThinkingLevel != selection.Configuration.ThinkingLevel ? prospective.ThinkingLevel : null;
+                if (unrecordedAfter is { } unrecordedLoadout) _unrecordedLoadout = unrecordedLoadout;
                 restoreActivation();
             }
             // Source setModel/setThinkingLevel: thinking_level_changed (and thinking_level_select) when the level changed,
             // then model_select when the model changed. Listener failures cannot undo the committed configuration.
             writeAdmitted = false;
             if (entries.Any(entry => entry.Type == "thinking_level_change"))
-                await EmitOperationAsync(new SessionThinkingLevelChanged(generation, prospective.ThinkingLevel, context.ThinkingLevel)).ConfigureAwait(false);
+                await EmitOperationAsync(new SessionThinkingLevelChanged(generation, selection.Configuration.ThinkingLevel, effectiveThinking)).ConfigureAwait(false);
             if (update.Model is { } selected && selected != previousModel)
                 await EmitOperationAsync(new SessionModelSelected(generation, selected, previousModel, update.ModelSelectSource ?? "set")).ConfigureAwait(false);
             return Snapshot with { IsConfiguring = false };
@@ -887,14 +946,27 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         return (configured, projector, codec, agent, bridge);
     }
 
-    private static void ValidateRuntimeContext(SessionContextProjection context, AgentConfiguration configuration)
+    /// <param name="tolerated">The selection the branch recorded when the session was opened on another model (sdk.ts: a fallback
+    /// model, or --model); it stands until a response or a model_change on the branch names the session's model.</param>
+    /// <param name="toleratedThinking">The thinking level the branch records when tree navigation kept the session's own level.</param>
+    private static void ValidateRuntimeContext(SessionContextProjection context, AgentConfiguration configuration, SessionContextModel? tolerated = null,
+        string? toleratedThinking = null)
     {
-        if (context.ThinkingLevel != configuration.ThinkingLevel) throw Error(PersistentAgentSessionFailure.UnsupportedThinkingLevel);
+        if (context.ThinkingLevel != configuration.ThinkingLevel && context.ThinkingLevel != toleratedThinking)
+            throw Error(PersistentAgentSessionFailure.UnsupportedThinkingLevel);
         // Source getBranchSelection: a virtual model_change holds over the physical responses it routed.
         if (SessionBranchSelection.Select(context, configuration.Model) is { } model &&
-            (model.Provider != configuration.Model.Provider || model.ModelId != configuration.Model.Id))
+            (model.Provider != configuration.Model.Provider || model.ModelId != configuration.Model.Id) && model != tolerated)
             throw Error(PersistentAgentSessionFailure.ModelMismatch);
     }
+
+    /// <summary>The branch selection a session opened on another model tolerates (see <see cref="ValidateRuntimeContext"/>).</summary>
+    private SessionContextModel? _toleratedSelection;
+    private string? _toleratedThinking;
+    /// <summary>The thinking level a re-resolution keeps while the branch records another (see <see cref="_toleratedThinking"/>).</summary>
+    private string? KeptThinking(AgentConfiguration configuration) => _toleratedThinking is null ? null : configuration.ThinkingLevel;
+    private static SessionContextModel? Divergent(SessionContextProjection context, ModelDescriptor model) =>
+        SessionBranchSelection.Select(context, model) is { } recorded && (recorded.Provider != model.Provider || recorded.ModelId != model.Id) ? recorded : null;
 
     public Task<AgentLoopResult> PromptAsync(TranscriptEntry message, CancellationToken cancellationToken = default) =>
         PromptAsync([message], cancellationToken);
@@ -934,6 +1006,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         catch { reservation.Abort.Dispose(); throw; }
         return SubmitInputCoreAsync(input, admission, options, cancellationToken, reservation);
     }
+
+    /// <summary>The host's prompt validation (<see cref="PersistentAgentSessionOptions.PromptPreflight"/>).</summary>
+    public Func<ModelDescriptor, CancellationToken, ValueTask>? PromptPreflight { get; private init; }
 
     /// <summary>Awaited before idle input is admitted, with the input's cancellation; set by the session host.</summary>
     public Func<CancellationToken, Task>? BeforeInputAdmission { get; set; }
@@ -985,6 +1060,14 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 ThrowAvailable(); work.ThrowIfCancellationRequested();
                 if (_active is not null && input.StreamingBehavior is null)
                     throw new InvalidOperationException("Active input requires steering or follow-up delivery.");
+            }
+            // agent-session.ts prompt: an idle prompt validates the model and its provider's auth before anything is persisted.
+            bool idlePrompt; lock (_gate) idlePrompt = _active is null && options?.QueueOnly != true;
+            if (idlePrompt && PromptPreflight is { } preflight)
+            {
+                ModelDescriptor model; lock (_gate) model = _agent.Snapshot.Model;
+                await preflight(model, work).ConfigureAwait(false);
+                work.ThrowIfCancellationRequested();
             }
             long timestamp;
             previous = _inputCallback.Value; _inputCallback.Value = reservation;
@@ -1223,7 +1306,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     }
     private void ValidateLoadout(ImmutableArray<TranscriptEntry> messages, CancellationToken token = default)
     {
-        var selected = LoadoutRegistry().Resolve(_configuration.Model, messages, _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false);
+        var selected = LoadoutRegistry().Resolve(_configuration.Model, WithUnrecordedLoadout(messages, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), token),
+            _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false, activeOrder: _configuration.Tools.Select(tool => tool.Name).ToImmutableArray());
         if (!selected.Configuration.Tools.Select(tool => (tool.Name, tool.ExecutionMode))
             .SequenceEqual(_configuration.Tools.Select(tool => (tool.Name, tool.ExecutionMode))))
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -1239,7 +1323,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         set { lock (_gate) { ThrowAvailable(); ThrowInputMutation(); _agent.FollowUpMode = value; } }
     }
     public IDisposable Subscribe(IAgentEventSink sink)
-    { lock (_gate) { ThrowAvailable(); return _agent.Subscribe(sink); } }
+    { lock (_gate) { ThrowBindable(); return _agent.Subscribe(sink); } }
     public bool Abort()
     {
         InputSubmission? input; ContextEditCancellation? edit; ContextEditCancellation? run;
@@ -1343,10 +1427,15 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 });
             // Reject unsupported selected influences/bounds before writing, without rewriting history.
             var nextContext = _projector.Project(log.Entries.Add(entry), entry.Id);
-            ValidateRuntimeContext(nextContext, _configuration);
+            ValidateRuntimeContext(nextContext, _configuration, _toleratedSelection, _toleratedThinking);
             if (_registry is not null) ValidateLoadout(nextContext.LlmMessages);
+            // A replacement enters the running loop (source in-place mutation), so it must be a message the loop can send.
+            if (!ReferenceEquals(message, original) && role != "custom") AgentLoopRunner.ValidateRequestMessages([message]);
             return (entry, nextContext);
             }
+            // The loop holds a custom replacement in its persisted form (the projection adds the entry timestamp).
+            if (replacement is not null && role == "custom")
+                replacement = SessionContextProjector.AgentMessages(nextContext) is { IsEmpty: false } projected && projected[^1].Role == "custom" ? projected[^1] : null;
             var acknowledged = await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
             if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             lock (_gate)
@@ -1355,11 +1444,14 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 if (role == "assistant") _lastAcknowledgedAssistantId = entry.Id;
                 if (replacement is not null)
                 {
-                    // The running loop keeps the original; it continues from the persisted context once idle.
                     if (_replacedMessages.Count >= 1024) _replacedMessages.Clear();
-                    _replacedMessages[original.WireBody.Value.GetRawText()] = replacement.WireBody; _agentHoldsReplacedMessages = true;
+                    _replacedMessages[original.WireBody.Value.GetRawText()] = replacement.WireBody;
+                    // The loop's assistant is the parsed replacement; its wire form maps to the persisted body too.
+                    if (role == "assistant") _replacedMessages[PiWireJson.WriteMessage(PiWireJson.ReadMessage(replacement.WireBody.Value)).Value.GetRawText()] = replacement.WireBody;
                 }
             }
+            // Source _replaceMessageInPlace: the running loop, the agent's history and later events use the replacement immediately.
+            if (replacement is not null) AgentMessageReplacement.Set(observation, replacement);
         }
         catch (Exception error)
         {
@@ -1451,14 +1543,20 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     }
     private static string Identity(Func<string> nextEntryId, string headerId, ImmutableArray<SessionEntry> entries)
     {
-        string id;
-        try { id = nextEntryId(); } catch (Exception) { throw Error(PersistentAgentSessionFailure.InvalidCommit); }
-        if (string.IsNullOrWhiteSpace(id) || id == headerId || entries.Any(entry => entry.Id == id))
-            throw Error(PersistentAgentSessionFailure.InvalidCommit);
-        return id;
+        // session-manager.ts generateId: up to 100 draws of a short id that is not in use yet, then a full UUID.
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            string id;
+            try { id = nextEntryId(); } catch (Exception) { throw Error(PersistentAgentSessionFailure.InvalidCommit); }
+            if (string.IsNullOrWhiteSpace(id)) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+            if (id != headerId && !entries.Any(entry => entry.Id == id)) return id;
+        }
+        return Guid.NewGuid().ToString("D");
     }
+    /// <summary>session-manager.ts entry timestamps: <c>new Date().toISOString()</c> (UTC, milliseconds, Z).</summary>
+    internal const string IsoTimestampFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
     private static SessionEntry Record(SessionEntryCodec codec, string type, string id, string? parentId,
-        Func<long> clock, Action<Utf8JsonWriter> fields, string timestampFormat = "O")
+        Func<long> clock, Action<Utf8JsonWriter> fields, string timestampFormat = IsoTimestampFormat)
     {
         string timestamp;
         try { timestamp = DateTimeOffset.FromUnixTimeMilliseconds(clock()).ToString(timestampFormat, CultureInfo.InvariantCulture); }
@@ -1466,9 +1564,14 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         using var bytes = new MemoryStream();
         using (var writer = new Utf8JsonWriter(bytes))
         {
-            writer.WriteStartObject(); writer.WriteString("type", type); writer.WriteString("id", id);
-            writer.WriteString("parentId", parentId); writer.WriteString("timestamp", timestamp);
-            fields(writer); writer.WriteEndObject();
+            writer.WriteStartObject(); writer.WriteString("type", type);
+            // session-manager.ts appendCustomEntry and appendCustomMessageEntry build { type, customType, ..., id, parentId, timestamp };
+            // every other entry starts with its envelope.
+            var envelopeLast = type is "custom" or "custom_message";
+            if (!envelopeLast) { writer.WriteString("id", id); writer.WriteString("parentId", parentId); writer.WriteString("timestamp", timestamp); }
+            fields(writer);
+            if (envelopeLast) { writer.WriteString("id", id); writer.WriteString("parentId", parentId); writer.WriteString("timestamp", timestamp); }
+            writer.WriteEndObject();
         }
         return codec.Parse(Encoding.UTF8.GetString(bytes.ToArray()));
     }

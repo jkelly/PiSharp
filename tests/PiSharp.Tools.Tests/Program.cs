@@ -22,7 +22,7 @@ internal static class Program
             .Concat(BashProgressDeliveryTests.Cases()).Concat(LsToolTests.Cases()).Concat(FindToolTests.Cases()).Concat(FdFindExecutorTests.Cases()).Concat(GrepToolTests.Cases())
             .Concat(GrepContextHostAdapterTests.Cases())
             .Concat(UnixProcessRunnerTests.Cases())
-            .Concat(ToolParityTests.Cases()).Concat(SkiaCodecTests.Cases())
+            .Concat(ToolParityTests.Cases()).Concat(SkiaCodecTests.Cases()).Concat(ToolValidationTests.Cases()).Concat(ToolEdgeInputTests.Cases())
             .Where(test => filter is null || test.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToArray();
         if (tests.Length == 0) { Console.Error.WriteLine("No matching tool test cases."); return 2; }
         foreach (var test in tests)

@@ -26,16 +26,22 @@ public sealed partial class PersistentAgentSession
     {
         ArgumentNullException.ThrowIfNull(prepare);
         if (_activationPreparation.Value || _inLoadoutDiagnosticDrain.Value) return null;
-        for (var attempt = 0; attempt < 16; attempt++)
+        // Source _refreshToolRegistry applies at once; a concurrent change that came first is prepared on again (each retry follows
+        // another committed change), with no fallback to the idle boundary while the run is in its provider phase.
+        while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             SessionRuntimeRegistry expected; ImmutableArray<string> names; long epoch; AgentConfiguration configuration;
             Sessions.Context.SessionContextProjection context;
+            bool busy;
             lock (_gate)
             {
-                if (!RunCatalogAdmissibleLocked()) return null;
+                busy = RunCatalogBusyLocked();
+                if (!busy && !RunCatalogAdmissibleLocked()) return null;
                 expected = _registry!; epoch = _activationEpoch; configuration = _configuration; context = _context;
                 names = _pendingActivation?.Names ?? configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
             }
+            if (busy) { await WaitForRunCatalogAsync(cancellationToken).ConfigureAwait(false); continue; }
             var prepared = await prepare(expected, names, cancellationToken).ConfigureAwait(false);
             ArgumentNullException.ThrowIfNull(prepared);
             if (!prepared.Registry.ReplacesCatalogOf(expected)) throw new ArgumentException("Catalog must derive from the exact captured session registry.");
@@ -50,14 +56,21 @@ public sealed partial class PersistentAgentSession
             try
             {
                 presentation = replacement.PrepareActiveLoadout(normalized, cancellationToken);
-                late = replacement.Resolve(configuration.Model, context.LlmMessages.Add(delta), configuration.ThinkingLevel, cancellationToken: cancellationToken,
+                late = replacement.Resolve(configuration.Model, WithUnrecordedLoadout(context.LlmMessages,
+                    configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), cancellationToken).Add(delta), configuration.ThinkingLevel, cancellationToken: cancellationToken,
                     prepareLoadout: false, preparedLoadout: presentation).Invoker;
             }
             finally { _activationPreparation.Value = false; }
             cancellationToken.ThrowIfCancellationRequested();
             lock (_gate)
             {
-                if (!RunCatalogAdmissibleLocked()) return null;
+                busy = RunCatalogBusyLocked();
+                if (!busy && !RunCatalogAdmissibleLocked()) return null;
+            }
+            if (busy) { await WaitForRunCatalogAsync(cancellationToken).ConfigureAwait(false); continue; }
+            lock (_gate)
+            {
+                if (!RunCatalogAdmissibleLocked()) continue;
                 // Another catalog change or activation came first: prepare again on top of it.
                 if (!ReferenceEquals(_registry, expected) || _activationEpoch != epoch || !ReferenceEquals(_configuration, configuration)) continue;
                 prepared.CommitPreparedRegistry();
@@ -70,7 +83,6 @@ public sealed partial class PersistentAgentSession
             }
             return new(Snapshot, replacement);
         }
-        return null;
     }
 
     private ToolInvoker? _lateNestedInvoker;
@@ -82,8 +94,10 @@ public sealed partial class PersistentAgentSession
     private SessionRuntimeRegistry LoadoutRegistry() =>
         _pendingActivation is { ReplaceDeclarations: true } && _recordedRegistry is { } recorded ? recorded : _registry!;
 
-    /// <summary>A run that settles without another request records the catalog it took during the run, so the session is idle
-    /// with a transcript its registry resolves. Skipped (the next request records it) when input is queued.</summary>
+    /// <summary>A run that settles without another request keeps the catalog it took during the run as the session's loadout, in
+    /// memory like an idle catalog change: the next request records it (source _refreshToolRegistry; declareToolChanges). The
+    /// transcript keeps the previous registry's declarations meanwhile (<see cref="_unrecordedLoadout"/>). Skipped (the next request
+    /// records it) when input is queued.</summary>
     private async Task RecordRunCatalogAsync(TaskCompletionSource operation)
     {
         PendingActivation? pending;
@@ -95,54 +109,33 @@ public sealed partial class PersistentAgentSession
             if (state.IsRunning || !state.PendingInputs.IsEmpty || state.SteeringCount != 0 || state.FollowUpCount != 0) return;
         }
         await _commits.WaitAsync(CancellationToken.None).ConfigureAwait(false);
-        var writeAdmitted = false;
         try
         {
-            SessionRuntimeRegistry registry; Sessions.Context.SessionContextProjection context; Sessions.Storage.SessionLogStoreSnapshot log;
-            AgentConfiguration configuration; long epoch;
+            SessionRuntimeRegistry registry; Sessions.Context.SessionContextProjection context; AgentConfiguration configuration; long epoch;
             lock (_gate)
             {
                 if (!ReferenceEquals(_pendingActivation, pending) || !ReferenceEquals(_active, operation) || _fault is not null || _disposed) return;
-                registry = _registry!; context = _context; log = _acknowledgedLog; configuration = _configuration; epoch = _activationEpoch;
+                registry = _registry!; context = _context; configuration = _configuration; epoch = _activationEpoch;
             }
-            var delta = registry.CreateActivationMessage(pending.Names, RecordedActiveToolNames(context, default), _clock(), default,
-                replaceDeclarations: true)!;
-            var entry = Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,
-                writer => { writer.WritePropertyName("message"); writer.WriteRawValue(delta.WireBody!.Value.GetRawText()); });
-            var prospective = _projector.Project(log.Entries.Add(entry), entry.Id);
             AgentConfiguration verified;
             _activationPreparation.Value = true;
             try
             {
-                verified = registry.Resolve(configuration.Model, prospective.LlmMessages, configuration.ThinkingLevel, prepareLoadout: false,
-                    preparedLoadout: pending.Presentation).Configuration;
+                verified = registry.Resolve(configuration.Model, WithLoadoutRecord(registry, context.LlmMessages, pending.Names, default),
+                    configuration.ThinkingLevel, prepareLoadout: false, preparedLoadout: pending.Presentation, activeOrder: pending.Names).Configuration;
             }
             finally { _activationPreparation.Value = false; }
-            ValidateRuntimeContext(prospective, verified);
+            ValidateRuntimeContext(context, verified, _toleratedSelection, _toleratedThinking);
             lock (_gate)
             {
                 if (!ReferenceEquals(_pendingActivation, pending) || _activationEpoch != epoch || !ReferenceEquals(_context, context) ||
-                    !ReferenceEquals(_acknowledgedLog, log) || !ReferenceEquals(_registry, registry) || _fault is not null || _disposed) return;
-                _activationPublishing = true; writeAdmitted = true;
-            }
-            var acknowledged = await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
-            if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
-            lock (_gate)
-            {
-                _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(verified), SessionContextProjector.AgentMessages(prospective));
-                _configuration = verified; _context = prospective; _acknowledgedLog = acknowledged.Snapshot;
-                _pendingActivation = null; _lateNestedInvoker = null; _recordedRegistry = null;
+                    !ReferenceEquals(_registry, registry) || _fault is not null || _disposed) return;
+                _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(verified), SessionContextProjector.AgentMessages(context));
+                _configuration = verified;
+                _pendingActivation = null; _lateNestedInvoker = null; _recordedRegistry = null; _unrecordedLoadout = true;
             }
         }
-        catch (Sessions.Storage.SessionLogStoreException storage)
-        {
-            var fault = new PersistentAgentSessionFault(PersistentAgentSessionFailure.AppendFailed, storage.Failure,
-                storage.MayHaveWritten, storage.DurableFlushCompleted);
-            if (storage.MayHaveWritten || _store.IsPoisoned) lock (_gate) _fault ??= fault;
-            throw new PersistentAgentSessionException(fault);
-        }
-        catch { if (writeAdmitted) lock (_gate) _fault ??= new(PersistentAgentSessionFailure.InvalidCommit); throw; }
-        finally { if (writeAdmitted) lock (_gate) _activationPublishing = false; _commits.Release(); }
+        finally { _commits.Release(); }
     }
 
     /// <summary>While a catalog published during the run awaits its boundary, nested calls (codemode scripts) reach its tools
@@ -156,6 +149,22 @@ public sealed partial class PersistentAgentSession
     /// published during the run (see <see cref="TryPublishToolCatalogDuringRunAsync"/>). Empty otherwise.</summary>
     public ImmutableArray<string> GetLateNestedToolNames() => LateNestedInvoker()?.CallableToolNames ?? [];
 
+
+    /// <summary>A run in its provider phase while another selected-state transaction is in flight (the run's request boundary
+    /// recording its loadout, a compaction or an appended entry): the catalog waits for it instead of falling back to the idle
+    /// boundary, which a tool of the same run (tool_search waiting for its servers) may be waiting on.</summary>
+    private bool RunCatalogBusyLocked() =>
+        !_disposed && !_admissionStopped && _fault is null && !_retired && !_replacing && _registry is not null &&
+        _active is not null && _operationPhase == SessionOperationPhase.Provider && !_closing.IsCancellationRequested &&
+        (_configuring || _compacting || _editingContext || _appendingExtensionEntry || _activationPublishing || _catalogPublication is not null);
+
+    /// <summary>Let the in-flight transaction finish: they hold the commit gate while they write.</summary>
+    private async Task WaitForRunCatalogAsync(CancellationToken token)
+    {
+        await _commits.WaitAsync(token).ConfigureAwait(false);
+        _commits.Release();
+        await Task.Delay(1, token).ConfigureAwait(false);
+    }
 
     /// <summary>A run in its provider phase, with no other selected-state transaction in flight.</summary>
     private bool RunCatalogAdmissibleLocked() =>

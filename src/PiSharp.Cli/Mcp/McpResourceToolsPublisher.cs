@@ -146,14 +146,15 @@ internal sealed class McpResourceToolsPublisher
                 cancellation.ThrowIfCancellationRequested();
                 var plan = registry.PrepareToolCatalogReplacement(scope, registrationIds, descriptors, registry.CaptureSnapshot());
                 var binding = new ExtensionAgentBinding(registry, policy, validator, sessionCancellationToken: current.LifetimeToken,
-                    options: new() { ActiveToolNames = [] }, capturedSnapshot: plan.PreviewSnapshot);
+                    invokerOptions: McpSessionHost.BindingInvokerOptions, options: PiSharp.Cli.Commands.PiPayloadBudget.PiBinding(new() { ActiveToolNames = [] }),
+                    capturedSnapshot: plan.PreviewSnapshot);
                 var nextNames = descriptors.Select(tool => tool.Name).ToImmutableHashSet(StringComparer.Ordinal);
                 var retained = expected.RegisteredTools.Where(tool => !publishedNames.Contains(tool.Adapter.Name)).ToImmutableArray();
                 var added = binding.Registrations.Where(tool => nextNames.Contains(tool.Name)).Select(tool =>
                 {
                     var index = binding.Registrations.IndexOf(tool);
                     return new SessionRegisteredTool(binding.RegisteredToolDeclarations[index], binding.Adapters[index])
-                    { Exposure = tool.Exposure, Namespace = tool.Namespace, DefaultActive = tool.DefaultActive, IsExtension = true,
+                    { Exposure = tool.Exposure, Namespace = tool.Namespace, DefaultActive = tool.DefaultActive, IsExtension = true, Annotations = tool.Annotations,
                         PrepareLoadout = binding.GetLoadoutPreparation(tool.Name) };
                 }).ToImmutableArray();
                 var replacement = expected.WithToolCatalog(retained.AddRange(added), composeHooks(expected, binding));

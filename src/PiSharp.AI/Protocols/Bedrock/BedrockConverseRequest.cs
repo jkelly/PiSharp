@@ -45,8 +45,9 @@ public sealed record BedrockConverseOptions
     public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask<JsonData?>>? OnPayload { get; init; }
     public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask>? OnResponse { get; init; }
     public int MaximumPayloadBytes { get; init; } = 32 * 1024 * 1024;
-    public int MaximumContentBlocks { get; init; } = 256;
-    public int MaximumResponseCharacters { get; init; } = 4 * 1024 * 1024;
+    public int MaximumContentBlocks { get; init; } = int.MaxValue;
+    /// <summary>The accumulated response, bounded like every other provider's (the SDK has no bound of its own).</summary>
+    public int MaximumResponseCharacters { get; init; } = PiRequestBudget.StreamCharacters;
 }
 
 /// <summary>The catalog model fields the Bedrock stream reads.</summary>
