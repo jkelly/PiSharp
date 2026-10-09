@@ -68,8 +68,9 @@ public sealed class SessionExportSource
     }
 
     /// <summary>
-    /// SessionManager.open(path) for export: lines that JSON.parse rejects are skipped, legacy versions are migrated in memory, a file
-    /// without a header gets a new one, the leaf is the last entry. Unlike upstream the source file is never rewritten.
+    /// SessionManager.open(path) for export: lines that JSON.parse rejects are skipped, legacy versions are migrated, a file
+    /// without a header gets a new one, the leaf is the last entry. As upstream (_setSessionFile, _loadEntries, _rewriteFile), an empty
+    /// file is initialized with the new header and a migrated file is rewritten in the current version.
     /// </summary>
     public static SessionExportSource Open(string path, string? workingDirectory = null, Func<DateTimeOffset>? clock = null)
     {
@@ -89,12 +90,14 @@ public sealed class SessionExportSource
         if (entries.Count == 0)
         {
             if (bytes.Length > 0) throw new InvalidOperationException($"Session file is not a valid {SessionHtmlExport.AppName} session: {resolved}");
-            return New(resolved, ExportPaths.ResolvePath(cwdBase), now(), []);
+            var created = New(resolved, ExportPaths.ResolvePath(cwdBase), now(), []);
+            Rewrite(resolved, created.fileEntries);
+            return created;
         }
         var header = entries.OfType<JsObject>().FirstOrDefault(entry => entry["type"] is "session");
         var cwd = header?["cwd"] is string headerCwd ? ExportPaths.ResolvePath(headerCwd, cwdBase) : ExportPaths.ResolvePath(cwdBase);
         if (header is null) return New(resolved, cwd, now(), entries);
-        Migrate(entries, header);
+        if (Migrate(entries, header)) Rewrite(resolved, entries);
         return new(entries, resolved, Js.ToJsString(header["id"]), cwd, null, true);
     }
 
@@ -109,10 +112,10 @@ public sealed class SessionExportSource
     private static bool JsTrimmedEmpty(string line) => line.All(character => char.IsWhiteSpace(character) || character == '\ufeff');
 
     /// <summary>migrateToCurrentVersion: v1 gains ids and parent links (compaction indices become ids), v2 renames hookMessage to custom.</summary>
-    private static void Migrate(List<object?> entries, JsObject header)
+    private static bool Migrate(List<object?> entries, JsObject header)
     {
         var version = header["version"] is double number ? number : 1;
-        if (version >= SessionEntryCodec.CurrentVersion) return;
+        if (version >= SessionEntryCodec.CurrentVersion) return false;
         if (version < 2)
         {
             object? previous = null;
@@ -135,7 +138,12 @@ public sealed class SessionExportSource
                 if (entry["type"] is "session") { entry["version"] = 3d; continue; }
                 if (entry["type"] is "message" && entry["message"] is JsObject message && message["role"] is "hookMessage") message["role"] = "custom";
             }
+        return true;
     }
+
+    /// <summary>_rewriteFile: every entry as JSON.stringify plus a newline.</summary>
+    private static void Rewrite(string path, IEnumerable<object?> entries) =>
+        File.WriteAllText(path, string.Concat(entries.Select(entry => Js.Stringify(entry) + "\n")), new UTF8Encoding(false));
 
     /// <summary>uuidv7(): 48-bit Unix milliseconds, version 7, variant 10, random bits.</summary>
     internal static string UuidV7(DateTimeOffset now)
