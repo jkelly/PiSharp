@@ -27,6 +27,8 @@ public sealed record ResponsesKeyAuthRequestOptions(
     /// <summary>Source model samplingParamsByThinkingLevel; the effective level's entry merges between model and request parameters.</summary>
     public JsonData? ModelSamplingParamsByThinkingLevel { get; init; }
     public JsonData? SamplingParams { get; init; }
+    /// <summary>compat.sessionAffinityFormat (types.ts SessionAffinityFormat): "openai" adds session_id, "openai-nosession" only
+    /// x-client-request-id (as OpenCode's Responses models declare), "openrouter" x-session-id.</summary>
     public string SessionAffinityFormat { get; init; } = "openai";
     public int MaximumHeaders { get; init; } = 128;
     public int MaximumHeaderCharacters { get; init; } = 4096;
@@ -111,7 +113,7 @@ public sealed class ResponsesKeyAuthRequestFactory
                 Math.Max(requested, 16) > _options.MaximumOutputTokens) ||
             (_options.Temperature is { } boundedTemperature && Math.Abs(boundedTemperature) > _options.MaximumTemperatureMagnitude))
             throw Failure(ResponsesKeyAuthRequestFailure.ResourceLimit);
-        if (_options.SessionAffinityFormat is not ("openai" or "openrouter" or "none") ||
+        if (_options.SessionAffinityFormat is not ("openai" or "openai-nosession" or "openrouter" or "none") ||
             _options.MaximumHeaders <= 0 || _options.MaximumHeaderCharacters <= 0 || _options.MaximumTotalHeaderCharacters <= 0)
             throw Failure(ResponsesKeyAuthRequestFailure.InvalidConfiguration);
         _toolChoiceSuffix = ToolChoiceField();
