@@ -361,7 +361,7 @@ internal static partial class TerminalEditorSourceWidth
         for (var at = 0; at < offsets.Length; at++) width += Grapheme(value[offsets[at]..(at + 1 < offsets.Length ? offsets[at + 1] : value.Length)]);
         return width;
     }
-    private static int Grapheme(string value)
+    internal static int Grapheme(string value)
     {
         var chars = value.EnumerateRunes().Select(r => r.Value).ToArray();
         if (chars.All(c => In(c, SpacingRanges))) return chars.Length;

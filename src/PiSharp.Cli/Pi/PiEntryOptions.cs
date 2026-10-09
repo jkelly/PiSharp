@@ -78,4 +78,6 @@ internal sealed record PiEntryOptions
     internal PiSharp.Cli.Extensions.Pi.PiExtensionHost? Extensions { get; init; }
     /// <summary>Source ExtensionMode of the run: <c>tui</c>, <c>rpc</c>, <c>json</c> or <c>print</c>.</summary>
     internal string ExtensionMode { get; init; } = "print";
+    /// <summary>Interactive mode inputs (IMPL-I): directories, resources and the live host link.</summary>
+    internal PiSharp.Cli.Interactive.Mode.InteractiveStartup? Interactive { get; init; }
 }
