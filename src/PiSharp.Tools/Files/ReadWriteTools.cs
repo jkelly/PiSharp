@@ -117,7 +117,7 @@ public sealed class ReadWriteTools
             var arguments = new Dictionary<string, object?> { ["path"] = target, ["displayPath"] = input.Path };
             if (name == "read")
             {
-                arguments["offset"] = input.Offset;
+                if (input.Offset is { } offset) arguments["offset"] = offset;
                 if (input.Limit is { } limit) arguments["limit"] = limit;
             }
             else arguments["content"] = input.Content;
@@ -150,7 +150,7 @@ public sealed class ReadWriteTools
         }
     }
 
-    private sealed record Input(string Path, string DisplayPath, int Offset, int? Limit, string? Content);
+    private sealed record Input(string Path, string DisplayPath, double? Offset, double? Limit, string? Content);
     private Input Parse(JsonData arguments, string name, bool normalized)
     {
         if (arguments is null || arguments.ToString().Length > _options.MaximumArgumentCharacters || arguments.Value.ValueKind != JsonValueKind.Object)
@@ -161,22 +161,17 @@ public sealed class ReadWriteTools
             // Source read/write schemas admit additional properties; execute reads only the declared ones.
             if (normalized && !allowed.Contains(property.Name, StringComparer.Ordinal) && property.Name != "displayPath")
                 throw new ArgumentException("Unsupported file argument.");
-        var path = String(value, "path", empty: false);
+        // Source resolveToCwd("") is the working directory; the file system reports what it does with it.
+        var path = String(value, "path", empty: !normalized);
         if (path.Length > _options.MaximumPathCharacters) throw new ArgumentException("Oversized file path.");
-        var display = normalized ? String(value, "displayPath", empty: false) : path;
+        var display = normalized ? String(value, "displayPath", empty: true) : path;
         if (display.Length > _options.MaximumPathCharacters) throw new ArgumentException("Oversized display path.");
-        var offset = 0; int? limit = null; string? content = null;
+        double? offset = null, limit = null; string? content = null;
         if (name == "read")
         {
-            // Source offset/limit are TypeBox numbers: a falsy or negative offset starts at line 1. Native admission keeps them integral.
+            // Source offset/limit are TypeBox numbers used with JavaScript arithmetic in execute (any finite value).
             // Pi validation.ts normalizeOptionalNulls: an optional property sent as null (strict tool schemas make optional properties nullable) is absent.
-            if (value.TryGetProperty("offset", out var number) && number.ValueKind != JsonValueKind.Null && !Integral(number, out offset))
-                throw new ArgumentException("Offset must be an integral number.");
-            if (value.TryGetProperty("limit", out number) && number.ValueKind != JsonValueKind.Null)
-            {
-                if (!Integral(number, out var count) || count < 0) throw new ArgumentException("Limit must be a nonnegative integral number.");
-                limit = count;
-            }
+            offset = Number(value, "offset"); limit = Number(value, "limit");
         }
         else
         {
@@ -186,12 +181,27 @@ public sealed class ReadWriteTools
         return new(path, display, offset, limit, content);
     }
 
-    private static bool Integral(JsonElement value, out int result)
+    private static double? Number(JsonElement value, string name)
     {
-        result = 0;
-        if (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var number) || !double.IsFinite(number) ||
-            number != Math.Truncate(number) || number is < int.MinValue or > int.MaxValue) return false;
-        result = (int)number; return true;
+        if (!value.TryGetProperty(name, out var item) || item.ValueKind == JsonValueKind.Null) return null;
+        if (item.ValueKind != JsonValueKind.Number || !item.TryGetDouble(out var number) || !double.IsFinite(number))
+            throw new ArgumentException("Read " + name + " must be a finite number.");
+        return number;
+    }
+
+    /// <summary>JavaScript Number#toString, as the source's template literals print numbers.</summary>
+    private static string Js(double value) => ToolArgumentValidation.Stringify(System.Text.Json.Nodes.JsonValue.Create(value))!;
+
+    /// <summary>JavaScript Array#slice(start, end) bounds: truncated toward zero, negative values count from the end.</summary>
+    private static (int From, int Count) Slice(int length, double start, double end)
+    {
+        int Bound(double value)
+        {
+            var truncated = double.IsNaN(value) ? 0 : Math.Truncate(value);
+            return (int)(truncated < 0 ? Math.Max(length + truncated, 0) : Math.Min(truncated, length));
+        }
+        var from = Bound(start);
+        return (from, Math.Max(Bound(end) - from, 0));
     }
 
     private static string String(JsonElement value, string name, bool empty, bool allowNulData = false)
@@ -232,29 +242,41 @@ public sealed class ReadWriteTools
         var mimeType = ImageMime.DetectSupportedImageMimeType(owned.AsSpan(0, Math.Min(owned.Length, ImageMime.SniffBytes)));
         if (mimeType is not null) return await ReadImageAsync(owned, mimeType, token).ConfigureAwait(false);
         var lines = LenientUtf8.GetString(owned).Split('\n');
-        // Source: a falsy offset starts at line 1; otherwise Math.max(0, offset - 1).
-        var start = input.Offset == 0 ? 0 : Math.Max(0, input.Offset - 1);
+        // Source: a falsy offset starts at line 1; otherwise Math.max(0, offset - 1). All arithmetic is JavaScript number arithmetic.
+        var start = input.Offset is { } offset && offset != 0 ? Math.Max(0, offset - 1) : 0;
         var startDisplay = start + 1;
         if (start >= lines.Length)
-            return ToolResult.Error(ToolFailureKind.InvalidArguments, $"Offset {input.Offset} is beyond end of file ({lines.Length} lines total)");
-        var count = input.Limit is { } requested ? Math.Min(requested, lines.Length - start) : lines.Length - start;
-        var selected = string.Join("\n", lines, start, count);
+            return ToolResult.Error(ToolFailureKind.InvalidArguments, $"Offset {Js(input.Offset!.Value)} is beyond end of file ({lines.Length} lines total)");
+        double? userLimitedLines = null;
+        (int From, int Count) range;
+        if (input.Limit is { } limit)
+        {
+            var endLine = Math.Min(start + limit, lines.Length);
+            range = Slice(lines.Length, start, endLine);
+            userLimitedLines = endLine - start;
+        }
+        else range = Slice(lines.Length, start, lines.Length);
+        var selected = string.Join("\n", lines, range.From, range.Count);
         var truncation = ToolOutputTruncator.Head(selected);
         string output; var details = JsonData.Null;
         if (truncation.FirstLineExceedsLimit)
         {
-            output = $"[Line {startDisplay} is {FormatSize(Utf8.GetByteCount(lines[start]))}, exceeds 50.0KB limit. Use bash: sed -n '{startDisplay}p' {input.DisplayPath} | head -c 51200]";
+            // Source allLines[startLine]: a fractional start indexes no line, and Buffer.byteLength(undefined) throws.
+            if (start != Math.Floor(start))
+                return ToolResult.Error(ToolFailureKind.ExecutionError,
+                    "The \"string\" argument must be of type string or an instance of Buffer or ArrayBuffer. Received undefined");
+            output = $"[Line {Js(startDisplay)} is {FormatSize(Utf8.GetByteCount(lines[(int)start]))}, exceeds 50.0KB limit. Use bash: sed -n '{Js(startDisplay)}p' {input.DisplayPath} | head -c 51200]";
             details = TruncationDetails(truncation);
         }
         else if (truncation.Truncated)
         {
             var end = startDisplay + truncation.OutputLines - 1;
             var suffix = truncation.TruncatedBy == ToolOutputTruncationLimit.Bytes ? " (50.0KB limit)" : "";
-            output = truncation.Content + $"\n\n[Showing lines {startDisplay}-{end} of {lines.Length}{suffix}. Use offset={end + 1} to continue.]";
+            output = truncation.Content + $"\n\n[Showing lines {Js(startDisplay)}-{Js(end)} of {lines.Length}{suffix}. Use offset={Js(end + 1)} to continue.]";
             details = TruncationDetails(truncation);
         }
-        else if (input.Limit is not null && start + count < lines.Length)
-            output = truncation.Content + $"\n\n[{lines.Length - start - count} more lines in file. Use offset={start + count + 1} to continue.]";
+        else if (userLimitedLines is { } limited && start + limited < lines.Length)
+            output = truncation.Content + $"\n\n[{Js(lines.Length - (start + limited))} more lines in file. Use offset={Js(start + limited + 1)} to continue.]";
         else output = truncation.Content;
         ToolResult result = new([new TextContent(output)], details);
         return result with { StructuredContent = ToReadOutput(result.ContentValue) };

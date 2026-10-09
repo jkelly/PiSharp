@@ -38,7 +38,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
     public BashTool(IProcessRunner runner, BashToolOptions options, Func<string>? nextSpillFileName = null)
     {
         ArgumentNullException.ThrowIfNull(runner); ArgumentNullException.ThrowIfNull(options);
-        if (options.MaximumCommandCharacters is < 1 or > 12_000 || options.MaximumArgumentCharacters is < 1 or > 96_000 ||
+        if (options.MaximumCommandCharacters is < 1 or > 96_000 || options.MaximumArgumentCharacters is < 1 or > 96_000 ||
             options.ShellArguments.IsDefault || options.ShellArguments.Length > 16 || options.ShellArguments.Any(argument => !Text(argument)) ||
             !Enum.IsDefined(options.CommandTransport) || options.CommandPrefix is { } prefix && (!Text(prefix) || prefix.Length > 12_000) ||
             !Absolute(options.Executable) || !File.Exists(options.Executable) ||
@@ -94,6 +94,15 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
     }
 
     private ShellConfiguration Shell => new(_options.Executable, _options.ShellArguments, _options.CommandTransport);
+
+    /// <summary>Node's child_process.spawn error when the operating system refuses the command line: on Windows CreateProcess takes at
+    /// most 32,767 characters (libuv reports ENAMETOOLONG); on Unix one argument is at most 128 KiB (E2BIG).</summary>
+    private static string? SpawnLimitError(PreparedToolAction action)
+    {
+        if (OperatingSystem.IsWindows())
+            return WindowsProcessLifetime.CommandLineLength(action.Target, action.CommandArguments) > 32_766 ? "spawn ENAMETOOLONG" : null;
+        return action.CommandArguments.Any(argument => System.Text.Encoding.UTF8.GetByteCount(argument) + 1 > 128 * 1024) ? "spawn E2BIG" : null;
+    }
     /// <summary>Source <c>commandPrefix ? `${commandPrefix}\n${command}` : command</c>.</summary>
     private string Resolve(string command) => string.IsNullOrEmpty(_options.CommandPrefix) ? command : _options.CommandPrefix + "\n" + command;
 
@@ -138,6 +147,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             setupError = "Invalid timeout: maximum is " + (MaximumTimeoutMilliseconds / 1000).ToString("R", CultureInfo.InvariantCulture) + " seconds";
         else if (!Directory.Exists(action.WorkingDirectory))
             setupError = $"Working directory does not exist: {action.WorkingDirectory}\nCannot execute bash commands.";
+        else if (SpawnLimitError(action) is { } spawnError) setupError = spawnError;
         if (setupError is not null)
         {
             try { await ToolProgressDelivery.ReportAndWaitAsync(onProgress, new([], JsonData.Null), cancellationToken).ConfigureAwait(false); }

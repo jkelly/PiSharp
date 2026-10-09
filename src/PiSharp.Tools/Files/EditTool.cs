@@ -150,7 +150,13 @@ public sealed class EditTool : IToolArgumentSchemaAdapter, IInitialToolArgumentP
                         "EditAccessFailure", false, false);
                 }
                 operationToken.ThrowIfCancellationRequested();
-                var original = await ReadOwnedAsync(action.Target, operationToken).ConfigureAwait(false);
+                byte[] original;
+                try { original = await ReadOwnedAsync(action.Target, operationToken).ConfigureAwait(false); }
+                catch (Exception error) when (error is UnauthorizedAccessException or IOException && Directory.Exists(action.Target))
+                {
+                    // Source ops.readFile of a directory (an empty path is the working directory): Node's EISDIR error.
+                    return Failure(ToolFailureKind.ExecutionError, "EISDIR: illegal operation on a directory, read", "EditIsDirectory", false, false);
+                }
                 operationToken.ThrowIfCancellationRequested(); var text = DecodeText(original);
                 var plan = EditPlan.Create(text, input.Edits, input.DisplayPath,
                     new(MaximumCharacters: Math.Max(_options.MaximumInputBytes, _options.MaximumOutputBytes), MaximumEdits: _options.MaximumEdits));
@@ -197,7 +203,7 @@ public sealed class EditTool : IToolArgumentSchemaAdapter, IInitialToolArgumentP
             if (normalized && property.Name is not ("path" or "edits" or "displayPath"))
                 throw new ArgumentException("Unsupported edit argument.");
         var path = Text(value.GetProperty("path")); var display = normalized ? Text(value.GetProperty("displayPath")) : path;
-        if (path.Length == 0 || display.Length == 0 || path.Length > _options.MaximumPathCharacters || display.Length > _options.MaximumPathCharacters)
+        if (normalized && path.Length == 0 || path.Length > _options.MaximumPathCharacters || display.Length > _options.MaximumPathCharacters)
             throw new ArgumentException("Invalid edit path.");
         var edits = ImmutableArray.CreateBuilder<TextEdit>();
         var hasArray = false;

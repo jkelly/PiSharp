@@ -26,7 +26,7 @@ internal static class BashToolTests
         {
             """{"command":"echo","timeout":1e999}""",
             """{"command":"\ud800"}""", """{"command":"x\u0000y"}""", """{"command":[]}""",
-            JsonSerializer.Serialize(new { command = new string('x', 12_001) })
+            JsonSerializer.Serialize(new { command = new string('x', 96_001) })
         })
             Failed(await invoker.ExecuteAsync(Invocation(JsonData.Parse(raw)), default), ToolFailureKind.InvalidArguments);
         using (var permissive = JsonDocument.Parse("""{"command":"echo",/* forbidden retained syntax */}""",

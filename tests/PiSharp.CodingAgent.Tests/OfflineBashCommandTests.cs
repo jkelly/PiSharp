@@ -45,7 +45,7 @@ internal static class OfflineBashCommandTests
             BashArgs(files, "printf allowed", timeout: "0"),
             BashArgs(files, "printf allowed", timeout: "NaN"),
             BashArgs(files, "printf allowed", timeout: "2147483.648"),
-            BashArgs(files, new string('x', 12_001)),
+            BashArgs(files, new string('x', 96_001)),
             BashArgs(files, "bad\0command"),
             BashArgs(files, "\ud800"),
             BashArgs(files, "printf allowed").Concat(["--allow-bash-command", "printf allowed"]).ToArray()

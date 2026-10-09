@@ -107,5 +107,33 @@ internal static partial class Program
             Equal(true, isError, "invalid MCP arguments are an error result");
             Equal("Validation failed for tool \"mcp__proj__count\":\n  - n: must be integer\n\nReceived arguments:\n{\n  \"n\": \"five\"\n}", text, "upstream validation message");
         }),
+        // bash.ts execute: an empty command runs, resolveTimeoutMs rejects a non-positive timeout and accepts a fractional one, and only
+        // the operating system bounds the command length (captured from the installed Pi 1.1.0 bash tool on Windows).
+        ("validation.bash-admits-what-the-source-schema-admits", async () =>
+        {
+            using var sandbox = new Sandbox("validation-bash");
+            var long20k = "echo " + new string('x', 20_000);
+            var long40k = "echo " + new string('x', 40_000);
+            var calls = new (object Input, string? Expected, bool IsError)[]
+            {
+                (new { command = "" }, "(no output)", false),
+                (new { command = "echo hi", timeout = 0 }, "Invalid timeout: must be a finite number of seconds", true),
+                (new { command = "echo hi", timeout = -1 }, "Invalid timeout: must be a finite number of seconds", true),
+                (new { command = "echo hi", timeout = 0.5 }, "hi\n", false),
+                // Runs (the old native cap was 12,000 characters); Git Bash's echo prints its own prefix of the argument, as under Pi.
+                (new { command = long20k }, null, false),
+                (new { command = long40k }, OperatingSystem.IsWindows() ? "spawn ENAMETOOLONG" : null, OperatingSystem.IsWindows()),
+            };
+            sandbox.Respond = (_, index) => index < calls.Length ? AnthropicToolCall("bash", calls[index].Input, "toolu_b" + index) : AnthropicText("done");
+            var (code, _, stderr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "run");
+            Equal(0, code, "exit; " + stderr);
+            for (var index = 0; index < calls.Length; index++)
+            {
+                var (text, isError) = ToolResultBlock(sandbox.Requests[index + 1]);
+                Equal(calls[index].IsError, isError, "bash call " + index + " isError: " + text[..Math.Min(200, text.Length)]);
+                if (calls[index].Expected is { } expected) Equal(expected, text, "bash call " + index);
+                else Check(text.Length > 1000 && text.TrimEnd('\n').All(character => character == 'x'), "a long command runs: " + text[..Math.Min(80, text.Length)]);
+            }
+        }),
     ];
 }

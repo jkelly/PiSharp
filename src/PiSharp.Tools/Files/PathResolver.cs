@@ -21,6 +21,8 @@ public sealed class PathResolver
 
     public string Resolve(string path)
     {
+        // Source resolveToCwd: path.resolve(cwd, "") is the working directory.
+        if (path is { Length: 0 }) return WorkingDirectory;
         CheckText(path);
         var normalized = Regex.Replace(path, "[\u00a0\u2000-\u200a\u202f\u205f\u3000]", " ");
         if (normalized.StartsWith('@')) normalized = normalized[1..];

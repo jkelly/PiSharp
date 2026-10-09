@@ -151,15 +151,16 @@ internal static class ReadWriteToolsTests
     private static async Task AdmissionAndDenial()
     {
         using var temp = new TemporaryFiles(); var operations = new Operations(); var tools = new ReadWriteTools(temp.Root, temp.Root, operations);
-        // Pi offset is a number; 0 and negative offsets start at line 1, so only non-integral values are refused natively.
-        foreach (var raw in new[] { "{}", "{\"path\":\"x\",\"offset\":1.5}", "{\"path\":\"x\",\"limit\":-1}" })
+        foreach (var raw in new[] { "{}" })
             Failure(await tools.CreateInvoker(new Policy()).ExecuteAsync(Invocation("read", JsonData.Parse(raw)), default), ToolFailureKind.InvalidArguments);
         foreach (var raw in new[] { "{\"path\":\"x\"}", "{\"path\":\"x\\u0000\",\"content\":\"valid\"}" })
             Failure(await tools.CreateInvoker(new Policy()).ExecuteAsync(Invocation("write", JsonData.Parse(raw)), default), ToolFailureKind.InvalidArguments);
         // Source validateToolArguments admits additional properties and coerces a number content to its string.
         var admitted = new ReadWriteTools(temp.Root, temp.Root, new Operations());
-        Check((await admitted.CreateInvoker(new Policy()).ExecuteAsync(Invocation("read", JsonData.Parse("{\"path\":\"x\",\"unknown\":1}")), default)).Failure?.Kind
-            != ToolFailureKind.InvalidArguments, "Additional read property was refused.");
+        // Pi offset and limit are any numbers, used with JavaScript arithmetic by execute (see ToolEdgeInputTests).
+        foreach (var raw in new[] { "{\"path\":\"x\",\"unknown\":1}", "{\"path\":\"x\",\"offset\":1.5}", "{\"path\":\"x\",\"limit\":-1}" })
+            Check((await admitted.CreateInvoker(new Policy()).ExecuteAsync(Invocation("read", JsonData.Parse(raw)), default)).Failure?.Kind
+                != ToolFailureKind.InvalidArguments, "Admitted read input was refused: " + raw);
         Check((await admitted.CreateInvoker(new Policy()).ExecuteAsync(Invocation("write", JsonData.Parse("{\"path\":\"x\",\"content\":1}")), default)).Failure?.Kind
             != ToolFailureKind.InvalidArguments, "Number write content was not coerced.");
         var original = Invocation("write", Arguments(new { path = "original", content = "text" }));

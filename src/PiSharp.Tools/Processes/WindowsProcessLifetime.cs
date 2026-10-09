@@ -191,7 +191,11 @@ internal sealed class WindowsProcessLifetime : IAsyncDisposable
     }
 
     // Windows CRT transport quoting. The explicit application name prevents executable token ambiguity.
-    private static string Quote(string argument)
+    /// <summary>Characters of the CreateProcess command line built for these arguments (at most 32,766 are accepted).</summary>
+    internal static long CommandLineLength(string executable, IEnumerable<string> arguments) =>
+        Quote(executable).Length + arguments.Sum(argument => 1L + Quote(argument).Length);
+
+    internal static string Quote(string argument)
     {
         var quoted = new StringBuilder("\""); var slashes = 0;
         foreach (var character in argument)
