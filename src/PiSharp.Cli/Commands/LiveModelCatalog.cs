@@ -44,6 +44,9 @@ internal sealed class LiveModelCatalog : IAsyncDisposable
     /// <summary>getAvailableSnapshot: the selectable models in the registry's order (the session's own model included).</summary>
     internal ImmutableArray<RpcModelDefinition> Available { get { lock (transports) return available; } }
 
+    /// <summary>The registry of the latest refresh (the available snapshot), or null before the first.</summary>
+    internal ModelRegistry? CurrentRegistry => Volatile.Read(ref current);
+
     internal JsonData? Wire(ModelDescriptor model) => Available.FirstOrDefault(definition => definition.Model == model)?.WireBody;
 
     internal LazyModelTransport? Transport(ModelDescriptor model)

@@ -34,6 +34,25 @@ internal static class PromptAuthCases
 
     public static IEnumerable<(string Id, Func<Task> Run)> All()
     {
+        // sdk.ts: a continued session whose model's provider has no auth runs on findInitialModel's pick, and interactive mode shows
+        // modelFallbackMessage (Pi 1.1.0 picks openai/gpt-5.5 with only an OpenAI key).
+        yield return ("e2e.prompt-auth.continue-falls-back-with-a-warning", async () =>
+        {
+            await using var pi = new InteractiveHarness("continue-fallback");
+            pi.Vars.Remove("ANTHROPIC_API_KEY"); pi.Vars["OPENAI_API_KEY"] = "sk-openai";
+            var cwd = System.Text.Json.Nodes.JsonValue.Create(pi.Cwd)!.ToJsonString();
+            pi.Write(Path.Combine(PiSharp.Cli.Pi.PiSessions.DefaultSessionDirectoryPath(pi.Cwd, pi.AgentDir), "2026-10-09T10-00-00-000Z_seed.jsonl"), string.Join("\n",
+                "{\"type\":\"session\",\"version\":3,\"id\":\"01a00000-0000-7000-8000-000000000001\",\"timestamp\":\"2026-10-09T10:00:00.000Z\",\"cwd\":" + cwd + "}",
+                "{\"type\":\"model_change\",\"id\":\"a1\",\"parentId\":null,\"timestamp\":\"2026-10-09T10:00:00.001Z\",\"provider\":\"anthropic\",\"modelId\":\"claude-haiku-4-5\"}",
+                "{\"type\":\"thinking_level_change\",\"id\":\"a2\",\"parentId\":\"a1\",\"timestamp\":\"2026-10-09T10:00:00.002Z\",\"thinkingLevel\":\"off\"}",
+                "{\"type\":\"message\",\"id\":\"a3\",\"parentId\":\"a2\",\"timestamp\":\"2026-10-09T10:00:00.003Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"seeded question\"}],\"timestamp\":1}}",
+                "{\"type\":\"message\",\"id\":\"a4\",\"parentId\":\"a3\",\"timestamp\":\"2026-10-09T10:00:00.004Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"seeded answer\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-haiku-4-5\",\"usage\":{\"input\":3,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":5,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}},\"stopReason\":\"stop\",\"timestamp\":2}}") + "\n");
+            pi.Start("-c", "--tui-mode", "regular");
+            await pi.WaitFor("escape interrupt");
+            await pi.WaitFor("Could not restore model anthropic/claude-haiku-4-5. Using openai/gpt-5.5");
+            await pi.WaitUntil(text => text.Contains("gpt-5.5", StringComparison.Ordinal) && text.Contains("seeded answer", StringComparison.Ordinal), "fallback model and the continued history");
+        });
+
         yield return ("e2e.prompt-auth.selected-model-without-key-login-then-prompt", async () =>
         {
             await using var pi = new InteractiveHarness("prompt-no-key");

@@ -124,6 +124,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     private LiveModelCatalog? _liveModels;
     /// <summary>The models this live session can switch to (null until <see cref="EnableModelSwitchingAsync"/>).</summary>
     internal LiveModelCatalog? LiveModels => _liveModels;
+    /// <summary>sdk.ts restore fallback: the model a restored session runs with when its branch's model is not bound (null refuses).</summary>
+    internal Func<PiSharp.Sessions.Context.SessionContextModel, ModelDescriptor?, ModelDescriptor?>? RestoreFallback { get; set; }
 
     /// <summary>agent-session.ts setModel/cycleModel: binds the run registry's available models to this session's runtime (each
     /// connects on first use, with the extensions' provider request hooks for its model).</summary>
@@ -329,7 +331,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
                 BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
                 DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync,
-                PreparePromptSections = PrepareDurablePromptSections });
+                PreparePromptSections = PrepareDurablePromptSections, RestoreFallbackModel = (saved, fallback) => RestoreFallback?.Invoke(saved, fallback) });
         // Publish installed metadata into the exact native baseline before any session/model resolution.
         // MCP runtime clones retain this catalog holder through the actual WithToolCatalog pipeline.
         extension?.RegistrationInstallation?.ConfigureModelCatalog(_startupRegistry, _startupRegistry.CaptureModelCatalog().Bindings, DecorateOriginalPromptBinding);

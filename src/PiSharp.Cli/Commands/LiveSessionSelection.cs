@@ -120,6 +120,10 @@ internal sealed class LiveSessionSelection
     /// <summary>The thinking level a <c>--model pattern:level</c> or scoped pattern named (cliThinkingFromModel).</summary>
     internal string? PatternThinkingLevel { get; set; }
     internal ImmutableArray<string> Warnings { get; set; } = [];
+    /// <summary>sdk.ts modelFallbackMessage: why the session runs on another model than the one it was continued with (or on none).</summary>
+    internal string? FallbackMessage { get; set; }
+    /// <summary>The model came from <c>--model</c> (buildSessionOptions options.model), which every session the run creates uses.</summary>
+    internal bool FromCliModel { get; set; }
     internal ImmutableArray<PiSharp.Cli.Models.ScopedModel> ScopedModels { get; set; } = [];
     /// <summary>True when the unmodified pinned row of a fixed-route provider is selected (the pre-catalog factories serve it).</summary>
     internal bool FixedRoute => FixedRouteProviders.Contains(Model.Provider) && (Entry is null || Entry.Pinned is not null);

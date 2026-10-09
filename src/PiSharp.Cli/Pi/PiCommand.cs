@@ -324,11 +324,11 @@ internal static class PiCommand
         LiveSessionSelection selection;
         try
         {
-            selection = await ResolveModelAsync(parsed, startupSnapshot, runtime, plan.HasMessages, runtimeDiagnostics, token).ConfigureAwait(false);
+            selection = await ResolveModelAsync(parsed, startupSnapshot, runtime, plan.HasMessages, runtimeDiagnostics, token, ContinuedSession(plan)).ConfigureAwait(false);
             if (parsed.ApiKey is { } apiKey)
             {
                 runtime = WithRuntimeApiKey(runtime, selection.Model.Provider, apiKey);
-                selection = await ResolveModelAsync(parsed, startupSnapshot, runtime, plan.HasMessages, [], token).ConfigureAwait(false);
+                selection = await ResolveModelAsync(parsed, startupSnapshot, runtime, plan.HasMessages, [], token, ContinuedSession(plan)).ConfigureAwait(false);
             }
         }
         catch (LiveSessionException) when (parsed.ApiKey is not null && parsed.Model is null && parsed.Models is null)
@@ -344,6 +344,7 @@ internal static class PiCommand
             // the `!session.model` exit in main.ts never applies: every mode starts, and the prompt preflight refuses each prompt until a
             // model is selected (interactive mode also warns with formatNoModelsAvailableMessage).
             selection = LiveSessionSelection.Unselected();
+            selection.FallbackMessage = PiSharp.Cli.Models.ModelListing.NoModelsAvailableMessage();
         }
         catch (LiveSessionException error)
         {
@@ -545,12 +546,15 @@ internal static class PiCommand
     /// <summary>Source buildSessionOptions over the registry: <c>--provider</c> requires <c>--model</c>; the CLI model, else the scoped
     /// models for a new session, else the saved default, else the first available model. Warnings join the run's diagnostics.</summary>
     private static async Task<LiveSessionSelection> ResolveModelAsync(PiArgs parsed, PiSharp.CodingAgent.Configuration.StartupSettingsSnapshot settings,
-        LiveSessionRuntime runtime, bool hasExistingSession, List<PiDiagnostic> diagnostics, CancellationToken token)
+        LiveSessionRuntime runtime, bool hasExistingSession, List<PiDiagnostic> diagnostics, CancellationToken token, string? sessionPath = null)
     {
         if (parsed.Provider is { } provider && parsed.Model is null)
             throw new LiveSessionException("ProviderRequiresModel", $"--provider requires --model (for example: --provider {provider} --model <pattern>)");
         var request = new SettingsModelSelection(parsed.Provider, parsed.Model, null)
-        { ModelPatterns = parsed.Models is { } models ? [.. models] : null, CliThinking = parsed.Thinking, UseModelMaximumTokens = true };
+        {
+            ModelPatterns = parsed.Models is { } models ? [.. models] : null, CliThinking = parsed.Thinking, UseModelMaximumTokens = true,
+            SessionBranch = sessionPath is null ? null : PiSessions.ReadBranch(sessionPath)
+        };
         using var warnings = new StringWriter();
         try { return await request.ResolveAsync(settings, runtime, warnings, hasExistingSession, token).ConfigureAwait(false); }
         finally
@@ -559,6 +563,9 @@ internal static class PiCommand
                 if (JsonNode.Parse(line)?["message"]?.GetValue<string>() is { } message) diagnostics.Add(new("warning", message));
         }
     }
+
+    /// <summary>The session file whose model sdk.ts restores: an opened session with messages (-c, --session, --resume, --fork).</summary>
+    private static string? ContinuedSession(PiSessionPlan plan) => plan.Mode == "open" && plan.HasMessages ? plan.SessionPath : null;
 
     /// <summary>Source modelRuntime.setRuntimeApiKey: the key answers for the provider's API key variables, and the stored auth.json
     /// credentials step aside so the key wins.</summary>

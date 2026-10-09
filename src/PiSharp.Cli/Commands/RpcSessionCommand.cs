@@ -233,6 +233,22 @@ public static class RpcSessionCommand
             string NextId() => "rpc-" + Guid.NewGuid().ToString("N");
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);
+            if (pi is not null)
+            {
+                // sdk.ts createAgentSession restore: a session whose branch model is not available runs on the fallback model. At startup
+                // the entry already chose it (the profile's model); a session switched to later (/resume) gets findInitialModel's pick
+                // over the current available snapshot as a continued session; with --model, that model (main.ts buildSessionOptions).
+                var restoring = profile; var cliModel = liveSelection is { FromCliModel: true } fromCli ? fromCli.Model : null;
+                restoring.RestoreFallback = (_, fallback) =>
+                {
+                    if (cliModel is not null) return cliModel;
+                    if (restoring.LiveModels is not { CurrentRegistry: { } registry } models) return fallback;
+                    var current = pi.ReloadSettings is { } reload ? reload(CancellationToken.None).GetAwaiter().GetResult() : settings;
+                    return SettingsModelSelection.ContinuingInitialModel(registry, current) is { } initial &&
+                        models.Available.FirstOrDefault(definition => definition.Model.Provider == initial.Provider && definition.Model.Id == initial.Id) is { } bound
+                        ? bound.Model : fallback;
+                };
+            }
             var lifecycle = profile.CreateLifecycle(Clock, NextId, options, catalog: catalog, backend: backend);
             // sdk.ts createAgentSession for a new session (/new, new_session): the CLI level, else the per-model or global default
             // the settings files hold now, clamped to the model.

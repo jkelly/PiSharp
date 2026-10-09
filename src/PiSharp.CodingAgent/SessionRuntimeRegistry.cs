@@ -47,6 +47,9 @@ public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int 
     /// <summary>Source <c>images.blockImages</c>, read per request so a changed setting applies mid-session: true replaces image
     /// blocks of user and tool result messages in the request (<see cref="BlockedImages"/>).</summary>
     public Func<bool>? BlockImages { get; init; }
+    /// <summary>sdk.ts createAgentSession restore: the model a restored session runs with when the model its branch selects is not
+    /// bound (no usable auth, or unknown), given that selection and the caller's fallback; null keeps the UnknownModel refusal.</summary>
+    public Func<SessionContextModel, ModelDescriptor?, ModelDescriptor?>? RestoreFallbackModel { get; init; }
 }
 public sealed record SessionRuntimeSelection(AgentConfiguration Configuration, ImmutableArray<JsonData> ActiveToolDeclarations)
 {
@@ -274,7 +277,7 @@ public sealed partial class SessionRuntimeRegistry
             catalog.Models.TryGetValue((provider, id), out var known) && known.Model.Api == SessionBranchSelection.VirtualApi) is { } selected)
         {
             if (!catalog.Models.TryGetValue((selected.Provider, selected.ModelId), out model!))
-                throw Error(SessionRuntimeRegistryFailure.UnknownModel);
+                model = Model(_options.RestoreFallbackModel?.Invoke(selected, fallbackModel) ?? throw Error(SessionRuntimeRegistryFailure.UnknownModel), catalog);
         }
         else model = Model(fallbackModel, catalog);
         return ResolveCatalog(catalog, model.Model, context.LlmMessages, context.ThinkingLevel, cancellationToken, initialActiveToolNames: initialActiveToolNames);
@@ -304,7 +307,7 @@ public sealed partial class SessionRuntimeRegistry
             catalog.Models.TryGetValue((provider, id), out var known) && known.Model.Api == SessionBranchSelection.VirtualApi) is { } selected)
         {
             if (!catalog.Models.TryGetValue((selected.Provider, selected.ModelId), out model!))
-                throw Error(SessionRuntimeRegistryFailure.UnknownModel);
+                model = Model(_options.RestoreFallbackModel?.Invoke(selected, fallbackModel) ?? throw Error(SessionRuntimeRegistryFailure.UnknownModel), catalog);
         }
         else model = Model(fallbackModel, catalog);
         var restore = new RestoreLog();
