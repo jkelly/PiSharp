@@ -66,8 +66,8 @@ internal static partial class Program
         Check(RecordedLoadouts(fixture.Root).Any(names => names.Contains("mcp__docs__search")), "the loadout is recorded");
     });
 
-    // A catalog the run took after its last request is recorded when the run settles, so the idle session's transcript and registry
-    // agree and the next prompt declares the tools from its first request.
+    // A catalog the run took after its last request stays in memory when the run settles (_refreshToolRegistry), and the next prompt
+    // records it (declareToolChanges) and declares the tools from its first request.
     private static Task LateServerAfterTheLastRequestIsRecordedAtSettlement() => WithRoot("mid-run-settled", DirectDocs, async fixture =>
     {
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -81,8 +81,9 @@ internal static partial class Program
         await using (var rpc = new Rpc(Args(fixture.Root, "new-lazy"), provider, fixture.Host(startupWait: TimeSpan.FromMilliseconds(200))))
         {
             await rpc.Prompt("p1", "hello");
-            Check(OpenLoadouts(fixture.Root).Last().Contains("mcp__docs__search"), "recorded when the run settled");
+            Check(!OpenLoadouts(fixture.Root).Any(names => names.Contains("mcp__docs__search")), "the run's catalog was written when it settled");
             await rpc.Prompt("p2", "again");
+            Names(["mcp__docs__search"], OpenLoadouts(fixture.Root).Last(), "recorded by the next prompt");
             Equal(0, await rpc.Finish(), "exit code; " + rpc.Error);
         }
         var requests = provider.Snapshot();

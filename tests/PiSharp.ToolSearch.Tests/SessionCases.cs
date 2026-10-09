@@ -99,7 +99,8 @@ internal static partial class Program
             Names(["read", ToolSearch.Name, "mcp__docs__search"], session.GetActiveTools(), "selection after the search");
             Equal(recorded, RecordedAdditions(session).Length, "recorded before the next request");
             await Prompt(session, "next");
-            Names(["mcp__docs__search"], RecordedAdditions(session)[^1], "the loaded tool recorded with the next request");
+            // The selection and the loaded tool apply in memory; the next request declares them together (declareToolChanges).
+            Names(["read", ToolSearch.Name, "mcp__docs__search"], RecordedAdditions(session)[^1], "recorded with the next request");
             // Active tools, direct tools and hidden tools are not searched; the rest of the deferred tools still are.
             Names(["mcp__docs__fetch"], McpToolSearch.SearchAndLoad(session, "search documentation", 8, CancellationToken.None).Select(tool => tool.Name),
                 "only inactive deferred tools");

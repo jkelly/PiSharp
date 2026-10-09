@@ -492,20 +492,11 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             // Source setThinkingLevel: a change of the session's level (which tree navigation may have kept over the branch's).
             if (update.ThinkingLevel is { } level && level != effectiveThinking)
                 Add("thinking_level_change", writer => writer.WriteString("thinkingLevel", level));
-            // Source declareToolChanges: the selection is recorded as its difference from the tools the transcript declares.
+            // Source setActiveToolsByName: a selection applies in memory, and the next request records its difference from the declared
+            // tools (declareToolChanges) with the prompt sections it changes. setModel/setThinkingLevel write only their own entries.
             var selectedTools = update.ActiveToolNames is { } activeNames ? _registry!.NormalizeActiveTools(activeNames, work) : (ImmutableArray<string>?)null;
-            var activation = selectedTools is { } selectedNames ? _registry!.CreateToolChangeMessage(context.LlmMessages, selectedNames, _clock(), work) : null;
             var currentNames = _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
-            var systemUpdate = update.ActiveToolNames is not null ? activation : update.SystemMessage;
-            SessionPromptSectionPreparation? promptPreparation = null;
-            if (update.SystemMessage is null)
-            {
-                var names = update.ActiveToolNames ?? _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
-                _activationPreparation.Value = true;
-                try { (systemUpdate, promptPreparation) = _registry!.PreparePromptSectionMessage(names, context.Messages, systemUpdate, _clock(), work); }
-                finally { _activationPreparation.Value = false; }
-            }
-            if (systemUpdate is { } system)
+            if (update.SystemMessage is { } system)
             {
                 if (system.Role != "system" || system.WireBody is null)
                     throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -515,20 +506,18 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 });
             }
             var prospective = _projector.Project(log.Entries.AddRange(entries), parent, work);
-            bool unrecorded; lock (_gate) unrecorded = _unrecordedLoadout;
-            // A selection that only reorders the tools (or matches the recorded loadout) writes nothing but still becomes the loadout.
-            if (entries.Count == 0 && (selectedTools is null || selectedTools.Value.SequenceEqual(currentNames, StringComparer.Ordinal) && !unrecorded))
+            if (entries.Count == 0 && (selectedTools is null || selectedTools.Value.SequenceEqual(currentNames, StringComparer.Ordinal)))
             {
-                promptPreparation?.ValidateSource();
                 work.ThrowIfCancellationRequested();
                 if (update.ActiveToolNames is not null) lock (_gate)
                 { work.ThrowIfCancellationRequested(); if (_pendingActivation is not null) PrepareActivationRestoration(_configuration)(); }
                 return Snapshot with { IsConfiguring = false };
             }
-            // A selection records the whole loadout (the recorded names removed); otherwise a restored loadout that awaits its record
-            // stays the agent's loadout, and the record the next request writes precedes this update.
-            var resolved = selectedTools is not null ? prospective : prospective with { LlmMessages = WithUnrecordedLoadout(prospective.LlmMessages,
-                currentNames, work, context.LlmMessages.Length) };
+            // The loadout the next request records precedes this update's entries in every resolution.
+            var resolved = prospective with { LlmMessages = selectedTools is { } selectedNames
+                ? WithLoadoutRecord(_registry!, prospective.LlmMessages, selectedNames, work, context.LlmMessages.Length)
+                : WithUnrecordedLoadout(prospective.LlmMessages, currentNames, work, context.LlmMessages.Length) };
+            var unrecordedAfter = selectedTools is { } loadout ? _registry!.CreateToolChangeMessage(context.LlmMessages, loadout, 0, work) is not null : (bool?)null;
             var targetThinking = update.ThinkingLevel ?? effectiveThinking;
             var selection = await PrepareAndDrainLoadoutAsync(() => _registry!.Resolve(resolved, update.Model ?? _configuration.Model, work,
                 thinkingLevel: resolved.ThinkingLevel != targetThinking ? targetThinking : null, activeOrder: selectedTools ?? currentNames), work).ConfigureAwait(false);
@@ -542,7 +531,6 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             work.ThrowIfCancellationRequested();
             Action restoreActivation;
             lock (_gate) restoreActivation = PrepareActivationRestoration(selection.Configuration);
-            promptPreparation?.ValidateSource();
             work.ThrowIfCancellationRequested();
             lock (_gate)
                 if (!ReferenceEquals(_context, context) || !ReferenceEquals(_acknowledgedLog, log) || !ReferenceEquals(_active, idle) ||
@@ -562,8 +550,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 _configuration = selection.Configuration;
                 if (acknowledged is not null) { _acknowledgedLog = acknowledged.Snapshot; _context = prospective; }
                 _toleratedThinking = prospective.ThinkingLevel != selection.Configuration.ThinkingLevel ? prospective.ThinkingLevel : null;
-                _acknowledgedPromptRevision = promptPreparation?.Revision ?? _acknowledgedPromptRevision;
-                if (selectedTools is not null) _unrecordedLoadout = false;
+                if (unrecordedAfter is { } unrecordedLoadout) _unrecordedLoadout = unrecordedLoadout;
                 restoreActivation();
             }
             // Source setModel/setThinkingLevel: thinking_level_changed (and thinking_level_select) when the level changed,

@@ -51,6 +51,7 @@ internal static partial class Program
             ("tree.navigation-without-system-message-keeps-current-tools", NavigationWithoutSystemMessageKeepsTools),
             ("open.restored-loadout-recorded-at-the-first-prompt", OpenRecordsRestoredLoadoutAtFirstPrompt),
             ("loadout.tool-change-records-match-declare-tool-changes", Sync(ToolChangeRecords)),
+            ("selection.idle-selection-and-catalog-recorded-at-the-next-prompt", IdleSelectionAndCatalogRecordedAtNextPrompt),
             ("prompt.hidden-tools-byte-exact-sections", Sync(HiddenPrompt)),
             ("prompt.skills-hint-reader-fallback-and-indirect", Sync(SkillsHint)),
             ("prompt.unhidden-docs-line-and-options", Sync(DocsAndOptions)),

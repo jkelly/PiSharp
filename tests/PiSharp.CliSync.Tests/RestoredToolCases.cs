@@ -42,8 +42,15 @@ internal static partial class Program
     private static async Task<string> RecordedSession(ImmutableArray<SessionRegisteredTool> tools, params ImmutableArray<string>[] selections)
     {
         var (session, directory) = await PendingSession(tools);
-        await using (session) foreach (var selection in selections) await session.SetActiveToolsAsync(selection);
+        await using (session) foreach (var selection in selections) await Recorded(session, selection);
         return Path.Combine(directory, "session.jsonl");
+    }
+
+    /// <summary>setActiveToolsByName applies in memory; the next prompt records the selection (declareToolChanges).</summary>
+    private static async Task Recorded(PersistentAgentSession session, ImmutableArray<string> names)
+    {
+        await session.SetActiveToolsAsync(names);
+        await session.PromptAsync(SettledUser("record " + string.Join(",", names))); await session.WaitForIdleAsync();
     }
 
     private static async Task OpenRestoresPendingTools()
@@ -119,12 +126,16 @@ internal static partial class Program
             Check(FileBytes(path).SequenceEqual(before), "opening the session wrote to its file");
             await reopened.SetActiveToolsAsync(["read"]);
             Check(reopened.PendingToolNames.IsEmpty, "deactivating selection kept restored pending tools");
-            // The selection's record removes the deactivated tools, the unregistered docs tool included.
-            var selection = reopened.Snapshot.Log.Entries[^1].WireBody.Value.GetProperty("message");
-            Names(["grep", DocsTool], SystemTools(selection, "toolsRemoved"), "selection removes the deactivated names");
-            Names([], SystemTools(selection, "toolsAdded"), "selection adds nothing");
             await ConnectDocs(owner, Tool(DocsTool, ToolExposure.Deferred));
             Names(["read"], owner.Current.Session.GetActiveTools(), "dropped pending tool or turned-off grep came back");
+            // setActiveToolsByName and the registration apply in memory: the next prompt records the deactivated tools' removal,
+            // the unregistered docs tool included.
+            Check(FileBytes(path).SequenceEqual(before), "the selection or the registration wrote to the session file");
+            var count = reopened.Snapshot.Log.Entries.Length; var leaf = reopened.Snapshot.Context.LeafId;
+            await reopened.PromptAsync(SettledUser("go")); await reopened.WaitForIdleAsync();
+            var selection = RecordedAtPrompt(reopened, count, leaf);
+            Names(["grep", DocsTool], SystemTools(selection, "toolsRemoved"), "the prompt removes the deactivated names");
+            Names([], SystemTools(selection, "toolsAdded"), "the prompt adds nothing");
         }
         finally { Directory.Delete(Path.GetDirectoryName(path)!, recursive: true); }
     }
@@ -134,8 +145,8 @@ internal static partial class Program
         var (session, directory) = await PendingSession([Tool("read"), Tool(DocsTool, ToolExposure.Deferred)]);
         try
         {
-            await session.SetActiveToolsAsync(["read", DocsTool]); var withDocs = session.Snapshot.Context.LeafId!;
-            await session.SetActiveToolsAsync(["read"]); var withoutDocs = session.Snapshot.Context.LeafId!;
+            await Recorded(session, ["read", DocsTool]); var withDocs = session.Snapshot.Context.LeafId!;
+            await Recorded(session, ["read"]); var withoutDocs = session.Snapshot.Context.LeafId!;
             // The docs server disconnects: its tool leaves the catalog.
             await Publish(session, [Tool("read")], restoring: false);
             await using var owner = new ReplaceableAgentSession(session, (_, _) => throw new InvalidOperationException("No replacement expected."));
@@ -207,8 +218,8 @@ internal static partial class Program
         var (session, directory) = await PendingSession([Tool("read"), Tool(DocsTool)]);
         try
         {
-            await session.SetActiveToolsAsync(["read", DocsTool]); var withDocs = session.Snapshot.Context.LeafId!;
-            await session.SetActiveToolsAsync(["read"]);
+            await Recorded(session, ["read", DocsTool]); var withDocs = session.Snapshot.Context.LeafId!;
+            await Recorded(session, ["read"]);
             await Publish(session, [Tool("read"), Changed(DocsTool)], restoring: false);
             await using var owner = new ReplaceableAgentSession(session, (_, _) => throw new InvalidOperationException("No replacement expected."));
             var count = session.Snapshot.Log.Entries.Length;
@@ -245,8 +256,8 @@ internal static partial class Program
         var (session, directory) = await PendingSession([Tool("read"), Tool(DocsTool)]);
         try
         {
-            await session.SetActiveToolsAsync(["read", DocsTool]); var withDocs = session.Snapshot.Context.LeafId!;
-            await session.SetActiveToolsAsync(["read"]);
+            await Recorded(session, ["read", DocsTool]); var withDocs = session.Snapshot.Context.LeafId!;
+            await Recorded(session, ["read"]);
             await Publish(session, [Tool("read"), Tool(DocsTool, ToolExposure.Hidden)], restoring: false);
             await using var owner = new ReplaceableAgentSession(session, (_, _) => throw new InvalidOperationException("No replacement expected."));
             var count = session.Snapshot.Log.Entries.Length;
@@ -306,7 +317,9 @@ internal static partial class Program
             Names(["read", "grep"], reopened.GetToolActivationSelection().Names, "activation selection");
             Equal(reopened.GetToolActivationSelection().Revision, reopened.ScheduleToolActivation(["read", "grep"]).Revision, "an unchanged selection changed the activation");
             var leaf = reopened.Snapshot.Context.LeafId!;
-            var earlier = reopened.Snapshot.Context.Ancestry[^1].ParentId!;
+            // The leaf of the first selection's exchange, before the second selection's record.
+            var earlier = reopened.Snapshot.Context.Ancestry.Last(entry => entry.WireBody.Value.TryGetProperty("message", out var message) &&
+                message.GetProperty("role").GetString() == "system").ParentId!;
             await NavigateTo(owner, earlier);
             Names(["read"], reopened.GetActiveTools(), "the earlier branch's loadout");
             await NavigateTo(owner, leaf);
@@ -398,6 +411,40 @@ internal static partial class Program
         Equal("{\"role\":\"system\",\"content\":\"\",\"sections\":{\"tools\":\"read\"},\"timestamp\":9}", sectionsOnly!.WireBody.Value.GetRawText(), "sections record");
     }
 
+    // agent-session.ts setActiveToolsByName and _refreshToolRegistry apply at idle in memory; the next prompt records the
+    // difference (captured with the installed Pi: a selection writes nothing, a reorder records no tool change).
+    private static async Task IdleSelectionAndCatalogRecordedAtNextPrompt()
+    {
+        var (session, directory) = await PendingSession([Tool("read"), Tool("grep"), Tool("ls")]);
+        var path = Path.Combine(directory, "session.jsonl");
+        try
+        {
+            await Recorded(session, ["read", "grep"]);
+            var before = FileBytes(path);
+            await session.SetActiveToolsAsync(["grep", "read"]);
+            Names(["grep", "read"], session.GetActiveTools(), "the selection's order");
+            Names(["grep", "read"], session.Snapshot.Agent.Tools.Select(tool => tool.Name), "the agent runs the selection");
+            Check(FileBytes(path).SequenceEqual(before), "an idle selection wrote to the session file");
+            var count = session.Snapshot.Log.Entries.Length;
+            await session.PromptAsync(SettledUser("reordered")); await session.WaitForIdleAsync();
+            Check(session.Snapshot.Log.Entries.Skip(count).All(entry => !entry.WireBody.Value.TryGetProperty("message", out var message) ||
+                message.GetProperty("role").GetString() != "system"), "a reorder recorded a tool change");
+            Names(["grep", "read"], session.GetActiveTools(), "the prompt kept the selection's order");
+
+            before = FileBytes(path);
+            await session.SetActiveToolsAsync(["ls"]);
+            await Publish(session, [Tool("read"), Changed("grep"), Tool("ls")], restoring: false);
+            Names(["ls"], session.GetActiveTools(), "the catalog change keeps the selection");
+            Check(FileBytes(path).SequenceEqual(before), "an idle selection or catalog publication wrote to the session file");
+            count = session.Snapshot.Log.Entries.Length; var leaf = session.Snapshot.Context.LeafId;
+            await session.PromptAsync(SettledUser("go")); await session.WaitForIdleAsync();
+            var record = RecordedAtPrompt(session, count, leaf);
+            Names(["ls"], SystemTools(record, "toolsAdded"), "the next prompt declares the selected tool");
+            Names(["read", "grep"], SystemTools(record, "toolsRemoved"), "and removes the deselected ones in recorded order");
+        }
+        finally { await session.DisposeAsync(); Directory.Delete(directory, recursive: true); }
+    }
+
     private static async Task NavigationWithoutSystemMessageKeepsTools()
     {
         var (session, directory) = await PendingSession([Tool("read"), Tool("grep"), Tool(DocsTool)]);
@@ -406,8 +453,8 @@ internal static partial class Program
             // Session creation records the model and thinking level but no system message.
             var start = session.Snapshot.Context.LeafId!;
             Check(!session.Snapshot.Context.LlmMessages.Any(message => message.Role == "system"), "fixture start declares a system message");
-            await session.SetActiveToolsAsync(["read", "grep", DocsTool]); var withDocs = session.Snapshot.Context.LeafId!;
-            await session.SetActiveToolsAsync(["read", "grep"]);
+            await Recorded(session, ["read", "grep", DocsTool]); var withDocs = session.Snapshot.Context.LeafId!;
+            await Recorded(session, ["read", "grep"]);
             await Publish(session, [Tool("read"), Tool("grep")], restoring: false);
             await using var owner = new ReplaceableAgentSession(session, (_, _) => throw new InvalidOperationException("No replacement expected."));
             await NavigateTo(owner, withDocs);
