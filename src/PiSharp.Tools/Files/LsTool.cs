@@ -65,6 +65,8 @@ public sealed class LsTool
         {
             token.ThrowIfCancellationRequested();
             var input = owner.Parse(invocation.Call.Arguments);
+            // Source ls.ts: existsSync(path with a NUL byte) is false.
+            if (input.Path.Contains('\0')) throw new ToolSourceErrorException("Path not found: " + owner._paths.ResolveWithNul(input.Path));
             var target = owner._paths.Absolute(await owner._operations.CanonicalizeAsync(owner._paths.Resolve(input.Path), token).ConfigureAwait(false));
             return new(Name, Name, PreparedToolActionKind.Path, target,
                 JsonData.Parse(JsonSerializer.Serialize(new { path = target, limit = input.Limit })), [],

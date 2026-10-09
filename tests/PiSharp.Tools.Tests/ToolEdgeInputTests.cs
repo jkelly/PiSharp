@@ -1,9 +1,11 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/tools/read.ts, write.ts, edit.ts, ls.ts and bash.ts.
 // Inputs upstream's validateToolArguments admits reach the tool's execute; the expected texts were captured by running the installed
 // Pi 1.1.0 tools with node (validateToolArguments, then execute) on the same files.
+using System.Collections.Immutable;
 using PiSharp.Agent;
 using PiSharp.Contracts;
 using PiSharp.Tools.Files;
+using PiSharp.Tools.Processes;
 
 internal static class ToolEdgeInputTests
 {
@@ -12,6 +14,7 @@ internal static class ToolEdgeInputTests
         ("edge read offset and limit follow the source number arithmetic", ReadNumbers),
         ("edge empty paths reach the file system as the source tools do", EmptyPaths),
         ("edge pi ls limits follow the source number arithmetic", LsNumbers),
+        ("edge NUL bytes give Node's argument errors", NulBytes),
     ];
 
     private static async Task ReadNumbers()
@@ -65,6 +68,55 @@ internal static class ToolEdgeInputTests
             ("""{"path":".","limit":2.5}""", "dir/\ne.txt\nlines.txt"),
         })
             Equal(expected, Text(await invoker.ExecuteAsync(Invocation("ls", input), default)), input);
+    }
+
+    private static async Task NulBytes()
+    {
+        using var temp = new Temp();
+        // util.inspect doubles each backslash of the absolute path.
+        var cwd = temp.Root.Replace("\\", "\\\\"); var sep = Path.DirectorySeparatorChar == '\\' ? "\\\\" : "/";
+        const string PathError = "The argument 'path' must be a string, Uint8Array, or URL without null bytes. Received ";
+        var files = new ReadWriteTools(temp.Root, temp.Root).CreateInvoker(new Allow());
+        foreach (var (tool, input, expected) in new[]
+        {
+            ("read", """{"path":"a\u0000b"}""", PathError + "'" + cwd + sep + "a\\x00b'"),
+            ("read", """{"path":"x/y\u0000z'q\n\t\u0001\u00e9\u007f\u0085\u2028\ud83d\ude00\""}""",
+                PathError + "`" + cwd + sep + "x" + sep + "y\\x00z'q\\n\\t\\x01\u00e9\\x7F\\x85\u2028\ud83d\ude00\"`"),
+            ("read", """{"path":"it's\u0000"}""", PathError + "\"" + cwd + sep + "it's\\x00\""),
+            ("write", """{"path":"a\u0000b","content":"x"}""", PathError + "'" + cwd + sep + "a\\x00b'"),
+            ("read", "{\"path\":\"" + new string('p', 200) + "\\u0000\"}", (PathError + "'" + cwd + sep + new string('p', 200))[..(PathError.Length + 128)] + "..."),
+        })
+        {
+            var result = await files.ExecuteAsync(Invocation(tool, input), default);
+            Equal(expected, Text(result), tool + " " + input); Equal(true, result.IsError, input + " isError");
+        }
+        var edit = new EditTool(temp.Root, temp.Root, new((path, _) => ValueTask.FromResult(path)));
+        Equal(PathError + "'" + cwd + sep + "a\\x00b'", Text(await edit.CreateInvoker(new Allow()).ExecuteAsync(
+            Invocation("edit", """{"path":"a\u0000b","edits":[{"oldText":"a","newText":"b"}]}"""), default)), "edit");
+        // existsSync is false for a NUL path: ls and grep report it as not found, with the raw NUL.
+        Equal("Path not found: " + Path.Join(temp.Root, "a\0b"), Text(await new LsTool(temp.Root, temp.Root, pi: true).CreateInvoker(new Allow())
+            .ExecuteAsync(Invocation("ls", """{"path":"a\u0000b"}"""), default)), "ls");
+        var grep = new ToolInvoker([new PiGrepTool(temp.Root, temp.Root, _ => ValueTask.FromResult<string?>("rg"))], new Allow());
+        Equal("Path not found: " + Path.Join(temp.Root, "a\0b"), Text(await grep.ExecuteAsync(Invocation("grep", """{"pattern":"x","path":"a\u0000b"}"""), default)), "grep path");
+        Equal("The argument 'args[5]' must be a string without null bytes. Received 'a\\x00b'",
+            Text(await grep.ExecuteAsync(Invocation("grep", """{"pattern":"a\u0000b"}"""), default)), "grep pattern");
+        var find = new ToolInvoker([new PiFindTool(temp.Root, temp.Root, _ => ValueTask.FromResult<string?>("fd"))], new Allow());
+        Equal("The argument 'args[7]' must be a string without null bytes. Received 'a\\x00b'",
+            Text(await find.ExecuteAsync(Invocation("find", """{"pattern":"a\u0000b"}"""), default)), "find pattern");
+        Equal("The argument 'args[8]' must be a string without null bytes. Received '" + cwd + sep + "a\\x00b'",
+            Text(await find.ExecuteAsync(Invocation("find", """{"pattern":"*","path":"a\u0000b"}"""), default)), "find path");
+        var bash = new ToolInvoker([new BashTool(new NoRunner(), new BashToolOptions(Environment.ProcessPath!, temp.Root,
+            ImmutableDictionary<string, string>.Empty, temp.Root))], new Allow());
+        Equal("The argument 'args[1]' must be a string without null bytes. Received 'echo a\\x00b'",
+            Text(await bash.ExecuteAsync(Invocation("bash", """{"command":"echo a\u0000b"}"""), default)), "bash");
+        Equal("The argument 'args[1]' must be a string without null bytes. Received \"echo 'q\\\\ \\x00\\n\\t\\x01\u00e9\"",
+            Text(await bash.ExecuteAsync(Invocation("bash", """{"command":"echo 'q\\ \u0000\n\t\u0001\u00e9"}"""), default)), "bash escapes");
+    }
+
+    private sealed class NoRunner : IProcessRunner
+    {
+        public ValueTask<ProcessRunResult> RunAsync(ProcessRequest request, ProcessOutputCallback? onUpdate = null, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("The tool ran.");
     }
 
     private static ToolInvocation Invocation(string name, string arguments)

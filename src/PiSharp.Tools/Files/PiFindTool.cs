@@ -46,6 +46,9 @@ public sealed class PiFindTool : IToolArgumentSchemaAdapter
     {
         token.ThrowIfCancellationRequested();
         var input = Parse(invocation.Call.Arguments);
+        // Source find.ts passes the path to spawn(fd, args), which rejects an argument with a NUL byte.
+        if (input.Path.Contains('\0'))
+            throw new ToolSourceErrorException(NodeArgumentErrors.SpawnArguments(Arguments(input, _paths.ResolveWithNul(input.Path)))!);
         var target = _paths.Resolve(input.Path.Length == 0 ? "." : input.Path);
         return ValueTask.FromResult(new PreparedToolAction(Name, Name, PreparedToolActionKind.Path, target,
             JsonData.Parse(JsonSerializer.Serialize(new { pattern = input.Pattern, path = target, limit = input.Limit })), [],
@@ -77,29 +80,9 @@ public sealed class PiFindTool : IToolArgumentSchemaAdapter
     {
         var effectiveLimit = input.Limit ?? DefaultLimit;
         var fd = await _fd(token).ConfigureAwait(false) ?? throw new PiSearchException("fd is not available and could not be downloaded");
-        var args = new List<string> { "--glob", "--color=never", "--hidden" };
-        // fd normally ignores .gitignore outside git repos, so keep --no-require-git there; inside repos use fd's git-aware default.
-        var insideGitRepo = false;
-        for (var current = searchPath; ;)
-        {
-            if (Path.Exists(Path.Join(current, ".git"))) { insideGitRepo = true; break; }
-            var parent = Path.GetDirectoryName(current);
-            if (string.IsNullOrEmpty(parent) || parent == current) break;
-            current = parent;
-        }
-        if (!insideGitRepo) args.Add("--no-require-git");
-        args.Add("--max-results"); args.Add(PiGrepTool.JsNumber(effectiveLimit));
-        // fd --glob matches the basename unless --full-path is set; a path-containing pattern needs a leading '**/'.
-        var effectivePattern = input.Pattern;
-        if (input.Pattern.Contains('/'))
-        {
-            args.Add("--full-path");
-            if (!input.Pattern.StartsWith('/') && !input.Pattern.StartsWith("**/", StringComparison.Ordinal) && input.Pattern != "**")
-                effectivePattern = "**/" + input.Pattern;
-            // fd matches full paths using native separators on Windows.
-            if (OperatingSystem.IsWindows()) effectivePattern = effectivePattern.Replace("/", @"[/\\]", StringComparison.Ordinal);
-        }
-        args.Add("--"); args.Add(effectivePattern); args.Add(searchPath);
+        var args = Arguments(input, searchPath);
+        // Source spawn(fd, args): Node rejects an argument with a NUL byte.
+        if (NodeArgumentErrors.SpawnArguments(args) is { } spawnError) throw new PiSearchException(spawnError);
         var lines = new List<string>();
         PiSearchProcess.Outcome outcome;
         try { outcome = await PiSearchProcess.RunAsync(fd, args, _paths.WorkingDirectory, _environment, line => { lines.Add(line); return false; }, token).ConfigureAwait(false); }
@@ -123,6 +106,36 @@ public sealed class PiFindTool : IToolArgumentSchemaAdapter
         }
         if (truncation.Truncated) { notices.Add("50.0KB limit reached"); details["truncation"] = PiGrepTool.TruncationDetails(truncation); }
         return PiGrepTool.Result(truncation.Content + (notices.Count == 0 ? "" : "\n\n[" + string.Join(". ", notices) + "]"), details.Count == 0 ? null : details);
+    }
+
+    /// <summary>find.ts's fd arguments for this input and search path.</summary>
+    private static List<string> Arguments(Input input, string searchPath)
+    {
+        var effectiveLimit = input.Limit ?? DefaultLimit;
+        var args = new List<string> { "--glob", "--color=never", "--hidden" };
+        // fd normally ignores .gitignore outside git repos, so keep --no-require-git there; inside repos use fd's git-aware default.
+        var insideGitRepo = false;
+        for (var current = searchPath; ;)
+        {
+            if (Path.Exists(Path.Join(current, ".git"))) { insideGitRepo = true; break; }
+            var parent = Path.GetDirectoryName(current);
+            if (string.IsNullOrEmpty(parent) || parent == current) break;
+            current = parent;
+        }
+        if (!insideGitRepo) args.Add("--no-require-git");
+        args.Add("--max-results"); args.Add(PiGrepTool.JsNumber(effectiveLimit));
+        // fd --glob matches the basename unless --full-path is set; a path-containing pattern needs a leading '**/'.
+        var effectivePattern = input.Pattern;
+        if (input.Pattern.Contains('/'))
+        {
+            args.Add("--full-path");
+            if (!input.Pattern.StartsWith('/') && !input.Pattern.StartsWith("**/", StringComparison.Ordinal) && input.Pattern != "**")
+                effectivePattern = "**/" + input.Pattern;
+            // fd matches full paths using native separators on Windows.
+            if (OperatingSystem.IsWindows()) effectivePattern = effectivePattern.Replace("/", @"[/\\]", StringComparison.Ordinal);
+        }
+        args.Add("--"); args.Add(effectivePattern); args.Add(searchPath);
+        return args;
     }
 
     /// <summary>find.ts relativizeFindResultPath.</summary>

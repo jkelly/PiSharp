@@ -105,6 +105,8 @@ public sealed class EditTool : IToolArgumentSchemaAdapter, IInitialToolArgumentP
     public async ValueTask<PreparedToolAction> PrepareAsync(ToolInvocation invocation, CancellationToken token)
     {
         token.ThrowIfCancellationRequested(); var input = Parse(invocation.Call.Arguments, normalized: false);
+        // Source ops.access(path): Node rejects a path with a NUL byte.
+        if (input.Path.Contains('\0')) throw new ToolSourceErrorException(NodeArgumentErrors.NullBytePath(_paths.ResolveWithNul(input.Path)));
         var target = _paths.Absolute(await _operations.CanonicalizeAsync(_paths.Resolve(input.Path), token).ConfigureAwait(false));
         token.ThrowIfCancellationRequested();
         var arguments = JsonData.Parse(JsonSerializer.Serialize(new { path = target, displayPath = input.Path,

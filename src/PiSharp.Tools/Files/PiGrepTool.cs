@@ -58,6 +58,8 @@ public sealed class PiGrepTool : IToolArgumentSchemaAdapter
     {
         token.ThrowIfCancellationRequested();
         var input = Parse(invocation.Call.Arguments);
+        // Source grep.ts: existsSync(path with a NUL byte) is false.
+        if (input.Path.Contains('\0')) throw new ToolSourceErrorException("Path not found: " + _paths.ResolveWithNul(input.Path));
         var target = _paths.Resolve(input.Path.Length == 0 ? "." : input.Path);
         return ValueTask.FromResult(new PreparedToolAction(Name, Name, PreparedToolActionKind.Path, target, Arguments(input, target), [],
             _paths.WorkingDirectory, ImmutableDictionary<string, string>.Empty));
@@ -129,6 +131,8 @@ public sealed class PiGrepTool : IToolArgumentSchemaAdapter
         if (input.Literal) args.Add("--fixed-strings");
         if (!string.IsNullOrEmpty(input.Glob)) { args.Add("--glob"); args.Add(input.Glob); }
         args.Add("--"); args.Add(input.Pattern); args.Add(searchPath);
+        // Source spawn(rg, args): Node rejects an argument with a NUL byte.
+        if (NodeArgumentErrors.SpawnArguments(args) is { } spawnError) throw new PiSearchException(spawnError);
         var matches = new List<(string FilePath, double LineNumber, string? LineText)>();
         var matchCount = 0; var matchLimitReached = false;
         PiSearchProcess.Outcome outcome;

@@ -25,10 +25,12 @@ internal static class BashToolTests
         foreach (var raw in new[]
         {
             """{"command":"echo","timeout":1e999}""",
-            """{"command":"\ud800"}""", """{"command":"x\u0000y"}""", """{"command":[]}""",
+            """{"command":"\ud800"}""", """{"command":[]}""",
             JsonSerializer.Serialize(new { command = new string('x', 96_001) })
         })
             Failed(await invoker.ExecuteAsync(Invocation(JsonData.Parse(raw)), default), ToolFailureKind.InvalidArguments);
+        // Source spawn rejects a NUL byte with Node's error (ToolEdgeInputTests); no action reaches the policy.
+        Failed(await invoker.ExecuteAsync(Invocation(JsonData.Parse("""{"command":"x\u0000y"}""")), default), ToolFailureKind.ExecutionError);
         using (var permissive = JsonDocument.Parse("""{"command":"echo",/* forbidden retained syntax */}""",
             new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip }))
             Failed(await invoker.ExecuteAsync(Invocation(JsonData.FromElement(permissive.RootElement)), default), ToolFailureKind.InvalidArguments);

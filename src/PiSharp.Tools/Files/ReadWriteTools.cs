@@ -111,6 +111,13 @@ public sealed class ReadWriteTools
         {
             token.ThrowIfCancellationRequested();
             var input = owner.Parse(invocation.Call.Arguments, name, normalized: false);
+            if (input.Path.Contains('\0'))
+            {
+                // Source read access / write mkdir(dirname) and writeFile: Node rejects the first path with a NUL byte.
+                var absolute = owner._paths.ResolveWithNul(input.Path);
+                if (name == "write" && Path.GetDirectoryName(absolute) is { } directory && directory.Contains('\0')) absolute = directory;
+                throw new ToolSourceErrorException(NodeArgumentErrors.NullBytePath(absolute));
+            }
             var lexical = name == "read" ? await owner._paths.ResolveReadAsync(input.Path, token).ConfigureAwait(false) : owner._paths.Resolve(input.Path);
             var target = owner._paths.Absolute(await owner._operations.CanonicalizeAsync(lexical, token).ConfigureAwait(false));
             token.ThrowIfCancellationRequested();
@@ -162,7 +169,7 @@ public sealed class ReadWriteTools
             if (normalized && !allowed.Contains(property.Name, StringComparer.Ordinal) && property.Name != "displayPath")
                 throw new ArgumentException("Unsupported file argument.");
         // Source resolveToCwd("") is the working directory; the file system reports what it does with it.
-        var path = String(value, "path", empty: !normalized);
+        var path = String(value, "path", empty: !normalized, allowNulData: !normalized);
         if (path.Length > _options.MaximumPathCharacters) throw new ArgumentException("Oversized file path.");
         var display = normalized ? String(value, "displayPath", empty: true) : path;
         if (display.Length > _options.MaximumPathCharacters) throw new ArgumentException("Oversized display path.");

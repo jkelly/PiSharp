@@ -34,6 +34,10 @@ public interface IInvocationPreparedToolAdapter : IPreparedToolAdapter
 /// message. Initial argument preparation raises it; any other preparation failure keeps the generic invalid-arguments result.</summary>
 public sealed class ToolArgumentPreparationException(string message, Exception? innerException = null) : Exception(message, innerException);
 
+/// <summary>The error the source tool's execute throws for this input before it has any effect (for example Node rejecting a path with a
+/// NUL byte), found while preparing the action. The invoker returns it as the error result without authorizing or executing anything.</summary>
+public sealed class ToolSourceErrorException(string message) : Exception(message);
+
 /// <summary>Trusted, initial-only argument preparation. Hook replacements never invoke this capability.</summary>
 public interface IInitialToolArgumentPreparationAdapter : IPreparedToolAdapter
 {
@@ -349,7 +353,10 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                         { Content = initialView.AssistantMessage.Content.SetItem(invocation.SourceIndex, call) }, Call = call };
                 }
             }
-            var action = await tool.PrepareAsync(initialView, cancellationToken).ConfigureAwait(false);
+            PreparedToolAction action;
+            try { action = await tool.PrepareAsync(initialView, cancellationToken).ConfigureAwait(false); }
+            catch (ToolSourceErrorException error) when (!cancellationToken.IsCancellationRequested)
+            { return CompleteResult(ToolResult.Error(ToolFailureKind.ExecutionError, error.Message)); }
             cancellationToken.ThrowIfCancellationRequested();
             if (!ValidAction(action, invocation.Call.Name, cancellationToken))
                 return CompleteResult(Error(ToolFailureKind.InvalidArguments));
@@ -373,7 +380,9 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                     var replacedCall = invocation.Call with { Arguments = before.Arguments };
                     var replacedAssistant = assistant with { Content = assistant.Content.SetItem(invocation.SourceIndex, replacedCall) };
                     var prepareView = invocation with { AssistantMessage = replacedAssistant, Call = replacedCall };
-                    action = await tool.PrepareAsync(prepareView, cancellationToken).ConfigureAwait(false);
+                    try { action = await tool.PrepareAsync(prepareView, cancellationToken).ConfigureAwait(false); }
+                    catch (ToolSourceErrorException error) when (!cancellationToken.IsCancellationRequested)
+                    { return CompleteResult(ToolResult.Error(ToolFailureKind.ExecutionError, error.Message)); }
                     cancellationToken.ThrowIfCancellationRequested();
                     if (!ValidAction(action, invocation.Call.Name, cancellationToken)) return CompleteResult(Error(stage));
                 }

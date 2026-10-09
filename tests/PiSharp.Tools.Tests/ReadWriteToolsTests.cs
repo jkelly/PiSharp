@@ -153,7 +153,9 @@ internal static class ReadWriteToolsTests
         using var temp = new TemporaryFiles(); var operations = new Operations(); var tools = new ReadWriteTools(temp.Root, temp.Root, operations);
         foreach (var raw in new[] { "{}" })
             Failure(await tools.CreateInvoker(new Policy()).ExecuteAsync(Invocation("read", JsonData.Parse(raw)), default), ToolFailureKind.InvalidArguments);
-        foreach (var raw in new[] { "{\"path\":\"x\"}", "{\"path\":\"x\\u0000\",\"content\":\"valid\"}" })
+        // A NUL path reaches Node in the source, which rejects it (ToolEdgeInputTests); nothing is authorized or written.
+        Failure(await tools.CreateInvoker(new Policy()).ExecuteAsync(Invocation("write", JsonData.Parse("{\"path\":\"x\\u0000\",\"content\":\"valid\"}")), default), ToolFailureKind.ExecutionError);
+        foreach (var raw in new[] { "{\"path\":\"x\"}" })
             Failure(await tools.CreateInvoker(new Policy()).ExecuteAsync(Invocation("write", JsonData.Parse(raw)), default), ToolFailureKind.InvalidArguments);
         // Source validateToolArguments admits additional properties and coerces a number content to its string.
         var admitted = new ReadWriteTools(temp.Root, temp.Root, new Operations());
@@ -284,8 +286,10 @@ internal static class ReadWriteToolsTests
     {
         using var temp = new TemporaryFiles(); var operations = new Operations(); var policy = new Policy();
         var tools = new ReadWriteTools(temp.Root, temp.Root, operations);
-        Failure(await tools.CreateInvoker(policy).ExecuteAsync(Invocation("write", Arguments(new { path = "bad\0path", content = "allowed\0data" })), default), ToolFailureKind.InvalidArguments);
-        Failure(await tools.CreateInvoker(policy).ExecuteAsync(Invocation("read", Arguments(new { path = "bad\0path" })), default), ToolFailureKind.InvalidArguments);
+        // Source: Node rejects the NUL path with ERR_INVALID_ARG_VALUE before any effect; the policy sees no action.
+        var badWrite = await tools.CreateInvoker(policy).ExecuteAsync(Invocation("write", Arguments(new { path = "bad\0path", content = "allowed\0data" })), default);
+        Failure(badWrite, ToolFailureKind.ExecutionError); Check(badWrite.Content.Single().Text.StartsWith("The argument 'path' must be a string", StringComparison.Ordinal), "write NUL path text");
+        Failure(await tools.CreateInvoker(policy).ExecuteAsync(Invocation("read", Arguments(new { path = "bad\0path" })), default), ToolFailureKind.ExecutionError);
         var original = Invocation("write", Arguments(new { path = "untouched.txt", content = "allowed\0data" }));
         var originalRaw = original.Call.Arguments.ToString();
         var pathNul = tools.CreateInvoker(policy, [(_, action, _) =>

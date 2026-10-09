@@ -82,6 +82,10 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             _options.ExposeSessionEnvironment ? _options.SessionEnvironment?.Invoke() : null);
         var context = new BashSpawnContext(Resolve(input.Command), _options.WorkingDirectory, environment);
         if (_options.SpawnHook is { } hook) context = hook(context) ?? throw Invalid();
+        // Source spawn(shell, [...args, command]): Node rejects an argument with a NUL byte.
+        if (_options.CommandTransport == ShellCommandTransport.Argv && context.Command.Contains('\0') &&
+            NodeArgumentErrors.SpawnArguments(Shell.CommandArguments(context.Command)) is { } spawnError)
+            throw new ToolSourceErrorException(spawnError);
         if (!Text(context.Command) || context.Command.Length > _options.MaximumCommandCharacters + (_options.CommandPrefix?.Length + 1 ?? 0) &&
             _options.SpawnHook is null || !Absolute(context.WorkingDirectory) || !EnvironmentValid(context.Environment)) throw Invalid();
         var arguments = new Dictionary<string, object?> { ["command"] = input.Command, ["outputPath"] = outputPath };
@@ -197,7 +201,8 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
                 throw Invalid();
         if (!value.TryGetProperty("command", out var command) || command.ValueKind != JsonValueKind.String) throw Invalid();
         var text = command.GetString()!;
-        if (!Text(text) || text.Length > _options.MaximumCommandCharacters) throw Invalid();
+        // A NUL byte reaches spawn, which reports it (PrepareAsync); the final action never carries one.
+        if (!Text(text, allowNul: !normalized) || text.Length > _options.MaximumCommandCharacters) throw Invalid();
         double? seconds = null; JsonElement? token = null;
         // Pi validation.ts normalizeOptionalNulls: an optional property sent as null (strict tool schemas make optional properties nullable) is absent.
         if (value.TryGetProperty("timeout", out var timeout) && timeout.ValueKind != JsonValueKind.Null)

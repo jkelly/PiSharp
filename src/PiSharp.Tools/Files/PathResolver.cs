@@ -45,6 +45,15 @@ public sealed class PathResolver
         return Absolute(Path.GetFullPath(normalized, WorkingDirectory));
     }
 
+    /// <summary>The absolute path the source would pass to Node for a path containing NUL bytes (path.resolve keeps them), for the
+    /// error text Node then throws.</summary>
+    public string ResolveWithNul(string path)
+    {
+        const char placeholder = '\uE000';
+        if (path.Contains(placeholder)) throw new ArgumentException("Unsupported path.", nameof(path));
+        return Resolve(path.Replace('\0', placeholder)).Replace(placeholder, '\0');
+    }
+
     public async ValueTask<string> ResolveReadAsync(string path, CancellationToken cancellationToken)
     {
         var resolved = Resolve(path);
