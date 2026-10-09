@@ -29,6 +29,17 @@ public static class RpcSessionCommand
         "(--offline-script <absolute JSON> | --live [--provider <provider>] [--model <pattern>[:<thinking>]] [--models <patterns>] [--max-output-tokens 1..8192]) [--thinking off|minimal|low|medium|high|xhigh|max] [--offline-api openai-responses|anthropic-messages|openai-completions] [--offline-images true|false (anthropic-messages|openai-completions)] [--leaf <id>|--root] [--allow-read <absolute file>] [--allow-write <absolute file>] " +
         "[[--bash-executable <absolute file>] --bash-spill-root <existing workspace directory> --allow-bash-command <exact command> [--bash-timeout <seconds>]] " + NativeExtensionConfiguration.Flags + " " + SessionCatalogCommand.Flags + " " + CreationFlags + " " + PromptTemplateCliConfiguration.Flags + " " + SettingsStartupConfiguration.Flags + " " + ToolSelectionCliConfiguration.Flags + " " + SkillCliConfiguration.Flags;
     public const string CreationFlags = "[--session-mode open|new-memory|new-lazy]";
+    /// <summary>agent-loop.ts runs tool turns until the model stops, with the whole transcript: the Pi entry has no turn or
+    /// transcript-message cap; the explicit verbs keep 64 turns and 1024 messages.</summary>
+    internal static AgentLoopOptions LoopOptions(bool pi) => pi ? new(MaximumTurns: int.MaxValue, MaximumTranscriptMessages: int.MaxValue)
+        : new(MaximumTurns: 64, MaximumTranscriptMessages: 1024);
+    /// <summary>session-manager.ts loads every line of the file: the Pi entry has no line or record cap (the explicit verbs keep 10,000).</summary>
+    internal static PiSharp.Sessions.Storage.SessionLogReaderOptions ReaderOptions(bool pi) =>
+        PiPayloadBudget.SessionReader(pi ? new(MaximumLines: int.MaxValue, MaximumRecords: int.MaxValue) : new(MaximumLines: 10_000, MaximumRecords: 10_000));
+    /// <summary>buildSessionContext walks every entry of the branch: the Pi entry has no entry, ancestor or message cap.</summary>
+    internal static PiSharp.Sessions.Context.SessionContextProjectionOptions ContextOptions(bool pi) => pi
+        ? PiPayloadBudget.Context with { MaximumEntries = int.MaxValue, MaximumAncestorSteps = int.MaxValue, MaximumOutputMessages = int.MaxValue }
+        : PiPayloadBudget.Context;
     private static readonly JsonlTransportOptions Framing = new(MaximumFrameBytes: PiPayloadBudget.RpcCommandBytes, MaximumJsonDepth: 32, MaximumPendingWrites: 32);
     private sealed record Arguments(string Session, string Workspace, string? Script, bool Latest, string? Leaf,
         ImmutableArray<string> Reads, ImmutableArray<string> Writes, string OfflineApi, OfflineBashAuthorization? Bash,
@@ -210,9 +221,9 @@ public static class RpcSessionCommand
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);
             var options = new PersistentAgentSessionOptions(UseLatestLeaf: parsed.Latest, SelectedLeafId: parsed.Leaf,
-                AgentOptions: PiPayloadBudget.Agent(new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024))),
-                SessionLogStoreOptions: new(ReaderOptions: PiPayloadBudget.SessionReader(new(MaximumLines: 10_000, MaximumRecords: 10_000))),
-                ContextOptions: PiPayloadBudget.Context);
+                AgentOptions: PiPayloadBudget.Agent(new(Loop: LoopOptions(pi is not null))),
+                SessionLogStoreOptions: new(ReaderOptions: ReaderOptions(pi is not null)),
+                ContextOptions: ContextOptions(pi is not null));
             string NextId() => "rpc-" + Guid.NewGuid().ToString("N");
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);

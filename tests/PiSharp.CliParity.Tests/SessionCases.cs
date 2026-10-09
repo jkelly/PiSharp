@@ -114,5 +114,37 @@ internal static partial class Program
             Equal(1, code, "exit");
             Equal($"Stored session working directory does not exist: {gone}\nSession file: {file}\nCurrent working directory: {sandbox.Cwd}\n", stderr, "message");
         }),
+        // agent-loop.ts runs tool turns until the model stops and session-manager.ts loads every entry of the file: the Pi entry
+        // has no turn, transcript-message, line or record cap (formerly 64 turns, 1024 messages and 10,000 lines/records).
+        ("sessions.pi-entry-has-no-turn-transcript-or-record-caps", async () =>
+        {
+            Equal(int.MaxValue, PiSharp.Cli.Commands.RpcSessionCommand.LoopOptions(pi: true).MaximumTurns, "turns");
+            Equal(int.MaxValue, PiSharp.Cli.Commands.RpcSessionCommand.LoopOptions(pi: true).MaximumTranscriptMessages, "transcript messages");
+            Equal(int.MaxValue, PiSharp.Cli.Commands.RpcSessionCommand.ReaderOptions(pi: true).MaximumRecords, "records");
+            Equal(int.MaxValue, PiSharp.Cli.Commands.RpcSessionCommand.ContextOptions(pi: true).MaximumEntries, "context entries");
+            using var sandbox = new Sandbox("no-caps");
+            var model = new[] { "--provider", "anthropic", "--model", "claude-sonnet-4-5" };
+            const int toolTurns = 70;
+            sandbox.Respond = (_, index) => index < toolTurns ? AnthropicToolCall("ls", new { path = "." }, "toolu_" + index) : AnthropicText("done");
+            var (code, stdout, stderr) = await sandbox.Run(["-p", "--tools", "ls", .. model, "list"]);
+            Equal(0, code, "exit; " + stderr);
+            Equal(toolTurns + 1, sandbox.Requests.Count, "every tool turn ran");
+            Equal("done\n", stdout, "final text");
+            // A session of more than 10,000 records resumes.
+            var lines = new List<string> { new JsonObject { ["type"] = "session", ["version"] = 3, ["id"] = "long-session",
+                ["timestamp"] = "2026-01-01T00:00:00.000Z", ["cwd"] = sandbox.Cwd }.ToJsonString() };
+            lines.Add(new JsonObject { ["type"] = "message", ["id"] = "m0", ["parentId"] = null, ["timestamp"] = "2026-01-01T00:00:00.000Z",
+                ["message"] = new JsonObject { ["role"] = "user", ["content"] = "first question", ["timestamp"] = 0 } }.ToJsonString());
+            for (var index = 1; index <= 10_050; index++)
+                lines.Add(new JsonObject { ["type"] = "custom", ["customType"] = "note", ["data"] = new JsonObject { ["n"] = index },
+                    ["id"] = "c" + index, ["parentId"] = index == 1 ? "m0" : "c" + (index - 1), ["timestamp"] = "2026-01-01T00:00:00.000Z" }.ToJsonString());
+            var file = sandbox.Write("long.jsonl", string.Join("\n", lines) + "\n");
+            sandbox.Requests.Clear(); sandbox.Respond = (_, _) => AnthropicText("resumed");
+            (code, stdout, stderr) = await sandbox.Run(["-p", "--session", file, .. model, "again"]);
+            Equal(0, code, "resume exit; " + stderr);
+            var messages = sandbox.Requests.Single().Json.GetProperty("messages");
+            Check(messages.GetArrayLength() == 2 && messages[0].GetRawText().Contains("first question", StringComparison.Ordinal), "history replayed: " + messages);
+            Check(File.ReadLines(file).Count() > 10_052, "the resumed session was appended to");
+        }),
     ];
 }
