@@ -867,6 +867,9 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
         long bytes = Encoding.UTF8.GetByteCount(captured.SessionId) +
             (long)(captured.SelectedLeafId is null ? 0 : Encoding.UTF8.GetByteCount(captured.SelectedLeafId));
         var owned = ImmutableArray.CreateBuilder<JsonData>(captured.BranchEntries.Length);
+        // Session entries are the session's own records (runner.ts hands handlers the session manager as it is): no per-entry bound
+        // beyond the snapshot's aggregate, and the depth an owned JSON value holds, not the registration JSON bounds.
+        var entryOptions = options with { MaximumJsonCharacters = int.MaxValue, MaximumJsonDepth = 64 };
         foreach (var entry in captured.BranchEntries)
         {
             if (entry is null)
@@ -874,11 +877,10 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             var raw = entry.ToString();
             characters += raw.Length;
             bytes += Encoding.UTF8.GetByteCount(raw);
-            if (raw.Length > options.MaximumJsonCharacters ||
-                characters > options.MaximumSessionCharacters ||
+            if (characters > options.MaximumSessionCharacters ||
                 bytes > options.MaximumSessionUtf8Bytes)
                 throw Failure(ExtensionRegistrationFailure.LimitExceeded, ownerId, operation);
-            if (!RegistrationPolicy.Json(entry, options, requireObject: true,
+            if (!RegistrationPolicy.Json(entry, entryOptions, requireObject: true,
                 retainOpaqueNumbers: sessionProvider is IExtensionSessionOpaqueViewProvider))
                 throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, ownerId, operation);
             // JsonData owns its document. Copying the array also severs a host's mutable backing-array alias.

@@ -89,13 +89,17 @@ internal static partial class Program
     // message of 100,000 characters (formerly 65,536).
     private static async Task LongSessionHandlers()
     {
-        // The Pi binding's dispatch admits a context of more than 1,024 messages; the profile default still refuses it.
+        // The Pi binding's dispatch admits a context of more than 1,024 messages, and so does the default dispatcher, whose context
+        // bound is now PiRequestBudget.RequestMessages (one million); a context beyond that is still refused.
         var context = Enumerable.Range(0, 1500).Select(index => new PiSharp.Contracts.TranscriptEntry("user", PiSharp.Contracts.JsonData.Parse(
             "{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"q\"}],\"timestamp\":" + index + "}"))).ToImmutableArray();
         var dispatcher = new PiSharp.Extensions.Runtime.Dispatch.ExtensionEventDispatcher(_ => { }, PiSharp.Cli.Commands.PiPayloadBudget.PiEventDispatch,
             messages => PiSharp.Agent.AgentLoopRunner.ValidateRequestMessages(messages, null, int.MaxValue));
         Equal(1500, (await dispatcher.DispatchContextAsync(dispatcher.ContextHandlers.CaptureSnapshot(), new(context))).Messages.Length, "Pi context dispatch");
-        var bounded = new PiSharp.Extensions.Runtime.Dispatch.ExtensionEventDispatcher(_ => { }, null, _ => { });
+        var defaults = new PiSharp.Extensions.Runtime.Dispatch.ExtensionEventDispatcher(_ => { }, null, _ => { });
+        Equal(1500, (await defaults.DispatchContextAsync(defaults.ContextHandlers.CaptureSnapshot(), new(context))).Messages.Length, "default context dispatch");
+        var bounded = new PiSharp.Extensions.Runtime.Dispatch.ExtensionEventDispatcher(_ => { },
+            new PiSharp.Extensions.Runtime.Dispatch.ExtensionEventDispatchOptions(MaximumContextMessages: 1_024), _ => { });
         await ThrowsAsync<ArgumentException>(() => bounded.DispatchContextAsync(bounded.ContextHandlers.CaptureSnapshot(), new(context)).AsTask());
 
         using var sandbox = NodeSandbox("long-session-handlers");
