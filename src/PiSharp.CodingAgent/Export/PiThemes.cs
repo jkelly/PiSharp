@@ -12,6 +12,12 @@ public sealed class PiTheme
     private readonly List<KeyValuePair<string, PiColor>> concrete = [];
     private readonly List<string> defaultForegrounds = [], defaultBackgrounds = [];
     private readonly HashSet<string> dim;
+    private readonly List<(string Token, object Value, bool Background)> rawTokens = [];
+    /// <summary>Resolved token values in token order (hex/ok*() strings, palette indices as double, "" for the terminal default); the
+    /// interactive Theme builds its escape sequences from them.</summary>
+    public IReadOnlyList<(string Token, object Value, bool Background)> RawTokens => rawTokens;
+    /// <summary>Foreground tokens rendered faint (SGR 2).</summary>
+    public IReadOnlyCollection<string> DimTokens => dim;
     public string? Name { get; }
     public string? SourcePath { get; }
     /// <summary>Declared in the theme JSON or detected from its colors; null for themes without usable colors.</summary>
@@ -26,6 +32,7 @@ public sealed class PiTheme
         var concreteForegrounds = new List<PiColor>(); var concreteBackgrounds = new List<PiColor>();
         void Add(string token, object value, bool background)
         {
+            rawTokens.Add((token, value, background));
             if (value is "") { (background ? defaultBackgrounds : defaultForegrounds).Add(token); return; }
             var color = value switch { double index => PiColors.Parse(index), string text => PiColors.Parse(text),
                 _ => throw new ArgumentException($"Invalid color value: {Js.ToJsString(value)}") };
