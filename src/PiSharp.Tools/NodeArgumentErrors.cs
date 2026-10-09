@@ -25,6 +25,27 @@ public static class NodeArgumentErrors
         return null;
     }
 
+    /// <summary>child_process.spawn's normalizeSpawnArguments null-byte checks, in Node's order: <c>file</c>, each <c>args[N]</c>,
+    /// <c>options.cwd</c>, then each <c>options.env</c> key and value. Node throws before anything is spawned (Node 22 texts, checked
+    /// with node). Null when no string has a NUL byte.</summary>
+    public static string? SpawnNullBytes(string file, IReadOnlyList<string> arguments, string? workingDirectory,
+        IEnumerable<KeyValuePair<string, string>>? environment)
+    {
+        ArgumentNullException.ThrowIfNull(file); ArgumentNullException.ThrowIfNull(arguments);
+        if (file.Contains('\0')) return "The argument 'file' must be a string without null bytes. Received " + Received(file);
+        if (SpawnArguments(arguments) is { } argument) return argument;
+        if (workingDirectory is not null && workingDirectory.Contains('\0'))
+            return "The property 'options.cwd' must be a string, Uint8Array, or URL without null bytes. Received " + Received(workingDirectory);
+        if (environment is not null)
+            foreach (var (key, value) in environment)
+            {
+                if (key.Contains('\0')) return $"The property 'options.env['{key}']' must be a string without null bytes. Received " + Received(key);
+                if (value is not null && value.Contains('\0'))
+                    return $"The property 'options.env['{key}']' must be a string without null bytes. Received " + Received(value);
+            }
+        return null;
+    }
+
     /// <summary>child_process.spawn's error when the operating system refuses the command line: on Windows CreateProcess takes at most
     /// 32,767 characters (libuv reports ENAMETOOLONG); on Unix one argument is at most 128 KiB (E2BIG). Null when it fits.</summary>
     public static string? SpawnLimit(string executable, IReadOnlyList<string> arguments)

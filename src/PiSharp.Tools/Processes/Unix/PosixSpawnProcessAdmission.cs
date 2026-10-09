@@ -29,6 +29,10 @@ public sealed class PosixSpawnProcessAdmission : IUnixProcessAdmission
         ArgumentNullException.ThrowIfNull(request);
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) throw new PlatformNotSupportedException();
         cancellationToken.ThrowIfCancellationRequested();
+        // posix_spawn takes C strings: a NUL byte would silently cut an argument, the working directory or a variable and run something
+        // else. Node's spawn refuses such strings (ERR_INVALID_ARG_VALUE), and so does every launch here.
+        if (NodeArgumentErrors.SpawnNullBytes(request.Executable, request.Arguments, request.WorkingDirectory, request.Environment) is { } nulError)
+            throw new ArgumentException(nulError, nameof(request));
         var environment = request.Environment.Select(pair => pair.Key + "=" + pair.Value).ToArray();
         var anchor = Spawn(Shell, [Shell, "-c", AnchorScript], environment, processGroup: 0, stdout: -1, stderr: -1);
         int[] stdout = [-1, -1], stderr = [-1, -1], stdin = [-1, -1];
@@ -228,6 +232,9 @@ public sealed class PosixShellOperations(ShellConfiguration shell, ImmutableDict
     public async ValueTask<int?> ExecuteAsync(string command, string workingDirectory, ProcessRawOutputCallback onData, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(onData);
+        // As on Windows: the missing working directory, Node's spawn validation (a NUL byte is ERR_INVALID_ARG_VALUE, never a command
+        // cut short by posix_spawn's C strings), E2BIG and ENOENT, before anything is spawned.
+        ShellSpawnPreflight.Check(shell, command, workingDirectory, environment);
         var request = new ProcessRequest(shell.Shell, shell.CommandArguments(command), workingDirectory, environment,
             Path.Combine(scratchDirectory, "pi-bash-discarded-" + Guid.NewGuid().ToString("N") + ".log"))
         { StandardInput = shell.CommandTransport == ShellCommandTransport.Stdin ? Encoding.UTF8.GetBytes(command) : null };

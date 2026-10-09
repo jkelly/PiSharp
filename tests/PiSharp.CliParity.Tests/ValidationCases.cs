@@ -138,7 +138,9 @@ internal static partial class Program
         {
             using var sandbox = new Sandbox("validation-rpc-nul");
             sandbox.Vars["PI_OFFLINE"] = "1";
-            var line = System.Text.Json.JsonSerializer.Serialize(new { id = "n0", type = "bash", command = "echo a\0b" }) + "\n";
+            // Node's spawn validation runs before anything is spawned on every platform; on Linux and macOS posix_spawn's C strings
+            // would otherwise cut the command at the NUL and run `touch nul-marker`.
+            var line = System.Text.Json.JsonSerializer.Serialize(new { id = "n0", type = "bash", command = "touch nul-marker\0b" }) + "\n";
             var gate = new GatedInput(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(line)));
             using var output = new SignalingStream("\"command\":\"bash\"", gate.Release);
             using var stdout = new StringWriter(); using var stderr = new StringWriter();
@@ -147,7 +149,30 @@ internal static partial class Program
             var response = JsonDocument.Parse(System.Text.Encoding.UTF8.GetString(output.ToArray()).Split('\n')
                 .First(text => text.Contains("\"command\":\"bash\"", StringComparison.Ordinal))).RootElement;
             Equal(false, response.GetProperty("success").GetBoolean(), "NUL command fails: " + response.GetRawText());
-            Equal("The argument 'args[1]' must be a string without null bytes. Received 'echo a\\x00b'", response.GetProperty("error").GetString(), "spawn error");
+            Equal("The argument 'args[1]' must be a string without null bytes. Received 'touch nul-marker\\x00b'", response.GetProperty("error").GetString(), "spawn error");
+            Check(!File.Exists(Path.Combine(sandbox.Cwd, "nul-marker")), "the command ran cut at the NUL (posix_spawn truncation)");
+            // The model's bash tool refuses the same way (bash.ts spawn), and nothing runs.
+            using var model = new Sandbox("validation-model-nul");
+            model.Respond = (_, index) => index == 0 ? AnthropicToolCall("bash", new { command = "touch model-marker\0b" }, "toolu_nul") : AnthropicText("done");
+            var (code, _, modelError) = await model.Run("-p", "--tools", "bash", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "run it");
+            Equal(0, code, "model run; " + modelError);
+            var messages = model.Requests[1].Json.GetProperty("messages");
+            var result = messages[messages.GetArrayLength() - 1].GetProperty("content")[0];
+            Check(result.GetProperty("is_error").GetBoolean(), "the model's NUL command is an error result");
+            Equal("The argument 'args[1]' must be a string without null bytes. Received 'touch model-marker\\x00b'",
+                result.GetProperty("content").GetString(), "model bash spawn error");
+            Check(!File.Exists(Path.Combine(model.Cwd, "model-marker")), "the model's command ran cut at the NUL");
+            // child_process.spawn's normalizeSpawnArguments order and texts (Node 22): file, args[N], options.cwd, options.env.
+            Equal("The argument 'file' must be a string without null bytes. Received 'sh\\x00x'",
+                PiSharp.Tools.NodeArgumentErrors.SpawnNullBytes("sh\0x", ["-c", "echo a\0b"], "/tmp\0x", null), "file first");
+            Equal("The argument 'args[1]' must be a string without null bytes. Received 'echo a\\x00b'",
+                PiSharp.Tools.NodeArgumentErrors.SpawnNullBytes("sh", ["-c", "echo a\0b"], "/tmp\0x", new Dictionary<string, string> { ["A"] = "x\0y" }), "args before cwd and env");
+            Equal("The property 'options.cwd' must be a string, Uint8Array, or URL without null bytes. Received '/tmp\\x00x'",
+                PiSharp.Tools.NodeArgumentErrors.SpawnNullBytes("sh", ["-c", "echo"], "/tmp\0x", new Dictionary<string, string> { ["A"] = "x\0y" }), "cwd before env");
+            Equal("The property 'options.env['A']' must be a string without null bytes. Received 'x\\x00y'",
+                PiSharp.Tools.NodeArgumentErrors.SpawnNullBytes("sh", ["-c", "echo"], "/tmp", new Dictionary<string, string> { ["A"] = "x\0y" }), "env value");
+            Equal("The property 'options.env['K\0']' must be a string without null bytes. Received 'K\\x00'",
+                PiSharp.Tools.NodeArgumentErrors.SpawnNullBytes("sh", ["-c", "echo"], "/tmp", new Dictionary<string, string> { ["K\0"] = "v" }), "env key");
         }),
         // bash.ts execute: an empty command runs, resolveTimeoutMs rejects a non-positive timeout and accepts a fractional one, and only
         // the operating system bounds the command length (captured from the installed Pi 1.1.0 bash tool on Windows).
