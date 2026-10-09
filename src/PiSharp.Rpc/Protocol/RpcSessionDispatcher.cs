@@ -404,6 +404,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 await WriteAsync(RpcCommandCodec.Error(null, "parse", "Failed to parse command: " + parseFailure, _options)).ConfigureAwait(false);
                 return;
             }
+            if (raw.Value.ValueKind == JsonValueKind.Null) { SignalFatal(RpcDispatchFailure.SessionRunFailed, new RpcInputTypeError()); return; }
             command = RpcCommandCodec.Decode(raw, _options);
             // With no native dialogs registered there is no pending request to resolve. These are never ordinary commands/responses.
             if (command.Type == "extension_ui_response") return;

@@ -77,8 +77,9 @@ public static class RpcSessionCommand
         LiveSessionRuntime? liveRuntime = null, PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
         Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null, PiSharp.Cli.Reloading.NativeHostReloadAdmission? reloadAdmission = null,
         TerminalExtensionInputAdmission? terminalInputAdmission = null,
-        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null) =>
-        RunCoreAsync(args, stdin, stdout, stderr, presentation, cancellationToken, userShutdown, stopTerminalAndJoin, liveRuntime, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission, terminalInputAdmission: terminalInputAdmission, decorateTerminalUi: decorateTerminalUi, mcpHost: mcpHost);
+        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null,
+        bool javaScriptInput = false) =>
+        RunCoreAsync(args, stdin, stdout, stderr, presentation, cancellationToken, userShutdown, stopTerminalAndJoin, liveRuntime, mcpAdmission: mcpAdmission, persistRetryEnabledOriginal: persistRetryEnabledOriginal, reloadAdmission: reloadAdmission, terminalInputAdmission: terminalInputAdmission, decorateTerminalUi: decorateTerminalUi, mcpHost: mcpHost, javaScriptInput: javaScriptInput);
 
     /// <summary>agent-session.ts _getThinkingLevelForModelSwitch: the settings' per-model level (modelThinkingLevels), else
     /// defaultThinkingLevel, else null (the current level stays).</summary>
@@ -133,7 +134,8 @@ public static class RpcSessionCommand
         PiSharp.Cli.Mcp.McpProfileRuntimeAdmission? mcpAdmission = null,
         Func<bool, CancellationToken, Task>? persistRetryEnabledOriginal = null, PiSharp.Cli.Reloading.NativeHostReloadAdmission? reloadAdmission = null,
         TerminalExtensionInputAdmission? terminalInputAdmission = null,
-        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null)
+        Func<IExtensionUiProvider, IExtensionUiProvider>? decorateTerminalUi = null, PiSharp.Cli.Mcp.McpSessionHost? mcpHost = null,
+        bool javaScriptInput = false)
     {
         ArgumentNullException.ThrowIfNull(stdin); ArgumentNullException.ThrowIfNull(stdout); ArgumentNullException.ThrowIfNull(stderr);
         OfflineSessionProfile? profile = null; PersistentAgentSession? session = null;
@@ -280,7 +282,8 @@ public static class RpcSessionCommand
             // Events and responses carry tool results with Pi-sized images (owner decision 0004).
             var outputFraming = Framing with { MaximumFrameBytes = PiPayloadBudget.OutputRecordBytes };
             observedOutput = new OutputObservation(stdout, gate, outputFraming.MaximumFrameBytes);
-            reader = new JsonlReader(observedInput, Framing);
+            // pi --mode rpc reads each line as rpc-mode.ts handleInputLine does (StringDecoder + JSON.parse).
+            reader = new JsonlReader(observedInput, Framing with { JavaScriptInput = javaScriptInput });
             writer = new JsonlWriter(observedOutput, outputFraming);
             // The profile retains resource ownership across the terminal-stopped boundary. Dispatcher cleanup
             // already fences RPC/UI admission and joins its original run, reader, callbacks and writer.
@@ -404,6 +407,13 @@ public static class RpcSessionCommand
         }
         catch (Exception error) { cleanupFailures.Add(error); }
         settlement?.Complete((operationFailure is null ? cleanupFailures : cleanupFailures.Prepend(operationFailure)).ToImmutableArray());
+        // rpc-mode.ts: a null command line is an unhandled TypeError; Node prints it and the process exits 1.
+        if (operationFailure is RpcDispatchException { InnerException: RpcInputTypeError typeError })
+        {
+            await stderr.WriteAsync("TypeError: " + typeError.Message + "\n").ConfigureAwait(false);
+            await stderr.FlushAsync().ConfigureAwait(false);
+            return 1;
+        }
         if (cleanupFailures.Count > 0)
         {
             if (Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1") await stderr.WriteAsync(string.Join(Environment.NewLine, cleanupFailures) + Environment.NewLine).ConfigureAwait(false);

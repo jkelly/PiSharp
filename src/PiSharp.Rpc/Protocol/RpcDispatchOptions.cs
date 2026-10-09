@@ -46,3 +46,9 @@ public sealed class RpcDispatchException : IOException
         _ => "RPC dispatcher cleanup failed."
     }, inner) => Failure = failure;
 }
+/// <summary>rpc-mode.ts handleInputLine given the JSON value <c>null</c>: handleCommand reads <c>null.id</c>, its catch block reads it
+/// again, and the rejection is unhandled, so Node prints the TypeError and exits 1 without a response. The dispatcher stops as fatally.</summary>
+public sealed class RpcInputTypeError : Exception
+{
+    internal RpcInputTypeError() : base("Cannot read properties of null (reading 'id')") { }
+}

@@ -6,8 +6,11 @@ using PiSharp.Contracts;
 namespace PiSharp.Rpc;
 
 public enum JsonlStreamOwnership { Borrowed, Owned }
+/// <param name="JavaScriptInput">Read each frame as rpc-mode.ts handleInputLine does: StringDecoder("utf8") (invalid bytes become U+FFFD)
+/// and <c>JSON.parse</c>, so duplicate names keep the last value, escaped lone surrogates are accepted (owned as U+FFFD) and any JSON
+/// value, not only an object, is a record. Only a JSON.parse SyntaxError rejects a frame.</param>
 public sealed record JsonlTransportOptions(int ReadBufferBytes = 4096, int MaximumFrameBytes = 1_048_576,
-    int MaximumJsonDepth = 32, int MaximumPendingWrites = 16)
+    int MaximumJsonDepth = 32, int MaximumPendingWrites = 16, bool JavaScriptInput = false)
 {
     internal void Validate(JsonlStreamOwnership ownership)
     {
@@ -44,8 +47,20 @@ public sealed class JsonlTransportException : IOException
 internal static class JsonlRecordCodec
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
+    private static readonly UTF8Encoding ReplacingUtf8 = new(false, false);
     internal static JsonData Parse(ReadOnlySpan<byte> bytes, JsonlTransportOptions options, bool final)
     {
+        if (options.JavaScriptInput)
+        {
+            var text = ReplacingUtf8.GetString(bytes);
+            CheckDepth(text, options.MaximumJsonDepth);
+            try { return PiSharp.AI.StreamingJson.JsonParse(text); }
+            catch (JsonException)
+            {
+                throw new JsonlTransportException(final ? JsonlTransportFailure.PartialFinalFrame : JsonlTransportFailure.MalformedJson,
+                    PiSharp.Contracts.Compatibility.JsJsonSyntax.Error(text));
+            }
+        }
         string raw;
         try { raw = Utf8.GetString(bytes); }
         catch (DecoderFallbackException) { throw Failure(JsonlTransportFailure.InvalidUtf8); }

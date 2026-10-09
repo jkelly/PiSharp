@@ -14,8 +14,8 @@ internal sealed record RpcCommandEnvelope(string? Id, string Type, string? Messa
     string? StreamingBehavior = null, string? Mode = null, string? Since = null, SessionCatalogQuery? CatalogQuery = null,
     string? TargetId = null, JsonData? Replacement = null, long? ExpectedGeneration = null,
     SessionCompactionRequest? Compaction = null, SessionBranchSummaryRequest? BranchSummary = null, string? Provider = null, string? ModelId = null, string? ThinkingLevel = null);
-internal sealed class RpcCommandException(string? id, string command, string message) : Exception(message)
-{ public string? Id { get; } = id; public string Command { get; } = command; }
+internal sealed class RpcCommandException(string? id, string? command, string message) : Exception(message)
+{ public string? Id { get; } = id; public string? Command { get; } = command; }
 
 internal static class RpcCommandCodec
 {
@@ -34,6 +34,9 @@ internal static class RpcCommandCodec
 
     internal static RpcCommandEnvelope Decode(JsonData input, RpcDispatchOptions options)
     {
+        // rpc-mode.ts handleCommand(JSON.parse(line)): a number, string, boolean or array has no id or type, so the switch falls to
+        // default and answers error(undefined, undefined, "Unknown command: undefined").
+        if (input.Value.ValueKind != JsonValueKind.Object) throw new RpcCommandException(null, null, "Unknown command: undefined");
         try { Strict(input, options.MaximumCommandBytes, options.MaximumJsonDepth); }
         catch (JsonlTransportException) { throw new RpcCommandException(null, "parse", "Failed to parse command: invalid strict JSON object."); }
         var body = input.Value; string? id = null;
@@ -43,7 +46,9 @@ internal static class RpcCommandCodec
                 throw new RpcCommandException(null, "parse", "Command id must be a bounded string when present.");
             id = identity.GetString();
         }
-        if (!body.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String ||
+        // An object without a type reaches the same default branch: "Unknown command: undefined", with its id.
+        if (!body.TryGetProperty("type", out var type)) throw new RpcCommandException(id, null, "Unknown command: undefined");
+        if (type.ValueKind != JsonValueKind.String ||
             type.GetString()!.Length > options.MaximumCommandTypeCharacters)
             throw new RpcCommandException(id, "parse", "Command type must be a bounded string.");
         var name = type.GetString()!;
@@ -238,15 +243,16 @@ internal static class RpcCommandCodec
         Header(writer, command.Id, command.Type); writer.WriteBoolean("success", true);
         if (data is not null) { writer.WritePropertyName("data"); writer.WriteRawValue(data.ToString()); }
     }, options.MaximumOutputBytes);
-    internal static JsonData Error(string? id, string command, string error, RpcDispatchOptions options)
+    internal static JsonData Error(string? id, string? command, string error, RpcDispatchOptions options)
     {
         try { return ErrorCore(id, command, error, options); }
         catch (RpcDispatchException) { return ErrorCore(id, command, "RPC command failed.", options); }
     }
-    private static JsonData ErrorCore(string? id, string command, string error, RpcDispatchOptions options) => Build(writer =>
+    private static JsonData ErrorCore(string? id, string? command, string error, RpcDispatchOptions options) => Build(writer =>
     { Header(writer, id, command); writer.WriteBoolean("success", false); writer.WriteString("error", error); }, options.MaximumOutputBytes);
-    private static void Header(Utf8JsonWriter writer, string? id, string command)
-    { if (id is not null) writer.WriteString("id", id); writer.WriteString("type", "response"); writer.WriteString("command", command); }
+    // JSON.stringify omits an undefined command (the type of a non-object or type-less command).
+    private static void Header(Utf8JsonWriter writer, string? id, string? command)
+    { if (id is not null) writer.WriteString("id", id); writer.WriteString("type", "response"); if (command is not null) writer.WriteString("command", command); }
     internal static JsonData Event(string type, Action<Utf8JsonWriter>? fields, RpcDispatchOptions options) => Build(writer =>
     { writer.WriteString("type", type); fields?.Invoke(writer); }, options.MaximumOutputBytes);
     internal static JsonData Build(Action<Utf8JsonWriter> fields, int maximum)

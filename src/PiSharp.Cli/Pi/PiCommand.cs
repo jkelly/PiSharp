@@ -444,7 +444,7 @@ internal static class PiCommand
                 await using (input.ConfigureAwait(false))
                 {
                     var code = await RpcSessionCommand.RunWithPresentationAsync(["session", "rpc", .. sessionArgs], input, output, err, null!, runToken,
-                        userShutdown: userShutdown, mcpHost: mcpHost).ConfigureAwait(false);
+                        userShutdown: userShutdown, mcpHost: mcpHost, javaScriptInput: true).ConfigureAwait(false);
                     return signals?.Exit(code) ?? code;
                 }
             }

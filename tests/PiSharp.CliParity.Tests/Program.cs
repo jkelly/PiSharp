@@ -38,6 +38,7 @@ internal static partial class Program
         cases.AddRange(JsonSyntaxCases());
         cases.AddRange(PromptAuthCases());
         cases.AddRange(ValidationCases());
+        cases.AddRange(RpcInputCases());
         var filter = Environment.GetEnvironmentVariable("CLIPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;
