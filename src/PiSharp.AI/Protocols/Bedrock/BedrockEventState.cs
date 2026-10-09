@@ -220,9 +220,20 @@ internal sealed class BedrockEventState
         if (_stopReason == StopReason.Pending) throw new InvalidOperationException("Bedrock stream ended without a stop reason");
         if (_stopReason == StopReason.Error) throw new InvalidOperationException(_stopError ?? "An unknown error occurred");
         EnsureStarted(output);
-        // Upstream finalizes blocks that never received contentBlockStop without an end event; a native successful settlement
-        // requires every block ended, so their end frames are emitted here.
-        for (var index = 0; index < _blocks.Count; index++) if (!_blocks[index].Ended) End(index, output);
+        // Source finalizeStreamingBlock: blocks that never received contentBlockStop are finalized (redacted content flushed, the
+        // streamed arguments kept) without an end event.
+        for (var index = 0; index < _blocks.Count; index++)
+        {
+            var block = _blocks[index];
+            if (block.Ended) continue;
+            Flush(block); block.Ended = true;
+            Emit(new ContentBlockFinalized(index, block.Kind switch
+            {
+                "text" => new TextContent(block.Text.ToString()),
+                "thinking" => new ThinkingContent(block.Text.ToString(), ThinkingProperties(block)),
+                _ => new ToolCallContent(block.Id, block.Name, Arguments(block))
+            }), output);
+        }
         var properties = JsonFields.Empty;
         if (_rawStopReason is not null) properties = properties.Set("rawStopReason", JsonData.Parse(JsonSerializer.Serialize(_rawStopReason)));
         var message = _reducer.Snapshot() with { Usage = _usage, StopReason = _stopReason, ExtraProperties = properties };

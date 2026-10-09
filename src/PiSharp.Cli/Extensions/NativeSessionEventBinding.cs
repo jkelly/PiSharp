@@ -333,7 +333,8 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
         {
             if (_partial is null || value is ThinkingCheckpoint or ToolCallCheckpoint or ToolCallHeaderUpdated) return;
             try { _partial.Apply(value); } catch (Exception) { _partial = null; return; }
-            if (value is StreamStarted or StreamTerminalEvent) return;
+            // A block finalized without a source push (Bedrock) has no message_update of its own.
+            if (value is StreamStarted or StreamTerminalEvent or ContentBlockFinalized) return;
             var partial = _partial.Snapshot();
             await binding.PublishAsync(owner, attached, "message_update", () => Json(writer =>
             {

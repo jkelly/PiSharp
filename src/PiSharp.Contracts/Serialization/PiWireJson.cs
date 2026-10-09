@@ -66,6 +66,7 @@ public static partial class PiWireJson
             "toolcall_end" => new ToolCallEnded(Index(), new ToolCallContent(String(value, "id"), String(value, "name"),
                 RequireObject(value.GetProperty("arguments")), Extras("contentIndex", "id", "name", "arguments")),
                 Extras("contentIndex", "id", "name", "arguments")),
+            "content_finalized" => new ContentBlockFinalized(Index(), ReadContent(value.GetProperty("content")), Extras("contentIndex", "content")),
             "done" => new StreamDone(ReadStopReason(String(value, "reason")), ReadMessage(value.GetProperty("message")), Extras("reason", "message")),
             "error" => new StreamError(ReadStopReason(String(value, "reason")), ReadMessage(value.GetProperty("error")), Extras("reason", "error")),
             _ => throw new JsonException($"Unknown stream event: {kind}")
@@ -97,6 +98,7 @@ public static partial class PiWireJson
                 foreach (var item in ContentNode(end.ToolCall))
                     if (item.Key != "type") node[item.Key] = item.Value?.DeepClone();
                 break;
+            case ContentBlockFinalized finalized: Indexed("content_finalized", finalized.ContentIndex); node["content"] = ContentNode(finalized.Content); break;
             case StreamTerminalEvent terminal:
                 node["type"] = terminal is StreamDone ? "done" : "error";
                 node["reason"] = StopReasonName(terminal.Reason);

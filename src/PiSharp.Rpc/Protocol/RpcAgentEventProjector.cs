@@ -156,7 +156,7 @@ public sealed class RpcAgentEventProjector
         // Native thinking/argument checkpoints and identity fills update reducer state
         // without a source push. Only the later public end is projected; no RPC event
         // is invented for a checkpoint. Final/aborted message bodies retain its state.
-        if (observation is ThinkingCheckpoint or ToolCallCheckpoint or ToolCallHeaderUpdated) return null;
+        if (observation is ThinkingCheckpoint or ToolCallCheckpoint or ToolCallHeaderUpdated or ContentBlockFinalized) return null;
         return RpcCommandCodec.Build(writer =>
         {
             var known = new HashSet<string>(StringComparer.Ordinal) { "type", "partial", "contentIndex" };

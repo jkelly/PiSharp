@@ -167,6 +167,23 @@ public sealed class AssistantStreamReducer
                     throw new StreamProtocolException("Duplicate final tool-call ID.");
                 CheckSize(ContentCharacters(end.ToolCall) - ContentCharacters(original));
                 call.Content = end.ToolCall; call.Ended = true; break;
+            case ContentBlockFinalized finalized:
+            {
+                if (finalized.ContentIndex < 0 || finalized.ContentIndex >= _blocks.Count || _blocks[finalized.ContentIndex].Ended ||
+                    _blocks[finalized.ContentIndex].Content.GetType() != finalized.Content.GetType())
+                    throw new StreamProtocolException("A finalized block must be an open block of the same kind.");
+                var block = _blocks[finalized.ContentIndex];
+                if (finalized.Content is ToolCallContent tool)
+                {
+                    var started = (ToolCallContent)block.Content;
+                    if (started.Id != tool.Id || started.Name != tool.Name || tool.Arguments.Value.ValueKind != JsonValueKind.Object)
+                        throw new StreamProtocolException("Tool-call identity changes at its end.");
+                    CheckSize(ContentCharacters(tool) - ContentCharacters(started));
+                }
+                var finalText = finalized.Content switch { TextContent finalTextContent => finalTextContent.Text, ThinkingContent finalThinking => finalThinking.Thinking, _ => null };
+                if (finalText is not null) { CheckSize(finalText.Length - block.Text.Length); block.Text.Clear(); block.Text.Append(finalText); }
+                block.Content = finalized.Content; block.Ended = true; break;
+            }
             default: throw new StreamProtocolException("Unknown progress event.");
         }
     }
