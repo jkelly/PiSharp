@@ -98,7 +98,7 @@ internal static class RpcCommandCodec
         if (name == "export_html") return new(id, name, Message: body.TryGetProperty("outputPath", out var output) && output.ValueKind == JsonValueKind.Null
             ? null : Optional("outputPath", Math.Min(options.MaximumPromptCharacters, 4096)));
         if (name == "compact") return new(id, name,
-            Compaction: new(SummaryOptions: new(CustomInstructions: Optional("customInstructions", Math.Min(options.MaximumPromptCharacters, 65_536)))));
+            Compaction: new(SummaryOptions: new(CustomInstructions: Optional("customInstructions", options.MaximumPromptCharacters))));
         if (name is "set_auto_compaction" or "set_auto_retry")
         {
             if (!body.TryGetProperty("enabled", out var enabled) || enabled.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
@@ -122,7 +122,7 @@ internal static class RpcCommandCodec
                 if (value.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new RpcCommandException(id, name, "Summary flags must be booleans.");
                 return value.GetBoolean();
             }
-            var focus = Optional("customInstructions", Math.Min(options.MaximumPromptCharacters, 65_536));
+            var focus = Optional("customInstructions", options.MaximumPromptCharacters);
             var summaryOptions = new SessionSummaryRequestOptions(CustomInstructions: focus);
             if (name == "pisharp_set_auto_compaction")
             {
@@ -213,7 +213,7 @@ internal static class RpcCommandCodec
                 throw new RpcCommandException(id, name, "Command excludeFromContext must be a boolean when present.");
             return new(id, name, Message: shellCommand, Mode: excluded.GetBoolean() ? "exclude" : "include");
         }
-        if (name == "set_session_name") return new(id, name, Message: Required("name", Math.Min(options.MaximumPromptCharacters, 65_536)));
+        if (name == "set_session_name") return new(id, name, Message: Required("name", options.MaximumPromptCharacters));
         if (name == "set_model")
         {
             var provider = Required("provider", options.MaximumCommandBytes);

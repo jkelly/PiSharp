@@ -366,12 +366,17 @@ public static class RpcSessionCommand
                 SwitchThinkingLevel = model => ModelSwitchThinkingLevel(pi?.ReloadSettings is { } reload ? reload(CancellationToken.None).GetAwaiter().GetResult() : settings, model)
             };
             dispatcher = new(session, writer, Clock, [new(profile.SelectedModel, profile.SelectedModelWire)],
-                options: new(MaximumCommandBytes: PiPayloadBudget.RpcCommandBytes, MaximumOutputBytes: outputFraming.MaximumFrameBytes,
+                options: new PiSharp.Rpc.Protocol.RpcDispatchOptions(MaximumCommandBytes: PiPayloadBudget.RpcCommandBytes, MaximumOutputBytes: outputFraming.MaximumFrameBytes,
                     MaximumModels: 4096, MaximumModelDefinitionBytes: 16 * 1024 * 1024, MaximumJsonDepth: framing.MaximumJsonDepth,
                     // rpc-mode.ts has no id or type length limit.
                     MaximumIdCharacters: javaScriptInput ? int.MaxValue : 256, MaximumCommandTypeCharacters: javaScriptInput ? int.MaxValue : 128,
                     // Pi has no prompt, steer, follow_up or bash text limit and no image count limit (the frame bound stays).
-                    MaximumPromptCharacters: pi is null ? 65_536 : int.MaxValue, MaximumImages: pi is null ? 16 : int.MaxValue),
+                    MaximumPromptCharacters: pi is null ? 65_536 : int.MaxValue, MaximumImages: pi is null ? 16 : int.MaxValue)
+                    // rpc-mode.ts answers get_messages/get_entries with the whole session, handles every command as it arrives, reports every
+                    // started tool and continues while input is queued: the Pi entry has no count bound on them (frames stay the memory bound).
+                    with { MaximumModels = pi is null ? 4096 : int.MaxValue, MaximumReturnedMessages = pi is null ? 1024 : int.MaxValue,
+                        MaximumReturnedEntries = pi is null ? 4096 : int.MaxValue, MaximumPendingToolMessages = pi is null ? 128 : int.MaxValue,
+                        MaximumContinuationRuns = pi is null ? 16 : int.MaxValue, MaximumConcurrentCommands = pi is null ? 8 : int.MaxValue },
                 sessionOwnership: RpcSessionOwnership.Borrowed, inputAdmission: profile.InputAdmission, extensionUi: ui,
                 extensionCommandCatalog: profile, sessionOwner: profile.Sessions,
                 // main.ts: the initial runtime's session starts with reason "startup" in the Pi entry (new, continued or resumed alike).

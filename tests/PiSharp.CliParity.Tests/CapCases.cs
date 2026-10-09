@@ -50,6 +50,26 @@ internal static partial class Program
             Equal(128, explicitVerb.MaximumTools, "explicit tools"); Check(explicitVerb.Queue is null, "explicit queue defaults");
             Equal(64, explicitVerb.Loop!.MaximumTurns, "explicit turns");
         })),
+        // print-mode.ts session.prompt and skills.ts: 150 skills (formerly 128 files), one of 200 KB (formerly 64 KiB), expanded into a
+        // print prompt of 100,000 characters (formerly 65,536) through the skill, template and dispatcher admission.
+        ("caps.print-prompt-and-skills-have-no-pi-limit", async () =>
+        {
+            using var sandbox = new Sandbox("caps-print-skills");
+            for (var index = 0; index < 150; index++)
+                sandbox.Write(Path.Combine(sandbox.AgentDir, "skills", "s" + index, "SKILL.md"), "---\nname: s" + index + "\ndescription: Skill " + index + "\n---\nbody " + index + "\n");
+            sandbox.Write(Path.Combine(sandbox.AgentDir, "skills", "big", "SKILL.md"), "---\nname: big\ndescription: Big skill\n---\n" + new string('b', 200_000) + "\n");
+            sandbox.Write(Path.Combine(sandbox.AgentDir, "prompts", "hello.md"), "Hello $1");
+            var arguments = new string('y', 100_000);
+            var (code, stdout, stderr) = await sandbox.Run(["-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "/skill:big " + arguments]);
+            Equal(0, code, "exit; " + stderr);
+            Equal("ok\n", stdout, "final text");
+            var system = string.Join("\n\n", sandbox.Requests[0].Json.GetProperty("system").EnumerateArray().Select(block => block.GetProperty("text").GetString()));
+            Check(Enumerable.Range(0, 150).All(index => system.Contains("<name>s" + index + "</name>", StringComparison.Ordinal)), "every skill listed");
+            var user = sandbox.Requests[0].Json.GetProperty("messages").EnumerateArray().Last().GetProperty("content");
+            var text = user.ValueKind == System.Text.Json.JsonValueKind.String ? user.GetString()! : string.Concat(user.EnumerateArray().Select(block => block.GetProperty("text").GetString()));
+            Check(text.StartsWith("<skill name=\"big\"", StringComparison.Ordinal) && text.Contains(new string('b', 200_000), StringComparison.Ordinal) &&
+                text.EndsWith("</skill>\n\n" + arguments, StringComparison.Ordinal), "the whole skill and the whole argument text: " + text.Length);
+        }),
         // anthropic-messages.ts and agent-loop.ts: a response of 80 tool_use blocks (formerly 64 stream content slots) runs every call.
         ("caps.response-with-many-parallel-tool-calls", async () =>
         {
