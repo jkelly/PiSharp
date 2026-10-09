@@ -11,11 +11,22 @@ PiSharp's CLI is a .NET tool. It needs the [.NET 10 SDK](https://dotnet.microsof
 dotnet tool install -g PiSharp.Cli
 ```
 
-Then run it:
+Then run it in your project folder:
 
 ```powershell
-pisharp --help
+cd my-project
+pisharp
 ```
+
+`pisharp` opens the terminal UI, as `pi` does. Type `/login` to sign in to a provider, or set an API key such as `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` first. Type `/model` to pick a model.
+
+For a one-shot answer, use print mode:
+
+```powershell
+pisharp -p "Summarize this repository"
+```
+
+If you already use Pi, PiSharp finds your sign-ins, settings, sessions and resources in `~/.pi/agent`. See [Coming from Pi](/docs/coming-from-pi/).
 
 ### Update or uninstall
 
@@ -30,7 +41,7 @@ The libraries are separate NuGet packages. See the [SDK](/sdk/).
 
 You need **.NET SDK 10.0.401** exactly: `global.json` pins it with roll-forward disabled.
 
-The committed `NuGet.Config` clears all package feeds. The default CLI build uses YamlDotNet for prompt-template frontmatter, so it needs that package from a local cache, or from nuget.org added as a source.
+The committed `NuGet.Config` clears all package feeds. The CLI build needs its third-party packages (YamlDotNet, SkiaSharp and Jint) from a local cache, or from nuget.org added as a source.
 
 ```powershell
 git clone https://github.com/jkelly/PiSharp.git
@@ -53,4 +64,6 @@ dotnet run --project tests/PiSharp.MistralConversations.Tests -c Release -p:Rest
 ## Next steps
 
 - [Coming from Pi](/docs/coming-from-pi/)
-- [Build an extension](/docs/extensions/build-an-extension/)
+- [Command line](/docs/reference/cli/)
+- [Providers and models](/docs/guides/providers/)
+- [Interactive mode](/docs/guides/interactive/)
