@@ -229,6 +229,14 @@ internal static partial class Program
         var types = lines.Skip(1).Select(line => JsonNode.Parse(line)!["type"]!.GetValue<string>()).ToArray();
         Check(types.First() == "agent_start" && types.Last() == "agent_settled", "event order: " + string.Join(",", types));
         Check(!types.Contains("response") && !types.Any(type => type.StartsWith("pisharp_", StringComparison.Ordinal)), "only session events: " + string.Join(",", types));
+        // Every line is JSON.stringify(event): ' and non-ASCII raw, JavaScript number text and property order.
+        sandbox.Respond = (_, _) => AnthropicText("it's café <&>");
+        (code, stdout, stderr) = await sandbox.Run("--mode", "json", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "Say 'hi' ü");
+        Equal(0, code, "exit code; stderr: " + stderr);
+        Check(stdout.Contains("it's café <&>", StringComparison.Ordinal) && stdout.Contains("Say 'hi' ü", StringComparison.Ordinal),
+            "json mode escaped text JSON.stringify writes raw: " + stdout);
+        foreach (var line in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            Equal(PiSharp.AI.StreamingJson.JsonReformat(line), line, "JSON.stringify form");
     }
 
     // system-prompt.ts buildSystemPromptSections with the default tools (read, bash, edit, write), joined as getSystemMessageText does.

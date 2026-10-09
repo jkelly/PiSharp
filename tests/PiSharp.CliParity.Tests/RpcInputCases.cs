@@ -21,6 +21,8 @@ internal static partial class Program
                 Line("{\"type\":\"get_state\",\"type\":\"bogus\",\"id\":\"d\"}"), Line("{\"type\":\"bogus\",\"id\":\"1\",\"id\":\"2\"}"),
                 // An escaped lone surrogate is a valid JSON.parse string; numbers beyond binary64 are Infinity.
                 Line("{\"id\":\"q\",\"type\":\"bogus\",\"note\":\"\\ud800\"}"), Line("{\"id\":\"1\",\"type\":\"bogus\",\"x\":1e999}"),
+                // An echoed lone surrogate is written back as JSON.stringify escapes it.
+                Line("{\"id\":\"s\\udc00\",\"type\":\"bogus\\ud800\"}"),
                 // Malformed UTF-8 decodes to U+FFFD.
                 Encoding.UTF8.GetBytes("{\"id\":\"u\",\"type\":\"bo").Append((byte)0xFF).Concat(Encoding.UTF8.GetBytes("gus\"}\n")).ToArray(),
                 // JSON.parse failures keep V8's SyntaxError text.
@@ -35,14 +37,13 @@ internal static partial class Program
                 """{"id":"2","type":"response","command":"bogus","success":false,"error":"Unknown command: bogus"}""",
                 """{"id":"q","type":"response","command":"bogus","success":false,"error":"Unknown command: bogus"}""",
                 """{"id":"1","type":"response","command":"bogus","success":false,"error":"Unknown command: bogus"}""",
+                """{"id":"s\udc00","type":"response","command":"bogus\ud800","success":false,"error":"Unknown command: bogus\ud800"}""",
                 "{\"id\":\"u\",\"type\":\"response\",\"command\":\"bo\uFFFDgus\",\"success\":false,\"error\":\"Unknown command: bo\uFFFDgus\"}",
                 """{"type":"response","command":"parse","success":false,"error":"Failed to parse command: Expected ',' or '}' after property value in JSON at position 19 (line 1 column 20)"}""",
                 """{"type":"response","command":"parse","success":false,"error":"Failed to parse command: Unexpected end of JSON input"}""",
             ];
-            // Compared as decoded JSON: the native writer escapes ' and non-ASCII where JSON.stringify writes them raw.
-            static string Canonical(IEnumerable<string> lines) =>
-                string.Join("\n", lines.Select(line => System.Text.Json.Nodes.JsonNode.Parse(line)!.ToJsonString()).Order(StringComparer.Ordinal));
-            Equal(Canonical(expected), Canonical(frames.Code), "rpc responses");
+            // Byte-identical to JSON.stringify: ' and non-ASCII raw, lone surrogates as lowercase escapes.
+            Equal(string.Join("\n", expected.Order(StringComparer.Ordinal)), string.Join("\n", frames.Code.Order(StringComparer.Ordinal)), "rpc responses");
             Equal(0, frames.Exit, "rpc exit; " + frames.Stderr);
         }),
         ("rpc-input.non-string-ids-and-types-echo-and-no-length-or-depth-32-caps", async () =>

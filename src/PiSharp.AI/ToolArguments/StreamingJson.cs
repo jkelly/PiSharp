@@ -31,15 +31,45 @@ public static class StreamingJson
     /// <c>JSON.parse(text)</c> with the same ownership as <see cref="Parse"/>: any JSON value, duplicate names keep the last value,
     /// lone surrogates become U+FFFD. A text JSON.parse rejects is a <see cref="JsonException"/> carrying V8's SyntaxError message.
     /// </summary>
-    public static JsonData JsonParse(string text)
+    public static JsonData JsonParse(string text) => JsonParse(text, out _);
+
+    /// <summary><see cref="JsonParse(string)"/>, also returning the exact (not well-formed) value of each top-level object member
+    /// whose string value has a lone surrogate, for callers that echo such a value back.</summary>
+    public static JsonData JsonParse(string text, out IReadOnlyDictionary<string, string>? loneSurrogateMembers)
     {
-        ArgumentNullException.ThrowIfNull(text);
-        Value value;
-        try { value = JsonParseValue(text); }
-        catch (SyntaxError) { throw new JsonException(PiSharp.Contracts.Compatibility.JsJsonSyntax.Describe(text, "Unexpected token in JSON")); }
+        var value = Syntax(text);
+        loneSurrogateMembers = null;
+        if (value is ObjectValue obj)
+        {
+            Dictionary<string, string>? members = null;
+            foreach (var key in obj.Order)
+                if (obj.Properties[key] is StringValue member && !ReferenceEquals(ToWellFormed(member.Text), member.Text))
+                    (members ??= new(StringComparer.Ordinal))[ToWellFormed(key)] = member.Text;
+            loneSurrogateMembers = members;
+        }
         var owned = Stringify(value, wellFormed: true);
         try { return JsonData.Parse(owned); }
         catch (JsonException) { throw TooDeep(); }
+    }
+
+    /// <summary><c>JSON.stringify(JSON.parse(text))</c> exactly, lone surrogates escaped as JavaScript writes them. A text JSON.parse
+    /// rejects is a <see cref="JsonException"/>.</summary>
+    public static string JsonReformat(string text) => Stringify(Syntax(text), wellFormed: false);
+
+    /// <summary>JSON.stringify of a string: only <c>"</c>, <c>\</c>, control characters and lone surrogates are escaped.</summary>
+    public static string JsonQuote(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var builder = new StringBuilder(text.Length + 2);
+        Quote(builder, text);
+        return builder.ToString();
+    }
+
+    private static Value Syntax(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        try { return JsonParseValue(text); }
+        catch (SyntaxError) { throw new JsonException(PiSharp.Contracts.Compatibility.JsJsonSyntax.Describe(text, "Unexpected token in JSON")); }
     }
 
     /// <summary><c>JSON.stringify(parseStreamingJson(partialJson))</c>, lone surrogates escaped as JavaScript writes them.</summary>

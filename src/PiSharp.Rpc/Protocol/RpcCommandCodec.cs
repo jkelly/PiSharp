@@ -40,13 +40,16 @@ internal static class RpcCommandCodec
         try { Strict(input, options.MaximumCommandBytes, options.MaximumJsonDepth); }
         catch (JsonlTransportException) { throw new RpcCommandException(null, "parse", "Failed to parse command: invalid strict JSON object."); }
         var body = input.Value; string? id = null;
+        // An id or type with a lone surrogate is echoed exactly (the owned record holds U+FFFD there).
+        JsonlRecordCodec.ExactMembers.TryGetValue(input, out var exact);
+        string Exact(string field, JsonElement value) => exact is not null && exact.TryGetValue(field, out var text) ? text : value.GetString()!;
         if (body.TryGetProperty("id", out var identity))
         {
             // rpc-mode.ts echoes command.id as it came: a non-string id is written back as that JSON value.
             if (identity.ValueKind != JsonValueKind.String) id = RawJson(identity);
             else if (identity.GetString()!.Length > options.MaximumIdCharacters)
                 throw new RpcCommandException(null, "parse", "Command id must be a bounded string when present.");
-            else id = identity.GetString();
+            else id = Exact("id", identity);
         }
         // An object without a type reaches the same default branch: "Unknown command: undefined", with its id.
         if (!body.TryGetProperty("type", out var type)) throw new RpcCommandException(id, null, "Unknown command: undefined");
@@ -54,7 +57,7 @@ internal static class RpcCommandCodec
         if (type.ValueKind != JsonValueKind.String) throw new RpcCommandException(id, RawJson(type), "Unknown command: " + JsString(type));
         if (type.GetString()!.Length > options.MaximumCommandTypeCharacters)
             throw new RpcCommandException(id, "parse", "Command type must be a bounded string.");
-        var name = type.GetString()!;
+        var name = Exact("type", type);
         try { _ = ErrorCore(id, name, "RPC command failed.", options); }
         catch (RpcDispatchException) { throw new RpcCommandException(null, "parse", "Command identity exceeds response limits."); }
         string Required(string field, int maximum)
@@ -252,7 +255,7 @@ internal static class RpcCommandCodec
         catch (RpcDispatchException) { return ErrorCore(id, command, "RPC command failed.", options); }
     }
     private static JsonData ErrorCore(string? id, string? command, string error, RpcDispatchOptions options) => Build(writer =>
-    { Header(writer, id, command); writer.WriteBoolean("success", false); writer.WriteString("error", error); }, options.MaximumOutputBytes);
+    { Header(writer, id, command); writer.WriteBoolean("success", false); writer.WritePropertyName("error"); WriteEchoed(writer, error); }, options.MaximumOutputBytes);
     // JSON.stringify omits an undefined command (the type of a non-object or type-less command).
     private static void Header(Utf8JsonWriter writer, string? id, string? command)
     {
@@ -268,7 +271,18 @@ internal static class RpcCommandCodec
     private static void WriteEchoed(Utf8JsonWriter writer, string value)
     {
         if (value.StartsWith(RawPrefix, StringComparison.Ordinal)) writer.WriteRawValue(value[RawPrefix.Length..]);
+        // Utf8JsonWriter refuses a lone surrogate; JSON.stringify writes it as an escape.
+        else if (HasLoneSurrogate(value)) writer.WriteRawValue(PiSharp.AI.StreamingJson.JsonQuote(value), skipInputValidation: true);
         else writer.WriteStringValue(value);
+    }
+    private static bool HasLoneSurrogate(string value)
+    {
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (char.IsHighSurrogate(value[index]) && index + 1 < value.Length && char.IsLowSurrogate(value[index + 1])) index++;
+            else if (char.IsSurrogate(value[index])) return true;
+        }
+        return false;
     }
     // String(value) for a JSON value, as a template literal converts it.
     private static string JsString(JsonElement value) => value.ValueKind switch

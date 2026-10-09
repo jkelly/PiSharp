@@ -44,7 +44,9 @@ internal static class PiPrintMode
             if (json && type != "response" && type?.StartsWith("pisharp_", StringComparison.Ordinal) != true)
             {
                 await outputGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
-                try { await stdout.WriteAsync((record.ToString() + "\n").AsMemory(), CancellationToken.None).ConfigureAwait(false); await stdout.FlushAsync(CancellationToken.None).ConfigureAwait(false); }
+                // print-mode.ts writes JSON.stringify(event): non-ASCII and ' raw, JavaScript number text.
+                var line = PiSharp.AI.StreamingJson.JsonReformat(record.ToString()) + "\n";
+                try { await stdout.WriteAsync(line.AsMemory(), CancellationToken.None).ConfigureAwait(false); await stdout.FlushAsync(CancellationToken.None).ConfigureAwait(false); }
                 finally { outputGate.Release(); }
             }
             records.Writer.TryWrite(record);
