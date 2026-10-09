@@ -237,7 +237,7 @@ public sealed partial class PersistentAgentSession
                     writer => { writer.WritePropertyName("message"); message.Value.WriteTo(writer); });
                 pending.Add(entry); entries = entries.Add(entry); leaf = entry.Id;
             }
-            var next = _projector.Project(entries, leaf); ValidateRuntimeContext(next, _configuration);
+            var next = _projector.Project(entries, leaf); ValidateRuntimeContext(next, _configuration, _toleratedSelection);
             if (_registry is not null) ValidateLoadout(next.LlmMessages);
             // Cancellation can initiate physical shutdown but cannot detach an admitted durable checkpoint.
             var originalAppend = _store.AppendAsync(pending.ToImmutable(), CancellationToken.None);

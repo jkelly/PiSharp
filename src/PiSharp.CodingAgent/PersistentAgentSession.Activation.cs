@@ -127,7 +127,7 @@ public sealed partial class PersistentAgentSession
         var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, token);
         var verified = registry.Resolve(_configuration.Model, prospective.LlmMessages, _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false,
             preparedLoadout: presentation);
-        ValidateRuntimeContext(prospective, verified.Configuration);
+        ValidateRuntimeContext(prospective, verified.Configuration, _toleratedSelection);
         if (!verified.Configuration.Tools.Select(tool => tool.Name).SequenceEqual(names, StringComparer.Ordinal))
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
         var projectedInputs = boundary.PendingInputs.Select(message =>

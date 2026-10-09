@@ -24,6 +24,9 @@ public sealed record PersistentAgentSessionOptions(bool UseLatestLeaf = true, st
     /// <summary>The placeholder a session without a selected model runs with (sdk.ts createAgentSession with no model): a new session
     /// records no <c>model_change</c> for it.</summary>
     public ModelDescriptor? UnselectedModel { get; init; }
+    /// <summary>main.ts buildSessionOptions <c>options.model</c> (--model): the model every session opened or created through these
+    /// options runs on, instead of the one its branch records.</summary>
+    public ModelDescriptor? SelectedModel { get; init; }
 }
 /// <summary>A prompt the session refused before admitting it (agent-session.ts prompt validation); nothing was persisted.</summary>
 public sealed class SessionPromptRejectedException(string message) : Exception(message);
@@ -319,7 +322,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             cancellationToken.ThrowIfCancellationRequested();
             // Without initial names the transcript's loadout is restored by name with the current bindings (Pi 0.99.2).
             var loadout = await registry.PrepareAndDrainAsync(() => registry.ResolveRestored(context, fallbackModel, cancellationToken,
-                registry.InitialActiveToolNames), cancellationToken).ConfigureAwait(false);
+                registry.InitialActiveToolNames, configured.SelectedModel), cancellationToken).ConfigureAwait(false);
             var selection = loadout.Selection;
             var bridge = new Bridge();
             agent = new(selection.Configuration, clock, bridge, configured.AgentOptions);
@@ -327,7 +330,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             cancellationToken.ThrowIfCancellationRequested();
             opened = new(path, store, agent, bridge, projector, codec, context, selection.Configuration, clock, nextEntryId,
                 configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions)
-            { _registry = registry, _runtimeLease = runtime, PromptPreflight = configured.PromptPreflight };
+            { _registry = registry, _runtimeLease = runtime, PromptPreflight = configured.PromptPreflight,
+                _toleratedSelection = Divergent(context, selection.Configuration.Model) };
             var restored = selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
             // Source constructor: the initial names (_buildRuntime) or the transcript's loadout (_restoreToolsFromTranscript) are
             // applied in memory and the file is not written; the next request records a loadout that differs from the recorded one.
@@ -382,7 +386,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             var registry = _registry.BindInvocationOwner(new(generation, linked.Token) { UncountedNestedCallTools = ["codemode"],
                 LateNestedTools = LateNestedInvoker });
             var selection = registry.Resolve(WithUnrecordedLoadout(_context, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), default),
-                _configuration.Model);
+                _configuration.Model, tolerated: _toleratedSelection);
             _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(_context));
             _configuration = selection.Configuration;
             _registry = registry;
@@ -903,14 +907,21 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         return (configured, projector, codec, agent, bridge);
     }
 
-    private static void ValidateRuntimeContext(SessionContextProjection context, AgentConfiguration configuration)
+    /// <param name="tolerated">The selection the branch recorded when the session was opened on another model (sdk.ts: a fallback
+    /// model, or --model); it stands until a response or a model_change on the branch names the session's model.</param>
+    private static void ValidateRuntimeContext(SessionContextProjection context, AgentConfiguration configuration, SessionContextModel? tolerated = null)
     {
         if (context.ThinkingLevel != configuration.ThinkingLevel) throw Error(PersistentAgentSessionFailure.UnsupportedThinkingLevel);
         // Source getBranchSelection: a virtual model_change holds over the physical responses it routed.
         if (SessionBranchSelection.Select(context, configuration.Model) is { } model &&
-            (model.Provider != configuration.Model.Provider || model.ModelId != configuration.Model.Id))
+            (model.Provider != configuration.Model.Provider || model.ModelId != configuration.Model.Id) && model != tolerated)
             throw Error(PersistentAgentSessionFailure.ModelMismatch);
     }
+
+    /// <summary>The branch selection a session opened on another model tolerates (see <see cref="ValidateRuntimeContext"/>).</summary>
+    private SessionContextModel? _toleratedSelection;
+    private static SessionContextModel? Divergent(SessionContextProjection context, ModelDescriptor model) =>
+        SessionBranchSelection.Select(context, model) is { } recorded && (recorded.Provider != model.Provider || recorded.ModelId != model.Id) ? recorded : null;
 
     public Task<AgentLoopResult> PromptAsync(TranscriptEntry message, CancellationToken cancellationToken = default) =>
         PromptAsync([message], cancellationToken);
@@ -1371,7 +1382,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 });
             // Reject unsupported selected influences/bounds before writing, without rewriting history.
             var nextContext = _projector.Project(log.Entries.Add(entry), entry.Id);
-            ValidateRuntimeContext(nextContext, _configuration);
+            ValidateRuntimeContext(nextContext, _configuration, _toleratedSelection);
             if (_registry is not null) ValidateLoadout(nextContext.LlmMessages);
             // A replacement enters the running loop (source in-place mutation), so it must be a message the loop can send.
             if (!ReferenceEquals(message, original) && role != "custom") AgentLoopRunner.ValidateRequestMessages([message]);

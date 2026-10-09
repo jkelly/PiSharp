@@ -77,7 +77,7 @@ public sealed partial class PersistentAgentSession
             }
             // Resolve the loadout as the next request records it: the recorded names removed and the selection declared.
             var resolved = context with { LlmMessages = WithLoadoutRecord(registry, context.LlmMessages, selected, work) };
-            var selection = await PrepareAndDrainLoadoutAsync(() => registry.Resolve(resolved, configuration.Model, work), work).ConfigureAwait(false);
+            var selection = await PrepareAndDrainLoadoutAsync(() => registry.Resolve(resolved, configuration.Model, work, tolerated: _toleratedSelection), work).ConfigureAwait(false);
             var messages = SessionContextProjector.AgentMessages(context);
             await using (var probe = new PiSharp.Agent.Agent(selection.Configuration, _clock, new NoopSink(), _agentOptions))
                 probe.ConfigureAndReplaceMessages(selection.Configuration, messages);

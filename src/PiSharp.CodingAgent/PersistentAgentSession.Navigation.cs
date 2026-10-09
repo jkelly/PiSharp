@@ -115,7 +115,7 @@ public sealed partial class PersistentAgentSession
             {
                 var current = GetToolActivationSelection().Names;
                 var keepCurrent = !current.IsEmpty && !prospective.LlmMessages.Any(message => message.Role == "system");
-                var (restoredLoadout, keptPresentation) = await PrepareAndDrainLoadoutAsync(() => (registry.ResolveRestored(prospective, revision.Configuration.Model, work),
+                var (restoredLoadout, keptPresentation) = await PrepareAndDrainLoadoutAsync(() => (registry.ResolveRestored(prospective, revision.Configuration.Model, work, tolerated: _toleratedSelection),
                     keepCurrent ? registry.PrepareActiveLoadout(registry.NormalizeActiveTools(current, work), work) : null), work).ConfigureAwait(false);
                 configuration = restoredLoadout.Selection.Configuration;
                 if (keepCurrent) keptTools = new(0, registry.NormalizeActiveTools(current, work), keptPresentation);
@@ -125,7 +125,7 @@ public sealed partial class PersistentAgentSession
                     unrecorded = restoredLoadout.RequiresRecord;
                 }
             }
-            ValidateRuntimeContext(prospective, configuration);
+            ValidateRuntimeContext(prospective, configuration, _toleratedSelection);
             var messages = SessionContextProjector.AgentMessages(prospective);
             await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
                 probe.ConfigureAndReplaceMessages(configuration, messages);
@@ -170,7 +170,7 @@ public sealed partial class PersistentAgentSession
                         WithLoadoutRecord(changedRegistry, prospective.LlmMessages, restoredNames, work) } : prospective,
                         revision.Configuration.Model, work), work).ConfigureAwait(false)).Configuration
                     : revision.Configuration;
-                ValidateRuntimeContext(prospective, configuration);
+                ValidateRuntimeContext(prospective, configuration, _toleratedSelection);
                 messages = SessionContextProjector.AgentMessages(prospective);
                 await using (var probe = new NativeAgent(configuration, _clock, new NoopSink(), _agentOptions))
                     probe.ConfigureAndReplaceMessages(configuration, messages);

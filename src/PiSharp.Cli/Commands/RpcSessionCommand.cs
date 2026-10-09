@@ -229,7 +229,9 @@ public static class RpcSessionCommand
                 ContextOptions: ContextOptions(pi is not null));
             // agent-session.ts prompt: Pi entries validate the model and its provider auth before each idle prompt.
             if (pi is not null)
-                options = options with { PromptPreflight = PromptPreflight(liveRuntime ?? LiveSessionRuntime.Default), UnselectedModel = LiveSessionSelection.UnselectedModel };
+                options = options with { PromptPreflight = PromptPreflight(liveRuntime ?? LiveSessionRuntime.Default), UnselectedModel = LiveSessionSelection.UnselectedModel,
+                    // main.ts buildSessionOptions: --model is the model of every session the run creates or opens.
+                    SelectedModel = liveSelection is { FromCliModel: true } fromCli ? fromCli.Model : null };
             string NextId() => "rpc-" + Guid.NewGuid().ToString("N");
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);
@@ -237,11 +239,10 @@ public static class RpcSessionCommand
             {
                 // sdk.ts createAgentSession restore: a session whose branch model is not available runs on the fallback model. At startup
                 // the entry already chose it (the profile's model); a session switched to later (/resume) gets findInitialModel's pick
-                // over the current available snapshot as a continued session; with --model, that model (main.ts buildSessionOptions).
-                var restoring = profile; var cliModel = liveSelection is { FromCliModel: true } fromCli ? fromCli.Model : null;
+                // over the current available snapshot as a continued session.
+                var restoring = profile;
                 restoring.RestoreFallback = (_, fallback) =>
                 {
-                    if (cliModel is not null) return cliModel;
                     if (restoring.LiveModels is not { CurrentRegistry: { } registry } models) return fallback;
                     var current = pi.ReloadSettings is { } reload ? reload(CancellationToken.None).GetAwaiter().GetResult() : settings;
                     return SettingsModelSelection.ContinuingInitialModel(registry, current) is { } initial &&

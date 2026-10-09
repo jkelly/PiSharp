@@ -265,8 +265,10 @@ public sealed partial class SessionRuntimeRegistry
             { Namespace = tool.Namespace, PromptGuidelines = tool.PromptGuidelines.IsDefault ? [] : tool.PromptGuidelines, OutputSchema = tool.OutputSchema };
     }
 
+    /// <param name="tolerated">A branch selection the session was opened over (a fallback model or --model): it keeps
+    /// <paramref name="fallbackModel"/>, the session's own model.</param>
     public SessionRuntimeSelection Resolve(SessionContextProjection context, ModelDescriptor? fallbackModel = null,
-        CancellationToken cancellationToken = default, ImmutableArray<string>? initialActiveToolNames = null)
+        CancellationToken cancellationToken = default, ImmutableArray<string>? initialActiveToolNames = null, SessionContextModel? tolerated = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
@@ -274,7 +276,7 @@ public sealed partial class SessionRuntimeRegistry
         SessionModelBinding model;
         // Source sdk.ts: the branch selection (getBranchSelection), not the latest assistant entry, names the restored model.
         if (SessionBranchSelection.Select(context.Ancestry, (provider, id) =>
-            catalog.Models.TryGetValue((provider, id), out var known) && known.Model.Api == SessionBranchSelection.VirtualApi) is { } selected)
+            catalog.Models.TryGetValue((provider, id), out var known) && known.Model.Api == SessionBranchSelection.VirtualApi) is { } selected && selected != tolerated)
         {
             if (!catalog.Models.TryGetValue((selected.Provider, selected.ModelId), out model!))
                 model = Model(_options.RestoreFallbackModel?.Invoke(selected, fallbackModel) ?? throw Error(SessionRuntimeRegistryFailure.UnknownModel), catalog);
@@ -296,15 +298,18 @@ public sealed partial class SessionRuntimeRegistry
     /// tells the caller to record the restored loadout before use, so later transcript resolutions see only bound declarations.
     /// </summary>
     internal SessionRestoredLoadout ResolveRestored(SessionContextProjection context, ModelDescriptor? fallbackModel,
-        CancellationToken cancellationToken, ImmutableArray<string>? initialActiveToolNames = null)
+        CancellationToken cancellationToken, ImmutableArray<string>? initialActiveToolNames = null, ModelDescriptor? selectedModel = null,
+        SessionContextModel? tolerated = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
         var catalog = _modelCatalog.Read();
         SessionModelBinding model;
+        // main.ts buildSessionOptions: a model the run selected (--model) is the model of every session it opens.
+        if (selectedModel is not null) model = Model(selectedModel, catalog);
         // Source sdk.ts: the branch selection (getBranchSelection), not the latest assistant entry, names the restored model.
-        if (SessionBranchSelection.Select(context.Ancestry, (provider, id) =>
-            catalog.Models.TryGetValue((provider, id), out var known) && known.Model.Api == SessionBranchSelection.VirtualApi) is { } selected)
+        else if (SessionBranchSelection.Select(context.Ancestry, (provider, id) =>
+            catalog.Models.TryGetValue((provider, id), out var known) && known.Model.Api == SessionBranchSelection.VirtualApi) is { } selected && selected != tolerated)
         {
             if (!catalog.Models.TryGetValue((selected.Provider, selected.ModelId), out model!))
                 model = Model(_options.RestoreFallbackModel?.Invoke(selected, fallbackModel) ?? throw Error(SessionRuntimeRegistryFailure.UnknownModel), catalog);

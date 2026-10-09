@@ -27,6 +27,13 @@ internal static partial class Program
             // A model that no longer exists: findInitialModel's anthropic default (Pi 1.1.0: anthropic/claude-opus-4-8).
             var gone = SeedSession(sandbox, "gone.jsonl", "anthropic", "claude-gone-9");
             Equal("anthropic/claude-opus-4-8", await StateModel(sandbox, "--session", gone), "unknown model falls back");
+            // The fallback model answers the continued session; nothing is recorded for it before its response (sdk.ts appends no
+            // model_change for a continued session; the response itself names the model).
+            var before = File.ReadAllLines(gone).Length;
+            (code, stdout, stderr) = await sandbox.Run("-p", "--session", gone, "after fallback");
+            Check(code == 0 && stdout == "ok\n", $"print on the fallback model: {code} {stdout} {stderr}");
+            Equal("claude-opus-4-8", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "the request goes to the fallback model");
+            Check(!File.ReadLines(gone).Skip(before).Any(line => line.Contains("\"type\":\"model_change\"", StringComparison.Ordinal)), "no model_change recorded");
             // No auth for the session's provider: another provider's default (Pi 1.1.0: openai/gpt-5.5).
             sandbox.Vars.Remove("ANTHROPIC_API_KEY"); sandbox.Vars["OPENAI_API_KEY"] = "sk-openai";
             var other = SeedSession(sandbox, "other.jsonl", "anthropic", "claude-haiku-4-5");
@@ -55,6 +62,31 @@ internal static partial class Program
             Check(responses[1]["success"]!.GetValue<bool>(), "switched: " + responses[1].ToJsonString());
             Equal("claude-opus-4-8", responses[2]["data"]!["model"]!["id"]!.GetValue<string>(), "unavailable model falls back");
             Equal("claude-haiku-4-5", responses[4]["data"]!["model"]!["id"]!.GetValue<string>(), "available model restored");
+        }),
+        ("resume.cli-model-is-the-model-of-every-session-the-run-opens", async () =>
+        {
+            using var sandbox = new Sandbox("resume-cli-model");
+            var haiku = SeedSession(sandbox, "haiku.jsonl", "anthropic", "claude-haiku-4-5");
+            // main.ts buildSessionOptions on every runtime creation: --model wins over a usable session model (switch_session) and over
+            // the model in use (new_session) — Pi 1.1.0 run with node reports claude-sonnet-4-5 for both.
+            var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"],
+                """{"id":"1","type":"switch_session","sessionPath":""" + JsonValue.Create(haiku)!.ToJsonString() + "}",
+                """{"id":"2","type":"get_state"}""",
+                """{"id":"3","type":"set_model","provider":"anthropic","modelId":"claude-opus-4-8"}""",
+                """{"id":"4","type":"new_session"}""",
+                """{"id":"5","type":"get_state"}""");
+            Check(responses[0]["success"]!.GetValue<bool>() && responses[3]["success"]!.GetValue<bool>(), "switched and created: " + responses[3].ToJsonString());
+            Equal("claude-sonnet-4-5", responses[1]["data"]!["model"]!["id"]!.GetValue<string>(), "switch_session keeps --model");
+            Equal("claude-sonnet-4-5", responses[4]["data"]!["model"]!["id"]!.GetValue<string>(), "new_session uses --model");
+            // Without --model the usable session model is restored (the case above), and a prompt goes to the --model one here.
+            var before = File.ReadAllLines(haiku).Length;
+            var (code, stdout, stderr) = await sandbox.Run("-p", "--session", haiku, "--provider", "anthropic", "--model", "claude-sonnet-4-5", "again");
+            Check(code == 0 && stdout == "ok\n", $"print: {code} {stdout} {stderr}");
+            Equal("claude-sonnet-4-5", sandbox.Requests[^1].Json.GetProperty("model").GetString(), "the request goes to --model");
+            // _recordSelection records only virtual selections; the response names the physical model.
+            Check(!File.ReadLines(haiku).Skip(before).Any(line => line.Contains("\"type\":\"model_change\"", StringComparison.Ordinal)), "no model_change recorded");
+            // The next continuation (no --model) restores the model that answered last.
+            Equal("anthropic/claude-sonnet-4-5", await StateModel(sandbox, "--session", haiku), "the response's model is the branch selection");
         }),
     ];
 

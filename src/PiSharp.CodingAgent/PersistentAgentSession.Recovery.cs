@@ -196,7 +196,7 @@ public sealed partial class PersistentAgentSession
                 token.ThrowIfCancellationRequested();var id=Identity(_nextEntryId,log.Header.Id,entries);token.ThrowIfCancellationRequested();
                 var entry=ContextEditRecord(target,replacement,id,parent,_clock);edits.Add(entry);entries=entries.Add(entry);parent=id;
             }
-            var prospective=_projector.Project(entries,parent,token);ValidateRuntimeContext(prospective,_configuration);
+            var prospective=_projector.Project(entries,parent,token);ValidateRuntimeContext(prospective, _configuration, _toleratedSelection);
             await using(var probe=new NativeAgent(_configuration,_clock,new NoopSink(),_agentOptions))probe.ConfigureAndReplaceMessages(_configuration,SessionContextProjector.AgentMessages(prospective));
             token.ThrowIfCancellationRequested();admitted=true;var acknowledgment=await _store.AppendAsync(edits.ToImmutable(),token).ConfigureAwait(false);
             if(!acknowledgment.CheckpointAcknowledged)throw Error(PersistentAgentSessionFailure.InvalidCommit);
