@@ -30,6 +30,14 @@ internal static partial class Program
 
     private static IEnumerable<(string, Func<Task>)> UnixProcessCases() =>
     [
+        // The explicit grant (--bash-executable/--bash-spill-root/--allow-bash-command) is admitted on Linux and macOS too, where it
+        // runs through the POSIX process-group runner (formerly Windows-only).
+        ("explicit.bash-grant-is-admitted-on-windows-linux-and-macos", Sync(() =>
+        {
+            var spill = Path.GetFullPath(Path.GetTempPath());
+            var options = PiSharp.Cli.Commands.OfflineSessionProfile.BashOptions(null, spill, ["echo hi"], "5");
+            Check(options is not null && options.Commands.Contains("echo hi") && options.Timeout == 5, "explicit bash options");
+        })),
         ("unix.posix-spawn-own-process-group-cwd-environment-and-stdio-pipes", async () =>
         {
             UnixOnly();

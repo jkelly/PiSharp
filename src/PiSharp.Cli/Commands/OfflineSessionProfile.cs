@@ -390,7 +390,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         ImmutableArray<string> commands, string? timeout)
     {
         if (executable is null && spillRoot is null && commands.IsEmpty && timeout is null) return null;
-        if (!OperatingSystem.IsWindows()) throw new SessionCommandException(SessionCommandFailure.UnsupportedBashPlatform);
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) throw new SessionCommandException(SessionCommandFailure.UnsupportedBashPlatform);
         if (spillRoot is null || commands.Length is < 1 or > 16)
             throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
         var exact = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal); long characters = 0;
@@ -513,7 +513,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         if (bash is not null)
         {
             token.ThrowIfCancellationRequested();
-            if (!OperatingSystem.IsWindows()) throw new SessionCommandException(SessionCommandFailure.UnsupportedBashPlatform);
+            // Windows runs the native job-object runner; Linux and macOS the POSIX process-group admission, as the pi policy does.
+            if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+                throw new SessionCommandException(SessionCommandFailure.UnsupportedBashPlatform);
             // Pi getShellConfig: the explicit shell (--bash-executable, like settings shellPath), else platform discovery.
             ShellConfiguration shell;
             try { shell = bash.Executable is { } configured ? ShellDiscovery.ForBash(configured) : ShellDiscovery.Resolve(toolSettings.ShellPath); }
@@ -525,8 +527,12 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 !(FilePolicy.Comparer.Equals(spillRoot, canonicalWorkspace) || FilePolicy.Within(canonicalWorkspace, spillRoot)) ||
                 reserved.Contains(spillRoot))
                 throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
-            var windows = SessionCommands.Absolute(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
-            if (!Directory.Exists(windows)) throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
+            string? windows = null;
+            if (OperatingSystem.IsWindows())
+            {
+                windows = SessionCommands.Absolute(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
+                if (!Directory.Exists(windows)) throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
+            }
             var spillDirectory = Path.Combine(spillRoot, "pisharp-bash-" + Guid.NewGuid().ToString("N"));
             if (File.Exists(spillDirectory) || Directory.Exists(spillDirectory))
                 throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
@@ -534,16 +540,22 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             var canonicalSpill = SessionCommands.Absolute(await files.CanonicalizeAsync(spillDirectory, token));
             if (!FilePolicy.Comparer.Equals(spillDirectory, canonicalSpill))
                 throw new SessionCommandException(SessionCommandFailure.InvalidBashConfiguration);
-            var environment = ImmutableDictionary<string, string>.Empty.Add("SystemRoot", windows)
+            // The explicit grant keeps a minimal environment: the system root (Windows) or the standard PATH (POSIX), the spill
+            // directory as the temporary directory, and a UTF-8 locale.
+            var environment = (windows is not null ? ImmutableDictionary<string, string>.Empty.Add("SystemRoot", windows)
+                    : ImmutableDictionary<string, string>.Empty.Add("PATH", "/usr/local/bin:/usr/bin:/bin").Add("TMPDIR", canonicalSpill))
                 .Add("TEMP", canonicalSpill).Add("TMP", canonicalSpill).Add("LANG", "C.UTF-8").Add("LC_ALL", "C.UTF-8");
             grant = new(shell, toolSettings.ShellCommandPrefix, canonicalWorkspace, canonicalSpill, environment, bash.Commands, bash.Timeout, files);
             // Pi spills any amount of command output to its file; only the in-memory tail is bounded.
             var unboundedOutput = new ProcessRunnerOptions(MaximumRawBytes: int.MaxValue);
-            processCleanup = new(new NativeProcessRunner(unboundedOutput));
+            processCleanup = new(OperatingSystem.IsWindows() ? new NativeProcessRunner(unboundedOutput)
+                : new PiSharp.Tools.Processes.Unix.UnixProcessRunner(new PiSharp.Tools.Processes.Unix.PosixSpawnProcessAdmission(), unboundedOutput));
             // Pi exposes PI_SESSION_ID, PI_SESSION_FILE, PI_PROVIDER, PI_MODEL and PI_REASONING_LEVEL to model bash commands.
             bashTool = new(processCleanup, BashToolOptions.FromShell(shell, canonicalWorkspace, environment, canonicalSpill) with
             { CommandPrefix = toolSettings.ShellCommandPrefix, SessionEnvironment = () => CurrentBashSession(bashOwner) });
-            userBash = new(new(new NativeShellOperations(shell, environment, canonicalSpill, unboundedOutput), canonicalSpill), toolSettings.ShellCommandPrefix);
+            IShellOperations operations = OperatingSystem.IsWindows() ? new NativeShellOperations(shell, environment, canonicalSpill, unboundedOutput)
+                : new PiSharp.Tools.Processes.Unix.PosixShellOperations(shell, environment, canonicalSpill);
+            userBash = new(new(operations, canonicalSpill), toolSettings.ShellCommandPrefix);
         }
         var piPolicy = toolPolicy is { Mode: PiSharp.Cli.Pi.PiToolPolicyMode.Pi } ? toolPolicy : null;
         string? piShell = null;
