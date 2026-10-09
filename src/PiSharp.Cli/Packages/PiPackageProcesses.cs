@@ -83,6 +83,26 @@ internal class PiPackageProcesses
         try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { } catch (System.ComponentModel.Win32Exception) { }
     }
 
+    /// <summary>execvp lookup: a command containing a slash resolves against the working directory; a bare name is the first executable
+    /// file on PATH (an empty PATH entry is the current directory).</summary>
+    internal static string? UnixWhich(string command, string cwd, string? path)
+    {
+        static bool Executable(string candidate)
+        {
+            if (!File.Exists(candidate)) return false;
+            if (OperatingSystem.IsWindows()) return true;
+            const UnixFileMode execute = UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute;
+            return (File.GetUnixFileMode(candidate) & execute) != 0;
+        }
+        if (command.Contains('/')) return Path.GetFullPath(command, cwd);
+        foreach (var directory in (path ?? "/usr/local/bin:/usr/bin:/bin").Split(':'))
+        {
+            var candidate = Path.Combine(directory.Length == 0 ? cwd : Path.GetFullPath(directory, cwd), command);
+            if (Executable(candidate)) return candidate;
+        }
+        return null;
+    }
+
     private Process Start(string command, IReadOnlyList<string> args, string? cwd, IReadOnlyDictionary<string, string>? extra, bool capture)
     {
         var info = new ProcessStartInfo { UseShellExecute = false, RedirectStandardOutput = capture, RedirectStandardError = capture };
@@ -105,7 +125,9 @@ internal class PiPackageProcesses
         }
         else
         {
-            info.FileName = command;
+            // child_process.spawn on Unix: a bare command is looked up on the child environment's PATH (execvp), a path is used as is.
+            info.FileName = UnixWhich(command, cwd ?? System.Environment.CurrentDirectory,
+                info.Environment.TryGetValue("PATH", out var path) ? path : null) ?? throw new PiPackageException($"spawn {command} ENOENT");
             foreach (var argument in args) info.ArgumentList.Add(argument);
         }
         try { return Process.Start(info) ?? throw new PiPackageException($"spawn {command} ENOENT"); }

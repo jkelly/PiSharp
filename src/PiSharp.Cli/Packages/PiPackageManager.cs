@@ -1310,7 +1310,7 @@ internal sealed class PiPackageManager
     private static List<Entry> ReadDirectory(string directory)
     {
         var result = new List<Entry>();
-        foreach (var info in new DirectoryInfo(directory).EnumerateFileSystemInfos())
+        foreach (var info in PiSharp.Contracts.Compatibility.NodeDirectoryOrder.Order(new DirectoryInfo(directory).EnumerateFileSystemInfos()))
         {
             if (info.LinkTarget is null) { result.Add(new(info.Name, info.FullName, info is DirectoryInfo, info is FileInfo)); continue; }
             var isDirectory = Directory.Exists(info.FullName); var isFile = !isDirectory && File.Exists(info.FullName);

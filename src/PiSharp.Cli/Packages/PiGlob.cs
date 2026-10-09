@@ -421,7 +421,7 @@ internal static class PiGlobExpand
 
     private static List<FileSystemInfo> Entries(string directory)
     {
-        try { return Directory.Exists(directory) ? [.. new DirectoryInfo(directory).EnumerateFileSystemInfos()] : []; }
+        try { return Directory.Exists(directory) ? [.. PiSharp.Contracts.Compatibility.NodeDirectoryOrder.Order(new DirectoryInfo(directory).EnumerateFileSystemInfos())] : []; }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return []; }
     }
 }
