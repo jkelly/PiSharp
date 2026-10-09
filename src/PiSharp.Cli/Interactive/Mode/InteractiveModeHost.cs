@@ -92,7 +92,8 @@ internal static class InteractiveModeHost
                 InitialMessages = [.. options.InitialMessages],
                 Verbose = options.Verbose,
                 TuiMode = options.TuiMode,
-                InitialThemeSetting = options.Theme
+                InitialThemeSetting = options.Theme,
+                ScopedModels = [.. options.Selection.ScopedModels.Select(scoped => new ScopedModel(scoped.Model.CloneJson(), scoped.ThinkingLevel))]
             }));
             observeMode?.Invoke(mode);
             host = Task.Run(() => RpcSessionCommand.RunWithPresentationAsync(rpcArgs, connection.Input, connection.Output, hostDiagnostics, mode,

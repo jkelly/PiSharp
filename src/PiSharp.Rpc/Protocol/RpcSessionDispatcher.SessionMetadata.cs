@@ -57,7 +57,7 @@ public sealed partial class RpcSessionDispatcher
             throw new RpcCommandException(command.Id, command.Type, "Session usage is outside the supported finite native accounting profile.");
         var totals = stats.Totals;
         double? window = null, contextTokens = null;
-        if (_models.TryGetValue(snapshot.Agent.Model, out var model) && model.Value.TryGetProperty("contextWindow", out var rawWindow) &&
+        if (TryGetModel(snapshot.Agent.Model, out var model) && model.Value.TryGetProperty("contextWindow", out var rawWindow) &&
             rawWindow.TryGetDouble(out var number) && double.IsFinite(number) && number > 0)
         {
             window = number;

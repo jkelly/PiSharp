@@ -39,11 +39,18 @@ internal static class InteractiveHostServices
                 try
                 {
                     var errors = await registry.RefreshAsync(allowNetwork: true, force: null, providers: null, token).ConfigureAwait(false);
+                    if (Profile()?.LiveModels is { } models) await models.RefreshAsync(token).ConfigureAwait(false);
                     return new ModelsRefreshResult(false, [.. errors.Select(error => KeyValuePair.Create(error.Key, error.Value.Message))]);
                 }
                 catch (OperationCanceledException) { return new ModelsRefreshResult(true, []); }
             },
             GetModelsJsonError = () => registry?.GetError(),
+            // model-runtime.ts: credentials or catalogs changed, so the available snapshot (and the session's selectable models) is re-read.
+            OnCredentialsChanged = async _ =>
+            {
+                if (Profile()?.LiveModels is { } models) await models.RefreshAsync().ConfigureAwait(false);
+                try { registry = await runtime.CreateModelRegistryAsync(CancellationToken.None).ConfigureAwait(false); } catch { }
+            },
             ResolveToolRenderers = toolName =>
             {
                 try { return Profile()?.ResolveExtensionToolRenderers(toolName) is { } extension ? BuiltInToolRenderers.Resolve(toolName, null, extension) : null; }

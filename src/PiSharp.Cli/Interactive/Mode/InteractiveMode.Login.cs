@@ -224,6 +224,8 @@ internal sealed partial class InteractiveMode
                     using var timeout = new CancellationTokenSource(15_000);
                     await context.Login!.Store.DeleteAsync(providerOption.Id, timeout.Token);
                     await RefreshStoredCredentialTypesAsync();
+                    try { await context.OnCredentialsChanged(providerOption.Id); } catch { }
+                    await RefreshAvailableModelsAsync();
                     UpdateAvailableProviderCount();
                     ShowStatus(providerOption.AuthType == "oauth"
                         ? $"Logged out of {providerOption.Name}"

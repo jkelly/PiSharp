@@ -31,7 +31,7 @@ internal sealed partial class OfflineSessionProfile
     /// (consulted by the user Bash host before local execution).</summary>
     private void BindSessionEventSeams(NativeExtensionActivation extension)
     {
-        extension.ModelWire = descriptor => descriptor == SelectedModel ? SelectedModelWire : null;
+        extension.ModelWire = descriptor => descriptor == SelectedModel ? SelectedModelWire : _liveModels?.Wire(descriptor);
         if (UserBash is UserBashHost host) host.Handlers = extension.HasUserBashHandlers ? [extension.UserBashHandler] : [];
     }
 }

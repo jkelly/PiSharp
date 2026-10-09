@@ -288,6 +288,93 @@ internal static class InteractiveModeCases
             Check(!pi.Terminal.Text.Contains("and loaded resources", StringComparison.Ordinal), "details hidden with quietStartup header");
         });
 
+        // agent-session.ts setModel/cycleModel over modelRuntime.getAvailableSnapshot: /model, Ctrl+P and --models switch the live
+        // session; the next request goes to the selected model and the session records the change.
+        yield return ("e2e.models.switch-with-model-command", Case("model-switch", async pi =>
+        {
+            var available = await pi.Mode!.Rpc.RequestAsync(new System.Text.Json.Nodes.JsonObject { ["type"] = "get_available_models" });
+            var ids = (available?["models"] as System.Text.Json.Nodes.JsonArray ?? []).Select(model => model?["id"]?.GetValue<string>()).ToList();
+            Check(ids.Contains("claude-haiku-4-5") && ids.Contains("claude-sonnet-4-5"), "the registry's anthropic models are available: " + string.Join(",", ids));
+            pi.Type("/model claude-haiku-4-5");
+            await Task.Delay(300);
+            pi.Type("\r");
+            await Task.Delay(300);
+            pi.Type("\r");
+            await pi.WaitUntil(text => text.Contains("claude-haiku-4-5 •", StringComparison.Ordinal), "footer shows the selected model");
+            await pi.Submit("hello haiku");
+            await pi.WaitFor("Hello from the fake model.");
+            Contains(pi.Requests[^1], "\"model\":\"claude-haiku-4-5\"", "request goes to the selected model");
+            var file = pi.SessionFiles().Single();
+            await pi.WaitUntil(_ => InteractiveHarness.ReadShared(file).Contains("\"modelId\":\"claude-haiku-4-5\"", StringComparison.Ordinal), "model_change recorded");
+            // Summaries (compaction here) run on the switched model's own route.
+            await pi.Submit("second turn");
+            await pi.WaitUntil(text => text.Split("Hello from the fake model.").Length > 2, "second answer");
+            var before = pi.Requests.Count;
+            pi.Respond = (_, _) => InteractiveHarness.AnthropicText("## Goal\nsummary from haiku");
+            await pi.Submit("/compact");
+            await pi.WaitUntil(_ => InteractiveHarness.ReadShared(file).Contains("\"type\":\"compaction\"", StringComparison.Ordinal), "compaction recorded");
+            Check(pi.Requests.Count > before, "a summary request was sent");
+            Contains(pi.Requests[^1], "\"model\":\"claude-haiku-4-5\"", "the summary request goes to the switched model");
+        }, setup: pi => File.WriteAllText(Path.Combine(pi.AgentDir, "settings.json"), """{"compaction":{"keepRecentTokens":1}}""")));
+
+        // settings-manager.ts getCompactionTokenSetting: an invalid token setting fails the compaction with upstream's message.
+        yield return ("e2e.compact.invalid-settings", Case("compact-invalid", async pi =>
+        {
+            await pi.Submit("/compact");
+            await pi.WaitFor("Compaction failed: Invalid compaction.keepRecentTokens setting: -1. Expected a non-negative");
+        }, setup: pi => File.WriteAllText(Path.Combine(pi.AgentDir, "settings.json"), """{"compaction":{"keepRecentTokens":-1}}""")));
+        // agent-session.ts compact: a session too small to compact reports one error (the compaction_end event's).
+        yield return ("e2e.compact.nothing-to-compact-once", Case("compact-small", async pi =>
+        {
+            await pi.Submit("/compact");
+            await pi.WaitFor("Nothing to compact (session too small)");
+            await Task.Delay(500);
+            Equal(1, pi.Terminal.Text.Split("Nothing to compact").Length - 1, "one error line: " + pi.Terminal.Text);
+        }));
+
+        yield return ("e2e.models.ctrl-p-cycles-available", Case("model-cycle", async pi =>
+        {
+            pi.Type("\u0010");
+            await pi.WaitUntil(text => !text.Contains("claude-sonnet-4-5 •", StringComparison.Ordinal) && text.Contains(" • ", StringComparison.Ordinal), "footer leaves the startup model");
+            var state = await pi.Mode!.Rpc.RequestAsync(new System.Text.Json.Nodes.JsonObject { ["type"] = "get_state" });
+            Check(state?["model"]?["id"]?.GetValue<string>() is { } id && id != "claude-sonnet-4-5", "the session model changed");
+        }));
+
+        yield return ("e2e.models.ctrl-p-cycles-scope", Case("model-scope", async pi =>
+        {
+            pi.Type("\u0010");
+            await pi.WaitUntil(text => text.Contains("claude-haiku-4-5 •", StringComparison.Ordinal), "next scoped model");
+            pi.Type("\u0010");
+            await pi.WaitUntil(text => text.Contains("claude-sonnet-4-5 •", StringComparison.Ordinal), "scope wraps around");
+            await pi.Submit("scoped hello");
+            await pi.WaitFor("Hello from the fake model.");
+            Contains(pi.Requests[^1], "\"model\":\"claude-sonnet-4-5\"", "request goes to the scoped model");
+        }, extra: ["--models", "claude-sonnet-4-5,claude-haiku-4-5"]));
+
+        // After /login the provider's models join the available snapshot and can be selected at once.
+        yield return ("e2e.models.login-makes-models-available", Case("model-login", async pi =>
+        {
+            static async Task<List<string?>> Providers(InteractiveHarness pi) =>
+                [.. ((await pi.Mode!.Rpc.RequestAsync(new System.Text.Json.Nodes.JsonObject { ["type"] = "get_available_models" }))?["models"] as System.Text.Json.Nodes.JsonArray ?? [])
+                    .Select(model => model?["provider"]?.GetValue<string>()).Distinct()];
+            Check(!(await Providers(pi)).Contains("openai"), "openai is not available before /login");
+            pi.Type("/login openai");
+            await Task.Delay(300);
+            pi.Type("\r");
+            await Task.Delay(300);
+            pi.Type("\r");
+            await pi.WaitFor("Select authentication method for OpenAI:");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("Enter OpenAI API key");
+            await Task.Delay(100);
+            pi.Type("sk-openai-test");
+            pi.Type("\r");
+            await pi.WaitFor("Saved API key for OpenAI");
+            await pi.WaitUntil(_ => Providers(pi).GetAwaiter().GetResult().Contains("openai"), "openai models available after /login");
+        }, setup: pi => pi.Configure = context => context with { Login = new PiSharp.Cli.Authentication.ProviderLoginHost(
+            new PiSharp.Cli.Authentication.AuthJsonCredentialStore(Path.Combine(pi.AgentDir, "auth.json")), () => new HttpClient()) }));
         yield return ("e2e.selector.scoped-models", Case("scoped", async pi =>
         {
             await pi.Submit("/scoped-models");

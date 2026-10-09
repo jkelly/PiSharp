@@ -57,6 +57,8 @@ internal sealed record InteractiveModeOptions
     public string? TuiMode { get; init; }
     public string? InitialThemeSetting { get; init; }
     public IReadOnlyList<string> DeprecationWarnings { get; init; } = [];
+    /// <summary>The session's scoped models (--models, else enabledModels): Ctrl+P cycles them (agent-session.ts scopedModels).</summary>
+    public IReadOnlyList<ScopedModel> ScopedModels { get; init; } = [];
 }
 
 /// <summary>Pi's interactive TUI mode over the RPC session host.</summary>
@@ -160,6 +162,7 @@ internal sealed partial class InteractiveMode
         this.options = options with { TuiMode = tuiMode };
         version = context.Version;
         state = new SessionState(context.Startup.Cwd);
+        state.ScopedModels = [.. options.ScopedModels];
         renderer = CreateRenderer(tuiMode, settings.ShowHardwareCursor, context.Terminal);
         ui = new TuiReference(() => renderer);
         ui.ClearOnShrink = settings.ClearOnShrink;

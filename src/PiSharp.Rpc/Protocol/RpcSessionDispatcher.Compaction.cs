@@ -22,9 +22,16 @@ public sealed partial class RpcSessionDispatcher
         if (!manualWire && !upstreamToggle && command.ExpectedGeneration != attachment.Generation)
             throw new RpcCommandException(command.Id, command.Type, command.Type == "pisharp_set_auto_compaction"
                 ? "Automatic summary configuration generation is stale." : "Summary session generation is stale.");
+        // agent-session.ts compact/_runAutoCompaction: settingsManager.getCompactionSettings(model) for the upstream commands.
+        SessionCompactionSettings? hostSettings = null;
+        if ((manualWire || upstreamToggle) && _compactionSettings is not null)
+        {
+            try { hostSettings = _compactionSettings(attachment.Session.Snapshot.Agent.Model); }
+            catch (InvalidOperationException error) { throw new RpcCommandException(command.Id, command.Type, "Compaction failed: " + error.Message); }
+        }
         if (upstreamToggle || command.Type == "pisharp_set_auto_compaction")
         {
-            var request = upstreamToggle ? new SessionCompactionRequest(ContextWindow: SummaryContextWindow(command, attachment), Automatic: true)
+            var request = upstreamToggle ? new SessionCompactionRequest(hostSettings, ContextWindow: SummaryContextWindow(command, attachment), Automatic: true)
                 : command.Compaction!;
             _ = RpcCommandCodec.Success(command, null, _options);
             await _sessionOwner.ConfigureAutomaticCompactionAsync(attachment,
@@ -64,8 +71,10 @@ public sealed partial class RpcSessionDispatcher
                     _ = RpcCommandCodec.Success(command, data, _options);
                     return ValueTask.CompletedTask;
                 }
-                var receipt = command.Compaction is not null
-                    ? await _sessionOwner.CompactAsync(attachment, command.Compaction, _summaryGenerator!, cancellation.Token, Validate).ConfigureAwait(false)
+                var compaction = manualWire && hostSettings is not null && command.Compaction is not null
+                    ? command.Compaction with { Settings = hostSettings } : command.Compaction;
+                var receipt = compaction is not null
+                    ? await _sessionOwner.CompactAsync(attachment, compaction, _summaryGenerator!, cancellation.Token, Validate).ConfigureAwait(false)
                     : await _sessionOwner.SummarizeBranchAsync(attachment, command.BranchSummary!, _summaryGenerator!, cancellation.Token, Validate).ConfigureAwait(false);
                 if (!manualWire) return NativeResponse(receipt?.Entry);
                 if (receipt is null)
@@ -101,7 +110,7 @@ public sealed partial class RpcSessionDispatcher
 
     private double SummaryContextWindow(RpcCommandEnvelope command, AgentSessionAttachment attachment)
     {
-        if (!_models.TryGetValue(attachment.Session.Snapshot.Agent.Model, out var model) ||
+        if (!TryGetModel(attachment.Session.Snapshot.Agent.Model, out var model) ||
             !model.Value.GetProperty("contextWindow").TryGetDouble(out var window) || !double.IsFinite(window) || window <= 0)
             throw new RpcCommandException(command.Id, command.Type, "Automatic compaction requires a positive finite model context window.");
         return window;
