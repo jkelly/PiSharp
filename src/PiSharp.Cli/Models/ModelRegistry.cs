@@ -102,6 +102,11 @@ internal sealed class ModelRegistry
         if (extensionProviders.Remove(providerId)) Rebuild();
     }
 
+    /// <summary>provider-composer.ts composeOAuthAuth / getAllModels for extension providers with <c>oauth</c>: the stored OAuth
+    /// credential resolves through the extension's refreshToken and getApiKey, and modifyModels projects the chat models.</summary>
+    internal IExtensionOAuthLayer? ExtensionOAuth { get => extensionOAuth; set { extensionOAuth = value; Rebuild(); } }
+    private IExtensionOAuthLayer? extensionOAuth;
+
     /// <summary>Source registerApiProvider(streamSimple): models of this API stream through the extension (keyed by API, as pi-ai's
     /// API provider registry is).</summary>
     internal void RegisterCustomStream(string api, Func<RegistryModel, PiSharp.AI.IChatTransport> create) => customStreams[api] = create;
@@ -120,7 +125,10 @@ internal sealed class ModelRegistry
             try
             {
                 var composed = providerConfig is null ? [.. baseModels] : ModelProviderComposer.Compose(id, baseModels, providerConfig);
-                next.Add(new(id, ModelProviderComposer.ApplyExtension(id, composed, extension), true, null));
+                var models = ModelProviderComposer.ApplyExtension(id, composed, extension);
+                // getAllModels: an extension's modifyModels projects the chat models with the stored OAuth credential.
+                if (extension is not null && Stored(id)?.Type == "oauth" && extensionOAuth?.ModifyModels(id, models) is { } modified) models = [.. modified];
+                next.Add(new(id, models, true, null));
             }
             catch (InvalidOperationException error) { next.Add(new(id, [.. baseModels], false, error.Message)); }
         }
@@ -242,7 +250,7 @@ internal sealed class ModelRegistry
             builtin is null ? null : BuiltinProviders.CheckAuth(builtin, credential, options.Environment, options.FileExists, options.Home);
         if (!composed.Overlaid) return Inherited(stored);
         var providerConfig = ProviderConfig(providerId);
-        if (stored?.Type == "oauth") return builtin?.OAuthName is not null ? "OAuth" : null;
+        if (stored?.Type == "oauth") return builtin?.OAuthName is not null || extensionOAuth?.Has(providerId) == true ? "OAuth" : null;
         var rawKey = ModelProviderComposer.ApiKey(providerConfig);
         // composeApiKeyAuth: OAuth-only providers get no fabricated API-key method.
         if (builtin is { Auth: ProviderAuthKind.OAuthOnly } && rawKey is null) return null;
@@ -310,8 +318,13 @@ internal sealed class ModelRegistry
         try
         {
             if (stored?.Type == "oauth")
-            { error = $"Stored OAuth credentials for \"{providerId}\" are not available on this route; use an API key."; return null; }
-            if (stored is { Type: "api_key", Key: { Length: > 0 } storedKey }) { key = storedKey; env = stored.Environment; source = "stored credential"; }
+            {
+                // composeOAuthAuth: an extension provider's OAuth credential becomes its API key (refreshed when it expires).
+                if (extensionOAuth?.Has(providerId) != true || extensionOAuth.ApiKey(providerId) is not { Length: > 0 } oauthKey)
+                { error = $"Stored OAuth credentials for \"{providerId}\" are not available on this route; use an API key."; return null; }
+                key = oauthKey; source = "OAuth";
+            }
+            else if (stored is { Type: "api_key", Key: { Length: > 0 } storedKey }) { key = storedKey; env = stored.Environment; source = "stored credential"; }
             // composeApiKeyAuth: a stored credential (even one whose key does not resolve) skips models.json apiKey.
             else if (stored is not { Type: "api_key" } && ModelProviderComposer.ApiKey(providerConfig) is { } rawKey)
             { key = Values.ResolveOrThrow(rawKey, $"API key for provider \"{providerId}\"", stored?.Environment); source = "configured API key"; }

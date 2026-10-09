@@ -33,14 +33,14 @@ internal sealed partial class InteractiveMode
     /// <summary>The provider catalog with each provider's configured status (stored credential, else an environment variable).</summary>
     private sealed class LoginCatalog(InteractiveMode mode) : ILoginProviderCatalog
     {
-        public IReadOnlyList<LoginProviderInfo> GetProviders() => ProviderAuthCatalog.All.Select(provider => new LoginProviderInfo(provider.Id, provider.Name,
+        public IReadOnlyList<LoginProviderInfo> GetProviders() => ProviderAuthCatalog.Entries().Select(provider => new LoginProviderInfo(provider.Id, provider.Name,
             provider.OAuth is { } oauth ? new AuthMethodInfo(oauth.Name, true, oauth.IsSubscription, oauth.LoginLabel) : null,
             new AuthMethodInfo(provider.ApiKeyName, provider.ApiKeyLogin != ApiKeyLoginKind.Secret || provider.EnvironmentVariables.Length > 0))).ToList();
 
         public ProviderAuthStatus GetProviderAuthStatus(string providerId)
         {
             if (mode.storedCredentialTypes.ContainsKey(providerId)) return new(true, null, "stored credential");
-            var provider = ProviderAuthCatalog.All.FirstOrDefault(entry => entry.Id == providerId);
+            var provider = ProviderAuthCatalog.Find(providerId);
             var variable = provider?.EnvironmentVariables.FirstOrDefault(name => !string.IsNullOrEmpty(mode.context.GetEnvironment(name)));
             return variable is not null ? new(true, null, variable) : new(false);
         }
@@ -197,7 +197,7 @@ internal sealed partial class InteractiveMode
             var stored = await context.Login.Store.ListAsync(timeout.Token);
             providerOptions = [.. stored.Select(row =>
             {
-                var provider = ProviderAuthCatalog.All.FirstOrDefault(entry => entry.Id == row.Provider);
+                var provider = ProviderAuthCatalog.Find(row.Provider);
                 return new AuthSelectorProvider(row.Provider, provider?.Name ?? row.Provider, row.Type, null, new AuthCheck(row.Type, "stored credential"),
                     provider?.OAuth?.IsSubscription == true);
             }).OrderBy(option => option.Name, StringComparer.Create(System.Globalization.CultureInfo.InvariantCulture, false))];

@@ -192,6 +192,7 @@ internal sealed partial class PiExtensionHost
             case "ui.read": return UiRead(Op());
             case "ui.setTheme": return new JsonObject { ["success"] = false, ["error"] = "Theme switching from extensions is not available in this PiSharp host" };
             case "ctx.executeTool": return await ExecuteToolAsync(p, request, token).ConfigureAwait(false);
+            case "oauth.prompt": return await OAuthPromptAsync(p, token).ConfigureAwait(false);
             case "ctx.compact":
                 // Source ExtensionContext.compact(): abort, then the session's manual compaction; onComplete gets the CompactionResult.
                 if (Compact is null) throw new NotSupportedException("ctx.compact() needs a session host with compaction (RPC, interactive, print)");
@@ -304,6 +305,7 @@ internal sealed partial class PiExtensionHost
                 return;
             }
             case "events.emit": DeliverFromNode(parameters); return;
+            case "oauth.event": OAuthEvent(parameters); return;
             case "component.event": ComponentEvent?.Invoke(parameters.GetProperty("id").GetString()!, parameters.Clone()); return;
             case "registrations.changed":
             {
@@ -962,8 +964,10 @@ internal sealed partial class PiExtensionHost
     /// routing calls the extension's <c>route(request, ctx)</c> in Node with upstream's ModelRouteRequest.</summary>
     /// <summary>model-runtime.ts registerProvider: each extension provider's chat models, baseUrl, apiKey and headers join the registry
     /// (model selection and the live routes read them); a provider with streamSimple serves its API through the Node host.</summary>
-    internal void RegisterProviders(PiSharp.Cli.Models.ModelRegistry registry)
+    internal void RegisterProviders(PiSharp.Cli.Models.ModelRegistry registry, string? authPath = null, TimeProvider? time = null)
     {
+        // provider-composer.ts composeOAuthAuth: the providers' OAuth methods resolve their stored credentials and project their models.
+        registry.ExtensionOAuth = new PiExtensionOAuthLayer(this, authPath, time);
         foreach (var registration in ProviderRegistrations)
         {
             if (registration["config"] is not JsonObject described || registration["name"]?.GetValue<string>() is not { } name) continue;

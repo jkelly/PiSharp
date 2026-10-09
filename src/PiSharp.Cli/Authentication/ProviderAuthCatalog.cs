@@ -84,7 +84,23 @@ internal static class ProviderAuthCatalog
         Key("zai-coding-cn", "Z.AI Coding CN", "Z.AI Coding CN API key", "ZAI_CODING_CN_API_KEY"),
     ];
 
-    public static ProviderAuthEntry? Find(string id) => All.FirstOrDefault(entry => entry.Id == id);
+    /// <summary>The providers extensions registered with an <c>oauth</c> config in the current run (model-runtime.ts registerProvider:
+    /// their OAuth method joins /login and the stored credentials' resolution).</summary>
+    private static readonly AsyncLocal<Func<IEnumerable<ProviderAuthEntry>>?> ExtensionEntries = new();
+    internal static Func<IEnumerable<ProviderAuthEntry>>? Extensions { get => ExtensionEntries.Value; set => ExtensionEntries.Value = value; }
+
+    /// <summary>Every provider's auth: the built-in ones (an extension's OAuth replacing a built-in provider's), then extension providers.</summary>
+    public static IEnumerable<ProviderAuthEntry> Entries()
+    {
+        var extensions = Extensions?.Invoke().ToList() ?? [];
+        foreach (var builtin in All) yield return extensions.FirstOrDefault(entry => entry.Id == builtin.Id) ?? builtin;
+        foreach (var extension in extensions) if (!All.Any(builtin => builtin.Id == extension.Id)) yield return extension;
+    }
+
+    public static ProviderAuthEntry? Find(string id) => Entries().FirstOrDefault(entry => entry.Id == id);
+
+    /// <summary>The built-in provider's auth only.</summary>
+    internal static ProviderAuthEntry? Builtin(string id) => All.FirstOrDefault(entry => entry.Id == id);
 
     /// <summary>A login option: one provider and one auth method (getLoginProviderOptions).</summary>
     internal sealed record LoginOption(ProviderAuthEntry Provider, string AuthType)
@@ -95,7 +111,7 @@ internal static class ProviderAuthCatalog
 
     public static IEnumerable<LoginOption> LoginOptions(string? authType = null)
     {
-        foreach (var provider in All)
+        foreach (var provider in Entries())
         {
             if (provider.OAuth is not null && authType is null or "oauth") yield return new(provider, "oauth");
             if (provider.ApiKeyName.Length != 0 && authType is null or "api_key") yield return new(provider, "api_key");
