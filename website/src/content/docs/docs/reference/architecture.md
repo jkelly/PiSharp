@@ -5,14 +5,16 @@ description: How PiSharp is put together.
 
 PiSharp is built as layered libraries. Each one depends only on the layers below it.
 
+Three libraries use third-party packages: `PiSharp.Tools.Skia` (SkiaSharp, for images), `PiSharp.Codemode` (Jint and its parser Acornima, for codemode scripts) and `PiSharp.PromptTemplates.Yaml` (YamlDotNet). The rest use only .NET.
+
 | Layer | Libraries |
 | --- | --- |
 | Contracts | `PiSharp.Contracts` |
 | Providers | `PiSharp.AI` |
-| Agent | `PiSharp.Agent`, `PiSharp.Tools`, `PiSharp.Sessions` |
-| Coding agent | `PiSharp.CodingAgent` |
+| Agent | `PiSharp.Agent`, `PiSharp.Tools`, `PiSharp.Tools.Skia`, `PiSharp.Sessions` |
+| Coding agent | `PiSharp.CodingAgent`, `PiSharp.Codemode`, `PiSharp.PromptTemplates.Yaml` |
 | Frontends | `PiSharp.Cli`, `PiSharp.Rpc`, `PiSharp.Tui` |
-| Extensions | `PiSharp.Extensions.Abstractions`, `PiSharp.Extensions.Runtime`, `PiSharp.Extensions.Agent`, `PiSharp.ExtensionHost`, optional `PiSharp.Compatibility.Node` |
+| Extensions | `PiSharp.Extensions.Abstractions`, `PiSharp.Extensions.Runtime`, `PiSharp.Extensions.Agent`, `PiSharp.ExtensionHost`, `PiSharp.Compatibility.Node` (the Node bridge) |
 
 ## Design principles
 
