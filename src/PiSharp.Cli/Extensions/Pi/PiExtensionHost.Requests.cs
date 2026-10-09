@@ -74,10 +74,33 @@ internal sealed partial class PiExtensionHost
 
     /// <summary>Brings the session's registrations in line with the extensions' current ones: commands of every extension (their
     /// name:N invocation names may change), then the tools of <paramref name="index"/> (all extensions with -1) in the live catalog.</summary>
-    internal async Task SyncRegistrationsAsync(int index, bool force)
+    internal Task SyncRegistrationsAsync(int index, bool force)
     {
         // Commands first, synchronously: the notification is processed before the callback that registered them returns.
         SyncCommands();
+        // The catalog publication waits for the session's mutation boundary; it must not inherit a running input or lifecycle callback's
+        // context (a /reload or session_start handler), so it runs detached and the session takes it at its next request.
+        Task pending;
+        using (ExecutionContext.SuppressFlow()) pending = Task.Run(() => SyncToolsAsync(index, force));
+        lock (_pendingSyncs) { _pendingSyncs.RemoveAll(task => task.IsCompleted); _pendingSyncs.Add(pending); }
+        return pending;
+    }
+
+    private readonly List<Task> _pendingSyncs = [];
+
+    /// <summary>Waits (bounded) until the registrations the extensions made so far reached the session: a prompt sees a tool registered
+    /// before it, as upstream's synchronous refreshTools gives.</summary>
+    internal async Task WaitForRegistrationsAsync(CancellationToken token)
+    {
+        Task[] pending;
+        lock (_pendingSyncs) pending = [.. _pendingSyncs.Where(task => !task.IsCompleted)];
+        if (pending.Length == 0) return;
+        try { await Task.WhenAll(pending).WaitAsync(TimeSpan.FromSeconds(10), token).ConfigureAwait(false); }
+        catch (TimeoutException) { }
+    }
+
+    private async Task SyncToolsAsync(int index, bool force)
+    {
         await _sync.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -151,7 +174,11 @@ internal sealed partial class PiExtensionHost
                     ? instructions.GetString() : null, token).ConfigureAwait(false);
             case "command.waitForIdle": await RequireAttached().Session.WaitForIdleAsync(token).ConfigureAwait(false); return null;
             case "command.session": return await SessionCommandAsync(p, token).ConfigureAwait(false);
-            case "command.reload": throw new NotSupportedException("ctx.reload() is not available in this PiSharp host yet");
+            case "command.reload":
+                // ctx.reload(): the mode's reload; the command's pi and ctx objects are stale afterwards.
+                if (Reload is null) throw new NotSupportedException("ctx.reload() needs a session host that reloads (RPC, interactive)");
+                await Reload(token).ConfigureAwait(false);
+                return null;
             case "models.read": return await ModelsAsync(Op(), Args(), token).ConfigureAwait(false);
             case "models.call": return await ModelsAsync(Op(), Args(), token).ConfigureAwait(false);
             case "bridge.call": return await BridgeCallAsync(p, request, token).ConfigureAwait(false);

@@ -21,6 +21,7 @@ internal static partial class Program
         ("gap.send-message-from-an-idle-command-appends-and-displays", SendMessageWhileIdle),
         ("gap.shortcuts-run-with-a-fresh-context", ShortcutContext),
         ("gap.registrations-after-the-factory-take-effect", LateRegistrations),
+        ("gap.reload-reloads-extensions-and-resources", Reload),
     ];
 
     // agent-session.ts sendCustomMessage: idle and without triggerTurn, the message is appended and emitted (message_start/_end) at once.
@@ -313,5 +314,63 @@ internal static partial class Program
         Check(sandbox.Requests[0].Json.GetProperty("tools").EnumerateArray().Any(tool => tool.GetProperty("name").GetString() == "late_tool"), "late tool declared");
         Equal("late tool ran", ToolResultText(sandbox.Requests[1]), "late tool executed");
         Check(LogLines(sandbox).Contains("""["late handler"]"""), "late handler ran: " + string.Join("|", LogLines(sandbox)));
+    }
+
+    private static string ReloadExtension(string version, string extraCommand) => Probe + $$"""
+        export default function (pi: any) {
+          pi.on("session_start", async (event: any) => log("{{version}} start", event.reason));
+          pi.on("session_shutdown", async (event: any) => log("{{version}} shutdown", event.reason));
+          pi.registerCommand("hello", { description: "Hello", handler: async () => log("hello from {{version}}") });
+          {{extraCommand}}
+          pi.registerCommand("again", { description: "Reload from a command", handler: async (_args: string, ctx: any) => {
+            await ctx.reload();
+            let stale = "usable";
+            try { ctx.cwd; } catch (error: any) { stale = String(error.message).startsWith("This extension ctx is stale") ? "stale" : String(error.message); }
+            log("{{version}} ctx after reload", stale);
+          } });
+        }
+        """;
+
+    // agent-session.ts reload(): /reload shuts the extensions down (reason "reload"), loads them again with fresh modules, rereads the
+    // prompt templates, skills and context files, and starts them (reason "reload"); ctx.reload() does the same from a command.
+    private static async Task Reload()
+    {
+        using var sandbox = NodeSandbox("reload");
+        var path = sandbox.Write(Path.Combine(sandbox.Cwd, "reloadable.ts"), ReloadExtension("v1", ""));
+        sandbox.Write(Path.Combine(sandbox.Cwd, "AGENTS.md"), "First context.\n");
+        var steps = new Queue<string>([
+            """{"id":"hello1","type":"prompt","message":"/hello"}""",
+            """{"id":"reload","type":"prompt","message":"/reload"}""",
+            """{"id":"hello2","type":"prompt","message":"/hello"}""",
+            """{"id":"commands","type":"get_commands"}""",
+            """{"id":"ask","type":"prompt","message":"what changed?"}""",
+            """{"id":"again","type":"prompt","message":"/again"}"""]);
+        var sent = steps.Dequeue();
+        var (code, records, stderr) = await RunRpc(sandbox, [.. Model, "-e", path], [sent],
+            (record, all) => IsResponse(record, "again") || record["type"]?.GetValue<string>() == "extension_error",
+            react: (record, push) =>
+            {
+                if (steps.Count == 0) return;
+                var current = JsonNode.Parse(sent)!["id"]!.GetValue<string>();
+                var next = current == "ask" ? record["type"]?.GetValue<string>() == "agent_settled" : IsResponse(record, current);
+                if (!next) return;
+                if (current == "hello1")
+                {
+                    // The extension, a prompt template, a skill and the context file change on disk before /reload.
+                    File.WriteAllText(path, ReloadExtension("v2", """pi.registerCommand("bye", { description: "Bye", handler: async () => log("bye") });"""));
+                    sandbox.Write(Path.Combine(sandbox.AgentDir, "prompts", "fresh.md"), "---\ndescription: Fresh template\n---\nFresh $@\n");
+                    sandbox.Write(Path.Combine(sandbox.AgentDir, "skills", "fresh", "SKILL.md"), "---\nname: fresh\ndescription: Fresh skill\n---\nSteps.\n");
+                    File.WriteAllText(Path.Combine(sandbox.Cwd, "AGENTS.md"), "Second context.\n");
+                }
+                sent = steps.Dequeue(); push(sent);
+            });
+        Equal(0, code, "exit; " + stderr + "; records " + string.Join("\n", records.Select(item => item.ToJsonString()).Where(text => !text.Contains("message_update", StringComparison.Ordinal))));
+        Names(["[\"v1 start\",\"new\"]", "[\"hello from v1\"]", "[\"v1 shutdown\",\"reload\"]", "[\"v2 start\",\"reload\"]", "[\"hello from v2\"]",
+            "[\"v2 shutdown\",\"reload\"]", "[\"v2 start\",\"reload\"]", "[\"v2 ctx after reload\",\"stale\"]", "[\"v2 shutdown\",\"quit\"]"], LogLines(sandbox), "reload lifecycle; records " + string.Join("\n",
+            records.Select(item => item.ToJsonString()).Where(text => !text.Contains("message_update", StringComparison.Ordinal))));
+        var commands = records.Single(record => IsResponse(record, "commands"))["data"]!["commands"]!.AsArray().Select(item => item!["name"]!.GetValue<string>()).ToList();
+        Check(commands.Contains("bye") && commands.Contains("fresh") && commands.Contains("skill:fresh"), "reloaded commands: " + string.Join(",", commands));
+        var ask = sandbox.Requests.Last(request => request.Body!.Contains("what changed?", StringComparison.Ordinal)).Body!;
+        Check(ask.Contains("Second context.", StringComparison.Ordinal), "reloaded context file in the request: " + ask);
     }
 }

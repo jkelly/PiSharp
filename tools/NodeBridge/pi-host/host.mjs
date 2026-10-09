@@ -125,6 +125,21 @@ async function handle(method, params, id) {
       return { results, flagValues: Object.fromEntries(runtime.flagValues) };
     }
     case 'bind': runtime.bound = true; return { flagValues: Object.fromEntries(runtime.flagValues) };
+    case 'reload': {
+      // agent-session.ts reload(): the old runtime is invalidated (its pi and ctx objects are stale) and the extensions load again
+      // into a fresh runtime with fresh modules, keeping the flag values.
+      const previous = runtime;
+      previous.invalidate();
+      runtime = new ExtensionRuntime(bridge, { ...previous.options, flagValues: Object.fromEntries(previous.flagValues), generation: previous.generation + 1 });
+      runtime.themeName = previous.themeName;
+      const results = [];
+      for (const entry of params.paths) {
+        const loaded = await runtime.load(entry);
+        results.push(loaded.error ? { path: entry, error: loaded.error } : { path: entry, extension: describeExtension(loaded.extension) });
+      }
+      runtime.bound = previous.bound;
+      return { results, flagValues: Object.fromEntries(runtime.flagValues) };
+    }
     case 'flags.set': for (const [name, value] of Object.entries(params.values ?? {})) runtime.flagValues.set(name, value); return true;
     case 'emit': return runtime.emit(runtime.extensions[params.ext], params.event, params.payload, params.ctx, params.handler);
     case 'tool.execute': {

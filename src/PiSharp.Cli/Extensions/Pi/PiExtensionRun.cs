@@ -49,6 +49,14 @@ internal sealed class PiExtensionRun : IAsyncDisposable
             ProjectTrusted = _ => projectTrusted
         }, token).ConfigureAwait(false);
         Host?.Reorder(sources.Select(source => source.Path));
+        // agent-session.ts reload(): the resource loader resolves the extension paths again (settings, packages, auto-discovery).
+        if (Host is { } host)
+            host.ResolveReloadPaths ??= async reloadToken =>
+            {
+                var reloaded = await ResolveSourcesAsync(PiSettings.Load(_cwd, _agentDir, host.ProjectTrusted ?? projectTrusted), reloadToken).ConfigureAwait(false);
+                foreach (var source in reloaded) host.SetSourceInfo(source.Path, source.SourceInfo());
+                return [.. reloaded.Where(source => File.Exists(source.Path)).Select(source => source.Path)];
+            };
     }
 
     /// <summary>resource-loader.ts reload: <c>packageManager.resolveExtensionSources(-e paths, temporary)</c> first, then (unless

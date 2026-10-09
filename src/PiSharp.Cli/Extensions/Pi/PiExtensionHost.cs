@@ -219,7 +219,8 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     {
         var names = CommandInvocationNames();
         var owners = new List<PiNodeOwner>();
-        foreach (var extension in Extensions)
+        // The loaded extensions, then spare owners for extensions a reload adds.
+        foreach (var extension in Extensions.Concat(CreateSpares()))
         {
             var owner = new PiNodeOwner(this, extension, names);
             owners.Add(owner);

@@ -14,9 +14,12 @@ namespace PiSharp.Cli.Extensions.Pi;
 
 /// <summary>A Node-hosted extension as a registry owner: each registration it made in Node becomes the native registration whose
 /// callbacks call back into Node. The extension's functions never leave Node; only JSON crosses.</summary>
-internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extension, IReadOnlyDictionary<(int Extension, string Name), string>? commandNames = null)
+internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initial, IReadOnlyDictionary<(int Extension, string Name), string>? commandNames = null)
     : IPiSharpExtension
 {
+    /// <summary>The extension this owner's slot holds now: a reload replaces it with the freshly loaded one.</summary>
+    private PiLoadedExtension extension => host.Slot(initial.Index) ?? initial;
+
     /// <summary>Events delivered as observations (handlers' results are ignored upstream).</summary>
     internal static readonly ImmutableHashSet<string> ObservationEvents =
     [

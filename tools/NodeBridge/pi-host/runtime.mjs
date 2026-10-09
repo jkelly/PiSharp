@@ -110,6 +110,9 @@ export function describeExtension(ext) {
 export class ExtensionRuntime {
   constructor(bridge, options) {
     this.bridge = bridge;
+    this.options = options;
+    /** Reload generation: the compatibility loader imports a reloaded module afresh (jiti's moduleCache:false does in Pi mode). */
+    this.generation = options.generation ?? 0;
     this.cwd = options.cwd;
     this.mode = options.mode ?? 'print';
     this.hasUI = options.hasUI === true;
@@ -288,7 +291,8 @@ export class ExtensionRuntime {
       let factory;
       if (this.importExtension) factory = await this.importExtension(resolvedPath);
       else {
-        const imported = await import(pathToFileURL(resolvedPath).href);
+        const url = pathToFileURL(resolvedPath).href + (this.generation > 0 ? `?pisharp-reload=${this.generation}` : '');
+        const imported = await import(url);
         factory = imported && 'default' in imported ? imported.default : imported;
         if (factory && typeof factory === 'object' && typeof factory.default === 'function') factory = factory.default;
       }

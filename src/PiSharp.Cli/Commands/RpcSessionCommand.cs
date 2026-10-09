@@ -204,6 +204,8 @@ public static class RpcSessionCommand
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();
             if (pi?.Skills is { } piSkills) profile.AdoptOriginalPromptSkills(piSkills);
+            // /reload and ctx.reload() (agent-session.ts reload): the Pi entry reloads extensions and resources in place.
+            if (pi is not null) { profile.PiReloadResources = pi.ReloadResources; if (pi.Extensions is { } reloading) { var reloader = profile; reloading.Reload = reloader.PiReloadAsync; } }
             else await profile.LoadSkillsAsync(parsed.Skills, stderr, cancellationToken).ConfigureAwait(false);
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);

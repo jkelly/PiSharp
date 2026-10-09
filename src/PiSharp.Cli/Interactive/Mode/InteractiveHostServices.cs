@@ -73,6 +73,8 @@ internal static class InteractiveHostServices
                 catch (OperationCanceledException) { return new ModelsRefreshResult(true, []); }
             },
             GetModelsJsonError = () => registry?.GetError(),
+            // agent-session.ts reload(): extensions, skills, prompt templates and context files (IMPL-E's in-place Pi reload).
+            ReloadSession = _ => Profile()?.SupportsPiReload == true ? Profile()!.PiReloadAsync(CancellationToken.None) : Task.CompletedTask,
             // model-runtime.ts: credentials or catalogs changed, so the available snapshot (and the session's selectable models) is re-read.
             OnCredentialsChanged = async _ =>
             {
