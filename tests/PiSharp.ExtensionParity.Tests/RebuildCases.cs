@@ -63,7 +63,8 @@ internal static partial class Program
         var ask = sandbox.Requests.First(request => request.Body!.Contains("use tool7", StringComparison.Ordinal));
         Names(Enumerable.Range(0, 10).Select(n => "tool" + n).Order(StringComparer.Ordinal),
             ask.Json.GetProperty("tools").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!).Where(name => name.StartsWith("tool", StringComparison.Ordinal)).Order(StringComparer.Ordinal),
-            "every reloaded extension's tool is declared");
+            "every reloaded extension's tool is declared; errors " + string.Join("\n", records.Where(record => record["type"]?.GetValue<string>() == "extension_error")
+                .Select(record => record.ToJsonString())));
         Equal("tool7 ran", ToolResultText(sandbox.Requests.Last()), "the eighth extension's tool executed");
     }
 

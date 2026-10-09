@@ -28,9 +28,11 @@ public sealed partial class ExtensionRegistry
         lock (gate)
         {
             EnsureScope(scope, operation);
-            if (!ReferenceEquals(scope.Registry, this) || !ReferenceEquals(expectedSnapshot, snapshot) ||
-                !ReferenceEquals(expectedSnapshot.RegistryIdentity, identity))
+            if (!ReferenceEquals(scope.Registry, this) || !ReferenceEquals(expectedSnapshot.RegistryIdentity, identity) ||
+                !ReferenceEquals(expectedSnapshot, snapshot) && !options.FollowCurrentSnapshot)
                 throw Failure(ExtensionRegistrationFailure.StaleSnapshot, scope.OwnerId, operation);
+            // A registry that follows its current snapshot prepares over the current registrations (its commit rebases as well).
+            expectedSnapshot = snapshot;
             if (previousIds.IsDefault || descriptors.IsDefault || previousIds.Length > options.MaximumRegistrationsPerOwner ||
                 descriptors.Length > options.MaximumRegistrationsPerOwner)
                 throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, scope.OwnerId, operation);

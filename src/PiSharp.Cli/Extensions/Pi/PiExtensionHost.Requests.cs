@@ -130,7 +130,11 @@ internal sealed partial class PiExtensionHost
                 await RetireOwnersAsync(activation, session).ConfigureAwait(false);
                 await SyncNativeToolsAsync(activation, session).ConfigureAwait(false);
                 foreach (var owner in owners.Where(owner => index < 0 || owner.Index == index))
-                    await owner.SyncToolsAsync(activation, session, force, CancellationToken.None).ConfigureAwait(false);
+                    // One extension's failed publication is its error; the others still publish.
+                    try { await owner.SyncToolsAsync(activation, session, force, CancellationToken.None).ConfigureAwait(false); }
+                    catch (Exception error) when (error is InvalidOperationException or PiSharp.Extensions.Runtime.ExtensionRegistrationException or
+                        PiSharp.CodingAgent.SessionRuntimeRegistryException)
+                    { await ReportAsync(owner.Path, "register", error.Message).ConfigureAwait(false); }
             }
         }
         catch (Exception error) when (error is InvalidOperationException or PiSharp.Extensions.Runtime.ExtensionRegistrationException or
