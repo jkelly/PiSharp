@@ -82,7 +82,7 @@ internal static partial class Program
             Directory.CreateDirectory(Path.Combine(stranger.Cwd, ".pi")); File.WriteAllText(Path.Combine(stranger.Cwd, ".pi", "mcp.json"), "{}");
             Equal(false, PiProjectTrust.CreateResolver(sandbox.AgentDir, sandbox.Home)(stranger.Cwd), "an undecided project with .pi/mcp.json is untrusted");
         }),
-        ("trust.untrusted-project-ignores-project-files-and-falls-back-to-explicit-tools", async () =>
+        ("trust.untrusted-project-ignores-project-files-and-keeps-the-pi-tool-policy", async () =>
         {
             using var sandbox = new Sandbox("trust-cli", trusted: false);
             sandbox.Write(Path.Combine(sandbox.Cwd, ".pi", "SYSTEM.md"), "PROJECT SYSTEM PROMPT");
@@ -93,7 +93,8 @@ internal static partial class Program
             Equal("done\n", stdout, "answer");
             var system = sandbox.Requests[0].Json.GetProperty("system")[0].GetProperty("text").GetString()!;
             Check(!system.Contains("PROJECT SYSTEM PROMPT", StringComparison.Ordinal), "untrusted .pi/SYSTEM.md ignored");
-            Check(!ToolResultText(sandbox.Requests[1]).Contains("outside secret", StringComparison.Ordinal), "explicit policy: no read grant");
+            // Decision 0004 (amended): trust gates project-local resources only; the tools keep the pi policy, as in Pi.
+            Check(ToolResultText(sandbox.Requests[1]).Contains("outside secret", StringComparison.Ordinal), "untrusted project keeps the pi policy");
             // --approve trusts the project for the run: the project prompt applies and the pi policy reads the file.
             sandbox.Requests.Clear();
             (code, _, stderr) = await sandbox.Run("-p", "--approve", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "read it");

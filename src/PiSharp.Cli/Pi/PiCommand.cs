@@ -278,7 +278,8 @@ internal static class PiCommand
         var packageDir = host.GetEnvironment("PI_PACKAGE_DIR") is { Length: > 0 } configuredPackage ? PiPaths.NormalizePath(configuredPackage, home) : null;
 
         var policyName = parsed.ToolPolicy ?? settings.ToolPolicy ?? "pi";
-        var toolPolicy = policyName == "explicit" || !projectTrusted ? PiToolPolicy.Explicit : new PiToolPolicy(PiToolPolicyMode.Pi)
+        // Decision 0004 (amended): as in Pi, project trust gates only project-local resources; an untrusted project keeps the pi policy.
+        var toolPolicy = policyName == "explicit" ? PiToolPolicy.Explicit : new PiToolPolicy(PiToolPolicyMode.Pi)
         {
             ProtectedDirectories = [.. new[] { plan.SessionDirectory, Path.GetDirectoryName(plan.SessionPath) }.OfType<string>().Select(Path.GetFullPath).Distinct(PiPaths.Comparer)],
             ProtectedTrees = [Path.GetFullPath(Path.Join(agentDir, "sessions"))]
@@ -300,7 +301,8 @@ internal static class PiCommand
             NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal)
         };
         var sessionArgs = SessionArguments(plan, parsed);
-        var mcpHost = host.CreateMcpHost(agentDir);
+        // The project .pi/mcp.json is read only for a trusted project (IMPL-H seam): the run's own trust answer.
+        var mcpHost = host.CreateMcpHost(agentDir) is { } createdHost ? createdHost with { IsProjectTrusted = options.ProjectTrusted } : null;
         using var entered = options.Enter();
         // print-mode.ts/rpc-mode.ts registerSignalHandlers: SIGTERM (and SIGHUP off Windows) shut the host down gracefully, then the
         // process exits 143 (129). Interactive mode keeps the terminal's own handling.

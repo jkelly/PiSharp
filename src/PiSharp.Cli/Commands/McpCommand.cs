@@ -106,8 +106,9 @@ internal static class McpCommand
         var environment = new Dictionary<string, string?>(StringComparer.Ordinal)
         { ["PI_CODING_AGENT_DIR"] = System.Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR") };
         var home = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
-        return new(Directory.GetCurrentDirectory(), TerminalKeybindingConfigurationLoader.ResolveAgentDirectory(home, platform, environment))
-        { HomeDirectory = home };
+        var agent = TerminalKeybindingConfigurationLoader.ResolveAgentDirectory(home, platform, environment);
+        // The project trust store (IMPL-F), resolved non-interactively: the stored decision, else defaultProjectTrust.
+        return new(Directory.GetCurrentDirectory(), agent) { HomeDirectory = home, IsProjectTrusted = PiSharp.Cli.Pi.PiProjectTrust.CreateResolver(agent, home) };
     }
 
     /// <summary>Run `mcp &lt;args&gt;` and return the exit code.</summary>
