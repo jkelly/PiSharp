@@ -18,6 +18,9 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
     internal ImmutableArray<string>? ModelPatterns { get; init; }
     /// <summary>The explicit <c>--thinking</c> level (it keeps a <c>:level</c> suffix in a fallback id).</summary>
     internal string? CliThinking { get; init; }
+    /// <summary>Pi-style entries: without <c>MaximumTokens</c>, requests ask for the model's own <c>maxTokens</c> (simple-options.ts
+    /// buildBaseOptions) instead of the explicit verbs' bounded default.</summary>
+    internal bool UseModelMaximumTokens { get; init; }
 
     /// <summary>Exact pinned identities only (no registry, no environment): the CLI identity, else the settings default.</summary>
     internal LiveSessionSelection Resolve(StartupSettingsSnapshot? settings) => LiveSessionSelection.Parse(
@@ -59,7 +62,7 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
             if (resolved.Warning is not null) warnings.Add(resolved.Warning);
             if (resolved.Error is not null || resolved.Model is null)
                 throw new LiveSessionException("UnknownLiveModel", resolved.Error ?? "Select a chat model for the supported live API.");
-            return Annotate(LiveSessionSelection.FromEntry(resolved.Model, registry, MaximumTokens), CliThinking is null ? resolved.ThinkingLevel : null, [], warnings);
+            return Annotate(Entry(resolved.Model, registry), CliThinking is null ? resolved.ThinkingLevel : null, [], warnings);
         }
         var scoped = ImmutableArray<ScopedModel>.Empty;
         if (!patterns.IsDefaultOrEmpty)
@@ -73,7 +76,7 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
         {
             var saved = defaultProvider is not null && defaultModel is not null ? registry.Find(defaultProvider, defaultModel) : null;
             var pick = saved is null ? scoped[0] : scoped.FirstOrDefault(entry => entry.Model.SameIdentity(saved)) ?? scoped[0];
-            return Annotate(LiveSessionSelection.FromEntry(pick.Model, registry, MaximumTokens), CliThinking is null ? pick.ThinkingLevel : null, scoped, warnings);
+            return Annotate(Entry(pick.Model, registry), CliThinking is null ? pick.ThinkingLevel : null, scoped, warnings);
         }
         if (defaultProvider is not null && defaultModel is not null)
         {
@@ -81,12 +84,16 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
             // authenticated model, and its credential is checked when the session connects.
             var saved = registry.Find(defaultProvider, defaultModel) ??
                 throw new LiveSessionException("UnknownLiveModel", "Select a chat model from the pinned provider catalog for the supported live API.");
-            return Annotate(LiveSessionSelection.FromEntry(saved, registry, MaximumTokens), null, scoped, warnings);
+            return Annotate(Entry(saved, registry), null, scoped, warnings);
         }
         var initial = ModelResolver.FindInitialModel(null, null, [], continuing, null, null, null, null, registry);
         if (initial.Model is null) throw new LiveSessionException("NoLiveModel", ModelListing.NoModelsAvailableMessage());
-        return Annotate(LiveSessionSelection.FromEntry(initial.Model, registry, MaximumTokens), null, scoped, warnings);
+        return Annotate(Entry(initial.Model, registry), null, scoped, warnings);
     }
+
+    private LiveSessionSelection Entry(RegistryModel model, ModelRegistry registry) =>
+        UseModelMaximumTokens && MaximumTokens is null ? LiveSessionSelection.FromEntry(model, registry, null, useModelMaximum: true)
+            : LiveSessionSelection.FromEntry(model, registry, MaximumTokens);
 
     private static LiveSessionSelection Annotate(LiveSessionSelection selection, string? thinking, ImmutableArray<ScopedModel> scoped,
         ImmutableArray<string>.Builder warnings)

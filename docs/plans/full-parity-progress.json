@@ -38,19 +38,19 @@
       "id": "IMPL-F",
       "title": "CLI, configuration and resources",
       "wave": 2,
-      "status": "planned"
+      "status": "merged; follow-up running"
     },
     {
       "id": "IMPL-G",
       "title": "Events, session features and extension events",
       "wave": 2,
-      "status": "planned"
+      "status": "merged"
     },
     {
       "id": "IMPL-H",
       "title": "MCP completion",
       "wave": 2,
-      "status": "planned"
+      "status": "merged; follow-up running"
     },
     {
       "id": "IMPL-I",
@@ -85,5 +85,52 @@
   "wave1": {
     "merged": "2026-10-08",
     "gate": "all release suites, Rpc, Sessions, Tools and the four new parity suites green"
-  }
+  },
+  "carryover": [
+    {
+      "from": "IMPL-G",
+      "item": "turn_end with drafts/continue ends the agent loop and resumes (extra agent_end/agent_start pair, turnIndex restarts); upstream replaces messages mid-run",
+      "owner": "deviation burn-down"
+    },
+    {
+      "from": "IMPL-G",
+      "item": "message_end replacement is not applied to the running loop until the next boundary",
+      "owner": "deviation burn-down"
+    },
+    {
+      "from": "IMPL-G",
+      "item": "live virtual-model wiring (pi.registerVirtualModel + VirtualModelRoutingTransport.ForLive) and _recordSelection",
+      "owner": "IMPL-E"
+    },
+    {
+      "from": "IMPL-B",
+      "item": "extension registration of classifier/image providers; llama.cpp server discovery; classify/generateImages over RPC and the Node bridge",
+      "owner": "IMPL-E"
+    },
+    {
+      "from": "IMPL-C",
+      "item": "codemode renderer shown in the terminal; prompt snippets",
+      "owner": "IMPL-I"
+    },
+    {
+      "from": "IMPL-A1",
+      "item": "masked secret input during /login",
+      "owner": "IMPL-I"
+    },
+    {
+      "from": "IMPL-A2",
+      "item": "interactive startup catalog refresh from pi.dev (decision 0004)",
+      "owner": "IMPL-I"
+    },
+    {
+      "from": "IMPL-H",
+      "item": "/mcp manager TUI wiring",
+      "owner": "IMPL-I"
+    },
+    {
+      "from": "IMPL-F",
+      "item": "interactive mode beyond routing, session picker, trust prompt, themes rendering, interactive off Windows",
+      "owner": "IMPL-I"
+    }
+  ]
 }

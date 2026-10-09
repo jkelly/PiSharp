@@ -140,15 +140,19 @@ internal sealed class LiveSessionSelection
     }
 
     /// <summary>A resolved registry entry (any provider, models.json custom model or fallback id) for its live route.</summary>
-    internal static LiveSessionSelection FromEntry(PiSharp.Cli.Models.RegistryModel entry, PiSharp.Cli.Models.ModelRegistry? registry, string? maximumTokens)
+    internal static LiveSessionSelection FromEntry(PiSharp.Cli.Models.RegistryModel entry, PiSharp.Cli.Models.ModelRegistry? registry, string? maximumTokens,
+        bool useModelMaximum = false)
     {
-        var tokens = ParseMaximumTokens(maximumTokens);
+        var tokens = useModelMaximum ? 0 : ParseMaximumTokens(maximumTokens);
+        // A virtual entry has no route of its own: VirtualModelRoutingTransport.ForLive routes it (IMPL-E registers virtual models).
         if (entry.Type != CatalogModelType.Chat || PiSharp.Cli.Models.VirtualModels.IsVirtual(entry) || !SupportedApi(entry.Provider, entry.Api))
             throw new LiveSessionException("LiveApiUnavailable",
                 $"Model \"{entry.Provider}/{entry.Id}\" uses the {(entry.Api.Length == 0 ? "unknown" : entry.Api)} API, which has no live route in PiSharp yet.");
         FrozenCatalogModel definition;
         try { definition = entry.ToDefinition(); }
         catch (CatalogReadException) { throw new LiveSessionException("UnknownLiveModel", $"Model \"{entry.Provider}/{entry.Id}\" lacks the catalog metadata its live route needs."); }
+        // Pi-style entries ask for the model's own maxTokens (simple-options.ts buildBaseOptions).
+        if (useModelMaximum) tokens = (int)Math.Clamp(definition.Raw.Value.GetProperty("maxTokens").GetDouble(), 1, int.MaxValue);
         if (tokens > definition.Raw.Value.GetProperty("maxTokens").GetDouble())
             throw new LiveSessionException("LiveOutputLimit", "The requested output limit exceeds the selected model metadata.");
         return new(definition, tokens) { Entry = entry, Registry = registry };
