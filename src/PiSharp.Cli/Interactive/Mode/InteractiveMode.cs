@@ -472,7 +472,8 @@ internal sealed partial class InteractiveMode
     {
         try
         {
-            if (await context.CheckForNewVersion(version) is { } release) ShowNewVersionNotification(release.Version, release.Note);
+            var options = new VersionCheckOptions { Http = context.VersionCheckHttp, BaseUrl = context.NuGetBaseUrl, Env = context.GetEnvironment };
+            if (await VersionCheck.CheckForNewVersion(context.ProductVersion, options) is { } release) ShowNewVersionNotification(release.Version);
         }
         catch { }
     }
@@ -608,25 +609,20 @@ internal sealed partial class InteractiveMode
         ui.RequestRender();
     }
 
-    public void ShowNewVersionNotification(string releaseVersion, string? releaseNote)
+    /// <summary>Source showNewVersionNotification, with owner decision 12's instruction (<c>dotnet tool update -g PiSharp.Cli</c>)
+    /// and PiSharp's changelog; the NuGet feed carries no release note.</summary>
+    public void ShowNewVersionNotification(string releaseVersion)
     {
-        string UpdateInstruction() => theme.Fg("muted", $"New version {releaseVersion} is available. Run ") + theme.Fg("accent", $"{AppName} update");
-        const string changelogUrl = "https://pi.dev/changelog";
+        string UpdateInstruction() => theme.Fg("muted", $"New version {releaseVersion} is available. Run ") + theme.Fg("accent", VersionCheck.UpdateCommand(releaseVersion));
+        const string changelogUrl = VersionCheck.ChangelogUrl;
         string ChangelogLine()
         {
             var link = TerminalImage.GetCapabilities().Hyperlinks ? TerminalImage.Hyperlink(theme.Fg("accent", changelogUrl), changelogUrl) : theme.Fg("accent", changelogUrl);
             return theme.Fg("muted", "Changelog: ") + link;
         }
-        var note = releaseNote is null ? null : TextUtils.JsTrim(releaseNote);
         chatContainer.AddChild(new Spacer(1));
         chatContainer.AddChild(new DynamicBorder(text => theme.Fg("warning", text)));
         chatContainer.AddChild(new ThemedText(() => $"{theme.Bold(theme.Fg("warning", "Update Available"))}\n{UpdateInstruction()}", 1, 0));
-        if (!string.IsNullOrEmpty(note))
-        {
-            chatContainer.AddChild(new Spacer(1));
-            chatContainer.AddChild(new Markdown(note, 1, 0, GetMarkdownThemeWithSettings(), new DefaultTextStyle(Color: text => theme.Fg("muted", text))));
-            chatContainer.AddChild(new Spacer(1));
-        }
         chatContainer.AddChild(new ThemedText(ChangelogLine, 1, 0));
         chatContainer.AddChild(new DynamicBorder(text => theme.Fg("warning", text)));
         ui.RequestRender();

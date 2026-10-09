@@ -51,7 +51,11 @@ internal sealed record InteractiveModeContext
     /// <summary>ensureTool(name, onStatus): the tool's path, downloading it when missing (status type, message).</summary>
     public Func<string, Action<string, string>, Task<string?>> EnsureTool { get; init; } = (_, _) => Task.FromResult<string?>(null);
     public Func<CancellationToken, Task<ModelsRefreshResult>> RefreshModelCatalogs { get; init; } = _ => Task.FromResult(new ModelsRefreshResult(false, []));
-    public Func<string, Task<LatestPiRelease?>> CheckForNewVersion { get; init; } = version => VersionCheck.CheckForNewPiVersion(version);
+    /// <summary>The running PiSharp version the startup update check compares with the latest PiSharp.Cli on NuGet (owner decision 12).</summary>
+    public string ProductVersion { get; init; } = PiSharp.Cli.Pi.PiConfig.Version;
+    /// <summary>The NuGet flat-container base URL and HTTP client of the startup update check (null: api.nuget.org, a shared client).</summary>
+    public string? NuGetBaseUrl { get; init; }
+    public HttpMessageInvoker? VersionCheckHttp { get; init; }
     /// <summary>Source packageManager.checkForAvailableUpdates: the display names of installed packages with updates.</summary>
     public Func<Task<IReadOnlyList<string>>> CheckForPackageUpdates { get; init; } = () => Task.FromResult<IReadOnlyList<string>>([]);
     public Func<string, IReadOnlyList<string>, TimeSpan, Task<ProcessResult>> RunProcess { get; init; } = DefaultRunProcess;

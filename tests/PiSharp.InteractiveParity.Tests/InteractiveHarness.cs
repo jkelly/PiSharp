@@ -25,6 +25,12 @@ internal sealed class InteractiveHarness : IAsyncDisposable
     /// <summary>Text the mode copied to the clipboard (the fake clipboard).</summary>
     public List<string> Copied { get; } = [];
     public string? ClipboardText { get; set; }
+    /// <summary>The running PiSharp version the startup update check compares with (InteractiveModeContext.ProductVersion).</summary>
+    public string ProductVersion { get; set; } = "1.1.0.2";
+    /// <summary>The fake NuGet flat container of the startup update check (https://nuget.test/v3-flatcontainer, 404 by default).</summary>
+    public Func<HttpRequestMessage, HttpResponseMessage> VersionFeed { get; set; } = _ => new HttpResponseMessage(HttpStatusCode.NotFound);
+    /// <summary>Requests to the fake NuGet feed; none while PI_OFFLINE or PI_SKIP_VERSION_CHECK is set.</summary>
+    public List<string> VersionRequests { get; } = [];
     /// <summary>Further context changes for a case (applied after the harness defaults).</summary>
     public Func<InteractiveModeContext, InteractiveModeContext>? Configure { get; set; }
     /// <summary>The fake GitHub the fd/rg tools manager downloads from (PiHost.ToolsHttp/ToolsReleaseBase).</summary>
@@ -41,7 +47,7 @@ internal sealed class InteractiveHarness : IAsyncDisposable
             ReadClipboardFilePaths = () => Task.FromResult<IReadOnlyList<string>?>(null),
             ReadClipboardImage = () => Task.FromResult<PiSharp.Cli.Interactive.Mode.Utilities.ClipboardImage?>(null),
             OpenUrl = _ => { },
-            CheckForNewVersion = _ => Task.FromResult<PiSharp.Cli.Interactive.Mode.Utilities.LatestPiRelease?>(null),
+            ProductVersion = ProductVersion, NuGetBaseUrl = "https://nuget.test/v3-flatcontainer", VersionCheckHttp = new HttpMessageInvoker(new Feed(this)),
             ParseChangelogEntries = () => [],
             GetEnvironment = name => Vars.GetValueOrDefault(name),
             Login = null
@@ -83,6 +89,15 @@ internal sealed class InteractiveHarness : IAsyncDisposable
             int index;
             lock (harness.Requests) { harness.Requests.Add(body); index = harness.Requests.Count - 1; }
             return harness.Respond(body, index);
+        }
+    }
+
+    private sealed class Feed(InteractiveHarness harness) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            lock (harness.VersionRequests) harness.VersionRequests.Add(request.RequestUri!.AbsoluteUri);
+            return Task.FromResult(harness.VersionFeed(request));
         }
     }
 

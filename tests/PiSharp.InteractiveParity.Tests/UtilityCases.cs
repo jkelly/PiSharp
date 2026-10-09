@@ -82,6 +82,16 @@ internal static class UtilityCases
         }
     }
 
+    /// <summary>A feed that answers only after five seconds unless the request is cancelled first (the version check timeout).</summary>
+    private sealed class SlowHttp : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(5_000, cancellationToken);
+            return Json("{\"versions\":[\"9.0.0\"]}");
+        }
+    }
+
     private static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK) =>
         new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
@@ -919,16 +929,22 @@ internal static class UtilityCases
         }));
     }
 
-    // ------------------------------------------------------------------ version-check.test.ts
+    // ------------------------------------------------------------------ version-check.test.ts (owner decision 12: NuGet PiSharp.Cli)
 
     private static IEnumerable<(string, Func<Task>)> VersionCases()
     {
-        static VersionCheckOptions Options(FakeHttp http, Dictionary<string, string>? env = null, bool retry = false) => new()
+        const string feedBase = "https://nuget.test/v3-flatcontainer";
+        const string feedIndex = "https://nuget.test/v3-flatcontainer/pisharp.cli/index.json";
+        static VersionCheckOptions Options(FakeHttp http, Dictionary<string, string>? env = null, bool retry = false, int? timeoutMs = null) => new()
         {
             Http = new HttpMessageInvoker(http),
+            BaseUrl = feedBase,
             Env = name => env is not null && env.TryGetValue(name, out var value) ? value : null,
             Retry = retry,
+            TimeoutMs = timeoutMs,
         };
+        static FakeHttp Versions(params string[] versions) =>
+            new((_, _) => Task.FromResult(Json(System.Text.Json.JsonSerializer.Serialize(new { versions }))));
 
         yield return ("util.version.compare", Sync(() =>
         {
@@ -938,51 +954,109 @@ internal static class UtilityCases
             Check(VersionCheck.ComparePackageVersions("5.0.0-beta.20", "5.0.0-beta.9") > 0, "numeric prerelease");
             Check(VersionCheck.ComparePackageVersions("1.0.0", "1.0.0-rc.1") > 0, "release after prerelease");
             Check(VersionCheck.ComparePackageVersions("1.0.0-alpha", "1.0.0-1") > 0, "alphanumeric after numeric");
+            Check(VersionCheck.ComparePackageVersions("1.0.0-rc.1.1", "1.0.0-rc.1") > 0, "more labels win a common prefix");
+            Equal(0, VersionCheck.ComparePackageVersions("1.0.0-RC.1", "1.0.0-rc.1"), "labels compare case-insensitively");
             Equal(0, VersionCheck.ComparePackageVersions(" v1.2.3 ", "1.2.3+build"), "v prefix, trim, build ignored");
-            Equal(null, VersionCheck.ComparePackageVersions("1.2", "1.2.3"), "invalid");
-            Equal(null, VersionCheck.ComparePackageVersions("01.2.3", "1.2.3"), "leading zero");
+            Equal(null, VersionCheck.ComparePackageVersions("1.2.3.4.5", "1.2.3"), "five parts");
+            Equal(null, VersionCheck.ComparePackageVersions("nightly", "1.2.3"), "not a version");
+            Equal(null, VersionCheck.ComparePackageVersions("", "1.2.3"), "empty");
             Check(!VersionCheck.IsNewerPackageVersion("0.70.5", "0.70.5"), "same is not newer");
             Check(VersionCheck.IsNewerPackageVersion("0.70.6", "0.70.5"), "newer");
             Check(VersionCheck.IsNewerPackageVersion("nightly", "0.70.5"), "invalid differing versions count as newer");
             Check(!VersionCheck.IsNewerPackageVersion(" nightly ", "nightly"), "invalid equal after trim");
         }));
+        yield return ("util.version.compare-four-part", Sync(() =>
+        {
+            Check(VersionCheck.ComparePackageVersions("1.1.0.10", "1.1.0.2") > 0, "1.1.0.10 after 1.1.0.2 (numeric, not text)");
+            Check(VersionCheck.ComparePackageVersions("1.1.0.2", "1.1.0.10") < 0, "1.1.0.2 before 1.1.0.10");
+            Equal(0, VersionCheck.ComparePackageVersions("1.1.0", "1.1.0.0"), "1.1.0 equals 1.1.0.0");
+            Equal(0, VersionCheck.ComparePackageVersions("1.1", "1.1.0.0"), "1.1 equals 1.1.0.0");
+            Check(VersionCheck.ComparePackageVersions("1.1.0.1", "1.1.0") > 0, "a fourth part after the three-part release");
+            Check(VersionCheck.ComparePackageVersions("1.1.1", "1.1.0.99") > 0, "third part outranks the fourth");
+            Check(VersionCheck.ComparePackageVersions("1.1.0.3-preview.1", "1.1.0.2") > 0, "next prerelease after the current release");
+            Check(VersionCheck.ComparePackageVersions("1.1.0.3-preview.1", "1.1.0.3") < 0, "prerelease before its release");
+            Check(VersionCheck.ComparePackageVersions("1.1.0.3-preview.10", "1.1.0.3-preview.2") > 0, "numeric prerelease labels");
+            Check(VersionCheck.IsNewerPackageVersion("1.1.0.10", "1.1.0.2"), "newer four-part");
+            Check(!VersionCheck.IsNewerPackageVersion("1.1.0", "1.1.0.0"), "equal four-part is not newer");
+        }));
+        yield return ("util.version.select-latest", Sync(() =>
+        {
+            string[] feed = ["1.1.0", "1.1.0.1", "1.1.0.10", "1.1.0.2", "1.1.0.11-preview.1", "junk"];
+            Equal("1.1.0.10", VersionCheck.SelectLatestVersion(feed, "1.1.0.2"), "stable running version: highest stable, prereleases ignored");
+            Equal("1.1.0.11-preview.1", VersionCheck.SelectLatestVersion(feed, "1.1.0.11-preview.0"), "prerelease running version sees prereleases");
+            Equal("1.1.0.12", VersionCheck.SelectLatestVersion([.. feed, "1.1.0.12"], "1.1.0.11-preview.1"), "and the release after them");
+            Equal(null, VersionCheck.SelectLatestVersion(["1.1.0.3-preview.1"], "1.1.0.2"), "only prereleases for a stable version");
+            Equal(null, VersionCheck.SelectLatestVersion([], "1.1.0.2"), "empty feed");
+            Equal("dotnet tool update -g PiSharp.Cli", VersionCheck.UpdateCommand("1.1.0.10"), "stable update command");
+            Equal("dotnet tool update -g PiSharp.Cli --prerelease", VersionCheck.UpdateCommand("1.1.0.11-preview.1"), "prerelease update command");
+        }));
         yield return ("util.version.only-newer", async () =>
         {
-            var http = new FakeHttp((_, _) => Task.FromResult(Json("{\"version\":\"1.2.3\"}")));
-            Equal(null, await VersionCheck.CheckForNewPiVersion("1.2.3", Options(http)), "same version");
-            Equal(new LatestPiRelease("1.2.3"), await VersionCheck.CheckForNewPiVersion("1.2.2", Options(http)), "newer");
+            var http = Versions("1.1.0", "1.1.0.1", "1.1.0.2");
+            Equal(null, await VersionCheck.CheckForNewVersion("1.1.0.2", Options(http)), "same version");
+            Equal(null, await VersionCheck.CheckForNewVersion("1.1.0.10", Options(http)), "running version newer than the feed");
+            Equal(new LatestRelease("1.1.0.2"), await VersionCheck.CheckForNewVersion("1.1.0.1", Options(http)), "newer");
+            Equal(new LatestRelease("1.1.0.2"), await VersionCheck.CheckForNewVersion("1.1.0", Options(http)), "newer than a three-part version");
+            Equal(null, await VersionCheck.CheckForNewVersion("1.1.0.0", Options(Versions("1.1.0"))), "1.1.0.0 is the feed's 1.1.0");
+        });
+        yield return ("util.version.prerelease", async () =>
+        {
+            var http = Versions("1.1.0.2", "1.1.0.3-preview.1", "1.1.0.3-preview.2");
+            Equal(null, await VersionCheck.CheckForNewVersion("1.1.0.2", Options(http)), "stable ignores prereleases");
+            Equal(new LatestRelease("1.1.0.3-preview.2"), await VersionCheck.CheckForNewVersion("1.1.0.3-preview.1", Options(http)), "prerelease sees the next prerelease");
+            Equal(null, await VersionCheck.CheckForNewVersion("1.1.0.3-preview.2", Options(http)), "latest prerelease");
+            Equal(new LatestRelease("1.1.0.3"), await VersionCheck.CheckForNewVersion("1.1.0.3-preview.2", Options(Versions("1.1.0.3-preview.2", "1.1.0.3"))), "release after the prerelease");
         });
         yield return ("util.version.endpoint-and-user-agent", async () =>
         {
-            var http = new FakeHttp((_, _) => Task.FromResult(Json("{\"version\":\"1.2.4\"}")));
-            Equal("1.2.4", await VersionCheck.GetLatestPiVersion("1.2.3", Options(http)), "version");
+            Equal("https://api.nuget.org/v3-flatcontainer/pisharp.cli/index.json", VersionCheck.IndexUrl(), "default NuGet index");
+            Equal(feedIndex, VersionCheck.IndexUrl(feedBase + "/"), "injected base, trailing slash");
+            var http = Versions("1.2.4");
+            Equal(new LatestRelease("1.2.4"), await VersionCheck.GetLatestRelease("1.2.3", Options(http)), "release");
             var request = http.Requests.Single();
-            Equal("https://pi.dev/api/latest-version", request.RequestUri!.ToString(), "url");
+            Equal(feedIndex, request.RequestUri!.ToString(), "url");
             Equal(HttpMethod.Get, request.Method, "method");
-            Check(string.Join(" ", request.Headers.GetValues("User-Agent")).StartsWith("pi/1.2.3 ", StringComparison.Ordinal), "user agent");
+            Check(string.Join(" ", request.Headers.GetValues("User-Agent")).StartsWith("pisharp/1.2.3 ", StringComparison.Ordinal), "user agent");
             Equal("application/json", string.Join(",", request.Headers.GetValues("accept")), "accept");
         });
         yield return ("util.version.retries-when-requested", async () =>
         {
             var http = new FakeHttp((_, attempt) => attempt < 3 ? Task.FromException<HttpResponseMessage>(new HttpRequestException("fetch failed"))
-                : Task.FromResult(Json("{\"version\":\"1.2.4\"}")));
-            Equal(new LatestPiRelease("1.2.4"), await VersionCheck.GetLatestPiRelease("1.2.3", Options(http, retry: true)), "release");
+                : Task.FromResult(Json("{\"versions\":[\"1.2.4\"]}")));
+            Equal(new LatestRelease("1.2.4"), await VersionCheck.GetLatestRelease("1.2.3", Options(http, retry: true)), "release");
             Equal(3, http.Requests.Count, "three attempts");
         });
         yield return ("util.version.retries-retryable-status", async () =>
         {
-            var http = new FakeHttp((_, attempt) => Task.FromResult(attempt == 1 ? Json("{}", HttpStatusCode.ServiceUnavailable) : Json("{\"version\":\"2.0.0\"}")));
-            Equal("2.0.0", await VersionCheck.GetLatestPiVersion("1.2.3", Options(http, retry: true)), "after a 503");
+            var http = new FakeHttp((_, attempt) => Task.FromResult(attempt == 1 ? Json("{}", HttpStatusCode.ServiceUnavailable) : Json("{\"versions\":[\"2.0.0\"]}")));
+            Equal(new LatestRelease("2.0.0"), await VersionCheck.GetLatestRelease("1.2.3", Options(http, retry: true)), "after a 503");
             var once = new FakeHttp((_, _) => Task.FromResult(Json("{}", HttpStatusCode.ServiceUnavailable)));
-            Equal(null, await VersionCheck.GetLatestPiVersion("1.2.3", Options(once)), "non-ok response");
+            Equal(null, await VersionCheck.GetLatestRelease("1.2.3", Options(once)), "non-ok response");
             Equal(1, once.Requests.Count, "no retry by default");
         });
         yield return ("util.version.automatic-check-one-request", async () =>
         {
             var http = new FakeHttp((_, _) => Task.FromException<HttpResponseMessage>(new HttpRequestException("fetch failed")));
-            Equal(null, await VersionCheck.CheckForNewPiVersion("1.2.3", Options(http)), "swallowed");
+            Equal(null, await VersionCheck.CheckForNewVersion("1.2.3", Options(http, retry: true)), "swallowed");
             Equal(1, http.Requests.Count, "one request");
-            await ThrowsAsync(() => VersionCheck.GetLatestPiRelease("1.2.3", Options(http)), "direct call throws");
+            await ThrowsAsync(() => VersionCheck.GetLatestRelease("1.2.3", Options(http)), "direct call throws");
+        });
+        yield return ("util.version.feed-errors-silent", async () =>
+        {
+            foreach (var (label, status, body) in new[]
+            {
+                ("404", HttpStatusCode.NotFound, "{}"), ("500", HttpStatusCode.InternalServerError, "{\"versions\":[\"9.0.0\"]}"),
+                ("malformed", HttpStatusCode.OK, "<html>"), ("json null", HttpStatusCode.OK, "null"), ("array", HttpStatusCode.OK, "[\"9.0.0\"]"),
+                ("versions not an array", HttpStatusCode.OK, "{\"versions\":\"9.0.0\"}"), ("no versions", HttpStatusCode.OK, "{\"data\":[]}"),
+                ("non-string versions", HttpStatusCode.OK, "{\"versions\":[9,null]}"), ("no valid versions", HttpStatusCode.OK, "{\"versions\":[\"latest\"]}"),
+            })
+            {
+                var http = new FakeHttp((_, _) => Task.FromResult(Json(body, status)));
+                Equal(null, await VersionCheck.CheckForNewVersion("1.2.3", Options(http)), label);
+                Equal(1, http.Requests.Count, label + ": one request");
+            }
+            var slow = new HttpMessageInvoker(new SlowHttp());
+            Equal(null, await VersionCheck.CheckForNewVersion("1.2.3", new VersionCheckOptions { Http = slow, BaseUrl = feedBase, Env = _ => null, TimeoutMs = 50 }), "timeout");
         });
         yield return ("util.version.format-error", Sync(() =>
         {
@@ -995,31 +1069,21 @@ internal static class UtilityCases
             Equal("plain", VersionCheck.FormatVersionCheckError(new Exception("plain")), "no cause");
             Equal("text", VersionCheck.FormatVersionCheckError("text"), "non-error value");
         }));
-        yield return ("util.version.package-metadata", async () =>
-        {
-            var http = new FakeHttp((_, _) => Task.FromResult(Json("{\"packageName\":\"@new-scope/pi\",\"version\":\"1.2.4\"}")));
-            Equal(new LatestPiRelease("1.2.4", "@new-scope/pi"), await VersionCheck.GetLatestPiRelease("1.2.3", Options(http)), "metadata");
-        });
-        yield return ("util.version.update-note", async () =>
-        {
-            var http = new FakeHttp((_, _) => Task.FromResult(Json("{\"note\":\" **Read this** \",\"version\":\"1.2.4\"}")));
-            Equal(new LatestPiRelease("1.2.4", null, "**Read this**"), await VersionCheck.GetLatestPiRelease("1.2.3", Options(http)), "note");
-            var blank = new FakeHttp((_, _) => Task.FromResult(Json("{\"version\":\"  \",\"note\":\"x\"}")));
-            Equal(null, await VersionCheck.GetLatestPiRelease("1.2.3", Options(blank)), "blank version");
-        });
         yield return ("util.version.skip-automatic-check", async () =>
         {
-            var http = new FakeHttp((_, _) => Task.FromResult(Json("{\"version\":\"1.2.4\"}")));
+            var http = Versions("1.2.4");
             var env = new Dictionary<string, string> { ["PI_SKIP_VERSION_CHECK"] = "1" };
-            Equal(null, await VersionCheck.CheckForNewPiVersion("1.2.3", Options(http, env)), "skipped");
+            Equal(null, await VersionCheck.CheckForNewVersion("1.2.3", Options(http, env)), "skipped");
             Equal(0, http.Requests.Count, "no request");
-            Equal("1.2.4", await VersionCheck.GetLatestPiVersion("1.2.3", Options(http, env)), "direct call allowed");
+            Equal(new LatestRelease("1.2.4"), await VersionCheck.GetLatestRelease("1.2.3", Options(http, env)), "direct call allowed");
             Equal(1, http.Requests.Count, "one request");
         });
         yield return ("util.version.offline", async () =>
         {
-            var http = new FakeHttp((_, _) => Task.FromResult(Json("{\"version\":\"1.2.4\"}")));
-            Equal(null, await VersionCheck.GetLatestPiRelease("1.2.3", Options(http, new() { ["PI_OFFLINE"] = "1" })), "offline");
+            var http = Versions("1.2.4");
+            var env = new Dictionary<string, string> { ["PI_OFFLINE"] = "1" };
+            Equal(null, await VersionCheck.CheckForNewVersion("1.2.3", Options(http, env)), "automatic check offline");
+            Equal(null, await VersionCheck.GetLatestRelease("1.2.3", Options(http, env)), "direct call offline");
             Equal(0, http.Requests.Count, "no request");
         });
     }
