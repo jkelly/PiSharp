@@ -279,7 +279,9 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
                             var initialInput = block.TryGetProperty("input", out var input) && input.ValueKind != JsonValueKind.Null
                                 ? JsonData.FromElement(Object(input)) : JsonData.EmptyObject;
                             slot = new(index, kind, toolProperties);
-                            Emit(new ToolCallStarted(index, new(String(block, "id"), ResponseToolName(String(block, "name")), initialInput, toolProperties))); break;
+                            // anthropic-messages.ts keeps content_block.id and .name as streamed, empty strings included (owner decision 13); a
+                            // missing one (undefined upstream) stays unrepresentable and fails as malformed.
+                            Emit(new ToolCallStarted(index, new(String(block, "id", allowEmpty: true), ResponseToolName(String(block, "name", allowEmpty: true)), initialInput, toolProperties))); break;
                         default: throw Protocol();
                     }
                     _slots.Add(wireIndex, slot); break;

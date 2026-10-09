@@ -109,9 +109,9 @@ public sealed class AssistantStreamReducer
             case TextStarted start: Add(start.ContentIndex, start.Content); break;
             case ThinkingStarted start: Add(start.ContentIndex, start.Content); break;
             case ToolCallStarted start:
-                if (_blocks.Any(block => block.Content is ToolCallContent tool && tool.Id == start.ToolCall.Id))
-                    throw new StreamProtocolException("Duplicate tool-call ID.");
                 RequireToolIdentity(start.ToolCall);
+                if (start.ToolCall.Id.Length > 0 && _blocks.Any(block => block.Content is ToolCallContent tool && tool.Id == start.ToolCall.Id))
+                    throw new StreamProtocolException("Duplicate tool-call ID.");
                 Add(start.ContentIndex, start.ToolCall);
                 break;
             case ToolCallProvisionalStarted start:
@@ -164,7 +164,8 @@ public sealed class AssistantStreamReducer
                 if ((original.Id != end.ToolCall.Id || original.Name != end.ToolCall.Name) &&
                     !(_allowPiMessagesIdentityReplacement && _start!.Api == "pi-messages"))
                     throw new StreamProtocolException("Tool-call identity changes at its end.");
-                if (_blocks.Where(block => !ReferenceEquals(block, call)).Any(block => block.Content is ToolCallContent tool && tool.Id == end.ToolCall.Id))
+                if (end.ToolCall.Id.Length > 0 &&
+                    _blocks.Where(block => !ReferenceEquals(block, call)).Any(block => block.Content is ToolCallContent tool && tool.Id == end.ToolCall.Id))
                     throw new StreamProtocolException("Duplicate final tool-call ID.");
                 CheckSize(ContentCharacters(end.ToolCall) - ContentCharacters(original));
                 call.Content = end.ToolCall; call.Ended = true; break;
@@ -272,7 +273,12 @@ public sealed class AssistantStreamReducer
     }
     private static void RequireToolIdentity(ToolCallContent call)
     {
-        if (string.IsNullOrWhiteSpace(call.Id) || string.IsNullOrWhiteSpace(call.Name))
+        // Owner decision 13: a tool call keeps whatever id and name its API finalized, empty strings included (google-generative-ai.ts
+        // and google-vertex.ts push name "", openai-completions.ts keeps id "", bedrock-converse-stream.ts "" for either, anthropic-messages.ts
+        // and pi-messages.ts whatever string the stream carried). Several calls may share the empty id, as upstream gives every id-less
+        // call ""; non-empty ids stay unique. Execution authority is not granted here: the agent only runs a call whose name is a
+        // registered tool (tools are registered with non-empty names), so a nameless call can never run one.
+        if (call.Id is null || call.Name is null)
             throw new StreamProtocolException("Tool-call ID and name are required.");
         // Arguments are any JSON value: parseStreamingJson, a provider SDK or a pi-messages toolCall may produce an array, a
         // string, a number, a boolean or null, and upstream keeps it.

@@ -991,8 +991,13 @@ internal static class Program
             await ThrowsAsync<ArgumentException>(() => scheduler.RunAsync(Message("A") with { StopReason = stopReason }, new Sink()));
         var duplicateSink = new Sink();
         await ThrowsAsync<ArgumentException>(() => scheduler.RunAsync(Message("A", "A") with { Content = [Call("A"), Call("A")] }, duplicateSink));
-        await ThrowsAsync<ArgumentException>(() => scheduler.RunAsync(Message("A") with { Content = [new ToolCallContent("", "A", JsonData.EmptyObject)] }, duplicateSink));
         Equal(0, duplicateSink.Events.Count);
+        // Owner decision 13: agent-loop.ts runs every toolCall block whatever its id and name. Nameless calls find no tool ("Tool  not found")
+        // and id-less calls share the id "".
+        var nameless = await scheduler.RunAsync(Message() with { Content = [new ToolCallContent("", "", JsonData.EmptyObject), new ToolCallContent("", "", JsonData.EmptyObject)] }, new Sink());
+        Equal(2, nameless.Messages.Length);
+        Check(nameless.Messages.All(message => message.ToolCallId == "" && message.ToolName == "" && message.IsError &&
+            message.Content.Single().Text == "Tool  not found"), "Nameless calls did not get upstream's unknown-tool result.");
         var noTools = await scheduler.RunAsync(Message() with { StopReason = StopReason.Stop }, new Sink());
         Check(!noTools.Terminate && !noTools.ShouldContinue, "Empty batch has a continuation hint.");
         var sourceIndexed = await scheduler.RunAsync(Message("A") with { Content = [new TextContent("before"), Call("A")] }, new Sink());

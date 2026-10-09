@@ -528,9 +528,11 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             var kind = String(item, "type");
             if (kind is not ("reasoning" or "message" or "function_call" or "custom_tool_call")) return null;
             if (_content.Count >= _options.MaximumContentSlots) throw Limit();
-            var itemId = String(item, "id");
             var call = kind is "function_call" or "custom_tool_call";
-            var slot = new Slot(_content.Count, kind, itemId, call ? String(item, "call_id") : null, call ? String(item, "name") : null);
+            // openai-responses-shared.ts: id `${item.call_id}|${item.id}` (a missing part reads "undefined") and name item.name, an empty
+            // string included (owner decision 13); a missing name stays unrepresentable and fails as malformed.
+            var itemId = ItemText(item, "id", call);
+            var slot = new Slot(_content.Count, kind, itemId, call ? CallText(item, "call_id") : null, call ? String(item, "name", allowEmpty: true) : null);
             if (kind == "reasoning") emit(new ThinkingStarted(slot.Index, new ThinkingContent("")));
             else if (kind == "message") emit(new TextStarted(slot.Index, new TextContent("")));
             else if (kind == "function_call")
@@ -702,6 +704,14 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         }
         private static string? OptionalString(JsonElement value, string name)
             => value.TryGetProperty(name, out _) ? String(value, name, allowEmpty: true) : null;
+        /// <summary>A tool-call identity part as a JavaScript template literal reads it: the string (empty included), "undefined" when
+        /// absent, "null" for null.</summary>
+        private static string CallText(JsonElement value, string name) =>
+            !value.TryGetProperty(name, out var field) ? "undefined" : field.ValueKind switch
+            {
+                JsonValueKind.String => field.GetString()!, JsonValueKind.Null => "null", _ => throw Protocol()
+            };
+        private static string ItemText(JsonElement item, string name, bool call) => call ? CallText(item, name) : String(item, name);
         private static int Index(JsonElement value)
         {
             if (!value.TryGetProperty("output_index", out var index) || !index.TryGetInt32(out var result) || result < 0) throw Protocol();

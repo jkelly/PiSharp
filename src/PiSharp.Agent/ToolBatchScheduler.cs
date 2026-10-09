@@ -83,10 +83,12 @@ public sealed class ToolBatchScheduler
             .Select(entry => new ToolInvocation(message, (ToolCallContent)entry.content, entry.index) { EventSink = sink }).ToImmutableArray();
         foreach (var invocation in invocations)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(invocation.Call.Id);
-            ArgumentException.ThrowIfNullOrWhiteSpace(invocation.Call.Name);
+            // agent-loop.ts runs every toolCall block, whatever id and name its API finalized (owner decision 13): a nameless call
+            // finds no tool and gets "Tool  not found"; id-less calls share the id "".
+            ArgumentNullException.ThrowIfNull(invocation.Call.Id);
+            ArgumentNullException.ThrowIfNull(invocation.Call.Name);
             ArgumentNullException.ThrowIfNull(invocation.Call.Arguments);
-            if (!ids.Add(invocation.Call.Id))
+            if (invocation.Call.Id.Length > 0 && !ids.Add(invocation.Call.Id))
                 throw new ArgumentException($"Duplicate tool call ID: {invocation.Call.Id}", nameof(message));
         }
         return invocations;

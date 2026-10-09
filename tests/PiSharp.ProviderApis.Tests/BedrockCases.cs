@@ -254,6 +254,44 @@ internal static partial class Program
             }
     }
 
+    // Owner decision 13. bedrock-converse-stream.ts handleContentBlockStart: id start.toolUse.toolUseId || "", name start.toolUse.name || "".
+    // Captured from @earendil-works/pi-ai@1.1.0 stream() against a local HTTP/2 event-stream server: every case finalizes as toolUse with
+    // these identities, two id-less calls sharing the id "". convertMessages replays them with toolUseId c.id and name c.name.
+    private static async Task BedrockNamelessToolCalls()
+    {
+        foreach (var (label, starts, expected) in new (string, string[], string)[]
+        {
+            ("both-missing", ["{}"], """[{"type":"toolCall","id":"","name":"","arguments":{}}]"""),
+            ("both-empty", ["""{"toolUseId":"","name":""}"""], """[{"type":"toolCall","id":"","name":"","arguments":{}}]"""),
+            ("nameless", ["""{"toolUseId":"t1"}"""], """[{"type":"toolCall","id":"t1","name":"","arguments":{}}]"""),
+            ("two-id-less", ["""{"name":"read"}""", "{}"], """[{"type":"toolCall","id":"","name":"read","arguments":{}},{"type":"toolCall","id":"","name":"","arguments":{}}]"""),
+        })
+        {
+            var tool = Bedrock(SonnetRow);
+            var messages = new List<byte[]> { EventMessage("messageStart", """{"role":"assistant"}""") };
+            for (var index = 0; index < starts.Length; index++)
+            {
+                messages.Add(EventMessage("contentBlockStart", "{\"contentBlockIndex\":" + index + ",\"start\":{\"toolUse\":" + starts[index] + "}}"));
+                messages.Add(EventMessage("contentBlockDelta", "{\"contentBlockIndex\":" + index + ",\"delta\":{\"toolUse\":{\"input\":\"{}\"}}}"));
+                messages.Add(EventMessage("contentBlockStop", "{\"contentBlockIndex\":" + index + "}"));
+            }
+            messages.Add(EventMessage("messageStop", """{"stopReason":"tool_use"}"""));
+            tool.Http.OnUrl("https://", _ => EventStream(messages: [.. messages]));
+            var events = await Collect(tool.Transport, new(tool.Model, [Entry("""{"role":"user","content":"Hi","timestamp":1}""")], 6));
+            var done = events[^1] as StreamDone ?? throw new InvalidOperationException(label + ": " + events[^1]);
+            Equal(StopReason.ToolUse, done.Reason, label);
+            JsonSame(expected, JsonDocument.Parse(Wire(done.Message)).RootElement.GetProperty("content").GetRawText(), label);
+        }
+        var replayed = Bedrock(SonnetRow);
+        var history = ImmutableArray.Create(Entry("""{"role":"user","content":"Hi","timestamp":1}"""),
+            Entry($$$"""{"role":"assistant","content":[{"type":"toolCall","id":"","name":"","arguments":{}}],"api":"bedrock-converse-stream","provider":"amazon-bedrock","model":"{{{ClaudeTranscriptModel}}}","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"toolUse","timestamp":3}"""),
+            Entry("""{"role":"toolResult","toolCallId":"","toolName":"","content":[{"type":"text","text":"Tool  not found"}],"details":{},"isError":true,"timestamp":4}"""));
+        using var request = await replayed.Transport.CreateRequestAsync(new(replayed.Model, history, 10));
+        var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync()).RootElement.GetProperty("messages");
+        JsonEqual("""{"content":[{"toolUse":{"input":{},"name":"","toolUseId":""}}],"role":"assistant"}""", body[1].GetRawText(), "nameless replay");
+        JsonEqual("""{"content":[{"toolResult":{"content":[{"text":"Tool  not found"}],"status":"error","toolUseId":""}},{"cachePoint":{"type":"default"}}],"role":"user"}""", body[2].GetRawText(), "nameless result replay");
+    }
+
     private static async Task BedrockErrors()
     {
         var hi = ImmutableArray.Create(Entry("""{"role":"user","content":"Hi","timestamp":1}"""));

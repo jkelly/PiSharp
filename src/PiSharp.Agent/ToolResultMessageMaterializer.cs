@@ -28,7 +28,7 @@ public static class ToolResultMessageMaterializer
     public static TranscriptEntry ToTranscript(ToolResultMessage message, long timestamp)
     {
         ArgumentNullException.ThrowIfNull(message);
-        if (string.IsNullOrWhiteSpace(message.ToolCallId) || string.IsNullOrWhiteSpace(message.ToolName) ||
+        if (message.ToolCallId is null || message.ToolName is null ||
             message.ToolCallId.Length > 65_536 || message.ToolName.Length > 65_536 ||
             !ToolResultValueCodec.ScalarText(message.ToolCallId) || !ToolResultValueCodec.ScalarText(message.ToolName))
             throw new InvalidOperationException("Invalid tool-result message identity.");

@@ -72,6 +72,13 @@ internal static partial class Program
             ("tool-arguments.mistral-fragments-and-non-string-arguments", MistralFinalArguments),
             ("tool-arguments.google-args-of-any-json-kind", GoogleFinalArguments),
             ("tool-arguments.pi-messages-object-assign-of-any-arguments", PiMessagesFinalArguments),
+            ("tool-identity.anthropic-empty-id-and-name-kept", AnthropicNamelessToolCalls),
+            ("tool-identity.completions-id-less-and-nameless-calls-kept", CompletionsNamelessToolCalls),
+            ("tool-identity.responses-template-id-and-empty-name-kept", ResponsesNamelessToolCalls),
+            ("tool-identity.google-and-vertex-nameless-calls-pushed", GoogleNamelessToolCalls),
+            ("tool-identity.mistral-empty-name-kept-and-id-derived", MistralNamelessToolCalls),
+            ("tool-identity.pi-messages-empty-identities-kept", PiMessagesNamelessToolCalls),
+            ("tool-identity.nameless-calls-and-results-replayed-per-api", NamelessToolCallReplays),
             ("errors.in-stream-error-texts-google-and-vertex", GoogleStreamErrorTexts),
             ("google.wire-body-matches-genai-for-gemini-and-vertex", GoogleWireBodies)
         };

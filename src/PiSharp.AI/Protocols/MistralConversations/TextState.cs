@@ -101,8 +101,10 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
                 if (!tools.TryGetValue(key, out var saved))
                 {
                     Limit(blocks.Count + 1, options.MaximumResponseContentBlocks);
+                    // mistral-conversations.ts keeps toolCall.function.name, an empty string included (owner decision 13); a missing one
+                    // (undefined upstream) stays unrepresentable and fails as malformed.
                     var name = function.GetProperty("name").GetString();
-                    if (string.IsNullOrEmpty(name)) throw Fail(NativeChatFailureCode.MalformedStream, "Missing Mistral tool name.");
+                    if (name is null) throw Fail(NativeChatFailureCode.MalformedStream, "Missing Mistral tool name.");
                     characters += id.Length + name.Length; Limit(characters, options.MaximumContentCharacters);
                     saved = (blocks.Count, ""); tools.Add(key, saved);
                     var block = new ToolCallContent(id, name, JsonData.EmptyObject); blocks.Add(block);
