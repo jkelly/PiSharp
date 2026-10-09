@@ -325,6 +325,14 @@ internal static class InteractiveModeCases
             await pi.WaitFor("readme-target.md");
         }));
 
+        yield return ("e2e.slash.bug-cancel", Case("bug", async pi =>
+        {
+            await pi.Submit("/bug");
+            await pi.WaitUntil(text => text.Contains("Pi developers", StringComparison.Ordinal) || text.Contains("bug", StringComparison.OrdinalIgnoreCase), "bug flow prompt");
+            await Task.Delay(200);
+            pi.Type("\u001b");
+            await pi.WaitFor("Bug report cancelled");
+        }));
         yield return ("e2e.autocomplete.slash-commands", Case("autocomplete", async pi =>
         {
             pi.Type("/hot");
