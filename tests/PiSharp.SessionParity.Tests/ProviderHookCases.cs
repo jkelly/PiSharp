@@ -20,6 +20,7 @@ internal static partial class Program
         Case("hooks.reduce-event-last-result-wins-and-failures-continue", ReduceEventOrder),
         Case("hooks.ui-prompt-start-end-once-for-nested-prompts", UiPromptEvents),
         Case("hooks.ui-prompt-wraps-terminal-component-scopes-and-custom", UiPromptCustomComponents),
+        Case("hooks.bedrock-event-stream-events-and-signed-payload-hooks", BedrockProviderHooks),
         Case("events.usage-entry-shape-and-entry-appended", UsageEntry),
     ];
 
@@ -75,6 +76,72 @@ internal static partial class Program
             """{"data":{"type":"done"},"type":"provider_stream_event","provider":"fixture","api":"openai-responses","model":"parity-events"}"""]),
             "provider_stream_event records: " + string.Join("\n", seen.Skip(2)));
         Check(text.StartsWith("data: {\"type\":\"delta\"", StringComparison.Ordinal) && text.EndsWith("data: [DONE]\n\n", StringComparison.Ordinal), "The SSE body was not passed through unchanged.");
+    }
+
+    private sealed class BedrockTime : TimeProvider { public override DateTimeOffset GetUtcNow() => new(2026, 10, 8, 12, 0, 0, TimeSpan.Zero); }
+    private sealed class FakeBedrock : HttpMessageHandler
+    {
+        internal string? Body; internal HttpRequestMessage? Request;
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            Request = request; Body = await request.Content!.ReadAsStringAsync(token);
+            static byte[] Event(string type, string payload) => PiSharp.AI.Protocols.Bedrock.AwsEventStream.Encode(
+                [new(":event-type", type), new(":content-type", "application/json"), new(":message-type", "event")], Encoding.UTF8.GetBytes(payload));
+            byte[] stream = [.. Event("messageStart", """{"p":"abc","role":"assistant"}"""),
+                .. Event("contentBlockDelta", """{"contentBlockIndex":0,"delta":{"text":"Hi"},"p":"abcdef"}"""),
+                .. Event("messageStop", """{"stopReason":"end_turn","p":"a"}""")];
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(stream) };
+            response.Content.Headers.TryAddWithoutValidation("Content-Type", "application/vnd.amazon.eventstream");
+            return response;
+        }
+    }
+
+    // bedrock-converse-stream.ts: onPayload runs before the SDK signs, header middleware adds signed headers, and every decoded stream
+    // item ({ messageStart: ... } etc.) reaches onProviderStreamEvent.
+    private static async Task BedrockProviderHooks()
+    {
+        await using var f = await CreateAsync(); var seen = new List<string>();
+        await f.Activate(api =>
+        {
+            var handlers = (IExtensionEventHandlerRegistry)api;
+            handlers.RegisterEventHandler(new("payload", "before_provider_request", (value, _, _) =>
+            {
+                var payload = System.Text.Json.Nodes.JsonNode.Parse(value.Value.GetProperty("payload").GetRawText())!.AsObject();
+                payload["inferenceConfig"] = new System.Text.Json.Nodes.JsonObject { ["maxTokens"] = 7 };
+                return ValueTask.FromResult<JsonData?>(JsonData.Parse(payload.ToJsonString()));
+            }));
+            handlers.RegisterEventHandler(new("headers", "before_provider_headers", (value, _, _) =>
+            {
+                var headers = System.Text.Json.Nodes.JsonNode.Parse(value.Value.GetProperty("headers").GetRawText())!.AsObject(); headers["x-trace"] = "t-1";
+                return ValueTask.FromResult<JsonData?>(JsonData.Parse(headers.ToJsonString()));
+            }));
+            api.Observe(new("stream", "provider_stream_event", (value, _, _) => { lock (seen) seen.Add(value.Value.GetProperty("data").GetRawText()); return ValueTask.CompletedTask; }));
+        });
+        var row = JsonData.Parse("""{"id":"amazon.nova-lite-v1:0","name":"Nova Lite","api":"bedrock-converse-stream","provider":"amazon-bedrock","baseUrl":"https://bedrock-runtime.us-east-1.amazonaws.com","reasoning":false,"input":["text"],"cost":{"input":0.06,"output":0.24,"cacheRead":0.015,"cacheWrite":0.06},"contextWindow":300000,"maxTokens":10000,"type":"chat"}""");
+        var model = new ModelDescriptor("amazon.nova-lite-v1:0", "bedrock-converse-stream", "amazon-bedrock");
+        var env = new Dictionary<string, string?> { ["AWS_ACCESS_KEY_ID"] = "AKIDEXAMPLE", ["AWS_SECRET_ACCESS_KEY"] = "secret-example", ["AWS_REGION"] = "us-east-1" };
+        var bedrock = new FakeBedrock();
+        var hooked = new ExtensionProviderHttpHandler(bedrock, f.Registry, f.Registry.CaptureSnapshot(), model, f.Report);
+        var environment = new PiSharp.AI.Protocols.Bedrock.AwsEnvironment(name => env.GetValueOrDefault(name), f.Root, new HttpMessageInvoker(bedrock, false), new BedrockTime());
+        var transport = new PiSharp.AI.Protocols.Bedrock.BedrockConverseStreamTransport(new HttpClient(hooked), model, row,
+            new PiSharp.AI.Protocols.Bedrock.BedrockConverseOptions(), environment);
+        var request = new PiSharp.AI.ChatRequest(model, [new TranscriptEntry("user", JsonData.Parse("""{"role":"user","content":"Hi","timestamp":1}"""))], 1);
+        var frames = new List<StreamEvent>();
+        await foreach (var frame in transport.StreamAsync(request)) frames.Add(frame);
+        Check(frames[^1] is StreamDone, "stream completed: " + string.Join(",", frames.Select(frame => frame.GetType().Name)));
+        Check(bedrock.Body!.Contains("\"maxTokens\":7", StringComparison.Ordinal), "replaced payload: " + bedrock.Body);
+        // The request reaching Bedrock is signed over the final payload and headers (x-trace is a signed header).
+        var sent = bedrock.Request!;
+        var headers = new List<KeyValuePair<string, string>> { new("content-type", sent.Content!.Headers.ContentType!.ToString()) };
+        headers.AddRange(sent.Headers.Where(header => header.Key is not ("Authorization" or "x-amz-date" or "x-amz-content-sha256"))
+            .Select(header => KeyValuePair.Create(header.Key, string.Join(",", header.Value))));
+        var expected = PiSharp.AI.Protocols.Bedrock.AwsSigV4.Sign(new("POST", sent.RequestUri!.Host, sent.RequestUri.AbsolutePath, [], headers, Encoding.UTF8.GetBytes(bedrock.Body)),
+            new("AKIDEXAMPLE", "secret-example"), "us-east-1", "bedrock", new BedrockTime().GetUtcNow());
+        Equal(expected.Authorization, sent.Headers.GetValues("Authorization").Single(), "signature over the hooked request");
+        Check(expected.Authorization.Contains("x-trace", StringComparison.Ordinal), "the hook header is signed");
+        for (var wait = 0; wait < 200 && seen.Count < 3; wait++) await Task.Delay(10);
+        Check(seen.SequenceEqual(["""{"messageStart":{"role":"assistant"}}""", """{"contentBlockDelta":{"contentBlockIndex":0,"delta":{"text":"Hi"}}}""",
+            """{"messageStop":{"stopReason":"end_turn"}}"""]), "provider_stream_event data: " + string.Join("\n", seen));
     }
 
     private static async Task ReduceEventOrder()

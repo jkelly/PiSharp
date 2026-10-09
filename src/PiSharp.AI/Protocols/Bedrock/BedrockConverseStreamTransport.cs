@@ -197,6 +197,18 @@ public sealed partial class BedrockConverseStreamTransport : IChatTransport, ITh
                 _environment.Time.GetUtcNow());
             foreach (var (name, value) in signature.AddedHeaders) message.Headers.TryAddWithoutValidation(name, value);
             message.Headers.TryAddWithoutValidation("Authorization", signature.Authorization);
+            var credentials = resolved.Credentials!; var region = resolved.Region; var time = _environment.Time;
+            message.Options.Set(PiSharp.AI.Providers.ProviderRequestSigning.Resign, async (signed, token) =>
+            {
+                foreach (var name in new[] { "Authorization", "x-amz-date", "x-amz-security-token", "x-amz-content-sha256" }) signed.Headers.Remove(name);
+                var bytes = signed.Content is null ? [] : await signed.Content.ReadAsByteArrayAsync(token).ConfigureAwait(false);
+                var current = new List<KeyValuePair<string, string>>();
+                if (signed.Content?.Headers.ContentType is { } type) current.Add(new("content-type", type.ToString()));
+                foreach (var header in signed.Headers) current.Add(new(header.Key, string.Join(",", header.Value)));
+                var again = AwsSigV4.Sign(new("POST", host, path, [], current, bytes), credentials, region, "bedrock", time.GetUtcNow());
+                foreach (var (name, value) in again.AddedHeaders) signed.Headers.TryAddWithoutValidation(name, value);
+                signed.Headers.TryAddWithoutValidation("Authorization", again.Authorization);
+            });
         }
         return message;
     }
