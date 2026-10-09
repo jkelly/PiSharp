@@ -113,6 +113,31 @@ internal static partial class Program
             Equal("{\"model\":\"gpt-5.4\",\"input\":[{\"role\":\"developer\",\"content\":\"SYS\"},{\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"PROMPT\"}]}],\"stream\":true,\"prompt_cache_key\":\"" +
                 sessionId + "\",\"store\":false,\"max_output_tokens\":" + maximum + reasoning + "}", sent.Body, "azure summary body " + (level ?? "-"));
         }
+        // amazon-bedrock streamSimple: a budget-thinking Claude model raises the summary cap by the level's budget
+        // (adjustMaxTokensForThinking, bedrock-converse-stream.ts ~555); an adaptive one keeps the cap and sends its effort.
+        foreach (var (id, maximum, level, expected) in new[]
+        {
+            ("anthropic.claude-sonnet-4-5-20250929-v1:0", 8000, (string?)"medium",
+                """{"messages":[{"role":"user","content":[{"text":"PROMPT"}]}],"system":[{"text":"SYS"}],"inferenceConfig":{"maxTokens":16192},"additionalModelRequestFields":{"thinking":{"type":"enabled","budget_tokens":8192,"display":"summarized"},"anthropic_beta":["interleaved-thinking-2025-05-14"]}}"""),
+            ("anthropic.claude-sonnet-4-5-20250929-v1:0", 4096, null,
+                """{"messages":[{"role":"user","content":[{"text":"PROMPT"}]}],"system":[{"text":"SYS"}],"inferenceConfig":{"maxTokens":4096}}"""),
+            ("global.anthropic.claude-opus-4-8", 8000, "high",
+                """{"messages":[{"role":"user","content":[{"text":"PROMPT"}]}],"system":[{"text":"SYS"}],"inferenceConfig":{"maxTokens":8000},"additionalModelRequestFields":{"thinking":{"type":"adaptive","display":"summarized","block_binding":{"prefix_mismatch_behavior":"drop_block"}},"output_config":{"effort":"high"},"anthropic_beta":["thinking-binding-controls-2026-08-01"]}}"""),
+        })
+        {
+            var bedrock = new LiveEndpoint(_ => new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("{}", Encoding.UTF8, "application/json") });
+            var selection = LiveSessionSelection.Parse("amazon-bedrock", id, "8192");
+            using (var connection = selection.Connect(new(Env(("AWS_ACCESS_KEY_ID", "AKIDEXAMPLE"), ("AWS_SECRET_ACCESS_KEY", "secret-example"), ("AWS_REGION", "us-east-1")), () => bedrock)))
+            {
+                try { await new TransportSessionSummaryGenerator(request => connection.CreateSummaryTransport((int)request.MaximumOutputTokens, request.ThinkingLevel))
+                    .GenerateAsync(new(level is null ? SessionSummaryKind.Branch : SessionSummaryKind.History, selection.Model, "SYS", "PROMPT", maximum, level, sessionId)); }
+                catch (PiSharp.Sessions.Compaction.SessionCompactionException) { }
+            }
+            var sent = bedrock.Snapshot().Single();
+            // The AWS SDK's member order is not this wire contract's; the request fields are compared as JSON.
+            Check(System.Text.Json.Nodes.JsonNode.DeepEquals(System.Text.Json.Nodes.JsonNode.Parse(expected), System.Text.Json.Nodes.JsonNode.Parse(sent.Body!)),
+                "bedrock " + id + " " + (level ?? "-") + " summary body: " + sent.Body);
+        }
         // A model without reasoning drops the session level (model.reasoning gate), keeping the thinking-off summary request.
         var plain = new LiveEndpoint(_ => new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("{}", Encoding.UTF8, "application/json") });
         var gpt41 = LiveSessionSelection.Parse("openai", "gpt-4.1", "8192");
