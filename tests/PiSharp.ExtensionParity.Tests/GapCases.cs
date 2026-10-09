@@ -23,6 +23,7 @@ internal static partial class Program
         ("gap.registrations-after-the-factory-take-effect", LateRegistrations),
         ("gap.reload-reloads-extensions-and-resources", Reload),
         ("gap.chat-provider-registration-and-unregistration", ChatProvider),
+        ("gap.editor-component-and-autocomplete-provider", EditorAndAutocomplete),
     ];
 
     // agent-session.ts sendCustomMessage: idle and without triggerTurn, the message is appended and emitted (message_start/_end) at once.
@@ -435,5 +436,81 @@ internal static partial class Program
         Equal(0, rpcCode, "rpc exit; " + rpcError);
         Check(HasAcme(records.First(record => IsResponse(record, "before"))), "acme model available while registered");
         Check(!HasAcme(records.Last(record => IsResponse(record, "after"))), "unregisterProvider removed the models");
+    }
+
+    // interactive-mode.ts setCustomEditorComponent / addAutocompleteProvider: an extension's editor (a CustomEditor) renders and takes
+    // keys in Node; submit and the mode's app actions come back; an autocomplete factory wraps the mode's provider.
+    private static async Task EditorAndAutocomplete()
+    {
+        RequirePiRuntime();
+        using var sandbox = NodeSandbox("editor");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "editor.ts"), Probe + """
+            import { CustomEditor } from "@earendil-works/pi-coding-agent";
+            class ShoutEditor extends CustomEditor {
+              render(width: number) { return super.render(width).map((line: string) => line); }
+            }
+            export default function (pi: any) {
+              pi.registerShortcut("ctrl+shift+e", { description: "Editor", handler: async (ctx: any) => {
+                ctx.ui.setEditorComponent((tui: any, theme: any, keybindings: any) => new ShoutEditor(tui, theme, keybindings));
+                ctx.ui.addAutocompleteProvider((base: any) => ({
+                  triggerCharacters: ["#"],
+                  async getSuggestions(lines: string[], line: number, col: number, options: any) {
+                    const inner = await base.getSuggestions(lines, line, col, options);
+                    return { items: [{ value: "zeta", label: "zeta" }, ...(inner?.items ?? [])], prefix: inner?.prefix ?? "" };
+                  },
+                  applyCompletion: (lines: string[], line: number, col: number, item: any, prefix: string) => base.applyCompletion(lines, line, col, item, prefix),
+                }));
+              } });
+            }
+            """);
+        await using var host = await StartHost(sandbox, extension);
+        var publications = new List<(string Op, JsonElement Args)>();
+        host.InteractiveUi = (op, args) => { lock (publications) publications.Add((op, args.ValueKind == JsonValueKind.Undefined ? default : args.Clone())); };
+        IInteractiveHostProbe interactive = new(host);
+        interactive.Configure();
+        var (shortcuts, _) = host.ResolveShortcuts(new Dictionary<string, IReadOnlyList<string>>());
+        await host.RunShortcutAsync(shortcuts.Single().Extension, shortcuts.Single().Shortcut, CancellationToken.None);
+        await WaitUntil(() => { lock (publications) return publications.Any(item => item.Op == "addAutocompleteProvider"); });
+        (string Op, JsonElement Args) editorPublication, wrapperPublication;
+        lock (publications) { editorPublication = publications.First(item => item.Op == "setEditorComponent"); wrapperPublication = publications.First(item => item.Op == "addAutocompleteProvider"); }
+        var editorId = editorPublication.Args[0].GetProperty("component").GetString()!;
+        var submitted = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var interrupted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var editor = interactive.Host.CreateEditor(editorId, action => action(), name => name == "app.interrupt" ? () => interrupted.TrySetResult() : null)!;
+        editor.OnSubmit = text => submitted.TrySetResult(text);
+        Check(editor.Render(40).Count > 0, "the editor renders");
+        foreach (var key in new[] { "h", "i" }) editor.HandleInput(key);
+        await WaitUntil(() => editor.GetText() == "hi");
+        editor.HandleInput("\r");
+        Equal("hi", await submitted.Task.WaitAsync(TimeSpan.FromSeconds(10)), "submit");
+        editor.HandleInput("\u001b");
+        await interrupted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var wrap = interactive.Host.AutocompleteWrapper(wrapperPublication.Args[0].GetProperty("wrapper").GetString()!)!;
+        var provider = wrap(new FixedProvider());
+        var suggestions = await provider.GetSuggestionsAsync(["al"], 0, 2, false, CancellationToken.None);
+        Names(["zeta", "alpha"], suggestions!.Items.Select(item => item.Value), "wrapped suggestions");
+        Equal("applied", provider.ApplyCompletion(["al"], 0, 2, new("alpha", "alpha"), "al").Lines.Single(), "base applyCompletion through the wrapper");
+        Names(["#"], provider.TriggerCharacters, "trigger characters");
+    }
+
+    private static async Task WaitUntil(Func<bool> condition)
+    {
+        for (var attempt = 0; attempt < 200 && !condition(); attempt++) await Task.Delay(50);
+        Check(condition(), "condition not reached in time");
+    }
+
+    private sealed class IInteractiveHostProbe(PiSharp.Cli.Extensions.Pi.PiExtensionHost host)
+    {
+        internal PiSharp.Cli.Interactive.Mode.IInteractiveExtensionHost Host { get; } = new PiSharp.Cli.Interactive.Mode.PiInteractiveExtensionHost(host);
+        internal void Configure() => Host.ConfigureEditor(new Dictionary<string, IReadOnlyList<string>> { ["app.interrupt"] = ["escape"], ["app.exit"] = ["ctrl+d"] },
+            ["app.interrupt"], _ => false);
+    }
+
+    private sealed class FixedProvider : PiSharp.Tui.Pi.IAutocompleteProvider
+    {
+        public Task<PiSharp.Tui.Pi.AutocompleteSuggestions?> GetSuggestionsAsync(IReadOnlyList<string> lines, int cursorLine, int cursorCol, bool force, CancellationToken cancellationToken) =>
+            Task.FromResult<PiSharp.Tui.Pi.AutocompleteSuggestions?>(new([new("alpha", "alpha")], "al"));
+        public PiSharp.Tui.Pi.CompletionResult ApplyCompletion(IReadOnlyList<string> lines, int cursorLine, int cursorCol, PiSharp.Tui.Pi.AutocompleteItem item, string prefix) =>
+            new(["applied"], 0, 7);
     }
 }

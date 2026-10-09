@@ -63,6 +63,7 @@ export async function loadPiModules(nodeModules, themeName) {
   const themes = await import(pathToFileURL(path.join(codingAgent, 'dist', 'modes', 'interactive', 'theme', 'theme.js')).href);
   try { themes.initTheme(themeName, false); } catch { /* the system theme stays unset only if Pi itself cannot load one */ }
   const ai = await import(pathToFileURL(piAiCompatEntry).href);
+  const tui = await import(pathToFileURL(piTuiEntry).href);
   const version = JSON.parse(fs.readFileSync(path.join(codingAgent, 'package.json'), 'utf8')).version;
 
   return {
@@ -75,6 +76,7 @@ export async function loadPiModules(nodeModules, themeName) {
       return jiti.import(extensionPath, { default: true });
     },
     createEventStream: () => ai.createAssistantMessageEventStream(),
+    tui,
     themeFactory: (name) => (name === undefined ? themes.theme : themes.getThemeByName(name)),
     currentTheme: () => themes.theme,
     themes,

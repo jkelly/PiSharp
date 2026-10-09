@@ -101,19 +101,22 @@ async function handle(method, params, id) {
     case 'init': {
       if (params.agentDir && !process.env.PI_CODING_AGENT_DIR) process.env.PI_CODING_AGENT_DIR = params.agentDir;
       globalThis.__pisharpHost = { agentDir: params.agentDir, version: params.version, cwd: params.cwd };
-      let themeFactory, importExtension, createEventStream, modules = 'compatibility';
+      let themeFactory, importExtension, createEventStream, tuiModule, editorTheme, modules = 'compatibility';
       if (params.piModules) {
         // The installed Pi packages, loaded with Pi's own jiti and aliases.
         const pi = await loadPiModules(params.piModules, params.theme);
         themeFactory = pi.themeFactory; importExtension = pi.importExtension; createEventStream = pi.createEventStream; modules = 'pi@' + pi.version;
+        tuiModule = pi.tui; editorTheme = () => pi.themes.getEditorTheme();
       } else {
         // Offline fallback: PiSharp's compatibility modules and loader hooks.
         await installHooks();
         try { const themes = await import(pathToFileURL(path.join(here, 'virtual', 'theme.mjs')).href); themeFactory = (name) => themes.createTheme(name); } catch { themeFactory = undefined; }
         const ai = await import(pathToFileURL(path.join(here, 'virtual', 'pi-ai.mjs')).href);
         createEventStream = () => ai.createAssistantMessageEventStream();
+        try { tuiModule = await import(pathToFileURL(path.join(here, 'virtual', 'pi-tui.mjs')).href); } catch { tuiModule = undefined; }
+        try { const themes = await import(pathToFileURL(path.join(here, 'virtual', 'theme.mjs')).href); editorTheme = typeof themes.getEditorTheme === 'function' ? () => themes.getEditorTheme() : undefined; } catch { editorTheme = undefined; }
       }
-      runtime = new ExtensionRuntime(bridge, { ...params, themeFactory, importExtension, createEventStream });
+      runtime = new ExtensionRuntime(bridge, { ...params, themeFactory, importExtension, createEventStream, tuiModule, editorTheme });
       return { node: process.version, pid: process.pid, modules };
     }
     case 'load': {
@@ -176,6 +179,22 @@ async function handle(method, params, id) {
     case 'component.render': return runtime.renderComponent(params.id, params.width);
     case 'component.input': runtime.inputComponent(params.id, params.data); return null;
     case 'component.dispose': runtime.disposeComponent(params.id); return null;
+    case 'component.method': return plain(runtime.callComponent(params.id, params.method, params.args)) ?? null;
+    case 'editor.configure': runtime.configureEditor(params.keybindings, params.actions); return null;
+    case 'editor.autocomplete': runtime.setEditorAutocomplete(params.id, params.token); return null;
+    case 'autocomplete.suggest': {
+      const controller = new AbortController(); active.set(id, controller);
+      try {
+        const provider = runtime.autocompleteProvider(params.wrapper, params.token);
+        return plain(await provider.getSuggestions(params.lines, params.cursorLine, params.cursorCol, { force: params.force === true, signal: controller.signal })) ?? null;
+      } finally { active.delete(id); }
+    }
+    case 'autocomplete.apply': return plain(runtime.autocompleteProvider(params.wrapper, params.token).applyCompletion(params.lines, params.cursorLine, params.cursorCol, params.item, params.prefix)) ?? null;
+    case 'autocomplete.triggers': return plain(runtime.autocompleteProvider(params.wrapper, params.token).triggerCharacters ?? []);
+    case 'autocomplete.file': {
+      const provider = runtime.autocompleteProvider(params.wrapper, params.token);
+      return typeof provider.shouldTriggerFileCompletion === 'function' ? provider.shouldTriggerFileCompletion(params.lines, params.cursorLine, params.cursorCol) !== false : true;
+    }
     case 'render.tool': return runtime.renderTool(params);
     case 'render.resolve': {
       const renderers = runtime.resolveToolRenderers(params.toolName);

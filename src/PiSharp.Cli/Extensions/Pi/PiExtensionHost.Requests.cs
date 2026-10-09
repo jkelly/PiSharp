@@ -182,6 +182,8 @@ internal sealed partial class PiExtensionHost
             case "models.read": return await ModelsAsync(Op(), Args(), token).ConfigureAwait(false);
             case "models.call": return await ModelsAsync(Op(), Args(), token).ConfigureAwait(false);
             case "bridge.call": return await BridgeCallAsync(p, request, token).ConfigureAwait(false);
+            case "autocomplete.base": return await AutocompleteBaseAsync(p, token).ConfigureAwait(false);
+            case "editor.shortcut": return EditorShortcut?.Invoke(p.GetProperty("data").GetString() ?? "") ?? false;
             default: throw new NotSupportedException($"{request.Method} is not available in this PiSharp host");
         }
     }
@@ -244,6 +246,7 @@ internal sealed partial class PiExtensionHost
             case "mcp.register": lock (_mcpServers) _mcpServers.Add(JsonNode.Parse(parameters.GetRawText())!.AsObject()); return;
             case "mcp.unregister": lock (_mcpServers) _mcpServers.RemoveAll(item => item["name"]?.GetValue<string>() == parameters.GetProperty("name").GetString()); return;
             case "events.emit": DeliverFromNode(parameters); return;
+            case "component.event": ComponentEvent?.Invoke(parameters.GetProperty("id").GetString()!, parameters.Clone()); return;
             case "registrations.changed":
             {
                 var index = parameters.GetProperty("ext").GetInt32();
