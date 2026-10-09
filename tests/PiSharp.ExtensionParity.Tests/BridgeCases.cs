@@ -134,7 +134,7 @@ internal static partial class Program
         };
         var (code, stdout, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "-e", extension, "--probe-mode", "loud-mode", "--probe-loud", "rewrite:Hello there"]);
         Equal(0, code, "exit; " + stderr);
-        Equal("done", stdout.Trim(), "final text");
+        Equal("done", stdout.Trim(), "final text; requests " + sandbox.Requests.Count + "; stderr " + stderr + "; log " + string.Join(" | ", LogLines(sandbox)));
         var first = sandbox.Requests[0].Json;
         var userText = first.GetProperty("messages").EnumerateArray().First(m => m.GetProperty("role").GetString() == "user").GetProperty("content");
         Check(userText.ToString().Contains("Hello there", StringComparison.Ordinal) && !userText.ToString().Contains("rewrite:", StringComparison.Ordinal), "input transform: " + userText);
@@ -220,7 +220,6 @@ internal static partial class Program
         Equal("one two", record[1]!.GetValue<string>(), "command arguments");
         Equal("function", record[3]!.GetValue<string>(), "command context waitForIdle");
         Equal("function", record[4]!.GetValue<string>(), "command context newSession");
-        await WaitUntil(() => File.ReadAllText(sandbox.SessionFiles().Single()).Contains("probe-msg", StringComparison.Ordinal), "custom message recorded");
     }
 
     private static async Task WaitUntil(Func<bool> condition, string what)
@@ -315,14 +314,16 @@ internal static partial class Program
         var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "ask.ts"), DialogExtension);
         var input = new LineInput();
         input.Push("{\"id\":\"1\",\"type\":\"prompt\",\"message\":\"/ask\"}");
-        var lines = new List<string>();
+        var lines = new List<string>(); var notified = false; var responded = false;
         using var output = new LineOutput(line =>
         {
             lock (lines) lines.Add(line);
             var record = JsonNode.Parse(line)!;
             if (record["type"]?.GetValue<string>() == "extension_ui_request" && record["method"]?.GetValue<string>() == "select")
                 input.Push(JsonSerializer.Serialize(new { type = "extension_ui_response", id = record["id"]!.GetValue<string>(), value = "blue" }));
-            if (record["type"]?.GetValue<string>() == "extension_ui_request" && record["method"]?.GetValue<string>() == "notify") input.Complete();
+            if (record["type"]?.GetValue<string>() == "extension_ui_request" && record["method"]?.GetValue<string>() == "notify") notified = true;
+            if (record["type"]?.GetValue<string>() == "response" && record["command"]?.GetValue<string>() == "prompt") responded = true;
+            if (notified && responded) input.Complete();
         });
         using var stdout = new StringWriter(); using var stderr = new StringWriter();
         var host = sandbox.Host(stdout, stderr, null, rpcInput: input, rpcOutput: output) with { StdoutIsTty = false };

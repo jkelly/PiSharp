@@ -38,8 +38,9 @@ internal sealed class PiExtensionRun : IAsyncDisposable
 
     private async Task LoadSourcesAsync(PiSettings settings, bool projectTrusted, CancellationToken token)
     {
-        var sources = PiExtensionDiscovery.Resolve(_cwd, _agentDir, _home, settings, projectTrusted, _parsed.Extensions ?? [], _parsed.NoExtensions,
-            PackageExtensions?.Invoke(settings, projectTrusted));
+        ImmutableArray<PiExtensionSource> sources;
+        try { sources = await ResolveSourcesAsync(settings, token).ConfigureAwait(false); }
+        catch (PiSharp.Cli.Packages.PiPackageException error) { _loading.Add([new("error", error.Message)]); return; }
         await _loading.LoadAsync(sources, () => new PiExtensionHostOptions(_cwd, _agentDir, _mode, _hasUI)
         {
             GetEnvironment = _host.GetEnvironment,
@@ -50,8 +51,31 @@ internal sealed class PiExtensionRun : IAsyncDisposable
         Host?.Reorder(sources.Select(source => source.Path));
     }
 
-    /// <summary>Extensions installed by packages (IMPL-E package manager): settings <c>packages</c> resolved for the trust state.</summary>
-    internal static Func<PiSettings, bool, IReadOnlyList<PiExtensionSource>>? PackageExtensions { get; set; }
+    /// <summary>resource-loader.ts reload: <c>packageManager.resolveExtensionSources(-e paths, temporary)</c> first, then (unless
+    /// <c>--no-extensions</c>) the enabled extensions of <c>packageManager.resolve()</c> (settings entries, auto-discovered folders and
+    /// packages in upstream's precedence; project ones only for a trusted project), each path once. Built-in extensions are PiSharp's own.</summary>
+    private async Task<ImmutableArray<PiExtensionSource>> ResolveSourcesAsync(PiSettings settings, CancellationToken token)
+    {
+        var output = _stderr ?? TextWriter.Null;
+        var manager = new PiSharp.Cli.Packages.PiPackageManager(_cwd, _agentDir, _home, settings, _host.GetEnvironment,
+            _host.PackageProcesses?.Invoke(output, output) ?? new() { Output = output, ErrorOutput = output });
+        var cli = _parsed.Extensions is { Count: > 0 } paths
+            ? await manager.ResolveExtensionSourcesAsync(paths, temporary: true, cancellationToken: token).ConfigureAwait(false)
+            : PiSharp.Cli.Packages.PiResolvedPaths.Empty;
+        var resolved = _parsed.NoExtensions ? PiSharp.Cli.Packages.PiResolvedPaths.Empty : await manager.ResolveAsync(cancellationToken: token).ConfigureAwait(false);
+        var seen = new HashSet<string>(PiPaths.Comparer);
+        var list = ImmutableArray.CreateBuilder<PiExtensionSource>();
+        foreach (var resource in cli.Extensions.Concat(resolved.Extensions))
+        {
+            if (!resource.Enabled || resource.Path.StartsWith("builtin:", StringComparison.Ordinal)) continue;
+            if (seen.Add(Path.GetFullPath(resource.Path))) list.Add(new(resource.Path, resource.Metadata.Scope, resource.Metadata.Source));
+        }
+        // A local -e path that does not exist is still reported (Extension path does not exist).
+        foreach (var path in _parsed.Extensions ?? [])
+            if (PiPaths.IsLocalPath(path) && PiPaths.ResolvePath(path, _cwd, _home, trim: true) is var local && !Path.Exists(local) && seen.Add(Path.GetFullPath(local)))
+                list.Add(new(local, "temporary", "cli"));
+        return list.ToImmutable();
+    }
 
     internal async Task ApplyFlagValuesAsync(IReadOnlyDictionary<string, string?> values, CancellationToken token)
     {

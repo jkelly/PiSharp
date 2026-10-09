@@ -1,0 +1,36 @@
+// Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/tui/src/index.ts.
+// Ported to plain ESM for the PiSharp Node extension bridge (TypeScript types stripped mechanically; behaviour unchanged).
+export { Marked } from "./vendor/marked.mjs";
+export { CombinedAutocompleteProvider } from "./tui/autocomplete.mjs";
+export { backgroundAnsi, colorToHex, colorToOkhsl, colorToOklch, colorToRgb, foregroundAnsi, indexedColor, mixColors, okhslColor, oklchColor, parseColor, rgbColor, styleText, styleTextWithAnsi } from "./tui/colors.mjs";
+export { Box } from "./tui/components/box.mjs";
+export { CancellableLoader } from "./tui/components/cancellable-loader.mjs";
+export { Editor } from "./tui/components/editor.mjs";
+export { HStack } from "./tui/components/h-stack.mjs";
+export { Image, setImageTranscoder } from "./tui/components/image.mjs";
+export { Input } from "./tui/components/input.mjs";
+export { Loader } from "./tui/components/loader.mjs";
+export { Markdown } from "./tui/components/markdown.mjs";
+export { MouseRegion } from "./tui/components/mouse-region.mjs";
+export { ScrollView } from "./tui/components/scroll-view.mjs";
+export { SelectList } from "./tui/components/select-list.mjs";
+export { SettingsList } from "./tui/components/settings-list.mjs";
+export { Spacer } from "./tui/components/spacer.mjs";
+export { Text } from "./tui/components/text.mjs";
+export { TruncatedText } from "./tui/components/truncated-text.mjs";
+export { VStack } from "./tui/components/v-stack.mjs";
+export { fuzzyFilter, fuzzyMatch } from "./tui/fuzzy.mjs";
+export { getKeybindings, KeybindingsManager, setKeybindings, TUI_KEYBINDINGS } from "./tui/keybindings.mjs";
+export { decodeKittyPrintable, isKeyRelease, isKeyRepeat, isKittyProtocolActive, Key, matchesKey, parseKey, setKittyProtocolActive } from "./tui/keys.mjs";
+export { renderLatex } from "./tui/latex.mjs";
+export { getNativeClipboard } from "./tui/native-platform.mjs";
+export { oklabToOkhslLightness } from "./tui/oklab.mjs";
+export { formatProgramStatus } from "./tui/program-status.mjs";
+export { StdinBuffer } from "./tui/stdin-buffer.mjs";
+export { isAppleTerminalSession, ProcessTerminal } from "./tui/terminal.mjs";
+export { parseTerminalColorSchemeReport } from "./tui/terminal-colors.mjs";
+export { allocateImageId, calculateImageRows, deleteAllKittyImages, deleteKittyImage, detectCapabilities, encodeITerm2, encodeKitty, getCapabilities, getCellDimensions, getGifDimensions, getImageDimensions, getJpegDimensions, getPngDimensions, getTerminalColorMode, getWebpDimensions, hyperlink, imageFallback, renderImage, resetCapabilitiesCache, setCapabilities, setCapabilityOverrides, setCellDimensions } from "./tui/terminal-image.mjs";
+export { Container, CURSOR_MARKER, compositeTuiLine, isFocusable, isViewportTUI } from "./tui/tui.mjs";
+export { TuiAltScreen } from "./tui/tui-alt-screen.mjs";
+export { TuiMainScreen } from "./tui/tui-main-screen.mjs";
+export { getOsc8LinkAtColumn, sliceByColumn, stripTerminalSequences, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "./tui/utils.mjs";
