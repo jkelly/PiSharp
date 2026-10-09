@@ -222,11 +222,13 @@ static class AnthropicMessagesTests
             new[] { Start, TextStart, Delta(9, "thinking_delta", "wrong") },
             new[] { Start, Delta(42, "text_delta", "unknown") }, new[] { Start, TextStart, End, Stop },
             new[] { Start, End, Stop, End },
-            new[] { Start, TextStart, """{"type":"content_block_start","index":0,"content_block":{"type":"fallback","model":"other"}}""" },
-            // Reported transformations are diagnostics (Pi abe508); only malformed entries are rejected.
-            new[] { Start, """{"type":"message_delta","delta":{},"input_transformations":[{"type":1}]}""" },
-            new[] { Start, """{"type":"message_delta","delta":{},"input_transformations":{"type":"unsupported"}}""" }
+            new[] { Start, TextStart, """{"type":"content_block_start","index":0,"content_block":{"type":"fallback","model":"other"}}""" }
         }) Failure(Terminal(await Collect(trace)), AnthropicMessagesFailure.MalformedStream);
+        // Reported transformations are diagnostics (Pi abe508): a non-array is ignored and entry values are copied unchecked.
+        var tolerated = Terminal(await Collect([Start, """{"type":"message_delta","delta":{},"input_transformations":[{"type":1}]}""",
+            """{"type":"message_delta","delta":{},"input_transformations":{"type":"unsupported"}}""", End, Stop]));
+        Assert(tolerated is StreamDone, "Transformations failed the stream.");
+        Assert(Property(tolerated.Message.ExtraProperties, "diagnostics").Contains("\"transformations\":[{\"type\":1}]", StringComparison.Ordinal), "Transformation not copied.");
         Failure(Terminal(await Collect([Start, """{"type":"error","error":{"type":"overloaded_error","message":"private-provider-payload"}}"""])), AnthropicMessagesFailure.ProviderError);
     }
 

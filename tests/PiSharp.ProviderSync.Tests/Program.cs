@@ -42,6 +42,7 @@ internal static partial class Program
             ("anthropic.mid-effort-sonnet-5-5-every-level-full-requests-oauth-and-simple", MidEffortSonnetEveryLevel),
             ("anthropic.mid-effort-multi-turn-replay-preserves-per-turn-effort", MidEffortReplay),
             ("anthropic.mid-effort-input-transformations-diagnostic", MidEffortInputTransformations),
+            ("anthropic.input-transformations-unchecked-entries-and-completion-clock", AnthropicInputTransformationsUnchecked),
             ("anthropic.unmanaged-fable-5-and-budget-sonnet-4-5-unchanged", UnmanagedAnthropicModelsUnchanged),
             ("sampling.completions-model-level-request-precedence", CompletionsSampling),
             ("sampling.responses-model-level-request-precedence-and-metadata-binding", ResponsesSampling),
