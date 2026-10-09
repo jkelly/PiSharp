@@ -136,6 +136,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     {
         get
         {
+            if (SelectedModel == LiveSessionSelection.UnselectedModel) return LiveSessionSelection.UnselectedWire;
             using var bytes = new MemoryStream();
             using (var writer = new Utf8JsonWriter(bytes))
             {
@@ -346,6 +347,21 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         }
     }
 
+    /// <summary>A selected model's route that connects on its first request, over a registry read at that moment (model-runtime.ts
+    /// prepareRequest resolves auth per request). Anthropic resolves as <see cref="LiveSessionSelection.ResolveAnthropicAsync"/> does.</summary>
+    private static LiveSessionConnection DeferredConnection(LiveSessionSelection selection, LiveSessionRuntime runtime) =>
+        LiveSessionConnection.Deferred(selection, selection.Entry is { } entry ? PiSharp.Cli.Models.VirtualModels.SupportedThinkingLevels(entry)
+            : PiSharp.AI.Protocols.ProviderShared.ProviderTranscriptAccess.SupportedThinkingLevels(selection.Definition.Raw), async token =>
+            {
+                var fresh = selection.WithRegistry(await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false));
+                if (fresh.Model.Provider == "anthropic" && fresh.Model.Api == "anthropic-messages")
+                {
+                    var (authentication, handler, reresolve) = await fresh.ResolveAnthropicAsync(runtime, token).ConfigureAwait(false);
+                    return await fresh.ConnectResolvedAnthropicAsync(authentication, handler, token, reresolve).ConfigureAwait(false);
+                }
+                return fresh.Connect(runtime);
+            });
+
     internal static ModelDescriptor SelectModel(string? offlineApi) => offlineApi switch
     {
         null or "openai-responses" => Model,
@@ -425,7 +441,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         Func<ExtensionRegistry, PiSharp.Cli.Extensions.Execution.NativeExtensionExecInstallation>? configuredExecInstallation = null,
         OriginalSystemPromptAdmission? originalSystemPrompt = null, BuiltinToolSettings? toolSettings = null,
         PiSharp.Cli.Mcp.McpRegisteredServers? mcpRegistrations = null,
-        PiSharp.Cli.Pi.PiToolPolicy? toolPolicy = null, PiSharp.Cli.Extensions.Pi.PiExtensionHost? piExtensions = null)
+        PiSharp.Cli.Pi.PiToolPolicy? toolPolicy = null, PiSharp.Cli.Extensions.Pi.PiExtensionHost? piExtensions = null,
+        bool deferMissingCredentials = false)
     {
         if (piExtensions is not null && extension is not null) throw new ArgumentException("A published native extension and Pi extensions cannot share one profile.");
         toolSettings ??= BuiltinToolSettings.Default;
@@ -587,19 +604,34 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 var hooked = liveRuntime ?? LiveSessionRuntime.Default;
                 liveRuntime = hooked with { CreateHttpHandler = () => providerHooks(hooked.CreateHttpHandler()) };
             }
-            if (resolvedAnthropicAuthentication is null && liveSelection is { Model.Provider: "anthropic" })
-            {
-                var (anthropic, anthropicHandler, reresolve) = await liveSelection.ResolveAnthropicAsync(liveRuntime, token).ConfigureAwait(false);
-                connectionOriginal = liveSelection.ConnectResolvedAnthropicAsync(anthropic, anthropicHandler, token, reresolve).AsTask();
-                connection = await connectionOriginal.ConfigureAwait(false);
-            }
-            else if (resolvedAnthropicAuthentication is null) connection = liveSelection?.Connect(liveRuntime);
+            // sdk.ts: a session without a model keeps the Agent's DEFAULT_MODEL; its provider has no auth, so nothing is ever sent to it.
+            if (liveSelection is { IsUnselected: true })
+                connection = LiveSessionConnection.Deferred(liveSelection, ["off"], _ => throw new InvalidOperationException("No API key for provider: unknown"));
             else
-            {
-                connectionOriginal = (liveSelection ?? throw new InvalidOperationException("Validated Anthropic selection is absent."))
-                    .ConnectResolvedAnthropicAsync(resolvedAnthropicAuthentication, resolvedAnthropicHandler, token).AsTask();
-                connection = await connectionOriginal.ConfigureAwait(false);
-            }
+                try
+                {
+                    if (resolvedAnthropicAuthentication is null && liveSelection is { Model.Provider: "anthropic" })
+                    {
+                        var (anthropic, anthropicHandler, reresolve) = await liveSelection.ResolveAnthropicAsync(liveRuntime, token).ConfigureAwait(false);
+                        connectionOriginal = liveSelection.ConnectResolvedAnthropicAsync(anthropic, anthropicHandler, token, reresolve).AsTask();
+                        connection = await connectionOriginal.ConfigureAwait(false);
+                    }
+                    else if (resolvedAnthropicAuthentication is null) connection = liveSelection?.Connect(liveRuntime);
+                    else
+                    {
+                        connectionOriginal = (liveSelection ?? throw new InvalidOperationException("Validated Anthropic selection is absent."))
+                            .ConnectResolvedAnthropicAsync(resolvedAnthropicAuthentication, resolvedAnthropicHandler, token).AsTask();
+                        connection = await connectionOriginal.ConfigureAwait(false);
+                    }
+                }
+                catch (LiveSessionException error) when (deferMissingCredentials && error.Code == "MissingLiveApiKey" && liveSelection is not null &&
+                    connection is null && connectionOriginal is null)
+                {
+                    // main.ts/agent-session.ts: a selected model whose provider has no credentials does not stop startup; the prompt
+                    // preflight refuses prompts until a credential appears (/login, auth.json, the environment), and the route then
+                    // connects with the credential sources as they are at that request.
+                    connection = DeferredConnection(liveSelection, liveRuntime ?? LiveSessionRuntime.Default);
+                }
             var profile = new OfflineSessionProfile(canonicalWorkspace, new BuiltinToolCatalog(canonicalWorkspace, toolHome, files,
                 readWriteOptions: ReadOptions(toolSettings, modelDefinition.DeclaresImageInput),
                 // Pi edits files of any size; only the edit arguments and the display diff keep the profile bounds.

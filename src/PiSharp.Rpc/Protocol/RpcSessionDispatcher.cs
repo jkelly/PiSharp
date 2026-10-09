@@ -441,6 +441,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 SessionCatalogException catalog => catalog.Message,
                 SessionContextEditException edit => edit.Message,
                 PromptInputAdmissionException admission => admission.Message,
+                // rpc-mode.ts prompt: a prompt refused by its preflight answers with the refusal's message.
+                SessionPromptRejectedException rejected => rejected.Message,
                 OperationCanceledException when originatingAttachment is not null && !ReferenceEquals(originatingAttachment, _sessionOwner!.Current) =>
                     "Command canceled after session replacement committed; inspect the current session and durable state.",
                 OperationCanceledException => "Command canceled before acceptance.",

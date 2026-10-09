@@ -232,6 +232,9 @@ internal sealed class ModelRegistry
         !options.StoredCredentials.TryGetValue(provider, out var stored) ? null :
         stored is { Type: "api_key", Key: { } key } ? stored with { Key = Values.Resolve(key, stored.Environment) } : stored;
 
+    /// <summary>Source isUsingOAuth: the provider's stored credential is an OAuth credential.</summary>
+    internal bool IsUsingOAuth(string provider) => options.StoredCredentials.TryGetValue(provider, out var stored) && stored.Type == "oauth";
+
     /// <summary>Source hasConfiguredAuth: the provider's auth check passes. Checks are cached until the next rebuild.</summary>
     internal bool HasConfiguredAuth(string provider) => CheckAuth(provider) is not null;
 

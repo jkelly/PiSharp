@@ -239,6 +239,41 @@ internal sealed class LiveSessionSelection
     /// <summary>The extension stream that serves this model's API (registerProvider with streamSimple), or null.</summary>
     internal Func<IChatTransport>? CustomStream { get; private init; }
 
+    /// <summary>This selection resolving its credentials through <paramref name="registry"/> (auth.json, models.json and the environment
+    /// as they are now), with the same catalog row, output limit and annotations.</summary>
+    internal LiveSessionSelection WithRegistry(PiSharp.Cli.Models.ModelRegistry registry) =>
+        new(Definition, MaximumOutputTokens)
+        {
+            Entry = Entry is null ? null : registry.Find(Entry.Provider, Entry.Id) ?? Entry, Registry = registry, CustomStream = CustomStream,
+            PatternThinkingLevel = PatternThinkingLevel, Warnings = Warnings, ScopedModels = ScopedModels, VirtualSession = VirtualSession
+        };
+
+    /// <summary>The model of a session that starts without one (sdk.ts createAgentSession when findInitialModel finds none): the Agent
+    /// keeps its DEFAULT_MODEL (agent.ts: id, name, api and provider "unknown"), which every mode starts with and reports. Its provider
+    /// has no auth, so each prompt is refused as "the selected model" until /model selects a real one; no model_change records it.</summary>
+    internal static ModelDescriptor UnselectedModel { get; } = new("unknown", "unknown", "unknown");
+    /// <summary>agent.ts DEFAULT_MODEL as get_state, get_available_models and extensions see it.</summary>
+    internal static JsonData UnselectedWire { get; } = JsonData.Parse(
+        """{"id":"unknown","name":"unknown","api":"unknown","provider":"unknown","baseUrl":"","reasoning":false,"input":[],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"contextWindow":0,"maxTokens":0}""");
+    internal bool IsUnselected => Model == UnselectedModel;
+    /// <summary>The selection of <see cref="UnselectedModel"/>. Its catalog row only satisfies the catalog shape (one text input and
+    /// unit limits); the reported definition is <see cref="UnselectedWire"/>.</summary>
+    internal static LiveSessionSelection Unselected()
+    {
+        var model = UnselectedModel;
+        var raw = new
+        {
+            type = "chat", id = model.Id, api = model.Api, provider = model.Provider, name = "unknown", baseUrl = "",
+            reasoning = false, input = new[] { "text" }, contextWindow = 1, maxTokens = 1,
+            cost = new { input = 0, output = 0, cacheRead = 0, cacheWrite = 0 }
+        };
+        var catalog = FrozenModelCatalog.ReadProviderJson(model.Provider, System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new Dictionary<string, object> { [model.Api] = new Dictionary<string, object> { ["chat:" + model.Id] = raw } }),
+            new(MaximumUtf8Bytes: 4096, MaximumModels: 1, MaximumProperties: 32, MaximumStringCharacters: 128));
+        if (!catalog.TryGetModel(CatalogModelType.Chat, model.Id, out var definition)) throw new InvalidOperationException("Unselected model row is invalid.");
+        return new(definition, 1);
+    }
+
     internal LiveSessionConnection Connect(LiveSessionRuntime? runtime)
     {
         runtime ??= LiveSessionRuntime.Default;
@@ -441,9 +476,56 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     /// <summary>A model an extension's streamSimple serves: every request streams through the Node host.</summary>
     internal static LiveSessionConnection ForCustom(LiveSessionSelection selection, IChatTransport transport) =>
         new(selection, null, "") { _custom = transport };
+    private Func<CancellationToken, ValueTask<LiveSessionConnection>>? _deferredConnect;
+    private ImmutableArray<string> _deferredLevels;
+    private LiveSessionConnection? _deferredInner;
+    private readonly SemaphoreSlim _deferredGate = new(1, 1);
+    private Task? _deferredClose;
+    /// <summary>agent-session.ts: a session starts with a selected model whose provider has no credentials yet; the prompt preflight
+    /// refuses prompts until they appear, and the route connects on the first request after that (<paramref name="connect"/>, retried
+    /// until it succeeds). Thinking levels come from the catalog row (getSupportedThinkingLevels).</summary>
+    internal static LiveSessionConnection Deferred(LiveSessionSelection selection, ImmutableArray<string> levels,
+        Func<CancellationToken, ValueTask<LiveSessionConnection>> connect) =>
+        new(selection, null, "") { _deferredConnect = connect, _deferredLevels = levels };
+    private async Task<LiveSessionConnection> ConnectDeferredAsync(CancellationToken token)
+    {
+        await _deferredGate.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _deferredInner ??= await _deferredConnect!(token).ConfigureAwait(false);
+        }
+        finally { _deferredGate.Release(); }
+    }
+    private async Task CloseDeferredAsync()
+    {
+        await _deferredGate.WaitAsync().ConfigureAwait(false);
+        try { if (_deferredInner is { } inner) await inner.DisposeAsync().ConfigureAwait(false); }
+        finally { _deferredGate.Release(); }
+    }
+    /// <summary>A transport of a deferred connection: it connects on its first request and then streams through the connected route's
+    /// transport of the same kind (main, summary or cache-warming replay).</summary>
+    private sealed class DeferredTransport(LiveSessionConnection owner, int? outputTokens, bool summary, bool replay) : IChatTransport, IThinkingLevelTransport
+    {
+        private readonly object gate = new();
+        private IChatTransport? bound;
+        public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor model)
+        {
+            if (model != owner.Selected.Model) throw new ArgumentException("Unknown selected model.", nameof(model));
+            return summary ? ["off"] : owner._deferredLevels;
+        }
+        public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var inner = await owner.ConnectDeferredAsync(cancellationToken).ConfigureAwait(false);
+            IChatTransport transport;
+            lock (gate) transport = bound ??= replay ? inner.CreateCacheWarmTransport() : inner.CreateTransport(outputTokens, summary);
+            await foreach (var observation in transport.StreamAsync(request, cancellationToken).ConfigureAwait(false)) yield return observation;
+        }
+    }
     internal IChatTransport CreateTransport(int? outputTokens = null, bool summary = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_deferredConnect is not null) return new DeferredTransport(this, outputTokens, summary, replay: false);
         if (_virtual is not null) return _virtual;
         if (_custom is not null) return _custom;
         if (_resolvedMain is not null)
@@ -522,6 +604,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     internal IChatTransport CreateCacheWarmTransport()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_deferredConnect is not null) return new DeferredTransport(this, null, false, replay: true);
         return _resolvedMain is not null ? new ResolvedTransport(this, 1, false) { Replay = true } : CreateTransport(1);
     }
     private IChatTransport Own(NativeHttpModelProvider provider)
@@ -575,7 +658,7 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     }
     public void Dispose()
     {
-        if (_resolvedMain is not null) throw new InvalidOperationException("Resolved connections require awaited DisposeAsync.");
+        if (_resolvedMain is not null || _deferredConnect is not null) throw new InvalidOperationException("Resolved connections require awaited DisposeAsync.");
         if (_disposed) return;
         _disposed = true;
         var failures = new List<Exception>();
@@ -594,10 +677,13 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
     internal void RefuseResolvedCleanupSelfWait()
     {
         if (IsInsideActiveResolved()) throw new InvalidOperationException("A resolved callback cannot join its own connection.");
+        Volatile.Read(ref _deferredInner)?.RefuseResolvedCleanupSelfWait();
     }
     public ValueTask DisposeAsync()
     {
         RefuseResolvedCleanupSelfWait();
+        if (_deferredConnect is not null)
+            lock (_resolvedGate) { _disposed = true; return new(_deferredClose ??= CloseDeferredAsync()); }
         if (_resolvedMain is null) { Dispose(); return ValueTask.CompletedTask; }
         lock (_resolvedGate)
         {

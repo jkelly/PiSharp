@@ -37,7 +37,8 @@ internal sealed class LiveModelCatalog : IAsyncDisposable
     {
         this.runtime = runtime; this.runtimeFor = runtimeFor; this.bind = bind; this.registry = registry;
         this.primary = primary; this.primaryWire = primaryWire;
-        available = [new(primary, primaryWire)];
+        // A session without a model (LiveSessionSelection.Unselected) offers only the registry's available models.
+        available = primary == LiveSessionSelection.UnselectedModel ? [] : [new(primary, primaryWire)];
     }
 
     /// <summary>getAvailableSnapshot: the selectable models in the registry's order (the session's own model included).</summary>
@@ -71,7 +72,7 @@ internal sealed class LiveModelCatalog : IAsyncDisposable
                 definitions.Add(new(descriptor, wire));
                 if (descriptor != primary) entries.Add((entry, descriptor));
             }
-            if (!definitions.Any(definition => definition.Model == primary)) definitions.Insert(0, new(primary, primaryWire));
+            if (primary != LiveSessionSelection.UnselectedModel && !definitions.Any(definition => definition.Model == primary)) definitions.Insert(0, new(primary, primaryWire));
             var catalog = registry.CaptureModelCatalog();
             var bound = catalog.Bindings.Select(binding => (binding.Model.Provider, binding.Model.Id)).ToHashSet();
             var additions = new List<SessionModelBinding>();

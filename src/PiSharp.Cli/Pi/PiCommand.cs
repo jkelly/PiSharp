@@ -340,9 +340,10 @@ internal static class PiCommand
         }
         catch (LiveSessionException error) when (error.Code is "NoLiveModel")
         {
-            await Report([.. startupDiagnostics, .. runtimeDiagnostics]).ConfigureAwait(false);
-            await Line(err, Paint(Red, error.Message)).ConfigureAwait(false);
-            return 1;
+            // sdk.ts createAgentSession: no model is not an error. The session keeps the Agent's DEFAULT_MODEL ("unknown"), so
+            // the `!session.model` exit in main.ts never applies: every mode starts, and the prompt preflight refuses each prompt until a
+            // model is selected (interactive mode also warns with formatNoModelsAvailableMessage).
+            selection = LiveSessionSelection.Unselected();
         }
         catch (LiveSessionException error)
         {

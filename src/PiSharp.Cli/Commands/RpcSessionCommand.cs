@@ -207,7 +207,8 @@ public static class RpcSessionCommand
                 originalSystemPrompt: pi?.SystemPrompt, toolPolicy: pi?.ToolPolicy ?? (parsed.ToolPolicy == "pi"
                     ? new PiSharp.Cli.Pi.PiToolPolicy(PiSharp.Cli.Pi.PiToolPolicyMode.Pi) { ProtectedDirectories = [Path.GetDirectoryName(parsed.Session)!] } : null),
                 // With --no-mcp extensions still register servers; nothing connects them, which is reported (reportUnhandledMcpServers).
-                mcpRegistrations: hostAdmission ? mcpHost!.Registrations : null, piExtensions: pi?.Extensions).ConfigureAwait(false);
+                mcpRegistrations: hostAdmission ? mcpHost!.Registrations : null, piExtensions: pi?.Extensions,
+                deferMissingCredentials: pi is not null).ConfigureAwait(false);
             // A virtual selection's router reads this profile's session branch and records its state there.
             if (liveSelection is { IsVirtual: true } virtualSelection) virtualSelection.VirtualSession = profile.CurrentVirtualModelSession;
             if (pi?.Extensions is { } modelsHost) await PiSharp.Cli.Extensions.Pi.PiExtensionModels.CreateAsync(modelsHost, liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false);
@@ -224,6 +225,9 @@ public static class RpcSessionCommand
                 AgentOptions: PiPayloadBudget.Agent(new(Loop: LoopOptions(pi is not null))),
                 SessionLogStoreOptions: new(ReaderOptions: ReaderOptions(pi is not null)),
                 ContextOptions: ContextOptions(pi is not null));
+            // agent-session.ts prompt: Pi entries validate the model and its provider auth before each idle prompt.
+            if (pi is not null)
+                options = options with { PromptPreflight = PromptPreflight(liveRuntime ?? LiveSessionRuntime.Default), UnselectedModel = LiveSessionSelection.UnselectedModel };
             string NextId() => "rpc-" + Guid.NewGuid().ToString("N");
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);
@@ -440,6 +444,19 @@ public static class RpcSessionCommand
             await stderr.FlushAsync().ConfigureAwait(false); return result;
         }
     }
+
+    /// <summary>agent-session.ts prompt: a model whose provider has no configured auth (the registry read now: auth.json, models.json and
+    /// the environment, so a credential added since startup counts) refuses with the OAuth re-login text or formatNoApiKeyFoundMessage.
+    /// A session without a model runs with Agent's DEFAULT_MODEL (provider "unknown"), refused as "the selected model"; the
+    /// formatNoModelSelectedMessage branch is unreachable upstream (session.model is never undefined).</summary>
+    internal static Func<ModelDescriptor, CancellationToken, ValueTask> PromptPreflight(LiveSessionRuntime runtime) => async (model, token) =>
+    {
+        var registry = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false);
+        if (registry.HasConfiguredAuth(model.Provider)) return;
+        throw new SessionPromptRejectedException(registry.IsUsingOAuth(model.Provider)
+            ? PiSharp.Cli.Models.ModelListing.OAuthAuthenticationFailedMessage(model.Provider)
+            : PiSharp.Cli.Models.ModelListing.NoApiKeyFoundMessage(model.Provider));
+    };
 
     // Startup UI settings must use the same validated workspace as the actual RPC composition.
     internal static string ResolveStartupWorkspace(string[] args) => Parse(args).Workspace;

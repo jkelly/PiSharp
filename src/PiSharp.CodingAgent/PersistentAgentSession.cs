@@ -18,7 +18,15 @@ public sealed record PersistentAgentSessionOptions(bool UseLatestLeaf = true, st
     SessionContextProjectionOptions? ContextOptions = null)
 {
     public PiSharp.CodingAgent.ToolSelection.AllowedToolSelection? LifetimeToolSelection { get; init; }
+    /// <summary>agent-session.ts prompt: run for an idle prompt after input handlers and expansion, before anything is persisted or a
+    /// run starts, with the session's current model. A <see cref="SessionPromptRejectedException"/> it throws rejects the prompt.</summary>
+    public Func<ModelDescriptor, CancellationToken, ValueTask>? PromptPreflight { get; init; }
+    /// <summary>The placeholder a session without a selected model runs with (sdk.ts createAgentSession with no model): a new session
+    /// records no <c>model_change</c> for it.</summary>
+    public ModelDescriptor? UnselectedModel { get; init; }
 }
+/// <summary>A prompt the session refused before admitting it (agent-session.ts prompt validation); nothing was persisted.</summary>
+public sealed class SessionPromptRejectedException(string message) : Exception(message);
 public enum PersistentAgentSessionFailure
 {
     InvalidConfiguration, UnsupportedThinkingLevel, ModelMismatch, InvalidCommit,
@@ -191,20 +199,21 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 !configured.UseLatestLeaf || configured.SelectedLeafId is not null)
                 throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
             cancellationToken.ThrowIfCancellationRequested();
-            var model = Record(codec, "model_change", Identity(nextEntryId, header.Id, []), null, clock, writer =>
+            // sdk.ts: a new session records its initial model (when there is one) and thinking level.
+            var model = configuration.Model == configured.UnselectedModel ? null : Record(codec, "model_change", Identity(nextEntryId, header.Id, []), null, clock, writer =>
             {
                 writer.WriteString("provider", configuration.Model.Provider);
                 writer.WriteString("modelId", configuration.Model.Id);
             });
-            var thinking = Record(codec, "thinking_level_change", Identity(nextEntryId, header.Id, [model]), model.Id,
+            var thinking = Record(codec, "thinking_level_change", Identity(nextEntryId, header.Id, model is null ? [] : [model]), model?.Id,
                 clock, writer => writer.WriteString("thinkingLevel", configuration.ThinkingLevel));
-            ImmutableArray<SessionEntry> initial = [model, thinking];
+            ImmutableArray<SessionEntry> initial = model is null ? [thinking] : [model, thinking];
             var context = projector.Project(initial, thinking.Id, cancellationToken);
             store = await SessionLogStore.CreateNewAsync(path, header, configured.SessionLogStoreOptions, cancellationToken).ConfigureAwait(false);
             // Once the file/header creation is admitted, complete the initial metadata checkpoint.
             await store.AppendAsync(initial, CancellationToken.None).ConfigureAwait(false);
             return new(path, store, agent, bridge, projector, codec, context, configuration, clock, nextEntryId,
-                configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions);
+                configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions) { PromptPreflight = configured.PromptPreflight };
         }
         catch
         {
@@ -230,7 +239,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             agent.ReplaceMessages(SessionContextProjector.AgentMessages(context));
             cancellationToken.ThrowIfCancellationRequested();
             return new(path, store, agent, bridge, projector, codec, context, configuration, clock, nextEntryId,
-                configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions);
+                configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions) { PromptPreflight = configured.PromptPreflight };
         }
         catch
         {
@@ -318,7 +327,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             cancellationToken.ThrowIfCancellationRequested();
             opened = new(path, store, agent, bridge, projector, codec, context, selection.Configuration, clock, nextEntryId,
                 configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions)
-            { _registry = registry, _runtimeLease = runtime };
+            { _registry = registry, _runtimeLease = runtime, PromptPreflight = configured.PromptPreflight };
             var restored = selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
             if (registry.InitialActiveToolNames is not null)
                 await opened.ConfigureAsync(new() { ActiveToolNames = restored, ReplaceDeclarations = loadout.RequiresRecord }, cancellationToken).ConfigureAwait(false);
@@ -935,6 +944,9 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         return SubmitInputCoreAsync(input, admission, options, cancellationToken, reservation);
     }
 
+    /// <summary>The host's prompt validation (<see cref="PersistentAgentSessionOptions.PromptPreflight"/>).</summary>
+    public Func<ModelDescriptor, CancellationToken, ValueTask>? PromptPreflight { get; private init; }
+
     /// <summary>Awaited before idle input is admitted, with the input's cancellation; set by the session host.</summary>
     public Func<CancellationToken, Task>? BeforeInputAdmission { get; set; }
     private readonly AsyncLocal<bool> _gatedInput = new();
@@ -985,6 +997,14 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 ThrowAvailable(); work.ThrowIfCancellationRequested();
                 if (_active is not null && input.StreamingBehavior is null)
                     throw new InvalidOperationException("Active input requires steering or follow-up delivery.");
+            }
+            // agent-session.ts prompt: an idle prompt validates the model and its provider's auth before anything is persisted.
+            bool idlePrompt; lock (_gate) idlePrompt = _active is null && options?.QueueOnly != true;
+            if (idlePrompt && PromptPreflight is { } preflight)
+            {
+                ModelDescriptor model; lock (_gate) model = _agent.Snapshot.Model;
+                await preflight(model, work).ConfigureAwait(false);
+                work.ThrowIfCancellationRequested();
             }
             long timestamp;
             previous = _inputCallback.Value; _inputCallback.Value = reservation;

@@ -93,7 +93,9 @@ internal static class InteractiveModeHost
                 Verbose = options.Verbose,
                 TuiMode = options.TuiMode,
                 InitialThemeSetting = options.Theme,
-                ScopedModels = [.. options.Selection.ScopedModels.Select(scoped => new ScopedModel(scoped.Model.CloneJson(), scoped.ThinkingLevel))]
+                ScopedModels = [.. options.Selection.ScopedModels.Select(scoped => new ScopedModel(scoped.Model.CloneJson(), scoped.ThinkingLevel))],
+                // sdk.ts: a session that starts without a model reports formatNoModelsAvailableMessage as its modelFallbackMessage.
+                ModelFallbackMessage = options.Selection.IsUnselected ? PiSharp.Cli.Models.ModelListing.NoModelsAvailableMessage() : null
             }));
             observeMode?.Invoke(mode);
             host = Task.Run(() => RpcSessionCommand.RunWithPresentationAsync(rpcArgs, connection.Input, connection.Output, hostDiagnostics, mode,
