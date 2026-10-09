@@ -207,6 +207,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             metadata.Attach(owner, replacement.Current);
             settled.Attach(owner, replacement.Current);
             sessionEvents.Attach(owner, replacement.Current);
+            Pi?.InstallInputGate(replacement.Current.Session);
             await replacementStart.PublishAsync(owner, replacement).ConfigureAwait(false);
         };
         owner.BeforeReplacement = _sessionViews.BeforeSwitch;

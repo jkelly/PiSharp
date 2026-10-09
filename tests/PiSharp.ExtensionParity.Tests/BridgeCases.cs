@@ -226,7 +226,7 @@ internal static partial class Program
         Equal(true, tool["systemPrompt"]!.GetValue<bool>(), "ctx.getSystemPrompt after before_agent_start");
         Equal(false, tool["idle"]!.GetValue<bool>(), "not idle while a tool runs");
         Check(LogRecords(sandbox, "bus").Any(), "event bus delivery");
-        Check(LogRecords(sandbox, "session_start").Any(record => record[1]!.GetValue<string>() == "new" && !record[2]!.GetValue<bool>()), "session_start new, no UI");
+        Check(LogRecords(sandbox, "session_start").Any(record => record[1]!.GetValue<string>() == "startup" && !record[2]!.GetValue<bool>()), "session_start startup (main.ts initial runtime), no UI");
         var session = File.ReadAllLines(sandbox.SessionFiles().Single()).Select(line => JsonNode.Parse(line)!).ToList();
         Check(session.Any(entry => entry["type"]?.GetValue<string>() == "custom" && entry["customType"]?.GetValue<string>() == "probe-entry" && entry["data"]?["n"]?.GetValue<int>() == 1), "appendEntry custom entry");
         Check(session.Any(entry => entry["type"]?.GetValue<string>() == "session_info" && entry["name"]?.GetValue<string>() == "Probe session"), "setSessionName sanitized");

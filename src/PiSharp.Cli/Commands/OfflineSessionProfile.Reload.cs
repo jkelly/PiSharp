@@ -90,7 +90,7 @@ internal sealed partial class OfflineSessionProfile
         {
             input = PromptInputValue.Own(input);
             token.ThrowIfCancellationRequested();
-            if (profile._extension?.Pi is { } pi) await pi.WaitForRegistrationsAsync(token).ConfigureAwait(false);
+            // The extensions' pending registrations were joined by the session's input gate before this input was admitted.
             var text = input.Text;
             var command = IsReloadCommand(text);
             if (!command)

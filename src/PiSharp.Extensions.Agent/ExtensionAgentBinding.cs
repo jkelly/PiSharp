@@ -98,7 +98,7 @@ public sealed class ExtensionAgentBinding
                 .Select(tool => tool.Name).ToImmutableHashSet(StringComparer.Ordinal) };
         Adapters = Snapshot.Tools.Select(tool => (IPreparedToolAdapter)new ExtensionToolAdapter(registry,
             Snapshot, tool, validateArguments, this.options.ResultValues, sessionCancellationToken)).ToImmutableArray();
-        PreparedHooks = Snapshot.ToolCallHandlers.IsEmpty && Snapshot.ToolResultHandlers.IsEmpty ? null :
+        PreparedHooks = !registry.FollowsCurrentSnapshot && Snapshot.ToolCallHandlers.IsEmpty && Snapshot.ToolResultHandlers.IsEmpty ? null :
             new RegisteredExtensionToolHooks(registry, Snapshot, this.options.ResultValues, this.options.ToolEventDispatch,
                 this.options.MaximumToolEventHandlers, sessionCancellationToken, this.options.ReportEventDiagnostic);
         var contextHooks = new RegisteredExtensionContextHooks(registry, this.options, sessionCancellationToken);

@@ -367,7 +367,7 @@ internal static partial class Program
                 sent = steps.Dequeue(); push(sent);
             });
         Equal(0, code, "exit; " + stderr + "; records " + string.Join("\n", records.Select(item => item.ToJsonString()).Where(text => !text.Contains("message_update", StringComparison.Ordinal))));
-        Names(["[\"v1 start\",\"new\"]", "[\"hello from v1\"]", "[\"v1 shutdown\",\"reload\"]", "[\"v2 start\",\"reload\"]", "[\"hello from v2\"]",
+        Names(["[\"v1 start\",\"startup\"]", "[\"hello from v1\"]", "[\"v1 shutdown\",\"reload\"]", "[\"v2 start\",\"reload\"]", "[\"hello from v2\"]",
             "[\"v2 shutdown\",\"reload\"]", "[\"v2 start\",\"reload\"]", "[\"v2 ctx after reload\",\"stale\"]", "[\"v2 shutdown\",\"quit\"]"], LogLines(sandbox), "reload lifecycle; records " + string.Join("\n",
             records.Select(item => item.ToJsonString()).Where(text => !text.Contains("message_update", StringComparison.Ordinal))));
         var commands = records.Single(record => IsResponse(record, "commands"))["data"]!["commands"]!.AsArray().Select(item => item!["name"]!.GetValue<string>()).ToList();

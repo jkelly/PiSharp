@@ -214,6 +214,31 @@ async function handle(method, params, id) {
       if (params.op === 'refreshModels') return config.refreshModels(params.args?.[0] ?? {});
       throw new Error(`Unsupported provider operation ${params.op}`);
     }
+    case 'provider.oauth': {
+      // provider-composer.ts adaptOAuth: an extension provider's oauth (login, refreshToken, getApiKey, modifyModels). The login's
+      // callbacks become the host's auth interaction: prompts are answered by the host, events are notified.
+      const oauth = runtime.providers.get(params.provider)?.config?.oauth;
+      if (!oauth) throw new Error(`Provider ${params.provider} has no OAuth login`);
+      if (params.op === 'apiKey') return oauth.getApiKey(params.credentials);
+      if (params.op === 'modifyModels') return plain(typeof oauth.modifyModels === 'function' ? oauth.modifyModels(params.models, params.credentials) : params.models);
+      const controller = new AbortController(); active.set(id, controller);
+      try {
+        if (params.op === 'refresh') return plain(await oauth.refreshToken(params.credentials, controller.signal));
+        if (params.op !== 'login') throw new Error(`Unsupported OAuth operation ${params.op}`);
+        const loginId = params.loginId;
+        const prompt = (value) => bridge.call('oauth.prompt', { loginId, prompt: plain(value) }, { signal: controller.signal });
+        const notify = (value) => bridge.notify('oauth.event', { loginId, event: plain(value) });
+        return plain(await oauth.login({
+          onAuth: (info) => notify({ type: 'auth_url', ...info }),
+          onDeviceCode: (info) => notify({ type: 'device_code', ...info }),
+          onPrompt: (value) => prompt({ type: 'text', ...value }),
+          onProgress: (message) => notify({ type: 'progress', message }),
+          onManualCodeInput: () => prompt({ type: 'manual_code', message: 'Paste the authorization code' }),
+          onSelect: (value) => prompt({ type: 'select', ...value }),
+          signal: controller.signal,
+        }));
+      } finally { active.delete(id); }
+    }
     case 'provider.stream': {
       // An extension provider's streamSimple (registerProvider with api + streamSimple): its AssistantMessageEvents stream back as
       // progress (pi-ai source events with their partial message), the final message as the result.

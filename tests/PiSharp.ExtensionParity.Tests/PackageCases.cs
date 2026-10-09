@@ -722,7 +722,8 @@ internal static partial class Program
         Equal("pnpm", wrapped.GetPackageManagerName(), "manager after the separator");
         Names(["install", "--prod", "--config.auto-install-peers=false", "--config.strict-peer-dependencies=false", "--config.strict-dep-builds=false"], wrapped.GetGitDependencyInstallArgs(), "pnpm git deps");
         Equal("pnpm", Manager(sandbox, J("""{"npmCommand":["corepack","pnpm"]}""")).GetPackageManagerName(), "corepack wrapper");
-        Equal("npm", Manager(sandbox, J("""{"npmCommand":["C:\\tools\\npm.cmd"]}""")).GetPackageManagerName(), "extension stripped");
+        // basename(command) without .cmd/.exe; a platform path to the shim (node:path basename splits only native separators).
+        Equal("npm", Manager(sandbox, new JsonObject { ["npmCommand"] = new JsonArray(Path.Combine(sandbox.Root, "tools", "npm.cmd")) }).GetPackageManagerName(), "extension stripped");
         Equal("Ambiguous npmCommand package managers: pnpm, bun", Throws<PiPackageException>(() => Manager(sandbox, J("""{"npmCommand":["wrap","pnpm","bun"]}""")).GetPackageManagerName(), "ambiguous").Message, "ambiguous");
         Equal("Invalid npmCommand: first array entry must be a non-empty command", Throws<PiPackageException>(() => Manager(sandbox, J("""{"npmCommand":[""]}""")).GetNpmCommand(), "empty").Message, "empty command");
 

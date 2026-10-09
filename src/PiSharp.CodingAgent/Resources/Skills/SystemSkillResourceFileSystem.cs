@@ -27,7 +27,7 @@ public sealed class SystemSkillResourceFileSystem : ISkillResourceFileSystem
     {
         CheckPath(path); if (maximumEntries < 1) throw new ArgumentOutOfRangeException(nameof(maximumEntries));
         var result = ImmutableArray.CreateBuilder<PromptTemplateDirectoryEntry>();
-        foreach (var entry in new DirectoryInfo(path).EnumerateFileSystemInfos())
+        foreach (var entry in PiSharp.Contracts.Compatibility.NodeDirectoryOrder.Order(new DirectoryInfo(path).EnumerateFileSystemInfos()))
         {
             if (result.Count == maximumEntries) throw new IOException("Skill directory entry limit.");
             var attributes = entry.Attributes;

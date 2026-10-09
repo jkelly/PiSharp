@@ -12,7 +12,7 @@ public sealed partial class ExtensionRegistry
     public bool HasObservers(ExtensionRegistrySnapshot captured, string topic)
     {
         ArgumentNullException.ThrowIfNull(captured);
-        return captured.Entries.Any(entry => entry.Kind == RegistrationKind.Observation && entry.Name == topic);
+        return Current(captured).Entries.Any(entry => entry.Kind == RegistrationKind.Observation && entry.Name == topic);
     }
 
     /// <summary>Source runner.emit for observation-only events. Each handler failure is reported with its message and the
@@ -57,7 +57,7 @@ public sealed partial class ExtensionRegistry
     public bool HasUserBashHandlers(ExtensionRegistrySnapshot captured)
     {
         ArgumentNullException.ThrowIfNull(captured);
-        return captured.Entries.Any(entry => entry.Kind == RegistrationKind.UserBashHandler);
+        return Current(captured).Entries.Any(entry => entry.Kind == RegistrationKind.UserBashHandler);
     }
 
     /// <summary>Source emitUserBash: handlers run in order and the first non-null patch wins. A patch without exactly one of

@@ -288,7 +288,8 @@ public static class RpcSessionCommand
                     MaximumModels: 4096, MaximumModelDefinitionBytes: 16 * 1024 * 1024),
                 sessionOwnership: RpcSessionOwnership.Borrowed, inputAdmission: profile.InputAdmission, extensionUi: ui,
                 extensionCommandCatalog: profile, sessionOwner: profile.Sessions,
-                sessionStartup: token => profile.StartLifecycleAsync(parsed.SessionMode == "open" ? "resume" : "new", token),
+                // main.ts: the initial runtime's session starts with reason "startup" in the Pi entry (new, continued or resumed alike).
+                sessionStartup: token => profile.StartLifecycleAsync(pi is not null ? "startup" : parsed.SessionMode == "open" ? "resume" : "new", token),
                 summaryGenerator: profile.SummaryGenerator, recoveryDesiredMaxOutput: profile.OriginalDesiredMaxOutput,
                 inputAdmissionSelector: profile.PromptInputSelector, exportHtmlWriter: profile.ExportHtmlWriter,
                 selectedTreePublisher: profile.PublishSelectedTreeAsync,

@@ -37,7 +37,7 @@ internal sealed partial class NativeExtensionActivation
         if (mcpServers is not null) { registry.McpServerHost = mcpServers; mcpServers.OwnerPath = pi.PathOfOwner; }
         try
         {
-            await pi.ActivateAsync(registry, token).ConfigureAwait(false);
+            await pi.ActivateAsync(registry, token, session: true).ConfigureAwait(false);
             var snapshot = registry.CaptureSnapshot();
             var configuration = new NativeExtensionConfiguration(pi.BridgeDirectory, pi.BridgeDirectory, pi.BridgeDirectory, pi.BridgeDirectory,
                 [.. snapshot.Tools.Select(tool => tool.Name).Distinct(StringComparer.Ordinal)])
@@ -63,7 +63,7 @@ internal sealed partial class NativeExtensionActivation
 
     /// <summary>An extension tool action's target is the current registration of a Pi extension tool with that name.</summary>
     internal bool IsCurrentToolTarget(string name, string target) => _registry.CaptureSnapshot().Tools.Any(tool => tool.Name == name &&
-        tool.OwnerId.StartsWith("pi-extension-", StringComparison.Ordinal) &&
+        (tool.OwnerId.StartsWith("pi-extension-", StringComparison.Ordinal) || tool.OwnerId.StartsWith("pi-native-", StringComparison.Ordinal)) &&
         tool.OwnerId + "/" + tool.OwnerGeneration.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/" + tool.RegistrationId == target);
 
     /// <summary>runtime.refreshTools(): replaces one Pi extension's tools in the live session's catalog (a registerTool after the factory

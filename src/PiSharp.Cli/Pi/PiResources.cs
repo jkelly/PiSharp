@@ -175,7 +175,7 @@ internal sealed class PiResources
         if (!Directory.Exists(directory)) return [];
         try
         {
-            return [.. new DirectoryInfo(directory).EnumerateFileSystemInfos()
+            return [.. PiSharp.Contracts.Compatibility.NodeDirectoryOrder.Order(new DirectoryInfo(directory).EnumerateFileSystemInfos())
                 .Where(entry => !entry.Name.StartsWith('.') && entry.Name != "node_modules" && entry.Name.EndsWith(extension, StringComparison.Ordinal) &&
                     (entry is FileInfo || entry.LinkTarget is not null && File.Exists(entry.FullName)))
                 .Select(entry => entry.FullName)];

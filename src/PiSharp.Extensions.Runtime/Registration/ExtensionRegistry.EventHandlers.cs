@@ -25,7 +25,7 @@ public sealed partial class ExtensionRegistry
     public bool HasEventHandlers(ExtensionRegistrySnapshot captured, string topic)
     {
         ArgumentNullException.ThrowIfNull(captured);
-        return captured.Entries.Any(entry => entry.Kind == RegistrationKind.EventHandler && entry.Name == topic);
+        return Current(captured).Entries.Any(entry => entry.Kind == RegistrationKind.EventHandler && entry.Name == topic);
     }
 
     /// <summary>Runs the topic's handlers in registration order with the same event, passing each result with its owner (the

@@ -17,8 +17,60 @@ namespace PiSharp.Cli.Extensions.Pi;
 internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initial, IReadOnlyDictionary<(int Extension, string Name), string>? commandNames = null)
     : IPiSharpExtension
 {
-    /// <summary>The extension this owner's slot holds now: a reload replaces it with the freshly loaded one.</summary>
-    private PiLoadedExtension extension => host.Slot(initial.Index) ?? initial;
+    /// <summary>The loaded extension this owner binds (its descriptor follows the registrations it makes after loading).</summary>
+    private PiLoadedExtension extension => initial;
+
+    /// <summary>An owner a reload activates: its tools reach the session through a catalog replacement, not at activation.</summary>
+    internal bool DeferTools { get; init; }
+    /// <summary>The registry owner of this extension once activated.</summary>
+    internal PiSharp.Extensions.Runtime.RegistrationScope? Scope => _registry as PiSharp.Extensions.Runtime.RegistrationScope;
+    internal string Path => extension.Path;
+    private volatile bool _retired;
+    private readonly HashSet<string> _registeredEvents = new(StringComparer.Ordinal);
+    private int _beforeAgentStartSlots;
+
+    /// <summary>The runtime this owner belongs to was replaced (reload): every handler stops, its commands, handlers, renderers and MCP
+    /// servers leave the registry at once; its tools leave with <see cref="RetireToolsAsync"/>.</summary>
+    internal void Retire()
+    {
+        _retired = true;
+        lock (_registeredEvents)
+        {
+            foreach (var (_, (_, handle)) in _commands) handle.Dispose();
+            _commands.Clear();
+        }
+        if (_registry is PiSharp.Extensions.Mcp.Registration.IExtensionMcpServerRegistry mcp)
+            try { foreach (var server in mcp.GetMcpServers().Where(server => server.ExtensionPath == extension.Path)) mcp.UnregisterMcpServer(server.Name); }
+            catch (Exception error) when (error is NotSupportedException or ObjectDisposedException or InvalidOperationException) { }
+        Scope?.WithdrawRegistrations(keepTools: true);
+    }
+
+    /// <summary>pi.registerMcpServer after loading: the server joins the session's registered servers at once (the MCP host connects it).</summary>
+    internal void RegisterMcpServer(JsonObject server)
+    {
+        if (_retired || _registry is not PiSharp.Extensions.Mcp.Registration.IExtensionMcpServerRegistry mcp) return;
+        var name = server["name"]?.GetValue<string>();
+        if (name is null) return;
+        try { mcp.RegisterMcpServer(name, JsonData.Parse(server["config"]?.ToJsonString() ?? "{}")); }
+        catch (Exception error) when (error is NotSupportedException or InvalidOperationException or ObjectDisposedException)
+        { _ = host.ReportAsync(extension.Path, "registerMcpServer", error.Message); }
+    }
+
+    /// <summary>pi.unregisterMcpServer: the server leaves the session's registered servers (its connection closes).</summary>
+    internal void UnregisterMcpServer(string name)
+    {
+        if (_retired || _registry is not PiSharp.Extensions.Mcp.Registration.IExtensionMcpServerRegistry mcp) return;
+        try { mcp.UnregisterMcpServer(name); }
+        catch (Exception error) when (error is NotSupportedException or InvalidOperationException or ObjectDisposedException) { }
+    }
+
+    /// <summary>The retired owner's tools leave the session's catalog (refreshTools over the rebuilt runtime).</summary>
+    internal async Task RetireToolsAsync(NativeExtensionActivation activation, PiSharp.CodingAgent.ReplaceableAgentSession owner, CancellationToken token)
+    {
+        if (Scope is not { } scope || _toolIds.IsEmpty) return;
+        await activation.PublishPiToolsAsync(owner, scope, _toolIds, _toolNames, [], token).ConfigureAwait(false);
+        _toolIds = []; _toolNames = [];
+    }
 
     /// <summary>Events delivered as observations (handlers' results are ignored upstream).</summary>
     internal static readonly ImmutableHashSet<string> ObservationEvents =
@@ -40,19 +92,21 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
         var descriptor = extension.Descriptor;
         if (registry is PiSharp.Extensions.Runtime.RegistrationScope scope) extension.OwnerGeneration = scope.OwnerGeneration;
         // Every event this host raises gets a native registration up front, gated by the extension's live handlers, so a handler the
-        // extension adds after its factory returned (pi.on in session_start, a reload) runs as upstream's runner would run it.
-        foreach (var eventName in LiveEvents.Concat(extension.Events).Distinct(StringComparer.Ordinal)) RegisterEvent(registry, eventName);
+        // extension adds after its factory returned (pi.on in session_start) runs as upstream's runner would run it; other event names
+        // are registered when the extension registers them (RegisterMissingHandlers).
         _registry = registry;
+        lock (_registeredEvents)
+            foreach (var eventName in LiveEvents.Concat(extension.Events).Distinct(StringComparer.Ordinal)) { RegisterEvent(registry, eventName); _registeredEvents.Add(eventName); }
         // A tool name an earlier extension registered is a load conflict (reported by the loader); the first registration is kept.
         var toolIds = ImmutableArray.CreateBuilder<string>(); var toolNames = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        foreach (var tool in (descriptor["tools"] as JsonArray ?? []).OfType<JsonObject>())
+        foreach (var tool in DeferTools ? Enumerable.Empty<JsonObject>() : (descriptor["tools"] as JsonArray ?? []).OfType<JsonObject>())
             try
             {
                 var registered = Tool(tool); registry.RegisterTool(registered);
                 toolIds.Add(registered.RegistrationId); toolNames.Add(registered.Name);
             }
             catch (PiSharp.Extensions.Runtime.ExtensionRegistrationException error) when (error.Failure is PiSharp.Extensions.Runtime.ExtensionRegistrationFailure.DuplicateName) { }
-        _toolIds = toolIds.ToImmutable(); _toolNames = toolNames.ToImmutable(); _publishedTools = ToolsJson();
+        _toolIds = toolIds.ToImmutable(); _toolNames = toolNames.ToImmutable(); _publishedTools = DeferTools ? "" : ToolsJson();
         foreach (var command in (descriptor["commands"] as JsonArray ?? []).OfType<JsonObject>())
         {
             var registered = Command(command);
@@ -77,8 +131,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
         "context", "context_with_system", "before_agent_start", "input", "tool_call", "tool_result", "user_bash", "session_before_switch",
         "session_before_fork", "session_before_tree"
     ];
-    /// <summary>Spare before_agent_start slots for handlers added after the factory (each Node handler has its own native slot).</summary>
-    private const int SpareHandlerSlots = 8;
+
 
     internal int Index => extension.Index;
     private IExtensionRegistry? _registry;
@@ -94,6 +147,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
     /// <summary>Commands whose invocation name changed (a duplicate appeared) or that the extension no longer has leave the registry.</summary>
     internal void RetireStaleCommands(IReadOnlyDictionary<(int Extension, string Name), string> names)
     {
+        if (_retired) return;
         var current = (extension.Descriptor["commands"] as JsonArray ?? []).OfType<JsonObject>().Select(command => command["name"]!.GetValue<string>())
             .ToHashSet(StringComparer.Ordinal);
         foreach (var (name, (invocation, handle)) in _commands.ToArray())
@@ -104,7 +158,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
     /// <summary>runner.ts: a command registered after the factory returned is callable at once (with its name:N invocation name).</summary>
     internal void RegisterMissingCommands(IReadOnlyDictionary<(int Extension, string Name), string> names)
     {
-        if (_registry is not { } registry) return;
+        if (_registry is not { } registry || _retired) return;
         _commandNames = names;
         foreach (var command in (extension.Descriptor["commands"] as JsonArray ?? []).OfType<JsonObject>())
         {
@@ -120,7 +174,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
     /// live session's catalog. Tool names another extension holds stay with that extension (a load conflict upstream).</summary>
     internal async Task SyncToolsAsync(NativeExtensionActivation activation, PiSharp.CodingAgent.ReplaceableAgentSession owner, bool force, CancellationToken token)
     {
-        if (_registry is not PiSharp.Extensions.Runtime.RegistrationScope scope) return;
+        if (_registry is not PiSharp.Extensions.Runtime.RegistrationScope scope || _retired) return;
         var json = ToolsJson();
         if (!force && json == _publishedTools) return;
         var taken = activation.Registry.CaptureSnapshot().Tools.Where(tool => tool.OwnerId != scope.OwnerId).Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
@@ -130,8 +184,21 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
         _toolIds = [.. descriptors.Select(tool => tool.RegistrationId)]; _toolNames = [.. descriptors.Select(tool => tool.Name)]; _publishedTools = json;
     }
 
+    /// <summary>runner.ts: a handler registered after the factory returned for an event this owner has no native registration for yet (a
+    /// custom event name, another before_agent_start handler) is registered now, so the next dispatch of that event reaches it.</summary>
+    internal void RegisterMissingHandlers()
+    {
+        if (_registry is not { } registry || _retired) return;
+        lock (_registeredEvents)
+        {
+            foreach (var eventName in extension.Events)
+                if (_registeredEvents.Add(eventName)) RegisterEvent(registry, eventName);
+            for (var handler = _beforeAgentStartSlots; handler < LiveHandlers("before_agent_start"); handler++) RegisterBeforeAgentStartSlot(registry, handler);
+        }
+    }
+
     /// <summary>Whether the extension has a handler for the event now (its descriptor follows registrations made after loading).</summary>
-    private bool Live(string eventName) => extension.Events.Contains(eventName, StringComparer.Ordinal);
+    private bool Live(string eventName) => !_retired && extension.Events.Contains(eventName, StringComparer.Ordinal);
     private int LiveHandlers(string eventName) => Live(eventName) ? extension.HandlerCount(eventName) : 0;
 
     // ------------------------------------------------------------------------------------------------------------- dispatch
@@ -189,29 +256,7 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
                 return;
             case "before_agent_start":
                 // One native handler per Node handler: each returns at most one message, and the host chains the system prompt.
-                for (var index = 0; index < LiveHandlers(eventName) + SpareHandlerSlots; index++)
-                {
-                    var handler = index;
-                    registry.RegisterBeforeAgentStartHandler(new(id + "-" + handler, async (snapshot, context, token) =>
-                    {
-                        if (handler >= LiveHandlers(eventName)) return null;
-                        var result = await EmitAsync(eventName, Event("before_agent_start", ("prompt", snapshot.Prompt),
-                            ("images", snapshot.Images is null ? null : Parse(snapshot.Images)), ("systemPrompt", snapshot.SystemPrompt)), context, token, handler).ConfigureAwait(false);
-                        if (result is not { ValueKind: JsonValueKind.Object } value) { host.RunSystemPrompt = snapshot.SystemPrompt; return null; }
-                        PiSharp.Extensions.Events.ExtensionCustomMessage? message = null; string? systemPrompt = null;
-                        if (value.TryGetProperty("messages", out var messages) && messages.ValueKind == JsonValueKind.Array && messages.GetArrayLength() > 0)
-                        {
-                            var first = messages[0];
-                            message = new(first.TryGetProperty("customType", out var type) ? type.GetString() ?? "" : "",
-                                !first.TryGetProperty("display", out var display) || display.ValueKind == JsonValueKind.True,
-                                first.TryGetProperty("content", out var content) ? Data(content) : null,
-                                first.TryGetProperty("details", out var details) ? Data(details) : null);
-                        }
-                        if (value.TryGetProperty("systemPrompt", out var prompt) && prompt.ValueKind == JsonValueKind.String) systemPrompt = prompt.GetString();
-                        host.RunSystemPrompt = systemPrompt ?? snapshot.SystemPrompt;
-                        return message is null && systemPrompt is null ? null : new ExtensionBeforeAgentStartPatch(message, systemPrompt);
-                    }));
-                }
+                for (var index = _beforeAgentStartSlots; index < LiveHandlers(eventName); index++) RegisterBeforeAgentStartSlot(registry, index);
                 return;
             case "input":
                 registry.RegisterInputHandler(new(id, async (snapshot, context, token) =>
@@ -316,9 +361,35 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
             default:
                 // An event this host does not raise (or a custom one): registered as an observation, as upstream keeps any handler.
                 registry.Observe(new(id, eventName, async (observation, context, token) =>
-                    await EmitAsync(eventName, Parse(observation), context, token).ConfigureAwait(false)));
+                { if (Live(eventName)) await EmitAsync(eventName, Parse(observation), context, token).ConfigureAwait(false); }));
                 return;
         }
+    }
+
+    /// <summary>One native before_agent_start handler for the Node handler at <paramref name="handler"/>.</summary>
+    private void RegisterBeforeAgentStartSlot(IExtensionRegistry registry, int handler)
+    {
+        const string eventName = "before_agent_start";
+        _beforeAgentStartSlots = handler + 1;
+        registry.RegisterBeforeAgentStartHandler(new("on-before_agent_start-" + handler, async (snapshot, context, token) =>
+        {
+            if (handler >= LiveHandlers(eventName)) return null;
+            var result = await EmitAsync(eventName, Event("before_agent_start", ("prompt", snapshot.Prompt),
+                ("images", snapshot.Images is null ? null : Parse(snapshot.Images)), ("systemPrompt", snapshot.SystemPrompt)), context, token, handler).ConfigureAwait(false);
+            if (result is not { ValueKind: JsonValueKind.Object } value) { host.RunSystemPrompt = snapshot.SystemPrompt; return null; }
+            PiSharp.Extensions.Events.ExtensionCustomMessage? message = null; string? systemPrompt = null;
+            if (value.TryGetProperty("messages", out var messages) && messages.ValueKind == JsonValueKind.Array && messages.GetArrayLength() > 0)
+            {
+                var first = messages[0];
+                message = new(first.TryGetProperty("customType", out var type) ? type.GetString() ?? "" : "",
+                    !first.TryGetProperty("display", out var display) || display.ValueKind == JsonValueKind.True,
+                    first.TryGetProperty("content", out var content) ? Data(content) : null,
+                    first.TryGetProperty("details", out var details) ? Data(details) : null);
+            }
+            if (value.TryGetProperty("systemPrompt", out var prompt) && prompt.ValueKind == JsonValueKind.String) systemPrompt = prompt.GetString();
+            host.RunSystemPrompt = systemPrompt ?? snapshot.SystemPrompt;
+            return message is null && systemPrompt is null ? null : new ExtensionBeforeAgentStartPatch(message, systemPrompt);
+        }));
     }
 
     private bool _vetoesRegistered;
@@ -396,6 +467,11 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
     /// error result whose text is the error message.</summary>
     private async ValueTask<JsonData> ExecuteAsync(string name, JsonData arguments, IExtensionToolContext context, CancellationToken token)
     {
+        if (_retired) return JsonData.Parse(new JsonObject
+        {
+            ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = $"Tool {name} belongs to an extension runtime a reload replaced" }),
+            ["details"] = new JsonObject(), ["isError"] = true
+        }.ToJsonString());
         using var lease = host.Enter(context);
         var invocation = context as IExtensionToolInvocationContext;
         var updates = Task.CompletedTask; var gate = new object();

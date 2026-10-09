@@ -316,7 +316,10 @@ internal static class PiCommand
         if (extensionRun?.Host is { } virtualHost)
         {
             var configured = runtime.ConfigureRegistry;
-            runtime = runtime with { ConfigureRegistry = registry => { configured?.Invoke(registry); virtualHost.RegisterProviders(registry); virtualHost.RegisterVirtualModels(registry); } };
+            var authPath = runtime.AuthPath; var time = runtime.Time;
+            runtime = runtime with { ConfigureRegistry = registry => { configured?.Invoke(registry); virtualHost.RegisterProviders(registry, authPath, time); virtualHost.RegisterVirtualModels(registry); } };
+            // model-runtime.ts registerProvider with oauth: the extensions' OAuth methods join /login (and stored credential refreshes).
+            Authentication.ProviderAuthCatalog.Extensions = () => virtualHost.OAuthEntries();
         }
         LiveSessionSelection selection;
         try

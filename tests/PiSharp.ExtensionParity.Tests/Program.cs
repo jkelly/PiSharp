@@ -31,6 +31,9 @@ internal static partial class Program
         cases.AddRange(ProviderCases());
         cases.AddRange(RuntimeCases());
         cases.AddRange(GapCases());
+        cases.AddRange(RebuildCases());
+        cases.AddRange(NativeCases());
+        cases.AddRange(OAuthCases());
         var filter = Environment.GetEnvironmentVariable("EXTPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0; var skipped = 0;

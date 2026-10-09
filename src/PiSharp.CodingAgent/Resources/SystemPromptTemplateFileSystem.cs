@@ -28,7 +28,7 @@ public sealed class SystemPromptTemplateFileSystem : IPromptTemplateFileSystem
     public ImmutableArray<PromptTemplateDirectoryEntry> ReadDirectory(string resolvedPath)
     {
         var entries = ImmutableArray.CreateBuilder<PromptTemplateDirectoryEntry>();
-        foreach (var entry in new DirectoryInfo(resolvedPath).GetFileSystemInfos())
+        foreach (var entry in PiSharp.Contracts.Compatibility.NodeDirectoryOrder.Order(new DirectoryInfo(resolvedPath).GetFileSystemInfos()))
         {
             var attributes = entry.Attributes;
             var kind = (attributes & FileAttributes.ReparsePoint) != 0 ? PromptTemplateFileKind.SymbolicLink

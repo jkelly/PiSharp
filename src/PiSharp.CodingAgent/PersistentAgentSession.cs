@@ -153,7 +153,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         return ThinkingLevels.GetSupported(configuration.Transport, selected);
     }
     /// <summary>Read-only self-wait detection for the current host call; this does not transfer input authority.</summary>
-    internal bool IsExecutingInputCallback
+    public bool IsExecutingInputCallback
     {
         get
         {

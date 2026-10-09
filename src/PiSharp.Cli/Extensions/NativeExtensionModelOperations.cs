@@ -159,7 +159,7 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
             ["openai"] = new FreshClientRefresh(http => new OpenAIChatGPTOAuthRefresh(http, timeProvider), createAuthHttp),
             ["openrouter"] = OpenRouterOAuthRefresh.Instance
         };
-        foreach (var entry in ProviderAuthCatalog.All)
+        foreach (var entry in ProviderAuthCatalog.Entries())
             if (entry.OAuth is { } oauth && !refreshes.ContainsKey(entry.Id))
                 refreshes[entry.Id] = new FreshClientRefresh(http => oauth.Create(new OAuthFlowContext(http, readEnvironment, timeProvider, null, 0, null)), createAuthHttp);
         return refreshes;
