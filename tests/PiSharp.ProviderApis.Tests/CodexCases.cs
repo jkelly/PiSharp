@@ -90,7 +90,8 @@ internal static partial class Program
         Equal("true", done.Message.ExtraProperties!.Values["endTurn"].ToString(), "end turn");
         Check(done.Message.Content.Single() is TextContent { Text: "Hello" }, "text");
         Equal(900L, done.Message.Usage.Input, "input excludes cached");
-        Equal(0.015125m, done.Message.Usage.Cost.Total, "priority pricing for gpt-5.5 (x2.5)");
+        // models.ts calculateCost then applyServiceTierPricing, in binary64 Numbers.
+        Equal(0.015125000000000001m, done.Message.Usage.Cost.Total, "priority pricing for gpt-5.5 (x2.5)");
         // Incomplete for max_output_tokens settles as length.
         var incomplete = Codex();
         incomplete.Http.OnUrl("https://", _ => Sse("""{"type":"response.incomplete","response":{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[]}}"""));

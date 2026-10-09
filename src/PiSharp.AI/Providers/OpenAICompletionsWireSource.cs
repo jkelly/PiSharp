@@ -698,7 +698,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             _usage = new(input, output, cacheRead, write, checked(input + output + cacheRead + write),
                 new(source.GetProperty("input").GetDecimal(), source.GetProperty("output").GetDecimal(),
                     source.GetProperty("cacheRead").GetDecimal(), source.GetProperty("cacheWrite").GetDecimal(),
-                    source.GetProperty("total").GetDecimal(), SourceBinary64Cost: sourceCost), extras);
+                    source.GetProperty("total").GetDecimal(), SourceBinary64Cost: sourceCost), extras) { ExtrasBeforeTotal = true };
         }
         private void Set(string name, string text)
         {

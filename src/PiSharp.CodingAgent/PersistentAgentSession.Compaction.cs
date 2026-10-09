@@ -448,7 +448,7 @@ public sealed partial class PersistentAgentSession
         var data = JsonData.Parse(JsonSerializer.Serialize(costs)); decimal D(string name) => data.Value.GetProperty(name).GetDecimal();
         try { return new(checked(left.Input + right.Input), checked(left.Output + right.Output), checked(left.CacheRead + right.CacheRead),
             checked(left.CacheWrite + right.CacheWrite), checked(left.TotalTokens + right.TotalTokens),
-            new(D("input"), D("output"), D("cacheRead"), D("cacheWrite"), D("total"), SourceBinary64Cost: data), extras); }
+            new(D("input"), D("output"), D("cacheRead"), D("cacheWrite"), D("total"), SourceBinary64Cost: data), extras) { ExtrasBeforeTotal = true }; }
         catch (OverflowException) { throw new SessionCompactionException(SessionCompactionFailure.UnsupportedNumber); }
     }
 }

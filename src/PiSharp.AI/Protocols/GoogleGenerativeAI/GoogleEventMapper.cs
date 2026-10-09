@@ -162,7 +162,7 @@ internal sealed class GoogleEventMapper
                 new(binary64.Value.GetProperty("input").GetDecimal(), binary64.Value.GetProperty("output").GetDecimal(),
                     binary64.Value.GetProperty("cacheRead").GetDecimal(), binary64.Value.GetProperty("cacheWrite").GetDecimal(),
                     binary64.Value.GetProperty("total").GetDecimal(), SourceBinary64Cost: binary64),
-                JsonFields.Empty.Set("reasoning", JsonData.Parse(thought.ToString(System.Globalization.CultureInfo.InvariantCulture))));
+                JsonFields.Empty.Set("reasoning", JsonData.Parse(thought.ToString(System.Globalization.CultureInfo.InvariantCulture)))) { ExtrasBeforeTotal = true };
         }
         return frames;
     }

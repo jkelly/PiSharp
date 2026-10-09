@@ -613,13 +613,11 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         {
             var multiplier = ResponsesServiceTier.Multiplier(_modelId, tier);
             if (multiplier == 1) return;
-            var cost = _usage.Cost;
-            var input = ComputedCost(checked(cost.Input * multiplier));
-            var output = ComputedCost(checked(cost.Output * multiplier));
-            var read = ComputedCost(checked(cost.CacheRead * multiplier));
-            var write = ComputedCost(checked(cost.CacheWrite * multiplier));
-            _usage = _usage with { Cost = cost with { Input = input, Output = output, CacheRead = read, CacheWrite = write,
-                Total = ComputedCost(checked(input + output + read + write)) } };
+            // openai-responses.ts applyServiceTierPricing multiplies the binary64 costs and sums them again.
+            var cost = _usage.Cost; var factor = Number(multiplier);
+            double input = Source(cost, "input") * factor, output = Source(cost, "output") * factor;
+            double read = Source(cost, "cacheRead") * factor, write = Source(cost, "cacheWrite") * factor;
+            _usage = _usage with { Cost = Binary64Cost(input, output, read, write, input + output + read + write) };
         }
         private TokenUsage Usage(JsonElement usage)
         {
@@ -637,19 +635,33 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             // Pi abe508 models.ts calculateCost through the shared tier selection.
             var rates = PromptLengthPricing.TrySelect(_rates.Tiers, candidate => candidate.InputTokensAbove, (decimal)uncached, cached, written, out var tier)
                 ? new ResponsesTokenRates(tier.Input, tier.Output, tier.CacheRead, tier.CacheWrite) : _rates;
-            var inputCost = ComputedCost(checked(rates.Input / 1_000_000m * uncached));
-            var outputCost = ComputedCost(checked(rates.Output / 1_000_000m * output));
-            var cachedCost = ComputedCost(checked(rates.CacheRead / 1_000_000m * cached));
-            var writtenCost = ComputedCost(checked(rates.CacheWrite / 1_000_000m * written));
+            // models.ts calculateCost in binary64 Numbers: three divide-then-multiply terms, the cache write term multiplies
+            // before dividing (no 1h writes here), and the total is left associative.
+            var inputCost = Number(rates.Input) / 1_000_000d * uncached;
+            var outputCost = Number(rates.Output) / 1_000_000d * output;
+            var cachedCost = Number(rates.CacheRead) / 1_000_000d * cached;
+            var writtenCost = (Number(rates.CacheWrite) * written + Number(rates.Input) * 2d * 0d) / 1_000_000d;
             return new(uncached, output, cached, written, total,
-                new(inputCost, outputCost, cachedCost, writtenCost, ComputedCost(checked(inputCost + outputCost + cachedCost + writtenCost))),
-                JsonFields.Empty.Set("reasoning", JsonData.Parse(reasoning.ToString(System.Globalization.CultureInfo.InvariantCulture))));
+                Binary64Cost(inputCost, outputCost, cachedCost, writtenCost, ((inputCost + outputCost) + cachedCost) + writtenCost),
+                JsonFields.Empty.Set("reasoning", JsonData.Parse(reasoning.ToString(System.Globalization.CultureInfo.InvariantCulture)))) { ExtrasBeforeTotal = true };
         }
 
-        // Only derived costs acquire a canonical decimal scale; raw provider/tool JSON is never rewritten.
-        private static decimal ComputedCost(decimal value) => decimal.Parse(
-            value.ToString("G29", System.Globalization.CultureInfo.InvariantCulture),
+        // A decimal rate as the Number JSON.parse reads from its text.
+        private static double Number(decimal value) => double.Parse(value.ToString(System.Globalization.CultureInfo.InvariantCulture),
             System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
+        private static double Source(UsageCost cost, string name) => cost.SourceBinary64Cost is { } source
+            ? source.Value.GetProperty(name).GetDouble()
+            : Number(name switch { "input" => cost.Input, "output" => cost.Output, "cacheRead" => cost.CacheRead, _ => cost.CacheWrite });
+        // The typed decimals are the binary64 values' shortest decimal text; the wire writes the Numbers themselves.
+        private UsageCost Binary64Cost(double input, double output, double read, double write, double total)
+        {
+            if (!double.IsFinite(input) || !double.IsFinite(output) || !double.IsFinite(read) || !double.IsFinite(write) || !double.IsFinite(total))
+                throw Protocol();
+            var data = JsonData.Parse(Contracts.Compatibility.EcmaScriptJsonProjection.Project(JsonSerializer.Serialize(new { input, output, cacheRead = read, cacheWrite = write, total })));
+            var value = data.Value;
+            return new(value.GetProperty("input").GetDecimal(), value.GetProperty("output").GetDecimal(), value.GetProperty("cacheRead").GetDecimal(),
+                value.GetProperty("cacheWrite").GetDecimal(), value.GetProperty("total").GetDecimal(), SourceBinary64Cost: data);
+        }
 
         private void CheckJson(JsonElement value, int depth)
         {

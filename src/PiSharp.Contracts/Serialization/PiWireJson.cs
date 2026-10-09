@@ -138,25 +138,55 @@ public static partial class PiWireJson
                 cost.GetProperty("total").GetDecimal(), JsonFields.FromObjectExcept(cost, "input", "output", "cacheRead", "cacheWrite", "total"),
                 JsonData.Parse("{" + string.Join(",", new[] { "input", "output", "cacheRead", "cacheWrite", "total" }
                     .Select(name => JsonSerializer.Serialize(name) + ":" + cost.GetProperty(name).GetRawText())) + "}")),
-            JsonFields.FromObjectExcept(value, "input", "output", "cacheRead", "cacheWrite", "totalTokens", "cost"));
+            JsonFields.FromObjectExcept(value, "input", "output", "cacheRead", "cacheWrite", "totalTokens", "cost"))
+        { ExtrasBeforeTotal = ExtraBeforeTotal(value) };
+    }
+    // Whether a field outside the standard ones precedes totalTokens (the literal key order; see TokenUsage.ExtrasBeforeTotal).
+    private static bool ExtraBeforeTotal(JsonElement usage)
+    {
+        foreach (var property in usage.EnumerateObject())
+        {
+            if (property.Name == "totalTokens") return false;
+            if (property.Name is not ("input" or "output" or "cacheRead" or "cacheWrite" or "cost")) return true;
+        }
+        return false;
     }
 
+    // Pi builds the message as one literal (each provider's `const output: AssistantMessage = { role, content, api, provider, model,
+    // [providerThinkingLevel,] usage, stopReason, timestamp }`), assigns optional fields as the stream reports them (responseId,
+    // responseModel, rawStopReason, errorMessage, ...), then event-stream.ts end() sets durationMs and agent-loop.ts Object.assign
+    // adds thinkingLevel. JSON.stringify keeps that insertion order.
+    private static readonly string[] MessageFields = ["role", "content", "api", "provider", "model", "usage", "stopReason", "timestamp", "durationMs"];
     private static JsonObject MessageNode(AssistantMessage message)
     {
-        var node = Object(message.ExtraProperties);
-        node["role"] = "assistant";
-        node["api"] = message.Api; node["provider"] = message.Provider; node["model"] = message.Model;
-        node["timestamp"] = message.Timestamp; node["stopReason"] = StopReasonName(message.StopReason);
+        var extras = message.ExtraProperties ?? JsonFields.Empty;
+        var node = new JsonObject { ["role"] = "assistant" };
         node["content"] = new JsonArray(message.Content.Select(content => (JsonNode)ContentNode(content)).ToArray());
-        var usage = Object(message.Usage.ExtraProperties);
-        usage["input"] = message.Usage.Input; usage["output"] = message.Usage.Output;
-        usage["cacheRead"] = message.Usage.CacheRead; usage["cacheWrite"] = message.Usage.CacheWrite;
-        usage["totalTokens"] = message.Usage.TotalTokens;
-        var cost = Object(message.Usage.Cost.ExtraProperties);
-        cost["input"] = message.Usage.Cost.Input; cost["output"] = message.Usage.Cost.Output;
-        cost["cacheRead"] = message.Usage.Cost.CacheRead; cost["cacheWrite"] = message.Usage.Cost.CacheWrite;
-        cost["total"] = message.Usage.Cost.Total;
-        if (message.Usage.Cost.SourceBinary64Cost is { } sourceCost)
+        node["api"] = message.Api; node["provider"] = message.Provider; node["model"] = message.Model;
+        if (extras.TryGet("providerThinkingLevel", out var providerLevel)) node["providerThinkingLevel"] = JsonNode.Parse(providerLevel!.ToString());
+        node["usage"] = UsageNode(message.Usage);
+        node["stopReason"] = StopReasonName(message.StopReason); node["timestamp"] = message.Timestamp;
+        foreach (var item in extras.Ordered)
+            if (item.Key is not ("providerThinkingLevel" or "thinkingLevel") && !MessageFields.Contains(item.Key))
+                node[item.Key] = JsonNode.Parse(item.Value.ToString());
+        if (message.DurationMs is { } duration) node["durationMs"] = duration;
+        if (extras.TryGet("thinkingLevel", out var level)) node["thinkingLevel"] = JsonNode.Parse(level!.ToString());
+        return node;
+    }
+
+    private static readonly string[] UsageFields = ["input", "output", "cacheRead", "cacheWrite", "totalTokens", "cost"];
+    private static JsonObject UsageNode(TokenUsage value)
+    {
+        var usage = new JsonObject { ["input"] = value.Input, ["output"] = value.Output, ["cacheRead"] = value.CacheRead, ["cacheWrite"] = value.CacheWrite };
+        var extras = (value.ExtraProperties ?? JsonFields.Empty).Ordered.Where(item => !UsageFields.Contains(item.Key)).ToArray();
+        if (value.ExtrasBeforeTotal) foreach (var item in extras) usage[item.Key] = JsonNode.Parse(item.Value.ToString());
+        usage["totalTokens"] = value.TotalTokens;
+        var cost = new JsonObject
+        {
+            ["input"] = value.Cost.Input, ["output"] = value.Cost.Output, ["cacheRead"] = value.Cost.CacheRead,
+            ["cacheWrite"] = value.Cost.CacheWrite, ["total"] = value.Cost.Total
+        };
+        if (value.Cost.SourceBinary64Cost is { } sourceCost)
         {
             var source = sourceCost.Value;
             var names = new[] { "input", "output", "cacheRead", "cacheWrite", "total" };
@@ -165,44 +195,50 @@ public static partial class PiWireJson
             foreach (var name in names)
             {
                 if (!source.TryGetProperty(name, out var number) || number.ValueKind != JsonValueKind.Number ||
-                    !number.TryGetDouble(out var value) || !double.IsFinite(value) || value < 0)
+                    !number.TryGetDouble(out var parsed) || !double.IsFinite(parsed) || parsed < 0)
                     throw new JsonException("Source cost must contain finite nonnegative numbers.");
                 var typed = name switch
                 {
-                    "input" => message.Usage.Cost.Input, "output" => message.Usage.Cost.Output,
-                    "cacheRead" => message.Usage.Cost.CacheRead, "cacheWrite" => message.Usage.Cost.CacheWrite,
-                    _ => message.Usage.Cost.Total
+                    "input" => value.Cost.Input, "output" => value.Cost.Output,
+                    "cacheRead" => value.Cost.CacheRead, "cacheWrite" => value.Cost.CacheWrite,
+                    _ => value.Cost.Total
                 };
                 if (!number.TryGetDecimal(out var owned) || owned != typed)
                     throw new JsonException("Source cost differs from its typed decimal value.");
                 cost[name] = JsonNode.Parse(number.GetRawText());
             }
         }
-        usage["cost"] = cost; node["usage"] = usage;
-        // The source assigns the duration to the finished message, after its other fields.
-        if (message.DurationMs is { } duration) node["durationMs"] = duration;
-        return node;
+        foreach (var item in (value.Cost.ExtraProperties ?? JsonFields.Empty).Ordered)
+            if (!cost.ContainsKey(item.Key)) cost[item.Key] = JsonNode.Parse(item.Value.ToString());
+        usage["cost"] = cost;
+        if (!value.ExtrasBeforeTotal) foreach (var item in extras) usage[item.Key] = JsonNode.Parse(item.Value.ToString());
+        return usage;
     }
 
+    // Pi content blocks are literals that start with their own fields ({ type: "thinking", thinking, thinkingSignature }); a
+    // provider's extra fields follow in the order it assigned them.
     private static JsonObject ContentNode(AssistantContent content)
     {
-        var node = Object(content.ExtraProperties);
+        var node = new JsonObject();
+        string[] own;
         switch (content)
         {
-            case TextContent text: node["type"] = "text"; node["text"] = text.Text; break;
-            case ThinkingContent thinking: node["type"] = "thinking"; node["thinking"] = thinking.Thinking; break;
+            case TextContent text: node["type"] = "text"; node["text"] = text.Text; own = ["type", "text"]; break;
+            case ThinkingContent thinking: node["type"] = "thinking"; node["thinking"] = thinking.Thinking; own = ["type", "thinking"]; break;
             case ToolCallContent tool:
                 node["type"] = "toolCall"; node["id"] = tool.Id; node["name"] = tool.Name;
-                node["arguments"] = JsonNode.Parse(tool.Arguments.ToString()); break;
+                node["arguments"] = JsonNode.Parse(tool.Arguments.ToString()); own = ["type", "id", "name", "arguments"]; break;
             default: throw new ArgumentException("Unknown assistant content.", nameof(content));
         }
+        foreach (var item in (content.ExtraProperties ?? JsonFields.Empty).Ordered)
+            if (!own.Contains(item.Key)) node[item.Key] = JsonNode.Parse(item.Value.ToString());
         return node;
     }
 
     private static JsonObject Object(JsonFields? properties)
     {
         var node = new JsonObject();
-        foreach (var item in (properties ?? JsonFields.Empty).Values)
+        foreach (var item in (properties ?? JsonFields.Empty).Ordered)
             node[item.Key] = JsonNode.Parse(item.Value.ToString());
         return node;
     }

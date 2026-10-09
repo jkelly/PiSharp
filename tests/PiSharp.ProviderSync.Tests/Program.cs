@@ -699,7 +699,7 @@ internal static partial class Program
 
     // models.ts calculateCost: inputTokens = input + cacheRead + cacheWrite; a tier applies only strictly above inputTokensAbove,
     // the greatest matching threshold prices the whole request (first of equal thresholds), and 1h cache writes cost 2x the
-    // selected input rate. Decimal paths are exact; binary64 paths equal Pi v1.1.0 calculateCost's Number results.
+    // selected input rate. Every path equals Pi v1.1.0 calculateCost's binary64 Number results.
     private static string RepositoryFile(params string[] parts)
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
@@ -740,10 +740,10 @@ internal static partial class Program
             0.0099m, 0.0005m, 0.00001m, 0m, 0.01041m);
         // One cache read more: the tier prices the whole request.
         Cost((await Usage(haiku, "claude-haiku-5-5", new { input_tokens = 99000, cache_read_input_tokens = 1001, output_tokens = 0 }, 1000)).Usage,
-            0.0495m, 0.0025m, 0.00005005m, 0m, 0.05205005m);
+            0.049499999999999995m, 0.0025m, 0.000050050000000000004m, 0m, 0.05205005m);
         // Cache writes count too; 1h writes cost twice the selected input rate (6000 x 0.125 + 4000 x 0.2 at base).
         Cost((await Usage(haiku, "claude-haiku-5-5", new { input_tokens = 90000, cache_creation_input_tokens = 10000, cache_creation = new { ephemeral_1h_input_tokens = 4000 }, output_tokens = 0 }, 500)).Usage,
-            0.009m, 0.00025m, 0m, 0.00155m, 0.0108m);
+            0.009000000000000001m, 0.00025m, 0m, 0.00155m, 0.0108m);
         // One write more: 6001 x 0.625 + 4000 x 1.0 per million.
         Cost((await Usage(haiku, "claude-haiku-5-5", new { input_tokens = 90000, cache_creation_input_tokens = 10001, cache_creation = new { ephemeral_1h_input_tokens = 4000 }, output_tokens = 0 }, 500)).Usage,
             0.045m, 0.00125m, 0m, 0.007750625m, 0.054000625m);
@@ -772,7 +772,7 @@ internal static partial class Program
         Cost(await Completions(100001, 1001, 0), 0.049499999999999995m, 0.0025m, 0.000050050000000000004m, 0m, 0.05205005m);
         Cost(await Completions(100001, 0, 10001), 0.045m, 0.0025m, 0m, 0.006250625m, 0.053750625m);
 
-        // Responses (decimal): GPT-5.4 at its 272000 threshold, cached tokens included in input_tokens.
+        // Responses (binary64): GPT-5.4 at its 272000 threshold, cached tokens included in input_tokens.
         var gpt = CatalogRow("openai", "gpt-5.4");
         var gptModel = new ModelDescriptor("gpt-5.4", "openai-responses", "openai");
         async Task<TokenUsage> Responses(int input, int cached)
@@ -783,8 +783,8 @@ internal static partial class Program
             using var provider = NativeProviderFactory.CreateResponses(gptModel, new("https://api.openai.com/v1/responses"), Key, new(true), null, handler, gpt);
             return (await new ChatClient(provider).CompleteAsync(new(gptModel, [Ask], 1)).WaitAsync(Deadline)).Message.Usage;
         }
-        Cost(await Responses(272000, 2000), 0.675m, 0.015m, 0.0005m, 0m, 0.6905m);
-        Cost(await Responses(272001, 2001), 1.35m, 0.0225m, 0.0010005m, 0m, 1.3735005m);
+        Cost(await Responses(272000, 2000), 0.675m, 0.015000000000000001m, 0.0005m, 0m, 0.6905m);
+        Cost(await Responses(272001, 2001), 1.35m, 0.022500000000000003m, 0.0010004999999999999m, 0m, 1.3735005m);
 
         // Authored tiers in source order [1000, 500, 1000]: exactly 1000 selects 500, 1001 selects the first 1000 tier, 501 selects 500.
         const string tiers = """[{"inputTokensAbove":1000,"input":4,"output":6,"cacheRead":1,"cacheWrite":0},{"inputTokensAbove":500,"input":9,"output":9,"cacheRead":9,"cacheWrite":0},{"inputTokensAbove":1000,"input":7,"output":7,"cacheRead":7,"cacheWrite":0}]""";

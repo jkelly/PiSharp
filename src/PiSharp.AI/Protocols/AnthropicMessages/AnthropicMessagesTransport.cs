@@ -410,14 +410,18 @@ public sealed partial class AnthropicMessagesTransport : IChatTransport
             if (_cacheWrite1h > write || _reasoning > output) throw Protocol();
             var total = checked(input + output + read + write);
             // Pi abe508 models.ts calculateCost: prompt-length tiers price the whole request, 1h writes at 2x the tier input.
-            var rates = PromptLengthPricing.Select(_rates.Input, _rates.Output, _rates.CacheRead, _rates.CacheWrite, _rates.Tiers, input, read, write);
-            var costInput = checked(rates.Input / 1_000_000m * input); var costOutput = checked(rates.Output / 1_000_000m * output);
-            var costRead = checked(rates.CacheRead / 1_000_000m * read);
-            var costWrite = checked((rates.CacheWrite * (write - _cacheWrite1h) + rates.Input * 2 * _cacheWrite1h) / 1_000_000m);
+            // Pi abe508 models.ts calculateCost runs in binary64 Numbers (prompt-length tiers price the whole request, 1h writes at 2x
+            // the tier input), so the costs are those Numbers: 5 / 1e6 * 3 is 0.000015000000000000002, as Pi records it.
             var extras = JsonFields.Empty.Set("cacheWrite1h", JsonData.Parse(_cacheWrite1h.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             if (_reasoning is { } tokens) extras = extras.Set("reasoning", JsonData.Parse(tokens.ToString(System.Globalization.CultureInfo.InvariantCulture)));
-            _usage = new(input, output, read, write, total, new(costInput, costOutput, costRead, costWrite,
-                checked(costInput + costOutput + costRead + costWrite)), extras);
+            var counts = new TokenUsage(input, output, read, write, total, new(0, 0, 0, 0, 0));
+            var binary64 = JsonData.Parse(Contracts.Compatibility.EcmaScriptJsonProjection.Project(
+                OriginalAnthropicUsageCostProjection.Create(_rates, counts, _cacheWrite1h)));
+            var cost = binary64.Value;
+            if (cost.EnumerateObject().Any(field => !field.Value.TryGetDouble(out var number) || !double.IsFinite(number))) throw Protocol();
+            _usage = new(input, output, read, write, total, new(cost.GetProperty("input").GetDecimal(), cost.GetProperty("output").GetDecimal(),
+                cost.GetProperty("cacheRead").GetDecimal(), cost.GetProperty("cacheWrite").GetDecimal(), cost.GetProperty("total").GetDecimal(),
+                SourceBinary64Cost: binary64), extras);
         }
         private void Transformations(JsonElement value)
         {
