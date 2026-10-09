@@ -130,7 +130,8 @@ public sealed class NativeShellOperations : IShellOperations
         // and missing shell fail as Node's errors. Executors report these messages as the command's failure.
         if (!Directory.Exists(workingDirectory))
             throw new PiSharp.Agent.ToolSourceErrorException($"Working directory does not exist: {workingDirectory}\nCannot execute bash commands.");
-        if (_shell.CommandTransport == ShellCommandTransport.Argv && NodeArgumentErrors.SpawnLimit(_shell.Shell, _shell.CommandArguments(command)) is { } spawnError)
+        if (_shell.CommandTransport == ShellCommandTransport.Argv && (NodeArgumentErrors.SpawnArguments(_shell.CommandArguments(command)) ??
+            NodeArgumentErrors.SpawnLimit(_shell.Shell, _shell.CommandArguments(command))) is { } spawnError)
             throw new PiSharp.Agent.ToolSourceErrorException(spawnError);
         if (!File.Exists(_shell.Shell)) throw new PiSharp.Agent.ToolSourceErrorException($"spawn {_shell.Shell} ENOENT");
         var request = new ProcessRequest(_shell.Shell, _shell.CommandArguments(command), workingDirectory, _environment,

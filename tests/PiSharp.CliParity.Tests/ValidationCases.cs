@@ -132,6 +132,23 @@ internal static partial class Program
                     "40k user command: " + second.GetRawText()[..Math.Min(300, second.GetRawText().Length)]);
             else Check(second.GetProperty("success").GetBoolean(), "40k user command runs on Unix");
         }),
+        // rpc-mode.ts "bash" -> executeBash -> spawn: a NUL byte fails as Node's argument error (captured from Pi 1.1.0 on Windows,
+        // where the shell's arguments are ["-c", command]).
+        ("validation.rpc-user-bash-nul-is-the-spawn-argument-error", async () =>
+        {
+            using var sandbox = new Sandbox("validation-rpc-nul");
+            sandbox.Vars["PI_OFFLINE"] = "1";
+            var line = System.Text.Json.JsonSerializer.Serialize(new { id = "n0", type = "bash", command = "echo a\0b" }) + "\n";
+            var gate = new GatedInput(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(line)));
+            using var output = new SignalingStream("\"command\":\"bash\"", gate.Release);
+            using var stdout = new StringWriter(); using var stderr = new StringWriter();
+            var host = sandbox.Host(stdout, stderr, null, rpcInput: gate, rpcOutput: output) with { StdoutIsTty = false };
+            Equal(0, await PiCommand.RunAsync(["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"], host, CancellationToken.None), "exit; " + stderr);
+            var response = JsonDocument.Parse(System.Text.Encoding.UTF8.GetString(output.ToArray()).Split('\n')
+                .First(text => text.Contains("\"command\":\"bash\"", StringComparison.Ordinal))).RootElement;
+            Equal(false, response.GetProperty("success").GetBoolean(), "NUL command fails: " + response.GetRawText());
+            Equal("The argument 'args[1]' must be a string without null bytes. Received 'echo a\\x00b'", response.GetProperty("error").GetString(), "spawn error");
+        }),
         // bash.ts execute: an empty command runs, resolveTimeoutMs rejects a non-positive timeout and accepts a fractional one, and only
         // the operating system bounds the command length (captured from the installed Pi 1.1.0 bash tool on Windows).
         ("validation.bash-admits-what-the-source-schema-admits", async () =>
