@@ -48,6 +48,10 @@ Earlier decisions stand: MCP servers in `mcp.json` are trusted and their tools c
    npm registry integrity) are installed into the agent directory on first extension use
    and extensions load through Pi's jiti setup; the ported shims are only the offline
    fallback. Owner: IMPL-E.
+10. **Native C# extensions in the Pi entry** are discovered like Pi extensions (global and
+    project extension folders, settings, packages, `-e`), gated only by project trust,
+    on every platform; the per-package approval and preflight files are not required
+    there. Owner: IMPL-E.
 
 Install telemetry (`core/telemetry.ts`, which reports installs to Pi's servers) is not
 ported: PiSharp is not Pi and must not report as it.
