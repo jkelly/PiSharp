@@ -19,6 +19,7 @@ internal static partial class Program
         Case("hooks.provider-request-payload-headers-response-and-stream-events", ProviderHttpHooks),
         Case("hooks.reduce-event-last-result-wins-and-failures-continue", ReduceEventOrder),
         Case("hooks.ui-prompt-start-end-once-for-nested-prompts", UiPromptEvents),
+        Case("hooks.ui-prompt-wraps-terminal-component-scopes-and-custom", UiPromptCustomComponents),
         Case("events.usage-entry-shape-and-entry-appended", UsageEntry),
     ];
 
@@ -140,6 +141,56 @@ internal static partial class Program
             """{"type":"ui_prompt_start","reason":"ui_prompt","kind":"input"}""",
             """{"type":"ui_prompt_end","reason":"ui_prompt","kind":"input"}"""]), "ui prompt events: " + string.Join("\n", seen));
     }
+    // runner.ts wrapUIPromptContext wraps every UI context, including the interactive one: dialogs report ui_prompt_start/end, and
+    // custom() is a "custom" prompt (no title) until the component is done. The wrapped scope keeps its capability interfaces.
+    private sealed class ComponentProvider(DialogProvider dialogs) : IExtensionUiProvider
+    {
+        internal readonly TaskCompletionSource Done = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public IExtensionUiScope OpenScope(IExtensionContext context) => new Scope(dialogs.OpenScope(context), this);
+        private sealed class Scope(IExtensionUiScope inner, ComponentProvider owner) : IExtensionUiScope, IExtensionCustomComponentUi
+        {
+            public ExtensionUiCapabilities Capabilities => inner.Capabilities;
+            public Task OpenCustomComponentAsync(ExtensionCustomComponentCallbacks component, CancellationToken token = default) => owner.Done.Task;
+            public Task SignalCustomComponentDoneAsync(ExtensionCustomComponentIdentity identity, CancellationToken token = default) { owner.Done.TrySetResult(); return Task.CompletedTask; }
+            public Task InvalidateCustomComponentAsync(ExtensionCustomComponentIdentity identity, CancellationToken token = default) => Task.CompletedTask;
+            public ValueTask<ExtensionUiOutcome<string>> SelectAsync(string title, ImmutableArray<string> choices, ExtensionUiDialogOptions? options = null, CancellationToken token = default) =>
+                inner.SelectAsync(title, choices, options, token);
+            public ValueTask<ExtensionUiOutcome<bool>> ConfirmAsync(string title, string message, ExtensionUiDialogOptions? options = null, CancellationToken token = default) =>
+                inner.ConfirmAsync(title, message, options, token);
+            public ValueTask<ExtensionUiOutcome<string>> InputAsync(string title, string? placeholder = null, ExtensionUiDialogOptions? options = null, CancellationToken token = default) =>
+                inner.InputAsync(title, placeholder, options, token);
+            public ValueTask<ExtensionUiOutcome<string>> EditorAsync(string title, string? prefill = null, CancellationToken token = default) => inner.EditorAsync(title, prefill, token);
+            public ValueTask<ExtensionUiOutcome<ExtensionUiPublication>> PublishAsync(ExtensionUiNotification notification, CancellationToken token = default) =>
+                inner.PublishAsync(notification, token);
+            public ValueTask DisposeAsync() => inner.DisposeAsync();
+        }
+    }
+
+    private static async Task UiPromptCustomComponents()
+    {
+        await using var f = await CreateAsync(); var seen = new List<string>();
+        var components = new ComponentProvider(new DialogProvider()); var prompts = new NativeUiPromptEvents(components);
+        await f.Activate(api =>
+        {
+            foreach (var topic in new[] { "ui_prompt_start", "ui_prompt_end" })
+                api.Observe(new(topic, topic, (value, _, _) => { lock (seen) seen.Add(value.ToString()); return ValueTask.CompletedTask; }));
+        });
+        prompts.Bind(f.Registry, f.Registry.CaptureSnapshot(), f.Report);
+        await using var scope = prompts.OpenScope(new Context());
+        Check(scope is IExtensionCustomComponentUi && scope is not IExtensionTerminalInput && scope is not IExtensionToolComponentUi, "capability interfaces kept");
+        await scope.ConfirmAsync("Sure?", "really");
+        var open = ((IExtensionCustomComponentUi)scope).OpenCustomComponentAsync(null!);
+        for (var wait = 0; wait < 200 && seen.Count < 3; wait++) await Task.Delay(10);
+        Check(!open.IsCompleted && seen.Count == 3, "custom prompt open: " + string.Join("\n", seen));
+        await ((IExtensionCustomComponentUi)scope).SignalCustomComponentDoneAsync(null!); await open;
+        for (var wait = 0; wait < 200 && seen.Count < 4; wait++) await Task.Delay(10);
+        Check(seen.SequenceEqual([
+            """{"type":"ui_prompt_start","reason":"ui_prompt","kind":"confirm","title":"Sure?"}""",
+            """{"type":"ui_prompt_end","reason":"ui_prompt","kind":"confirm","title":"Sure?"}""",
+            """{"type":"ui_prompt_start","reason":"ui_prompt","kind":"custom"}""",
+            """{"type":"ui_prompt_end","reason":"ui_prompt","kind":"custom"}"""]), "ui prompt events: " + string.Join("\n", seen));
+    }
+
     private sealed class Context : IExtensionContext
     {
         public string OwnerId => "parity"; public long OwnerGeneration => 1;

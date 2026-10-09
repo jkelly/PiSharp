@@ -10,8 +10,8 @@ namespace PiSharp.Cli.Extensions;
 
 /// <summary>Source ui_prompt_start/ui_prompt_end: while an extension waits on a blocking dialog (select, confirm, input, editor),
 /// extensions are told the host is waiting on the user. Nested prompts report once, for the outermost prompt. The events are
-/// published asynchronously, as Pi queues them. Scopes with terminal component capabilities are passed through unwrapped
-/// (IMPL-I owns the interactive UI and its custom prompts).</summary>
+/// published asynchronously, as Pi queues them. A custom terminal component (ctx.ui.custom) is a "custom" prompt from its open until
+/// done(). Scopes keep exactly the capability interfaces of the scope they wrap.</summary>
 internal sealed class NativeUiPromptEvents(IExtensionUiProvider inner) : IExtensionUiProvider
 {
     private readonly object _gate = new();
@@ -24,7 +24,13 @@ internal sealed class NativeUiPromptEvents(IExtensionUiProvider inner) : IExtens
     public IExtensionUiScope OpenScope(IExtensionContext context)
     {
         var scope = inner.OpenScope(context);
-        return scope is IExtensionCustomComponentUi or IExtensionToolComponentUi or IExtensionTerminalInput ? scope : new Scope(this, scope);
+        return scope switch
+        {
+            IExtensionCustomComponentUi and IExtensionToolComponentUi and IExtensionTerminalInput => new TerminalScope(this, scope),
+            IExtensionCustomComponentUi and not IExtensionToolComponentUi and not IExtensionTerminalInput => new CustomScope(this, scope),
+            IExtensionToolComponentUi or IExtensionTerminalInput => scope, // No host composes these without custom components.
+            _ => new Scope(this, scope)
+        };
     }
 
     private IDisposable Prompt(string kind, string? title)
@@ -61,8 +67,30 @@ internal sealed class NativeUiPromptEvents(IExtensionUiProvider inner) : IExtens
         public void Dispose() { if (Interlocked.Exchange(ref disposed, 1) == 0) owner.End(kind, title); }
     }
 
-    private sealed class Scope(NativeUiPromptEvents owner, IExtensionUiScope inner) : IExtensionUiScope
+    /// <summary>Source withUIPrompt("custom", undefined, ...) around ui.custom(): the open lasts until the component is done.</summary>
+    private class CustomScope(NativeUiPromptEvents owner, IExtensionUiScope inner) : Scope(owner, inner), IExtensionCustomComponentUi
     {
+        private IExtensionCustomComponentUi Custom => (IExtensionCustomComponentUi)Inner;
+        public async Task OpenCustomComponentAsync(ExtensionCustomComponentCallbacks component, CancellationToken token = default)
+        { using (Owner.Prompt("custom", null)) await Custom.OpenCustomComponentAsync(component, token).ConfigureAwait(false); }
+        public Task SignalCustomComponentDoneAsync(ExtensionCustomComponentIdentity identity, CancellationToken token = default) =>
+            Custom.SignalCustomComponentDoneAsync(identity, token);
+        public Task InvalidateCustomComponentAsync(ExtensionCustomComponentIdentity identity, CancellationToken token = default) =>
+            Custom.InvalidateCustomComponentAsync(identity, token);
+    }
+
+    private sealed class TerminalScope(NativeUiPromptEvents owner, IExtensionUiScope inner) : CustomScope(owner, inner), IExtensionToolComponentUi, IExtensionTerminalInput
+    {
+        public IExtensionToolComponentPresentation AttachToolComponent(ExtensionCustomComponentCallbacks source) =>
+            ((IExtensionToolComponentUi)Inner).AttachToolComponent(source);
+        public IDisposable OnTerminalInput(ExtensionTerminalInputHandler handler) => ((IExtensionTerminalInput)Inner).OnTerminalInput(handler);
+        public IDisposable OnTerminalInputAsync(ExtensionTerminalInputAsyncHandler handler) => ((IExtensionTerminalInput)Inner).OnTerminalInputAsync(handler);
+    }
+
+    private class Scope(NativeUiPromptEvents owner, IExtensionUiScope inner) : IExtensionUiScope
+    {
+        protected NativeUiPromptEvents Owner => owner;
+        protected IExtensionUiScope Inner => inner;
         public ExtensionUiCapabilities Capabilities => inner.Capabilities;
         public async ValueTask<ExtensionUiOutcome<string>> SelectAsync(string title, ImmutableArray<string> choices, ExtensionUiDialogOptions? options = null,
             CancellationToken cancellationToken = default)
