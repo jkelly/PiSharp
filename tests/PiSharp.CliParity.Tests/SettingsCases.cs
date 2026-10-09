@@ -41,7 +41,7 @@ internal static partial class Program
             var path = sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), "{ not json");
             var settings = PiSettings.Load(sandbox.Cwd, sandbox.AgentDir, projectTrusted: true);
             var diagnostic = settings.DrainDiagnostics().Single();
-            Check(diagnostic.Type == "warning" && diagnostic.Message.StartsWith($"Invalid settings file {path}: ", StringComparison.Ordinal), "diagnostic text: " + diagnostic.Message);
+            Check(diagnostic.Type == "warning" && diagnostic.Message == $"Invalid settings file {path}: Expected property name or '}}' in JSON at position 2 (line 1 column 3)", "diagnostic text: " + diagnostic.Message);
             Equal(0, settings.DrainDiagnostics().Length, "drained once");
             var (code, stdout, stderr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "hi");
             Equal(0, code, "a broken settings file does not stop the run; " + stderr);

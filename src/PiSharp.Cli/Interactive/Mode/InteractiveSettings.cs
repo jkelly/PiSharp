@@ -51,7 +51,7 @@ internal sealed class InteractiveSettings
             var text = File.ReadAllText(path);
             if (text.StartsWith('﻿')) text = text[1..];
             if (text.Length == 0) return ([], false);
-            return (JsonNode.Parse(text) as JsonObject is { } obj ? PiSettings.Migrate(obj) : throw new JsonException("Settings must be a JSON object"), false);
+            return (PiSharp.Cli.Pi.PiJson.Parse(text) as JsonObject is { } obj ? PiSettings.Migrate(obj) : throw new JsonException("Settings must be a JSON object"), false);
         }
         catch (Exception error) when (error is JsonException or IOException or UnauthorizedAccessException)
         {

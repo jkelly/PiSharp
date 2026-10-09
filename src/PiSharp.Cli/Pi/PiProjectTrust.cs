@@ -63,7 +63,7 @@ internal sealed class ProjectTrustStore
         var data = new Dictionary<string, bool?>(StringComparer.Ordinal);
         if (!File.Exists(TrustPath)) return data;
         JsonNode? parsed;
-        try { parsed = JsonNode.Parse(PiPaths.ReadText(TrustPath)); }
+        try { parsed = PiJson.Parse(PiPaths.ReadText(TrustPath)); }
         catch (JsonException error) { throw new InvalidDataException($"Failed to read trust store {TrustPath}: {error.Message}"); }
         if (parsed is not JsonObject entries) throw new InvalidDataException($"Invalid trust store {TrustPath}: expected an object");
         foreach (var (key, value) in entries)

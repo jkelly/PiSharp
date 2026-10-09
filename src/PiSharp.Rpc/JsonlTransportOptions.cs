@@ -36,6 +36,9 @@ public sealed class JsonlTransportException : IOException
         JsonlTransportFailure.PendingWriteLimit => "JSONL writer pending-call limit exceeded.",
         _ => "JSONL frame is not complete strict JSON."
     }) => Failure = failure;
+    /// <summary>JSON.parse's SyntaxError message for a malformed frame (rpc-mode.ts reports it as "Failed to parse command: ...").</summary>
+    public string? SyntaxError { get; }
+    internal JsonlTransportException(JsonlTransportFailure failure, string? syntaxError) : this(failure) => SyntaxError = syntaxError;
 }
 
 internal static class JsonlRecordCodec
@@ -53,7 +56,11 @@ internal static class JsonlRecordCodec
             Validate(document.RootElement, raw);
             return JsonData.FromElement(document.RootElement);
         }
-        catch (JsonException) { throw Failure(final ? JsonlTransportFailure.PartialFinalFrame : JsonlTransportFailure.MalformedJson); }
+        catch (JsonException)
+        {
+            throw new JsonlTransportException(final ? JsonlTransportFailure.PartialFinalFrame : JsonlTransportFailure.MalformedJson,
+                PiSharp.Contracts.Compatibility.JsJsonSyntax.Error(raw));
+        }
     }
 
     internal static byte[] Encode(JsonData record, JsonlTransportOptions options)
