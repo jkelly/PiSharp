@@ -51,6 +51,7 @@ internal static partial class Program
             ("live.provider-route-selection-and-per-request-auth", LiveRoutes),
             ("login.every-provider-cli-flow-api-key-and-oauth", CliLogin),
         };
+        cases = [.. cases, .. GoogleAdcCases];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {
