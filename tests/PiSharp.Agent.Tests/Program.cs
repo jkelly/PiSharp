@@ -918,11 +918,15 @@ internal static class Program
         { Content = [Call("A"), new ToolCallContent("call-B", "B", JsonData.Parse("[]")), Call("missing"), Call("C"), Call("D")] };
         var batch = await new ToolBatchScheduler([new("A", executor), new("B", executor), new("C", executor), new("D", executor)], hooks)
             .RunAsync(message, new Sink());
-        Sequence(["A", "C", "D"], before);
-        Sequence(["C", "D"], executed);
-        Sequence(["C", "D"], after);
+        // The loop admits arguments of any JSON kind: packages/agent/src/agent-loop.ts:716-727 prepareToolCall only looks the tool up
+        // and runs that tool's validateToolArguments. B's plain executor declares no schema, so its non-object [] reaches the
+        // before hook and the executor; a schema-bearing tool rejects it with "root: must be object" (Tools ToolValidationTests).
+        Sequence(["A", "B", "C", "D"], before);
+        Sequence(["B", "C", "D"], executed);
+        Sequence(["B", "C", "D"], after);
         Equal(ToolFailureKind.HookError, batch.Outcomes[0].Result.Failure!.Kind);
-        Equal(ToolFailureKind.InvalidArguments, batch.Outcomes[1].Result.Failure!.Kind);
+        Equal("[]", batch.Outcomes[1].Invocation.Call.Arguments.ToString());
+        Check(!batch.Messages[1].IsError, "The after hook override of B's thrown executor failure did not reach the transcript.");
         Equal(ToolFailureKind.UnknownTool, batch.Outcomes[2].Result.Failure!.Kind);
         Equal(ToolFailureKind.HookError, batch.Outcomes[3].Result.Failure!.Kind);
         Check(!batch.Messages[4].IsError, "Finalized result override did not reach transcript.");

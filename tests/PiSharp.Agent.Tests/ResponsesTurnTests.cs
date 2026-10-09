@@ -10,7 +10,12 @@ using PiSharp.Contracts;
 internal static class ResponsesTurnTests
 {
     private const string ToolId = "call-turn|fc-turn";
+    // The authoritative output_item.done arguments, as the wire carries them.
     private const string FinalArguments = """{"value":7,"note":"authoritative","exact":9007199254740993,"scale":1.0}""";
+    // pi-ai finalizes them with parseStreamingJson (packages/ai/src/api/openai-responses-shared.ts:716,
+    // packages/ai/src/utils/json-parse.ts:104-110): JSON.parse rounds 9007199254740993 to the binary64 9007199254740992 and
+    // 1.0 is the number 1, so the finalized call carries the JavaScript value.
+    private const string FinalizedArguments = """{"value":7,"note":"authoritative","exact":9007199254740992,"scale":1}""";
     private const string Start = """{"type":"response.output_item.added","output_index":9,"item":{"type":"function_call","id":"fc-turn","call_id":"call-turn","name":"inspect","arguments":""}}""";
     private const string Delta = """{"type":"response.function_call_arguments.delta","output_index":9,"item_id":"fc-turn","delta":"{\"value\":999"}""";
     private const string ArgumentsDone = """{"type":"response.function_call_arguments.done","output_index":9,"item_id":"fc-turn","arguments":"{\"value\":888}"}""";
@@ -145,10 +150,10 @@ internal static class ResponsesTurnTests
     {
         Equal(ToolId, call.Id);
         Equal("inspect", call.Name);
-        Equal(FinalArguments, call.Arguments.Value.GetRawText());
+        Equal(FinalizedArguments, call.Arguments.Value.GetRawText());
         Equal(7, call.Arguments.Value.GetProperty("value").GetInt32());
-        Equal("9007199254740993", call.Arguments.Value.GetProperty("exact").GetRawText());
-        Equal("1.0", call.Arguments.Value.GetProperty("scale").GetRawText());
+        Equal("9007199254740992", call.Arguments.Value.GetProperty("exact").GetRawText());
+        Equal("1", call.Arguments.Value.GetProperty("scale").GetRawText());
     }
 
     private static void NoEffects(Effects effects)

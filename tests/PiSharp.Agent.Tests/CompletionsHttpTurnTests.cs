@@ -11,7 +11,10 @@ using PiSharp.Contracts;
 internal static class CompletionsHttpTurnTests
 {
     private static readonly ModelDescriptor Model = new("agent-http-model", "openai-completions", "openai");
-    private const string Arguments = "{\"value\":1.00,\"keep\":null}";
+    // The wire carries {"value":1.00,"keep":null}; pi-ai finalizes tool-call arguments with parseStreamingJson
+    // (packages/ai/src/api/openai-completions.ts:464, packages/ai/src/utils/json-parse.ts:104-110), so the call the tool
+    // receives and the assistant message record carry the JavaScript value {"value":1,"keep":null}.
+    private const string Arguments = "{\"value\":1,\"keep\":null}";
     private const string Tool = """{"choices":[{"delta":{"tool_calls":[{"index":9,"id":"call-inspect","type":"function","function":{"name":"inspect","arguments":"{\"value\":1.00,\"keep\":null}"}}]}}]}""";
     private const string ToolFinish = """{"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""";
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(5);
@@ -108,7 +111,9 @@ internal static class CompletionsHttpTurnTests
     {
         foreach (var (wire, status, failure) in new[]
         {
-            (Sse(Tool.Replace("1.00,\\\"keep\\\":null}", "", StringComparison.Ordinal), ToolFinish), HttpStatusCode.OK, ToolFailureKind.ExecutionError),
+            // Truncated arguments {"value": finalize through parseStreamingJson to {} (packages/ai/src/utils/json-parse.ts:112-114), a
+            // toolUse assistant whose call packages/agent/src/agent-loop.ts:727 validateToolArguments rejects: an InvalidArguments result, no effect.
+            (Sse(Tool.Replace("1.00,\\\"keep\\\":null}", "", StringComparison.Ordinal), ToolFinish), HttpStatusCode.OK, ToolFailureKind.InvalidArguments),
             (Sse(Tool, """{"choices":[{"delta":{},"finish_reason":"length"}]}""", "[DONE]"), HttpStatusCode.OK, ToolFailureKind.Truncated),
             ("event: error\ndata: {\"error\":{\"message\":\"private\"}}\n\n", HttpStatusCode.OK, ToolFailureKind.ExecutionError),
             (Sse(Tool, ToolFinish), HttpStatusCode.TooManyRequests, ToolFailureKind.ExecutionError),
