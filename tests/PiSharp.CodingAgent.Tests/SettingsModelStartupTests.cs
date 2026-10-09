@@ -79,12 +79,18 @@ internal static class SettingsModelStartupTests
     {
         using var fixture = new Fixture();
         File.WriteAllText(fixture.User, "{\"defaultProvider\":\"openai\",\"defaultModel\":\"unknown\"}");
+        // Pi 1.1.0 findInitialModel: a saved default that does not exist falls back to the first available model.
         await using (var host = new Host(fixture, ["--user-settings", fixture.User]))
-        { Equal(2, await host.Completion); Equal(true, host.Error.ToString().Contains("UnknownLiveModel", StringComparison.Ordinal)); }
+        {
+            var state = (await host.Response("state", "get_state")).Value.GetProperty("data");
+            Equal(true, state.GetProperty("model").GetProperty("id").GetString() is { Length: > 0 } id && id != "unknown");
+            Equal(0, await host.Finish()); Equal(false, host.Error.ToString().Contains("UnknownLiveModel", StringComparison.Ordinal));
+        }
+        var reads = fixture.CredentialReads;
         // An unreadable selected path would be diagnosed if the host got as far as settings IO.
         await using (var host = new Host(fixture, ["--user-settings", fixture.Root, "--thinking", "invalid"]))
         { Equal(2, await host.Completion); Equal(false, host.Error.ToString().Contains("settings_diagnostic", StringComparison.Ordinal)); }
-        Equal(0, fixture.Handler.Sends); Equal(0, fixture.CredentialReads);
+        Equal(0, fixture.Handler.Sends); Equal(reads, fixture.CredentialReads);
     }
     private static async Task Resume()
     {

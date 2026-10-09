@@ -79,15 +79,9 @@ internal sealed record SettingsModelSelection(string? Provider, string? Model, s
             var pick = saved is null ? scoped[0] : scoped.FirstOrDefault(entry => entry.Model.SameIdentity(saved)) ?? scoped[0];
             return Annotate(Entry(pick.Model, registry), CliThinking is null ? pick.ThinkingLevel : null, scoped, warnings);
         }
-        if (defaultProvider is not null && defaultModel is not null)
-        {
-            // Deviation (recorded): a configured default that is not in the catalog is refused instead of silently replaced by the first
-            // authenticated model, and its credential is checked when the session connects.
-            var saved = registry.Find(defaultProvider, defaultModel) ??
-                throw new LiveSessionException("UnknownLiveModel", "Select a chat model from the pinned provider catalog for the supported live API.");
-            return Annotate(Entry(saved, registry), null, scoped, warnings);
-        }
-        var initial = ModelResolver.FindInitialModel(null, null, [], continuing, null, null, null, null, registry);
+        // model-resolver.ts findInitialModel: the saved default when it exists and its provider has configured auth, else the first
+        // available model (a known provider's default first).
+        var initial = ModelResolver.FindInitialModel(null, null, [], continuing, defaultProvider, defaultModel, null, null, registry);
         if (initial.Model is null) throw new LiveSessionException("NoLiveModel", ModelListing.NoModelsAvailableMessage());
         return Annotate(Entry(initial.Model, registry), null, scoped, warnings);
     }
