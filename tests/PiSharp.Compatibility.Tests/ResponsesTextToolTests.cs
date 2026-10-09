@@ -101,15 +101,22 @@ static class ResponsesTextToolTests
         }
     }
 
-    public static async Task StrictFinalArguments()
+    public static async Task FinalArgumentsFollowParseStreamingJson()
     {
-        foreach (var raw in new[] { "{\"path\":\"private", "{\"a\":1,\"a\":2}", "[1]", "null", "{\"path\":\"C:\\q\"}" })
+        // Pi abe508 openai-responses-shared.ts:716 finalizes with parseStreamingJson (json-parse.ts:104-124), so partial, duplicate,
+        // non-object and invalid-escape arguments complete the call; expected values are the installed pi-ai 1.1.0 results.
+        foreach (var (raw, expected) in new[]
+        {
+            ("{\"path\":\"private", "{\"path\":\"private\"}"), ("{\"a\":1,\"a\":2}", "{\"a\":2}"), ("[1]", "[1]"), ("null", "null"),
+            ("{\"path\":\"C:\\q\"}", "{\"path\":\"C:\\\\q\"}")
+        })
         {
             var end = JsonSerializer.Serialize(new { type = "response.output_item.done", output_index = 9,
                 item = new { type = "function_call", id = "item", call_id = "call", name = "read", arguments = raw } });
             var result = await Complete(ToolStart, end, Completed);
-            Equal(ChatFailureKind.MalformedStream, result.Failure!.Kind); Equal(StopReason.Error, result.Message.StopReason);
-            Assert(!result.Failure.Message.Contains("private", StringComparison.Ordinal), "Rejected argument leaked.");
+            Assert(result.Failure is null && result.Message.StopReason == StopReason.ToolUse, "parseStreamingJson final failed the turn: " + raw);
+            Assert(Same(JsonData.Parse(expected).Value, ((ToolCallContent)result.Message.Content[0]).Arguments.Value),
+                "Final arguments differ from parseStreamingJson: " + raw);
         }
         var checkpoint = """{"type":"response.function_call_arguments.done","output_index":9,"item_id":"item","arguments":"{\"value\":null}"}""";
         var endFallback = """{"type":"response.output_item.done","output_index":9,"item":{"type":"function_call","id":"item","call_id":"call","name":"read","arguments":""}}""";
@@ -302,11 +309,12 @@ static class ResponsesTextToolTests
             var names = new[] { "input", "output", "cacheRead", "cacheWrite", "total" };
             for (var index = 0; index < names.Length; index++) Equal(tokens[index], cost.GetProperty(names[index]).GetRawText());
         }
-        // Cost canonicalization must not touch authoritative opaque argument numeric tokens.
+        // Final arguments are Pi abe508 openai-responses-shared.ts:716 parseStreamingJson(item.arguments || partialJson || "{}"), a
+        // JSON.parse whose Numbers print as 1 and 9007199254740992 (installed pi-ai 1.1.0).
         var end = """{"type":"response.output_item.done","output_index":9,"item":{"type":"function_call","id":"item","call_id":"call","name":"read","arguments":"{\"integerScale\":1.0,\"large\":9007199254740993}"}}""";
-        var opaque = await Complete(ToolStart, end, Completed); Assert(opaque.Failure is null, "Strict complete numeric argument object rejected.");
+        var opaque = await Complete(ToolStart, end, Completed); Assert(opaque.Failure is null, "Complete numeric argument object rejected.");
         var arguments = PiWireJson.WriteMessage(opaque.Message).Value.GetProperty("content")[0].GetProperty("arguments");
-        Equal("1.0", arguments.GetProperty("integerScale").GetRawText()); Equal("9007199254740993", arguments.GetProperty("large").GetRawText());
+        Equal("1", arguments.GetProperty("integerScale").GetRawText()); Equal("9007199254740992", arguments.GetProperty("large").GetRawText());
     }
     private static bool Same(JsonElement expected, JsonElement actual)
     {

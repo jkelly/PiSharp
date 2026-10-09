@@ -10,7 +10,7 @@ internal static class OpenAICompletionsWireTests
     [
         ("Completions authored interleaved text thinking indexed tools exact finals reducer and ChatRun", CompletedInterleaving),
         ("Completions source stop aliases EOF compatibility and cache usage precedence", StopAndUsage),
-        ("Completions strict executable finals reject repair and unsupported partial identities without authority", StrictAndUnsupported),
+        ("Completions parseStreamingJson finals and unsupported partial identities without authority", StrictAndUnsupported),
         ("Completions raw DTO depth Unicode count and logical payload bounds", LimitsAndAdmission),
         ("Completions factory Current read disposal failures preserve distinct sanitized owned boundaries", OwnershipAndFaults),
         ("Completions cancellation pull pacing cleanup and final-event race compose with ChatRun", CancellationAndChatRun)
@@ -43,12 +43,14 @@ internal static class OpenAICompletionsWireTests
         };
         Check(expectedOperations.SequenceEqual(frames.Select(Operation)), "Source-informed operation/index order differs.");
         var terminal = (StreamDone)frames[^1]; Equal(StopReason.ToolUse, terminal.Reason);
+        // Pi abe508 openai-completions.ts:464 finishCurrentBlock: block.arguments = parseStreamingJson(block.partialArgs), a JSON.parse
+        // whose Number 1.00 is 1 (installed pi-ai 1.1.0 prints {"n":1}).
         var expected = JsonData.Parse("""
             {"role":"assistant","api":"openai-completions","provider":"fixture-provider","model":"requested-model","timestamp":123,
              "stopReason":"toolUse","responseId":"resp-first","responseModel":"actual-model","rawStopReason":"tool_calls",
              "content":[{"type":"text","text":"Hi there"},{"type":"thinking","thinking":"plan more","thinkingSignature":"reasoning_content"},
                 {"type":"toolCall","id":"call-a","name":"read","arguments":{"path":"a\nb"}},
-                {"type":"toolCall","id":"call-b","name":"sum","arguments":{"n":1.00}}],
+                {"type":"toolCall","id":"call-b","name":"sum","arguments":{"n":1}}],
              "usage":{"input":15,"output":7,"cacheRead":2,"cacheWrite":3,"reasoning":1,"totalTokens":27,
                 "cost":{"input":15,"output":14,"cacheRead":1,"cacheWrite":4.5,"total":34.5}}}
             """);
@@ -137,15 +139,22 @@ internal static class OpenAICompletionsWireTests
 
     private static async Task StrictAndUnsupported()
     {
-        foreach (var raw in new[] { "{\"path\":\"private", "{\"n\":1,\"n\":2}", "[1]", "null", "{\"path\":\"\\q\"}",
-            "{\"n\":1e999}", "{\"s\":\"\\ud800\"}" })
+        // Pi abe508 openai-completions.ts:464 finalizes every tool call with parseStreamingJson (json-parse.ts:104-124), so partial,
+        // duplicate, invalid-escape, out-of-range and non-object arguments end the call and the turn completes. Expected values are the
+        // installed pi-ai 1.1.0 results as JSON.stringify writes them (1e999 is Infinity, written null); a lone surrogate is owned as
+        // U+FFFD (StreamingJson's documented representation limit).
+        foreach (var (raw, expected) in new[]
+        {
+            ("{\"path\":\"private", "{\"path\":\"private\"}"), ("{\"n\":1,\"n\":2}", "{\"n\":2}"), ("[1]", "[1]"), ("null", "null"),
+            ("{\"path\":\"\\q\"}", "{\"path\":\"\\\\q\"}"), ("{\"n\":1e999}", "{\"n\":null}"), ("{\"s\":\"\\ud800\"}", "{\"s\":\"\\uFFFD\"}")
+        })
         {
             var frames = await Collect([ToolChunk(new { index = 9, id = "call", function = new { name = "read", arguments = raw } }),
                 Finish("tool_calls")]);
-            Failed(Terminal(frames), OpenAICompletionsWireFailure.MalformedStream);
-            Equal(0, frames.OfType<ToolCallEnded>().Count()); Equal(0, frames.OfType<StreamDone>().Count());
-            Check(!Property(Terminal(frames).Message.ExtraProperties, "errorMessage").Contains("private", StringComparison.Ordinal),
-                "Rejected argument payload leaked into diagnostic.");
+            Check(Terminal(frames) is StreamDone { Reason: StopReason.ToolUse } && frames.OfType<ToolCallEnded>().Count() == 1,
+                "parseStreamingJson final failed the turn: " + raw);
+            Check(Same(JsonData.Parse(expected).Value, ((ToolCallContent)Terminal(frames).Message.Content[0]).Arguments.Value),
+                "Final arguments differ from parseStreamingJson: " + raw);
         }
         foreach (var unsupported in new[]
         {
