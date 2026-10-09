@@ -80,6 +80,7 @@ internal static class InteractiveModeHost
         string? resumeCommand = null;
         try
         {
+            context = InteractiveHostServices.Configure(context, options);
             if (configureContext is not null) context = configureContext(context);
             mode = await loop.InvokeAsync(() => new InteractiveMode(context, new InteractiveModeOptions
             {

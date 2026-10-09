@@ -81,6 +81,10 @@ internal sealed record InteractiveModeContext
     // Cache statistics
     public Func<IReadOnlyList<JsonObject>, IReadOnlyDictionary<string, CacheMissNotice>>? CollectCacheMisses { get; init; }
     public Func<IReadOnlyList<JsonObject>, JsonObject, CacheMissNotice?>? DetectCacheMiss { get; init; }
+    /// <summary>detectCacheMiss for a persisted assistant entry (by id).</summary>
+    public Func<string, CacheMissNotice?>? DetectCacheMissForEntry { get; init; }
+    /// <summary>modelRuntime.isUsingSubscription(provider).</summary>
+    public Func<string, bool> UsingSubscription { get; init; } = _ => false;
     public Func<JsonObject, string>? FormatCacheWarmingUsage { get; init; }
     public Func<IReadOnlyList<JsonObject>, CacheWaste>? ComputeCacheWaste { get; init; }
     public Func<IReadOnlyList<JsonObject>, IReadOnlyList<UsageCostEntry>>? GetUsageCostBreakdown { get; init; }

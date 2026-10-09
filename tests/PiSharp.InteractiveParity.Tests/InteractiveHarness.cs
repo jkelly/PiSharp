@@ -56,6 +56,8 @@ internal sealed class InteractiveHarness : IAsyncDisposable
         Vars["ANTHROPIC_API_KEY"] = "sk-test-key";
         Vars["PI_CODING_AGENT_DIR"] = AgentDir;
         Vars["PI_OFFLINE"] = "1";
+        Vars["PATH"] = Environment.GetEnvironmentVariable("PATH");
+        Vars["PATHEXT"] = Environment.GetEnvironmentVariable("PATHEXT");
         Terminal = new VirtualTerminal(columns, rows);
     }
 

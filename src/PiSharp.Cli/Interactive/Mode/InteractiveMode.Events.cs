@@ -124,6 +124,12 @@ internal sealed partial class InteractiveMode
                     AddMessageToChat(SessionEntries.CreateCustomMessage(S(entry["customType"]) ?? "", entry["content"], true, entry["details"], S(entry["timestamp"])));
                     ui.RequestRender();
                 }
+                else if (entryType == "message" && S(entry["message"]?["role"]) == "assistant" && settings.ShowCacheMissNotices &&
+                    S(entry["message"]?["stopReason"]) is not ("aborted" or "error") && context.DetectCacheMissForEntry?.Invoke(entryId) is { } entryMiss)
+                {
+                    AddCacheMissNotice(entryMiss);
+                    ui.RequestRender();
+                }
                 else if (entryType == "compaction")
                 {
                     var entries = SessionEntries.BuildContextEntries(state.Entries, state.LeafId);

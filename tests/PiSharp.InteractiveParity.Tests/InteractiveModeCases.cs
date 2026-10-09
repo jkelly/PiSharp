@@ -244,6 +244,87 @@ internal static class InteractiveModeCases
             Check(!pi.Terminal.Text.Contains("and loaded resources", StringComparison.Ordinal), "details hidden with quietStartup header");
         });
 
+        yield return ("e2e.selector.scoped-models", Case("scoped", async pi =>
+        {
+            await pi.Submit("/scoped-models");
+            await pi.WaitFor("Model Configuration");
+            pi.Type("\u001b");
+            await pi.WaitUntil(text => !text.Contains("Model Configuration", StringComparison.Ordinal), "closed");
+        }));
+
+        yield return ("e2e.selector.trust", Case("trust", async pi =>
+        {
+            await pi.Submit("/trust");
+            await pi.WaitFor("Project trust");
+            pi.Type("\u001b");
+            await pi.WaitUntil(text => !text.Contains("Project trust", StringComparison.Ordinal), "closed");
+        }));
+
+        yield return ("e2e.login.auth-type-selector", Case("login", async pi =>
+        {
+            await pi.Submit("/login");
+            await pi.WaitFor("Select authentication method:");
+            Contains(pi.Terminal.Text, "Sign in with an API key", "api key option");
+            pi.Type("\u001b");
+            await pi.WaitUntil(text => !text.Contains("Select authentication method:", StringComparison.Ordinal), "closed");
+        }));
+
+        yield return ("e2e.login.api-key-prompt-is-masked", Case("login-mask", async pi =>
+        {
+            pi.Type("/login anthropic");
+            await Task.Delay(300);
+            pi.Type("\r");
+            await Task.Delay(300);
+            pi.Type("\r");
+            await pi.WaitFor("Select authentication method for Anthropic:");
+            pi.Type("\u001b[B");
+            await Task.Delay(100);
+            pi.Type("\r");
+            await pi.WaitFor("Enter Anthropic API key");
+            await Task.Delay(100);
+            pi.Type("sk-secret-value-123");
+            await pi.WaitFor("*******************");
+            Check(!pi.Terminal.Text.Contains("sk-secret-value-123", StringComparison.Ordinal), "secret never shown");
+            pi.Type("\u001b");
+        }, setup: pi => pi.Configure = context => context with { Login = new PiSharp.Cli.Authentication.ProviderLoginHost(
+            new PiSharp.Cli.Authentication.AuthJsonCredentialStore(Path.Combine(pi.AgentDir, "auth.json")), () => new HttpClient()) }));
+
+        yield return ("e2e.mcp.manager", Case("mcp", async pi =>
+        {
+            await pi.Submit("/mcp");
+            await pi.WaitUntil(text => text.Contains("MCP", StringComparison.Ordinal), "mcp output");
+        }));
+
+        yield return ("e2e.theme.light-setting", async () =>
+        {
+            await using var pi = new InteractiveHarness("light");
+            pi.Write(Path.Combine(pi.AgentDir, "settings.json"), "{\"theme\":\"light\"}");
+            pi.Start(Regular);
+            await pi.WaitFor("escape interrupt");
+            Equal("light", PiSharp.Cli.Interactive.Mode.Themes.CurrentThemeName, "light theme active");
+        });
+
+        yield return ("e2e.settings.output-pad-zero", async () =>
+        {
+            await using var pi = new InteractiveHarness("pad");
+            pi.Write(Path.Combine(pi.AgentDir, "settings.json"), "{\"outputPad\":0}");
+            pi.Start(Regular);
+            await pi.WaitFor("escape interrupt");
+            await pi.Submit("/thinking bogus");
+            await pi.Submit("");
+            await pi.WaitFor("Error: Unknown thinking level");
+            Check(pi.Terminal.Lines.Any(line => line.StartsWith("Error: Unknown thinking level", StringComparison.Ordinal)), "error line has no padding with outputPad 0");
+        });
+
+        yield return ("e2e.autocomplete.at-file", Case("at-file", async pi =>
+        {
+            if (PiSharp.Cli.Interactive.Mode.Utilities.ToolsManager.GetToolPath("fd", pi.AgentDir, Environment.GetEnvironmentVariable) is null)
+                throw new SkipCaseException("fd is not installed on this machine.");
+            File.WriteAllText(Path.Combine(pi.Cwd, "readme-target.md"), "x");
+            pi.Type("look at @readme-t");
+            await pi.WaitFor("readme-target.md");
+        }));
+
         yield return ("e2e.autocomplete.slash-commands", Case("autocomplete", async pi =>
         {
             pi.Type("/hot");

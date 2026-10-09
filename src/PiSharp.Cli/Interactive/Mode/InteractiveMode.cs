@@ -180,6 +180,7 @@ internal sealed partial class InteractiveMode
         editorContainer = new Container();
         editorContainer.AddChild(editor);
         footerDataProvider = new FooterDataProvider(Cwd);
+        state.UsingSubscription = context.UsingSubscription;
         footer = new FooterComponent(state, footerDataProvider);
         footer.SetAutoCompactEnabled(state.AutoCompactionEnabled);
         footerContainer = new Container();
