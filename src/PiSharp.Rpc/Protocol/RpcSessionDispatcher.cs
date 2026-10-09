@@ -159,6 +159,8 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         public TaskCompletionSource Ready = NewGate();
         public readonly TaskCompletionSource Entered = NewGate();
         public readonly TaskCompletionSource Settled = NewGate();
+        /// <summary>Set (under the gate) just before agent_settled is written: a client that saw it may prompt at once.</summary>
+        public bool SettledPublished;
     }
     private sealed class EventSink(RpcSessionDispatcher owner) : IAgentEventSink
     { public ValueTask EmitAsync(AgentEvent observation, CancellationToken token) => owner.ObserveAsync(observation); }
@@ -835,11 +837,19 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         finally { _transitions.Release(); }
         await PublishQueueAsync(force: true).ConfigureAwait(false);
     }
+    /// <summary>Pi accepts a prompt as soon as agent_settled has been published; the run releases its ownership right after
+    /// writing it, so a prompt in that window waits for the release instead of being refused as "settling".</summary>
+    private async Task WaitForPublishedSettlementAsync(CancellationToken token)
+    {
+        RunState? published; lock (_gate) published = _run is { SettledPublished: true } run ? run : null;
+        if (published is not null) await published.Settled.Task.WaitAsync(token).ConfigureAwait(false);
+    }
     private async Task PromptAsync(RpcCommandEnvelope command, CancellationToken token)
     {
         var input = Input(command); RunState? run = null; Task<AgentLoopResult>? processing = null; var queued = false; PersistentAgentSession? originating = null;
         var startedResponse = RpcCommandCodec.Success(command, Disposition("started"), _options);
         var queuedResponse = RpcCommandCodec.Success(command, Disposition("queued"), _options);
+        await WaitForPublishedSettlementAsync(token).ConfigureAwait(false);
         await _transitions.WaitAsync(token).ConfigureAwait(false);
         try
         {
@@ -903,6 +913,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         var queued = RpcCommandCodec.Success(command, Disposition("queued"), _options);
         var handled = RpcCommandCodec.Success(command, Disposition("handled"), _options);
         using var admissionCancellation = CancellationTokenSource.CreateLinkedTokenSource(token, _stopInputToken);
+        if (command.Type == "prompt") await WaitForPublishedSettlementAsync(admissionCancellation.Token).ConfigureAwait(false);
         await _inputCommands.WaitAsync(admissionCancellation.Token).ConfigureAwait(false);
         var candidate = new RunState(0);
         PersistentAgentSession originating;
@@ -1018,6 +1029,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             await PublishQueueAsync(force: false).ConfigureAwait(false);
             bool fatal, aborted; lock (_gate) { fatal = _fatal is not null; aborted = run.AbortRequested; }
             // aborted reports whether this session-level run ended because an abort was requested while it ran.
+            lock (_gate) run.SettledPublished = true;
             if (!fatal) await WriteAsync(RpcCommandCodec.Event("agent_settled", writer => writer.WriteBoolean("aborted", aborted), _options)).ConfigureAwait(false);
         }
         catch (Exception error) { SignalFatal(error is RpcDispatchException dispatch ? dispatch.Failure : RpcDispatchFailure.SessionRunFailed, error); }
