@@ -61,6 +61,8 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
         MaximumDescriptionCharacters = 1024 * 1024, MaximumJsonCharacters = 64 * 1024 * 1024, MaximumJsonDepth = 64,
         // Pi extensions may replace built-in tools (registerTool with a built-in name) and register any command name.
         ReservedToolNames = [], ReservedCommandNames = [], AllowAnyCommandName = true,
+        // runner.ts resolveRegisteredCommands: a command name registered by several extensions (Node or native) is invoked as name:N.
+        SuffixDuplicateCommandNames = true,
         // runner.ts reads the extensions' live handler maps: owners and handlers added after the session bound take part at once.
         FollowCurrentSnapshot = true
     };

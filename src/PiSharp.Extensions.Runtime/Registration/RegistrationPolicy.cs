@@ -24,6 +24,10 @@ public sealed record ExtensionRegistryOptions
     /// <summary>Command names as Pi accepts them: any non-empty name without whitespace or control characters (Pi's registerCommand
     /// takes any name, and a duplicate becomes <c>name:N</c>). Registration ids stay identifiers.</summary>
     public bool AllowAnyCommandName { get; init; }
+    /// <summary>Pi runner resolveRegisteredCommands: owners may register the same command name; every occurrence of a name registered
+    /// more than once (in extension load order) is invoked as <c>name:1</c>, <c>name:2</c>…, skipping taken names. Within one owner
+    /// a name stays unique.</summary>
+    public bool SuffixDuplicateCommandNames { get; init; }
     /// <summary>Dispatches resolve against the registry's current registrations instead of the captured revision they were given
     /// (Pi's runner reads its extensions' live handler maps: an owner activated or a handler registered after the session bound, as
     /// a reload rebuilds the extension runtime, takes part in the next dispatch).</summary>

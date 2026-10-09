@@ -144,15 +144,15 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
 
     private string ToolsJson() => (extension.Descriptor["tools"] as JsonArray)?.ToJsonString() ?? "[]";
 
-    /// <summary>Commands whose invocation name changed (a duplicate appeared) or that the extension no longer has leave the registry.</summary>
+    /// <summary>Commands the extension no longer has leave the registry (the registry recomputes name:N invocation names).</summary>
     internal void RetireStaleCommands(IReadOnlyDictionary<(int Extension, string Name), string> names)
     {
         if (_retired) return;
+        _ = names;
         var current = (extension.Descriptor["commands"] as JsonArray ?? []).OfType<JsonObject>().Select(command => command["name"]!.GetValue<string>())
             .ToHashSet(StringComparer.Ordinal);
-        foreach (var (name, (invocation, handle)) in _commands.ToArray())
-            if (!current.Contains(name) || names.GetValueOrDefault((extension.Index, name)) is { } wanted && wanted != invocation)
-            { handle.Dispose(); _commands.Remove(name); }
+        foreach (var (name, (_, handle)) in _commands.ToArray())
+            if (!current.Contains(name)) { handle.Dispose(); _commands.Remove(name); }
     }
 
     /// <summary>runner.ts: a command registered after the factory returned is callable at once (with its name:N invocation name).</summary>
@@ -538,9 +538,9 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
     private ExtensionCommandDescriptor Command(JsonObject command)
     {
         var name = command["name"]!.GetValue<string>();
-        var invocation = CommandNames?.GetValueOrDefault((extension.Index, name)) ?? name;
-        // The registration id is an identifier; the command keeps its Pi name (name:N for duplicates).
-        return new("command-" + string.Concat(invocation.Select(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '.')), invocation, command["description"]?.GetValue<string>() ?? "", async (arguments, context, token) =>
+        // The registration id is an identifier; the command keeps its Pi name. The registry invokes a name several extensions
+        // (Node or native) registered as name:N (runner.ts resolveRegisteredCommands).
+        return new("command-" + string.Concat(name.Select(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '.')), name, command["description"]?.GetValue<string>() ?? "", async (arguments, context, token) =>
         {
             using var lease = host.Enter(context);
             var args = arguments.Value.ValueKind == JsonValueKind.String ? arguments.Value.GetString() ?? "" : "";

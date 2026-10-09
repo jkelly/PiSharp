@@ -80,7 +80,7 @@ public sealed partial class ExtensionRegistry
             }
             var futureEntries = ownerOrder.Where(owner => owner.State == RegistrationScopeState.Active)
                 .SelectMany(owner => ReferenceEquals(owner, scope) ? staged.Entries : owner.Staged.Entries).ToImmutableArray();
-            var preview = new ExtensionRegistrySnapshot(identity, checked(revision + 1), futureEntries);
+            var preview = new ExtensionRegistrySnapshot(identity, checked(revision + 1), futureEntries, CommandInvocationNames(futureEntries));
             var plan = new ToolCatalogReplacementPlan(this, scope, expectedSnapshot, old, added.MoveToImmutable(),
                 staged, preview, addedCharacters);
             plan.ValidateCharges();

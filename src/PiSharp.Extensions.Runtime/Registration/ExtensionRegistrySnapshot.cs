@@ -52,13 +52,19 @@ public sealed class ExtensionRegistrySnapshot
     internal object RegistryIdentity { get; }
     internal ImmutableArray<RegistrationEntry> Entries { get; }
 
-    internal ExtensionRegistrySnapshot(object identity, long revision, ImmutableArray<RegistrationEntry> entries)
+    private readonly ImmutableDictionary<RegistrationEntry, string>? _commandNames;
+    /// <summary>The name a registration is invoked by: a duplicated command's <c>name:N</c> (Pi resolveRegisteredCommands), else its name.</summary>
+    internal string NameOf(RegistrationEntry entry) => _commandNames is not null && _commandNames.TryGetValue(entry, out var invocation) ? invocation : entry.Name;
+
+    internal ExtensionRegistrySnapshot(object identity, long revision, ImmutableArray<RegistrationEntry> entries,
+        ImmutableDictionary<RegistrationEntry, string>? commandNames = null)
     {
         RegistryIdentity = identity;
         Revision = revision;
         Entries = entries;
+        _commandNames = commandNames;
         Registrations = entries.Where(entry => entry.Kind != RegistrationKind.EventBus).Select(entry => new ExtensionRegistrationInfo(entry.OwnerId,
-            entry.OwnerGeneration, entry.RegistrationId, entry.Kind.ToString(), entry.Name)).ToImmutableArray();
+            entry.OwnerGeneration, entry.RegistrationId, entry.Kind.ToString(), NameOf(entry))).ToImmutableArray();
         BeforeAgentStartHandlers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.BeforeAgentStartHandler)).ToImmutableArray();
         ContextHandlers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.ContextHandler)).ToImmutableArray();
         ContextWithSystemHandlers = Registrations.Where(row => row.Kind == nameof(RegistrationKind.ContextWithSystemHandler)).ToImmutableArray();
@@ -69,7 +75,7 @@ public sealed class ExtensionRegistrySnapshot
         {
             var descriptor = (ExtensionCommandDescriptor)entry.Descriptor;
             return new ExtensionCommandRegistrationInfo(entry.OwnerId, entry.OwnerGeneration, entry.RegistrationId,
-                entry.Name, descriptor.Description, descriptor.GetArgumentCompletionsAsync is not null, descriptor.SourcePath);
+                NameOf(entry), descriptor.Description, descriptor.GetArgumentCompletionsAsync is not null, descriptor.SourcePath);
         }).ToImmutableArray();
         CommandCatalog = JsonData.Parse(JsonSerializer.Serialize(Commands.Select(command => new
         {
