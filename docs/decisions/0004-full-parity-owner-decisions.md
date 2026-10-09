@@ -9,8 +9,10 @@ Date: 2026-10-08. Context: [full-parity plan](../plans/full-parity-v1.1.0.md).
    default to `pi`: file tools accept any path and bash runs any command with the full
    environment and the discovered shell, as in Pi. The existing `session …` and `rpc`
    subcommands default to `explicit` and keep their `--allow-*` grants. Session files,
-   extension manifests, approvals and snapshots stay protected in both modes. Untrusted
-   projects (project-trust flow) fall back to `explicit`. Owner: IMPL-F.
+   extension manifests, approvals and snapshots stay protected in both modes. Amended
+   2026-10-08: as in Pi, project trust only gates project-local resources
+   (`.pi/settings.json`, `SYSTEM.md`, project extensions, `.pi/mcp.json`); tools stay on the
+   `pi` policy in untrusted projects. Owner: IMPL-F.
 2. **Image codec.** SkiaSharp (MIT) with its per-platform native assets, pinned exactly,
    for `read` image decoding, resizing and JPEG re-encoding as Pi's Photon does. It is
    PiSharp's second external runtime dependency besides YamlDotNet (Jint is the third, for
@@ -28,3 +30,17 @@ Date: 2026-10-08. Context: [full-parity plan](../plans/full-parity-v1.1.0.md).
 
 Earlier decisions stand: MCP servers in `mcp.json` are trusted and their tools callable
 (1.1.0.1); unknown tool names are ignored as in Pi (1.1.0).
+
+## Later decisions (2026-10-08)
+
+4. **Untrusted projects** keep the `pi` tool policy (see the amendment to 1).
+5. **ripgrep and fd** are used from `PATH` or `<agentDir>/bin`, and downloaded from their
+   release pages on first use when missing, as Pi's tools manager does (honouring
+   `PI_OFFLINE`). Owner: IMPL-F.
+6. **Stored `!command` keys for every provider and AWS `credential_process`** run as Pi
+   does (confirmed separately because an agent's permission check had blocked the change).
+7. **Codemode deadline** starts when the script starts running in its worker, not when the
+   worker launches; Pi's worker starts in milliseconds, so the user-visible budget matches.
+
+Install telemetry (`core/telemetry.ts`, which reports installs to Pi's servers) is not
+ported: PiSharp is not Pi and must not report as it.
