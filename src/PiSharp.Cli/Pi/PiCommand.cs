@@ -265,7 +265,7 @@ internal static class PiCommand
             {
                 Scope = path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
                 ReportMissingPath = path.ReportMissing
-            })]), token: token).ConfigureAwait(false);
+            })]), options: PiSharp.Cli.Commands.PiPayloadBudget.PiSkills, token: token).ConfigureAwait(false);
         var prompts = new PromptTemplateCliConfiguration([.. resources.PromptPaths.Select(path => new PromptTemplatePathSelection(path.Path,
             new(path.Path, path.Source, path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
                 PromptTemplateSourceOrigin.TopLevel), ReportMissingPath: path.ReportMissing))]);
@@ -295,7 +295,7 @@ internal static class PiCommand
             {
                 Scope = path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
                 ReportMissingPath = path.ReportMissing
-            })]), token: reloadToken).ConfigureAwait(false);
+            })]), options: PiSharp.Cli.Commands.PiPayloadBudget.PiSkills, token: reloadToken).ConfigureAwait(false);
             var reloadPrompts = new PromptTemplateCliConfiguration([.. reloaded.PromptPaths.Select(path => new PromptTemplatePathSelection(path.Path,
                 new(path.Path, path.Source, path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
                     PromptTemplateSourceOrigin.TopLevel), ReportMissingPath: path.ReportMissing))]);

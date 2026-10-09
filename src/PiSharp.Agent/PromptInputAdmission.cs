@@ -35,6 +35,10 @@ public sealed record PromptInputAdmissionOptions(int MaximumTextCharacters = 65_
     int MaximumMessageCharacters = PiSharp.AI.PiRequestBudget.RequestEntryCharacters,
     int MaximumMessageBytes = PiSharp.AI.PiRequestBudget.RequestPayloadBytes)
 {
+    /// <summary>No count or size bound beyond JSON depth: for reducers (skills, prompt templates, reload routing) whose caller
+    /// admits the input and their result under its own options, so a reducer never refuses what the caller admits.</summary>
+    public static PromptInputAdmissionOptions Unbounded { get; } = new(int.MaxValue, int.MaxValue, int.MaxValue, int.MaxValue, 64,
+        int.MaxValue, int.MaxValue);
     /// <summary>Explicit queue commands retain their supplied mode even while idle and never start a generation.</summary>
     public bool QueueOnly { get; init; }
     /// <summary>Trusted synchronous preflight over owned values, outside state locks. May be called again if the queue grows.</summary>

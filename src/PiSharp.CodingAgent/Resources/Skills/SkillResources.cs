@@ -48,15 +48,16 @@ public sealed class SkillResourceSet
     {
         ArgumentNullException.ThrowIfNull(selections); ArgumentNullException.ThrowIfNull(decode);
         files ??= new SystemSkillResourceFileSystem(); options ??= new();
-        if (options.MaximumFiles is < 1 or > 1024 || options.MaximumEntries is < 1 or > 65_536 ||
-            options.MaximumDepth is < 0 or > 64 || options.MaximumFileBytes is < 1 or > 1_048_576 ||
-            options.MaximumTotalBytes < options.MaximumFileBytes || options.MaximumTotalBytes > 16_777_216)
+        // Hosts following Pi (skills.ts reads every skill file of any size) pass int.MaxValue counts; the per-file read stays a memory
+        // bound of the host's choosing and the directory depth a recursion guard.
+        if (options.MaximumFiles < 1 || options.MaximumEntries < 1 || options.MaximumDepth is < 0 or > 64 || options.MaximumFileBytes < 1 ||
+            options.MaximumTotalBytes < options.MaximumFileBytes)
             throw new ArgumentException("Invalid skill resource limits.", nameof(options));
         var skills = ImmutableArray.CreateBuilder<SkillResource>(); var diagnostics = ImmutableArray.CreateBuilder<SkillDiagnostic>();
         var descriptors = ImmutableArray.CreateBuilder<SkillReloadDescriptor>();
         var paths = new HashSet<string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         var names = new Dictionary<string, SkillResource>(StringComparer.Ordinal);
-        int readCount = 0, entriesSeen = 0, readBytes = 0, selectedCount = 0;
+        int readCount = 0, entriesSeen = 0, selectedCount = 0; long readBytes = 0;
         foreach (var selection in selections)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -130,7 +131,7 @@ public sealed class SkillResourceSet
             if (readCount >= options.MaximumFiles || readBytes >= options.MaximumTotalBytes)
             { diagnostics.Add(new("warning", "ReadLimit", path)); return null; }
             readCount++;
-            var budget = Math.Min(options.MaximumFileBytes, options.MaximumTotalBytes - readBytes);
+            var budget = (int)Math.Min(options.MaximumFileBytes, options.MaximumTotalBytes - readBytes);
             byte[] bytes;
             try
             {
@@ -200,7 +201,6 @@ public sealed class SkillResourceSet
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested(); ArgumentNullException.ThrowIfNull(text);
-        if (text.Length > 1_048_576) throw new ArgumentException("Skill input character limit.", nameof(text));
         if (!text.StartsWith("/skill:", StringComparison.Ordinal)) return text;
         var space = text.IndexOf(' '); var name = space < 0 ? text[7..] : text[7..space];
         var skill = Skills.FirstOrDefault(skill => skill.Name == name); if (skill is null) return text;
@@ -226,7 +226,8 @@ public sealed class SkillResourceSet
 
     public static ParsedSkillBlock? ParseBlock(string text)
     {
-        ArgumentNullException.ThrowIfNull(text); if (text.Length > 1_048_576) throw new ArgumentException("Skill block limit.");
+        // skills.ts parseSkillBlock matches any message text; the non-backtracking match is linear in its length.
+        ArgumentNullException.ThrowIfNull(text);
         var match = Regex.Match(text, "^<skill name=\"([^\"]+)\" location=\"([^\"]+)\">\\n([\\s\\S]*?)\\n</skill>(?:\\n\\n([\\s\\S]+))?$",
             RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
         if (!match.Success) return null;
@@ -245,12 +246,12 @@ public sealed class SkillInputAdmission(SkillResourceSet skills, IPromptInputAdm
 {
     public async ValueTask<PromptInputDecision> ReduceAsync(PromptInput input, CancellationToken token)
     {
-        token.ThrowIfCancellationRequested(); input = PromptInputValue.Own(input);
+        token.ThrowIfCancellationRequested(); input = PromptInputValue.Own(input, PromptInputAdmissionOptions.Unbounded);
         var decision = rawHandlers is null ? new PromptInputDecision(PromptInputAction.Continue) : await rawHandlers.ReduceAsync(input, token).ConfigureAwait(false);
-        token.ThrowIfCancellationRequested(); var effective = PromptInputValue.Apply(input, decision);
+        token.ThrowIfCancellationRequested(); var effective = PromptInputValue.Apply(input, decision, PromptInputAdmissionOptions.Unbounded);
         if (decision.Action == PromptInputAction.Handled) return decision;
         var expanded = await skills.ExpandAsync(effective.Text, report, token).ConfigureAwait(false);
-        var final = PromptInputValue.Own(effective with { Text = expanded }); token.ThrowIfCancellationRequested();
+        var final = PromptInputValue.Own(effective with { Text = expanded }, PromptInputAdmissionOptions.Unbounded); token.ThrowIfCancellationRequested();
         return decision.Action == PromptInputAction.Transform || expanded != effective.Text
             ? new(PromptInputAction.Transform, final.Text, final.Images) : new(PromptInputAction.Continue);
     }
