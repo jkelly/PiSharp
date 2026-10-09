@@ -144,6 +144,7 @@ internal sealed class LiveSessionSelection
         bool useModelMaximum = false)
     {
         var tokens = useModelMaximum ? 0 : ParseMaximumTokens(maximumTokens);
+        // A virtual entry has no route of its own: VirtualModelRoutingTransport.ForLive routes it (IMPL-E registers virtual models).
         if (entry.Type != CatalogModelType.Chat || PiSharp.Cli.Models.VirtualModels.IsVirtual(entry) || !SupportedApi(entry.Provider, entry.Api))
             throw new LiveSessionException("LiveApiUnavailable",
                 $"Model \"{entry.Provider}/{entry.Id}\" uses the {(entry.Api.Length == 0 ? "unknown" : entry.Api)} API, which has no live route in PiSharp yet.");

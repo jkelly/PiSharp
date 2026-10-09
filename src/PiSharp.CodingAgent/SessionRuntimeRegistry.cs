@@ -261,7 +261,9 @@ public sealed partial class SessionRuntimeRegistry
         cancellationToken.ThrowIfCancellationRequested();
         var catalog = _modelCatalog.Read();
         SessionModelBinding model;
-        if (context.Model is { } selected)
+        // Source sdk.ts: the branch selection (getBranchSelection), not the latest assistant entry, names the restored model.
+        if (SessionBranchSelection.Select(context.Ancestry, (provider, id) =>
+            catalog.Models.TryGetValue((provider, id), out var known) && known.Model.Api == SessionBranchSelection.VirtualApi) is { } selected)
         {
             if (!catalog.Models.TryGetValue((selected.Provider, selected.ModelId), out model!))
                 throw Error(SessionRuntimeRegistryFailure.UnknownModel);
@@ -289,7 +291,9 @@ public sealed partial class SessionRuntimeRegistry
         cancellationToken.ThrowIfCancellationRequested();
         var catalog = _modelCatalog.Read();
         SessionModelBinding model;
-        if (context.Model is { } selected)
+        // Source sdk.ts: the branch selection (getBranchSelection), not the latest assistant entry, names the restored model.
+        if (SessionBranchSelection.Select(context.Ancestry, (provider, id) =>
+            catalog.Models.TryGetValue((provider, id), out var known) && known.Model.Api == SessionBranchSelection.VirtualApi) is { } selected)
         {
             if (!catalog.Models.TryGetValue((selected.Provider, selected.ModelId), out model!))
                 throw Error(SessionRuntimeRegistryFailure.UnknownModel);

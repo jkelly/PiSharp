@@ -32,7 +32,7 @@ public sealed partial class ExtensionRegistry
     /// it; a failure is reported with its message and the next handler still runs. Returns the final event.</summary>
     public async ValueTask<JsonData> ReduceEventAsync(ExtensionRegistrySnapshot captured, string topic, JsonData initial,
         ExtensionEventFold fold, Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? report,
-        CancellationToken operationToken = default, CancellationToken sessionToken = default)
+        CancellationToken operationToken = default, CancellationToken sessionToken = default, Func<JsonData, bool>? stopAfter = null)
     {
         ArgumentNullException.ThrowIfNull(initial); ArgumentNullException.ThrowIfNull(fold);
         var admission = Admit(captured, RegistrationKind.EventHandler, topic, "reduce-event", operationToken, sessionToken);
@@ -49,6 +49,8 @@ public sealed partial class ExtensionRegistry
                     await using var context = await CreateUiContextAsync(scope, operationToken, sessionToken).ConfigureAwait(false);
                     var result = await ((ExtensionEventHandlerDescriptor)entry.Descriptor).HandleAsync(current, context.Context, linked.Token).ConfigureAwait(false);
                     if (result is not null && fold(current, result) is { } next) current = next;
+                    // Source session_before_* events: a cancelling result ends the dispatch.
+                    if (result is not null && stopAfter?.Invoke(result) == true) return current;
                 }
                 catch (Exception error) when (!operationToken.IsCancellationRequested && !sessionToken.IsCancellationRequested)
                 { await ReportAsync(report, new(topic, scope.OwnerId, scope.OwnerGeneration, entry.RegistrationId, ExtensionEventFailure.HandlerFailed) { Message = error.Message }).ConfigureAwait(false); }

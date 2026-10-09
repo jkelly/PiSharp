@@ -27,6 +27,23 @@ internal sealed class VirtualModelRoutingTransport(ModelRegistry registry, Regis
 {
     private readonly ConcurrentDictionary<string, IChatTransport> _routes = new(StringComparer.Ordinal);
 
+    /// <summary>IMPL-E seam for the live route of a virtual selection. Upstream registers virtual models only through the extension
+    /// API (pi.registerVirtualModel), so no live session selects one yet; a host that admits that registration builds the session
+    /// transport here. Each physical target connects through its own live route (<see cref="Commands.LiveSessionSelection.FromEntry"/>),
+    /// and every connection opened is added to <paramref name="connections"/> for the host to dispose with the session.</summary>
+    internal static VirtualModelRoutingTransport ForLive(ModelRegistry registry, RegistryModel model, Commands.LiveSessionRuntime? runtime,
+        string? maximumTokens, Func<IVirtualModelSession?> session, ICollection<IDisposable> connections)
+    {
+        ArgumentNullException.ThrowIfNull(registry); ArgumentNullException.ThrowIfNull(connections);
+        if (!VirtualModels.IsVirtual(model)) throw new ArgumentException("A virtual route needs a virtual model.", nameof(model));
+        return new(registry, model, physical =>
+        {
+            var connection = Commands.LiveSessionSelection.FromEntry(physical, registry, maximumTokens).Connect(runtime);
+            lock (connections) connections.Add(connection);
+            return connection.CreateTransport();
+        }, session);
+    }
+
     public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor descriptor) => VirtualModels.SupportedThinkingLevels(model);
 
     public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)

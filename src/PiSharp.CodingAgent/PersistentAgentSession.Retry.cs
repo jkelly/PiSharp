@@ -211,7 +211,7 @@ public sealed partial class PersistentAgentSession
         lock (_gate)
         {
             if (!ReferenceEquals(_active, idle)) throw Error(PersistentAgentSessionFailure.StaleSession);
-            var wire = PiWireJson.WriteMessage(assistant).Value;
+            var wire = PersistedWire(PiWireJson.WriteMessage(assistant)).Value;
             var acknowledged = _context.ContextEntries.LastOrDefault(entry => entry.SourceEntry.Id == _lastAcknowledgedAssistantId &&
                 entry.Messages.Any(message => message.Role == "assistant" && JsonElement.DeepEquals(message.WireBody.Value, wire)));
             if (acknowledged is null) throw Error(PersistentAgentSessionFailure.InvalidCommit);

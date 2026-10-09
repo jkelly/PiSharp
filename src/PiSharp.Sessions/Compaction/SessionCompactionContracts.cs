@@ -15,7 +15,7 @@ public sealed record SessionCompactionSettings(bool Enabled = true, double Reser
     }
 }
 public enum SessionCompactionFailure { InvalidSettings, InvalidMessage, UnsupportedNumber, ResourceLimit, InvalidBoundary,
-    NothingToSummarize, SummaryFailed, StaleSelection }
+    NothingToSummarize, SummaryFailed, StaleSelection, Cancelled }
 public sealed class SessionCompactionException(SessionCompactionFailure failure) : Exception(failure switch
 {
     SessionCompactionFailure.InvalidSettings => "Summary planning settings are invalid.",
@@ -23,6 +23,7 @@ public sealed class SessionCompactionException(SessionCompactionFailure failure)
     SessionCompactionFailure.NothingToSummarize => "The selected context has nothing to compact.",
     SessionCompactionFailure.StaleSelection => "Summary result no longer owns the selected session context.",
     SessionCompactionFailure.SummaryFailed => "Summary generation failed; no summary checkpoint was appended.",
+    SessionCompactionFailure.Cancelled => "Compaction cancelled",
     _ => "Summary planning requires supported canonical context and a valid selected boundary."
 })
 {
