@@ -13,8 +13,9 @@ using PiSharp.Cli.Pi;
 // PiSharp's Pi entry and both files are compared entry by entry after only ids, timestamps and durations are replaced by placeholders
 // (their formats are checked first; a parent session path keeps only its file name format). Every line must also be byte-identical to
 // JSON.stringify of its own value. Each scenario holds its runs (one `pi --mode rpc` process each over the same home and project, the
-// RPC commands sent one at a time after the previous one settled), the provider responses in request order, the project files and the
-// models.json/settings.json it ran with. Paths are compared with / separators (the goldens were captured on Windows). A scenario with
+// RPC commands sent one at a time after the previous one settled), the provider responses in request order, the method and path of each
+// request Pi sent (the models.json base URLs point every provider, built-in ones included, at the fake server; PiSharp must send the
+// same paths), the project files, extra environment variables and the models.json/settings.json it ran with. Paths are compared with / separators (the goldens were captured on Windows). A scenario with
 // "extensions" loads a TypeScript extension and needs the Pi runtime the ExtensionParity suite installs; it is skipped without it.
 // SESSFMT_DIR replays another golden directory and SESSFMT_DUMP writes PiSharp's files and RPC output for inspection.
 internal static partial class Program
@@ -33,14 +34,12 @@ internal static partial class Program
         var name = scenario["name"]!.GetValue<string>();
         using var sandbox = new Sandbox("sessfmt-" + name);
         foreach (var (relative, text) in scenario["files"]!.AsObject()) sandbox.Write(Path.Combine(sandbox.Cwd, relative), text!.GetValue<string>());
-        // The capture pointed the built-in providers at the fake server with baseUrl-only overrides; here the injected handler is the
-        // fake server, so those overrides are dropped and custom providers keep a placeholder address.
-        var models = scenario["models"]!.DeepClone().AsObject();
-        foreach (var (provider, config) in models["providers"]!.AsObject().ToArray())
-            if (config is JsonObject only && only.Count == 1 && only.ContainsKey("baseUrl")) models["providers"]!.AsObject().Remove(provider);
-        sandbox.Write(Path.Combine(sandbox.AgentDir, "models.json"), models.ToJsonString().Replace("{base}", "http://127.0.0.1:9", StringComparison.Ordinal));
+        // The capture pointed the providers at the fake server through models.json base URLs ({base}); the injected handler answers
+        // every address here, and the request paths the overrides produce are compared with Pi's.
+        sandbox.Write(Path.Combine(sandbox.AgentDir, "models.json"), scenario["models"]!.ToJsonString().Replace("{base}", "http://127.0.0.1:9", StringComparison.Ordinal));
         if (scenario["settings"] is JsonObject settings) sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), settings.ToJsonString());
         sandbox.Vars["OPENAI_API_KEY"] = "sk-test-key";
+        foreach (var (variable, value) in scenario["env"]?.AsObject() ?? []) sandbox.Vars[variable] = value!.GetValue<string>();
         if (scenario["extensions"]?.GetValue<bool>() == true)
         {
             // TypeScript extensions run on the Pi 1.1.0 packages the ExtensionParity suite installs once per machine (PiNodeRuntime).
@@ -125,6 +124,12 @@ internal static partial class Program
                 var left = line < want.Count ? want[line] : "<missing>"; var right = line < have.Count ? have[line] : "<missing>";
                 if (left != right) problems.Add($"file {index} line {line + 1}:\n  pi:      {left}\n  pisharp: {right}");
             }
+        }
+        if (scenario["requests"] is JsonArray requests)
+        {
+            var want = requests.Select(request => request!["method"]!.GetValue<string>() + " " + request["url"]!.GetValue<string>()).ToArray();
+            var have = sandbox.Requests.Select(request => request.Method + " " + new Uri(request.Url).PathAndQuery).ToArray();
+            if (!want.SequenceEqual(have, StringComparer.Ordinal)) problems.Add("requests:\n  pi:      " + string.Join(", ", want) + "\n  pisharp: " + string.Join(", ", have));
         }
         Check(problems.Count == 0, string.Join("\n", problems));
     }
