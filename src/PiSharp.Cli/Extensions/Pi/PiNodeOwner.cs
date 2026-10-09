@@ -14,7 +14,8 @@ namespace PiSharp.Cli.Extensions.Pi;
 
 /// <summary>A Node-hosted extension as a registry owner: each registration it made in Node becomes the native registration whose
 /// callbacks call back into Node. The extension's functions never leave Node; only JSON crosses.</summary>
-internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extension) : IPiSharpExtension
+internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extension, IReadOnlyDictionary<(int Extension, string Name), string>? commandNames = null)
+    : IPiSharpExtension
 {
     /// <summary>Events delivered as observations (handlers' results are ignored upstream).</summary>
     internal static readonly ImmutableHashSet<string> ObservationEvents =
@@ -35,7 +36,10 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
     {
         var descriptor = extension.Descriptor;
         foreach (var eventName in extension.Events) RegisterEvent(registry, eventName);
-        foreach (var tool in (descriptor["tools"] as JsonArray ?? []).OfType<JsonObject>()) registry.RegisterTool(Tool(tool));
+        // A tool name an earlier extension registered is a load conflict (reported by the loader); the first registration is kept.
+        foreach (var tool in (descriptor["tools"] as JsonArray ?? []).OfType<JsonObject>())
+            try { registry.RegisterTool(Tool(tool)); }
+            catch (PiSharp.Extensions.Runtime.ExtensionRegistrationException error) when (error.Failure is PiSharp.Extensions.Runtime.ExtensionRegistrationFailure.DuplicateName) { }
         foreach (var command in (descriptor["commands"] as JsonArray ?? []).OfType<JsonObject>()) registry.RegisterCommand(Command(command));
         if (descriptor["toolRenderers"] is JsonValue renderers && renderers.GetValue<int>() > 0 && registry is IExtensionToolRendererRegistry rendererRegistry)
             rendererRegistry.RegisterToolRenderer(new("tool-renderer", ResolveRenderers));
@@ -369,7 +373,9 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
     private ExtensionCommandDescriptor Command(JsonObject command)
     {
         var name = command["name"]!.GetValue<string>();
-        return new("command-" + name, name, command["description"]?.GetValue<string>() ?? "", async (arguments, context, token) =>
+        var invocation = commandNames?.GetValueOrDefault((extension.Index, name)) ?? name;
+        invocation = invocation.Replace(':', '.'); // Registry names are ASCII identifiers; /name:2 maps to name.2.
+        return new("command-" + invocation, invocation, command["description"]?.GetValue<string>() ?? "", async (arguments, context, token) =>
         {
             using var lease = host.Enter(context);
             var args = arguments.Value.ValueKind == JsonValueKind.String ? arguments.Value.GetString() ?? "" : "";

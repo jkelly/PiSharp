@@ -21,7 +21,75 @@ internal static partial class Program
         ("bridge.discovery-global-folder-and-settings-entries", DiscoveryFolders),
         ("bridge.rpc-ui-dialog-round-trip", RpcDialog),
         ("bridge.virtual-model-routes-each-request", VirtualModel),
+        ("bridge.renderers-markdown-and-shortcuts-through-the-host", Renderers),
+        ("bridge.virtual-modules-for-upstream-imports", VirtualModules),
     ];
+
+    private static async Task<PiSharp.Cli.Extensions.Pi.PiExtensionHost> StartHost(Sandbox sandbox, string extension)
+    {
+        var host = await PiSharp.Cli.Extensions.Pi.PiExtensionHost.StartAsync(new(sandbox.Cwd, sandbox.AgentDir, "tui", true)
+        { GetEnvironment = name => sandbox.Vars.GetValueOrDefault(name) }, CancellationToken.None);
+        await host.LoadAsync([extension], CancellationToken.None);
+        Check(host.Errors.IsEmpty, "load errors: " + string.Join("; ", host.Errors.Select(error => error.Error)));
+        return host;
+    }
+
+    // types.ts registerMessageRenderer/registerEntryRenderer/registerMarkdownTransformer/registerShortcut: pi-tui components built in
+    // Node render to rows the host draws; the shortcut handler runs with a context.
+    private static async Task Renderers()
+    {
+        using var sandbox = NodeSandbox("renderers");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "render.ts"), """
+            import { Text, Container, Spacer } from "@earendil-works/pi-tui";
+            import { appendFileSync } from "node:fs";
+            export default function (pi: any) {
+              pi.registerMessageRenderer("note", (message: any, options: any, theme: any) => {
+                const box = new Container(); box.addChild(new Text("NOTE: " + message.content, 0, 0)); box.addChild(new Spacer(1)); return box;
+              });
+              pi.registerEntryRenderer("marker", (entry: any) => new Text("ENTRY " + entry.data.n, 1, 0));
+              pi.registerMarkdownTransformer((markdown: string) => markdown.replace("TODO", "DONE"));
+              pi.registerShortcut("ctrl+shift+k", { description: "Probe shortcut", handler: (ctx: any) => appendFileSync(process.cwd() + "/probe.log", JSON.stringify(["shortcut", ctx.mode]) + "\n") });
+            }
+            """);
+        await using var host = await StartHost(sandbox, extension);
+        var rows = await host.RenderMessageAsync("note", new JsonObject { ["role"] = "custom", ["customType"] = "note", ["content"] = "hello" }, 20, false, CancellationToken.None);
+        Names(["NOTE: hello", ""], rows!.Value.Select(row => row.TrimEnd()), "message renderer rows");
+        Check(await host.RenderMessageAsync("other", new JsonObject(), 20, false, CancellationToken.None) is null, "unrendered custom type");
+        var entry = await host.RenderEntryAsync("marker", new JsonObject { ["data"] = new JsonObject { ["n"] = 7 } }, 20, false, CancellationToken.None);
+        Equal("ENTRY 7", entry!.Value.Single().Trim(), "entry renderer");
+        Equal("all DONE", await host.TransformMarkdownAsync("all TODO", null, CancellationToken.None), "markdown transformer");
+        var shortcut = host.Shortcuts.Single();
+        Equal("ctrl+shift+k", shortcut.Shortcut, "shortcut key"); Equal("Probe shortcut", shortcut.Description, "shortcut description");
+    }
+
+    // virtual-modules.ts: the runtime values extensions import from Pi's packages resolve in the bridge (typebox, pi-ai StringEnum,
+    // pi-tui helpers, pi-coding-agent helpers), so upstream-style extensions load unchanged.
+    private static async Task VirtualModules()
+    {
+        using var sandbox = NodeSandbox("virtual-modules");
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "imports.ts"), """
+            import { Type } from "typebox";
+            import { StringEnum } from "@earendil-works/pi-ai";
+            import { truncateToWidth, visibleWidth, matchesKey, Key } from "@earendil-works/pi-tui";
+            import { defineTool, isToolCallEventType, CONFIG_DIR_NAME, getAgentDir, truncateHead, formatSize } from "@mariozechner/pi-coding-agent";
+            import { appendFileSync } from "node:fs";
+            export default function (pi: any) {
+              const tool = defineTool({ name: "shaped", label: "Shaped", description: "TypeBox schema",
+                parameters: Type.Object({ mode: StringEnum(["a", "b"] as const), count: Type.Optional(Type.Number()) }),
+                async execute() { return { content: [{ type: "text", text: "ok" }], details: {} }; } });
+              pi.registerTool(tool);
+              appendFileSync(process.cwd() + "/probe.log", JSON.stringify(["imports", visibleWidth(truncateToWidth("abcdefgh", 4)), typeof matchesKey, typeof Key,
+                isToolCallEventType("bash", { type: "tool_call", toolName: "bash", input: {} }), CONFIG_DIR_NAME, getAgentDir() === process.env.PI_CODING_AGENT_DIR,
+                formatSize(2048), truncateHead("a\nb\nc", { maxLines: 2 }).truncated]) + "\n");
+            }
+            """);
+        await using var host = await StartHost(sandbox, extension);
+        var parameters = host.Extensions.Single().Descriptor["tools"]![0]!["parameters"]!;
+        Equal("""{"type":"object","required":["mode"],"properties":{"mode":{"type":"string","enum":["a","b"]},"count":{"type":"number"}}}""",
+            JsonNode.Parse(parameters.ToJsonString())!.ToJsonString(), "TypeBox schema as JSON");
+        var record = LogRecords(sandbox, "imports").Single();
+        Equal("""["imports",4,"function","object",true,".pi",true,"2.0KB",true]""", record.ToJsonString(), "virtual module values");
+    }
 
     private static Sandbox NodeSandbox(string name, bool trusted = true)
     {

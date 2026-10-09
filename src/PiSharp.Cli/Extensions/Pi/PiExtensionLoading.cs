@@ -38,6 +38,8 @@ internal sealed class PiExtensionLoading
         var before = Host.Errors.Length;
         await Host.LoadAsync(paths, token).ConfigureAwait(false);
         foreach (var error in Host.Errors.Skip(before)) _diagnostics.Add(new("error", $"Failed to load extension \"{error.Path}\": {error.Error}"));
+        _diagnostics.RemoveAll(diagnostic => diagnostic.Message.Contains("\" conflicts with ", StringComparison.Ordinal));
+        foreach (var conflict in Host.Conflicts()) _diagnostics.Add(new("error", $"Failed to load extension \"{conflict.Path}\": {conflict.Error}"));
     }
 
     internal void Add(IEnumerable<PiDiagnostic> diagnostics) => _diagnostics.AddRange(diagnostics);

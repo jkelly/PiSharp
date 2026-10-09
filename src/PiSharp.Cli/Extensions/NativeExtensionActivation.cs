@@ -276,6 +276,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         _closing.Token.ThrowIfCancellationRequested();
         if (!text.StartsWith('/')) return false;
         var separator = text.IndexOf(' '); var name = separator < 0 ? text[1..] : text[1..separator];
+        if (Pi is not null) name = name.Replace(':', '.');
         return IsEnabledCommand(name);
     }
 
@@ -284,6 +285,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         token.ThrowIfCancellationRequested();
         if (!IsRegisteredCommand(text)) return false;
         var separator = text.IndexOf(' '); var name = separator < 0 ? text[1..] : text[1..separator];
+        if (Pi is not null) name = name.Replace(':', '.');
         var arguments = separator < 0 ? "" : text[(separator + 1)..];
         var lifecycleOrigin = BeginLifecycleOrigin();
         Task? invocationOriginal = null; Exception? invocationDirect = null;

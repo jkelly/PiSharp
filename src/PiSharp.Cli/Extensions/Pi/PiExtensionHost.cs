@@ -189,8 +189,50 @@ internal sealed partial class PiExtensionHost : IPiNodeHostPeer, IAsyncDisposabl
     /// <summary>Registers every loaded extension as a registry owner, in load order.</summary>
     internal async Task ActivateAsync(ExtensionRegistry registry, CancellationToken token)
     {
+        var names = CommandInvocationNames();
         foreach (var extension in Extensions)
-            await registry.ActivateAsync(extension.OwnerId, new PiNodeOwner(this, extension), token).ConfigureAwait(false);
+            await registry.ActivateAsync(extension.OwnerId, new PiNodeOwner(this, extension, names), token).ConfigureAwait(false);
+    }
+
+    /// <summary>Source resolveRegisteredCommands: a command name registered more than once (across extensions, in load order) is
+    /// invoked as <c>name:1</c>, <c>name:2</c>…, skipping taken names.</summary>
+    internal Dictionary<(int Extension, string Name), string> CommandInvocationNames()
+    {
+        var commands = Extensions.SelectMany(extension => (extension.Descriptor["commands"] as JsonArray ?? []).OfType<JsonObject>()
+            .Select(command => (extension.Index, Name: command["name"]!.GetValue<string>()))).ToList();
+        var counts = commands.GroupBy(command => command.Name, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        var seen = new Dictionary<string, int>(StringComparer.Ordinal); var taken = new HashSet<string>(StringComparer.Ordinal);
+        var names = new Dictionary<(int, string), string>();
+        foreach (var (index, name) in commands)
+        {
+            var occurrence = seen[name] = seen.GetValueOrDefault(name) + 1;
+            var invocation = counts[name] > 1 ? $"{name}:{occurrence}" : name;
+            if (taken.Contains(invocation))
+            {
+                var suffix = occurrence;
+                do { suffix++; invocation = $"{name}:{suffix}"; } while (taken.Contains(invocation));
+            }
+            taken.Add(invocation);
+            names[(index, name)] = invocation;
+        }
+        return names;
+    }
+
+    /// <summary>resource-loader.ts detectExtensionConflicts: a tool or flag name an earlier extension registered is an error of the later one.</summary>
+    internal ImmutableArray<PiExtensionLoadError> Conflicts()
+    {
+        var conflicts = ImmutableArray.CreateBuilder<PiExtensionLoadError>();
+        var tools = new Dictionary<string, string>(StringComparer.Ordinal); var flags = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var extension in Extensions)
+        {
+            foreach (var name in (extension.Descriptor["tools"] as JsonArray ?? []).OfType<JsonObject>().Select(tool => tool["name"]!.GetValue<string>()))
+                if (tools.TryGetValue(name, out var owner) && owner != extension.Path) conflicts.Add(new(extension.Path, $"Tool \"{name}\" conflicts with {owner}"));
+                else tools[name] = extension.Path;
+            foreach (var name in (extension.Descriptor["flags"] as JsonArray ?? []).OfType<JsonObject>().Select(flag => flag["name"]!.GetValue<string>()))
+                if (flags.TryGetValue(name, out var owner) && owner != extension.Path) conflicts.Add(new(extension.Path, $"Flag \"--{name}\" conflicts with {owner}"));
+                else flags[name] = extension.Path;
+        }
+        return conflicts.ToImmutable();
     }
 
     /// <summary>A registry over the loaded extensions for the CLI's own events before the session exists (project_trust,

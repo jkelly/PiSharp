@@ -576,6 +576,46 @@ internal sealed partial class PiExtensionHost
         await Node.RequestAsync("callback.invoke", new JsonObject { ["id"] = callback.GetString(), ["args"] = lease.Id }, token).ConfigureAwait(false);
     }
 
+    // ----------------------------------------------------------------------------------------------------------------- UI seams (IMPL-I)
+
+    /// <summary>Source registerShortcut: the extensions' shortcuts (key id, description, extension path), in load order. The
+    /// interactive mode resolves conflicts with its keybindings (runner.ts getShortcuts) and calls <see cref="RunShortcutAsync"/>.</summary>
+    internal ImmutableArray<(string Shortcut, string? Description, string ExtensionPath, int Extension)> Shortcuts =>
+        [.. Extensions.SelectMany(extension => (extension.Descriptor["shortcuts"] as JsonArray ?? []).OfType<JsonObject>()
+            .Select(item => (item["shortcut"]!.GetValue<string>(), item["description"]?.GetValue<string>(), extension.Path, extension.Index)))];
+
+    /// <summary>Runs a shortcut's handler with a context bound to <paramref name="context"/> (the interactive mode's current one).</summary>
+    internal async Task RunShortcutAsync(int extension, string shortcut, IExtensionContext context, CancellationToken token)
+    {
+        using var lease = Enter(context);
+        await Node.RequestAsync("shortcut.run", new JsonObject { ["ext"] = extension, ["shortcut"] = shortcut, ["ctx"] = lease.Id }, token,
+            afterPrecedingFrames: true).ConfigureAwait(false);
+    }
+
+    /// <summary>Source getMessageRenderer: the rows a registerMessageRenderer renderer draws for a custom message, or null when no
+    /// extension renders that customType.</summary>
+    internal Task<ImmutableArray<string>?> RenderMessageAsync(string customType, JsonNode message, int width, bool expanded, CancellationToken token) =>
+        RenderAsync("render.message", new JsonObject { ["customType"] = customType, ["message"] = message.DeepClone(), ["width"] = width, ["expanded"] = expanded }, token);
+
+    /// <summary>Source getEntryRenderer: the rows a registerEntryRenderer renderer draws for a custom entry, or null.</summary>
+    internal Task<ImmutableArray<string>?> RenderEntryAsync(string customType, JsonNode entry, int width, bool expanded, CancellationToken token) =>
+        RenderAsync("render.entry", new JsonObject { ["customType"] = customType, ["entry"] = entry.DeepClone(), ["width"] = width, ["expanded"] = expanded }, token);
+
+    private async Task<ImmutableArray<string>?> RenderAsync(string method, JsonObject parameters, CancellationToken token)
+    {
+        var result = await Node.RequestAsync(method, parameters, token).ConfigureAwait(false);
+        if (result is not { ValueKind: JsonValueKind.Object } value || !value.TryGetProperty("handled", out var handled) || handled.ValueKind != JsonValueKind.True) return null;
+        return [.. value.GetProperty("lines").EnumerateArray().Select(line => line.GetString() ?? "")];
+    }
+
+    /// <summary>Source getMarkdownTransformers: the extensions' markdown transformers applied in load order.</summary>
+    internal async Task<string> TransformMarkdownAsync(string markdown, JsonObject? context, CancellationToken token)
+    {
+        if (!Extensions.Any(extension => extension.Descriptor["markdownTransformer"]?.GetValue<bool>() == true)) return markdown;
+        var result = await Node.RequestAsync("markdown.transform", new JsonObject { ["markdown"] = markdown, ["context"] = context?.DeepClone() ?? new JsonObject() }, token).ConfigureAwait(false);
+        return result is { ValueKind: JsonValueKind.String } text ? text.GetString()! : markdown;
+    }
+
     // ----------------------------------------------------------------------------------------------------------------- virtual models
 
     /// <summary>runner.ts bindCore: the virtual models the extensions registered (pi.registerVirtualModel) join a model registry;
