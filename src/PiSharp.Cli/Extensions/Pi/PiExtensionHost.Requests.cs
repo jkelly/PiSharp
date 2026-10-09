@@ -521,7 +521,8 @@ internal sealed partial class PiExtensionHost
             case "systemPrompt":
                 // agent-session.ts: during a run the prompt is the one before_agent_start handlers produced (agent.state.systemPrompt).
                 if (state is { Agent.IsRunning: true } && RunSystemPrompt is { } runPrompt) return runPrompt;
-                return state is null ? "" : new PiSharp.Sessions.Context.SessionSystemReplay().Replay(state.Agent.Messages, CancellationToken.None).Prompt;
+                // Between runs: the prompt of the in-memory loadout (_baseSystemPromptOptions after _rebuildSystemPrompt).
+                return state is null ? "" : attached?.Session.GetSystemPrompt() ?? new PiSharp.Sessions.Context.SessionSystemReplay().Replay(state.Agent.Messages, CancellationToken.None).Prompt;
             case "contextUsage":
             {
                 if (ContextUsage?.Invoke() is { } supplied) return supplied;

@@ -51,7 +51,8 @@ public sealed partial class RpcSessionDispatcher
         try
         {
             var source = SessionExportSource.FromLog(snapshot.Log.Header, snapshot.Log.Entries, snapshot.Context.LeafId, session.Path);
-            var state = new SessionExportAgentState(system.Prompt, system.Tools.Select(tool => SessionExportTool.FromJson(tool.ToString())).ToList());
+            // exportToHtml(this.state): the transcript's prompt (agent.state.systemPrompt) and the in-memory loadout (agent.state.tools).
+            var state = new SessionExportAgentState(system.Prompt, session.GetActiveToolDeclarations(work.Token).Select(tool => SessionExportTool.FromJson(tool.ToString())).ToList());
             html = SessionHtmlExport.GenerateHtml(SessionHtmlExport.BuildSessionData(source, state, _htmlExport.CreateToolRenderer?.Invoke()),
                 _htmlExport.Themes, _htmlExport.ResolveThemeName());
         }

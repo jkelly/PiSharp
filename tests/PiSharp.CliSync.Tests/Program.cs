@@ -52,6 +52,7 @@ internal static partial class Program
             ("open.restored-loadout-recorded-at-the-first-prompt", OpenRecordsRestoredLoadoutAtFirstPrompt),
             ("loadout.tool-change-records-match-declare-tool-changes", Sync(ToolChangeRecords)),
             ("selection.idle-selection-and-catalog-recorded-at-the-next-prompt", IdleSelectionAndCatalogRecordedAtNextPrompt),
+            ("prompt.in-memory-loadout-prompt-before-the-next-prompt", InMemoryLoadoutPrompt),
             ("prompt.hidden-tools-byte-exact-sections", Sync(HiddenPrompt)),
             ("prompt.skills-hint-reader-fallback-and-indirect", Sync(SkillsHint)),
             ("prompt.unhidden-docs-line-and-options", Sync(DocsAndOptions)),

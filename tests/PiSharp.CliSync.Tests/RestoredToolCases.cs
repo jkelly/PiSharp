@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.AI;
+using PiSharp.Agent;
 using PiSharp.Contracts;
 using PiSharp.CodingAgent;
 using PiSharp.CodingAgent.ToolSelection;
@@ -441,6 +442,45 @@ internal static partial class Program
             var record = RecordedAtPrompt(session, count, leaf);
             Names(["ls"], SystemTools(record, "toolsAdded"), "the next prompt declares the selected tool");
             Names(["read", "grep"], SystemTools(record, "toolsRemoved"), "and removes the deselected ones in recorded order");
+        }
+        finally { await session.DisposeAsync(); Directory.Delete(directory, recursive: true); }
+    }
+
+    // agent-session.ts systemPrompt and emitBeforeAgentStart(_baseSystemPromptOptions): _rebuildSystemPrompt applies a selection to the
+    // prompt at once, before the next prompt records it; exportToHtml lists agent.state.tools, the in-memory loadout.
+    private static async Task InMemoryLoadoutPrompt()
+    {
+        var directory = Temp("prompt-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(directory); var ids = 0;
+        var started = new List<string>();
+        var hooks = new AgentHooks
+        {
+            BeforePrompt = (start, token) =>
+            {
+                lock (started) started.Add(new PiSharp.Sessions.Context.SessionSystemReplay().Replay(start.History.AddRange(start.Inputs), token).Prompt);
+                return ValueTask.FromResult(new AgentPromptPreparation([]));
+            }
+        };
+        var registry = new SessionRuntimeRegistry([new(SettledModel, new SettledTransport(), Hooks: hooks)], [Tool("read"), Tool("grep")], new Deny(), new()
+        {
+            PreparePromptSections = request => new(new object(), [KeyValuePair.Create("tools", "<tools>" + string.Join(",", request.SelectedTools) + "</tools>")], () => { })
+        });
+        var header = new PiSharp.Sessions.Serialization.SessionEntryCodec().Parse(JsonSerializer.Serialize(new { type = "session", version = 3, id = "prompt-header",
+            timestamp = "2026-10-08T00:00:00.000Z", cwd = directory }));
+        var session = await PersistentAgentSession.CreateAsync(Path.Combine(directory, "session.jsonl"), header, registry, SettledModel,
+            () => 7, () => "prompt-entry-" + Interlocked.Increment(ref ids));
+        try
+        {
+            await Recorded(session, ["read"]);
+            Equal("<tools>read</tools>", started.Single(), "before_agent_start of the recorded selection");
+            Equal("<tools>read</tools>", session.GetSystemPrompt(), "prompt after the run");
+            await session.SetActiveToolsAsync(["grep", "read"]);
+            // The transcript still declares the recorded prompt; the in-memory prompt is the selection's.
+            Equal("<tools>read</tools>", new PiSharp.Sessions.Context.SessionSystemReplay().Replay(session.Snapshot.Context.Messages).Prompt, "transcript prompt");
+            Equal("<tools>grep,read</tools>", session.GetSystemPrompt(), "getSystemPrompt after an idle selection");
+            Names(["grep", "read"], session.GetActiveToolDeclarations().Select(tool => tool.Value.GetProperty("name").GetString()!), "exported tools");
+            await session.PromptAsync(SettledUser("go")); await session.WaitForIdleAsync();
+            Equal("<tools>grep,read</tools>", started[^1], "before_agent_start sees the in-memory prompt");
+            Equal("<tools>grep,read</tools>", new PiSharp.Sessions.Context.SessionSystemReplay().Replay(session.Snapshot.Context.Messages).Prompt, "recorded by the prompt");
         }
         finally { await session.DisposeAsync(); Directory.Delete(directory, recursive: true); }
     }
