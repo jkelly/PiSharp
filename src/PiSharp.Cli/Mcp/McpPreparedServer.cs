@@ -222,7 +222,7 @@ public sealed class McpPreparedServer : IAsyncDisposable
             var current = registry.CaptureSnapshot();
             var descriptors = publication.Tools.Select(tool => new ExtensionToolDescriptor(tool.Name, tool.Name,
                 tool.Description, tool.Parameters, (arguments, context, callCancellation) => ExecuteAsync(tool.OriginalName, arguments, context, callCancellation))
-                { Namespace = tool.Namespace, Exposure = tool.Exposure, DefaultActive = tool.Exposure == ToolExposure.Direct }).ToImmutableArray();
+                { Namespace = tool.Namespace, Exposure = tool.Exposure, DefaultActive = tool.Exposure == ToolExposure.Direct, Annotations = tool.Annotations }).ToImmutableArray();
             var nextIds = descriptors.Select(tool => tool.RegistrationId).ToImmutableArray();
             var nextNames = descriptors.Select(tool => tool.Name).ToImmutableHashSet(StringComparer.Ordinal);
             var plan = registry.PrepareToolCatalogReplacement(scope, registrationIds, descriptors, current);
@@ -234,7 +234,7 @@ public sealed class McpPreparedServer : IAsyncDisposable
             {
                 var index = binding.Registrations.IndexOf(tool);
                 return new SessionRegisteredTool(binding.RegisteredToolDeclarations[index], binding.Adapters[index])
-                    { Exposure = tool.Exposure, Namespace = tool.Namespace, DefaultActive = tool.DefaultActive, IsExtension = true,
+                    { Exposure = tool.Exposure, Namespace = tool.Namespace, DefaultActive = tool.DefaultActive, IsExtension = true, Annotations = tool.Annotations,
                         PrepareLoadout = binding.GetLoadoutPreparation(tool.Name) };
             }).ToImmutableArray();
             var replacement = expected.WithToolCatalog(retained.AddRange(added), composeHooks(expected, binding));

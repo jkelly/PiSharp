@@ -240,7 +240,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 new SessionRegisteredTool(extension.EnabledDeclarations[index], adapter, ToolExecutionMode.Sequential)
                 { IsExtension = true, Exposure = extension.EnabledRegistrations[index].Exposure, Namespace = extension.EnabledRegistrations[index].Namespace,
                     DefaultActive = extension.EnabledRegistrations[index].DefaultActive,
-                    PromptGuidelines = extension.EnabledRegistrations[index].PromptGuidelines,
+                    PromptGuidelines = extension.EnabledRegistrations[index].PromptGuidelines, Annotations = extension.EnabledRegistrations[index].Annotations,
                     PrepareLoadout = extension.Binding.GetLoadoutPreparation(adapter.Name) }));
         }
         if (toolSelection is not null)

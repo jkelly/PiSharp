@@ -251,9 +251,11 @@ internal sealed partial class PiExtensionHost
             if (!registered.PromptGuidelines.IsDefaultOrEmpty) info["promptGuidelines"] = new JsonArray([.. registered.PromptGuidelines.Select(text => (JsonNode)text)]);
             if (registered.Namespace is { } space)
                 info["namespace"] = new JsonObject { ["name"] = space.Name, ["description"] = space.Description, ["instructions"] = space.Instructions };
+            if (registered.Annotations is { Count: > 0 } hints)
+                info["annotations"] = new JsonObject([.. hints.OrderBy(hint => Array.IndexOf(AnnotationOrder, hint.Key) is var at && at < 0 ? int.MaxValue : at)
+                    .Select(hint => KeyValuePair.Create(hint.Key, (JsonNode?)hint.Value))]);
             if (annotations.TryGetValue(name, out var source) && registered.IsExtension)
             {
-                if (source.Tool["annotations"] is JsonObject hints) info["annotations"] = hints.DeepClone();
                 info["sourceInfo"] = new JsonObject { ["path"] = source.Extension.ResolvedPath, ["source"] = "local", ["scope"] = "user", ["origin"] = "top-level" };
             }
             else info["sourceInfo"] = new JsonObject { ["path"] = "<builtin:" + name + ">", ["source"] = "builtin", ["scope"] = "temporary", ["origin"] = "top-level" };
@@ -261,6 +263,8 @@ internal sealed partial class PiExtensionHost
         }
         return tools;
     }
+
+    private static readonly string[] AnnotationOrder = ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"];
 
     /// <summary>Source getCommands: extension commands (with invocation names), then prompt templates and skills (IMPL-I adds those).</summary>
     private JsonArray Commands()

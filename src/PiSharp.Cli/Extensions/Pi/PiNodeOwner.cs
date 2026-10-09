@@ -280,6 +280,9 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension extens
             DefaultActive = tool["defaultActive"] is JsonValue active ? active.GetValue<bool>() : exposure is ToolExposure.Direct or ToolExposure.ModelOnly,
             PromptGuidelines = [.. (tool["promptGuidelines"] as JsonArray ?? []).Select(item => item!.GetValue<string>())],
             ConstrainedSampling = tool["constrainedSampling"] is JsonObject sampling ? JsonData.Parse(sampling.ToJsonString()) : null,
+            Annotations = tool["annotations"] is JsonObject hints
+                ? hints.Where(hint => hint.Value is JsonValue value && value.GetValueKind() is JsonValueKind.True or JsonValueKind.False)
+                    .ToImmutableDictionary(hint => hint.Key, hint => hint.Value!.GetValue<bool>(), StringComparer.Ordinal) : null,
             PrepareInitialArgumentsAsync = async (arguments, token) =>
             {
                 var prepared = await host.CallAsync("tool.prepareArguments", new JsonObject { ["ext"] = extension.Index, ["name"] = name, ["args"] = Parse(arguments) }, token).ConfigureAwait(false);

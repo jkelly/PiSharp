@@ -153,7 +153,7 @@ internal sealed class McpResourceToolsPublisher
                 {
                     var index = binding.Registrations.IndexOf(tool);
                     return new SessionRegisteredTool(binding.RegisteredToolDeclarations[index], binding.Adapters[index])
-                    { Exposure = tool.Exposure, Namespace = tool.Namespace, DefaultActive = tool.DefaultActive, IsExtension = true,
+                    { Exposure = tool.Exposure, Namespace = tool.Namespace, DefaultActive = tool.DefaultActive, IsExtension = true, Annotations = tool.Annotations,
                         PrepareLoadout = binding.GetLoadoutPreparation(tool.Name) };
                 }).ToImmutableArray();
                 var replacement = expected.WithToolCatalog(retained.AddRange(added), composeHooks(expected, binding));
