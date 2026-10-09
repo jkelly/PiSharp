@@ -209,13 +209,10 @@ public sealed class EditTool : IPreparedToolAdapter
         token.ThrowIfCancellationRequested(); if (memory.Length > _options.MaximumInputBytes) throw new FileToolException(FileToolFailure.ResourceLimit);
         return memory.ToArray();
     }
-    /// <summary>Source buffer.toString("utf-8"). Control characters and NUL are ordinary text; a file that is not valid UTF-8
-    /// is refused, because writing the lossy decode back would replace its undecodable bytes (native data-loss guard).</summary>
-    private static string DecodeText(byte[] bytes)
-    {
-        try { return Utf8.GetString(bytes); }
-        catch (DecoderFallbackException) { throw new FileToolException(FileToolFailure.UnsupportedContent); }
-    }
+    /// <summary>Source buffer.toString("utf-8"): control characters and NUL are ordinary text, and each undecodable sequence becomes
+    /// U+FFFD (WHATWG maximal subparts, as Node decodes), so the edited file is written back as UTF-8 with those replacements.</summary>
+    internal static string DecodeText(byte[] bytes) => LossyUtf8.GetString(bytes);
+    private static readonly UTF8Encoding LossyUtf8 = new(false, false);
     private static ToolResult Failure(ToolFailureKind kind, string message, string code, bool writeAttempted, bool writeCompleted) =>
         new([new TextContent(message)], JsonData.Parse(JsonSerializer.Serialize(new { fileOperation = new { code, writeAttempted, writeCompleted } })), true, Failure: new(kind, message));
 }
