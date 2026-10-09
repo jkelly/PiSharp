@@ -503,7 +503,9 @@ public static class RpcSessionCommand
     {
         if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) return;
         var full = Path.GetFullPath(path);
-        var lazy = backend is { Mode: SessionStorageMode.LazyLocal };
+        // The backend (lazy local, or memory under --no-session) serves a file outside its namespace as a lazy local file.
+        var lazy = backend is { Mode: SessionStorageMode.LazyLocal } || backend is not null &&
+            !string.Equals(Path.GetDirectoryName(full), backend.Directory, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
         // A session of this run that is not written yet.
         if (lazy && !File.Exists(full) && backend!.FileExists(full)) return;
         if (Directory.Exists(full)) return;

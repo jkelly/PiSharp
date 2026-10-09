@@ -23,6 +23,7 @@ internal static class SessionStorageBackendTests
         ("session-backend lazy exact copies retain blank whitespace and CRLF framing before and after conversation", LazyExactFraming),
         ("session-backend lazy file admission counts materialized pre-existing and pending namespace files", LazyFileBounds),
         ("session-backend lazy local serves session files outside its directory as SessionManager.open does", LazyOutside),
+        ("session-backend memory serves session files outside its namespace as local lazy files (--no-session switch)", MemoryOutside),
         ("session-backend branch publisher uses volatile and deferred receipts then real conversation publication", Branches),
         ("session-backend memory exact copy preserves all source bytes and refuses overwrite", MemoryCopy),
         ("session-backend memory catalog pagination cancellation and inert missing parent metadata", MemoryCatalog)
@@ -81,7 +82,9 @@ internal static class SessionStorageBackendTests
         await using (var reopened = await SessionLogStore.OpenAsync(path, Options(backend))) Check(reopened.Snapshot.Entries.IsEmpty, "Rejected bytes became a memory checkpoint.");
         await using (var second = await SessionLogStore.CreateNewAsync(Path.Combine(root, "b.jsonl"), Header(root), Options(backend))) { }
         await Fails<SessionLogStoreException>(() => SessionLogStore.CreateNewAsync(Path.Combine(root, "c.jsonl"), Header(root), Options(backend)));
-        await Fails<ArgumentException>(async () => { await backend.OpenAsync(Path.Combine(root, "nested", "outside.jsonl"), true, default); });
+        // A path outside the namespace is a local lazy file (SessionManager.open takes any path); pending, it counts against the bound.
+        await Fails<IOException>(async () => { await backend.OpenAsync(Path.Combine(root, "nested", "outside.jsonl"), true, default); });
+        await Fails<ArgumentException>(async () => { await backend.OpenAsync(root + Path.DirectorySeparatorChar, true, default); });
         var tight = new SessionStorageBackend(VirtualDirectory(), SessionStorageMode.InMemory, new(4, 512, 512));
         var tightPath = Path.Combine(tight.Directory, "tight.jsonl");
         await using var limited = await SessionLogStore.CreateNewAsync(tightPath, Header("cwd"), Options(tight));
@@ -132,6 +135,30 @@ internal static class SessionStorageBackendTests
         await Fails<ArgumentException>(async () => { await backend.OpenAsync(other.Path + Path.DirectorySeparatorChar, true, default); });
     }
     private static SessionStorageBackend SessionStorageBackendForDisk(string directory) => new(directory, SessionStorageMode.LazyLocal);
+    private static async Task MemoryOutside()
+    {
+        using var other = new LocalDirectory();
+        var backend = new SessionStorageBackend(VirtualDirectory(), SessionStorageMode.InMemory);
+        var existing = Path.Combine(other.Path, "existing.jsonl");
+        await using (var store = await SessionLogStore.CreateNewAsync(existing, Header(other.Path), Options(SessionStorageBackendForDisk(other.Path))))
+            await store.AppendAsync([User("user", null)]);
+        await using (var reopened = await SessionLogStore.OpenAsync(existing, Options(backend)))
+        {
+            Equal(SessionLogStorageDurability.LocalFileFlush, reopened.Snapshot.StorageDurability);
+            await reopened.AppendAsync([State("after", "user")]);
+        }
+        Check(File.ReadAllText(existing).Contains("\"after\"", StringComparison.Ordinal), "The outside file was not written.");
+        var fresh = Path.Combine(other.Path, "fresh.jsonl");
+        await using (var store = await SessionLogStore.CreateNewAsync(fresh, Header(other.Path, "fresh"), Options(backend)))
+        {
+            var setup = await store.AppendAsync([State("setup")]);
+            Equal(SessionLogStorageDurability.DeferredLocalFile, setup.Snapshot.StorageDurability);
+            Check(!File.Exists(fresh), "An outside new session materialized before a conversation.");
+            var user = await store.AppendAsync([User("user", "setup")]);
+            Check(user.Snapshot.IsMaterialized && File.Exists(fresh), "An outside new session stayed in memory.");
+        }
+        await Fails<FileNotFoundException>(async () => { await backend.OpenAsync(Path.Combine(backend.Directory, "absent.jsonl"), false, default); });
+    }
     private static async Task LazyAssistant()
     {
         using var directory = new LocalDirectory(); var path = Path.Combine(directory.Path, "assistant.jsonl");

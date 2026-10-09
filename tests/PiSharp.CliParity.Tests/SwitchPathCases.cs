@@ -57,6 +57,30 @@ internal static partial class Program
             Equal("this is not a session\n", File.ReadAllText(junk), "junk file unchanged");
             Equal(empty, Data(10)["sessionFile"]!.GetValue<string>(), "the current session stays");
         }),
+        ("switch.no-session-run-opens-and-writes-a-session-file", async () =>
+        {
+            using var sandbox = new Sandbox("switch-no-session");
+            var elsewhere = Path.Combine(sandbox.Root, "elsewhere");
+            Directory.CreateDirectory(elsewhere);
+            var outside = SeedSession(sandbox, "outside.jsonl", "anthropic", "claude-sonnet-4-5", elsewhere);
+            // --no-session starts in memory; switchSession opens SessionManager.open(path), a persisted session (Pi 1.1.0 run with
+            // node: the file gains the session_info entry, and a new session afterwards goes next to it).
+            var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--no-session", "--provider", "anthropic", "--model", "claude-sonnet-4-5"],
+                """{"id":"1","type":"switch_session","sessionPath":""" + JsonValue.Create(outside)!.ToJsonString() + "}",
+                """{"id":"2","type":"get_state"}""",
+                """{"id":"3","type":"get_messages"}""",
+                """{"id":"4","type":"set_session_name","name":"renamed"}""",
+                """{"id":"5","type":"new_session"}""",
+                """{"id":"6","type":"get_state"}""");
+            Check(responses[0]["success"]!.GetValue<bool>(), "switched: " + responses[0].ToJsonString());
+            Equal(outside, responses[1]["data"]!["sessionFile"]!.GetValue<string>(), "session file");
+            Equal(2, (responses[2]["data"]!["messages"] as JsonArray)!.Count, "history");
+            Check(responses[3]["success"]!.GetValue<bool>(), "renamed: " + responses[3].ToJsonString());
+            Check(File.ReadLines(outside).Select(line => JsonNode.Parse(line)!).Any(entry => entry["type"]?.GetValue<string>() == "session_info" &&
+                entry["name"]?.GetValue<string>() == "renamed"), "the switched-to file is written");
+            Equal(elsewhere, Path.GetDirectoryName(responses[5]["data"]!["sessionFile"]!.GetValue<string>()), "new session next to it");
+            Equal(0, sandbox.SessionFiles().Length, "nothing in the session directory");
+        }),
         ("switch.headerless-entries-are-not-a-valid-session", async () =>
         {
             using var sandbox = new Sandbox("headerless");
