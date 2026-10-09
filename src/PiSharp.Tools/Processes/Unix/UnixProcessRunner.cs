@@ -239,8 +239,8 @@ public sealed class UnixProcessRunner : ISeparatedProcessRunner
 
     private static bool Valid(ProcessRequest? request)
     {
-        // The admission seam delivers stdin EOF only; standard input transport (legacy WSL bash) is Windows-only.
-        if (request is null || request.StandardInput is not null || request.Arguments.IsDefault || request.Arguments.Length > 256 || request.Environment is null || request.Environment.Count > 1024 ||
+        // Standard input bytes (commandTransport "stdin") are bounded as on Windows; the admission writes them, then EOF.
+        if (request is null || request.StandardInput is { Length: > 16 * 1024 * 1024 } || request.Arguments.IsDefault || request.Arguments.Length > 256 || request.Environment is null || request.Environment.Count > 1024 ||
             !Absolute(request.Executable) || !Absolute(request.WorkingDirectory) || !Absolute(request.SpillPath) ||
             request.TimeoutSeconds is { } seconds && (!double.IsFinite(seconds) || seconds <= 0 || seconds * 1000 > int.MaxValue)) return false;
         long characters = request.Executable.Length + request.WorkingDirectory.Length + request.SpillPath.Length;
