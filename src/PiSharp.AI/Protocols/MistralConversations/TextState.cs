@@ -100,7 +100,7 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
                 var function = call.GetProperty("function");
                 if (!tools.TryGetValue(key, out var saved))
                 {
-                    Limit(blocks.Count + 1, options.MaximumContentBlocks);
+                    Limit(blocks.Count + 1, options.MaximumResponseContentBlocks);
                     var name = function.GetProperty("name").GetString();
                     if (string.IsNullOrEmpty(name)) throw Fail(NativeChatFailureCode.MalformedStream, "Missing Mistral tool name.");
                     characters += id.Length + name.Length; Limit(characters, options.MaximumContentCharacters);
@@ -130,7 +130,7 @@ internal sealed class TextState(ChatRequest request, MistralTextOptions options)
             if (currentText >= 0 && (blocks[currentText] is ThinkingContent) != thinking) EndText(frames);
             if (currentText < 0)
             {
-                Limit(blocks.Count + 1, options.MaximumContentBlocks); currentText = blocks.Count;
+                Limit(blocks.Count + 1, options.MaximumResponseContentBlocks); currentText = blocks.Count;
                 if (thinking) { blocks.Add(new ThinkingContent("")); frames.Add(Snapshot(new ThinkingStarted(currentText, new ThinkingContent("")))); }
                 else { blocks.Add(new TextContent("")); frames.Add(Snapshot(new TextStarted(currentText, new TextContent("")))); }
             }

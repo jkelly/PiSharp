@@ -14,7 +14,8 @@ internal static class MistralToolStreamingTests
         ("mistral invalid mixed chunk rolls back unpublished text and tool mutations", AtomicChunk),
         ("mistral Simple reasoning maps and cache options reach request and reasoning stream", SimpleOptions),
         ("mistral tool finalization waits original held body disposal and cancellation", HeldCleanup),
-        ("mistral tool choice and unsupported replay refuse before HTTP effects", Admission)
+        ("mistral tool choice and unsupported replay refuse before HTTP effects", Admission),
+        ("mistral response blocks have no count bound of their own and a separate response option", ManyResponseBlocks)
     ];
     private static readonly ModelDescriptor Model = new("fixture", "mistral-conversations", "mistral");
     private static MistralTextOptions Options => new(new("https://fixture.invalid/"), true, new(1, 2, 1, 0), "fixture") { ApiKey = "fixture" };
@@ -23,6 +24,23 @@ internal static class MistralToolStreamingTests
     private static string Frame(object value) => "data: " + JsonSerializer.Serialize(value) + "\n\n";
     private static string Delta(object delta, string? finish = null) => Frame(new { choices = new[] { new { delta, finish_reason = finish } } });
     private static object Call(int index, string? id, string? name, object arguments) => new { index, id, function = new { name, arguments } };
+    // mistral.ts pushes every streamed block onto output.content: 1,100 tool calls in one response complete (formerly the shared
+    // 1,024-block option, which also bounded request parts). The response bound is its own option; the request bound does not apply.
+    private static async Task ManyResponseBlocks()
+    {
+        const int calls = 1100;
+        var wire = Delta(new { tool_calls = Enumerable.Range(0, calls).Select(index => Call(index, "id" + index, "lookup", "{}")).ToArray() }, "tool_calls") +
+            Frame(new { choices = Array.Empty<object>(), usage = new { prompt_tokens = 5, completion_tokens = 3, total_tokens = 8 } });
+        async Task<StreamEvent> Last(MistralTextOptions options)
+        {
+            using var handler = new Handler(_ => Task.FromResult(Response(new Body(wire))));
+            using var client = new HttpClient(handler);
+            return (await Collect(new(client, Model, options), Request))[^1];
+        }
+        var done = await Last(Options with { MaximumContentBlocks = 2 });
+        Check(done is StreamDone { Reason: StopReason.ToolUse } finished && finished.Message.Content.OfType<ToolCallContent>().Count() == calls);
+        Check(await Last(Options with { MaximumResponseContentBlocks = 1000 }) is StreamError);
+    }
     private static async Task ToolLoop()
     {
         var request = Request with { Messages = [
