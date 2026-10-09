@@ -11,8 +11,18 @@ namespace PiSharp.Cli.Pi;
 /// <summary>A project_trust handler's decision: yes or no, and whether the store should remember it.</summary>
 internal sealed record PiProjectTrustDecision(bool Trusted, bool Remember);
 
+/// <summary>A path a resources_discover handler returned and the extension that returned it (source emitResourcesDiscover).</summary>
+internal sealed record PiDiscoveredPath(string Path, string ExtensionPath)
+{
+    /// <summary>Source getExtensionSourceLabel: <c>extension:&lt;name&gt;</c> from the file name without .ts/.js, or the synthetic
+    /// path without angle brackets.</summary>
+    internal string SourceLabel => ExtensionPath.StartsWith('<')
+        ? "extension:" + ExtensionPath.Replace("<", "").Replace(">", "")
+        : "extension:" + System.Text.RegularExpressions.Regex.Replace(System.IO.Path.GetFileName(ExtensionPath), @"\.(ts|js)$", "");
+}
+
 /// <summary>Resource paths returned by resources_discover handlers, in handler order.</summary>
-internal sealed record PiDiscoveredResources(ImmutableArray<string> SkillPaths, ImmutableArray<string> PromptPaths, ImmutableArray<string> ThemePaths)
+internal sealed record PiDiscoveredResources(ImmutableArray<PiDiscoveredPath> SkillPaths, ImmutableArray<PiDiscoveredPath> PromptPaths, ImmutableArray<PiDiscoveredPath> ThemePaths)
 {
     internal static PiDiscoveredResources Empty { get; } = new([], [], []);
     internal bool IsEmpty => SkillPaths.IsEmpty && PromptPaths.IsEmpty && ThemePaths.IsEmpty;
@@ -26,7 +36,7 @@ internal static class PiExtensionEvents
     internal const string ResourcesDiscover = "resources_discover";
 
     /// <summary>Source emitProjectTrustEvent: handlers in registration order; the first result that is not
-    /// <c>trusted: "undecided"</c> decides (<c>trusted === "yes"</c>); later handlers' results are ignored. A failing handler is
+    /// <c>trusted: "undecided"</c> decides (<c>trusted === "yes"</c>) and no later handler runs. A failing handler is
     /// reported as <c>Extension "&lt;path&gt;" project_trust error: &lt;message&gt;</c> (resolveProjectTrusted's onExtensionError) and the
     /// next one runs. Null when no handler decided.</summary>
     internal static async Task<PiProjectTrustDecision?> ProjectTrustAsync(ExtensionRegistry registry, ExtensionRegistrySnapshot snapshot, string cwd,
@@ -36,15 +46,13 @@ internal static class PiExtensionEvents
         if (!registry.HasEventHandlers(snapshot, ProjectTrust)) return null;
         PiProjectTrustDecision? decided = null;
         var initial = JsonData.Parse(JsonSerializer.Serialize(new { type = ProjectTrust, cwd }));
-        await registry.ReduceEventAsync(snapshot, ProjectTrust, initial, (_, result) =>
+        await registry.DispatchUntilAsync(snapshot, ProjectTrust, initial, (_, result) =>
         {
-            if (decided is null && result.Value.ValueKind == JsonValueKind.Object)
-            {
-                var trusted = result.Value.TryGetProperty("trusted", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
-                if (trusted != "undecided")
-                    decided = new(trusted == "yes", result.Value.TryGetProperty("remember", out var remember) && remember.ValueKind == JsonValueKind.True);
-            }
-            return null; // Every handler sees the unchanged { type, cwd } event.
+            if (result.Value.ValueKind != JsonValueKind.Object) return false;
+            var trusted = result.Value.TryGetProperty("trusted", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+            if (trusted == "undecided") return false;
+            decided = new(trusted == "yes", result.Value.TryGetProperty("remember", out var remember) && remember.ValueKind == JsonValueKind.True);
+            return true; // The first decision wins; later handlers do not run.
         }, async (diagnostic, _) =>
         {
             if (onError is not null) await onError($"Extension \"{diagnostic.OwnerId}\" project_trust error: {diagnostic.Message ?? diagnostic.Failure.ToString()}").ConfigureAwait(false);
@@ -61,25 +69,25 @@ internal static class PiExtensionEvents
         ArgumentNullException.ThrowIfNull(registry); ArgumentNullException.ThrowIfNull(snapshot);
         if (reason is not ("startup" or "reload")) throw new ArgumentException("resources_discover reason is startup or reload.", nameof(reason));
         if (!registry.HasEventHandlers(snapshot, ResourcesDiscover)) return PiDiscoveredResources.Empty;
-        var skills = ImmutableArray.CreateBuilder<string>(); var prompts = ImmutableArray.CreateBuilder<string>(); var themes = ImmutableArray.CreateBuilder<string>();
+        var skills = ImmutableArray.CreateBuilder<PiDiscoveredPath>(); var prompts = ImmutableArray.CreateBuilder<PiDiscoveredPath>(); var themes = ImmutableArray.CreateBuilder<PiDiscoveredPath>();
         var initial = JsonData.Parse(JsonSerializer.Serialize(new { type = ResourcesDiscover, cwd, reason }));
-        await registry.ReduceEventAsync(snapshot, ResourcesDiscover, initial, (_, result) =>
+        await registry.DispatchUntilAsync(snapshot, ResourcesDiscover, initial, (owner, result) =>
         {
             if (result.Value.ValueKind == JsonValueKind.Object)
             {
-                Collect(result.Value, "skillPaths", skills); Collect(result.Value, "promptPaths", prompts); Collect(result.Value, "themePaths", themes);
+                Collect(result.Value, "skillPaths", owner, skills); Collect(result.Value, "promptPaths", owner, prompts); Collect(result.Value, "themePaths", owner, themes);
             }
-            return null;
+            return false;
         }, async (diagnostic, _) =>
         {
             if (onError is not null) await onError(diagnostic.OwnerId, diagnostic.Message ?? diagnostic.Failure.ToString()).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
         return new(skills.ToImmutable(), prompts.ToImmutable(), themes.ToImmutable());
 
-        static void Collect(JsonElement result, string name, ImmutableArray<string>.Builder target)
+        static void Collect(JsonElement result, string name, string owner, ImmutableArray<PiDiscoveredPath>.Builder target)
         {
             if (result.TryGetProperty(name, out var paths) && paths.ValueKind == JsonValueKind.Array)
-                foreach (var path in paths.EnumerateArray()) if (path.ValueKind == JsonValueKind.String) target.Add(path.GetString()!);
+                foreach (var path in paths.EnumerateArray()) if (path.ValueKind == JsonValueKind.String) target.Add(new(path.GetString()!, owner));
         }
     }
 }

@@ -19,6 +19,9 @@ internal sealed record PiToolPolicy(PiToolPolicyMode Mode)
     /// <summary>Directories whose <c>.jsonl</c> files are protected at any depth (the agent directory's <c>sessions</c> tree).</summary>
     internal ImmutableArray<string> ProtectedTrees { get; init; } = [];
     internal IReadOnlyDictionary<string, string>? Environment { get; init; }
+    /// <summary>The rg/fd tools manager the grep and find tools use (null: no search tools); status messages go to the reporter.</summary>
+    internal PiToolsManager? Search { get; init; }
+    internal Action<PiToolStatus>? ReportToolStatus { get; init; }
     internal static PiToolPolicy Explicit { get; } = new(PiToolPolicyMode.Explicit);
 }
 

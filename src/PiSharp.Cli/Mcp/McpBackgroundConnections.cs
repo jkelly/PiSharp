@@ -20,12 +20,12 @@ public sealed record McpBackgroundServerAdmission(string Name, Action<McpServerE
 public sealed record McpBackgroundConnectionReport(long Generation, McpServerEntry Entry, McpRuntimeSnapshot? Snapshot, Exception? Failure);
 
 /// <summary>Pi 1.1.0 background connection: every enabled server connects here after the attachment is bound. Its tools are
-/// published to the session catalog when it connects (at the next idle boundary, through <see cref="McpPreparedServer"/>), the
-/// `mcp_servers` section picks up its instructions, and a failure is reported without affecting the session. Before idle input
-/// is admitted, <see cref="BeforeInputAsync"/> waits as the original's hooks do: the first prompt up to <see cref="StartupWait"/>
-/// for servers with `direct` tools (waitForDirectServers) and, because PiSharp publishes tools between runs rather than during
-/// one, every prompt for the servers an active `tool_search` (all of them) or `codemode` (its servers) reaches. Retiring the
-/// attachment cancels connections still pending and joins them.</summary>
+/// published to the session catalog when it connects (during a run, at once and declared from the run's next request; see
+/// <see cref="PersistentAgentSession.TryPublishToolCatalogDuringRunAsync"/>), the `mcp_servers` section picks up its
+/// instructions, and a failure is reported without affecting the session. Before idle input is admitted,
+/// <see cref="BeforeInputAsync"/> waits as the original's before_agent_start does: the first prompt up to
+/// <see cref="StartupWait"/> for servers with `direct` tools (waitForDirectServers). Retiring the attachment cancels connections
+/// still pending and joins them.</summary>
 public sealed class McpBackgroundConnections
 {
     /// <summary>The original's startupWaitMs default.</summary>
@@ -105,10 +105,9 @@ public sealed class McpBackgroundConnections
         }
     }
 
-    /// <summary>The waits the original runs in before_agent_start and tool_call, before idle input is admitted. The first prompt
-    /// waits up to <see cref="StartupWait"/> for servers with `direct` tools, then notes that the others are still connecting.
-    /// An active tool_search reaches every server and an active codemode the servers with `codemode` tools, so their tools are
-    /// registered before the prompt runs.</summary>
+    /// <summary>index.ts before_agent_start waitForDirectServers, before idle input is admitted: the first prompt waits up to
+    /// <see cref="StartupWait"/> for servers with `direct` tools, then notes that the others are still connecting. tool_search,
+    /// codemode and the resource tools wait for the servers they reach inside their calls (tool_call), not here.</summary>
     internal async Task BeforeInputAsync(PersistentAgentSession session, CancellationToken token)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -126,12 +125,6 @@ public sealed class McpBackgroundConnections
                     catch (Exception) { /* A notice failure must not affect the session. */ }
             }
         }
-        var active = session.GetActiveTools();
-        if (active.Contains(McpToolSearch.Name, StringComparer.Ordinal))
-            await WhenSettled(_ => true).WaitAsync(token).ConfigureAwait(false);
-        else if (active.Contains(PiSharp.Extensions.Mcp.Discovery.McpDiscoveryToolIdentity.CodemodeName, StringComparer.Ordinal))
-            await WhenSettled(entry => McpConfigurationReader.ConfiguredExposures(entry.Config).Contains(McpExposure.Codemode))
-                .WaitAsync(token).ConfigureAwait(false);
     }
 
     private async Task RunAsync(ReplaceableAgentSession owner, AgentSessionAttachment attachment)

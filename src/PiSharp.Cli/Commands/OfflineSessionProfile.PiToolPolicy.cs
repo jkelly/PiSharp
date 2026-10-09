@@ -15,25 +15,32 @@ internal sealed partial class OfflineSessionProfile
     private static (BashTool? Bash, UserBashHost? UserBash, OwnedProcessCleanup? Cleanup, string? Shell) PiBash(
         PiSharp.Cli.Pi.PiToolPolicy policy, BuiltinToolSettings settings, string workspace, Func<BashSessionEnvironment?> session)
     {
-        // The native process runner is Windows-only in this build (NativeProcessRunner reports UnsupportedPlatform elsewhere, and
-        // PiSharp.Tools has no production Unix process-group admission yet), so bash is not offered where it cannot run.
-        if (!OperatingSystem.IsWindows()) return (null, null, null, null);
+        // Windows runs the native job-object runner; Linux and macOS the POSIX process-group admission (posix_spawn into a fresh group).
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return (null, null, null, null);
         ShellConfiguration shell;
         try { shell = ShellDiscovery.Resolve(settings.ShellPath); }
         catch (ShellDiscoveryException) { return (null, null, null, null); }
         var environment = ShellDiscovery.ShellEnvironment(policy.Environment ?? ProcessEnvironment(), ShellDiscovery.BinDirectory(), OperatingSystem.IsWindows());
         var spill = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()));
         var unboundedOutput = new ProcessRunnerOptions(MaximumRawBytes: int.MaxValue);
-        var cleanup = new OwnedProcessCleanup(new NativeProcessRunner(unboundedOutput));
+        var cleanup = new OwnedProcessCleanup(OperatingSystem.IsWindows() ? new NativeProcessRunner(unboundedOutput)
+            : new PiSharp.Tools.Processes.Unix.UnixProcessRunner(new PiSharp.Tools.Processes.Unix.PosixSpawnProcessAdmission(), unboundedOutput));
         try
         {
             var bash = new BashTool(cleanup, BashToolOptions.FromShell(shell, workspace, environment, spill) with
             { CommandPrefix = settings.ShellCommandPrefix, SessionEnvironment = session });
-            var user = new UserBashHost(new(new NativeShellOperations(shell, environment, spill, unboundedOutput), spill), settings.ShellCommandPrefix);
+            IShellOperations operations = OperatingSystem.IsWindows() ? new NativeShellOperations(shell, environment, spill, unboundedOutput)
+                : new PiSharp.Tools.Processes.Unix.PosixShellOperations(shell, environment, spill);
+            var user = new UserBashHost(new(operations, spill), settings.ShellCommandPrefix);
             return (bash, user, cleanup, shell.Shell);
         }
         catch (ArgumentException) { return (null, null, null, null); }
     }
+
+    /// <summary>The separated process runner of the search tools: the native runner on Windows, the POSIX process-group runner on Linux
+    /// and macOS.</summary>
+    internal static ISeparatedProcessRunner PiProcessRunner() => OperatingSystem.IsWindows() ? new NativeProcessRunner()
+        : new PiSharp.Tools.Processes.Unix.UnixProcessRunner(new PiSharp.Tools.Processes.Unix.PosixSpawnProcessAdmission());
 
     /// <summary>The process environment (source process.env), one entry per name.</summary>
     internal static IReadOnlyDictionary<string, string> ProcessEnvironment()

@@ -31,12 +31,17 @@ internal static partial class Program
         cases.AddRange(EntryCases());
         cases.AddRange(AuthCases());
         cases.AddRange(ExtensionEventCases());
+        cases.AddRange(McpTrustCases());
+        cases.AddRange(ToolsManagerCases());
+        cases.AddRange(UnixProcessCases());
+        cases.AddRange(GapCases());
         var filter = Environment.GetEnvironmentVariable("CLIPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;
         foreach (var test in cases)
         {
             try { await test.Run().WaitAsync(TimeSpan.FromSeconds(180)); results.Add(new { test.Id, status = "PASS_AUTHORED_NATIVE_ONLY" }); }
+            catch (SkipException skip) { results.Add(new { test.Id, status = "SKIPPED_PLATFORM", failure = skip.Message }); }
             catch (Exception error) { failures++; results.Add(new { test.Id, status = "FAIL", failure = error.ToString() }); }
         }
         var output = new { sourceSha = Upstream, status = "AUTHORED NATIVE; NO UPSTREAM CAPTURE", cases = cases.Count, failures,
@@ -50,6 +55,10 @@ internal static partial class Program
         Console.WriteLine(json);
         return failures == 0 ? 0 : 1;
     }
+
+    /// <summary>A case that does not apply on this platform (reported as SKIPPED_PLATFORM, not as a pass).</summary>
+    private sealed class SkipException(string reason) : Exception(reason);
+    private static void UnixOnly() { if (OperatingSystem.IsWindows()) throw new SkipException("Linux and macOS only (the release pipeline runs it on ubuntu-latest)."); }
 
     private static Func<Task> Sync(Action run) => () => { run(); return Task.CompletedTask; };
     private static void Check(bool value, string reason) { if (!value) throw new InvalidOperationException(reason); }
@@ -73,6 +82,8 @@ internal static partial class Program
         public Dictionary<string, string?> Vars { get; } = new(StringComparer.Ordinal);
         public List<Seen> Requests { get; } = [];
         public Func<Seen, int, HttpResponseMessage> Respond { get; set; } = (_, _) => AnthropicText("ok");
+        /// <summary>Requests to the remote model catalog (main.ts RPC background refresh); every catalog answers 404.</summary>
+        public List<string> CatalogRequests { get; } = [];
         public Sandbox(string name, bool trusted = true)
         {
             Root = Path.Combine(Path.GetFullPath(Path.GetTempPath()), "pisharp-cli-parity", name + "-" + Guid.NewGuid().ToString("N")[..8]);
@@ -94,7 +105,8 @@ internal static partial class Program
             return path;
         }
         public LiveSessionRuntime Runtime() => new(name => Vars.GetValueOrDefault(name), () => new Endpoint(this),
-            Path.Combine(AgentDir, "auth.json"), ModelsPath: Path.Combine(AgentDir, "models.json"));
+            Path.Combine(AgentDir, "auth.json"), ModelsPath: Path.Combine(AgentDir, "models.json"))
+        { CatalogBaseUrl = "https://catalog.test", CreateCatalogClient = () => new HttpClient(new Catalog(this)) };
         public PiHost Host(StringWriter stdout, StringWriter stderr, string? stdin, bool interactive = false,
             Func<string[], PiEntryOptions, CancellationToken, Task<int>>? runInteractive = null, Stream? rpcInput = null, Stream? rpcOutput = null) => new()
         {
@@ -133,6 +145,15 @@ internal static partial class Program
             int index;
             lock (sandbox.Requests) { sandbox.Requests.Add(seen); index = sandbox.Requests.Count - 1; }
             return sandbox.Respond(seen, index);
+        }
+    }
+
+    private sealed class Catalog(Sandbox sandbox) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            lock (sandbox.CatalogRequests) sandbox.CatalogRequests.Add(request.RequestUri!.AbsoluteUri);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
         }
     }
 

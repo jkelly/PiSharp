@@ -178,6 +178,8 @@ public sealed class McpDefaultOAuthHost : IAsyncDisposable
             options.AuthorizationServerMetadataUrl)), token).ConfigureAwait(false);
     }
     private Uri? challengedMetadata;
+    /// <summary>signInMcpServer resourceMetadataUrl: discovery starts at the resource metadata URL of the challenge that asked for the sign-in.</summary>
+    internal void UseChallenge(Uri? resourceMetadataUrl) { lock (authorizationGate) challengedMetadata = resourceMetadataUrl; }
     private async Task UnauthorizedAsync(McpHttpUnauthorizedContext context, CancellationToken token)
     {
         if (context.ServerUrl != resources.Server) throw new ArgumentException("Unauthorized response belongs to another MCP endpoint.");

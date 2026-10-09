@@ -74,6 +74,8 @@ public sealed class McpAdmittedOAuthRefreshAdapter
     /// server's tokens meanwhile (many servers rotate refresh tokens, and two refreshes with one token lose the grant). Inside the
     /// lock, tokens that changed meanwhile are used without refreshing. Null serializes refreshes only within this adapter.</summary>
     public Func<CancellationToken, Task<IAsyncDisposable>>? RefreshLock { get; init; }
+    /// <summary>oauth.ts onChallenge: receives the `WWW-Authenticate` challenge of every 401 or 403 this adapter handles.</summary>
+    public Action<McpOAuthChallenge>? OnChallenge { get; init; }
     public McpAdmittedOAuthRefreshAdapter(Uri exactServer, IMcpAdmittedOAuthStateStore explicitlyAdmittedStore,
         McpAdmittedOAuthExchange explicitlyAdmittedExchange, Func<double> unixMilliseconds, McpOAuthCancellationAdmission cancellationAdmission,
         McpOAuthAdmittedClient? configuredClient = null, int maximumBytes = 1_048_576)
@@ -149,6 +151,10 @@ public sealed class McpAdmittedOAuthRefreshAdapter
         try
         {
             var challenge = Challenge(context.Response);
+            // oauth.ts onChallenge: the connection keeps the challenge, so a sign-in uses its resource metadata URL and scope.
+            if (OnChallenge is { } report)
+                try { report(McpOAuthChallenge.Parse(context.Response.Headers.TryGetValues("WWW-Authenticate", out var values) ? string.Join(",", values) : null)); }
+                catch (Exception) { /* Recording the challenge must not change the request. */ }
             // The original skips refresh for insufficient scope and proceeds to authorization.
             // This bounded adapter refuses before refresh; browser/code acquisition is not admitted.
             if (challenge.Error == "insufficient_scope") throw new McpOAuthAuthorizationRequiredException();

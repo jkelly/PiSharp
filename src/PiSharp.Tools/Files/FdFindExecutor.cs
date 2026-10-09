@@ -41,7 +41,7 @@ public sealed class FdFindExecutor : IFindExecutor
         ArgumentNullException.ThrowIfNull(admission); ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(spills); ArgumentNullException.ThrowIfNull(environment);
         if (!Absolute(binary.Executable) || binary.Length is < 1 or > 64 * 1024 * 1024 || binary.Sha256 is not { Length: 64 } ||
-            !binary.Sha256.All(char.IsAsciiHexDigit) || binary.RuntimeIdentifier != "win-x64" ||
+            !binary.Sha256.All(char.IsAsciiHexDigit) || !Text(binary.RuntimeIdentifier, 64) ||
             !Text(binary.Version, 128) || !Text(binary.AdmissionReceipt, 256) || !Absolute(workspace) || environment.Count > 1024 ||
             environment.Any(pair => !Text(pair.Key, 4096) || pair.Key.Contains('=') || pair.Value is null || pair.Value.Length > 16_384 || pair.Value.Contains('\0')) ||
             environment.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count() != environment.Count ||

@@ -20,7 +20,9 @@ public sealed partial class PersistentAgentSession
     private readonly AsyncLocal<bool> _activationPreparation = new();
     private PendingActivation? _pendingActivation;
     private bool _activationPublishing;
-    private sealed record PendingActivation(long Epoch, ImmutableArray<string> Names, ToolLoadoutPresentation? Presentation);
+    /// <summary><paramref name="ReplaceDeclarations"/>: the catalog changed during a run (<see cref="TryPublishToolCatalogDuringRunAsync"/>), so the
+    /// next boundary records and reconfigures the loadout even when the names did not change.</summary>
+    private sealed record PendingActivation(long Epoch, ImmutableArray<string> Names, ToolLoadoutPresentation? Presentation, bool ReplaceDeclarations = false);
 
     public SessionToolActivationSelection GetToolActivationSelection()
     {
@@ -34,13 +36,15 @@ public sealed partial class PersistentAgentSession
         if (_activationPreparation.Value || _inLoadoutDiagnosticDrain.Value) throw new InvalidOperationException("Loadout preparation or diagnostic reporting cannot reenter activation.");
         using var preparation = ReserveSynchronousLoadoutWork();
         SessionRuntimeRegistry registry; AgentConfiguration configuration; SessionContextProjection context;
-        long epoch; ImmutableArray<string> previous;
+        long epoch; ImmutableArray<string> previous; bool replace;
         lock (_gate)
         {
             ThrowActivationAvailable(); cancellationToken.ThrowIfCancellationRequested();
             registry = _registry ?? throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
             configuration = _configuration; context = _context; epoch = _activationEpoch;
             previous = _pendingActivation?.Names ?? configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
+            // A catalog change during the run still owes its reconfiguration, even when the selection returns to the recorded names.
+            replace = _pendingActivation?.ReplaceDeclarations == true;
         }
         var normalized = registry.NormalizeActiveTools(names, cancellationToken);
         if (previous.SequenceEqual(normalized, StringComparer.Ordinal))
@@ -49,7 +53,7 @@ public sealed partial class PersistentAgentSession
             SelectPendingToolsLocked(previous, normalized); return new(epoch, normalized); } }
         if (normalized.Length > (_agentOptions?.MaximumTools ?? 128)) throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
         var nextEpoch = checked(epoch + 1);
-        var delta = registry.CreateActivationMessage(normalized, configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), 0, cancellationToken);
+        var delta = registry.CreateActivationMessage(normalized, configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), 0, cancellationToken, replaceDeclarations: replace);
         ToolLoadoutPresentation? presentation;
         _activationPreparation.Value = true;
         try
@@ -66,7 +70,7 @@ public sealed partial class PersistentAgentSession
             if (_activationEpoch != epoch || !ReferenceEquals(_configuration, configuration))
                 throw new InvalidOperationException("Activation selection changed during preparation.");
             _activationEpoch = nextEpoch;
-            _pendingActivation = delta is null ? null : new(nextEpoch, normalized, presentation);
+            _pendingActivation = delta is null ? null : new(nextEpoch, normalized, presentation, replace);
             SelectPendingToolsLocked(previous, normalized);
             return new(nextEpoch, normalized);
         }
@@ -106,7 +110,7 @@ public sealed partial class PersistentAgentSession
         }
         var names = pending?.Names ?? _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
         var delta = pending is null ? null : registry.CreateActivationMessage(names,
-            _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), _clock(), token);
+            _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), _clock(), token, replaceDeclarations: pending.ReplaceDeclarations);
         SessionPromptSectionPreparation? promptPreparation;
         _activationPreparation.Value = true;
         try { (delta, promptPreparation) = registry.PreparePromptSectionMessage(names, context.Messages, delta, _clock(), token, pending?.Presentation); }

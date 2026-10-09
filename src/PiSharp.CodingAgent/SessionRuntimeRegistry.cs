@@ -46,6 +46,8 @@ public sealed record SessionRuntimeSelection(AgentConfiguration Configuration, I
 {
     public ImmutableArray<ToolLoadoutDiagnostic> LoadoutDiagnostics { get; init; } = [];
     public long ModelCatalogRevision { get; init; }
+    /// <summary>The invoker of <see cref="Configuration"/>'s tools, which also reaches its callable nested tools.</summary>
+    internal ToolInvoker? Invoker { get; init; }
 }
 /// <summary>A loadout restored from the transcript: tools left out that stay pending, and whether it differs from the record.</summary>
 internal sealed record SessionRestoredLoadout(SessionRuntimeSelection Selection, ImmutableArray<string> Pending, bool RequiresRecord);
@@ -437,7 +439,7 @@ public sealed partial class SessionRuntimeRegistry
         cancellationToken.ThrowIfCancellationRequested();
         return new(new AgentConfiguration(binding.Model, binding.Transport, definitions, binding.ToolHooks, binding.ExecutionMode, hooks)
             { ThinkingLevel = thinkingLevel },
-            rawDeclarations.ToImmutable()) { LoadoutDiagnostics = loadoutDiagnostics, ModelCatalogRevision = catalog.Revision };
+            rawDeclarations.ToImmutable()) { LoadoutDiagnostics = loadoutDiagnostics, ModelCatalogRevision = catalog.Revision, Invoker = invoker };
 
         void Count()
         {
