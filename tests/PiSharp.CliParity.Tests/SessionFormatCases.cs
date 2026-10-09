@@ -66,7 +66,18 @@ internal static partial class Program
                 if (next - first >= steps.Length) { input.Complete(); return; }
                 var step = steps[next - first];
                 var command = new JsonObject { ["id"] = (++next).ToString(System.Globalization.CultureInfo.InvariantCulture) };
-                foreach (var (key, value) in step) command[key] = value?.DeepClone();
+                foreach (var (key, value) in step)
+                {
+                    // "$fork:N" names the N-th entry id of the last get_fork_messages response.
+                    if (value is JsonValue text && text.GetValueKind() == JsonValueKind.String && text.GetValue<string>().StartsWith("$fork:", StringComparison.Ordinal))
+                    {
+                        string[] seen; lock (events) seen = [.. events];
+                        var forks = seen.Select(line => JsonNode.Parse(line)!).Last(line => line["type"]?.GetValue<string>() == "response" &&
+                            line["command"]?.GetValue<string>() == "get_fork_messages")["data"]!["messages"]!.AsArray();
+                        command[key] = forks[int.Parse(text.GetValue<string>()[6..], System.Globalization.CultureInfo.InvariantCulture)]!["entryId"]!.DeepClone();
+                    }
+                    else command[key] = value?.DeepClone();
+                }
                 input.Send(command.ToJsonString());
             }
             using var output = new LineOutput(line =>

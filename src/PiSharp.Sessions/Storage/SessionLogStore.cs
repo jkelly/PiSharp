@@ -263,18 +263,9 @@ public sealed class SessionLogStore : IAsyncDisposable
     private static SessionEntry Own(SessionEntryCodec codec, SessionEntry entry, bool javaScript)
     {
         if (!javaScript) return codec.Read(entry.WireBody.Value);
-        string text;
-        try
-        {
-            // JSON.stringify(JSON.parse(record)); the codec then applies its own bounds to the result.
-            text = EcmaScriptJsonProjection.Project(entry.WireBody, new(MaximumInputCharacters: int.MaxValue, MaximumInputBytes: int.MaxValue,
-                MaximumOutputCharacters: int.MaxValue, MaximumOutputBytes: int.MaxValue, MaximumDepth: 64, MaximumNodes: int.MaxValue,
-                MaximumPropertiesPerObject: int.MaxValue, MaximumNumbers: int.MaxValue, MaximumNumberCharacters: 16_384,
-                MaximumTotalNumberCharacters: int.MaxValue, MaximumStringCharacters: int.MaxValue));
-        }
+        try { return SessionJavaScriptJson.Stringify(codec, entry); }
         catch (EcmaScriptJsonProjectionException error)
         { throw Error(error.Failure == EcmaScriptJsonProjectionFailure.ResourceLimit ? SessionLogStoreFailure.ResourceLimit : SessionLogStoreFailure.InvalidEntry); }
-        return codec.Parse(text);
     }
     private static byte[] Encode(SessionEntryCodec codec, SessionEntry entry, SessionLogReaderOptions bounds)
     {

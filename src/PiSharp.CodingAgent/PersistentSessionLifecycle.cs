@@ -64,7 +64,8 @@ public sealed class PersistentSessionLifecycle
         var bounds = this.options.SessionLogStoreOptions?.ReaderOptions ?? new();
         var graph = this.options.ContextOptions ?? new();
         planner = new(new(Math.Min(100_000, Math.Min(graph.MaximumEntries, Math.Max(1, bounds.MaximumRecords - 1))),
-            bounds.MaximumInputBytes, bounds.CodecOptions, graph.MaximumInputCharacters));
+            bounds.MaximumInputBytes, bounds.CodecOptions, graph.MaximumInputCharacters,
+            JavaScriptSerialization: this.options.SessionLogStoreOptions?.JavaScriptSerialization == true));
         publisher = new(new(bounds, graph), fileSystem);
         Catalog = catalog;
         this.registryForWorkingDirectory = registryForWorkingDirectory;
