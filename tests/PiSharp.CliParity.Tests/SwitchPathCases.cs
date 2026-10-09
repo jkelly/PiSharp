@@ -81,6 +81,34 @@ internal static partial class Program
             Equal(elsewhere, Path.GetDirectoryName(responses[5]["data"]!["sessionFile"]!.GetValue<string>()), "new session next to it");
             Equal(0, sandbox.SessionFiles().Length, "nothing in the session directory");
         }),
+        ("switch.sessions-without-messages-choose-their-model-like-find-initial-model", async () =>
+        {
+            // main.ts createRuntime runs buildSessionOptions and sdk.ts findInitialModel for every session: one without messages
+            // (new_session, a missing file) takes the scoped pick, else the saved default, else the first available model, not
+            // the model set_model chose (rpc set_model does not persist it). Pi 1.1.0 run with node: claude-opus-4-8 without a scope
+            // or default, claude-haiku-4-5 with --models claude-haiku-4-5,claude-sonnet-4-5 or the default claude-haiku-4-5.
+            async Task Expect(string expected, string[] extra, string? settings = null)
+            {
+                using var sandbox = new Sandbox("new-session-model");
+                if (settings is not null) sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), settings);
+                var missing = Path.Combine(sandbox.Root, "elsewhere", "missing.jsonl");
+                var responses = await RpcSequence(sandbox, ["--mode", "rpc", .. extra],
+                    """{"id":"1","type":"set_model","provider":"anthropic","modelId":"claude-sonnet-4-5"}""",
+                    """{"id":"2","type":"new_session"}""",
+                    """{"id":"3","type":"get_state"}""",
+                    """{"id":"4","type":"set_model","provider":"anthropic","modelId":"claude-sonnet-4-5"}""",
+                    """{"id":"5","type":"switch_session","sessionPath":""" + JsonValue.Create(missing)!.ToJsonString() + "}",
+                    """{"id":"6","type":"get_state"}""");
+                Check(responses[0]["success"]!.GetValue<bool>() && responses[3]["success"]!.GetValue<bool>(), "set_model: " + responses[0].ToJsonString());
+                Equal(expected, responses[2]["data"]!["model"]!["id"]!.GetValue<string>(), "new_session model " + string.Join(' ', extra));
+                Equal(expected, responses[5]["data"]!["model"]!["id"]!.GetValue<string>(), "missing file model " + string.Join(' ', extra));
+            }
+            await Expect("claude-opus-4-8", []);
+            await Expect("claude-haiku-4-5", ["--models", "claude-haiku-4-5,claude-sonnet-4-5"]);
+            await Expect("claude-haiku-4-5", [], """{"defaultProvider":"anthropic","defaultModel":"claude-haiku-4-5"}""");
+            // --model is every session's model (buildSessionOptions options.model).
+            await Expect("claude-haiku-4-5", ["--provider", "anthropic", "--model", "claude-haiku-4-5"]);
+        }),
         ("switch.headerless-entries-are-not-a-valid-session", async () =>
         {
             using var sandbox = new Sandbox("headerless");

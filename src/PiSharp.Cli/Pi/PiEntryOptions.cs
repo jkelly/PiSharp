@@ -62,6 +62,8 @@ internal sealed record PiEntryOptions
     internal PromptTemplateCliConfiguration PromptTemplates { get; init; } = new([]);
     internal string? ThinkingLevel { get; init; }
     internal bool ThinkingFromCli { get; init; }
+    /// <summary>The --models patterns (null: settings enabledModels), which main.ts resolves again for every session it creates.</summary>
+    internal ImmutableArray<string>? ModelPatterns { get; init; }
     /// <summary>Messages and images the interactive frontend submits at startup (IMPL-I): source initialMessage/initialImages/initialMessages.</summary>
     internal string? InitialMessage { get; init; }
     internal ImmutableArray<JsonData> InitialImages { get; init; } = [];

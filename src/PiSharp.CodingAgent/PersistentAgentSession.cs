@@ -30,6 +30,9 @@ public sealed record PersistentAgentSessionOptions(bool UseLatestLeaf = true, st
     /// <summary>sdk.ts createAgentSession for a session without messages: its thinking level for the model it runs on (given the
     /// model's supported levels; null keeps the restored level). When set, opening such a session records the model and that level.</summary>
     public Func<ModelDescriptor, ImmutableArray<string>, string?>? NewSessionThinkingLevel { get; init; }
+    /// <summary>sdk.ts findInitialModel (with main.ts's scoped pick) for a session without messages, when no <see cref="SelectedModel"/>
+    /// is set: the model it records and runs on (null, or a model without a binding, keeps the restored or current model).</summary>
+    public Func<CancellationToken, ValueTask<ModelDescriptor?>>? NewSessionModel { get; init; }
 }
 /// <summary>A prompt the session refused before admitting it (agent-session.ts prompt validation); nothing was persisted.</summary>
 public sealed class SessionPromptRejectedException(string message) : Exception(message);
@@ -333,7 +336,15 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             if (configured.NewSessionThinkingLevel is { } initialThinking && !context.Messages.Any(message => message.Role != "system"))
             {
                 var model = loadout.Selection.Configuration.Model;
-                var level = initialThinking(model, registry.GetSupportedThinkingLevels(model)) ?? loadout.Selection.Configuration.ThinkingLevel;
+                // main.ts buildSessionOptions + sdk.ts findInitialModel: without --model, a session without messages takes the scoped
+                // models' pick, else the saved default, else the first available model, not the model in use.
+                if (configured.SelectedModel is null && configured.NewSessionModel is { } choose && await choose(cancellationToken).ConfigureAwait(false) is { } chosen)
+                {
+                    try { _ = registry.GetSupportedThinkingLevels(chosen); model = chosen; }
+                    catch (SessionRuntimeRegistryException error) when (error.Failure == SessionRuntimeRegistryFailure.UnknownModel) { /* Not bound: keep. */ }
+                }
+                var level = initialThinking(model, registry.GetSupportedThinkingLevels(model)) ?? (model == loadout.Selection.Configuration.Model
+                    ? loadout.Selection.Configuration.ThinkingLevel : registry.GetDefaultThinkingLevel(model));
                 var header = store.Snapshot.Header; var existing = store.Snapshot.Entries;
                 var modelEntry = Record(codec, "model_change", Identity(nextEntryId, header.Id, existing), context.LeafId, clock, writer =>
                 {

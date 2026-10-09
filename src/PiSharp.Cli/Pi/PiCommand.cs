@@ -410,6 +410,7 @@ internal static class PiCommand
             SystemPrompt = PiSystemPrompt.Admission(resources, skills?.Resources, host.ApplicationDirectory ?? packageDir),
             HeaderId = plan.HeaderId, HeaderTimestamp = plan.HeaderTimestamp, SessionName = sessionName,
             Skills = skills, PromptTemplates = prompts, ThinkingLevel = parsed.Thinking, ThinkingFromCli = parsed.Thinking is not null,
+            ModelPatterns = parsed.Models is { } modelPatterns ? [.. modelPatterns] : null,
             InitialMessage = initialMessage, InitialImages = [.. initialImages.Select(image => image.ToJson())], InitialMessages = [.. parsed.Messages],
             Theme = startupSettings.Theme, TuiMode = parsed.TuiMode, Verbose = parsed.Verbose, Themes = resources.Themes,
             // interactive-mode.ts: the header hides only for quietStartup true, the details for true or "header"; --verbose shows both.

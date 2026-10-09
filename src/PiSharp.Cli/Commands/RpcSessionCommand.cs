@@ -233,6 +233,18 @@ public static class RpcSessionCommand
                     // main.ts buildSessionOptions: --model is the model of every session the run creates or opens.
                     SelectedModel = liveSelection is { FromCliModel: true } fromCli ? fromCli.Model : null,
                     // sdk.ts: a session without messages starts with the CLI level, else the per-model or default setting, clamped.
+                    // main.ts createRuntime for a session without messages: the scoped pick, else findInitialModel (no model: none).
+                    NewSessionModel = async token =>
+                    {
+                        var current = pi.ReloadSettings is { } reloadModel ? await reloadModel(token).ConfigureAwait(false) : settings;
+                        try
+                        {
+                            return (await new SettingsModelSelection(null, null, null) { ModelPatterns = pi.ModelPatterns, UseModelMaximumTokens = true }
+                                .ResolveAsync(current, liveRuntime ?? LiveSessionRuntime.Default, null, false, token).ConfigureAwait(false)).Model;
+                        }
+                        catch (LiveSessionException error) when (error.Code == "NoLiveModel") { return LiveSessionSelection.UnselectedModel; }
+                        catch (Exception error) when (error is LiveSessionException or SessionCommandException) { return null; }
+                    },
                     NewSessionThinkingLevel = (model, levels) => SettingsModelSelection.Thinking(pi.ReloadSettings is { } reloadThinking
                         ? reloadThinking(CancellationToken.None).GetAwaiter().GetResult() : settings, model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel, false, levels) };
             string NextId() => "rpc-" + Guid.NewGuid().ToString("N");
