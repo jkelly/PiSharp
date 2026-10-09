@@ -46,8 +46,8 @@ public static class SessionContextEditCommand
             try
             {
                 var sessionOptions = new PersistentAgentSessionOptions(UseLatestLeaf: parsed.Latest, SelectedLeafId: parsed.Leaf,
-                    AgentOptions: new(Loop: new(MaximumTurns: 64, MaximumTranscriptMessages: 1024)),
-                    SessionLogStoreOptions: new(ReaderOptions: new(MaximumInputBytes: 8_388_608, MaximumLines: 10_000, MaximumRecords: 10_000)));
+                    AgentOptions: new(Loop: new(MaximumTurns: 64)),
+                    SessionLogStoreOptions: new(ReaderOptions: new(MaximumInputBytes: 8_388_608)));
                 long sequence = 0; var start = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 long Clock() => start + Interlocked.Increment(ref sequence);
                 string NextId() => "cli-edit-" + Guid.NewGuid().ToString("N");

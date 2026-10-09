@@ -134,9 +134,12 @@ internal static class MistralReplayTests
     }
     private static async Task Bounds()
     {
+        // Pi caps no message count; the replay character budget bounds the transcript before any payload hook or HTTP.
         var input = Enumerable.Repeat(User(), 257).ToArray(); var before = input.Select(message => message.WireBody.ToString()).ToArray(); var hooks = 0;
+        var characters = input.Sum(message => message.WireBody.Value.GetRawText().Length);
         using var handler = new Handler(_ => throw new InvalidOperationException("Refused HTTP admission.")); using var client = new HttpClient(handler);
-        var transport = new MistralTextHttpSseTransport(client, Model, Options with { OnPayload = (_, _, _) => { hooks++; return ValueTask.FromResult<JsonData?>(null); } });
+        var transport = new MistralTextHttpSseTransport(client, Model, Options with { MaximumContentCharacters = characters - 1,
+            OnPayload = (_, _, _) => { hooks++; return ValueTask.FromResult<JsonData?>(null); } });
         var observations = new List<StreamEvent>(); await foreach (var observation in transport.StreamAsync(new(Model, [.. input]))) observations.Add(observation);
         Check(observations.Last() is StreamError { NativeDiagnostic.Code: NativeChatFailureCode.ResourceLimit } &&
             !observations.OfType<StreamStarted>().Any() && hooks == 0 && handler.Calls == 0 && before.SequenceEqual(input.Select(message => message.WireBody.ToString())));

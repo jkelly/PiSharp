@@ -67,6 +67,7 @@ internal static partial class Program
             ("auth.anthropic.live-route-stored-key-env-precedence-and-federation", LiveAnthropicPrecedenceAndFederation),
             ("provider.anthropic.live-route-managed-effort-levels-markers-and-recorded-effort", LiveManagedEffortLevels),
             ("provider.azure.live-route-responses-completions-and-endpoint-errors", LiveAzureRoutes),
+            ("live.long-session-2000-messages-10000-records-opens-and-sends-whole-transcript", LiveLongSessionOpensAndPrompts),
             ("mcp.session.global-config-direct-background-failure-report-and-no-mcp", McpProductionSession),
             ("mcp.session.oauth-server-sends-stored-mcp-auth-token", McpOAuthServerUsesStoredTokens),
             ("mcp.session.windows-command-resolution-and-cmd-escaping", McpStdioWindowsCommand),

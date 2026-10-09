@@ -44,7 +44,7 @@ public sealed record OpenAICodexResponsesOptions
     public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask<JsonData?>>? OnPayload { get; init; }
     public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask>? OnResponse { get; init; }
     public Func<JsonData, ModelDescriptor, CancellationToken, ValueTask>? OnProviderStreamEvent { get; init; }
-    public int MaximumMessages { get; init; } = 1024;
+    public int MaximumMessages { get; init; } = PiRequestBudget.RequestMessages;
     /// <summary>Pi has no request-size cap; the default admits image payloads of several megabytes.</summary>
     public int MaximumEntryCharacters { get; init; } = 64 * 1_048_576;
 }

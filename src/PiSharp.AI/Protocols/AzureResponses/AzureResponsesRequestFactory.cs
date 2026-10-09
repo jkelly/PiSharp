@@ -150,7 +150,10 @@ public sealed class AzureResponsesRequestFactory
         {
             var projected = EcmaScriptJsonProjection.Project(payload, new(MaximumInputCharacters: _options.MaximumPayloadBytes,
                 MaximumInputBytes: _options.MaximumPayloadBytes, MaximumOutputCharacters: _options.MaximumPayloadBytes, MaximumOutputBytes: _options.MaximumPayloadBytes,
-                MaximumDepth: _options.MaximumJsonDepth, MaximumStringCharacters: _options.MaximumPayloadBytes), token);
+                MaximumDepth: _options.MaximumJsonDepth, MaximumStringCharacters: _options.MaximumPayloadBytes,
+                // Node and number counts grow with the message count; the payload budget bounds them.
+                MaximumNodes: _options.MaximumPayloadBytes, MaximumNumbers: _options.MaximumPayloadBytes,
+                MaximumTotalNumberCharacters: _options.MaximumPayloadBytes), token);
             return JsonData.Parse(projected);
         }
         catch (EcmaScriptJsonProjectionException error)

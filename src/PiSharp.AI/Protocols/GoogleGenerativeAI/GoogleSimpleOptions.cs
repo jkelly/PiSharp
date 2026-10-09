@@ -7,7 +7,7 @@ namespace PiSharp.AI.Protocols.GoogleGenerativeAI;
 public sealed record GoogleSimpleOptions(GoogleGenerativeAIOptions DirectOptions, string? Reasoning = null)
 {
     public JsonData? ThinkingBudgets { get; init; }
-    public int MaximumContextMessages { get; init; } = 4096;
+    public int MaximumContextMessages { get; init; } = PiRequestBudget.RequestMessages;
     public int MaximumContextCharacters { get; init; } = PiRequestBudget.RequestPayloadBytes;
     public override string ToString() => nameof(GoogleSimpleOptions);
 }

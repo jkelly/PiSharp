@@ -34,7 +34,9 @@ public sealed class GoogleVertexRequestFactory
         // The body (images included) is bounded by the payload budget, not by the projection's 1 MiB string defaults.
         var budget = Math.Max(projection.MaximumPayloadBytes, 1_048_576);
         var bytes = Encoding.UTF8.GetBytes(EcmaScriptJsonProjection.Project(body, new(MaximumInputCharacters: budget, MaximumInputBytes: Math.Max(budget, 4_194_304),
-            MaximumOutputCharacters: budget, MaximumOutputBytes: Math.Max(budget, 4_194_304), MaximumStringCharacters: budget)));
+            MaximumOutputCharacters: budget, MaximumOutputBytes: Math.Max(budget, 4_194_304), MaximumStringCharacters: budget,
+            // Node and number counts grow with the message count; the payload budget bounds them.
+            MaximumNodes: budget, MaximumNumbers: budget, MaximumTotalNumberCharacters: budget)));
         if (bytes.Length > projection.MaximumPayloadBytes) throw GoogleData.Fail(GoogleFailure.ResourceLimit);
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         { ["User-Agent"] = "pi/1.1.0", ["Accept"] = "text/event-stream" };

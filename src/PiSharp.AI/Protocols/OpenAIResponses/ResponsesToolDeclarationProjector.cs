@@ -9,8 +9,8 @@ namespace PiSharp.AI.Protocols.OpenAIResponses;
 
 public sealed record ResponsesToolDeclarationProjectionOptions(
     bool SupportsStrictMode = false, bool? Strict = false,
-    int MaximumMessages = 256, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
-    int MaximumDeclarations = 1024, int MaximumActiveTools = 128, int MaximumJsonDepth = 32,
+    int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
+    int MaximumDeclarations = PiRequestBudget.RequestItems, int MaximumActiveTools = 128, int MaximumJsonDepth = 32,
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes)
 {
     /// <summary>Model compat <c>supportsOpenAIGrammarTools</c>: grammar tools become custom tools and replay as custom tool calls.</summary>

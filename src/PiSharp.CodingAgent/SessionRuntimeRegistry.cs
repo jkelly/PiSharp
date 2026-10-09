@@ -23,7 +23,7 @@ public sealed record SessionRegisteredTool(JsonData Declaration, IPreparedToolAd
     public ImmutableArray<string> PromptGuidelines { get; init; } = [];
 }
 public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int MaximumTools = 128,
-    int MaximumMessages = 1024, int MaximumDeclarations = 4096, int MaximumCharacters = 1_048_576,
+    int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumDeclarations = PiRequestBudget.RequestItems, int MaximumCharacters = 1_048_576,
     int MaximumJsonDepth = 32, ToolInvokerOptions? ToolInvokerOptions = null)
 {
     /// <summary>Borrowed prepared hooks for all active native and extension adapters in the single final-action invoker.</summary>

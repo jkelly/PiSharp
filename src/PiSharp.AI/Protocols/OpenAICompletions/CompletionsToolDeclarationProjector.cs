@@ -26,8 +26,8 @@ public sealed class CompletionsRequestException : Exception
 }
 
 public sealed record CompletionsToolDeclarationProjectionOptions(bool SupportsStrictMode = false,
-    int MaximumMessages = 256, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
-    int MaximumDeclarations = 1024, int MaximumActiveTools = 128, int MaximumJsonDepth = 32,
+    int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
+    int MaximumDeclarations = PiRequestBudget.RequestItems, int MaximumActiveTools = 128, int MaximumJsonDepth = 32,
     int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes, int MaximumOutputBytes = PiRequestBudget.RequestPayloadBytes)
 {
     public bool SupportsOpenAIGrammarTools { get; init; }
@@ -247,8 +247,10 @@ internal static class CompletionsJson
         {
             return JsonData.Parse(EcmaScriptJsonProjection.Project(data, new(MaximumInputCharacters: maximumCharacters,
                 MaximumInputBytes: maximumBytes, MaximumOutputCharacters: maximumCharacters, MaximumOutputBytes: maximumBytes,
-                // A single string (an image data URL) may use the whole configured budget (owner decision 0004: Pi's request budgets).
-                MaximumDepth: maximumDepth, MaximumStringCharacters: maximumCharacters), token));
+                // A single string (an image data URL) may use the whole configured budget (owner decision 0004: Pi's request budgets),
+                // and node and number counts, which grow with the message count, are bounded by the same character budget.
+                MaximumDepth: maximumDepth, MaximumStringCharacters: maximumCharacters, MaximumNodes: maximumCharacters,
+                MaximumNumbers: maximumCharacters, MaximumTotalNumberCharacters: maximumCharacters), token));
         }
         catch (EcmaScriptJsonProjectionException error)
         { throw Fail(error.Failure == EcmaScriptJsonProjectionFailure.ResourceLimit ? CompletionsRequestFailure.ResourceLimit : CompletionsRequestFailure.InvalidTranscript); }

@@ -48,6 +48,7 @@ internal static partial class Program
             ("authjson.json-provider-fields-and-api-key-entries", AuthJsonFields),
             ("authjson.stored-command-keys-resolve-for-every-provider", StoredCommandKeys),
             ("live.provider-route-selection-and-per-request-auth", LiveRoutes),
+            ("live.long-transcript-2000-messages-with-loadout-records-every-family", LongTranscriptEveryFamily),
             ("login.every-provider-cli-flow-api-key-and-oauth", CliLogin),
         };
         var results = new List<object>(); var failures = 0;
