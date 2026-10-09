@@ -31,6 +31,7 @@ internal static partial class Program
         cases.AddRange(ProviderCases());
         cases.AddRange(RuntimeCases());
         cases.AddRange(GapCases());
+        cases.AddRange(SwitchVetoCases());
         cases.AddRange(RebuildCases());
         cases.AddRange(NativeCases());
         cases.AddRange(OAuthCases());

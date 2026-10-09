@@ -498,46 +498,76 @@ public static class RpcSessionCommand
     /// <summary>session-manager.ts SessionManager.open and _setSessionFile before a switch: a session file opens wherever it is; an
     /// empty file is initialized with a session header; a non-empty file that does not parse as a session is refused (unchanged); a
     /// missing file is a new session at that path, written once it has a conversation (the lazy store holds its header until then).
-    /// The header's cwd is the host's (process.cwd()).</summary>
-    internal static async ValueTask PrepareSessionPathAsync(string path, SessionStorageBackend? backend, string cwd, CancellationToken token)
+    /// The header's cwd is the host's (process.cwd()). Upstream opens the path only after the session_before_switch veto, so the
+    /// returned undo puts the path back as it was (opening a session without messages also records its model and level).</summary>
+    internal static async ValueTask<Func<ValueTask>?> PrepareSessionPathAsync(string path, SessionStorageBackend? backend, string cwd, CancellationToken token)
     {
-        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) return;
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) return null;
         var full = Path.GetFullPath(path);
         // The backend (lazy local, or memory under --no-session) serves a file outside its namespace as a lazy local file.
         var lazy = backend is { Mode: SessionStorageMode.LazyLocal } || backend is not null &&
             !string.Equals(Path.GetDirectoryName(full), backend.Directory, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-        // A session of this run that is not written yet.
-        if (lazy && !File.Exists(full) && backend!.FileExists(full)) return;
-        if (Directory.Exists(full)) return;
+        // A session of this run that is not written yet: its pending bytes come back on undo.
+        if (backend is not null && !File.Exists(full) && backend.FileExists(full))
+        {
+            byte[] pending;
+            var read = await backend.OpenReadAsync(full, token).ConfigureAwait(false);
+            await using (read.ConfigureAwait(false))
+            {
+                using var copy = new MemoryStream();
+                await read.CopyToAsync(copy, token).ConfigureAwait(false);
+                pending = copy.ToArray();
+            }
+            return async () =>
+            {
+                if (File.Exists(full)) return; // Written since: a conversation is no longer the prepared state.
+                await backend.DeleteOwnedAsync(full).ConfigureAwait(false);
+                await StageAsync(backend, full, pending, CancellationToken.None).ConfigureAwait(false);
+            };
+        }
+        if (Directory.Exists(full)) return null;
         if (File.Exists(full))
         {
-            if (new FileInfo(full).Length > 0)
+            var length = new FileInfo(full).Length;
+            if (length > 0)
             {
                 if (PiSharp.Cli.Pi.PiSessions.ReadHeader(full) is null)
                     throw new InvalidDataException($"Session file is not a valid {PiSharp.Cli.Pi.PiConfig.AppName} session: {full}");
-                return;
             }
-            await File.WriteAllTextAsync(full, NewHeader() + "\n", new UTF8Encoding(false), token).ConfigureAwait(false);
-            return;
+            else await File.WriteAllTextAsync(full, NewHeader() + "\n", new UTF8Encoding(false), token).ConfigureAwait(false);
+            return () =>
+            {
+                if (File.Exists(full))
+                {
+                    using var stream = new FileStream(full, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                    if (stream.Length > length) stream.SetLength(length);
+                }
+                return ValueTask.CompletedTask;
+            };
         }
         if (lazy)
         {
-            var storage = await backend!.OpenAsync(full, true, token).ConfigureAwait(false);
-            await using (storage.ConfigureAwait(false))
-            {
-                await storage.WriteAsync(Encoding.UTF8.GetBytes(NewHeader() + "\n")).ConfigureAwait(false);
-                await storage.BeforeCheckpointAsync().ConfigureAwait(false);
-            }
-            return;
+            await StageAsync(backend!, full, Encoding.UTF8.GetBytes(NewHeader() + "\n"), token).ConfigureAwait(false);
+            return async () => { if (!File.Exists(full)) await backend!.DeleteOwnedAsync(full).ConfigureAwait(false); };
         }
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
         await File.WriteAllTextAsync(full, NewHeader() + "\n", new UTF8Encoding(false), token).ConfigureAwait(false);
+        return () => { if (File.Exists(full)) File.Delete(full); return ValueTask.CompletedTask; };
 
         string NewHeader()
         {
             var (_, id, timestamp) = PiSharp.Cli.Pi.PiSessions.NewSessionFile(Path.GetDirectoryName(full)!, null, DateTimeOffset.UtcNow);
             return PiSharp.Cli.Pi.PiJson.Stringify(new System.Text.Json.Nodes.JsonObject
             { ["type"] = "session", ["version"] = PiSharp.Cli.Pi.PiSessions.CurrentSessionVersion, ["id"] = id, ["timestamp"] = timestamp, ["cwd"] = cwd });
+        }
+        static async ValueTask StageAsync(SessionStorageBackend backend, string path, byte[] bytes, CancellationToken token)
+        {
+            var storage = await backend.OpenAsync(path, true, token).ConfigureAwait(false);
+            await using (storage.ConfigureAwait(false))
+            {
+                await storage.WriteAsync(bytes).ConfigureAwait(false);
+                await storage.BeforeCheckpointAsync().ConfigureAwait(false);
+            }
         }
     }
 
