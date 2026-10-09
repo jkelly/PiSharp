@@ -5,7 +5,8 @@ using System.Runtime.InteropServices;
 namespace PiSharp.Tools.Processes.Unix;
 
 /// <summary>Trusted effect boundary. Launch must establish a fresh private process group before child execution,
-/// copy the requested environment/argv exactly, redirect both pipes and deliver stdin EOF. A failed or canceled
+/// copy the requested environment/argv exactly, redirect both pipes and deliver the request's standard input bytes (none when null)
+/// followed by EOF. A failed or canceled
 /// admission owns and joins anything it created. Process.Start followed by setpgid is not an admissible implementation.</summary>
 public interface IUnixProcessAdmission
 {

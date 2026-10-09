@@ -227,7 +227,7 @@ public sealed class BashTool : IPreparedToolAdapter
         {
             if (!Text(key) || key.Length == 0 || key.Contains('=') || !names.Add(key) || !Text(value)) return false;
             characters += (long)key.Length + value.Length + 2;
-            if (characters > 32767) return false;
+            if (characters > (OperatingSystem.IsWindows() ? 32767 : 128 * 1024)) return false; // The Windows environment block limit; Unix argv+env share a larger budget.
         }
         return true;
     }

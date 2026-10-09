@@ -91,8 +91,11 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var agent = TerminalKeybindingConfigurationLoader.ResolveAgentDirectory(home, platform,
             new Dictionary<string, string?> { ["PI_CODING_AGENT_DIR"] = Environment.GetEnvironmentVariable("PI_CODING_AGENT_DIR") });
+        // Project trust: the Pi entry's own answer for its run, else the trust store read non-interactively (IMPL-F).
+        var resolver = PiSharp.Cli.Pi.PiProjectTrust.CreateResolver(agent, home);
         return new(agent, home, () => Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>()
-            .Select(entry => KeyValuePair.Create((string)entry.Key, (string?)entry.Value ?? "")));
+            .Select(entry => KeyValuePair.Create((string)entry.Key, (string?)entry.Value ?? "")))
+        { IsProjectTrusted = cwd => PiSharp.Cli.Pi.PiEntryOptions.Current?.ProjectTrusted(cwd) ?? resolver(cwd) };
     }
 
     /// <summary>Reads the global mcp.json and, in a trusted project, the project's (unless <paramref name="noMcp"/>) and returns the
