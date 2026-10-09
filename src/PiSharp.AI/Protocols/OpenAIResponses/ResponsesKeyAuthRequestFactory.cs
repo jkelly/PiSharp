@@ -257,7 +257,8 @@ public sealed class ResponsesKeyAuthRequestFactory
             }
         }
         Merge(_options.ModelHeaders);
-        if (_options.SessionId is { Length: > 0 } session)
+        // openai-responses.ts createClient gets cacheSessionId: no session headers when cache retention is "none".
+        if (_options.SessionId is { Length: > 0 } session && _cacheRetention != "none")
         {
             _ = ClampSessionId(session); // Headers use original session; body cache key is clamped separately.
             if (_options.SessionAffinityFormat == "openrouter") headers["x-session-id"] = session;

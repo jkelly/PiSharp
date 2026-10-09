@@ -30,6 +30,9 @@ public sealed record ProviderRouteOptions(Func<CancellationToken, ValueTask<Prov
     public int MaxTokens { get; init; } = 1024;
     /// <summary>A summary route: no prompt caching and thinking off.</summary>
     public bool Summary { get; init; }
+    /// <summary>With <see cref="Summary"/>: the summary keeps the main route's thinking binding and follows each request's level
+    /// (compaction.ts completeSummarization); only caching stays off.</summary>
+    public bool SummaryThinking { get; init; }
     public string? SessionId { get; init; }
     /// <summary>Caller request headers (options.headers), applied after model and provider headers; null removes.</summary>
     public ImmutableDictionary<string, string?>? Headers { get; init; }
@@ -173,7 +176,7 @@ public static partial class NativeProviderFactory
         var key = auth.ApiKey is { Length: > 0 } apiKey ? apiKey : rewrites.Values.Any(value => value is not null) ? "header-owned-auth" : null;
         if (key is null) throw new InvalidOperationException($"No API key for provider: {model.Provider}");
         var handler = client is null ? null : new RouteHandler(client, rewrites);
-        var maximum = options.MaxTokens; var summary = options.Summary;
+        var maximum = options.MaxTokens; var summary = options.Summary; var plain = summary && !options.SummaryThinking;
         var sessionId = options.Summary ? null : options.SessionId;
         // Pi has no request-size cap: projection budgets follow the configured payload limit (images of ~4.5 MB reach the provider).
         var budget = options.MaximumPayloadBytes;
@@ -188,7 +191,7 @@ public static partial class NativeProviderFactory
                         MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget)) { ModelSupportsImages = images };
                 var request = new CompletionsKeyAuthRequestOptions(MaxTokens: maximum, CacheRetention: summary ? CompletionsCacheRetention.None : CompletionsCacheRetention.Short,
                     MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId) { ModelMetadata = metadata };
-                return BindCompletions(model, endpoint, key, projection, request with { ModelHeaders = modelHeaders }, handler, summary ? null : metadata);
+                return BindCompletions(model, endpoint, key, projection, request with { ModelHeaders = modelHeaders }, handler, plain ? null : metadata);
             }
             case "openai-responses":
             {
@@ -197,17 +200,17 @@ public static partial class NativeProviderFactory
                     MaximumInputCharacters: budget, MaximumOutputCharacters: budget,
                     ToolDeclarations: new(MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
                         MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget)) { ModelSupportsImages = images },
-                    new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId) { ModelHeaders = modelHeaders },
-                    handler, summary ? null : metadata);
+                    new(SupportsMaxOutputTokens: true, MaxOutputTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, SessionId: sessionId, CacheRetention: summary ? "none" : null) { ModelHeaders = modelHeaders },
+                    handler, plain ? null : metadata);
             }
             default:
                 return BindRouteAnthropic(model, new Uri(baseUrl), key, RouteAnthropicProjection(raw, new(MaximumTokens: maximum, ModelReasoning: reasoning,
                     ModelSupportsImages: images, ThinkingEnabled: false, MaximumMessages: options.MaximumMessages, MaximumEntryCharacters: options.MaximumEntryCharacters,
                     MaximumInputCharacters: budget, MaximumOutputCharacters: budget, MaximumOutputBytes: budget,
-                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), summary),
+                    CacheRetention: summary ? AnthropicCacheRetention.None : AnthropicCacheRetention.Short), plain),
                     new(MaxTokens: maximum, MaximumPayloadBytes: options.MaximumPayloadBytes, ModelHeaders: modelHeaders, SessionId: sessionId)
                     { BearerAuthorization = model.Provider == "github-copilot" },
-                    handler, summary ? null : metadata);
+                    handler, plain ? null : metadata);
         }
     }
 
@@ -220,7 +223,8 @@ public static partial class NativeProviderFactory
         {
             SupportsMidConversationEffort = value.TryGetProperty("compat", out var compat) && compat.ValueKind == JsonValueKind.Object &&
                 compat.TryGetProperty("supportsMidConvoEffort", out var mid) && mid.ValueKind == JsonValueKind.True,
-            SupportsThinkingOff = supportsOff, ModelReasoning = projection.ModelReasoning && (supportsOff || !summary)
+            SupportsThinkingOff = supportsOff, ModelReasoning = projection.ModelReasoning && (supportsOff || !summary),
+            AllowedFallbackModels = AnthropicFallbackModels(value)
         };
     }
 

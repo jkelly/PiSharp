@@ -172,15 +172,16 @@ internal sealed class LazyModelTransport(RegistryModel entry, ModelDescriptor mo
     }
 
     /// <summary>The summarization route of this model (compaction, branch and bug report summaries) at <paramref name="maximum"/> tokens.</summary>
-    internal IChatTransport Summary(int maximum) => new SummaryRoute(this, maximum);
+    /// <param name="level">The summary's reasoning level (compaction: the session's thinking level), applied when the model reasons.</param>
+    internal IChatTransport Summary(int maximum, string? level = null) => new SummaryRoute(this, maximum, level);
 
-    private sealed class SummaryRoute(LazyModelTransport owner, int maximum) : IChatTransport, IThinkingLevelTransport
+    private sealed class SummaryRoute(LazyModelTransport owner, int maximum, string? level) : IChatTransport, IThinkingLevelTransport
     {
         public ImmutableArray<string> GetSupportedThinkingLevels(ModelDescriptor descriptor) => ["off"];
         public async IAsyncEnumerable<StreamEvent> StreamAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             var live = await owner.ConnectAsync(cancellationToken).ConfigureAwait(false);
-            await foreach (var observation in live.CreateTransport(Math.Min(maximum, live.MaximumOutputTokens), summary: true)
+            await foreach (var observation in live.CreateSummaryTransport(Math.Min(maximum, live.MaximumOutputTokens), level)
                 .StreamAsync(request, cancellationToken).ConfigureAwait(false)) yield return observation;
         }
     }

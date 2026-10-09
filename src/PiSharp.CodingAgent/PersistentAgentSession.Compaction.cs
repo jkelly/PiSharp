@@ -198,9 +198,15 @@ public sealed partial class PersistentAgentSession
                     }
                     fromExtension = provided is not null;
                     // Construct/bound every prospective provider request before starting the first transport.
-                    var history = SessionSummaryRequestBuilder.History(plan, configuration.Model, log.Header.Id, request.SummaryOptions);
+                    // agent-session.ts _runDefaultCompaction: compact() gets the session's thinking level (createSummarizationOptions sends
+                    // it as reasoning unless "off"; the summary route applies model.reasoning) and `undefined, // sessionId`, so each
+                    // completeSummarization call routes with its own fresh uuidv7 (kept across that call's retries).
+                    var summaryOptions = request.SummaryOptions ?? new();
+                    if (summaryOptions.ThinkingLevel is null)
+                        summaryOptions = summaryOptions with { ThinkingLevel = configuration.ThinkingLevel, ModelSupportsReasoning = true };
+                    var history = SessionSummaryRequestBuilder.History(plan, configuration.Model, Guid.CreateVersion7().ToString(), summaryOptions);
                     var prefix = plan.IsSplitTurn && !plan.TurnPrefixMessages.IsEmpty
-                        ? SessionSummaryRequestBuilder.TurnPrefix(plan, configuration.Model, log.Header.Id, request.SummaryOptions) : null;
+                        ? SessionSummaryRequestBuilder.TurnPrefix(plan, configuration.Model, Guid.CreateVersion7().ToString(), summaryOptions) : null;
                     if (provided is null)
                     {
                         if (prefix is null) generated = await GenerateRetryingSummaryAsync(generator, history, work, "compaction", request.Reason).ConfigureAwait(false);

@@ -173,13 +173,20 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     private IChatTransport SummaryTransport(SessionSummaryRequest summary)
     {
         // A model the session switched to summarizes through its own live route.
-        if (summary.Model != SelectedModel && _liveModels?.Transport(summary.Model) is { } switched && summary.ThinkingLevel is null &&
+        if (summary.Model != SelectedModel && _liveModels?.Transport(summary.Model) is { } switched &&
             summary.CacheRetention == "none" && summary.MaximumOutputTokens is > 0 and <= 1_000_000 && summary.MaximumOutputTokens == Math.Floor(summary.MaximumOutputTokens))
-            return switched.Summary((int)summary.MaximumOutputTokens);
-        if (summary.Model != SelectedModel || summary.ThinkingLevel is not null || summary.CacheRetention != "none" ||
+            return switched.Summary((int)summary.MaximumOutputTokens, summary.ThinkingLevel);
+        if (summary.Model != SelectedModel || summary.CacheRetention != "none" ||
             summary.MaximumOutputTokens is <= 0 or > 1_000_000 || summary.MaximumOutputTokens != Math.Floor(summary.MaximumOutputTokens))
             throw new SessionCompactionException(SessionCompactionFailure.InvalidSettings);
-        if (_live is not null) return _live.CreateTransport((int)summary.MaximumOutputTokens, summary: true);
+        // compaction.ts: maxTokens = min(budget, model.maxTokens); the live route's cap is the model's.
+        if (_live is not null) return _live.CreateSummaryTransport(Math.Min((int)summary.MaximumOutputTokens, _live.MaximumOutputTokens), summary.ThinkingLevel);
+        // The offline profile's own requests never reason (its transports project reasoning off), so its summaries do not either.
+        return new LiveSessionConnection.SummaryLevelTransport(OfflineSummaryTransport(summary), null, offWhenOffered: false);
+    }
+
+    private IChatTransport OfflineSummaryTransport(SessionSummaryRequest summary)
+    {
         if (SelectedModel.Api == "anthropic-messages")
         {
             var factory = new AnthropicMessagesKeyAuthRequestFactory(AnthropicBase, SelectedModel,

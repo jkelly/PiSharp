@@ -382,7 +382,7 @@ internal static class SessionCompactionIntegrationTests
                 Check(compact && name == "compact-aborted" && generator.Index == 1 && schedule.Length == 2,
                     "An undeclared source/native response-count difference appeared.");
                 var plan = new SessionCompactionPlanner().Prepare(session.Snapshot.Context, new(true, 128, 2))!;
-                CompareReferenceRequest(schedule[1], SessionSummaryRequestBuilder.TurnPrefix(plan, Model, session.Snapshot.Log.Header.Id, new(256, true)), session.Snapshot.Log.Header.Id);
+                CompareReferenceRequest(schedule[1], SessionSummaryRequestBuilder.TurnPrefix(plan, Model, Guid.CreateVersion7().ToString(), new(256, true)), session.Snapshot.Log.Header.Id);
             }
             Equal(generator.Index, generator.Disposals); Equal(0, author.Ids); Equal(0, author.Clocks); Equal(0, script.Requests.Count);
             SameBytes(before, await Bytes(files.A));
@@ -468,7 +468,9 @@ internal static class SessionCompactionIntegrationTests
             Check(IsUuidV7(sourceRoute) && sourceRoute != activeSessionId, "Source branch route is not a fresh UUIDv7 relative to its manager.");
             Check(IsUuidV7(request.SessionId) && request.SessionId != activeSessionId, "Native branch route is not a fresh UUIDv7 relative to its manager.");
         }
-        else { Equal(activeSessionId, sourceRoute); Equal(sourceRoute, request.SessionId); }
+        // The pinned reference capture predates Pi 1.1.0, whose agent-session.ts _runDefaultCompaction passes `undefined, // sessionId`:
+        // completeSummarization then routes each compaction summary with a fresh uuidv7 instead of the manager's id.
+        else { Equal(activeSessionId, sourceRoute); Check(IsUuidV7(request.SessionId) && request.SessionId != activeSessionId, "Native compaction route is not a fresh UUIDv7."); }
         Equal(options.TryGetProperty("reasoning", out var thinking) ? thinking.GetString() : null, request.ThinkingLevel);
         Equal(source.GetProperty("model").GetProperty("id").GetString(), request.Model.Id);
         Equal(source.GetProperty("model").GetProperty("provider").GetString(), request.Model.Provider);
@@ -476,7 +478,7 @@ internal static class SessionCompactionIntegrationTests
         // Authored headers/env/baseUrl/model price metadata are complete source-only observations.
         // Native host binding chooses those options; no live provider or tool is acquired here.
         Console.WriteLine("COMPACTION-ROUTING " + JsonSerializer.Serialize(new { Source = sourceRoute, Native = request.SessionId,
-            ActiveSession = activeSessionId, Kind = request.Kind.ToString(), Comparison = request.Kind == SessionSummaryKind.Branch ? "fresh-uuidv7-relation" : "exact-manager-routing" }));
+            ActiveSession = activeSessionId, Kind = request.Kind.ToString(), Comparison = "fresh-uuidv7-relation" }));
         return (sourceRoute, request.SessionId);
     }
     private static bool IsUuidV7(string? value) => value is { Length: 36 } && Guid.TryParseExact(value, "D", out _) &&
@@ -896,7 +898,9 @@ internal static class SessionCompactionIntegrationTests
             committed = (await session.CompactAsync("source", new(settings, SummaryOptions: new(64, true, "high", "literal hostile instructions remain data")), generator))!;
             SummaryCheckpoint(committed); Check(committed.Plan is { IsSplitTurn: true }, "Fixture failed to exercise history plus split-prefix merge.");
             Equal(2, generator.Requests.Count); Equal(SessionSummaryKind.History, generator.Requests[0].Kind); Equal(SessionSummaryKind.TurnPrefix, generator.Requests[1].Kind);
-            Check(generator.Requests.All(request => request.SessionId == "source" && request.CacheRetention == "none"), "Summary routing or disabled cache policy changed.");
+            // Pi 1.1.0: each compaction summary call routes with its own fresh uuidv7 (completeSummarization), never the session id.
+            Check(generator.Requests.All(request => IsUuidV7(request.SessionId) && request.SessionId != "source" && request.CacheRetention == "none") &&
+                generator.Requests[0].SessionId != generator.Requests[1].SessionId, "Summary routing or disabled cache policy changed.");
             Equal("high", generator.Requests[0].ThinkingLevel); Equal(64d, generator.Requests[0].MaximumOutputTokens);
             var body = committed.Entry.WireBody.Value; Equal("metadata", committed.Entry.ParentId);
             Equal(14L, body.GetProperty("usage").GetProperty("totalTokens").GetInt64());

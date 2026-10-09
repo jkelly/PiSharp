@@ -24,7 +24,10 @@ public sealed class TransportSessionSummaryGenerator(Func<SessionSummaryRequest,
             { role = "user", content = new[] { new { type = "text", text = request.Prompt } }, timestamp }))));
         var source = transport(request) ?? throw new SessionCompactionException(SessionCompactionFailure.SummaryFailed);
         AssistantMessage? final = null; var count = 0; var cleanupFailed = false;
-        await foreach (var observation in source.StreamAsync(new(request.Model, messages, timestamp), cancellationToken).ConfigureAwait(false))
+        // compaction.ts completeSummarization: the request carries the summary's reasoning level (createSummarizationOptions) and its
+        // routing session id; the bound route applies model.reasoning and the cache retention.
+        var chatRequest = new ChatRequest(request.Model, messages, timestamp) { ThinkingLevel = request.ThinkingLevel, SessionId = request.SessionId };
+        await foreach (var observation in source.StreamAsync(chatRequest, cancellationToken).ConfigureAwait(false))
         {
             if (++count > maximumEvents || final is not null) throw new SessionCompactionException(SessionCompactionFailure.ResourceLimit);
             if (observation is StreamTerminalEvent terminal)

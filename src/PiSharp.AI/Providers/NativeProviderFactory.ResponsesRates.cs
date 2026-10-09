@@ -26,6 +26,17 @@ public static partial class NativeProviderFactory
 
     // Pi abe508 anthropic-messages.ts prices usage with calculateCost(model) from model.cost, tiers included, or from the
     // cost of the compat.allowedFallbackModels entry (first match) naming the model that answered.
+    /// <summary>anthropic-messages.ts buildParams: <c>params.fallbacks = compat.allowedFallbackModels.map(f =&gt; ({ model: f.model }))</c>
+    /// when the list is non-empty (default otherwise).</summary>
+    public static ImmutableArray<string> AnthropicFallbackModels(JsonElement metadata)
+    {
+        if (metadata.ValueKind != JsonValueKind.Object || !metadata.TryGetProperty("compat", out var compat) || compat.ValueKind != JsonValueKind.Object ||
+            !compat.TryGetProperty("allowedFallbackModels", out var allowed) || allowed.ValueKind != JsonValueKind.Array || allowed.GetArrayLength() == 0)
+            return default;
+        return [.. allowed.EnumerateArray().Select(fallback => fallback.ValueKind == JsonValueKind.Object && fallback.TryGetProperty("model", out var model) &&
+            model.ValueKind == JsonValueKind.String ? model.GetString()! : "")];
+    }
+
     /// <summary>Binds catalog <c>cost</c> (with prompt-length tiers) and <c>compat.allowedFallbackModels</c> costs to Messages options.</summary>
     public static AnthropicMessagesOptions? AnthropicMessagesOptionsForModel(JsonData? metadata, AnthropicMessagesOptions? options = null)
     {
