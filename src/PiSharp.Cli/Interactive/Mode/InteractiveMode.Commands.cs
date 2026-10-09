@@ -528,7 +528,7 @@ internal sealed partial class InteractiveMode
             var resolved = Path.GetFullPath(PiSharp.Cli.Pi.PiPaths.ResolvePath(inputPath, Cwd, context.Startup.Home));
             if (!File.Exists(resolved)) { ShowError($"Failed to import session: File not found: {resolved}"); return; }
             var target = context.ImportSessionFile(resolved);
-            var data = await rpc.RequestAsync(new JsonObject { ["type"] = "switch_session", ["sessionPath"] = target });
+            var data = await ReplaceSessionAsync(new JsonObject { ["type"] = "switch_session", ["sessionPath"] = target });
             if (data is JsonObject result && B(result["cancelled"])) { ShowStatus("Import cancelled"); return; }
             ShowStatus($"Session imported from: {inputPath}");
         }
@@ -771,7 +771,7 @@ internal sealed partial class InteractiveMode
         ClearStatusIndicator();
         try
         {
-            var data = await rpc.RequestAsync(new JsonObject { ["type"] = "new_session" });
+            var data = await ReplaceSessionAsync(new JsonObject { ["type"] = "new_session" });
             if (data is JsonObject result && B(result["cancelled"])) return;
             chatContainer.AddChild(new Spacer(1));
             chatContainer.AddChild(new ThemedText(() => theme.Fg("accent", "✓ New session started"), 1, 1));
@@ -886,7 +886,7 @@ internal sealed partial class InteractiveMode
         if (state.LeafId is null) { ShowStatus("Nothing to clone yet"); return; }
         try
         {
-            var data = await rpc.RequestAsync(new JsonObject { ["type"] = "clone" });
+            var data = await ReplaceSessionAsync(new JsonObject { ["type"] = "clone" });
             if (data is JsonObject result && B(result["cancelled"])) { ui.RequestRender(); return; }
             editor.SetText("");
             ShowStatus("Cloned to new session");
@@ -926,6 +926,7 @@ internal sealed partial class InteractiveMode
         programStatus.Reset();
         ApplyRuntimeSettings();
         await RefreshSessionAsync();
+        renderedGeneration = state.Generation;
         await RefreshAvailableModelsAsync();
         await RefreshCommandsAsync();
         SetupAutocompleteProvider();

@@ -30,7 +30,7 @@ internal sealed class McpBinding
 
 /// <summary>The services the interactive mode uses beyond the RPC session: terminal, settings, clipboard, catalogs, credentials,
 /// extensions and diagnostics. The host fills them with the production implementations; tests substitute them.</summary>
-internal sealed class InteractiveModeContext
+internal sealed record InteractiveModeContext
 {
     public required RpcSessionClient Rpc { get; init; }
     public required InteractiveSettings Settings { get; init; }

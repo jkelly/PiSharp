@@ -470,7 +470,7 @@ internal sealed partial class InteractiveMode
                     done();
                     try
                     {
-                        var data = await rpc.RequestAsync(new JsonObject { ["type"] = "fork", ["entryId"] = entryId });
+                        var data = await ReplaceSessionAsync(new JsonObject { ["type"] = "fork", ["entryId"] = entryId });
                         if (data is JsonObject result && B(result["cancelled"])) { ui.RequestRender(); return; }
                         editor.SetText(S((data as JsonObject)?["text"]) ?? "");
                         ShowStatus("Forked to new session");
@@ -645,7 +645,7 @@ internal sealed partial class InteractiveMode
         ClearStatusIndicator();
         try
         {
-            var data = await rpc.RequestAsync(new JsonObject { ["type"] = "switch_session", ["sessionPath"] = sessionPath });
+            var data = await ReplaceSessionAsync(new JsonObject { ["type"] = "switch_session", ["sessionPath"] = sessionPath });
             if (data is JsonObject result && B(result["cancelled"])) return false;
             ShowStatus("Resumed session");
             return true;

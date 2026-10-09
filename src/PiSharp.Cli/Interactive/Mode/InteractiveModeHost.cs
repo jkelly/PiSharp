@@ -16,7 +16,7 @@ internal static class InteractiveModeHost
     /// <summary>Runs interactive mode over <c>session terminal</c> arguments (the RPC host runs the same session arguments).</summary>
     public static async Task<int> RunAsync(string[] terminalArgs, PiEntryOptions options, PiSharp.Cli.Mcp.McpSessionHost? mcpHost,
         McpBinding? mcp, TextWriter stdout, TextWriter stderr, CancellationToken token, Func<UiLoop, ITerminal>? createTerminal = null,
-        Action<InteractiveMode>? observeMode = null)
+        Action<InteractiveMode>? observeMode = null, Func<InteractiveModeContext, InteractiveModeContext>? configureContext = null)
     {
         var startup = options.Interactive ?? throw new InvalidOperationException("Interactive startup options are missing.");
         var rpcArgs = terminalArgs.Where(value => value != "--terminal-preview").ToArray();
@@ -80,6 +80,7 @@ internal static class InteractiveModeHost
         string? resumeCommand = null;
         try
         {
+            if (configureContext is not null) context = configureContext(context);
             mode = await loop.InvokeAsync(() => new InteractiveMode(context, new InteractiveModeOptions
             {
                 MigratedProviders = [.. options.MigratedAuthProviders],

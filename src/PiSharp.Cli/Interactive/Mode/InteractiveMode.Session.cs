@@ -86,6 +86,34 @@ internal sealed partial class InteractiveMode
     /// <summary>The session state (footer, selectors and tests read it).</summary>
     internal SessionState Session => state;
 
+    private readonly List<(long Generation, TaskCompletionSource Done)> generationWaiters = [];
+    /// <summary>The session generation the transcript shows (set once a switch finished rendering).</summary>
+    private long renderedGeneration;
+
+    /// <summary>Sends a session-replacing command (new, fork, clone, switch) and waits until the mode rebound to the new session,
+    /// as runtimeHost.newSession()/fork()/switchSession() resolve after the rebind.</summary>
+    private async Task<JsonObject?> ReplaceSessionAsync(JsonObject command)
+    {
+        var data = await rpc.RequestAsync(command) as JsonObject;
+        if (data is null || B(data["cancelled"])) return data;
+        if (data["generation"] is JsonValue value && value.TryGetValue<long>(out var generation) && generation > renderedGeneration)
+        {
+            var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            generationWaiters.Add((generation, done));
+            await done.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        }
+        return data;
+    }
+
+    private void CompleteGenerationWaiters()
+    {
+        foreach (var waiter in generationWaiters.Where(waiter => waiter.Generation <= renderedGeneration).ToList())
+        {
+            generationWaiters.Remove(waiter);
+            waiter.Done.TrySetResult();
+        }
+    }
+
     private async Task RefreshStateAsync()
     {
         if (await rpc.RequestAsync(new JsonObject { ["type"] = "get_state" }) is JsonObject data) state.ApplyState(data);

@@ -20,6 +20,28 @@ internal sealed class InteractiveHarness : IAsyncDisposable
     public StringWriter Stdout { get; } = new() { NewLine = "\n" };
     public StringWriter Stderr { get; } = new() { NewLine = "\n" };
     public InteractiveMode? Mode { get; private set; }
+    /// <summary>Text the mode copied to the clipboard (the fake clipboard).</summary>
+    public List<string> Copied { get; } = [];
+    public string? ClipboardText { get; set; }
+    /// <summary>Further context changes for a case (applied after the harness defaults).</summary>
+    public Func<InteractiveModeContext, InteractiveModeContext>? Configure { get; set; }
+
+    private InteractiveModeContext ConfigureContext(InteractiveModeContext context)
+    {
+        var configured = context with
+        {
+            CopyToClipboard = text => { lock (Copied) Copied.Add(text); return Task.CompletedTask; },
+            ReadClipboardText = () => Task.FromResult(ClipboardText),
+            ReadClipboardFilePaths = () => Task.FromResult<IReadOnlyList<string>?>(null),
+            ReadClipboardImage = () => Task.FromResult<PiSharp.Cli.Interactive.Mode.Utilities.ClipboardImage?>(null),
+            OpenUrl = _ => { },
+            CheckForNewVersion = _ => Task.FromResult<PiSharp.Cli.Interactive.Mode.Utilities.LatestPiRelease?>(null),
+            ParseChangelogEntries = () => [],
+            GetEnvironment = name => Vars.GetValueOrDefault(name),
+            Login = null
+        };
+        return Configure?.Invoke(configured) ?? configured;
+    }
     private Task<int>? run;
     private readonly CancellationTokenSource deadline = new(TimeSpan.FromSeconds(150));
 
@@ -69,7 +91,7 @@ internal sealed class InteractiveHarness : IAsyncDisposable
             LiveRuntime = runtime, CreateMcpHost = agentDir => new PiSharp.Cli.Mcp.McpSessionHost(agentDir, Home, () => []),
             RunInteractive = (terminalArgs, options, token) => InteractiveModeHost.RunAsync(terminalArgs, options,
                 new PiSharp.Cli.Mcp.McpSessionHost(AgentDir, Home, () => []), new McpBinding(), Stdout, Stderr, token,
-                loop => new PiSharp.Tui.Pi.ProcessTerminal(loop, Terminal, name => Vars.GetValueOrDefault(name)), mode => Mode = mode),
+                loop => new PiSharp.Tui.Pi.ProcessTerminal(loop, Terminal, name => Vars.GetValueOrDefault(name)), mode => Mode = mode, ConfigureContext),
             ApplicationDirectory = Path.Combine(Root, "app"), Now = () => DateTimeOffset.UtcNow
         };
         run = Task.Run(() => PiCommand.RunAsync(args, host, deadline.Token));

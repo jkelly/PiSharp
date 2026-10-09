@@ -418,6 +418,8 @@ internal sealed partial class InteractiveMode
         UpdateTerminalTitle();
         footer.Invalidate();
         ui.RequestRender();
+        renderedGeneration = Math.Max(renderedGeneration, state.Generation);
+        CompleteGenerationWaiters();
     }
 
     private static string? ReadSessionCwd(string sessionFile)
