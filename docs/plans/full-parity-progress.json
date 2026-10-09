@@ -125,11 +125,6 @@
   "carryover": [
     {
       "from": "BURN-DOWN",
-      "item": "per-request message-count caps in the provider request projectors (Anthropic 1,024, Completions, Responses, Codex, Mistral 256)",
-      "owner": "in progress"
-    },
-    {
-      "from": "BURN-DOWN",
       "item": "lone surrogates on input: RPC input and tool-call arguments become U+FFFD; session lines containing one are refused",
       "owner": "open"
     },
@@ -225,9 +220,10 @@
     "notes": "docs/release-notes/1.1.0.2.md",
     "changelog": "website/src/content/changelog/1.1.0.2.md (status in-progress, no date; set to released with the date at tag time)",
     "tag": "not created; the owner confirms the tag",
-    "blockers": [
-      "tests/PiSharp.InteractiveParity.Tests ChangelogSyncCases changelog.sync.shipped-next-to-the-executable still expects 1.1.0.1 as the newest CHANGELOG.md entry; update its expectations for 1.1.0.2",
-      "provider projector message-count caps: removal in progress"
-    ]
+    "blockers": []
+  },
+  "messageCaps": {
+    "status": "merged",
+    "notes": "Transcript message-count caps lifted on every provider route, the agent loop and the session reader (PiRequestBudget.RequestMessages/RequestItems); 2,000-message regression on 15 routes."
   }
 }

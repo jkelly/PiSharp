@@ -26,13 +26,18 @@ A C#-only patch on the Pi v1.1.0 baseline that ports the rest of Pi v1.1.0. Upda
 - Pi's TypeScript extensions and packages, on Pi's own npm packages, and `pisharp install|remove|update|list|config`
 - Native C# extensions loaded from Pi's extension folders
 
+### Fixed
+
+- Long sessions: no more failures past 256 or 1,024 messages
+- Prompts sent right after `agent_settled` are accepted
+
 ### New dependencies
 
 - SkiaSharp (images), Jint and Acornima (codemode). Pi's npm packages are installed on first extension use.
 
 ### Known differences
 
-- Requests with more than 1,024 messages still fail on some providers; the fix is in progress. See [Parity](https://pisharp.ai/parity/) for the rest.
+- See [Parity](https://pisharp.ai/parity/) for the remaining differences from Pi.
 
 ## [1.1.0.1] - 2026-10-08
 

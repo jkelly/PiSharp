@@ -24,7 +24,7 @@
         {
           "area": "Providers and model selection",
           "status": "partial",
-          "notes": "All 10 of Pi's chat APIs, including Bedrock, Codex and Copilot, and all 42 provider catalogs, each with a live route and /login. --model patterns, --models, --list-models, models.json and the startup catalog refresh work. Gaps: requests over 1,024 messages still fail on the Anthropic, Completions and Responses routes (removal in progress); no llama.cpp router discovery and no /llama. Intentional: no Codex WebSocket, no zstd.",
+          "notes": "All 10 of Pi's chat APIs, including Bedrock, Codex and Copilot, and all 42 provider catalogs, each with a live route and /login. --model patterns, --models, --list-models, models.json and the startup catalog refresh work. Gaps: no llama.cpp router discovery and no /llama. Intentional: no Codex WebSocket, no zstd.",
           "evidence": "https://github.com/jkelly/PiSharp/tree/main/tests/PiSharp.ProviderApis.Tests"
         },
         {
@@ -212,7 +212,6 @@
       "title": "Still open",
       "blurb": "Differences that remain to be fixed or decided.",
       "items": [
-        { "title": "Provider message caps", "notes": "The Anthropic, OpenAI Completions and Responses, Codex and Mistral request builders still refuse more than 1,024 (some 256) messages in one request. Removing them is in progress." },
         { "title": "Lone surrogates", "notes": "Output escapes them as JSON.stringify does. On input, RPC and tool-call arguments turn them into U+FFFD, and a session line that contains one is refused." },
         { "title": "JSON depth 64", "notes": "Session records, RPC input and streamed tool-call arguments nested deeper than 64 levels are refused. JSON.parse has no such limit." },
         { "title": "Fractional token counts", "notes": "Usage counts must be whole numbers. A provider that reports a fraction fails the response, and Bedrock reads it as 0." },
@@ -233,7 +232,7 @@
     {
       "title": "Provider layer",
       "status": "ported",
-      "notes": "All 10 of Pi's chat APIs and 42 provider catalogs, logins, classifiers and images. Per-request message caps are being removed."
+      "notes": "All 10 of Pi's chat APIs and 42 provider catalogs, logins, classifiers and images."
     },
     {
       "title": "Agent loop and tools",
