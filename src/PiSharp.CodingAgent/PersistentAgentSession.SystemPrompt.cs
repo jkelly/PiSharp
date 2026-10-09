@@ -24,7 +24,8 @@ public sealed partial class PersistentAgentSession
         }
         if (registry is null || messages.IsDefault) return messages;
         var names = pending?.Names ?? current;
-        var tools = pending is not null || unrecorded ? registry.CreateToolChangeMessage(messages, names, 0, cancellationToken) : null;
+        var tools = pending is not null || unrecorded ? registry.CreateToolChangeMessage(messages, names, 0, cancellationToken,
+            pending?.Presentation ?? registry.PrepareActiveLoadout(names, cancellationToken, report: false)) : null;
         TranscriptEntry? record;
         var prior = _activationPreparation.Value;
         _activationPreparation.Value = true;

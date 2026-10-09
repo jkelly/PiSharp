@@ -115,7 +115,7 @@ public sealed partial class PersistentAgentSession
         // change, or a loadout applied in memory (session open, tree navigation). A loadout that only reorders the tools records none.
         var presentation = pending?.Presentation ?? registry.PrepareActiveLoadout(names, token, report: false);
         var changesTools = pending is not null || unrecorded;
-        var delta = changesTools ? registry.CreateToolChangeMessage(context.LlmMessages, names, _clock(), token) : null;
+        var delta = changesTools ? registry.CreateToolChangeMessage(context.LlmMessages, names, _clock(), token, presentation) : null;
         SessionPromptSectionPreparation? promptPreparation;
         _activationPreparation.Value = true;
         try { (delta, promptPreparation) = registry.PreparePromptSectionMessage(names, context.Messages, delta, _clock(), token, presentation); }

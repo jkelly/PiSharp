@@ -242,16 +242,19 @@ public sealed partial class SessionRuntimeRegistry
     /// Source agent-loop declareToolChanges with pi-ai getToolStateChanges: the record of the loadout <paramref name="names"/>
     /// (declared with their current bindings) against the tools the <paramref name="transcript"/> declares. A tool whose
     /// declaration changed is removed and added again. toolsAdded follows the loadout's order and toolsRemoved the recorded
-    /// order; an empty list is omitted, and an unchanged loadout has no record (null).
+    /// order; an empty list is omitted, and an unchanged loadout has no record (null). Tools a prepareLoadout hook describes
+    /// (<paramref name="presentation"/>) are declared with that description, as agent-session.ts _applyToolLoadout sets them on
+    /// agent.state.tools.
     /// </summary>
     internal TranscriptEntry? CreateToolChangeMessage(ImmutableArray<TranscriptEntry> transcript, ImmutableArray<string> names,
-        long timestamp, CancellationToken cancellationToken)
+        long timestamp, CancellationToken cancellationToken, ToolLoadoutPresentation? presentation = null)
     {
+        JsonElement Declared(string name) => presentation?.Describe(_tools[name].Declaration.Value) ?? _tools[name].Declaration.Value;
         var selected = NormalizeActiveTools(names, cancellationToken);
         var recorded = new SessionSystemReplay().Replay(transcript, cancellationToken).Tools;
         var previous = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var tool in recorded) previous[tool.Value.GetProperty("name").GetString()!] = DeclarationKey(tool.Value);
-        var current = selected.ToDictionary(name => name, name => DeclarationKey(_tools[name].Declaration.Value), StringComparer.Ordinal);
+        var current = selected.ToDictionary(name => name, name => DeclarationKey(Declared(name)), StringComparer.Ordinal);
         var added = selected.Where(name => !previous.TryGetValue(name, out var key) || key != current[name]).ToArray();
         var removed = recorded.Select(tool => tool.Value.GetProperty("name").GetString()!)
             .Where(name => !current.TryGetValue(name, out var key) || key != previous[name]).ToArray();
@@ -263,7 +266,7 @@ public sealed partial class SessionRuntimeRegistry
             if (added.Length > 0)
             {
                 writer.WritePropertyName("toolsAdded"); writer.WriteStartArray();
-                foreach (var name in added) writer.WriteRawValue(_tools[name].Declaration.Value.GetRawText());
+                foreach (var name in added) writer.WriteRawValue(Declared(name).GetRawText());
                 writer.WriteEndArray();
             }
             if (removed.Length > 0)
@@ -441,7 +444,7 @@ public sealed partial class SessionRuntimeRegistry
                 if (_options.LifetimeToolSelection?.IsAllowed(name) == false || !_tools.TryGetValue(name, out var tool)) continue;
                 if (tool.Exposure is not (ToolExposure.Direct or ToolExposure.ModelOnly)) continue;
                 // A recorded declaration that remains selected must match its binding, unless a restored loadout replaces it.
-                if (active.TryGetValue(name, out var recorded) && !Same(recorded.Value, tool.Declaration.Value, cancellationToken))
+                if (active.TryGetValue(name, out var recorded) && !SameDeclaration(recorded.Value, tool.Declaration.Value, cancellationToken))
                 {
                     if (restore is null) throw Error(SessionRuntimeRegistryFailure.DeclarationMismatch);
                     restore.Replaced = true;
@@ -467,7 +470,7 @@ public sealed partial class SessionRuntimeRegistry
                 if (restore is null) throw Error(unbound ? SessionRuntimeRegistryFailure.UnknownTool : SessionRuntimeRegistryFailure.UnsupportedDeclaration);
                 restore.Skipped.Add(name); order.Remove(name); continue;
             }
-            if (!Same(active[name].Value, tool.Declaration.Value, cancellationToken))
+            if (!SameDeclaration(active[name].Value, tool.Declaration.Value, cancellationToken))
             {
                 if (restore is null) throw Error(SessionRuntimeRegistryFailure.DeclarationMismatch);
                 restore.Replaced = true; active[name] = tool.Declaration;
@@ -577,6 +580,18 @@ public sealed partial class SessionRuntimeRegistry
     {
         if (value.ValueKind != JsonValueKind.Array) throw Error(SessionRuntimeRegistryFailure.InvalidTranscript);
         return value.EnumerateArray();
+    }
+    /// <summary>A recorded declaration matches its binding; with a prepareLoadout hook registered it may carry the description the
+    /// hook gave it (agent-session.ts _applyToolLoadout records the prepared description).</summary>
+    private bool SameDeclaration(JsonElement recorded, JsonElement binding, CancellationToken token)
+    {
+        if (Same(recorded, binding, token)) return true;
+        if (!_registeredTools.Any(tool => tool.PrepareLoadout is not null) || recorded.ValueKind != JsonValueKind.Object ||
+            binding.ValueKind != JsonValueKind.Object || !recorded.TryGetProperty("description", out var description) ||
+            description.ValueKind != JsonValueKind.String) return false;
+        var left = recorded.EnumerateObject().Where(property => property.Name != "description").ToArray();
+        var right = binding.EnumerateObject().Where(property => property.Name != "description").ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
+        return left.Length == right.Count && left.All(property => right.TryGetValue(property.Name, out var other) && Same(property.Value, other, token));
     }
     private static bool Same(JsonElement left, JsonElement right, CancellationToken token)
     {

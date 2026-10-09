@@ -81,7 +81,8 @@ public sealed class ToolLoadoutPresentation
             return new TranscriptEntry("system", JsonData.Parse(JsonSerializer.Serialize(fields)));
         }).ToImmutableArray();
     }
-    private JsonElement Describe(JsonElement tool)
+    /// <summary>The declaration with the description a prepareLoadout hook gave it (unchanged without one).</summary>
+    public JsonElement Describe(JsonElement tool)
     {
         if (!descriptions.TryGetValue(tool.GetProperty("name").GetString()!, out var description)) return tool;
         var fields = tool.EnumerateObject().ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal);
