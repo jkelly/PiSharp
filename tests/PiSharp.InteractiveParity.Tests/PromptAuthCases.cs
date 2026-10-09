@@ -34,6 +34,26 @@ internal static class PromptAuthCases
 
     public static IEnumerable<(string Id, Func<Task> Run)> All()
     {
+        // /resume and /import switch with the session's path (switch_session); SessionManager.open takes a file from any directory.
+        yield return ("e2e.sessions.switch-to-a-session-file-outside-the-session-directory", async () =>
+        {
+            await using var pi = new InteractiveHarness("switch-outside");
+            var elsewhere = Path.Combine(pi.Root, "elsewhere");
+            var cwd = System.Text.Json.Nodes.JsonValue.Create(pi.Cwd)!.ToJsonString();
+            var outside = pi.Write(Path.Combine(elsewhere, "outside.jsonl"), string.Join("\n",
+                "{\"type\":\"session\",\"version\":3,\"id\":\"01a00000-0000-7000-8000-000000000009\",\"timestamp\":\"2026-10-09T10:00:00.000Z\",\"cwd\":" + cwd + "}",
+                "{\"type\":\"message\",\"id\":\"a3\",\"parentId\":null,\"timestamp\":\"2026-10-09T10:00:00.003Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"outside question\"}],\"timestamp\":1}}",
+                "{\"type\":\"message\",\"id\":\"a4\",\"parentId\":\"a3\",\"timestamp\":\"2026-10-09T10:00:00.004Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"outside answer\"}],\"api\":\"anthropic-messages\",\"provider\":\"anthropic\",\"model\":\"claude-sonnet-4-5\",\"usage\":{\"input\":3,\"output\":2,\"cacheRead\":0,\"cacheWrite\":0,\"totalTokens\":5,\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0,\"total\":0}},\"stopReason\":\"stop\",\"timestamp\":2}}") + "\n");
+            pi.Start("--provider", "anthropic", "--model", "claude-sonnet-4-5", "--tui-mode", "regular");
+            await pi.WaitFor("escape interrupt");
+            var data = await pi.Mode!.Rpc.RequestAsync(new System.Text.Json.Nodes.JsonObject { ["type"] = "switch_session", ["sessionPath"] = outside });
+            Check(data?["cancelled"]?.GetValue<bool>() == false, "switched: " + data?.ToJsonString());
+            await pi.WaitFor("outside answer");
+            await pi.Submit("continue outside");
+            await pi.WaitFor("Hello from the fake model.");
+            await pi.WaitUntil(_ => InteractiveHarness.ReadShared(outside).Contains("continue outside", StringComparison.Ordinal), "the outside file is continued");
+        });
+
         // interactive-mode.ts findExactModelMatch: no cached match refreshes the catalogs (model-runtime.ts refresh re-reads models.json
         // and the credentials, without network under PI_OFFLINE) and matches against the refreshed available snapshot.
         yield return ("e2e.models.model-command-refreshes-when-nothing-cached-matches", async () =>

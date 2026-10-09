@@ -22,6 +22,7 @@ internal static class SessionStorageBackendTests
         ("session-backend lazy first materialization preserves a racing unrelated destination", LazyRace),
         ("session-backend lazy exact copies retain blank whitespace and CRLF framing before and after conversation", LazyExactFraming),
         ("session-backend lazy file admission counts materialized pre-existing and pending namespace files", LazyFileBounds),
+        ("session-backend lazy local serves session files outside its directory as SessionManager.open does", LazyOutside),
         ("session-backend branch publisher uses volatile and deferred receipts then real conversation publication", Branches),
         ("session-backend memory exact copy preserves all source bytes and refuses overwrite", MemoryCopy),
         ("session-backend memory catalog pagination cancellation and inert missing parent metadata", MemoryCatalog)
@@ -110,6 +111,27 @@ internal static class SessionStorageBackendTests
         Check(actual.Snapshot.Entries.Select(entry => entry.Id).SequenceEqual(new[] { "setup", "user", "after" }), "First materialization lost accumulated setup or subsequent append.");
         Equal("1.00e400", actual.Snapshot.Entries[0].WireBody.Value.GetProperty("data").GetProperty("opaque").GetRawText());
     }
+    // session-manager.ts SessionManager.open: a session file in another directory opens, and a new one there stays lazy.
+    private static async Task LazyOutside()
+    {
+        using var directory = new LocalDirectory(); using var other = new LocalDirectory();
+        var backend = new SessionStorageBackend(directory.Path, SessionStorageMode.LazyLocal);
+        var existing = Path.Combine(other.Path, "existing.jsonl");
+        await using (var store = await SessionLogStore.CreateNewAsync(existing, Header(other.Path), Options(SessionStorageBackendForDisk(other.Path))))
+            await store.AppendAsync([User("user", null)]);
+        await using (var reopened = await SessionLogStore.OpenAsync(existing, Options(backend)))
+        {
+            Check(reopened.Snapshot.IsMaterialized && reopened.Snapshot.Entries.Length == 1, "Outside session did not open.");
+            await reopened.AppendAsync([State("after", "user")]);
+        }
+        Check(backend.FileExists(existing) && backend.GetMetadata(existing).Bytes == new FileInfo(existing).Length, "Outside metadata.");
+        var fresh = Path.Combine(other.Path, "fresh.jsonl");
+        await using (var store = await SessionLogStore.CreateNewAsync(fresh, Header(other.Path, "fresh"), Options(backend)))
+            await store.AppendAsync([State("setup")]);
+        Check(!File.Exists(fresh) && backend.FileExists(fresh), "An outside new session materialized before a conversation.");
+        await Fails<ArgumentException>(async () => { await backend.OpenAsync(other.Path + Path.DirectorySeparatorChar, true, default); });
+    }
+    private static SessionStorageBackend SessionStorageBackendForDisk(string directory) => new(directory, SessionStorageMode.LazyLocal);
     private static async Task LazyAssistant()
     {
         using var directory = new LocalDirectory(); var path = Path.Combine(directory.Path, "assistant.jsonl");

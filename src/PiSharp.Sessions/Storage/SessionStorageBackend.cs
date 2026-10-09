@@ -45,7 +45,10 @@ public sealed class SessionStorageBackend : ISessionLogStorageFactory, ISessionC
         if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path) || path.Length > 4096)
             throw new ArgumentException("Session backend path is invalid.");
         var canonical = Path.GetFullPath(path);
-        if (!paths.Equals(Path.GetDirectoryName(canonical), Directory) || string.IsNullOrEmpty(Path.GetFileName(canonical)))
+        // session-manager.ts SessionManager.open: a local session file may live in any directory (its directory becomes the session
+        // directory); lazy local storage serves such files as it serves its own. Memory storage keeps its namespace.
+        if (string.IsNullOrEmpty(Path.GetFileName(canonical)) ||
+            Mode != SessionStorageMode.LazyLocal && !paths.Equals(Path.GetDirectoryName(canonical), Directory))
             throw new ArgumentException("Session path is outside this explicit backend namespace.");
         return canonical;
     }

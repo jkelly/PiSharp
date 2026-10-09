@@ -336,7 +336,9 @@ public static class RpcSessionCommand
                 postInputSettlement: profile.DrainLifecycleHandoffsAsync,
                 postRunSettlement: profile.DrainLifecycleHandoffsAsync, userBash: profile.UserBash, modelRuntime: modelRuntime,
                 compactionSettings: pi is null ? null : model => CompactionSettings(pi.ReloadSettings is { } reloadCompaction
-                    ? reloadCompaction(CancellationToken.None).GetAwaiter().GetResult() : settings, model));
+                    ? reloadCompaction(CancellationToken.None).GetAwaiter().GetResult() : settings, model),
+                // agent-session-runtime.ts switchSession: SessionManager.open(sessionPath) for the Pi entry.
+                prepareSessionPath: pi is null ? null : (path, token) => PrepareSessionPathAsync(path, backend, profile.Workspace, token));
             profile.ConfigureLifecycleModeStop(lifecycleStop.CancelAsync);
             if (pi?.Extensions is { } compactingExtensions)
             {
@@ -489,6 +491,50 @@ public static class RpcSessionCommand
             ? PiSharp.Cli.Models.ModelListing.OAuthAuthenticationFailedMessage(model.Provider)
             : PiSharp.Cli.Models.ModelListing.NoApiKeyFoundMessage(model.Provider));
     };
+
+    /// <summary>session-manager.ts SessionManager.open and _setSessionFile before a switch: a session file opens wherever it is; an
+    /// empty file is initialized with a session header; a non-empty file that does not parse as a session is refused (unchanged); a
+    /// missing file is a new session at that path, written once it has a conversation (the lazy store holds its header until then).
+    /// The header's cwd is the host's (process.cwd()).</summary>
+    internal static async ValueTask PrepareSessionPathAsync(string path, SessionStorageBackend? backend, string cwd, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) return;
+        var full = Path.GetFullPath(path);
+        var lazy = backend is { Mode: SessionStorageMode.LazyLocal };
+        // A session of this run that is not written yet.
+        if (lazy && !File.Exists(full) && backend!.FileExists(full)) return;
+        if (Directory.Exists(full)) return;
+        if (File.Exists(full))
+        {
+            if (new FileInfo(full).Length > 0)
+            {
+                if (PiSharp.Cli.Pi.PiSessions.ReadHeader(full) is null)
+                    throw new InvalidDataException($"Session file is not a valid {PiSharp.Cli.Pi.PiConfig.AppName} session: {full}");
+                return;
+            }
+            await File.WriteAllTextAsync(full, NewHeader() + "\n", new UTF8Encoding(false), token).ConfigureAwait(false);
+            return;
+        }
+        if (lazy)
+        {
+            var storage = await backend!.OpenAsync(full, true, token).ConfigureAwait(false);
+            await using (storage.ConfigureAwait(false))
+            {
+                await storage.WriteAsync(Encoding.UTF8.GetBytes(NewHeader() + "\n")).ConfigureAwait(false);
+                await storage.BeforeCheckpointAsync().ConfigureAwait(false);
+            }
+            return;
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        await File.WriteAllTextAsync(full, NewHeader() + "\n", new UTF8Encoding(false), token).ConfigureAwait(false);
+
+        string NewHeader()
+        {
+            var (_, id, timestamp) = PiSharp.Cli.Pi.PiSessions.NewSessionFile(Path.GetDirectoryName(full)!, null, DateTimeOffset.UtcNow);
+            return PiSharp.Cli.Pi.PiJson.Stringify(new System.Text.Json.Nodes.JsonObject
+            { ["type"] = "session", ["version"] = PiSharp.Cli.Pi.PiSessions.CurrentSessionVersion, ["id"] = id, ["timestamp"] = timestamp, ["cwd"] = cwd });
+        }
+    }
 
     // Startup UI settings must use the same validated workspace as the actual RPC composition.
     internal static string ResolveStartupWorkspace(string[] args) => Parse(args).Workspace;

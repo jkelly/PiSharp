@@ -111,10 +111,10 @@ internal static partial class Program
     }
 
     /// <summary>A continued session in the sandbox's cwd: one exchange on <paramref name="provider"/>/<paramref name="model"/>.</summary>
-    private static string SeedSession(Sandbox sandbox, string name, string provider, string model)
+    private static string SeedSession(Sandbox sandbox, string name, string provider, string model, string? directory = null)
     {
         var cwd = JsonValue.Create(sandbox.Cwd)!.ToJsonString();
-        return sandbox.Write(Path.Combine(PiSessions.DefaultSessionDirectoryPath(sandbox.Cwd, sandbox.AgentDir), name), string.Join("\n",
+        return sandbox.Write(Path.Combine(directory ?? PiSessions.DefaultSessionDirectoryPath(sandbox.Cwd, sandbox.AgentDir), name), string.Join("\n",
             "{\"type\":\"session\",\"version\":3,\"id\":\"01a00000-0000-7000-8000-" + Guid.NewGuid().ToString("N")[..12] + "\",\"timestamp\":\"2026-10-09T10:00:00.000Z\",\"cwd\":" + cwd + "}",
             "{\"type\":\"model_change\",\"id\":\"a1\",\"parentId\":null,\"timestamp\":\"2026-10-09T10:00:00.001Z\",\"provider\":\"" + provider + "\",\"modelId\":\"" + model + "\"}",
             "{\"type\":\"thinking_level_change\",\"id\":\"a2\",\"parentId\":\"a1\",\"timestamp\":\"2026-10-09T10:00:00.002Z\",\"thinkingLevel\":\"off\"}",
