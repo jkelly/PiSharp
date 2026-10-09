@@ -889,7 +889,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     private static void ValidateRuntimeContext(SessionContextProjection context, AgentConfiguration configuration)
     {
         if (context.ThinkingLevel != configuration.ThinkingLevel) throw Error(PersistentAgentSessionFailure.UnsupportedThinkingLevel);
-        if (context.Model is { } model &&
+        // Source getBranchSelection: a virtual model_change holds over the physical responses it routed.
+        if (SessionBranchSelection.Select(context, configuration.Model) is { } model &&
             (model.Provider != configuration.Model.Provider || model.ModelId != configuration.Model.Id))
             throw Error(PersistentAgentSessionFailure.ModelMismatch);
     }
@@ -1294,20 +1295,22 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     {
         if (observation is AgentLoopTurnEnded turn) { await CommitNativeDiagnosticAsync(turn).ConfigureAwait(false); return; }
         if (observation is not (AgentLoopInputMessageEnded or AssistantMessageEnded or ToolResultMessageEnded)) return;
+        // Source message_end handlers run before the message is persisted; a replacement is what the session records.
+        var replacement = await MessageEndReplacementAsync().ConfigureAwait(false); Exception? rejected = null;
         await _commits.WaitAsync().ConfigureAwait(false);
         try
         {
             // Agent publishes this exact owned record before invoking its primary sink.
             var messages = _agent.Snapshot.Messages;
             if (messages.IsEmpty) throw Error(PersistentAgentSessionFailure.InvalidCommit);
-            var message = messages[^1];
+            var original = messages[^1]; var message = replacement ?? original;
             var role = observation switch
             {
                 AgentLoopInputMessageEnded input => input.Message.Role,
                 AssistantMessageEnded => "assistant",
                 _ => "toolResult"
             };
-            if (message.Role != role) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+            if (original.Role != role || message.Role != role) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             SessionContextProjection previous;
             lock (_gate)
             {
@@ -1315,6 +1318,12 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 previous = _context;
             }
             var log = _store.Snapshot;
+            SessionEntry entry; SessionContextProjection nextContext;
+            try { (entry, nextContext) = Prepare(message); }
+            catch (Exception error) when (replacement is not null && error is not SessionLogStoreException)
+            { rejected = error; replacement = null; message = original; (entry, nextContext) = Prepare(message); }
+            (SessionEntry, SessionContextProjection) Prepare(TranscriptEntry message)
+            {
             var entry = Record(_codec, role == "custom" ? "custom_message" : "message", Identity(_nextEntryId, log.Header.Id, log.Entries), previous.LeafId,
                 _clock, writer =>
                 {
@@ -1333,12 +1342,20 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             var nextContext = _projector.Project(log.Entries.Add(entry), entry.Id);
             ValidateRuntimeContext(nextContext, _configuration);
             if (_registry is not null) ValidateLoadout(nextContext.LlmMessages);
+            return (entry, nextContext);
+            }
             var acknowledged = await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
             if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             lock (_gate)
             {
                 _acknowledgedLog = acknowledged.Snapshot; _context = nextContext;
                 if (role == "assistant") _lastAcknowledgedAssistantId = entry.Id;
+                if (replacement is not null)
+                {
+                    // The running loop keeps the original; it continues from the persisted context once idle.
+                    if (_replacedMessages.Count >= 1024) _replacedMessages.Clear();
+                    _replacedMessages[original.WireBody.Value.GetRawText()] = replacement.WireBody; _agentHoldsReplacedMessages = true;
+                }
             }
         }
         catch (Exception error)
@@ -1351,6 +1368,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             throw new PersistentAgentSessionException(fault);
         }
         finally { _commits.Release(); }
+        if (rejected is not null) await RejectMessageEndAsync(rejected).ConfigureAwait(false);
         if (observation is AssistantMessageEnded assistant && assistant.Message.StopReason != StopReason.Error)
         {
             SessionRetryCoordinator? retry; lock (_gate) retry = _retryCoordinator;

@@ -29,9 +29,20 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
     internal void Attach(ReplaceableAgentSession owner, AgentSessionAttachment attached)
     {
         owner.ValidateAttachment(attached);
-        if (!AgentTopics.Concat(["model_select", "thinking_level_select", "session_compact_failed"]).Any(topic => registry.HasObservers(captured, topic)))
-        { Detach(); return; }
+        attached.Session.ConfigureBeforeCompaction(registry.HasEventHandlers(captured, "session_before_compact")
+            ? (proposal, token) => BeforeCompactAsync(owner, attached, proposal, token) : null);
+        var turnEnd = registry.HasEventHandlers(captured, "turn_end"); var beforeSettle = registry.HasEventHandlers(captured, "agent_before_settle");
+        var messageEnd = registry.HasEventHandlers(captured, "message_end");
+        attached.Session.ConfigureMessageEndHandler(messageEnd ? (message, token) => MessageEndAsync(owner, attached, message, token) : null,
+            messageEnd ? error => ReportAsync(attached, "message_end", "Invalid message_end replacement: " + error.Message) : null);
+        if (!turnEnd && !beforeSettle && !AgentTopics.Concat(["model_select", "thinking_level_select", "session_compact_failed"]).Any(topic => registry.HasObservers(captured, topic)))
+        { attached.Session.ConfigureBoundaryHandlers(null, null); Detach(); return; }
         var sink = new Sink(this, owner, attached);
+        attached.Session.ConfigureBoundaryHandlers(turnEnd ? sink.TurnEndBoundaryAsync : null,
+            beforeSettle ? (request, token) => BoundaryAsync(owner, attached, "agent_before_settle",
+                writer => { writer.WriteString("type", "agent_before_settle"); writer.WriteString("outcome", request.Outcome); }, request, token) : null,
+            kind => ReportAsync(attached, kind == SessionBoundaryKind.TurnEnd ? "turn_end" : "agent_before_settle",
+                (kind == SessionBoundaryKind.TurnEnd ? "turn_end" : "agent_before_settle") + " requested continuation without runnable model context"));
         var agent = attached.Session.Subscribe(sink); IDisposable operation;
         try { operation = attached.Session.SubscribeOperationEvents(sink); }
         catch { agent.Dispose(); throw; }
@@ -61,6 +72,147 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
                 catch (Exception) { }
         }
     }
+
+    private async ValueTask ReportAsync(AgentSessionAttachment attached, string topic, string message)
+    {
+        if (report is null) return;
+        try { await report(new(topic, "<boundary>", attached.Generation, topic, ExtensionEventFailure.InvalidResult) { Message = message }, CancellationToken.None).ConfigureAwait(false); }
+        catch (Exception) { }
+    }
+
+    /// <summary>Source emitBoundary: each handler sees the drafted entries, the continue flag and the context preview so far; a result's
+    /// entries or continue replaces them, and the preview is rebuilt after every handler. Entries the session would refuse are
+    /// reported as invalid, and an invalid final state commits nothing and does not continue.</summary>
+    private async ValueTask<SessionBoundaryDecision?> BoundaryAsync(ReplaceableAgentSession owner, AgentSessionAttachment attached, string topic,
+        Action<Utf8JsonWriter> writeBase, SessionBoundaryRequest request, CancellationToken token)
+    {
+        if (!ReferenceEquals(owner.Current, attached)) return null;
+        ImmutableArray<JsonData> entries = []; var shouldContinue = false; var valid = true; var invalid = new List<string>();
+        var context = request.Preview(entries, token);
+        JsonData Event() => Json(writer =>
+        {
+            writeBase(writer);
+            writer.WritePropertyName("entries"); writer.WriteStartArray(); foreach (var entry in entries) writer.WriteRawValue(entry.ToString()); writer.WriteEndArray();
+            writer.WriteBoolean("continue", shouldContinue); writer.WritePropertyName("context"); WriteContext(writer, context);
+        });
+        await registry.ReduceEventAsync(captured, topic, Event(), (_, result) =>
+        {
+            var value = result.Value; string? shape = null;
+            if (value.ValueKind == JsonValueKind.Object)
+            {
+                if (value.TryGetProperty("entries", out var drafted))
+                {
+                    if (drafted.ValueKind == JsonValueKind.Array) entries = [.. drafted.EnumerateArray().Select(item => JsonData.Parse(item.GetRawText()))];
+                    else shape = "entries must be an array";
+                }
+                if (value.TryGetProperty("continue", out var next)) shouldContinue = Truthy(next);
+            }
+            try
+            {
+                if (shape is not null) throw new InvalidDataException(shape);
+                context = request.Preview(entries, token); valid = true;
+            }
+            catch (Exception error) when (error is not OperationCanceledException) { valid = false; invalid.Add("Invalid boundary entries: " + error.Message); }
+            return Event();
+        }, report, token, attached.LifetimeToken).ConfigureAwait(false);
+        foreach (var message in invalid) await ReportAsync(attached, topic, message).ConfigureAwait(false);
+        return valid ? new(entries, shouldContinue) : new([], false);
+    }
+
+    /// <summary>Source emitMessageEnd: each handler sees the current message; a replacement with another role is reported and
+    /// skipped. Null (no replacement) keeps the message.</summary>
+    private async ValueTask<TranscriptEntry?> MessageEndAsync(ReplaceableAgentSession owner, AgentSessionAttachment attached, TranscriptEntry message,
+        CancellationToken token)
+    {
+        if (!ReferenceEquals(owner.Current, attached)) return null;
+        var current = message.WireBody; var modified = false; var invalid = 0;
+        JsonData Event() => Json(writer => { writer.WriteString("type", "message_end"); Raw(writer, "message", current); });
+        await registry.ReduceEventAsync(captured, "message_end", Event(), (_, result) =>
+        {
+            if (result.Value.ValueKind != JsonValueKind.Object || !result.Value.TryGetProperty("message", out var replacement) || !Truthy(replacement)) return null;
+            if (replacement.ValueKind != JsonValueKind.Object || !replacement.TryGetProperty("role", out var role) || role.ValueKind != JsonValueKind.String ||
+                role.GetString() != message.Role)
+            { invalid++; return null; }
+            // Untyped handlers can return null or missing content; it never enters session history.
+            var node = System.Text.Json.Nodes.JsonNode.Parse(replacement.GetRawText())!.AsObject();
+            if (message.Role is "user" or "assistant" or "toolResult" or "custom" && node["content"] is null) node["content"] = new System.Text.Json.Nodes.JsonArray();
+            current = JsonData.Parse(node.ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
+            modified = true; return Event();
+        }, report, token, attached.LifetimeToken).ConfigureAwait(false);
+        for (var index = 0; index < invalid; index++)
+            await ReportAsync(attached, "message_end", "message_end handlers must return a message with the same role").ConfigureAwait(false);
+        return modified ? new TranscriptEntry(message.Role, current) : null;
+    }
+
+    private static void WriteContext(Utf8JsonWriter writer, SessionBoundaryPreview preview)
+    {
+        var context = preview.Context;
+        writer.WriteStartObject();
+        writer.WritePropertyName("contextEntries"); writer.WriteStartArray();
+        foreach (var entry in context.ContextEntries.IsDefault ? [] : context.ContextEntries)
+        {
+            writer.WriteStartObject(); Raw(writer, "sourceEntry", entry.SourceEntry.WireBody);
+            Array(writer, "messages", entry.Messages.Select(message => message.WireBody)); writer.WriteEndObject();
+        }
+        writer.WriteEndArray();
+        Array(writer, "contextMessages", context.Messages.Select(message => message.WireBody));
+        Array(writer, "llmMessages", context.LlmMessages.Select(message => message.WireBody));
+        Array(writer, "pendingMessages", preview.PendingMessages.Select(message => message.WireBody));
+        writer.WriteBoolean("canContinue", preview.CanContinue); writer.WriteEndObject();
+    }
+
+    /// <summary>Source emit for session_before_compact: handlers see the same event, the last truthy result wins, and a
+    /// cancelling result ends the dispatch. A malformed compaction result is reported and ignored.</summary>
+    private async ValueTask<SessionBeforeCompactDecision?> BeforeCompactAsync(ReplaceableAgentSession owner, AgentSessionAttachment attached,
+        SessionBeforeCompactProposal proposal, CancellationToken token)
+    {
+        if (!ReferenceEquals(owner.Current, attached)) return null;
+        JsonData? last = null;
+        await registry.ReduceEventAsync(captured, "session_before_compact", proposal.ToJson(),
+            (_, result) => { if (Truthy(result.Value)) last = result; return null; }, report, token, attached.LifetimeToken,
+            result => Truthy(result.Value) && result.Value.ValueKind == JsonValueKind.Object &&
+                result.Value.TryGetProperty("cancel", out var cancel) && Truthy(cancel)).ConfigureAwait(false);
+        if (last is not { Value.ValueKind: JsonValueKind.Object } chosen) return null;
+        if (chosen.Value.TryGetProperty("cancel", out var cancelled) && Truthy(cancelled)) return new(Cancel: true);
+        if (!chosen.Value.TryGetProperty("compaction", out var compaction) || !Truthy(compaction)) return new();
+        try { return new(Compaction: ExtensionCompaction(compaction)); }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            if (report is not null)
+                try { await report(new("session_before_compact", "native-host", attached.Generation, "result", ExtensionEventFailure.InvalidResult)
+                    { Message = error.Message }, CancellationToken.None).ConfigureAwait(false); }
+                catch (Exception) { }
+            return new();
+        }
+    }
+    private static SessionExtensionCompaction ExtensionCompaction(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty("summary", out var summary) || summary.ValueKind != JsonValueKind.String ||
+            !value.TryGetProperty("firstKeptEntryId", out var firstKept) || firstKept.ValueKind != JsonValueKind.String ||
+            !value.TryGetProperty("tokensBefore", out var tokens) || tokens.ValueKind != JsonValueKind.Number)
+            throw new InvalidDataException("session_before_compact compaction requires summary, firstKeptEntryId and tokensBefore.");
+        TokenUsage? usage = null;
+        if (value.TryGetProperty("usage", out var usageValue) && usageValue.ValueKind != JsonValueKind.Undefined && usageValue.ValueKind != JsonValueKind.Null)
+            usage = PiWireJson.ReadMessage(Json(writer =>
+            {
+                writer.WriteString("role", "assistant"); writer.WritePropertyName("content"); writer.WriteStartArray(); writer.WriteEndArray();
+                writer.WriteString("api", "summary"); writer.WriteString("provider", "summary"); writer.WriteString("model", "summary");
+                writer.WritePropertyName("usage"); writer.WriteRawValue(usageValue.GetRawText());
+                writer.WriteString("stopReason", "stop"); writer.WriteNumber("timestamp", 0);
+            }).Value).Usage;
+        JsonData? details = value.TryGetProperty("details", out var detailsValue) && detailsValue.ValueKind != JsonValueKind.Undefined
+            ? JsonData.Parse(detailsValue.GetRawText()) : null;
+        return new(summary.GetString()!, firstKept.GetString()!, tokens.GetDouble(), usage, details);
+    }
+    /// <summary>JavaScript truthiness of a handler result value.</summary>
+    internal static bool Truthy(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Object or JsonValueKind.Array => true,
+        JsonValueKind.True => true,
+        JsonValueKind.String => value.GetString()!.Length != 0,
+        JsonValueKind.Number => value.GetDouble() is var number && number != 0 && !double.IsNaN(number),
+        _ => false
+    };
 
     internal static JsonData Json(Action<Utf8JsonWriter> write)
     {
@@ -171,7 +323,7 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
                         writer.WriteString("reason", SessionSummarizationRetryAttemptStarted.ReasonText(failed.Reason));
                         if (failed.ErrorMessage is not null) writer.WriteString("errorMessage", failed.ErrorMessage);
                         writer.WriteBoolean("aborted", failed.Aborted); writer.WriteBoolean("willRetry", failed.WillRetry);
-                        writer.WriteBoolean("fromExtension", false);
+                        writer.WriteBoolean("fromExtension", failed.FromExtension);
                     })).ConfigureAwait(false); break;
             }
         }
@@ -198,44 +350,61 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
         }
         private static JsonData Result(ToolResult result) => Json(writer => ToolResultValueCodec.WriteProperties(writer, result));
 
-        /// <summary>Source turn_end boundary event: the persisted entry ids of the turn's assistant message and tool results,
+        /// <summary>The turn_end fields before the boundary state: the persisted assistant message and tool results and their entry ids.
+        /// Null when the assistant entry cannot be resolved.</summary>
+        private Action<Utf8JsonWriter>? TurnEndBase(AgentLoopTurn turn, string outcome)
+        {
+            var context = Session.Snapshot.Context;
+            var assistantIndex = turn.Transcript.Length - turn.ToolResults.Length - 1;
+            if (assistantIndex < 0 || turn.Transcript[assistantIndex].Role != "assistant") throw new InvalidOperationException("The turn has no assistant message.");
+            var assistant = Session.PersistedWire(turn.Transcript[assistantIndex].WireBody);
+            var toolResults = turn.ToolResults.Select(message => Session.PersistedWire(message.WireBody)).ToImmutableArray();
+            string? EntryId(JsonData message) => context.ContextEntries.IsDefault ? null : context.ContextEntries.LastOrDefault(entry =>
+                entry.Messages.Any(candidate => JsonElement.DeepEquals(candidate.WireBody.Value, message.Value)))?.SourceEntry.Id;
+            var messageEntryId = EntryId(assistant);
+            if (messageEntryId is null) return null;
+            var turnIndex = _turnIndex;
+            return writer =>
+            {
+                writer.WriteString("type", "turn_end"); writer.WriteNumber("turnIndex", turnIndex); Raw(writer, "message", assistant);
+                Array(writer, "toolResults", toolResults);
+                writer.WriteString("messageEntryId", messageEntryId);
+                writer.WritePropertyName("toolResultEntryIds"); writer.WriteStartArray();
+                foreach (var result in toolResults) if (EntryId(result) is { } id) writer.WriteStringValue(id);
+                writer.WriteEndArray();
+                writer.WriteString("outcome", outcome);
+            };
+        }
+        private static string Outcome(AgentLoopTurn turn) => turn.Result.Chat.Message.StopReason switch
+        { StopReason.Aborted => "aborted", StopReason.Error => "error", _ => "completed" };
+
+        /// <summary>Source _dispatchTurnEndBoundary for the result-returning turn_end handlers.</summary>
+        internal async ValueTask<SessionBoundaryDecision?> TurnEndBoundaryAsync(SessionBoundaryRequest request, CancellationToken token)
+        {
+            if (TurnEndBase(request.Turn!, request.Outcome) is not { } writeBase)
+            {
+                await binding.ReportAsync(attached, "turn_end", "turn_end could not resolve the persisted assistant entry ID").ConfigureAwait(false);
+                return null;
+            }
+            return await binding.BoundaryAsync(owner, attached, "turn_end", writeBase, request, token).ConfigureAwait(false);
+        }
+
+        /// <summary>Source turn_end event for observers: the persisted entry ids of the turn's assistant message and tool results,
         /// the outcome, no drafted entries, and the projected context preview.</summary>
         private JsonData TurnEnd(AgentLoopTurn turn)
         {
-            var snapshot = Session.Snapshot; var context = snapshot.Context;
-            var assistantIndex = turn.Transcript.Length - turn.ToolResults.Length - 1;
-            if (assistantIndex < 0 || turn.Transcript[assistantIndex].Role != "assistant") throw new InvalidOperationException("The turn has no assistant message.");
-            var assistant = turn.Transcript[assistantIndex].WireBody;
-            string? EntryId(JsonData message) => context.ContextEntries.IsDefault ? null : context.ContextEntries.LastOrDefault(entry =>
-                entry.Messages.Any(candidate => JsonElement.DeepEquals(candidate.WireBody.Value, message.Value)))?.SourceEntry.Id;
-            var stopReason = assistant.Value.TryGetProperty("stopReason", out var reason) ? reason.GetString() : null;
+            var writeBase = TurnEndBase(turn, Outcome(turn)) ?? throw new InvalidOperationException("The turn's assistant entry is not persisted.");
+            var context = Session.Snapshot.Context;
             var queue = Session.GetPendingInputQueueSnapshot();
             var pending = queue.SteeringMessages.Concat(queue.FollowUpMessages).ToImmutableArray();
             var finalRole = context.LlmMessages.IsEmpty ? null : context.LlmMessages[^1].Role;
             var canContinue = context.LlmMessages.Any(message => message.Role != "system") && finalRole != "assistant" || !pending.IsEmpty;
             return Json(writer =>
             {
-                writer.WriteString("type", "turn_end"); writer.WriteNumber("turnIndex", _turnIndex); Raw(writer, "message", assistant);
-                Array(writer, "toolResults", turn.ToolResults.Select(message => message.WireBody));
-                if (EntryId(assistant) is { } messageEntryId) writer.WriteString("messageEntryId", messageEntryId);
-                writer.WritePropertyName("toolResultEntryIds"); writer.WriteStartArray();
-                foreach (var result in turn.ToolResults) if (EntryId(result.WireBody) is { } id) writer.WriteStringValue(id);
-                writer.WriteEndArray();
-                writer.WriteString("outcome", stopReason == "aborted" ? "aborted" : stopReason == "error" ? "error" : "completed");
+                writeBase(writer);
                 writer.WritePropertyName("entries"); writer.WriteStartArray(); writer.WriteEndArray();
                 writer.WriteBoolean("continue", false);
-                writer.WritePropertyName("context"); writer.WriteStartObject();
-                writer.WritePropertyName("contextEntries"); writer.WriteStartArray();
-                foreach (var entry in context.ContextEntries.IsDefault ? [] : context.ContextEntries)
-                {
-                    writer.WriteStartObject(); Raw(writer, "sourceEntry", entry.SourceEntry.WireBody);
-                    Array(writer, "messages", entry.Messages.Select(message => message.WireBody)); writer.WriteEndObject();
-                }
-                writer.WriteEndArray();
-                Array(writer, "contextMessages", context.Messages.Select(message => message.WireBody));
-                Array(writer, "llmMessages", context.LlmMessages.Select(message => message.WireBody));
-                Array(writer, "pendingMessages", pending.Select(message => message.WireBody));
-                writer.WriteBoolean("canContinue", canContinue); writer.WriteEndObject();
+                writer.WritePropertyName("context"); WriteContext(writer, new(context, pending, canContinue));
             });
         }
     }

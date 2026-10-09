@@ -16,7 +16,12 @@ public sealed record SessionCompactionPrepared(long OperationGeneration, Session
 /// <summary>Original compaction terminal, published after owned generator/checkpoint/cancellation joins.</summary>
 public sealed record SessionCompactionEnded(long OperationGeneration, SessionCompactionReason Reason,
     JsonData? Result, bool Aborted, bool WillRetry, string? ErrorMessage)
-    : SessionOperationEvent(OperationGeneration);
+    : SessionOperationEvent(OperationGeneration)
+{
+    /// <summary>Source SessionCompactFailedEvent.fromExtension: the compaction content came from an extension (a
+    /// session_before_compact result or an extension-provided summary).</summary>
+    public bool FromExtension { get; init; }
+}
 
 public sealed partial class PersistentAgentSession
 {

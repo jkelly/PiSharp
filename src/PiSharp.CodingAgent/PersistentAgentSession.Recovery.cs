@@ -68,7 +68,8 @@ public sealed partial class PersistentAgentSession
         {
             var decision=original.FinishTurnDecision is null?AgentLoopFinishAction.Default:await original.FinishTurnDecision(turn,token).ConfigureAwait(false);
             double? desired;lock(_gate)desired=_automaticCompaction is null?null:_recoveryDesiredOutput;
-            return desired is { } max&&SessionRecoveryClassifier.IsRecoverableLength(turn.Result.Chat.Message,max)?AgentLoopFinishAction.End:decision;
+            decision=desired is { } max&&SessionRecoveryClassifier.IsRecoverableLength(turn.Result.Chat.Message,max)?AgentLoopFinishAction.End:decision;
+            return await TurnBoundaryAsync(turn,decision,token).ConfigureAwait(false);
         } } };
     }
     private async ValueTask EmitOperationAsync(SessionOperationEvent observation)
@@ -88,6 +89,11 @@ public sealed partial class PersistentAgentSession
         while(true)
         {
             allTurns.AddRange(result.Turns);
+            if (await SettleTurnBoundaryAsync(result, idle, token).ConfigureAwait(false))
+            {
+                if(runs>=(_agentOptions?.Loop?.MaximumTurns??16)){result=result with { Reason=AgentLoopStopReason.TurnLimit };break;}
+                SetOperationPhase(SessionOperationPhase.Provider);result=await _agent.ContinueAsync(token).ConfigureAwait(false);runs++;continue;
+            }
             if (!token.IsCancellationRequested && await TryAutomaticRetryAsync(result, idle, token).ConfigureAwait(false))
             { SetOperationPhase(SessionOperationPhase.Provider); result = await _agent.ContinueAsync(token).ConfigureAwait(false); runs++; continue; }
             var recovery=token.IsCancellationRequested?RecoveryDecision.None:await RunAutomaticBoundaryAsync(result,idle,token,operation,attempted).ConfigureAwait(false);
@@ -97,10 +103,17 @@ public sealed partial class PersistentAgentSession
             Func<CancellationToken,ValueTask>? boundary;lock(_gate)boundary=_beforeSettlement;
             SetOperationPhase(SessionOperationPhase.BeforeSettlement);
             if(boundary is not null&&!token.IsCancellationRequested)await boundary(token).ConfigureAwait(false);
+            // Source _runBeforeSettleBoundary: agent_before_settle may append entries and ensure one more provider request.
+            var settle=token.IsCancellationRequested?null:await RunBeforeSettleBoundaryAsync(idle,token).ConfigureAwait(false);
+            if(settle==true)
+            {
+                if(runs>=(_agentOptions?.Loop?.MaximumTurns??16)){result=result with { Reason=AgentLoopStopReason.TurnLimit };break;}
+                SetOperationPhase(SessionOperationPhase.Provider);result=await _agent.ContinueAsync(token).ConfigureAwait(false);runs++;continue;
+            }
             // Default sessions retain the accepted explicit-Continue contract for input admitted
             // during low-level end delivery. Recovery and explicit boundary hooks own the wider settlement loop.
             bool ownsContinuation;lock(_gate)ownsContinuation=boundary is not null||_automaticCompaction is not null&&_recoveryDesiredOutput is not null;
-            var canContinue=ownsContinuation&&result.Reason==AgentLoopStopReason.Completed&&!token.IsCancellationRequested;
+            var canContinue=settle is null&&ownsContinuation&&result.Reason==AgentLoopStopReason.Completed&&!token.IsCancellationRequested;
             AgentPendingInputQueueSnapshot queued;
             lock (_gate)
             {
@@ -130,7 +143,7 @@ public sealed partial class PersistentAgentSession
         if(configured is null||desired is null||result.Turns.IsEmpty)return RecoveryDecision.None;
         var turn=result.Turns[^1];var assistant=turn.Result.Chat.Message;var model=_configuration.Model;
         if(assistant.StopReason==StopReason.Aborted||assistant.Model!=model.Id||assistant.Provider!=model.Provider||assistant.Api!=model.Api)return RecoveryDecision.None;
-        var wire=PiWireJson.WriteMessage(assistant).Value;
+        var wire=PersistedWire(PiWireJson.WriteMessage(assistant)).Value;
         var selected=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="assistant"&&JsonElement.DeepEquals(m.WireBody.Value,wire)));
         if(selected is null)return RecoveryDecision.None;
         var index=context.Ancestry.IndexOf(selected.SourceEntry);
@@ -153,7 +166,7 @@ public sealed partial class PersistentAgentSession
             var targets=new List<string>{selected.SourceEntry.Id};
             foreach(var tool in turn.ToolResults.Where(m=>syntheticIds.Contains(m.WireBody.Value.GetProperty("toolCallId").GetString()!)))
             {
-                var target=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="toolResult"&&JsonElement.DeepEquals(m.WireBody.Value,tool.WireBody.Value)));
+                var target=context.ContextEntries.LastOrDefault(e=>e.Messages.Any(m=>m.Role=="toolResult"&&JsonElement.DeepEquals(m.WireBody.Value,PersistedWire(tool.WireBody).Value)));
                 if(target is null)throw Error(PersistentAgentSessionFailure.InvalidCommit);targets.Add(target.SourceEntry.Id);
             }
             SetOperationPhase(SessionOperationPhase.RecoveryOmission);await OmitRecoveryAttemptAsync(targets,token,idle).ConfigureAwait(false);
