@@ -78,6 +78,8 @@ public sealed class TurnRunner
                 await sink.EmitAsync(new AssistantMessageStarted(chat.Message), deliveryToken).ConfigureAwait(false);
         }
         var tools = await scheduler.RunAsync(chat.Message, settleAbort ? new SettlementSink(sink) : sink, cancellationToken).ConfigureAwait(false);
+        // A message_end replacement is the turn's assistant from here on (source in-place mutation).
+        if (tools.Assistant is { } replaced) chat = chat with { Message = replaced };
         return new(chat, tools, run.CleanupFailure);
     }
 

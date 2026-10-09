@@ -65,11 +65,8 @@ public sealed partial class PersistentAgentSession
     private Func<SessionBoundaryKind, ValueTask>? _invalidBoundaryContinuation;
     private SessionMessageEndHandler? _messageEnd;
     private Func<Exception, ValueTask>? _messageEndRejected;
-    private PendingTurnBoundary? _pendingTurnBoundary;
     private string _lastActivityOutcome = "completed";
     private readonly Dictionary<string, JsonData> _replacedMessages = new(StringComparer.Ordinal);
-    private bool _agentHoldsReplacedMessages;
-    private sealed record PendingTurnBoundary(ImmutableArray<JsonData> Entries, bool Continue, bool ResumeNaturally);
 
     /// <summary>Trusted host binding of the turn_end and agent_before_settle handlers. <paramref name="invalidContinuation"/> reports a
     /// continuation requested without runnable model context (source _reportInvalidBoundaryContinuation).</summary>
@@ -93,9 +90,9 @@ public sealed partial class PersistentAgentSession
         lock (_gate) return _replacedMessages.TryGetValue(message.Value.GetRawText(), out var replacement) ? replacement : message;
     }
 
-    /// <summary>Source finishTurn: turn_end handlers run once the turn's messages are persisted. Drafted entries replace the agent's
-    /// context, which needs an idle agent, so a turn with drafts or a requested continuation ends this loop; the session commits the
-    /// drafts and resumes the run (<see cref="SettleTurnBoundaryAsync"/>).</summary>
+    /// <summary>Source finishTurn with _dispatchTurnEndBoundary: turn_end handlers run once the turn's messages are persisted; their
+    /// drafted entries are committed at once and the running loop continues from the refreshed context (no new agent run). A
+    /// requested continuation becomes the loop's continue decision when the context can run; an earlier end decision wins.</summary>
     private async ValueTask<AgentLoopFinishAction> TurnBoundaryAsync(AgentLoopTurn turn, AgentLoopFinishAction decision, CancellationToken token)
     {
         var stop = turn.Result.Chat.Message.StopReason;
@@ -104,25 +101,13 @@ public sealed partial class PersistentAgentSession
         lock (_gate) { _lastActivityOutcome = outcome; handler = _turnBoundary; }
         if (handler is null) return decision;
         var result = await handler(new(SessionBoundaryKind.TurnEnd, outcome, turn, Preview(SessionBoundaryKind.TurnEnd)), token).ConfigureAwait(false);
-        if (result is null || result.Entries.IsDefaultOrEmpty && !result.Continue) return decision;
-        lock (_gate) _pendingTurnBoundary = new(result.Entries.IsDefault ? [] : result.Entries, result.Continue,
-            decision == AgentLoopFinishAction.Continue || decision == AgentLoopFinishAction.Default && turn.Result.Tools.ShouldContinue);
-        return AgentLoopFinishAction.End;
-    }
-
-    /// <summary>Commits the ended turn's drafts and says whether the run resumes: the turn's own continuation (tool results, an
-    /// explicit hook continuation), queued input, or a turn_end continuation the context can run.</summary>
-    private async Task<bool> SettleTurnBoundaryAsync(AgentLoopResult result, TaskCompletionSource idle, CancellationToken token)
-    {
-        await RestoreReplacedMessagesAsync(idle).ConfigureAwait(false);
-        PendingTurnBoundary? pending;
-        lock (_gate) { pending = _pendingTurnBoundary; _pendingTurnBoundary = null; }
-        if (pending is null) return false;
-        if (!pending.Entries.IsEmpty) await CommitBoundaryDraftsAsync(pending.Entries, idle).ConfigureAwait(false);
-        var final = PreviewCore(SessionBoundaryKind.TurnEnd, [], CancellationToken.None);
-        if (pending.Continue && !final.CanContinue) await ReportInvalidContinuationAsync(SessionBoundaryKind.TurnEnd).ConfigureAwait(false);
-        if (result.Reason != AgentLoopStopReason.Completed || token.IsCancellationRequested) return false;
-        return (pending.ResumeNaturally || pending.Continue) && final.CanContinue || HasQueuedInput();
+        if (result is null) return decision;
+        if (!result.Entries.IsDefaultOrEmpty) await CommitBoundaryDraftsAsync(result.Entries, null).ConfigureAwait(false);
+        var extensionContinue = result.Continue;
+        if (extensionContinue && !PreviewCore(SessionBoundaryKind.TurnEnd, [], CancellationToken.None).CanContinue)
+        { await ReportInvalidContinuationAsync(SessionBoundaryKind.TurnEnd).ConfigureAwait(false); extensionContinue = false; }
+        if (decision == AgentLoopFinishAction.End) return decision;
+        return extensionContinue || decision == AgentLoopFinishAction.Continue ? AgentLoopFinishAction.Continue : AgentLoopFinishAction.Default;
     }
 
     /// <summary>Source _runBeforeSettleBoundary. Null when no handler is bound; otherwise whether the run continues.</summary>
@@ -181,9 +166,9 @@ public sealed partial class PersistentAgentSession
             (kind == SessionBoundaryKind.TurnEnd ? queued : finalRole == "assistant" && queued));
     }
 
-    /// <summary>Source _commitBoundaryDrafts, between agent loops: append the drafts in order, refresh the agent context, and emit
-    /// entry_appended for each.</summary>
-    private async Task CommitBoundaryDraftsAsync(ImmutableArray<JsonData> drafts, TaskCompletionSource idle)
+    /// <summary>Source _commitBoundaryDrafts: append the drafts in order, refresh the agent context, and emit entry_appended for each.
+    /// With <paramref name="idle"/> null it runs inside the active run's turn boundary, and the loop continues from the refreshed context.</summary>
+    private async Task CommitBoundaryDraftsAsync(ImmutableArray<JsonData> drafts, TaskCompletionSource? idle)
     {
         await _commits.WaitAsync().ConfigureAwait(false); var admitted = false;
         try
@@ -192,7 +177,7 @@ public sealed partial class PersistentAgentSession
             lock (_gate)
             {
                 ThrowAvailable();
-                if (!ReferenceEquals(_active, idle)) throw Error(PersistentAgentSessionFailure.StaleSession);
+                if (idle is null ? _active is null : !ReferenceEquals(_active, idle)) throw Error(PersistentAgentSessionFailure.StaleSession);
                 previous = _context; log = _acknowledgedLog;
             }
             var (entries, prospective) = BoundaryEntries(previous, log, drafts, existing => Identity(_nextEntryId, log.Header.Id, existing), _clock, CancellationToken.None);
@@ -205,8 +190,9 @@ public sealed partial class PersistentAgentSession
             if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             lock (_gate)
             {
-                _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(_configuration), SessionContextProjector.AgentMessages(prospective));
-                _acknowledgedLog = acknowledged.Snapshot; _context = prospective; _agentHoldsReplacedMessages = false;
+                if (idle is null) _agent.ReplaceRunMessages(SessionContextProjector.AgentMessages(prospective));
+                else _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(_configuration), SessionContextProjector.AgentMessages(prospective));
+                _acknowledgedLog = acknowledged.Snapshot; _context = prospective;
             }
             admitted = false; await PublishAppendedAsync(acknowledged.Entries).ConfigureAwait(false);
         }
@@ -286,22 +272,5 @@ public sealed partial class PersistentAgentSession
     {
         Func<Exception, ValueTask>? rejected; lock (_gate) rejected = _messageEndRejected;
         if (rejected is not null) try { await rejected(error).ConfigureAwait(false); } catch (Exception) { }
-    }
-
-    /// <summary>The agent's run kept the original of a replaced message; once it is idle, it continues from the persisted context.</summary>
-    private async Task RestoreReplacedMessagesAsync(TaskCompletionSource idle)
-    {
-        lock (_gate) if (!_agentHoldsReplacedMessages) return;
-        await _commits.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            lock (_gate)
-            {
-                if (!_agentHoldsReplacedMessages || !ReferenceEquals(_active, idle)) return;
-                _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(_configuration), SessionContextProjector.AgentMessages(_context));
-                _agentHoldsReplacedMessages = false;
-            }
-        }
-        finally { _commits.Release(); }
     }
 }

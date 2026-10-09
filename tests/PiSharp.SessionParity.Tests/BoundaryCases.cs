@@ -27,6 +27,8 @@ internal static partial class Program
         Case("boundary.turn-end-invalid-entries-and-unrunnable-continue-reported", TurnEndInvalid),
         Case("boundary.agent-before-settle-drafts-and-continue", BeforeSettleContinue),
         Case("boundary.message-end-replacement-persisted-and-role-checked", MessageEndReplacement),
+        Case("boundary.turn-end-drafts-continue-the-same-run", TurnEndSameRun),
+        Case("boundary.message-end-replacement-applies-within-the-run", MessageEndWithinRun),
         Case("boundary.resume-restores-virtual-branch-selection", ResumeVirtualSelection),
         Case("boundary.switch-emits-no-restore-model-select", SwitchEmitsNoModelSelect),
     ];
@@ -201,6 +203,70 @@ internal static partial class Program
         var sent = f.Transport.Requests[1].Messages.Where(message => message.Role == "assistant").Select(message => message.WireBody.ToString()).ToArray();
         Check(sent.Any(text => text.Contains("replaced", StringComparison.Ordinal)) && !sent.Any(text => text.Contains("original", StringComparison.Ordinal)),
             "The next request did not use the persisted replacement.");
+    }
+
+    // Upstream finishTurn commits turn_end drafts and returns {action:"continue"}; runLoop continues: one agent_start/agent_end
+    // pair, turn_start/turn_end per request, turnIndex 0 and 1, and agent_end.messages are the run's newMessages (no drafts).
+    private static async Task TurnEndSameRun()
+    {
+        await using var f = await CreateAsync(Response(text: "alpha"), Response(text: "beta")); var events = new List<JsonData>();
+        await f.Activate(api => ((IExtensionEventHandlerRegistry)api).RegisterEventHandler(new("boundary", "turn_end", (value, _, _) =>
+        {
+            events.Add(value);
+            return events.Count == 1 ? Result("""{"entries":[{"type":"custom_message","customType":"note","content":"please continue","display":true}],"continue":true}""") : NoResult;
+        })));
+        AttachEvents(f); f.StartRpc(); await f.PromptAsync();
+        Equal(2, f.Transport.Calls, "provider requests");
+        var types = f.Frames().Select(Type).Where(type => type is "agent_start" or "agent_end" or "turn_start" or "turn_end").ToArray();
+        Check(types.SequenceEqual(["agent_start", "turn_start", "turn_end", "turn_start", "turn_end", "agent_end"]), "lifecycle: " + string.Join(",", types));
+        Check(events.Select(value => value.Value.GetProperty("turnIndex").GetInt32()).SequenceEqual([0, 1]), "turnIndex continues across the boundary");
+        var agentEnd = f.Frames().Single(frame => Type(frame) == "agent_end").Value.GetProperty("messages");
+        var texts = agentEnd.EnumerateArray().Select(message => message.GetProperty("role").GetString() + ":" + message.GetRawText()).ToArray();
+        Check(agentEnd.GetArrayLength() == 3 && texts[0].StartsWith("user:", StringComparison.Ordinal) && texts[1].Contains("alpha", StringComparison.Ordinal) &&
+            texts[2].Contains("beta", StringComparison.Ordinal), "agent_end messages: " + string.Join(" | ", texts));
+        Check(f.Transport.Requests[1].Messages.Any(message => message.WireBody.ToString().Contains("please continue", StringComparison.Ordinal)), "draft in the next request");
+        var turnStarts = f.Frames().Where(frame => Type(frame) == "turn_start").ToArray();
+        Equal(2, turnStarts.Length, "turn_start frames");
+    }
+
+    // Upstream _replaceMessageInPlace mutates the finalized message: the loop's next request in the same run, the turn_end and
+    // agent_end payloads and the agent state all carry the replacement.
+    private static async Task MessageEndWithinRun()
+    {
+        await using var f = await CreateAsync(true, ToolCall(), Response(text: "done"));
+        await f.Session.SetActiveToolsAsync(["probe"]);
+        await f.Activate(api => ((IExtensionEventHandlerRegistry)api).RegisterEventHandler(new("replace", "message_end", (value, _, _) =>
+        {
+            var message = JsonNode.Parse(value.Value.GetProperty("message").GetRawText())!.AsObject();
+            var role = message["role"]!.GetValue<string>();
+            if (role == "assistant" && message["stopReason"]!.GetValue<string>() == "toolUse")
+            {
+                ((JsonArray)message["content"]!).Add(new JsonObject { ["type"] = "text", ["text"] = "assistant-replaced" });
+                return Result(new JsonObject { ["message"] = message }.ToJsonString());
+            }
+            if (role == "toolResult")
+            {
+                message["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "result-replaced" });
+                return Result(new JsonObject { ["message"] = message }.ToJsonString());
+            }
+            return NoResult;
+        })));
+        AttachEvents(f); f.StartRpc(); await f.PromptAsync();
+        Equal(2, f.Transport.Calls, "provider requests");
+        Equal(1, f.Probe.Executions, "tool executions");
+        var second = string.Join("\n", f.Transport.Requests[1].Messages.Select(message => message.WireBody.ToString()));
+        Check(second.Contains("assistant-replaced", StringComparison.Ordinal) && second.Contains("result-replaced", StringComparison.Ordinal) &&
+            !second.Contains("probe output", StringComparison.Ordinal), "The same run's next request did not use the replacements.");
+        var turnEnd = f.Frames().First(frame => Type(frame) == "turn_end").Value;
+        Check(turnEnd.GetProperty("message").GetRawText().Contains("assistant-replaced", StringComparison.Ordinal) &&
+            turnEnd.GetProperty("toolResults")[0].GetRawText().Contains("result-replaced", StringComparison.Ordinal), "RPC turn_end: " + turnEnd.GetRawText());
+        var agentEnd = f.Frames().Single(frame => Type(frame) == "agent_end").Value.GetProperty("messages").GetRawText();
+        Check(agentEnd.Contains("assistant-replaced", StringComparison.Ordinal) && agentEnd.Contains("result-replaced", StringComparison.Ordinal) &&
+            !agentEnd.Contains("probe output", StringComparison.Ordinal), "RPC agent_end: " + agentEnd);
+        var agentMessages = string.Join("\n", f.Session.Snapshot.Agent.Messages.Select(message => message.WireBody.ToString()));
+        Check(agentMessages.Contains("assistant-replaced", StringComparison.Ordinal) && !agentMessages.Contains("probe output", StringComparison.Ordinal), "agent state");
+        var types = f.Frames().Select(Type).Where(type => type is "agent_start" or "agent_end").ToArray();
+        Check(types.SequenceEqual(["agent_start", "agent_end"]), "lifecycle: " + string.Join(",", types));
     }
 
     private static readonly ModelDescriptor Router = new("router", "pi-virtual", "fixture");

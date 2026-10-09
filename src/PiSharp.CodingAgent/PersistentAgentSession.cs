@@ -1345,8 +1345,13 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             var nextContext = _projector.Project(log.Entries.Add(entry), entry.Id);
             ValidateRuntimeContext(nextContext, _configuration);
             if (_registry is not null) ValidateLoadout(nextContext.LlmMessages);
+            // A replacement enters the running loop (source in-place mutation), so it must be a message the loop can send.
+            if (!ReferenceEquals(message, original) && role != "custom") AgentLoopRunner.ValidateRequestMessages([message]);
             return (entry, nextContext);
             }
+            // The loop holds a custom replacement in its persisted form (the projection adds the entry timestamp).
+            if (replacement is not null && role == "custom")
+                replacement = SessionContextProjector.AgentMessages(nextContext) is { IsEmpty: false } projected && projected[^1].Role == "custom" ? projected[^1] : null;
             var acknowledged = await _store.AppendAsync([entry], CancellationToken.None).ConfigureAwait(false);
             if (!acknowledged.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
             lock (_gate)
@@ -1355,11 +1360,14 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 if (role == "assistant") _lastAcknowledgedAssistantId = entry.Id;
                 if (replacement is not null)
                 {
-                    // The running loop keeps the original; it continues from the persisted context once idle.
                     if (_replacedMessages.Count >= 1024) _replacedMessages.Clear();
-                    _replacedMessages[original.WireBody.Value.GetRawText()] = replacement.WireBody; _agentHoldsReplacedMessages = true;
+                    _replacedMessages[original.WireBody.Value.GetRawText()] = replacement.WireBody;
+                    // The loop's assistant is the parsed replacement; its wire form maps to the persisted body too.
+                    if (role == "assistant") _replacedMessages[PiWireJson.WriteMessage(PiWireJson.ReadMessage(replacement.WireBody.Value)).Value.GetRawText()] = replacement.WireBody;
                 }
             }
+            // Source _replaceMessageInPlace: the running loop, the agent's history and later events use the replacement immediately.
+            if (replacement is not null) AgentMessageReplacement.Set(observation, replacement);
         }
         catch (Exception error)
         {

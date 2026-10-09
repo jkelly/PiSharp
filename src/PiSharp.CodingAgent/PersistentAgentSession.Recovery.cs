@@ -90,11 +90,6 @@ public sealed partial class PersistentAgentSession
         while(true)
         {
             allTurns.AddRange(result.Turns);
-            if (await SettleTurnBoundaryAsync(result, idle, token).ConfigureAwait(false))
-            {
-                if(runs>=(_agentOptions?.Loop?.MaximumTurns??16)){result=result with { Reason=AgentLoopStopReason.TurnLimit };break;}
-                SetOperationPhase(SessionOperationPhase.Provider);result=await _agent.ContinueAsync(token).ConfigureAwait(false);runs++;continue;
-            }
             if (!token.IsCancellationRequested && await TryAutomaticRetryAsync(result, idle, token).ConfigureAwait(false))
             { SetOperationPhase(SessionOperationPhase.Provider); result = await _agent.ContinueAsync(token).ConfigureAwait(false); runs++; continue; }
             var recovery=token.IsCancellationRequested?RecoveryDecision.None:await RunAutomaticBoundaryAsync(result,idle,token,operation,attempted).ConfigureAwait(false);

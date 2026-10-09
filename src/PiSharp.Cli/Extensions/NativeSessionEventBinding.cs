@@ -246,7 +246,8 @@ internal sealed class NativeSessionEventBinding(ExtensionRegistry registry, Exte
                     await Publish("agent_end", () => Json(writer =>
                     {
                         writer.WriteString("type", "agent_end");
-                        Array(writer, "messages", end.Result.Transcript.Skip(Math.Min(_historyLength, end.Result.Transcript.Length)).Select(message => message.WireBody));
+                        Array(writer, "messages", (end.Result.RunMessages.IsDefault ? end.Result.Transcript.Skip(Math.Min(_historyLength, end.Result.Transcript.Length))
+                            : end.Result.RunMessages).Select(message => message.WireBody));
                     })).ConfigureAwait(false); break;
                 case AgentLoopTurnStarted:
                     await Publish("turn_start", () => Json(writer =>
