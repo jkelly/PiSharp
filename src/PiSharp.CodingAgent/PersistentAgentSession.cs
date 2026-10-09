@@ -265,7 +265,14 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(registry);
         registry = registry.RetainToolSelection(options?.LifetimeToolSelection);
-        var selection = await registry.PrepareAndDrainAsync(() => registry.Resolve(initialModel, [], registry.GetDefaultThinkingLevel(initialModel), cancellationToken), cancellationToken).ConfigureAwait(false);
+        // sdk.ts createAgentSession: a new session's first thinking_level_change already holds the resolved level (the CLI level,
+        // else the per-model or default setting, clamped), not the model default followed by a second change.
+        string? thinkingLevel = null;
+        if (options?.NewSessionThinkingLevel is { } initialThinking)
+            try { thinkingLevel = initialThinking(initialModel, registry.GetSupportedThinkingLevels(initialModel)); }
+            catch (SessionRuntimeRegistryException error) when (error.Failure == SessionRuntimeRegistryFailure.UnknownModel) { }
+        thinkingLevel ??= registry.GetDefaultThinkingLevel(initialModel);
+        var selection = await registry.PrepareAndDrainAsync(() => registry.Resolve(initialModel, [], thinkingLevel, cancellationToken), cancellationToken).ConfigureAwait(false);
         var session = await CreateAsync(path, header, selection.Configuration, clock, nextEntryId, options, cancellationToken).ConfigureAwait(false);
         session._registry = registry;
         return session;

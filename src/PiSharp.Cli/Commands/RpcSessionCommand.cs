@@ -305,7 +305,11 @@ public static class RpcSessionCommand
                 : await lifecycle.CreateAsync(parsed.Session, new PiSharp.Sessions.Serialization.SessionEntryCodec().Parse(JsonSerializer.Serialize(new
                     { type = "session", version = 3, id = pi?.HeaderId ?? NextId(), timestamp = pi?.HeaderTimestamp ?? DateTimeOffset.FromUnixTimeMilliseconds(Clock()).ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture), cwd = profile.Workspace })),
                     profile.SelectedModel, cancellationToken).ConfigureAwait(false);
-            if (parsed.SessionMode != "open") await session.ConfigureAsync(new(SystemMessage: new("system", profile.InitialSystem)), cancellationToken).ConfigureAwait(false);
+            // sdk.ts createAgentSession writes only model_change and thinking_level_change for a new session; its prompt sections and
+            // tool loadout are recorded by the first request (agent-session.ts _preparePromptAndToolLoadout, agent-loop.ts
+            // declareToolChanges: one system message before the prompt). The Pi entry applies the loadout in memory until then.
+            if (parsed.SessionMode != "open" && pi is null) await session.ConfigureAsync(new(SystemMessage: new("system", profile.InitialSystem)), cancellationToken).ConfigureAwait(false);
+            else if (parsed.SessionMode != "open") await session.ApplyInitialToolsAsync(profile.InitialToolNames, cancellationToken).ConfigureAwait(false);
             // A session whose stored cwd no longer exists continues in the cwd the user chose (main.ts promptForMissingSessionCwd).
             var pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
             var continuesElsewhere = pi?.SessionCwdOverride is { } cwdOverride && string.Equals(SessionCommands.Absolute(cwdOverride), profile.Workspace, pathComparison) &&
@@ -315,15 +319,19 @@ public static class RpcSessionCommand
             if (continuesElsewhere) lifecycle.WorkingDirectoryOverride = profile.Workspace;
             var thinking = SettingsModelSelection.Thinking(settings, session.Snapshot.Agent.Model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel,
                 parsed.SessionMode == "open", session.GetSupportedThinkingLevels());
+            // sdk.ts: an existing session takes the CLI level in memory (no thinking_level_change; the Pi entry), a new one recorded it.
             if (thinking is not null && thinking != session.Snapshot.Context.ThinkingLevel)
-                await session.ConfigureAsync(new(ThinkingLevel: thinking), cancellationToken).ConfigureAwait(false);
+            {
+                if (pi is not null && parsed.SessionMode == "open") await session.ApplyInitialThinkingLevelAsync(thinking, cancellationToken).ConfigureAwait(false);
+                else await session.ConfigureAsync(new(ThinkingLevel: thinking), cancellationToken).ConfigureAwait(false);
+            }
             await profile.LoadPromptTemplatesAsync(pi?.PromptTemplates ?? parsed.Prompts, pi is null ? stderr : TextWriter.Null, cancellationToken).ConfigureAwait(false);
             if (pi?.SessionName is { } sessionName) await session.SetSessionNameAsync(session.Snapshot.Log.Header.Id, sessionName, cancellationToken).ConfigureAwait(false);
             if (parsed.SessionMode == "open") await profile.ApplySkillsAsync(session, cancellationToken).ConfigureAwait(false);
             if (settings is not null) { session.SteeringMode = settings.SteeringMode; session.FollowUpMode = settings.FollowUpMode; }
             await profile.AttachOwnerAsync(session, options, Clock, NextId, parsed.Stores.IsEmpty ? null : parsed.Stores, lifecycle).ConfigureAwait(false);
             if (reloadAdmission is not null) profile.ConfigureReload(reloadAdmission);
-            await profile.ApplyInitialToolSelectionAsync(session, cancellationToken, resumed: parsed.SessionMode == "open").ConfigureAwait(false);
+            await profile.ApplyInitialToolSelectionAsync(session, cancellationToken, resumed: parsed.SessionMode == "open" || pi is not null).ConfigureAwait(false);
             observedInput = new InputObservation(stdin, gate);
             // Events and responses carry tool results with Pi-sized images (owner decision 0004).
             // pi --mode rpc reads each line as rpc-mode.ts handleInputLine does (StringDecoder + JSON.parse). JSON.parse and

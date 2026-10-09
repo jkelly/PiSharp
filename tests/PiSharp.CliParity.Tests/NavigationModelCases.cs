@@ -18,7 +18,9 @@ internal static partial class Program
             var firstAnswer = File.ReadLines(file).Select(line => JsonNode.Parse(line)!)
                 .First(entry => entry["type"]?.GetValue<string>() == "message" && entry["message"]?["role"]?.GetValue<string>() == "assistant")["id"]!.GetValue<string>();
             var linesBefore = File.ReadAllLines(file).Length;
-            var responses = await RpcDialog(sandbox, ["--mode", "rpc", "-c"], seen => seen.Count switch
+            // sdk.ts: --thinking on a continued session sets the level in memory without a thinking_level_change, so the branch still
+            // records "low" and only this run's --thinking makes the session's level "high".
+            var responses = await RpcDialog(sandbox, ["--mode", "rpc", "-c", "--thinking", "high"], seen => seen.Count switch
             {
                 0 => """{"id":"1","type":"get_state"}""",
                 1 => """{"id":"2","type":"pisharp_capture_navigation","mode":"tree","generation":""" + seen[0]["data"]!["pisharpGeneration"]!.ToJsonString() + "}",

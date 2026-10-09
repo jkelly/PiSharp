@@ -161,6 +161,9 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     internal double OriginalDesiredMaxOutput => _live?.MaximumOutputTokens ?? 8192;
     public string Workspace { get; }
     public JsonData InitialSystem { get; private set; }
+    /// <summary>The names <see cref="InitialSystem"/> declares, in order: a new session's initial loadout.</summary>
+    internal ImmutableArray<string> InitialToolNames => InitialSystem.Value.TryGetProperty("toolsAdded", out var tools) && tools.ValueKind == JsonValueKind.Array
+        ? tools.EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!).ToImmutableArray() : [];
     public object[] Requests => _handler.Requests.ToArray();
     public object[] Actions => _policy.Actions.ToArray();
     public int UsedTurns => _handler.Requests.Count;
