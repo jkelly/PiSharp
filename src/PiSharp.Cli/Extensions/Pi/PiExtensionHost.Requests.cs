@@ -232,15 +232,15 @@ internal sealed partial class PiExtensionHost
                     _shellOutputs[callId] = (output.Callback, output.Chain.ContinueWith(_ => output.Callback(bytes).AsTask(), TaskScheduler.Default).Unwrap());
                 return;
             }
-            case "provider.register": lock (_providers) _providers.Add(JsonNode.Parse(parameters.GetRawText())!.AsObject()); RegistrationsChanged?.Invoke(); return;
+            case "provider.register": lock (_providers) _providers.Add(JsonNode.Parse(parameters.GetRawText())!.AsObject()); RegistrationsChanged?.Invoke(); ProvidersChanged?.Invoke(); return;
             case "provider.unregister":
                 lock (_providers) _providers.RemoveAll(item => item["name"]?.GetValue<string>() == parameters.GetProperty("name").GetString());
-                RegistrationsChanged?.Invoke(); return;
-            case "virtualModel.register": lock (_virtualModels) _virtualModels.Add(JsonNode.Parse(parameters.GetRawText())!.AsObject()); RegistrationsChanged?.Invoke(); return;
+                RegistrationsChanged?.Invoke(); ProvidersChanged?.Invoke(); return;
+            case "virtualModel.register": lock (_virtualModels) _virtualModels.Add(JsonNode.Parse(parameters.GetRawText())!.AsObject()); RegistrationsChanged?.Invoke(); ProvidersChanged?.Invoke(); return;
             case "virtualModel.unregister":
                 lock (_virtualModels) _virtualModels.RemoveAll(item => item["definition"]?["provider"]?.GetValue<string>() == parameters.GetProperty("provider").GetString() &&
                     item["definition"]?["id"]?.GetValue<string>() == parameters.GetProperty("id").GetString());
-                RegistrationsChanged?.Invoke(); return;
+                RegistrationsChanged?.Invoke(); ProvidersChanged?.Invoke(); return;
             case "mcp.register": lock (_mcpServers) _mcpServers.Add(JsonNode.Parse(parameters.GetRawText())!.AsObject()); return;
             case "mcp.unregister": lock (_mcpServers) _mcpServers.RemoveAll(item => item["name"]?.GetValue<string>() == parameters.GetProperty("name").GetString()); return;
             case "events.emit": DeliverFromNode(parameters); return;
@@ -266,6 +266,9 @@ internal sealed partial class PiExtensionHost
 
     /// <summary>ctx.shutdown(): the mode's graceful shutdown.</summary>
     internal Action? ShutdownRequested { get; set; }
+
+    /// <summary>A provider or virtual model was registered or unregistered after startup: the session re-reads its models.</summary>
+    internal Action? ProvidersChanged { get; set; }
 
     /// <summary>The session's extension UI (RPC or terminal) for UI calls made after their callback returned.</summary>
     internal IExtensionUiProvider? UiProvider { get; set; }
@@ -895,6 +898,33 @@ internal sealed partial class PiExtensionHost
 
     /// <summary>runner.ts bindCore: the virtual models the extensions registered (pi.registerVirtualModel) join a model registry;
     /// routing calls the extension's <c>route(request, ctx)</c> in Node with upstream's ModelRouteRequest.</summary>
+    /// <summary>model-runtime.ts registerProvider: each extension provider's chat models, baseUrl, apiKey and headers join the registry
+    /// (model selection and the live routes read them); a provider with streamSimple serves its API through the Node host.</summary>
+    internal void RegisterProviders(PiSharp.Cli.Models.ModelRegistry registry)
+    {
+        foreach (var registration in ProviderRegistrations)
+        {
+            if (registration["config"] is not JsonObject described || registration["name"]?.GetValue<string>() is not { } name) continue;
+            var config = (JsonObject)described.DeepClone();
+            foreach (var field in new[] { "classifiers", "images", "hasRefreshModels", "oauth" }) config.Remove(field);
+            if (config["models"] is JsonArray models)
+            {
+                var chat = models.OfType<JsonObject>().Where(model => model["type"]?.GetValue<string>() is null or "chat").Select(model => model.DeepClone()).ToArray();
+                if (chat.Length == 0) config.Remove("models"); else config["models"] = new JsonArray(chat);
+            }
+            var hasStream = config["hasStreamSimple"]?.GetValue<bool>() == true;
+            if (config["models"] is null && config["baseUrl"] is null && config["apiKey"] is null && config["headers"] is null && !hasStream) continue;
+            try
+            {
+                registry.RegisterExtensionProvider(name, config);
+                if (hasStream && config["api"]?.GetValue<string>() is { } api)
+                    registry.RegisterCustomStream(api, entry => new PiProviderTransport(this, entry, registry));
+            }
+            catch (InvalidOperationException error)
+            { _ = ReportAsync(registration["extensionPath"]?.GetValue<string>() ?? name, "register_provider", error.Message); }
+        }
+    }
+
     internal void RegisterVirtualModels(PiSharp.Cli.Models.ModelRegistry registry)
     {
         foreach (var registration in VirtualModelRegistrations)

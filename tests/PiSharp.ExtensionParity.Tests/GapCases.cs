@@ -22,6 +22,7 @@ internal static partial class Program
         ("gap.shortcuts-run-with-a-fresh-context", ShortcutContext),
         ("gap.registrations-after-the-factory-take-effect", LateRegistrations),
         ("gap.reload-reloads-extensions-and-resources", Reload),
+        ("gap.chat-provider-registration-and-unregistration", ChatProvider),
     ];
 
     // agent-session.ts sendCustomMessage: idle and without triggerTurn, the message is appended and emitted (message_start/_end) at once.
@@ -372,5 +373,67 @@ internal static partial class Program
         Check(commands.Contains("bye") && commands.Contains("fresh") && commands.Contains("skill:fresh"), "reloaded commands: " + string.Join(",", commands));
         var ask = sandbox.Requests.Last(request => request.Body!.Contains("what changed?", StringComparison.Ordinal)).Body!;
         Check(ask.Contains("Second context.", StringComparison.Ordinal), "reloaded context file in the request: " + ask);
+    }
+
+    private const string ChatProviderExtension = """
+        import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
+        import { appendFileSync } from "node:fs";
+        const log = (...items: unknown[]) => appendFileSync(process.cwd() + "/probe.log", JSON.stringify(items) + "\n");
+        export default function (pi: any) {
+          pi.registerProvider("acme-chat", {
+            baseUrl: "https://acme.invalid/v1", apiKey: "$ACME_KEY", api: "acme-api",
+            models: [{ id: "m1", name: "Acme One", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8000, maxTokens: 1000 }],
+            streamSimple(model: any, context: any, options: any) {
+              const stream = createAssistantMessageEventStream();
+              const last = context.messages.filter((m: any) => m.role === "user").at(-1);
+              log("stream", model.provider, model.id, options?.apiKey ?? null, typeof last.content === "string" ? last.content : last.content[0].text);
+              const output: any = { role: "assistant", content: [], api: model.api, provider: model.provider, model: model.id,
+                usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+                stopReason: "stop", timestamp: Date.now() };
+              queueMicrotask(() => {
+                stream.push({ type: "start", partial: output });
+                output.content.push({ type: "text", text: "" });
+                stream.push({ type: "text_start", contentIndex: 0, partial: output });
+                output.content[0].text = "acme says hi";
+                stream.push({ type: "text_delta", contentIndex: 0, delta: "acme says hi", partial: output });
+                stream.push({ type: "text_end", contentIndex: 0, content: "acme says hi", partial: output });
+                stream.push({ type: "done", reason: "stop", message: output });
+                stream.end();
+              });
+              return stream;
+            },
+          });
+          pi.registerCommand("drop", { description: "Unregister", handler: async () => pi.unregisterProvider("acme-chat") });
+        }
+        """;
+
+    // model-runtime.ts registerProvider + api-registry streamSimple: the provider's models are selectable, its apiKey resolves at
+    // request time, and its stream serves the request; unregisterProvider removes the models from the available set.
+    private static async Task ChatProvider()
+    {
+        RequirePiRuntime();
+        using var sandbox = NodeSandbox("chat-provider");
+        sandbox.Vars["ACME_KEY"] = "acme-secret";
+        var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "acme.ts"), ChatProviderExtension);
+        var (code, stdout, stderr) = await sandbox.Run("-p", "--provider", "acme-chat", "--model", "m1", "-e", extension, "hello acme");
+        Equal(0, code, "exit; " + stderr);
+        Equal("acme says hi", stdout.Trim(), "the extension stream answered");
+        Equal("""["stream","acme-chat","m1","acme-secret","hello acme"]""", LogLines(sandbox).Single(), "stream inputs");
+        Check(sandbox.Requests.Count == 0, "no other provider was asked");
+
+        File.Delete(Path.Combine(sandbox.Cwd, "probe.log"));
+        bool HasAcme(JsonNode record) => record["data"]!["models"]!.AsArray().Any(model => model!["provider"]?.GetValue<string>() == "acme-chat");
+        var probes = 0;
+        var (rpcCode, records, rpcError) = await RunRpc(sandbox, [.. Model, "-e", extension], ["""{"id":"before","type":"get_available_models"}"""],
+            (record, _) => IsResponse(record, "after") && !HasAcme(record) || probes > 40,
+            react: (record, push) =>
+            {
+                if (IsResponse(record, "before")) push("""{"id":"drop","type":"prompt","message":"/drop"}""");
+                else if (IsResponse(record, "drop") || IsResponse(record, "after") && HasAcme(record))
+                { probes++; Thread.Sleep(100); push("""{"id":"after","type":"get_available_models"}"""); }
+            });
+        Equal(0, rpcCode, "rpc exit; " + rpcError);
+        Check(HasAcme(records.First(record => IsResponse(record, "before"))), "acme model available while registered");
+        Check(!HasAcme(records.Last(record => IsResponse(record, "after"))), "unregisterProvider removed the models");
     }
 }

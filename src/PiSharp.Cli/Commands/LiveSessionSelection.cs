@@ -164,6 +164,17 @@ internal sealed class LiveSessionSelection
             });
             return new(described.ToDefinition(), Math.Max(1, (int)Math.Min(entry.MaxTokens, int.MaxValue))) { Entry = entry, Registry = registry };
         }
+        // An extension's streamSimple serves its API (registerProvider): the model streams through the Node host.
+        if (registry?.CustomStream(entry.Api) is { } custom && entry.Type == CatalogModelType.Chat && !PiSharp.Cli.Models.VirtualModels.IsVirtual(entry))
+        {
+            var described = entry.With(json =>
+            {
+                if (entry.ContextWindow <= 0) json["contextWindow"] = 128000;
+                if (entry.MaxTokens <= 0) json["maxTokens"] = 16384;
+            });
+            var maximum = useModelMaximum ? (int)Math.Clamp(described.MaxTokens, 1, int.MaxValue) : Math.Max(1, tokens);
+            return new(described.ToDefinition(), maximum) { Entry = entry, Registry = registry, CustomStream = () => custom(entry) };
+        }
         if (entry.Type != CatalogModelType.Chat || PiSharp.Cli.Models.VirtualModels.IsVirtual(entry) || !SupportedApi(entry.Provider, entry.Api))
             throw new LiveSessionException("LiveApiUnavailable",
                 $"Model \"{entry.Provider}/{entry.Id}\" uses the {(entry.Api.Length == 0 ? "unknown" : entry.Api)} API, which has no live route in PiSharp yet.");
@@ -221,10 +232,14 @@ internal sealed class LiveSessionSelection
     internal Func<PiSharp.Cli.Models.IVirtualModelSession?>? VirtualSession { get; set; }
     internal bool IsVirtual => Entry is not null && PiSharp.Cli.Models.VirtualModels.IsVirtual(Entry);
 
+    /// <summary>The extension stream that serves this model's API (registerProvider with streamSimple), or null.</summary>
+    internal Func<IChatTransport>? CustomStream { get; private init; }
+
     internal LiveSessionConnection Connect(LiveSessionRuntime? runtime)
     {
         runtime ??= LiveSessionRuntime.Default;
         if (IsVirtual && Registry is not null) return LiveSessionConnection.ForVirtual(this, runtime);
+        if (CustomStream is { } custom) return LiveSessionConnection.ForCustom(this, custom());
         if (LiveProviderRoute.TryConnect(this, runtime) is { } routed) return routed;
         var environment = runtime.CreateEnvironment();
         string? key; IReadOnlyDictionary<string, string>? headers = null;
@@ -414,10 +429,15 @@ internal sealed class LiveSessionConnection(LiveSessionSelection selection, Http
             () => selection.VirtualSession?.Invoke(), connection._virtualConnections);
         return connection;
     }
+    private IChatTransport? _custom;
+    /// <summary>A model an extension's streamSimple serves: every request streams through the Node host.</summary>
+    internal static LiveSessionConnection ForCustom(LiveSessionSelection selection, IChatTransport transport) =>
+        new(selection, null, "") { _custom = transport };
     internal IChatTransport CreateTransport(int? outputTokens = null, bool summary = false)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_virtual is not null) return _virtual;
+        if (_custom is not null) return _custom;
         if (_resolvedMain is not null)
         {
             lock (_resolvedGate)

@@ -61,7 +61,7 @@ internal sealed class LiveModelCatalog : IAsyncDisposable
             var entries = new List<(RegistryModel Entry, ModelDescriptor Model)>();
             foreach (var entry in models.GetAvailable())
             {
-                if (VirtualModels.IsVirtual(entry) || entry.Type != CatalogModelType.Chat || !LiveSessionSelection.SupportedApi(entry.Provider, entry.Api)) continue;
+                if (VirtualModels.IsVirtual(entry) || entry.Type != CatalogModelType.Chat || !(LiveSessionSelection.SupportedApi(entry.Provider, entry.Api) || models.CustomStream(entry.Api) is not null)) continue;
                 FrozenCatalogModel definition;
                 try { definition = entry.ToDefinition(); }
                 catch (Exception error) when (error is CatalogReadException or ArgumentException or InvalidOperationException) { continue; }

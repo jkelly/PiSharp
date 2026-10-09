@@ -273,6 +273,9 @@ public static class RpcSessionCommand
             // in interactive mode), as agent-session.ts setModel/cycleModel do over modelRuntime.getAvailableSnapshot.
             var liveModels = pi is not null && profile.IsLive
                 ? await profile.EnableModelSwitchingAsync(liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false) : null;
+            // model-runtime.ts registerProvider/unregisterProvider/unregisterVirtualModel after startup: the selectable models follow.
+            if (pi?.Extensions is { } providerHost && liveModels is not null)
+                providerHost.ProvidersChanged = () => _ = liveModels.RefreshAsync().ContinueWith(task => _ = task.Exception, TaskScheduler.Default);
             var scope = liveSelection?.ScopedModels ?? [];
             var modelRuntime = liveModels is null ? null : new PiSharp.Rpc.Protocol.RpcModelRuntime(() => liveModels.Available)
             {

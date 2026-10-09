@@ -195,6 +195,25 @@ async function handle(method, params, id) {
       if (params.op === 'refreshModels') return config.refreshModels(params.args?.[0] ?? {});
       throw new Error(`Unsupported provider operation ${params.op}`);
     }
+    case 'provider.stream': {
+      // An extension provider's streamSimple (registerProvider with api + streamSimple): its AssistantMessageEvents stream back as
+      // progress (pi-ai source events with their partial message), the final message as the result.
+      const record = [...runtime.providers.values()].find(item => item.config?.api === params.api && typeof item.config?.streamSimple === 'function')
+        ?? runtime.providers.get(params.provider);
+      const streamSimple = record?.config?.streamSimple;
+      if (typeof streamSimple !== 'function') throw new Error(`No extension provider streams the ${params.api} API`);
+      const controller = new AbortController(); active.set(id, controller);
+      try {
+        const stream = await streamSimple(params.model, params.context, { ...(params.options ?? {}), signal: controller.signal });
+        let final;
+        for await (const event of stream) {
+          send({ type: 'progress', id, value: plain(event) });
+          if (event.type === 'done') final = event.message; else if (event.type === 'error') final = event.error;
+        }
+        if (!final && typeof stream.result === 'function') final = await stream.result();
+        return plain(final ?? null);
+      } finally { active.delete(id); }
+    }
     case 'events.deliver': runtime.eventBus.deliver(params.channel, params.data); return null;
     case 'invalidate': runtime.invalidate(params.message); return null;
     case 'shutdown': shuttingDown = true; setImmediate(() => port.postMessage({ kind: 'stop' })); return null;
