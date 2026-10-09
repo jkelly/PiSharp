@@ -43,6 +43,7 @@ internal static partial class Program
         cases.AddRange(SummaryAuthCases());
         cases.AddRange(SwitchPathCases());
         cases.AddRange(NavigationModelCases());
+        cases.AddRange(SessionFormatCases());
         var filter = Environment.GetEnvironmentVariable("CLIPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;
