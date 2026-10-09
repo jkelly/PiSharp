@@ -38,7 +38,9 @@ public static class AdmittedMcpHttpChannelFactory
         return (entry, cancellationToken) =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!ReferenceEquals(entry, exactAdmittedEntry)) throw new InvalidOperationException("HTTP admission belongs to the exact captured server entry");
+            // `/mcp` reconfigures the server (enabled, exposure) without changing its connection.
+            if (!McpConfigurationReader.SameConnection(entry, exactAdmittedEntry) || !entry.Config.Enabled)
+                throw new InvalidOperationException("HTTP admission belongs to the exact captured server entry");
             // Each acquisition transfers one independently closeable channel; the client stays borrowed.
             var channel = new McpJsonRpcRequestChannel(
                 new McpStreamableHttpTransport(explicitlyAdmittedBinding, requests, limits, clock), limits, notification, clock);

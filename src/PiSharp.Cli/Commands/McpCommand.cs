@@ -467,7 +467,7 @@ internal static class McpCommand
             {
                 log($"Sign in to MCP server \"{name}\" in your browser:\n{authorizationUrl.AbsoluteUri}");
                 openUrl(authorizationUrl.AbsoluteUri);
-            }, readRedirectUrl), AdmittedHttpClientRequestFactory.Create(client)), timeout.Token).ConfigureAwait(false);
+            }, readRedirectUrl), AdmittedHttpClientRequestFactory.Create(client)) { Challenge = connected.Challenge }, timeout.Token).ConfigureAwait(false);
         }
         catch (Exception signInError)
         {
@@ -488,23 +488,24 @@ internal static class McpCommand
     }
 
     /// <summary>One connection to the server, closed again: its tool count, or whether it needs a sign-in, or its error.</summary>
-    private static async Task<(int? Tools, bool NeedsSignIn, string? Error)> ConnectAsync(McpServerEntry entry, McpSessionHost host, HttpClient client,
+    private static async Task<(int? Tools, bool NeedsSignIn, string? Error, PiSharp.Extensions.Mcp.Authentication.McpOAuthChallenge? Challenge)> ConnectAsync(McpServerEntry entry, McpSessionHost host, HttpClient client,
         McpCommandOptions options, CancellationToken token)
     {
-        McpServerRuntime? runtime = null;
+        McpServerRuntime? runtime = null; PiSharp.Extensions.Mcp.Authentication.McpOAuthChallenge? challenge = null;
         try
         {
             var runtimeOptions = new McpRuntimeOptions(1, McpSessionHost.ClientVersion);
-            runtime = new McpServerRuntime(entry, runtimeOptions, host.Channel(entry, options.Cwd, runtimeOptions, () => client),
+            // runtime.ts connection.challenge: the server's challenge, which the sign-in answers.
+            runtime = new McpServerRuntime(entry, runtimeOptions, host.Channel(entry, options.Cwd, runtimeOptions, () => client, challenge: received => challenge = received),
                 (publication, _) => ValueTask.FromResult(new McpCatalogPublicationReceipt(publication.Current.Generation, publication.Current.Revision, true)));
             var snapshot = await runtime.ConnectAsync(token).ConfigureAwait(false);
-            return (snapshot.Catalog.Tools.Length, false, null);
+            return (snapshot.Catalog.Tools.Length, false, null, challenge);
         }
         catch (Exception failure) when (!token.IsCancellationRequested)
         {
             for (Exception? current = failure; current is not null; current = current.InnerException)
-                if (current is PiSharp.Extensions.Mcp.Authentication.McpOAuthAuthorizationRequiredException) return (null, true, null);
-            return (null, false, failure is AggregateException { InnerExceptions.Count: 1 } single ? single.InnerExceptions[0].Message : failure.Message);
+                if (current is PiSharp.Extensions.Mcp.Authentication.McpOAuthAuthorizationRequiredException) return (null, true, null, challenge);
+            return (null, false, failure is AggregateException { InnerExceptions.Count: 1 } single ? single.InnerExceptions[0].Message : failure.Message, challenge);
         }
         finally { if (runtime is not null) try { await runtime.CloseAsync().ConfigureAwait(false); } catch (Exception) { } }
     }

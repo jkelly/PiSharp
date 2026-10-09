@@ -152,8 +152,12 @@ public sealed partial class ReplaceableAgentSession
         await admissionOriginal.ConfigureAwait(false);
         bool claimed; Exception? failure;
         lock (gate) { claimed = lease.AdmissionClaimed; failure = lease.AdmissionFailure; }
-        if (claimed)
-        { if (failure is null) lease.Completion!.TrySetResult(); else lease.Completion!.TrySetException(failure); }
+        if (!claimed) return;
+        if (failure is not null) { lease.Completion!.TrySetException(failure); return; }
+        // A resource closed while its attachment continues (an MCP server removed or rebound during the session) is done:
+        // it leaves the owner's set, so it no longer counts toward MaximumOwnedResources and is not retired again.
+        lock (gate) ownedResources.Remove(lease);
+        lease.Completion!.TrySetResult();
     }
 
     // Caller holds the actual owner mutation semaphore and exact persistent reservation.

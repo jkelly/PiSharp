@@ -120,7 +120,8 @@ public static class RpcSessionCommand
                 }, modelSupportsImages: parsed.SupportsImages, liveSelection: liveSelection, liveRuntime: liveRuntime,
                 toolSelection: ToolSelectionCliConfiguration.ResolveOptions(parsed.Tools, settings), mcpAdmission: parsed.Tools.NoMcp && !hostAdmission ? null : mcpAdmission,
                 toolSettings: PiSharp.Tools.BuiltinToolSettings.FromSettings(settings?.Values),
-                mcpRegistrations: hostAdmission && !parsed.Tools.NoMcp ? mcpHost!.Registrations : null).ConfigureAwait(false);
+                // With --no-mcp extensions still register servers; nothing connects them, which is reported (reportUnhandledMcpServers).
+                mcpRegistrations: hostAdmission ? mcpHost!.Registrations : null).ConfigureAwait(false);
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();

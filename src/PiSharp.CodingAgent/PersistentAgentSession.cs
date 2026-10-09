@@ -370,7 +370,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         try
         {
             // Pi sets no limit on the nested calls of codemode scripts.
-            var registry = _registry.BindInvocationOwner(new(generation, linked.Token) { UncountedNestedCallTools = ["codemode"] });
+            var registry = _registry.BindInvocationOwner(new(generation, linked.Token) { UncountedNestedCallTools = ["codemode"],
+                LateNestedTools = LateNestedInvoker });
             var selection = registry.Resolve(_context, _configuration.Model);
             _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(_context));
             _configuration = selection.Configuration;
@@ -1148,6 +1149,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 try
                 {
                     bashBoundary = await BeginUserBashBoundaryAsync(idle).ConfigureAwait(false);
+                    // A catalog the run took after its last request is recorded before the session is idle again.
+                    await RecordRunCatalogAsync(idle).ConfigureAwait(false);
                     if (settledResult is not null) settledResult = settledResult with { Transcript = Snapshot.Context.LlmMessages };
                 }
                 catch (Exception error) { AddDistinctFailure(failures, error); status = "failed"; }
@@ -1219,7 +1222,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     }
     private void ValidateLoadout(ImmutableArray<TranscriptEntry> messages, CancellationToken token = default)
     {
-        var selected = _registry!.Resolve(_configuration.Model, messages, _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false);
+        var selected = LoadoutRegistry().Resolve(_configuration.Model, messages, _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false);
         if (!selected.Configuration.Tools.Select(tool => (tool.Name, tool.ExecutionMode))
             .SequenceEqual(_configuration.Tools.Select(tool => (tool.Name, tool.ExecutionMode))))
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);

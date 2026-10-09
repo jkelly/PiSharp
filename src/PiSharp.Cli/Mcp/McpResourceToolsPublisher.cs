@@ -41,6 +41,8 @@ internal sealed class McpResourceToolsPublisher
     private ImmutableHashSet<string> publishedNames = ImmutableHashSet<string>.Empty.WithComparer(StringComparer.Ordinal);
     private McpExposure? published;
     private bool closed;
+    /// <summary>index.ts tool_call: the resource tools reach every server, so a call first waits for their connections.</summary>
+    internal Func<CancellationToken, Task>? WaitForServers { get; init; }
 
     internal McpResourceToolsPublisher(ExtensionRegistry registry, RegistrationScope scope, IToolActionPolicy policy,
         ExtensionToolArgumentValidator validator, McpPreparedHookComposer composeHooks, McpCallGrants grants)
@@ -75,6 +77,21 @@ internal sealed class McpResourceToolsPublisher
             else servers.Remove(name);
         }
         await PublishAsync(token).ConfigureAwait(false);
+    }
+
+    /// <summary>The descriptor with its call waiting for the servers first (<see cref="WaitForServers"/>).</summary>
+    private ExtensionToolDescriptor Waiting(ExtensionToolDescriptor descriptor)
+    {
+        if (WaitForServers is not { } wait) return descriptor;
+        var execute = descriptor.ExecuteAsync;
+        return descriptor with
+        {
+            ExecuteAsync = async (arguments, context, token) =>
+            {
+                await wait(token).ConfigureAwait(false);
+                return await execute(arguments, context, token).ConfigureAwait(false);
+            }
+        };
     }
 
     /// <summary>The widest exposure of the servers the tools reach; null (hidden) when there are none.</summary>
@@ -123,7 +140,7 @@ internal sealed class McpResourceToolsPublisher
             var next = withdrawal is null ? Widest() : null;
             if (next == published) return;
             ImmutableArray<ExtensionToolDescriptor> descriptors = next is { } exposure
-                ? dispatch.CreateDescriptors(RegistrationPrefix, McpCatalogPlanner.ToToolExposure(exposure)) : [];
+                ? [.. dispatch.CreateDescriptors(RegistrationPrefix, McpCatalogPlanner.ToToolExposure(exposure)).Select(Waiting)] : [];
             ValueTask<PreparedSessionToolCatalog> Prepare(SessionRuntimeRegistry expected, ImmutableArray<string> activeNames, CancellationToken cancellation)
             {
                 cancellation.ThrowIfCancellationRequested();

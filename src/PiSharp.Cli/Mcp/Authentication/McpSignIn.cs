@@ -49,6 +49,9 @@ public sealed record McpSignInOptions(Uri ServerUrl, IMcpAdmittedOAuthStateStore
     public Func<int, byte[]> RandomBytes { get; init; } = RandomNumberGenerator.GetBytes;
     /// <summary>Bounds each authorization server request (the original's 15 s).</summary>
     public TimeSpan RequestTimeout { get; init; } = McpDefaultOAuthHostResources.DefaultRequestTimeout;
+    /// <summary>The challenge that asked for this sign-in (the connection's last one): its resource metadata URL starts discovery,
+    /// its scope is requested, and `insufficient_scope` asks for more scope through the browser.</summary>
+    public McpOAuthChallenge? Challenge { get; init; }
 }
 
 /// <summary>Sign-in to an MCP server: the stored refresh token when possible, otherwise the browser authorization code
@@ -148,8 +151,12 @@ public static class McpSignIn
                 },
                 ClientMetadataDocumentBase: cimd ? ClientMetadataBaseUrl : null,
                 AuthorizationServerMetadataUrl: settings.AuthServerMetadataUrl, RequestTimeout: options.RequestTimeout));
-            var scope = MergeScopes(settings.Scope);
-            if ((await host.AuthorizeAsync(host.Options(scope: scope), token).ConfigureAwait(false)).Outcome == McpOAuthAuthorizationOutcome.Authorized) return;
+            // A server asking for more scope gets it on top of the configured scope and, since the challenge may list only the
+            // missing scopes, on top of the scope granted so far. A refresh keeps the granted scope, so a step-up skips it.
+            var challenge = options.Challenge; var stepUp = challenge?.IsStepUp == true;
+            var scope = MergeScopes(settings.Scope, stepUp ? McpOAuthScope.StepUp(stored?.Tokens?.Scope, challenge!.Scope) : challenge?.Scope);
+            host.UseChallenge(challenge?.ResourceMetadataUrl);
+            if ((await host.AuthorizeAsync(host.Options(scope: scope, skipRefresh: stepUp), token).ConfigureAwait(false)).Outcome == McpOAuthAuthorizationOutcome.Authorized) return;
             if (authorizationUrl is null || state is null) throw new InvalidOperationException("OAuth flow did not produce an authorization URL");
             // The flow picks the redirect URI, which may be specific to the MCP server.
             var authorizationRedirectUrl = new Uri(McpOAuthCallbackServer.Query(authorizationUrl.Query.TrimStart('?'), "redirect_uri") ?? redirectUrl);

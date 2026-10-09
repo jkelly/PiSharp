@@ -19,6 +19,14 @@ public sealed class McpRegisteredServers : IExtensionMcpServerHost
     private readonly List<McpRegisteredServer> servers = [];
     private readonly List<Action> listeners = [];
     private Func<JsonData, Task>? dispatch;
+    private readonly Dictionary<string, string> owners = new(StringComparer.Ordinal);
+    private readonly HashSet<string> reported = new(StringComparer.Ordinal);
+    private Func<bool>? handled;
+    private Action<string, string, string>? reportUnhandled;
+
+    /// <summary>Whether the session's MCP support connects registered servers. `--no-mcp` turns it off, as it leaves the built-in MCP
+    /// extension out, so registrations then reach only native extensions that handle <c>mcp_servers_change</c>.</summary>
+    public bool HostConnects { get; internal set; } = true;
 
     /// <summary>The extension path of an owner (the host's package path); the owner id itself without one.</summary>
     public Func<string, string>? OwnerPath { get; set; }
@@ -39,6 +47,7 @@ public sealed class McpRegisteredServers : IExtensionMcpServerHost
                 throw new InvalidOperationException($"MCP server \"{name}\" conflicts with registered server \"{clash.Name}\"");
             var registered = new McpRegisteredServer(name, config, path);
             if (existing >= 0) servers[existing] = registered; else servers.Add(registered);
+            owners[name] = ownerId;
         }
         Changed();
     }
@@ -48,7 +57,7 @@ public sealed class McpRegisteredServers : IExtensionMcpServerHost
     {
         ArgumentNullException.ThrowIfNull(ownerId); ArgumentNullException.ThrowIfNull(name);
         var path = PathOf(ownerId);
-        lock (gate) { if (servers.RemoveAll(server => server.Name == name && server.ExtensionPath == path) == 0) return; }
+        lock (gate) { if (servers.RemoveAll(server => server.Name == name && server.ExtensionPath == path) == 0) return; owners.Remove(name); }
         Changed();
     }
 
@@ -85,12 +94,38 @@ public sealed class McpRegisteredServers : IExtensionMcpServerHost
         return JsonData.Parse(System.Text.Encoding.UTF8.GetString(buffer.ToArray()));
     }
 
+    /// <summary>runner.ts reportUnhandledMcpServers: from the binding on (session start, then every change), each registered server is
+    /// reported once (owner id, name, message) while nothing connects registered servers: the host does not
+    /// (<see cref="HostConnects"/>) and <paramref name="isHandled"/> says no extension handles <c>mcp_servers_change</c>.</summary>
+    internal void BindUnhandledReport(Func<bool> isHandled, Action<string, string, string> report)
+    {
+        lock (gate) { handled = isHandled; reportUnhandled = report; }
+        ReportUnhandled();
+    }
+
+    private void ReportUnhandled()
+    {
+        List<(string Owner, string Name)> unreported = [];
+        Action<string, string, string>? report;
+        lock (gate)
+        {
+            report = reportUnhandled;
+            if (report is null || HostConnects || handled?.Invoke() != false) return;
+            foreach (var server in servers)
+                if (reported.Add(server.Name)) unreported.Add((owners.GetValueOrDefault(server.Name, server.ExtensionPath), server.Name));
+        }
+        foreach (var (owner, name) in unreported)
+            try { report(owner, name, $"MCP server \"{name}\" is registered, but no loaded extension connects MCP servers; another extension may have replaced the built-in MCP support"); }
+            catch (Exception) { /* A report failure must not affect the registration. */ }
+    }
+
     private void Changed()
     {
         Action[] current; Func<JsonData, Task>? observe;
         lock (gate) { current = [.. listeners]; observe = dispatch; }
         foreach (var listener in current) try { listener(); } catch (Exception) { /* The host reports its own failures. */ }
         if (observe is not null) _ = DispatchAsync(observe, ChangeEvent(List()));
+        ReportUnhandled();
     }
 
     private static async Task DispatchAsync(Func<JsonData, Task> observe, JsonData value)
