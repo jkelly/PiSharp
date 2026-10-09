@@ -114,6 +114,7 @@ internal static partial class Program
             Equal(1, code, "exit");
             Equal($"Stored session working directory does not exist: {gone}\nSession file: {file}\nCurrent working directory: {sandbox.Cwd}\n", stderr, "message");
         }),
+        ("sessions.resume-applies-the-tool-loadout-in-memory-and-the-next-prompt-records-it", ResumeRecordsLoadoutAtNextPrompt),
         // agent-loop.ts runs tool turns until the model stops and session-manager.ts loads every entry of the file: the Pi entry
         // has no turn, transcript-message, line or record cap (formerly 64 turns, 1024 messages and 10,000 lines/records).
         ("sessions.pi-entry-has-no-turn-transcript-or-record-caps", async () =>
@@ -147,4 +148,61 @@ internal static partial class Program
             Check(File.ReadLines(file).Count() > 10_052, "the resumed session was appended to");
         }),
     ];
+
+    // sdk.ts createAgentSession passes the selected tool names (initialActiveToolNames) and the AgentSession constructor applies them
+    // in memory with the current tool definitions (_buildRuntime); agent-loop.ts declareToolChanges records the loadout at the next
+    // prompt, in a system message before the user message. Opening the session over RPC, reading its state and quitting leaves the
+    // file untouched, although its recorded loadout is stale.
+    private static async Task ResumeRecordsLoadoutAtNextPrompt()
+    {
+        using var sandbox = new Sandbox("restored-loadout");
+        var model = new[] { "--provider", "anthropic", "--model", "claude-sonnet-4-5" };
+        Equal(0, (await sandbox.Run(["-p", "--tools", "read,ls", .. model, "first"])).Code, "first run");
+        var file = sandbox.SessionFiles().Single();
+        // The recorded loadout is stale: ls was declared differently and an MCP server's tool is no longer registered.
+        var lines = File.ReadAllLines(file);
+        var index = Array.FindLastIndex(lines, line => JsonNode.Parse(line)!["message"]?["toolsAdded"] is not null);
+        Check(index > 0, "the first run recorded its loadout");
+        var record = JsonNode.Parse(lines[index])!.AsObject();
+        var declared = record["message"]!["toolsAdded"]!.AsArray();
+        Names(["read", "ls"], declared.Select(tool => tool!["name"]!.GetValue<string>()), "first run loadout");
+        declared.Single(tool => tool!["name"]!.GetValue<string>() == "ls")!["description"] = "an older ls";
+        declared.Add(new JsonObject { ["name"] = "mcp__gone__search", ["description"] = "gone", ["parameters"] = new JsonObject { ["type"] = "object" } });
+        lines[index] = record.ToJsonString();
+        File.WriteAllText(file, string.Join("\n", lines) + "\n");
+        var before = File.ReadAllBytes(file);
+
+        async Task<JsonNode[]> Rpc(string commands, bool settles, bool selected = true)
+        {
+            var gate = new GatedInput(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(commands)));
+            if (!settles) gate.Release();
+            using var output = new SignalingStream("\"type\":\"agent_settled\"", gate.Release);
+            using var stdout = new StringWriter(); using var stderr = new StringWriter();
+            var host = sandbox.Host(stdout, stderr, null, rpcInput: gate, rpcOutput: output) with { StdoutIsTty = false };
+            Equal(0, await PiCommand.RunAsync(["--mode", "rpc", "--session", file, .. selected ? new[] { "--tools", "read,ls" } : [], .. model], host, CancellationToken.None), "rpc exit; " + stderr);
+            return [.. System.Text.Encoding.UTF8.GetString(output.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => JsonNode.Parse(line)!)];
+        }
+        // With the default tools and with --tools.
+        foreach (var selected in new[] { false, true })
+        {
+            var state = (await Rpc("""{"id":"1","type":"get_state"}""" + "\n", settles: false, selected)).Single(line => line["id"]?.GetValue<string>() == "1");
+            Check(state["success"]!.GetValue<bool>(), "get_state: " + state.ToJsonString());
+            Check(File.ReadAllBytes(file).SequenceEqual(before), "opening the session, reading its state and quitting wrote to its file: " +
+                string.Join("\n", File.ReadAllLines(file).Skip(lines.Length)));
+        }
+
+        await Rpc("""{"id":"2","type":"prompt","message":"second"}""" + "\n", settles: true);
+        var added = File.ReadAllLines(file).Skip(lines.Length).Select(line => JsonNode.Parse(line)!).ToArray();
+        Check(added.Length >= 3, "the prompt appended its entries");
+        var loadout = added[0]["message"]!;
+        Equal("system", loadout["role"]!.GetValue<string>(), "the loadout record comes first");
+        Equal(JsonNode.Parse(lines[^1])!["id"]!.GetValue<string>(), added[0]["parentId"]!.GetValue<string>(), "the record continues the resumed leaf");
+        Names(["read", "ls", "mcp__gone__search"], loadout["toolsRemoved"]!.AsArray().Select(tool => tool!["name"]!.GetValue<string>()), "recorded names removed");
+        var current = loadout["toolsAdded"]!.AsArray();
+        Names(["read", "ls"], current.Select(tool => tool!["name"]!.GetValue<string>()), "selected loadout recorded");
+        Check(current.Single(tool => tool!["name"]!.GetValue<string>() == "ls")!["description"]!.GetValue<string>() != "an older ls", "the current ls declaration is recorded");
+        Equal("user", added[1]["message"]!["role"]!.GetValue<string>(), "the user message follows the record");
+        Equal(added[0]["id"]!.GetValue<string>(), added[1]["parentId"]!.GetValue<string>(), "the user message continues the record");
+        Names(["read", "ls"], sandbox.Requests[^1].Json.GetProperty("tools").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()!), "the request declares the selected loadout");
+    }
 }

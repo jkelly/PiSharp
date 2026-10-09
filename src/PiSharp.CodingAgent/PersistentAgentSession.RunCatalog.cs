@@ -53,7 +53,8 @@ public sealed partial class PersistentAgentSession
             try
             {
                 presentation = replacement.PrepareActiveLoadout(normalized, cancellationToken);
-                late = replacement.Resolve(configuration.Model, context.LlmMessages.Add(delta), configuration.ThinkingLevel, cancellationToken: cancellationToken,
+                late = replacement.Resolve(configuration.Model, WithUnrecordedLoadout(context.LlmMessages,
+                    configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), cancellationToken).Add(delta), configuration.ThinkingLevel, cancellationToken: cancellationToken,
                     prepareLoadout: false, preparedLoadout: presentation).Invoker;
             }
             finally { _activationPreparation.Value = false; }
@@ -133,7 +134,7 @@ public sealed partial class PersistentAgentSession
             {
                 _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(verified), SessionContextProjector.AgentMessages(prospective));
                 _configuration = verified; _context = prospective; _acknowledgedLog = acknowledged.Snapshot;
-                _pendingActivation = null; _lateNestedInvoker = null; _recordedRegistry = null;
+                _pendingActivation = null; _lateNestedInvoker = null; _recordedRegistry = null; _unrecordedLoadout = false;
             }
         }
         catch (Sessions.Storage.SessionLogStoreException storage)

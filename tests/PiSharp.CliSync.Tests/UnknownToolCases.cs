@@ -47,10 +47,17 @@ internal static partial class Program
         {
             var registry = new SessionRuntimeRegistry([new(SettledModel, new SettledTransport())], [Tool("read"), Tool("grep")], new Deny(),
                 new() { InitialActiveToolNames = ["missing_tool", "grep", DocsTool] });
+            var before = FileBytes(recorded);
             await using var opened = await Reopen(recorded, registry);
             Names(["grep"], opened.GetActiveTools(), "initial names keep only registered tools");
             Check(opened.PendingToolNames.IsEmpty, "an ignored initial name became pending");
-            Names(["grep"], SystemTools(opened.Snapshot.Log.Entries[^1].WireBody.Value.GetProperty("message"), "toolsAdded"), "initial selection recorded");
+            // The constructor applies the initial names in memory (_buildRuntime); the first prompt records them.
+            Check(FileBytes(recorded).SequenceEqual(before), "opening with initial names wrote to the session file");
+            var count = opened.Snapshot.Log.Entries.Length; var leaf = opened.Snapshot.Context.LeafId;
+            await opened.PromptAsync(SettledUser("go")); await opened.WaitForIdleAsync();
+            var record = RecordedAtPrompt(opened, count, leaf);
+            Names(["read", "grep"], SystemTools(record, "toolsRemoved"), "initial selection replaces the recorded names");
+            Names(["grep"], SystemTools(record, "toolsAdded"), "initial selection recorded");
         }
         finally { Directory.Delete(Path.GetDirectoryName(recorded)!, recursive: true); }
     });

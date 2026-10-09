@@ -49,6 +49,7 @@ internal static partial class Program
             ("restore.changed-declaration-uses-current-binding", OpenReplacesChangedDeclarations),
             ("restore.hidden-tool-skipped-and-pending", RestoreSkipsHiddenTools),
             ("tree.navigation-without-system-message-keeps-current-tools", NavigationWithoutSystemMessageKeepsTools),
+            ("open.restored-loadout-recorded-at-the-first-prompt", OpenRecordsRestoredLoadoutAtFirstPrompt),
             ("prompt.hidden-tools-byte-exact-sections", Sync(HiddenPrompt)),
             ("prompt.skills-hint-reader-fallback-and-indirect", Sync(SkillsHint)),
             ("prompt.unhidden-docs-line-and-options", Sync(DocsAndOptions)),

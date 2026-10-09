@@ -329,11 +329,11 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions)
             { _registry = registry, _runtimeLease = runtime, PromptPreflight = configured.PromptPreflight };
             var restored = selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
-            if (registry.InitialActiveToolNames is not null)
-                await opened.ConfigureAsync(new() { ActiveToolNames = restored, ReplaceDeclarations = loadout.RequiresRecord }, cancellationToken).ConfigureAwait(false);
+            // Source constructor: the initial names (_buildRuntime) or the transcript's loadout (_restoreToolsFromTranscript) are
+            // applied in memory and the file is not written; the next request records a loadout that differs from the recorded one.
             // Restored tools that are not registered yet, such as MCP tools whose server is still connecting, stay pending.
-            else if (loadout.RequiresRecord)
-                await opened.RecordRestoredToolsAsync(restored, loadout.Pending, cancellationToken).ConfigureAwait(false);
+            opened.RestoreUnrecordedTools(loadout.RequiresRecord || !restored.SequenceEqual(opened.RecordedActiveToolNames(context, cancellationToken), StringComparer.Ordinal),
+                registry.InitialActiveToolNames is null ? loadout.Pending : []);
             return opened;
         }
         catch (Exception admission)
@@ -381,7 +381,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             // Pi sets no limit on the nested calls of codemode scripts.
             var registry = _registry.BindInvocationOwner(new(generation, linked.Token) { UncountedNestedCallTools = ["codemode"],
                 LateNestedTools = LateNestedInvoker });
-            var selection = registry.Resolve(_context, _configuration.Model);
+            var selection = registry.Resolve(WithUnrecordedLoadout(_context, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), default),
+                _configuration.Model);
             _agent.ConfigureAndReplaceMessages(RecoveryConfiguration(selection.Configuration), SessionContextProjector.AgentMessages(_context));
             _configuration = selection.Configuration;
             _registry = registry;
@@ -449,9 +450,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 });
             if (update.ThinkingLevel is { } level && level != context.ThinkingLevel)
                 Add("thinking_level_change", writer => writer.WriteString("thinkingLevel", level));
-            var systemUpdate = update.ActiveToolNames is { } activeNames
+            var activation = update.ActiveToolNames is { } activeNames
                 ? _registry!.CreateActivationMessage(activeNames, RecordedActiveToolNames(context, work), _clock(), work, update.ReplaceDeclarations)
-                : update.SystemMessage;
+                : null;
+            var systemUpdate = update.ActiveToolNames is not null ? activation : update.SystemMessage;
             SessionPromptSectionPreparation? promptPreparation = null;
             if (update.SystemMessage is null)
             {
@@ -478,7 +480,11 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 { work.ThrowIfCancellationRequested(); if (_pendingActivation is not null) PrepareActivationRestoration(_configuration)(); }
                 return Snapshot with { IsConfiguring = false };
             }
-            var selection = await PrepareAndDrainLoadoutAsync(() => _registry!.Resolve(prospective, update.Model ?? _configuration.Model, work), work).ConfigureAwait(false);
+            // A selection records the whole loadout (the recorded names removed); otherwise a restored loadout that awaits its record
+            // stays the agent's loadout, and the record the next request writes precedes this update.
+            var resolved = activation is not null ? prospective : prospective with { LlmMessages = WithUnrecordedLoadout(prospective.LlmMessages,
+                _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), work, context.LlmMessages.Length) };
+            var selection = await PrepareAndDrainLoadoutAsync(() => _registry!.Resolve(resolved, update.Model ?? _configuration.Model, work), work).ConfigureAwait(false);
             // A stored selection only carries provider/modelId; preserve exact API matching for an explicitly requested model.
             if (update.Model is { } requested && selection.Configuration.Model != requested)
                 throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -508,6 +514,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 _acknowledgedLog = acknowledged.Snapshot;
                 _context = prospective;
                 _acknowledgedPromptRevision = promptPreparation?.Revision ?? _acknowledgedPromptRevision;
+                if (activation is not null) _unrecordedLoadout = false;
                 restoreActivation();
             }
             // Source setModel/setThinkingLevel: thinking_level_changed (and thinking_level_select) when the level changed,
@@ -1243,7 +1250,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
     }
     private void ValidateLoadout(ImmutableArray<TranscriptEntry> messages, CancellationToken token = default)
     {
-        var selected = LoadoutRegistry().Resolve(_configuration.Model, messages, _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false);
+        var selected = LoadoutRegistry().Resolve(_configuration.Model, WithUnrecordedLoadout(messages, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), token),
+            _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false);
         if (!selected.Configuration.Tools.Select(tool => (tool.Name, tool.ExecutionMode))
             .SequenceEqual(_configuration.Tools.Select(tool => (tool.Name, tool.ExecutionMode))))
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);

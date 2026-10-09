@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Sessions.Context;
 using PiSharp.Sessions.Serialization;
@@ -17,7 +18,8 @@ public sealed partial class PersistentAgentSession
             SessionLogStoreSnapshot log; SessionContextProjection previous;
             lock (_gate) { reservation.ValidateCatalogAuthority(this); if (_setupAppending) throw new InvalidOperationException("Setup selection cannot overlap an append."); log = _acknowledgedLog; previous = _context; }
             var projected = _projector.Project(log.Entries, leaf, token);
-            var configuration = _registry?.Resolve(projected, _configuration.Model, token).Configuration ?? _configuration;
+            var configuration = _registry?.Resolve(WithUnrecordedLoadout(projected, _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), token),
+                _configuration.Model, token).Configuration ?? _configuration;
             ValidateRuntimeContext(projected, configuration);
             lock (_gate)
             {
@@ -56,8 +58,11 @@ public sealed partial class PersistentAgentSession
                 }
             });
             var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, token);
+            // A restored loadout that awaits its record (the next request writes it) precedes the setup record.
+            var resolved = prospective with { LlmMessages = WithUnrecordedLoadout(prospective.LlmMessages,
+                _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), token, previous.LlmMessages.Length) };
             var configuration = _registry is { } registry
-                ? (await SessionLoadoutDiagnosticBoundary.RunAsync(() => registry.Resolve(prospective, _configuration.Model, token),
+                ? (await SessionLoadoutDiagnosticBoundary.RunAsync(() => registry.Resolve(resolved, _configuration.Model, token),
                     () => new ValueTask(reservation.DrainLoadoutDiagnosticsAsync(token))).ConfigureAwait(false)).Configuration
                 : _configuration;
             ValidateRuntimeContext(prospective, configuration);

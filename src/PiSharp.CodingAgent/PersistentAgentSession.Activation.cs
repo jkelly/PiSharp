@@ -59,7 +59,8 @@ public sealed partial class PersistentAgentSession
         try
         {
             presentation = delta is null ? null : registry.PrepareActiveLoadout(normalized, cancellationToken);
-            if (delta is not null) _ = registry.Resolve(configuration.Model, context.LlmMessages.Add(delta), configuration.ThinkingLevel, cancellationToken: cancellationToken,
+            if (delta is not null) _ = registry.Resolve(configuration.Model, WithUnrecordedLoadout(context.LlmMessages,
+                configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), cancellationToken).Add(delta), configuration.ThinkingLevel, cancellationToken: cancellationToken,
                 prepareLoadout: false, preparedLoadout: presentation);
         }
         finally { _activationPreparation.Value = false; }
@@ -97,30 +98,35 @@ public sealed partial class PersistentAgentSession
     private async ValueTask<AgentRequestPreparation?> PrepareActivationRequestAsync(AgentRequestBoundary boundary, CancellationToken token)
     {
         await DrainLoadoutDiagnosticsAsync(token).ConfigureAwait(false);
-        PendingActivation? pending; SessionLogStoreSnapshot log; SessionContextProjection context;
+        PendingActivation? pending; SessionLogStoreSnapshot log; SessionContextProjection context; bool unrecorded;
         TaskCompletionSource operation; long epoch; SessionRuntimeRegistry registry; object? priorPromptRevision;
         lock (_gate)
         {
             ThrowAvailable(); token.ThrowIfCancellationRequested();
-            pending = _pendingActivation;
-            if (pending is null && _registry?.HasPromptSectionPreparation != true) return null;
+            pending = _pendingActivation; unrecorded = _unrecordedLoadout;
+            if (pending is null && !unrecorded && _registry?.HasPromptSectionPreparation != true) return null;
             operation = _active ?? throw new InvalidOperationException("Activation publication requires an owned run.");
             registry = _registry!; log = _acknowledgedLog; context = _context; epoch = _activationEpoch;
             priorPromptRevision = _acknowledgedPromptRevision;
         }
         var names = pending?.Names ?? _configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
-        var delta = pending is null ? null : registry.CreateActivationMessage(names,
-            _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), _clock(), token, replaceDeclarations: pending.ReplaceDeclarations);
+        // Source agent-loop declareToolChanges: the run records a restored loadout (session open, tree navigation) that differs from
+        // the recorded one before its first request, in the system message that precedes the prompt's messages. It replaces the
+        // recorded names, which the current registry may not know.
+        var presentation = pending is null && unrecorded ? registry.PrepareActiveLoadout(names, token, report: false) : pending?.Presentation;
+        var delta = pending is null && !unrecorded ? null : registry.CreateActivationMessage(names,
+            unrecorded ? RecordedActiveToolNames(context, token) : _configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), _clock(), token,
+            replaceDeclarations: unrecorded || pending!.ReplaceDeclarations);
         SessionPromptSectionPreparation? promptPreparation;
         _activationPreparation.Value = true;
-        try { (delta, promptPreparation) = registry.PreparePromptSectionMessage(names, context.Messages, delta, _clock(), token, pending?.Presentation); }
+        try { (delta, promptPreparation) = registry.PreparePromptSectionMessage(names, context.Messages, delta, _clock(), token, presentation); }
         finally { _activationPreparation.Value = false; }
         if (delta is null) { promptPreparation?.ValidateSource(); token.ThrowIfCancellationRequested(); return null; }
         var entry = Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,
             writer => { writer.WritePropertyName("message"); writer.WriteRawValue(delta.WireBody.Value.GetRawText()); });
         var prospective = _projector.Project(log.Entries.Add(entry), entry.Id, token);
         var verified = registry.Resolve(_configuration.Model, prospective.LlmMessages, _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false,
-            preparedLoadout: pending?.Presentation);
+            preparedLoadout: presentation);
         ValidateRuntimeContext(prospective, verified.Configuration);
         if (!verified.Configuration.Tools.Select(tool => tool.Name).SequenceEqual(names, StringComparer.Ordinal))
             throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -147,7 +153,8 @@ public sealed partial class PersistentAgentSession
                     ThrowAvailable(); cancellation.ThrowIfCancellationRequested();
                     if (_activationEpoch != epoch || !ReferenceEquals(_pendingActivation, pending) || !ReferenceEquals(_active, operation) ||
                         !ReferenceEquals(_context, context) || !ReferenceEquals(_acknowledgedLog, log) ||
-                        !ReferenceEquals(_registry, registry) || !ReferenceEquals(_acknowledgedPromptRevision, priorPromptRevision))
+                        !ReferenceEquals(_registry, registry) || !ReferenceEquals(_acknowledgedPromptRevision, priorPromptRevision) ||
+                        _unrecordedLoadout != unrecorded)
                         throw new AgentRequestBoundaryStaleException();
                     _activationPublishing = true; writeAdmitted = true;
                 }
@@ -160,6 +167,7 @@ public sealed partial class PersistentAgentSession
                     _configuration = verified.Configuration; _context = prospective; _acknowledgedLog = acknowledged.Snapshot;
                     _acknowledgedPromptRevision = promptPreparation?.Revision ?? _acknowledgedPromptRevision;
                     if (_activationEpoch == epoch && ReferenceEquals(_pendingActivation, pending)) _pendingActivation = null;
+                    _unrecordedLoadout = false;
                     publishAgent();
                 }
             }

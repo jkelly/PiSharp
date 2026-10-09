@@ -277,7 +277,7 @@ public static class RpcSessionCommand
             if (settings is not null) { session.SteeringMode = settings.SteeringMode; session.FollowUpMode = settings.FollowUpMode; }
             await profile.AttachOwnerAsync(session, options, Clock, NextId, parsed.Stores.IsEmpty ? null : parsed.Stores, lifecycle).ConfigureAwait(false);
             if (reloadAdmission is not null) profile.ConfigureReload(reloadAdmission);
-            await profile.ApplyInitialToolSelectionAsync(session, cancellationToken).ConfigureAwait(false);
+            await profile.ApplyInitialToolSelectionAsync(session, cancellationToken, resumed: parsed.SessionMode == "open").ConfigureAwait(false);
             observedInput = new InputObservation(stdin, gate);
             // Events and responses carry tool results with Pi-sized images (owner decision 0004).
             var outputFraming = Framing with { MaximumFrameBytes = PiPayloadBudget.OutputRecordBytes };

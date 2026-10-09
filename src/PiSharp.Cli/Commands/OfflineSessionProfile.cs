@@ -95,17 +95,24 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     internal async ValueTask AttachSessionAsync(PersistentAgentSession session, string reason, CancellationToken token)
     { await AttachOwnerAsync(session).ConfigureAwait(false); await StartLifecycleAsync(reason, token).ConfigureAwait(false); }
     private readonly ImmutableArray<string>? _initialActiveTools;
-    internal async Task ApplyInitialToolSelectionAsync(PersistentAgentSession session, CancellationToken token)
+    /// <summary>sdk.ts createAgentSession initialActiveToolNames. For a resumed session (<paramref name="resumed"/>) the names are applied
+    /// in memory, as the AgentSession constructor applies them, and the next prompt records the loadout: opening a session writes nothing.</summary>
+    internal async Task ApplyInitialToolSelectionAsync(PersistentAgentSession session, CancellationToken token, bool resumed = false)
     {
+        ImmutableArray<string>? initial = null;
         if (mcpRuntime is not null)
         {
             var registry = session.CaptureToolCatalogRegistry();
             var selection = registry.LifetimeToolSelection ?? throw new InvalidOperationException("Admitted catalog requires an explicit lifetime selection.");
-            var selectedNames = selection.SelectInitial(registry.RegisteredTools.Select(tool => new PiSharp.CodingAgent.ToolSelection.ToolSelectionDescriptor(
+            initial = selection.SelectInitial(registry.RegisteredTools.Select(tool => new PiSharp.CodingAgent.ToolSelection.ToolSelectionDescriptor(
                 tool.Adapter.Name, tool.Exposure, tool.DefaultActive, tool.IsExtension)).ToImmutableArray());
-            await session.SetActiveToolsAsync(selectedNames, token).ConfigureAwait(false);
         }
-        else if (_initialActiveTools is { } names) await session.SetActiveToolsAsync(names, token).ConfigureAwait(false);
+        else if (_initialActiveTools is { } names) initial = names;
+        if (initial is { } selected)
+        {
+            if (resumed) await session.ApplyInitialToolsAsync(selected, token).ConfigureAwait(false);
+            else await session.SetActiveToolsAsync(selected, token).ConfigureAwait(false);
+        }
         await DrainLoadoutDiagnosticsAsync(token).ConfigureAwait(false);
     }
     private readonly SessionRuntimeRegistry _startupRegistry;

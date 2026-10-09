@@ -108,6 +108,8 @@ public sealed partial class PersistentAgentSession
                 _registry = replacement; _configuration = selection.Configuration;
                 _acknowledgedLog = acknowledged.Snapshot; _context = prospective;
                 _activationEpoch = nextActivation; _pendingActivation = null;
+                // The publication recorded the whole loadout, replacing the recorded names: a restored loadout is recorded too.
+                _unrecordedLoadout = false;
                 RetirePendingToolsLocked(pendingCandidates, selected);
             }
             return new(Snapshot with { IsConfiguring = false }, replacement);
