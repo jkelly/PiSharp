@@ -99,6 +99,26 @@ internal static partial class Program
             Equal("error", last.GetProperty("stopReason").GetString(), "the run ended with an error message");
             Equal(last.GetProperty("errorMessage").GetString() + "\n", stderr, "stderr is the errorMessage");
         }),
+        // The provider SDKs read every event of a stream, of any size: a response of 6,000 text deltas (formerly 4,096 events) with one
+        // delta of 100,000 characters (formerly 65,536 per SSE line and event) completes.
+        ("caps.long-streamed-response", async () =>
+        {
+            using var sandbox = new Sandbox("caps-long-stream");
+            var body = Frame("message_start", new { type = "message_start", message = new { id = "msg_l", role = "assistant", model = "claude-sonnet-4-5", content = Array.Empty<object>(), usage = new { input_tokens = 3, output_tokens = 0 } } })
+                + Frame("content_block_start", new { type = "content_block_start", index = 0, content_block = new { type = "text", text = "" } });
+            var text = new System.Text.StringBuilder(body);
+            for (var index = 0; index < 6000; index++)
+                text.Append(Frame("content_block_delta", new { type = "content_block_delta", index = 0, delta = new { type = "text_delta", text = "a" } }));
+            text.Append(Frame("content_block_delta", new { type = "content_block_delta", index = 0, delta = new { type = "text_delta", text = new string('b', 100_000) } }));
+            text.Append(Frame("content_block_stop", new { type = "content_block_stop", index = 0 }) +
+                Frame("message_delta", new { type = "message_delta", delta = new { stop_reason = "end_turn" }, usage = new { output_tokens = 2 } }) +
+                Frame("message_stop", new { type = "message_stop" }));
+            var wire = text.ToString();
+            sandbox.Respond = (_, _) => Sse(wire);
+            var (code, stdout, stderr) = await sandbox.Run(["-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "write"]);
+            Equal(0, code, "exit; " + stderr);
+            Equal(new string('a', 6000) + new string('b', 100_000) + "\n", stdout, "the whole response");
+        }),
         // anthropic-messages.ts and agent-loop.ts: a response of 80 tool_use blocks (formerly 64 stream content slots) runs every call.
         ("caps.response-with-many-parallel-tool-calls", async () =>
         {

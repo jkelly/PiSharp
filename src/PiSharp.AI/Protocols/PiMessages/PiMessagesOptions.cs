@@ -22,7 +22,7 @@ public sealed record PiMessagesOptions(JsonData ModelMetadata, string? ApiKey = 
     public Func<HttpResponseMessage, CancellationToken, ValueTask<Stream?>>? BodyReaderFactory { get; init; }
     public int ReadBufferBytes { get; init; } = 4096;
     public int MaximumFrameCharacters { get; init; } = PiRequestBudget.StreamCharacters;
-    public int MaximumDataEvents { get; init; } = 4096;
+    public int MaximumDataEvents { get; init; } = int.MaxValue;
     public long MaximumTotalDataCharacters { get; init; } = PiRequestBudget.StreamTotalCharacters;
     public int MaximumPayloadBytes { get; init; } = PiRequestBudget.RequestPayloadBytes;
     public int MaximumContentSlots { get; init; } = int.MaxValue;
@@ -37,7 +37,7 @@ public sealed record PiMessagesOptions(JsonData ModelMetadata, string? ApiKey = 
     internal void Validate()
     {
         if (ModelMetadata is null || Hooks is null || ReadBufferBytes is < 1 or > 65_536 || MaximumFrameCharacters is < 1 or > PiRequestBudget.MaximumBound ||
-            MaximumDataEvents is < 1 or > 65_536 || MaximumTotalDataCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumPayloadBytes is < 1 or > PiRequestBudget.MaximumBound ||
+            MaximumDataEvents < 1 || MaximumTotalDataCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumPayloadBytes is < 1 or > PiRequestBudget.MaximumBound ||
             MaximumContentSlots < 1 || MaximumContentCharacters is < 1 or > PiRequestBudget.MaximumBound || MaximumJsonDepth is < 1 or > 64 ||
             MaximumHeaders is < 1 or > 4096 || MaximumHeaderCharacters is < 1 or > 65_536 || MaximumResponseErrorBytes is < 1 or > 8_388_608)
             throw new ArgumentOutOfRangeException(nameof(PiMessagesOptions), "Invalid Pi Messages limits.");

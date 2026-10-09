@@ -223,7 +223,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     {
         var invocation = new Invocation();
         var inner = new ResponsesTextToolTransport((chat, cancellation, context) => PrepareAsync(chat, invocation, cancellation),
-            new ResponsesTextToolOptions(MaximumEvents: 65_536, MaximumEventCharacters: 16 * 1_048_576, MaximumInputCharacters: 64 * 1_048_576,
+            new ResponsesTextToolOptions(MaximumEvents: int.MaxValue, MaximumEventCharacters: 16 * 1_048_576, MaximumInputCharacters: 64 * 1_048_576,
                 MaximumContentSlots: int.MaxValue, MaximumContentCharacters: 16 * 1_048_576, MaximumJsonDepth: 64, Rates: _rates)
             { SupportsOpenAIGrammarTools = _grammar });
         await foreach (var frame in inner.StreamAsync(request, token).ConfigureAwait(false))

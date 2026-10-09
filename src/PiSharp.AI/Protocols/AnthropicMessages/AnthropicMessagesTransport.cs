@@ -12,7 +12,7 @@ namespace PiSharp.AI.Protocols.AnthropicMessages;
 public sealed record AnthropicTokenRates(decimal Input = 0, decimal Output = 0, decimal CacheRead = 0, decimal CacheWrite = 0)
 { public ImmutableArray<TokenRateTier> Tiers { get; init; } = []; }
 public sealed record AnthropicFallbackModel(string Provider, string Model, AnthropicTokenRates Rates);
-public sealed record AnthropicMessagesOptions(int MaximumEvents = 4096, int MaximumEventCharacters = 65_536,
+public sealed record AnthropicMessagesOptions(int MaximumEvents = int.MaxValue, int MaximumEventCharacters = PiRequestBudget.StreamCharacters,
     int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = int.MaxValue, int MaximumContentCharacters = PiRequestBudget.StreamCharacters,
     int MaximumSignatureCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = 32, AnthropicTokenRates? Rates = null,
     ImmutableArray<AnthropicFallbackModel> AllowedFallbackModels = default, bool OAuthToolNames = false,

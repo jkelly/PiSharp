@@ -46,7 +46,7 @@ public sealed record ResponsesTokenRates(decimal Input = 0, decimal Output = 0, 
 { public ImmutableArray<ResponsesTokenRateTier> Tiers { get; init; } = []; }
 
 public sealed record ResponsesTextToolOptions(
-    int MaximumEvents = 4096, int MaximumEventCharacters = 65_536,
+    int MaximumEvents = int.MaxValue, int MaximumEventCharacters = PiRequestBudget.StreamCharacters,
     int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = int.MaxValue,
     int MaximumContentCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = 32,
     ResponsesTokenRates? Rates = null, string? ServiceTier = null)

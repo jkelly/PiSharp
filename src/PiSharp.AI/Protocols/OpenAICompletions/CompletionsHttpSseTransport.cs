@@ -8,7 +8,7 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.OpenAICompletions;
 
-public sealed record CompletionsHttpSseOptions(int MaximumDataEvents = 4096, int MaximumDataCharacters = 65_536,
+public sealed record CompletionsHttpSseOptions(int MaximumDataEvents = int.MaxValue, int MaximumDataCharacters = PiRequestBudget.StreamCharacters,
     long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters, int MaximumJsonDepth = 32, SseDecoderOptions? Framing = null)
 {
     public CompletionsLifecycleHooks? Hooks { get; init; }

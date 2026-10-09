@@ -7,7 +7,9 @@ using PiSharp.Contracts;
 
 namespace PiSharp.AI.Protocols.AnthropicMessages;
 
-public sealed record AnthropicMessagesHttpSseOptions(int MaximumDataEvents = 4096, int MaximumDataCharacters = 65_536,
+/// <summary>The SDK reads every event of a stream, of any size: no event count; one event keeps the per-content memory bound and the
+/// whole stream the total one.</summary>
+public sealed record AnthropicMessagesHttpSseOptions(int MaximumDataEvents = int.MaxValue, int MaximumDataCharacters = PiRequestBudget.StreamCharacters,
     long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters, int MaximumJsonDepth = 32, SseDecoderOptions? Framing = null);
 
 /// <summary>One configured HTTP/SSE send per enumeration, composed with the accepted Anthropic DTO mapper. Borrows the client.</summary>

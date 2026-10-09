@@ -10,8 +10,8 @@ using PiSharp.Contracts;
 namespace PiSharp.AI.Protocols.OpenAIResponses;
 
 public sealed record ResponsesHttpSseOptions(
-    int MaximumDataEvents = 4096,
-    int MaximumDataCharacters = 65_536,
+    int MaximumDataEvents = int.MaxValue,
+    int MaximumDataCharacters = PiRequestBudget.StreamCharacters,
     long MaximumTotalDataCharacters = PiRequestBudget.StreamTotalCharacters,
     int MaximumJsonDepth = 32,
     SseDecoderOptions? Framing = null);
