@@ -66,7 +66,7 @@ public sealed class GoogleGenerativeAIHttpTransport : IChatTransport
                     try
                     {
                         retryable = GoogleRetryPolicy.Retryable(response, _options);
-                        if (retryable) delay = GoogleRetryPolicy.Delay(response, _options, retryIndex, statusError.Message);
+                        if (retryable) delay = GoogleRetryPolicy.Delay(_options, retryIndex);
                     }
                     catch (Exception error) { planningFailure = error; }
                     if (!retryable && planningFailure is null) throw statusError;

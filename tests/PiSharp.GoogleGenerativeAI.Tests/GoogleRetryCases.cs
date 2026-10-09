@@ -169,8 +169,10 @@ internal static class GoogleRetryCases
             Equal(1, fixture.Requests.Count); Equal(0, fixture.Retries.Count); fixture.AssertReleased(0);
         }
         var headerClock = new Clock(); using var longHeader = new Fixture([429, 200], Options(headerClock) with { MaximumHeaderCharacters = 128 });
+        // retryGoogleRequest never reads the rejected response's headers, so an oversized retry header is not admitted at all.
         longHeader.Headers["retry-after-ms"] = new string('1', 129);
-        AssertOutcome(await Consume(longHeader, true), NativeChatFailureCode.ResourceLimit); longHeader.AssertReleased(0);
+        var pendingLong = Consume(longHeader, true); (await headerClock.Next()).Fire();
+        AssertOutcome(await pendingLong, null); longHeader.AssertReleased(0); Equal(437.5, longHeader.Retries.Single().Delay.TotalMilliseconds);
         foreach (var count in new[] { -1, 33 })
         {
             using var client = new HttpClient(new Handler((_, _) => throw new InvalidOperationException("Effects before validation.")));

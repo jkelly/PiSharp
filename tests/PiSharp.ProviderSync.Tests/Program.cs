@@ -467,7 +467,13 @@ internal static partial class Program
             ([429, 200], [("retry-after", "invalid-date")], [], [437.5]),
             ([429, 200], [("retry-after", "Infinity")], [], [437.5]),
             ([429, 200], [("retry-after-ms", "Infinity")], [], [437.5]),
-            ([429, 200], [("retry-after", "2")], [503], [2000]),
+            // google-shared.ts retryGoogleRequest sets headers = undefined on the @google/genai ApiError, so no retry header is read
+            // (captured: installed pi-ai 1.1.0 + @google/genai 2.21.0 retried after ~400 ms despite retry-after: 3 / x-should-retry: false).
+            ([429, 200], [("retry-after", "2")], [503], [437.5]),
+            ([429, 200], [("retry-after-ms", "2500")], [], [437.5]),
+            ([429, 200], [("retry-after", "999")], [], [437.5]),
+            ([429, 200], [("x-should-retry", "false")], [], [437.5]),
+            ([400], [("x-should-retry", "true")], [], []),
             ([429], [("x-should-retry", "true")], [429], []),
         })
         {
