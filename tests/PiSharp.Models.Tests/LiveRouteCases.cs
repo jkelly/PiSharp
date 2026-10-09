@@ -235,6 +235,13 @@ internal static partial class Program
             .Replace("\n", Environment.NewLine), fallback.Diagnostics, "warning diagnostic");
         using (var connection = fallback.Selection.Connect(runtime)) await Drive(connection.CreateTransport(), fallback.Selection.Model);
         using (var body = JsonDocument.Parse(endpoint.Snapshot()[^1].Body!)) Equal("brand-new-model", body.RootElement.GetProperty("model").GetString(), "custom id sent");
+        // Azure resolves a custom deployment id the same way (buildFallbackModel), not only exact catalog ids.
+        var azureRuntime = new LiveSessionRuntime(Env(("AZURE_OPENAI_API_KEY", "az"), ("AZURE_OPENAI_BASE_URL", "https://pisharp-res.openai.azure.com/openai/v1")), () => endpoint);
+        var azureFallback = await Select(new("azure", "my-deployment", null), azureRuntime);
+        Equal("my-deployment", azureFallback.Selection.Model.Id, "custom id on azure");
+        Check(azureFallback.Diagnostics.Contains("Model \\u0022my-deployment\\u0022 not found for provider \\u0022azure\\u0022. Using custom model id.", StringComparison.Ordinal), azureFallback.Diagnostics);
+        using (var connection = azureFallback.Selection.Connect(azureRuntime)) await Drive(connection.CreateTransport(), azureFallback.Selection.Model);
+        Check(endpoint.Snapshot()[^1].Body!.Contains("\"my-deployment\"", StringComparison.Ordinal), "azure custom id sent: " + endpoint.Snapshot()[^1].Body);
         var unknown = await ThrowsAsync<LiveSessionException>(() => Select(new(null, "no-such-model-anywhere", null)), "unknown");
         Check(unknown.Code == "UnknownLiveModel" && unknown.Message == "Model \"no-such-model-anywhere\" not found. Use --list-models to see available models.", unknown.Message);
         Equal("LiveOutputLimit", (await ThrowsAsync<LiveSessionException>(() => Select(new("openai", "gpt-4-turbo", "8192")), "limit")).Code, "output limit");
