@@ -86,7 +86,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
         if (_options.CommandTransport == ShellCommandTransport.Argv && context.Command.Contains('\0') &&
             NodeArgumentErrors.SpawnArguments(Shell.CommandArguments(context.Command)) is { } spawnError)
             throw new ToolSourceErrorException(spawnError);
-        if (!Text(context.Command) || context.Command.Length > _options.MaximumCommandCharacters + (_options.CommandPrefix?.Length + 1 ?? 0) &&
+        if (!Text(context.Command, allowNul: StdinTransport) || context.Command.Length > _options.MaximumCommandCharacters + (_options.CommandPrefix?.Length + 1 ?? 0) &&
             _options.SpawnHook is null || !Absolute(context.WorkingDirectory) || !EnvironmentValid(context.Environment)) throw Invalid();
         var arguments = new Dictionary<string, object?> { ["command"] = input.Command, ["outputPath"] = outputPath };
         if (input.TimeoutToken is { } timeout) arguments["timeout"] = timeout;
@@ -98,6 +98,9 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
     }
 
     private ShellConfiguration Shell => new(_options.Executable, _options.ShellArguments, _options.CommandTransport);
+    /// <summary>Source commandTransport "stdin" (legacy WSL bash): the command is written to the shell's standard input, so a NUL
+    /// byte in it reaches the shell as data (Node checks only spawn arguments); argv and the environment never carry one.</summary>
+    private bool StdinTransport => _options.CommandTransport == ShellCommandTransport.Stdin;
 
     /// <summary>Node's child_process.spawn error when the operating system refuses the command line: on Windows CreateProcess takes at
     /// most 32,767 characters (libuv reports ENAMETOOLONG); on Unix one argument is at most 128 KiB (E2BIG).</summary>
@@ -116,7 +119,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             var shellCommand = _options.CommandTransport == ShellCommandTransport.Stdin ? input.StandardInput
                 : action.CommandArguments.IsDefault || action.CommandArguments.Length == 0 ? null : action.CommandArguments[^1];
             var valid = action.ToolName == Name && action.Operation == Name && action.Kind == PreparedToolActionKind.Command &&
-                action.Target == _options.Executable && File.Exists(action.Target) && shellCommand is not null && Text(shellCommand) &&
+                action.Target == _options.Executable && File.Exists(action.Target) && shellCommand is not null && Text(shellCommand, allowNul: StdinTransport) &&
                 (_options.SpawnHook is not null || shellCommand == Resolve(input.Command)) &&
                 !action.CommandArguments.IsDefault && action.CommandArguments.SequenceEqual(Shell.CommandArguments(shellCommand)) &&
                 (input.StandardInput is null) == (_options.CommandTransport == ShellCommandTransport.Argv) &&
@@ -197,7 +200,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
         if (!value.TryGetProperty("command", out var command) || command.ValueKind != JsonValueKind.String) throw Invalid();
         var text = command.GetString()!;
         // A NUL byte reaches spawn, which reports it (PrepareAsync); the final action never carries one.
-        if (!Text(text, allowNul: !normalized) || text.Length > _options.MaximumCommandCharacters) throw Invalid();
+        if (!Text(text, allowNul: !normalized || StdinTransport) || text.Length > _options.MaximumCommandCharacters) throw Invalid();
         double? seconds = null; JsonElement? token = null;
         // Pi validation.ts normalizeOptionalNulls: an optional property sent as null (strict tool schemas make optional properties nullable) is absent.
         if (value.TryGetProperty("timeout", out var timeout) && timeout.ValueKind != JsonValueKind.Null)
@@ -214,7 +217,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             if (!SpillPath(output)) throw Invalid();
             if (value.TryGetProperty("standardInput", out var stdin))
             {
-                if (stdin.ValueKind != JsonValueKind.String || !Text(stdin.GetString())) throw Invalid();
+                if (stdin.ValueKind != JsonValueKind.String || !Text(stdin.GetString(), allowNul: StdinTransport)) throw Invalid();
                 standardInput = stdin.GetString();
             }
         }

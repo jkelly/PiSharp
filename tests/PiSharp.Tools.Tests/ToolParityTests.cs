@@ -265,6 +265,11 @@ internal static class ToolParityTests
         var result = await stdin.CreateInvoker(new Allow()).ExecuteAsync(Invocation("bash", new { command = "pwd" }), default);
         Check(!result.IsError, "Stdin action failed.");
         Equal("export TEST_VAR=hello\npwd", Encoding.UTF8.GetString(runner.Requests.Single().StandardInput!));
+        // Source stdin.end(command): a NUL byte is standard-input data, not a spawn argument, so the command runs.
+        var nul = await stdin.CreateInvoker(new Allow()).ExecuteAsync(Invocation("bash", new { command = "echo a\0b" }), default);
+        Check(!nul.IsError, "Stdin NUL command failed: " + Text(nul));
+        Equal("export TEST_VAR=hello\necho a\0b", Encoding.UTF8.GetString(runner.Requests[^1].StandardInput!));
+        Check(runner.Requests[^1].Arguments.SequenceEqual(["-s"]), "NUL reached argv.");
     }
 
     private static async Task BashSessionEnvironment()
