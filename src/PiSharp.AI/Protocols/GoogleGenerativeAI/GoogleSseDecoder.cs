@@ -26,7 +26,8 @@ public sealed class GoogleSseDecoder(GoogleGenerativeAIOptions options)
                 var json = data.ToString(); data.Clear();
                 if (json == "[DONE]") return null;
                 if (++events > options.MaximumEvents) throw GoogleData.Fail(GoogleFailure.ResourceLimit);
-                return GoogleData.Admit(JsonData.Parse(json), options);
+                // @google/genai processStreamResponse: JSON.parse(chunkString), so duplicate names keep the last value.
+                return GoogleData.Admit(StreamingJson.JsonParse(json), options);
             }
             if (text.StartsWith("data:", StringComparison.Ordinal))
             {

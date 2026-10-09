@@ -128,6 +128,8 @@ internal static partial class Program
         {
             ("array", "[1,2]", "[1,2]"), ("string", "\"s\"", "\"s\""), ("number", "5", "5"), ("null", "null", "{}"), ("missing", null, "{}"),
             ("false", "false", "false"), ("object", "{\"x\":1.50,\"2\":1}", "{\"2\":1,\"x\":1.5}"),
+            // The SDK JSON.parse's each chunk: duplicate names keep the last value.
+            ("duplicates", "{\"a\":1,\"b\":2,\"a\":3}", "{\"a\":3,\"b\":2}"),
         })
         {
             var call = args is null ? "{\"name\":\"read\"}" : "{\"name\":\"read\",\"args\":" + args + "}";
@@ -150,6 +152,8 @@ internal static partial class Program
         {
             ("array", "[1]", "[1]"), ("string", "\"s\"", "\"s\""), ("null", "null", "null"), ("number", "7", "7"), ("absent", null, "{\"v\":1,\"w\":[2]}"),
             ("object", "{\"v\":1}", "{\"v\":1}"),
+            // parseEvent JSON.parse's each data line: duplicate names keep the last value.
+            ("duplicates", "{\"v\":1,\"v\":2}", "{\"v\":2}"),
         })
         {
             var toolCall = "{\"type\":\"toolCall\",\"id\":\"c1\",\"name\":\"read\"" + (final is null ? "" : ",\"arguments\":" + final) + "}";
