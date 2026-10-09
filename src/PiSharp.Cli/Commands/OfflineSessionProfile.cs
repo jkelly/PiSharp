@@ -226,7 +226,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
     private OfflineSessionProfile(string workspace, BuiltinToolCatalog tools, FilePolicy policy, Handler handler, ModelDescriptor model,
         BashTool? bash, NativeExtensionActivation? extension, FrozenCatalogModel modelDefinition, OwnedProcessCleanup? processCleanup, LiveSessionConnection? live = null,
         InitialToolSelection? toolSelection = null, bool deferCatalogValidation = false,
-        OriginalSystemPromptAdmission? originalSystemPrompt = null)
+        OriginalSystemPromptAdmission? originalSystemPrompt = null, bool piEntry = false)
     {
         if (live is null) RequireSelectedModelDefinition(model, modelDefinition);
         Workspace = workspace; _policy = policy; _handler = handler; SelectedModel = model; _extension = extension;
@@ -275,6 +275,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             : new ToolInvokerOptions(MaximumArgumentCharacters: 96_000, MaximumActionCharacters: 192_000,
                 MaximumResultCharacters: PiPayloadBudget.ToolResultCharacters, MaximumActionEntries: 1026)) with
             { MaximumStructuredContentCharacters = PiPayloadBudget.ToolResultCharacters + 65_536 };
+        // The Pi entry declares and calls every registered tool and keeps every content block (agent.ts/agent-loop.ts have no count bound).
+        if (piEntry) invokerOptions = PiPayloadBudget.PiInvoker(invokerOptions);
         _profileInvokerOptions = invokerOptions;
         if (extension is not null)
         {
@@ -340,7 +342,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         // Pi runs a turn's tool calls in parallel (Agent toolExecution "parallel"); other profiles keep their sequential batches.
         _startupRegistry = new([DecorateOriginalPromptBinding(new(model, transport, ExecutionMode: policy.Pi is not null ? ToolExecutionMode.Parallel : ToolExecutionMode.Sequential,
             Hooks: extension?.Binding.ContextHooks))], registrations, policy,
-            new SessionRuntimeRegistryOptions(MaximumModels: 4096, MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
+            new SessionRuntimeRegistryOptions(MaximumModels: piEntry ? int.MaxValue : 4096, MaximumTools: piEntry ? int.MaxValue : 128,
+                MaximumMessages: piEntry ? int.MaxValue : 1024, MaximumDeclarations: piEntry ? int.MaxValue : 4096, MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
                 LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
                 BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
                 DrainLoadoutDiagnostics = extension is null ? null : extension.DrainLoadoutDiagnosticsAsync,
@@ -470,7 +473,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         OriginalSystemPromptAdmission? originalSystemPrompt = null, BuiltinToolSettings? toolSettings = null,
         PiSharp.Cli.Mcp.McpRegisteredServers? mcpRegistrations = null,
         PiSharp.Cli.Pi.PiToolPolicy? toolPolicy = null, PiSharp.Cli.Extensions.Pi.PiExtensionHost? piExtensions = null,
-        bool deferMissingCredentials = false)
+        bool deferMissingCredentials = false, bool piEntry = false)
     {
         if (piExtensions is not null && extension is not null) throw new ArgumentException("A published native extension and Pi extensions cannot share one profile.");
         toolSettings ??= BuiltinToolSettings.Default;
@@ -669,7 +672,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
                 piGrep: piSearch?.Grep(files), piFind: piSearch?.Find(files), pi: piPolicy is not null), policy,
                 new Handler(turns, beforeSendAsync, model), model, bashTool, activation, modelDefinition, processCleanup, connection, toolSelection,
                 deferCatalogValidation: mcpAdmission is not null || registeredMcpAdmission is not null || readApplicationHost is not null,
-                originalSystemPrompt: originalSystemPrompt);
+                originalSystemPrompt: originalSystemPrompt, piEntry: piEntry);
             profile.UserBash = userBash; bashOwner = profile; profile.ImageSettings = toolSettings;
             if (readApplicationHost is not null) profile.ConfigureMcpRegistrationRuntime(readApplicationHost().CreateRegisteredAdmission());
             else if (registeredMcpAdmission is not null) profile.ConfigureMcpRegistrationRuntime(registeredMcpAdmission);

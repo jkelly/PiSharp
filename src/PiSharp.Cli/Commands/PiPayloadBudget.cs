@@ -44,6 +44,69 @@ internal static class PiPayloadBudget
         return options with { Loop = (options.Loop ?? new()) with { CanonicalToolResultLimits = ToolResults }, ResultValues = ToolResults };
     }
 
+    /// <summary>Pi entry tool results: agent-loop.ts keeps every content block of a result (the 128-block profile bound is lifted);
+    /// the character and byte bounds stay the memory bounds above.</summary>
+    public static ToolResultValueOptions PiToolResults { get; } = ToolResults with { MaximumContentBlocks = int.MaxValue };
+
+    /// <summary>agent.ts steer/followUp push onto plain arrays: the Pi entry's queues have no message-count or size bound.</summary>
+    public static AgentPendingInputQueueOptions PiQueue { get; } = new(MaximumMessagesPerQueue: int.MaxValue,
+        MaximumMessageCharacters: int.MaxValue, MaximumCharactersPerQueue: long.MaxValue, MaximumJsonDepth: 64);
+
+    /// <summary>agent-loop.ts emits every tool_execution_update an onUpdate reports: no count bound per batch, per pending delivery or
+    /// per update's content blocks. The retained characters of not-yet-delivered updates stay a memory bound.</summary>
+    public static ToolProgressDeliveryOptions PiProgress { get; } = new(ToolProgressDeliveryMode.SourceCompatible,
+        MaximumUpdates: int.MaxValue, MaximumPendingUpdates: int.MaxValue, MaximumContentBlocks: int.MaxValue);
+
+    /// <summary>agent-session.ts prompt/sendUserMessage: an extension's user message has no text or image-count bound; the message keeps
+    /// the request-entry and payload memory bounds every prompt has (the record's other defaults).</summary>
+    public static PromptInputAdmissionOptions PiExtensionInput { get; } = new(
+        MaximumTextCharacters: PiSharp.AI.PiRequestBudget.RequestEntryCharacters, MaximumImages: int.MaxValue, MaximumJsonDepth: 64);
+
+    /// <summary>The agent options of the Pi entry: no tool, subscriber, queue, progress or result-block count bound (agent.ts has none).</summary>
+    public static AgentOptions PiAgent(AgentOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return options with
+        {
+            Loop = (options.Loop ?? new()) with { CanonicalToolResultLimits = PiToolResults }, ResultValues = PiToolResults,
+            MaximumTools = int.MaxValue, MaximumSubscribers = int.MaxValue, Queue = PiQueue, ProgressDelivery = PiProgress
+        };
+    }
+
+    /// <summary>The Pi entry's tool invoker: every registered tool, every transform, every assistant and result content block.</summary>
+    public static ToolInvokerOptions PiInvoker(ToolInvokerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return options with
+        {
+            MaximumTools = int.MaxValue, MaximumTransforms = int.MaxValue, MaximumAssistantContentBlocks = int.MaxValue,
+            MaximumResultContentBlocks = int.MaxValue
+        };
+    }
+
+    /// <summary>runner.ts emits input, before_agent_start, context and tool events with whatever the session holds: no text, JSON,
+    /// image, concurrency or context-message bound. The reentrant dispatch depth stays a recursion guard.</summary>
+    public static PiSharp.Extensions.Runtime.Dispatch.ExtensionEventDispatchOptions PiEventDispatch { get; } = new(
+        MaximumTextCharacters: int.MaxValue, MaximumJsonCharacters: int.MaxValue, MaximumJsonBytes: int.MaxValue, MaximumJsonDepth: 64,
+        MaximumImages: int.MaxValue, MaximumConcurrentDispatches: int.MaxValue, MaximumContextMessages: int.MaxValue);
+
+    /// <summary>An extension or MCP tool binding of the Pi entry: every registered tool (formerly 128), Pi-sized tool results (formerly
+    /// 65,536 characters and 128 blocks), every event handler, and declarations bounded only by the request payload.</summary>
+    public static PiSharp.Extensions.Agent.ExtensionAgentBindingOptions PiBinding(PiSharp.Extensions.Agent.ExtensionAgentBindingOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return options with
+        {
+            MaximumTools = int.MaxValue, MaximumDeclarationCharacters = RequestPayloadBytes, MaximumDeclarationBytes = RequestPayloadBytes,
+            ResultValues = PiToolResults, ToolEventDispatch = PiEventDispatch, MaximumToolEventHandlers = int.MaxValue
+        };
+    }
+
+    /// <summary>skills.ts loads every skill under every skill path, whatever their number or size. A skill file is read whole, so its
+    /// read keeps the 64 MiB memory bound the read tool has; the directory depth keeps the loader's recursion guard.</summary>
+    public static PiSharp.CodingAgent.Resources.Skills.SkillResourceOptions PiSkills { get; } = new(MaximumFiles: int.MaxValue,
+        MaximumEntries: int.MaxValue, MaximumDepth: 64, MaximumFileBytes: 64 * 1024 * 1024, MaximumTotalBytes: int.MaxValue);
+
     /// <summary>The session context projection: several Pi-sized images per branch.</summary>
     public static SessionContextProjectionOptions Context { get; } =
         new(MaximumInputCharacters: SessionFileBytes, MaximumOutputCharacters: SessionFileBytes);

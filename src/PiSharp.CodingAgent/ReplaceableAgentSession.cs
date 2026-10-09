@@ -59,6 +59,8 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
             state.Agent.IsRunning || state.IsProcessingOperation || state.IsCompacting || state.Fault is not null)
             throw new ArgumentException("Replacement owner requires an available idle initial session.", nameof(initial));
         open = openReplacement; this.creationServices = creationServices;
+        attachmentLimit = creationServices?.MaximumOwnerAttachments ?? MaximumAttachments;
+        ownedResourceLimit = creationServices?.MaximumOwnedResources ?? MaximumOwnedResources;
         var lifetime = new CancellationTokenSource();
         try
         {
@@ -78,7 +80,10 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
 
     public AgentSessionAttachment Current { get { lock (gate) return current; } }
     public bool CancellationCallbackFailed { get { lock (gate) return cancellationCallbackFailed; } }
+    /// <summary>The default bound on attachments (session switches) and reload attempts of one owner; a lifecycle may raise it
+    /// (<see cref="PersistentSessionLifecycle.MaximumOwnerAttachments"/>).</summary>
     public const int MaximumAttachments = 128;
+    private readonly int attachmentLimit, ownedResourceLimit;
     public bool CanCreateSessions => creationServices is not null;
     public bool CanDiscoverSessions => creationServices?.Catalog is not null;
     /// <summary>One lifecycle service supplies existing opens, catalog resume and durable creation.
@@ -338,7 +343,7 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
         {
             ValidateAttachment(expected);
             lock (gate) transitionCancellation = linked;
-            lock (gate) if (lifetimes.Count >= MaximumAttachments) throw new InvalidOperationException("Session attachment limit reached; restart the host.");
+            lock (gate) if (lifetimes.Count >= attachmentLimit) throw new InvalidOperationException("Session attachment limit reached; restart the host.");
             using var reservation = expected.Session.ReserveReplacement();
             var retainedRetry = expected.Session.CaptureRetryAdmission();
             if (creation is not null)

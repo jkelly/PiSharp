@@ -16,6 +16,11 @@ public sealed record AgentSessionCreationRequest(AgentSessionCreationKind Kind, 
 /// It owns no default home or provider. Destinations are fresh siblings in the attached backend namespace.</summary>
 public sealed class PersistentSessionLifecycle
 {
+    /// <summary>The attachments (session switches) and reload attempts an owner this lifecycle attaches admits. A host following Pi,
+    /// whose agent-session.ts switches and reloads any number of times in one process, sets int.MaxValue.</summary>
+    public int MaximumOwnerAttachments { get; set; } = ReplaceableAgentSession.MaximumAttachments;
+    /// <summary>The owned resources (MCP servers, extension bindings) such an owner admits at once; int.MaxValue follows Pi.</summary>
+    public int MaximumOwnedResources { get; set; } = ReplaceableAgentSession.MaximumOwnedResources;
     private readonly SessionRuntimeRegistry registry;
     private readonly Func<long> clock;
     private readonly Func<string> nextEntryId;

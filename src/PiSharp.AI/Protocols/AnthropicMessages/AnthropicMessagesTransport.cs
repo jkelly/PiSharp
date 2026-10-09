@@ -16,7 +16,7 @@ public sealed record AnthropicMessagesOptions(int MaximumEvents = 4096, int Maxi
     int MaximumInputCharacters = PiRequestBudget.StreamCharacters, int MaximumContentSlots = 64, int MaximumContentCharacters = PiRequestBudget.StreamCharacters,
     int MaximumSignatureCharacters = PiRequestBudget.StreamCharacters, int MaximumJsonDepth = 32, AnthropicTokenRates? Rates = null,
     ImmutableArray<AnthropicFallbackModel> AllowedFallbackModels = default, bool OAuthToolNames = false,
-    int MaximumToolDeclarations = 1024, int MaximumActiveTools = 128)
+    int MaximumToolDeclarations = int.MaxValue, int MaximumActiveTools = int.MaxValue)
 {
     public bool CaptureSourceEmissionSnapshots { get; init; }
     /// <summary>Exact native effort recorded on every message of a managed (compat.supportsMidConvoEffort) request; null when unmanaged.</summary>

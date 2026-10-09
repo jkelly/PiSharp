@@ -29,7 +29,9 @@ internal sealed partial class NativeExtensionActivation
         var facadeHost = new NativeExtensionContextFacadeHost();
         NativeExtensionActivation? admittedActivation = null;
         var registrationActions = new NativeExistingSessionRegistrationActions(facadeHost,
-            () => admittedActivation?.InputAdmission ?? throw new NotSupportedException("The native input pipeline has not been bound."));
+            () => admittedActivation?.InputAdmission ?? throw new NotSupportedException("The native input pipeline has not been bound."))
+        // agent-session.ts sendUserMessage -> prompt: no text or image-count bound beyond the request-entry memory bounds.
+        { InputLimits = PiSharp.Cli.Commands.PiPayloadBudget.PiExtensionInput };
         IExtensionContextReadHost facadeCapabilities = new NativeExtensionRegistrationFacadeHost(facadeHost, registrationActions);
         var uiPrompts = uiProvider is null ? null : new NativeUiPromptEvents(uiProvider);
         var registry = new ExtensionRegistry(PiExtensionHost.RegistryOptions, uiPrompts ?? (IExtensionUiProvider)new UnavailableExtensionUiProvider(),
@@ -83,7 +85,8 @@ internal sealed partial class NativeExtensionActivation
                 cancellation.ThrowIfCancellationRequested();
                 var plan = _registry.PrepareToolCatalogReplacement(scope, previousIds, descriptors, _registry.CaptureSnapshot());
                 var binding = new PiSharp.Extensions.Agent.ExtensionAgentBinding(_registry, policy, (_, _, _) => ValueTask.FromResult(true),
-                    invokerOptions: _boundLimits, sessionCancellationToken: current.LifetimeToken, options: new() { ActiveToolNames = [] },
+                    invokerOptions: _boundLimits, sessionCancellationToken: current.LifetimeToken,
+                    options: PiSharp.Cli.Commands.PiPayloadBudget.PiBinding(new() { ActiveToolNames = [] }),
                     capturedSnapshot: plan.PreviewSnapshot);
                 var nextNames = descriptors.Select(tool => tool.Name).ToImmutableHashSet(StringComparer.Ordinal);
                 var retained = expected.RegisteredTools.Where(tool => !previousNames.Contains(tool.Adapter.Name) && !nextNames.Contains(tool.Adapter.Name)).ToImmutableArray();

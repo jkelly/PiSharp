@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using PiSharp.Contracts;
+using PiSharp.Extensions;
 
 namespace PiSharp.Extensions.Runtime;
 
@@ -17,6 +18,11 @@ public sealed record ExtensionRegistryOptions
     public int MaximumConcurrentDispatches { get; init; } = 32;
     /// <summary>Bound of one host-built agent/session event observation (Pi events carry whole messages and context previews).</summary>
     public int MaximumObservationCharacters { get; init; } = 67_108_864;
+    /// <summary>Bounds of the session branch view each callback context captures (<see cref="ExtensionSessionSnapshotLimits"/> by
+    /// default). A host following Pi, whose runner.ts hands every handler the whole session manager, lifts them.</summary>
+    public int MaximumSessionBranchEntries { get; init; } = ExtensionSessionSnapshotLimits.MaximumBranchEntries;
+    public long MaximumSessionCharacters { get; init; } = ExtensionSessionSnapshotLimits.MaximumCharacters;
+    public long MaximumSessionUtf8Bytes { get; init; } = ExtensionSessionSnapshotLimits.MaximumUtf8Bytes;
     public ImmutableArray<string> ReservedToolNames { get; init; } =
         ["read", "bash", "powershell", "edit", "write", "grep", "find", "ls"];
     public ImmutableArray<string> ReservedCommandNames { get; init; } =
@@ -74,7 +80,8 @@ internal static class RegistrationPolicy
             options.MaximumRegistrationsPerOwner <= 0 || options.MaximumMetadataCharacters <= 0 ||
             options.MaximumIdentifierCharacters <= 0 || options.MaximumDescriptionCharacters < 0 ||
             options.MaximumJsonCharacters <= 0 || options.MaximumJsonDepth is < 1 or > 64 ||
-            options.MaximumConcurrentDispatches <= 0 || options.ReservedToolNames.IsDefault ||
+            options.MaximumConcurrentDispatches <= 0 || options.MaximumSessionBranchEntries <= 0 || options.MaximumSessionCharacters <= 0 ||
+            options.MaximumSessionUtf8Bytes <= 0 || options.ReservedToolNames.IsDefault ||
             options.ReservedCommandNames.IsDefault || options.ReservedToolNames.Length > 256 ||
             options.ReservedCommandNames.Length > 256)
             throw new ArgumentOutOfRangeException(nameof(options));

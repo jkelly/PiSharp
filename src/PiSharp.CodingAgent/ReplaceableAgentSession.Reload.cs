@@ -29,7 +29,7 @@ public sealed partial class ReplaceableAgentSession
             reloadAttempts.TryGetValue(expected, out var attempts);
             if (attempts is not null && attempts.TryGetValue(identity, out var existing))
                 return existing as Task<T> ?? throw new InvalidOperationException("This attachment already has a different reload operation.");
-            if (reloadAttemptCount >= MaximumAttachments) throw new InvalidOperationException("Reload attempt limit reached; restart the host.");
+            if (reloadAttemptCount >= attachmentLimit) throw new InvalidOperationException("Reload attempt limit reached; restart the host.");
             var pending = attempts?.Values.FirstOrDefault(task => !task.IsCompleted);
             if (pending is not null)
             {
@@ -38,7 +38,7 @@ public sealed partial class ReplaceableAgentSession
             }
             ValidateAttachment(expected);
             if (changed?.GetInvocationList().Length > 1) throw new ArgumentException("Reload attachment notification requires one joined callback.");
-            if (lifetimes.Count >= MaximumAttachments) throw new InvalidOperationException("Session attachment limit reached; restart the host.");
+            if (lifetimes.Count >= attachmentLimit) throw new InvalidOperationException("Session attachment limit reached; restart the host.");
             completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
             if (attempts is null)
             { attempts = new(ReferenceEqualityComparer.Instance); reloadAttempts.Add(expected, attempts); }

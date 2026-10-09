@@ -861,7 +861,7 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
                 !RegistrationPolicy.Identifier(captured.SelectedLeafId, options.MaximumIdentifierCharacters) ||
             captured.BranchEntries.IsDefault || !Enum.IsDefined(captured.Persistence))
             throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, ownerId, operation);
-        if (captured.BranchEntries.Length > ExtensionSessionSnapshotLimits.MaximumBranchEntries)
+        if (captured.BranchEntries.Length > options.MaximumSessionBranchEntries)
             throw Failure(ExtensionRegistrationFailure.LimitExceeded, ownerId, operation);
         long characters = (long)captured.SessionId.Length + (captured.SelectedLeafId?.Length ?? 0);
         long bytes = Encoding.UTF8.GetByteCount(captured.SessionId) +
@@ -875,8 +875,8 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             characters += raw.Length;
             bytes += Encoding.UTF8.GetByteCount(raw);
             if (raw.Length > options.MaximumJsonCharacters ||
-                characters > ExtensionSessionSnapshotLimits.MaximumCharacters ||
-                bytes > ExtensionSessionSnapshotLimits.MaximumUtf8Bytes)
+                characters > options.MaximumSessionCharacters ||
+                bytes > options.MaximumSessionUtf8Bytes)
                 throw Failure(ExtensionRegistrationFailure.LimitExceeded, ownerId, operation);
             if (!RegistrationPolicy.Json(entry, options, requireObject: true,
                 retainOpaqueNumbers: sessionProvider is IExtensionSessionOpaqueViewProvider))
@@ -884,8 +884,8 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
             // JsonData owns its document. Copying the array also severs a host's mutable backing-array alias.
             owned.Add(entry);
         }
-        if (characters > ExtensionSessionSnapshotLimits.MaximumCharacters ||
-            bytes > ExtensionSessionSnapshotLimits.MaximumUtf8Bytes)
+        if (characters > options.MaximumSessionCharacters ||
+            bytes > options.MaximumSessionUtf8Bytes)
             throw Failure(ExtensionRegistrationFailure.LimitExceeded, ownerId, operation);
         return new(captured.SessionId, captured.Generation, captured.SelectedLeafId, owned.MoveToImmutable())
             { Persistence = captured.Persistence };

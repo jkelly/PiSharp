@@ -33,6 +33,10 @@ public static class RpcSessionCommand
     /// transcript-message cap; the explicit verbs keep 64 turns and 1024 messages.</summary>
     internal static AgentLoopOptions LoopOptions(bool pi) => pi ? new(MaximumTurns: int.MaxValue, MaximumTranscriptMessages: int.MaxValue)
         : new(MaximumTurns: 64, MaximumTranscriptMessages: 1024);
+    /// <summary>agent.ts holds every tool, subscriber, queued message and progress update: the Pi entry has no count bound on them
+    /// (the explicit verbs keep the profile defaults).</summary>
+    internal static PiSharp.Agent.AgentOptions AgentOptions(bool pi) => pi
+        ? PiPayloadBudget.PiAgent(new(Loop: LoopOptions(true))) : PiPayloadBudget.Agent(new(Loop: LoopOptions(false)));
     /// <summary>session-manager.ts loads every line of the file: the Pi entry has no line or record cap (the explicit verbs keep 10,000).</summary>
     internal static PiSharp.Sessions.Storage.SessionLogReaderOptions ReaderOptions(bool pi) =>
         PiPayloadBudget.SessionReader(pi ? new(MaximumLines: int.MaxValue, MaximumRecords: int.MaxValue) : new(MaximumLines: 10_000, MaximumRecords: 10_000));
@@ -223,7 +227,7 @@ public static class RpcSessionCommand
                     ? new PiSharp.Cli.Pi.PiToolPolicy(PiSharp.Cli.Pi.PiToolPolicyMode.Pi) { ProtectedDirectories = [Path.GetDirectoryName(parsed.Session)!] } : null),
                 // With --no-mcp extensions still register servers; nothing connects them, which is reported (reportUnhandledMcpServers).
                 mcpRegistrations: hostAdmission ? mcpHost!.Registrations : null, piExtensions: pi?.Extensions,
-                deferMissingCredentials: pi is not null).ConfigureAwait(false);
+                deferMissingCredentials: pi is not null, piEntry: pi is not null).ConfigureAwait(false);
             // A virtual selection's router reads this profile's session branch and records its state there.
             if (liveSelection is { IsVirtual: true } virtualSelection) virtualSelection.VirtualSession = profile.CurrentVirtualModelSession;
             if (pi?.Extensions is { } modelsHost) await PiSharp.Cli.Extensions.Pi.PiExtensionModels.CreateAsync(modelsHost, liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false);
@@ -237,7 +241,7 @@ public static class RpcSessionCommand
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);
             var options = new PersistentAgentSessionOptions(UseLatestLeaf: parsed.Latest, SelectedLeafId: parsed.Leaf,
-                AgentOptions: PiPayloadBudget.Agent(new(Loop: LoopOptions(pi is not null))),
+                AgentOptions: AgentOptions(pi is not null),
                 SessionLogStoreOptions: new(ReaderOptions: ReaderOptions(pi is not null), JavaScriptSerialization: pi is not null),
                 ContextOptions: ContextOptions(pi is not null));
             // agent-session.ts prompt: Pi entries validate the model and its provider auth before each idle prompt.
@@ -280,6 +284,8 @@ public static class RpcSessionCommand
                 };
             }
             var lifecycle = profile.CreateLifecycle(Clock, NextId, options, catalog: catalog, backend: backend);
+            // agent-session.ts switches sessions, reloads and holds MCP servers any number of times in one process.
+            if (pi is not null) { lifecycle.MaximumOwnerAttachments = int.MaxValue; lifecycle.MaximumOwnedResources = int.MaxValue; }
             // sdk.ts createAgentSession for a new session (/new, new_session): the CLI level, else the per-model or global default
             // the settings files hold now, clamped to the model.
             lifecycle.ConfigureNewSession = async (created, token) =>

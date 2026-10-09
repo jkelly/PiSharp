@@ -164,7 +164,7 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
             token.ThrowIfCancellationRequested(); _closing.Token.ThrowIfCancellationRequested();
             // Pi extension tools validate (and coerce) their arguments with upstream's validateToolArguments in their own runtime.
             return ValueTask.FromResult(Pi is not null || _schemas.TryGetValue(tool.Name, out var schema) && schema.Validate(arguments));
-        }, invokerOptions: limits, options: new()
+        }, invokerOptions: limits, options: (Pi is null ? new PiSharp.Extensions.Agent.ExtensionAgentBindingOptions() : PiSharp.Cli.Commands.PiPayloadBudget.PiBinding(new())) with
         {
             RestoreSystemMessage = (messages, token) => new SessionSystemReplay().Replay(messages, token).CurrentMessage,
             ReadSystemPrompt = (messages, token) => new SessionSystemReplay().Replay(messages, token).Prompt,
@@ -175,8 +175,11 @@ internal sealed partial class NativeExtensionActivation : IAsyncDisposable, IPro
         UiPrompts?.Bind(_registry, Binding.Snapshot, _reportInputDiagnostic);
         BindMcpServersChange();
         // Capture exactly the binding revision, never a second per-operation handler set.
-        var input = new RegisteredExtensionInputAdmission(_registry, Binding.Snapshot, sessionCancellationToken: _closing.Token,
-            reportDiagnostic: _reportInputDiagnostic);
+        // runner.ts emitInput runs every input handler with the whole text and every image (the Pi entry lifts the profile bounds).
+        var input = Pi is null
+            ? new RegisteredExtensionInputAdmission(_registry, Binding.Snapshot, sessionCancellationToken: _closing.Token, reportDiagnostic: _reportInputDiagnostic)
+            : new RegisteredExtensionInputAdmission(_registry, Binding.Snapshot, PiSharp.Cli.Commands.PiPayloadBudget.PiEventDispatch, int.MaxValue,
+                _closing.Token, _reportInputDiagnostic);
         RawInputHandlers = input;
         InputAdmission = new CommandInputAdmission(this, input);
     }
