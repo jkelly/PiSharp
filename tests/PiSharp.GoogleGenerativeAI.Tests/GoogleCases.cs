@@ -247,14 +247,46 @@ internal static class GoogleCases
             Equal(finish, result.Message.ExtraProperties!.Values["rawStopReason"].Value.GetString());
             Check((result.Failure is null) == (finish is "STOP" or "MAX_TOKENS"), "Finish authority differs.");
         }
+        // Captured from the installed pi-ai 1.1.0 google-generative-ai stream (@google/genai 2.21.0): google-generative-ai.ts takes
+        // functionCall.name || "", functionCall.args ?? {} (any JSON value; JSON.parse keeps the last duplicate name), id
+        // `${functionCall.name}_${Date.now()}_${n}` when none is given, and joins any `text` value as a JavaScript string.
+        foreach (var (chunk, toolName, idPrefix, arguments, text) in new (string, string?, string?, string?, string?)[] {
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":{"name":"inspect","args":[]}}]},"finishReason":"STOP"}]}""", "inspect", "inspect_", "[]", null),
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":{"name":"inspect","args":"x"}}]},"finishReason":"STOP"}]}""", "inspect", "inspect_", "\"x\"", null),
+            ("""{"candidates":[{"content":{"parts":[{"functionCall":{"name":"inspect","args":{"x":1,"x":2}}}]},"finishReason":"STOP"}]}""", "inspect", "inspect_", """{"x":2}""", null),
+            ("""{"candidates":[{"content":{"parts":[{"text":false}]},"finishReason":"STOP"}]}""", null, null, null, "false"),
+            ("""{"candidates":[{"content":{"parts":[{"text":null},{"text":1.5},{"text":{"a":1}}]},"finishReason":"STOP"}]}""", null, null, null, "null1.5[object Object]"),
+            ("""{"candidates":[{"content":{"parts":["x"]},"finishReason":"STOP"}]}""", null, null, null, null) })
+        {
+            var result = await Complete(Wire(chunk)); Check(result.Failure is null, "Upstream-accepted chunk failed: " + chunk);
+            Equal(toolName is null ? StopReason.Stop : StopReason.ToolUse, result.Message.StopReason);
+            if (toolName is not null)
+            {
+                var call = (ToolCallContent)result.Message.Content.Single();
+                Equal(toolName, call.Name); Check(call.Id.StartsWith(idPrefix!, StringComparison.Ordinal), "Generated tool id differs: " + call.Id);
+                Equal(arguments, call.Arguments.ToString());
+            }
+            else Equal(text, text is null ? (result.Message.Content.IsEmpty ? null : "content") : ((TextContent)result.Message.Content.Single()).Text);
+        }
+        // Rejected as upstream rejects them: JSON.parse's SyntaxError, the TypeErrors of iterating a non-iterable parts value and of
+        // reading `.text` on a null part, and a candidates value without a first candidate (no finish reason).
+        foreach (var (chunk, error) in new[] {
+            ("{bad}", "Expected property name or '}' in JSON at position 1 (line 1 column 2)"),
+            ("""{"candidates":[{"content":{"parts":{}},"finishReason":"STOP"}]}""", "candidate.content.parts is not iterable"),
+            ("""{"candidates":[{"content":{"parts":[null]},"finishReason":"STOP"}]}""", "Cannot read properties of null (reading 'text')"),
+            ("""{"candidates":{}}""", "Google stream ended without a finish reason") })
+        {
+            var failed = await Complete(Wire(chunk)); Check(failed.Failure is not null && failed.Message.StopReason == StopReason.Error, "Invalid chunk accepted: " + chunk);
+            Equal(error, Error(failed));
+        }
+        // Native deviation (unchanged): upstream pushes a nameless tool call (name "", id "_..." or "undefined_..."), but native streams
+        // require tool identity before any execution authority, so these fail as malformed data.
         foreach (var chunk in new[] {
             """{"candidates":[{"content":{"parts":[{"functionCall":{"name":"","args":{}}}]},"finishReason":"STOP"}]}""",
-            """{"candidates":[{"content":{"parts":[{"functionCall":{"name":"inspect","args":[]}}]},"finishReason":"STOP"}]}""",
-            """{"candidates":[{"content":{"parts":[{"functionCall":{"name":"inspect","args":{"x":1,"x":2}}}]},"finishReason":"STOP"}]}""",
-            """{"candidates":[{"content":{"parts":[{"text":false}]},"finishReason":"STOP"}]}""",
-            "{bad}" })
+            """{"candidates":[{"content":{"parts":[{"functionCall":{"args":{"a":1}}}]},"finishReason":"STOP"}]}""",
+            """{"candidates":[{"content":{"parts":[{"functionCall":"x"}]},"finishReason":"STOP"}]}""" })
         {
-            var failed = await Complete(Wire(chunk)); Check(failed.Failure is not null && failed.Message.StopReason == StopReason.Error, "Invalid tool/value accepted.");
+            var failed = await Complete(Wire(chunk)); Check(failed.Failure is not null && failed.Message.StopReason == StopReason.Error, "Nameless tool call accepted: " + chunk);
         }
         var eof = await Complete(Wire(ToolChunk.Replace(",\"finishReason\":\"STOP\"", "", StringComparison.Ordinal)));
         Check(eof.Failure is not null && Error(eof).Contains("without a finish reason", StringComparison.Ordinal), "Missing finish accepted.");

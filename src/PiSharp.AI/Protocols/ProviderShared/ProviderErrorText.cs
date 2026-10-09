@@ -273,7 +273,7 @@ internal static class ProviderErrorText
     };
 
     /// <summary><c>String(value)</c> of a parsed JSON value.</summary>
-    private static string JsString(JsonElement value) => value.ValueKind switch
+    internal static string JsString(JsonElement value) => value.ValueKind switch
     {
         JsonValueKind.String => Decode(value.GetRawText()),
         JsonValueKind.Object => "[object Object]",
