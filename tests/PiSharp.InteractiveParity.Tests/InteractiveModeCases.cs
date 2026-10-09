@@ -154,6 +154,17 @@ internal static class InteractiveModeCases
             await pi.WaitFor("interactive-bash-ok");
         }));
 
+        // interactive-mode.ts handleBashCommand: a failed executeBash completes the bash component and shows
+        // "Bash command failed: <error.message>"; a command beyond Windows' command-line limit fails as Node's spawn error.
+        yield return ("e2e.bash.spawn-failure-shows-the-error", Case("bash-failure", async pi =>
+        {
+            pi.Type("!");
+            pi.Type("\u001b[200~echo " + new string('q', 40_000) + "\u001b[201~");
+            pi.Type("\r");
+            if (OperatingSystem.IsWindows()) await pi.WaitFor("Bash command failed: spawn ENAMETOOLONG", 60_000);
+            else await pi.WaitFor("qqqqqqqqqq", 60_000);
+        }));
+
         yield return ("e2e.selector.model-escape", Case("model", async pi =>
         {
             await pi.Submit("/model");

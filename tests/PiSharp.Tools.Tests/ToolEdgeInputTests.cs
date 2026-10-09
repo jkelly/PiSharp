@@ -15,6 +15,7 @@ internal static class ToolEdgeInputTests
         ("edge empty paths reach the file system as the source tools do", EmptyPaths),
         ("edge pi ls limits follow the source number arithmetic", LsNumbers),
         ("edge NUL bytes give Node's argument errors", NulBytes),
+        ("edge user shell failures give the source's errors", UserShellFailures),
         ("edge edit applies more than 1024 replacements as the source does", ManyEdits),
     ];
 
@@ -124,6 +125,24 @@ internal static class ToolEdgeInputTests
         var result = await edit.CreateInvoker(new Allow()).ExecuteAsync(Invocation("edit", $$"""{"path":"many.txt","edits":[{{edits}}]}"""), default);
         Equal("Successfully replaced 1500 block(s) in many.txt.", Text(result), "1500 edits");
         Equal("<1499>\n[1500]", string.Join("\n", (await File.ReadAllTextAsync(temp.File("many.txt"))).Split('\n')[1499..1501]), "edited content");
+    }
+
+    // bash.ts createLocalShellOperations exec (user bash): the working-directory check, then spawn's missing-shell error.
+    private static async Task UserShellFailures()
+    {
+        using var temp = new Temp();
+        var missingShell = Path.Combine(temp.Root, "no-such-shell" + (OperatingSystem.IsWindows() ? ".exe" : ""));
+        var shell = new NativeShellOperations(missingShell, ImmutableDictionary<string, string>.Empty, temp.Root);
+        var missingDirectory = Path.Combine(temp.Root, "gone");
+        Equal($"Working directory does not exist: {missingDirectory}\nCannot execute bash commands.",
+            await Failure(() => shell.ExecuteAsync("echo hi", missingDirectory, _ => ValueTask.CompletedTask, default).AsTask()), "missing cwd");
+        Equal($"spawn {missingShell} ENOENT", await Failure(() => shell.ExecuteAsync("echo hi", temp.Root, _ => ValueTask.CompletedTask, default).AsTask()), "missing shell");
+
+        static async Task<string> Failure(Func<Task> run)
+        {
+            try { await run(); return "<no error>"; }
+            catch (ToolSourceErrorException error) { return error.Message; }
+        }
     }
 
     private sealed class NoRunner : IProcessRunner
