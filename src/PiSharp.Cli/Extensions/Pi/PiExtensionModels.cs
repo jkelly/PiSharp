@@ -39,7 +39,8 @@ internal sealed class PiExtensionModels
     {
         var chat = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false);
         var builtin = NativeExtensionModelOperations.CreateDefaultRegistry(runtime.ReadEnvironment, runtime.AuthPath, runtime.CreateAuthHttp, runtime.Time);
-        var models = new PiExtensionModels(chat, builtin);
+        var models = new PiExtensionModels(chat, builtin) { _runtime = runtime };
+        host.Stream = models.StreamAsync;
         foreach (var registration in host.ProviderRegistrations) models.Register(host, registration, runtime.ReadEnvironment);
         host.Models = models.CallAsync;
         host.ModelJson = (provider, id) => chat.Find(provider, id) is { } model ? JsonNode.Parse(model.ToJsonString()) : null;
@@ -123,6 +124,51 @@ internal sealed class PiExtensionModels
             }, cancellationToken).ConfigureAwait(false);
             return ModelOperationJson.ParseAssistantImages(result ?? throw new InvalidOperationException("The extension image provider returned nothing"));
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------- streams
+
+    private LiveSessionRuntime? _runtime;
+
+    /// <summary>pi-ai stream/streamSimple/complete called from extension code (summaries, sub-agents): the model streams through its
+    /// PiSharp live route with the run's credentials; the result is the final AssistantMessage (an error message on failure).
+    /// The context's <c>systemPrompt</c> and <c>tools</c> become the leading system message, as the session's requests carry them.</summary>
+    internal async Task<JsonNode?> StreamAsync(JsonElement model, JsonElement context, CancellationToken token)
+    {
+        var provider = model.GetProperty("provider").GetString()!; var id = model.GetProperty("id").GetString()!;
+        try
+        {
+            var entry = _chat.Find(provider, id) ?? RegistryModel.FromJson(JsonNode.Parse(model.GetRawText())!.AsObject());
+            await using var connection = LiveSessionSelection.FromEntry(entry, _chat, null, useModelMaximum: true).Connect(_runtime);
+            var messages = ImmutableArray.CreateBuilder<TranscriptEntry>();
+            var system = new JsonObject { ["role"] = "system", ["content"] = context.TryGetProperty("systemPrompt", out var prompt) && prompt.ValueKind == JsonValueKind.String ? prompt.GetString() : "",
+                ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() };
+            if (context.TryGetProperty("tools", out var tools) && tools.ValueKind == JsonValueKind.Array && tools.GetArrayLength() > 0)
+                system["toolsAdded"] = new JsonArray([.. tools.EnumerateArray().Select(tool => (JsonNode)new JsonObject
+                {
+                    ["name"] = tool.GetProperty("name").GetString(), ["description"] = tool.TryGetProperty("description", out var d) ? d.GetString() : "",
+                    ["parameters"] = tool.TryGetProperty("parameters", out var p) ? JsonNode.Parse(p.GetRawText()) : new JsonObject()
+                })]);
+            messages.Add(new("system", JsonData.Parse(system.ToJsonString())));
+            if (context.TryGetProperty("messages", out var list) && list.ValueKind == JsonValueKind.Array)
+                foreach (var message in list.EnumerateArray())
+                    messages.Add(new(message.TryGetProperty("role", out var role) ? role.GetString() ?? "user" : "user", JsonData.Parse(message.GetRawText())));
+            StreamTerminalEvent? terminal = null;
+            await foreach (var observation in connection.CreateTransport().StreamAsync(new PiSharp.AI.ChatRequest(new(entry.Id, entry.Api, entry.Provider), messages.ToImmutable(),
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), token).ConfigureAwait(false))
+                if (observation is StreamTerminalEvent done) terminal = done;
+            return terminal is null ? Failed("The stream ended without a final message") : JsonNode.Parse(PiWireJson.WriteMessage(terminal.Message).ToString());
+        }
+        catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
+        { return Failed(error.Message); }
+
+        JsonObject Failed(string message) => new()
+        {
+            ["role"] = "assistant", ["content"] = new JsonArray(), ["api"] = model.TryGetProperty("api", out var api) ? api.GetString() : "", ["provider"] = provider, ["model"] = id,
+            ["usage"] = new JsonObject { ["input"] = 0, ["output"] = 0, ["cacheRead"] = 0, ["cacheWrite"] = 0, ["totalTokens"] = 0,
+                ["cost"] = new JsonObject { ["input"] = 0, ["output"] = 0, ["cacheRead"] = 0, ["cacheWrite"] = 0, ["total"] = 0 } },
+            ["stopReason"] = "error", ["errorMessage"] = message, ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+        };
     }
 
     // ---------------------------------------------------------------------------------------------------------------- calls

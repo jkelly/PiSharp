@@ -62,6 +62,7 @@
         "dependencies": {
           "PiSharp.Codemode": "[1.1.0.1, )",
           "PiSharp.CodingAgent": "[1.1.0.1, )",
+          "PiSharp.Compatibility.Node": "[1.1.0.1, )",
           "PiSharp.Extensions.Agent": "[1.1.0.1, )",
           "PiSharp.Extensions.Runtime": "[1.1.0.1, )",
           "PiSharp.PromptTemplates.Yaml": "[1.1.0.1, )",
@@ -86,8 +87,23 @@
           "PiSharp.Sessions": "[1.1.0.1, )"
         }
       },
+      "pisharp.compatibility.node": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.1.0.1, )",
+          "PiSharp.ExtensionHost": "[1.1.0.1, )",
+          "PiSharp.Extensions.Abstractions": "[1.1.0.1, )",
+          "PiSharp.Extensions.Runtime": "[1.1.0.1, )"
+        }
+      },
       "pisharp.contracts": {
         "type": "Project"
+      },
+      "pisharp.extensionhost": {
+        "type": "Project",
+        "dependencies": {
+          "PiSharp.Contracts": "[1.1.0.1, )"
+        }
       },
       "pisharp.extensions.abstractions": {
         "type": "Project",

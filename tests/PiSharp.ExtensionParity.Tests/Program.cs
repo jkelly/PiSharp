@@ -139,7 +139,13 @@ internal static partial class Program
         }
         public string[] SessionFiles() => Directory.Exists(Path.Combine(AgentDir, "sessions"))
             ? Directory.GetFiles(Path.Combine(AgentDir, "sessions"), "*.jsonl", SearchOption.AllDirectories) : [];
-        public void Dispose() { try { Directory.Delete(Root, true); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
+        public void Dispose()
+        {
+            // git object files are read-only; clear the attribute so the sandbox is removed.
+            try { foreach (var file in Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories)) File.SetAttributes(file, FileAttributes.Normal); }
+            catch (IOException) { } catch (UnauthorizedAccessException) { }
+            try { Directory.Delete(Root, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
     }
 
     internal sealed record Seen(string Method, string Url, IReadOnlyDictionary<string, string> Headers, string? Body)

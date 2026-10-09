@@ -72,12 +72,7 @@ internal sealed partial class PiExtensionHost
             case "ui.read": return UiRead(Op());
             case "ui.setTheme": return new JsonObject { ["success"] = false, ["error"] = "Theme switching from extensions is not available in this PiSharp host" };
             case "ctx.executeTool": return await ExecuteToolAsync(p, request, token).ConfigureAwait(false);
-            case "ctx.compact":
-            {
-                if (ContextOf(p) is IExtensionCommandContext command && command is not null && _activation is not null)
-                    throw new NotSupportedException("ctx.compact() is not available in this PiSharp host yet");
-                throw new NotSupportedException("ctx.compact() is not available in this PiSharp host yet");
-            }
+            case "ctx.compact": throw new NotSupportedException("ctx.compact() is not available in this PiSharp host yet");
             case "command.waitForIdle": await RequireAttached().Session.WaitForIdleAsync(token).ConfigureAwait(false); return null;
             case "command.session": return await SessionCommandAsync(p, token).ConfigureAwait(false);
             case "command.reload": throw new NotSupportedException("ctx.reload() is not available in this PiSharp host yet");
@@ -202,8 +197,8 @@ internal sealed partial class PiExtensionHost
     private async Task<JsonNode?> SetModelAsync(JsonElement model, CancellationToken token)
     {
         var actions = _actions ?? throw new InvalidOperationException("Extension runtime not initialized.");
-        var descriptor = new ModelDescriptor(model.GetProperty("provider").GetString()!, model.GetProperty("id").GetString()!,
-            model.TryGetProperty("api", out var api) ? api.GetString() ?? "" : "");
+        var descriptor = new ModelDescriptor(model.GetProperty("id").GetString()!, model.TryGetProperty("api", out var api) ? api.GetString() ?? "" : "",
+            model.GetProperty("provider").GetString()!);
         return await actions.SetModelAsync(descriptor, token).ConfigureAwait(false);
     }
 
@@ -310,7 +305,23 @@ internal sealed partial class PiExtensionHost
                 // agent-session.ts: during a run the prompt is the one before_agent_start handlers produced (agent.state.systemPrompt).
                 if (state is { Agent.IsRunning: true } && RunSystemPrompt is { } runPrompt) return runPrompt;
                 return state is null ? "" : new PiSharp.Sessions.Context.SessionSystemReplay().Replay(state.Agent.Messages, CancellationToken.None).Prompt;
-            case "contextUsage": return ContextUsage?.Invoke();
+            case "contextUsage":
+            {
+                if (ContextUsage?.Invoke() is { } supplied) return supplied;
+                // compaction.ts estimateContextTokens: the last assistant usage (input + output + cache) over the model's context window.
+                if (state is null || ModelJson?.Invoke(state.Agent.Model.Provider, state.Agent.Model.Id)?["contextWindow"] is not JsonValue window ||
+                    !window.TryGetValue<double>(out var contextWindow) || contextWindow <= 0) return null;
+                double? tokens = null;
+                foreach (var message in state.Context.Messages.Reverse())
+                {
+                    var body = message.WireBody.Value;
+                    if (message.Role != "assistant" || !body.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object) continue;
+                    double Field(string name) => usage.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetDouble() : 0;
+                    tokens = Field("input") + Field("output") + Field("cacheRead") + Field("cacheWrite");
+                    break;
+                }
+                return new JsonObject { ["tokens"] = tokens, ["contextWindow"] = contextWindow, ["percent"] = tokens is { } used ? used / contextWindow * 100 : null };
+            }
             case "callableTools":
                 return ContextOf(p) is IExtensionToolContext tool ? new JsonArray([.. tool.Tools.Select(name => (JsonNode)new JsonObject { ["name"] = name })]) : new JsonArray();
             case "systemPromptOptions": return new JsonObject { ["cwd"] = Cwd };
@@ -322,6 +333,8 @@ internal sealed partial class PiExtensionHost
     internal Func<string, string, JsonNode?>? ModelJson { get; set; }
     /// <summary>ctx.getContextUsage() (the CLI supplies the session's usage estimate).</summary>
     internal Func<JsonNode?>? ContextUsage { get; set; }
+    /// <summary>pi-ai stream/complete from extension code: the final AssistantMessage of the model's live route (supplied by the CLI).</summary>
+    internal Func<JsonElement, JsonElement, CancellationToken, Task<JsonNode?>>? Stream { get; set; }
     /// <summary>The model registry calls of ctx.modelRegistry (find, getAll, classify, generateImages, …), supplied by the CLI.</summary>
     internal Func<string, JsonElement, CancellationToken, Task<JsonNode?>>? Models { get; set; }
 
@@ -521,6 +534,9 @@ internal sealed partial class PiExtensionHost
                 result.Remove("isError");
                 return result;
             }
+            case "stream": case "streamSimple": case "complete": case "completeSimple":
+                if (Stream is null) throw new NotSupportedException($"{name} is not available in the PiSharp Node bridge");
+                return await Stream(args[0], args.GetArrayLength() > 1 ? args[1] : default, token).ConfigureAwait(false);
             case "getModel": return Models is null ? null : await Models("find", JsonDocument.Parse(new JsonArray(args[0].GetString(), args[1].GetString()).ToJsonString()).RootElement, token).ConfigureAwait(false);
             case "getModels": return Models is null ? new JsonArray() : await Models("getAll", default, token).ConfigureAwait(false);
             default: throw new NotSupportedException($"{name} is not available in the PiSharp Node bridge");
