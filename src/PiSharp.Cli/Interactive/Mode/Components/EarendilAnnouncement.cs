@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/earendil-announcement.ts.
-// config.ts getBundledInteractiveAssetPath is not ported yet: hosts set EarendilAnnouncementComponent.GetBundledInteractiveAssetPath.
-// Without it (or when the file cannot be read) the image is left out, as upstream does when the read fails.
+// config.ts getBundledInteractiveAssetPath: the bundled assets sit in the application's assets folder, as the Bun binary's do
+// (<package dir>/assets). When the file cannot be read the image is left out, as upstream does.
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
 
@@ -15,7 +15,8 @@ internal sealed class EarendilAnnouncementComponent : Container
     private static bool attemptedImageLoad;
 
     /// <summary>config.ts getBundledInteractiveAssetPath(name): the path of a bundled interactive asset.</summary>
-    public static Func<string, string>? GetBundledInteractiveAssetPath { get; set; }
+    public static Func<string, string>? GetBundledInteractiveAssetPath { get; set; } =
+        name => Path.Combine(AppContext.BaseDirectory, "assets", name);
 
     /// <summary>Test hook: forget the cached image so the next component reads it again.</summary>
     internal static void ResetImageCacheForTests()

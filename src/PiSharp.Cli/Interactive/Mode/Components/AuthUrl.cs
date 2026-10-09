@@ -1,5 +1,5 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/modes/interactive/components/auth-url.ts.
-// utils/clipboard.ts copyToClipboard is not ported yet: the host passes it (or sets AuthUrlComponent.DefaultCopyToClipboard).
+// The copy action defaults to utils/clipboard.ts copyToClipboard (Utilities/Clipboard.cs); hosts may pass their own.
 using PiSharp.Tui.Pi;
 using static PiSharp.Cli.Interactive.Mode.ThemeGlobals;
 
@@ -12,7 +12,7 @@ namespace PiSharp.Cli.Interactive.Mode.Components;
 internal sealed class AuthUrlComponent : Container
 {
     /// <summary>utils/clipboard.ts copyToClipboard, used when no delegate is passed to the constructor.</summary>
-    public static Func<string, Task>? DefaultCopyToClipboard { get; set; }
+    public static Func<string, Task>? DefaultCopyToClipboard { get; set; } = text => Utilities.Clipboard.CopyToClipboard(text);
 
     public string Url { get; }
     private readonly ITui tui;
