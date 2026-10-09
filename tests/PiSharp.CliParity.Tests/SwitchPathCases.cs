@@ -47,11 +47,28 @@ internal static partial class Program
             // An empty file gets a session header.
             Check(responses[7]["success"]!.GetValue<bool>() && (Data(8)["messages"] as JsonArray)!.Count == 0, "empty: " + Response(7));
             Check(JsonNode.Parse(File.ReadLines(empty).First())!["type"]!.GetValue<string>() == "session", "empty file gets a header");
+            // sdk.ts: a session without messages records its model and thinking level at once (Pi 1.1.0 writes all three lines).
+            Names(["session", "model_change", "thinking_level_change"], File.ReadLines(empty).Select(line => JsonNode.Parse(line)!["type"]!.GetValue<string>()), "empty file entries");
+            Equal("claude-sonnet-4-5", JsonNode.Parse(File.ReadLines(empty).ElementAt(1))!["modelId"]!.GetValue<string>(), "recorded model");
+            Equal("medium", JsonNode.Parse(File.ReadLines(empty).ElementAt(2))!["thinkingLevel"]!.GetValue<string>(), "recorded thinking level");
             // A non-empty file that is not a session is refused, unchanged, and the current session stays.
             Check(!responses[9]["success"]!.GetValue<bool>() && responses[9]["error"]!.GetValue<string>() == "Session file is not a valid pi session: " + junk,
                 "junk: " + Response(9));
             Equal("this is not a session\n", File.ReadAllText(junk), "junk file unchanged");
             Equal(empty, Data(10)["sessionFile"]!.GetValue<string>(), "the current session stays");
+        }),
+        ("switch.empty-session-file-at-startup-records-model-and-thinking", async () =>
+        {
+            using var sandbox = new Sandbox("startup-empty");
+            var empty = sandbox.Write(Path.Combine(sandbox.Root, "elsewhere", "empty.jsonl"), "");
+            // Pi 1.1.0 (--session empty --model claude-sonnet-4-5 --thinking high): header, model_change and thinking_level_change at once.
+            var responses = await RpcSequence(sandbox, ["--mode", "rpc", "--session", empty, "--provider", "anthropic", "--model", "claude-sonnet-4-5", "--thinking", "high"],
+                """{"id":"1","type":"get_state"}""");
+            Equal("high", responses[0]["data"]!["thinkingLevel"]!.GetValue<string>(), "thinking level");
+            var entries = File.ReadLines(empty).Select(line => JsonNode.Parse(line)!).ToArray();
+            Names(["session", "model_change", "thinking_level_change"], entries.Select(entry => entry["type"]!.GetValue<string>()), "startup entries");
+            Equal("claude-sonnet-4-5", entries[1]["modelId"]!.GetValue<string>(), "recorded model");
+            Equal("high", entries[2]["thinkingLevel"]!.GetValue<string>(), "recorded thinking level");
         }),
     ];
 }

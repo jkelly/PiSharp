@@ -231,7 +231,10 @@ public static class RpcSessionCommand
             if (pi is not null)
                 options = options with { PromptPreflight = PromptPreflight(liveRuntime ?? LiveSessionRuntime.Default), UnselectedModel = LiveSessionSelection.UnselectedModel,
                     // main.ts buildSessionOptions: --model is the model of every session the run creates or opens.
-                    SelectedModel = liveSelection is { FromCliModel: true } fromCli ? fromCli.Model : null };
+                    SelectedModel = liveSelection is { FromCliModel: true } fromCli ? fromCli.Model : null,
+                    // sdk.ts: a session without messages starts with the CLI level, else the per-model or default setting, clamped.
+                    NewSessionThinkingLevel = (model, levels) => SettingsModelSelection.Thinking(pi.ReloadSettings is { } reloadThinking
+                        ? reloadThinking(CancellationToken.None).GetAwaiter().GetResult() : settings, model, parsed.Thinking ?? liveSelection?.PatternThinkingLevel, false, levels) };
             string NextId() => "rpc-" + Guid.NewGuid().ToString("N");
             var catalog = new SessionCatalog(parsed.Stores.IsEmpty ? [new("session-directory", Path.GetDirectoryName(parsed.Session)!)] : parsed.Stores,
                 fileSystem: backend);

@@ -27,6 +27,9 @@ public sealed record PersistentAgentSessionOptions(bool UseLatestLeaf = true, st
     /// <summary>main.ts buildSessionOptions <c>options.model</c> (--model): the model every session opened or created through these
     /// options runs on, instead of the one its branch records.</summary>
     public ModelDescriptor? SelectedModel { get; init; }
+    /// <summary>sdk.ts createAgentSession for a session without messages: its thinking level for the model it runs on (given the
+    /// model's supported levels; null keeps the restored level). When set, opening such a session records the model and that level.</summary>
+    public Func<ModelDescriptor, ImmutableArray<string>, string?>? NewSessionThinkingLevel { get; init; }
 }
 /// <summary>A prompt the session refused before admitting it (agent-session.ts prompt validation); nothing was persisted.</summary>
 public sealed class SessionPromptRejectedException(string message) : Exception(message);
@@ -325,6 +328,26 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             // Without initial names the transcript's loadout is restored by name with the current bindings (Pi 0.99.2).
             var loadout = await registry.PrepareAndDrainAsync(() => registry.ResolveRestored(context, fallbackModel, cancellationToken,
                 registry.InitialActiveToolNames, configured.SelectedModel), cancellationToken).ConfigureAwait(false);
+            // sdk.ts createAgentSession: a session without messages (an empty or header-only file, a new session) records its model
+            // and thinking level at once (appendModelChange, appendThinkingLevelChange); a lazy store keeps them until it is written.
+            if (configured.NewSessionThinkingLevel is { } initialThinking && !context.Messages.Any(message => message.Role != "system"))
+            {
+                var model = loadout.Selection.Configuration.Model;
+                var level = initialThinking(model, registry.GetSupportedThinkingLevels(model)) ?? loadout.Selection.Configuration.ThinkingLevel;
+                var header = store.Snapshot.Header; var existing = store.Snapshot.Entries;
+                var modelEntry = Record(codec, "model_change", Identity(nextEntryId, header.Id, existing), context.LeafId, clock, writer =>
+                {
+                    writer.WriteString("provider", model.Provider);
+                    writer.WriteString("modelId", model.Id);
+                });
+                var thinkingEntry = Record(codec, "thinking_level_change", Identity(nextEntryId, header.Id, existing.Add(modelEntry)), modelEntry.Id,
+                    clock, writer => writer.WriteString("thinkingLevel", level));
+                var appended = await store.AppendAsync([modelEntry, thinkingEntry], cancellationToken).ConfigureAwait(false);
+                if (!appended.CheckpointAcknowledged) throw Error(PersistentAgentSessionFailure.InvalidCommit);
+                context = projector.Project(appended.Snapshot.Entries, thinkingEntry.Id, cancellationToken);
+                loadout = await registry.PrepareAndDrainAsync(() => registry.ResolveRestored(context, model, cancellationToken,
+                    registry.InitialActiveToolNames, model), cancellationToken).ConfigureAwait(false);
+            }
             var selection = loadout.Selection;
             var bridge = new Bridge();
             agent = new(selection.Configuration, clock, bridge, configured.AgentOptions);
