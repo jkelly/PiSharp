@@ -159,7 +159,9 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
     internal IExtensionRegistration Register(RegistrationScope scope, ExtensionCommandDescriptor descriptor)
     {
         const string operation = "register-command";
-        if (descriptor is null || !ValidNames(descriptor.RegistrationId, descriptor.Name) ||
+        if (descriptor is null || !(options.AllowAnyCommandName
+                ? RegistrationPolicy.Identifier(descriptor.RegistrationId, options.MaximumIdentifierCharacters) && RegistrationPolicy.CommandName(descriptor.Name, options.MaximumIdentifierCharacters)
+                : ValidNames(descriptor.RegistrationId, descriptor.Name)) ||
             !RegistrationPolicy.Description(descriptor.Description, options) || descriptor.ExecuteAsync is null ||
             descriptor.GetArgumentCompletionsAsync?.GetInvocationList().Length > 1 ||
             descriptor.SourcePath is not null && !RegistrationPolicy.Description(descriptor.SourcePath, options))
@@ -854,7 +856,8 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
         int maximumSelected = int.MaxValue)
     {
         ArgumentNullException.ThrowIfNull(captured);
-        if (!RegistrationPolicy.Identifier(name, options.MaximumIdentifierCharacters))
+        if (!(kind == RegistrationKind.Command && options.AllowAnyCommandName ? RegistrationPolicy.CommandName(name, options.MaximumIdentifierCharacters)
+                : RegistrationPolicy.Identifier(name, options.MaximumIdentifierCharacters)))
             throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, "registry", operation);
         operationToken.ThrowIfCancellationRequested();
         sessionToken.ThrowIfCancellationRequested();

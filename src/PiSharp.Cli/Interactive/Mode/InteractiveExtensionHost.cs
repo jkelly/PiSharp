@@ -29,6 +29,13 @@ internal interface IInteractiveExtensionHost
     string TransformMarkdown(string markdown, JsonObject context);
     IReadOnlyList<LoadedResource> LoadedExtensions();
     IReadOnlyList<ResourceDiagnostic> Diagnostics();
+    /// <summary>ctx.ui.setEditorComponent: the extension editor with this component id (null when the host has none). Its events run
+    /// through <paramref name="post"/> on the mode's loop; <paramref name="action"/> resolves the mode's app actions by name.</summary>
+    IEditorComponent? CreateEditor(string componentId, Action<Action> post, Func<string, Action?> action) => null;
+    /// <summary>ctx.ui.addAutocompleteProvider: the wrapper the extension's factory makes around the provider so far.</summary>
+    Func<IAutocompleteProvider, IAutocompleteProvider>? AutocompleteWrapper(string wrapperId) => null;
+    /// <summary>The mode's keybindings, its editor's app actions and its extension shortcuts, for extension editors.</summary>
+    void ConfigureEditor(IReadOnlyDictionary<string, IReadOnlyList<string>> keybindings, IEnumerable<string> actions, Func<string, bool> shortcut) { }
 }
 
 /// <summary>What the extensions read from the mode without entering its loop (ctx.ui.getEditorText, the footer data, tui.terminal).</summary>
@@ -104,6 +111,24 @@ internal sealed class PiInteractiveExtensionHost(PiExtensionHost host) : IIntera
     public IReadOnlyList<LoadedResource> LoadedExtensions() => [.. host.Extensions.Select(extension => new LoadedResource(extension.Path, null))];
 
     public IReadOnlyList<ResourceDiagnostic> Diagnostics() => [.. host.Errors.Select(error => new ResourceDiagnostic("error", error.Error, error.Path))];
+
+    private readonly ConcurrentDictionary<string, NodeEditorComponent> editors = new(StringComparer.Ordinal);
+
+    public IEditorComponent? CreateEditor(string componentId, Action<Action> post, Func<string, Action?> action)
+    {
+        var editor = new NodeEditorComponent(host, componentId, post) { Action = action };
+        editors[componentId] = editor;
+        host.ComponentEvent = (id, value) => { if (editors.TryGetValue(id, out var target)) target.Event(value); };
+        return editor;
+    }
+
+    public Func<IAutocompleteProvider, IAutocompleteProvider>? AutocompleteWrapper(string wrapperId) => inner => new NodeAutocompleteProvider(host, wrapperId, inner);
+
+    public void ConfigureEditor(IReadOnlyDictionary<string, IReadOnlyList<string>> keybindings, IEnumerable<string> actions, Func<string, bool> shortcut)
+    {
+        host.EditorShortcut = shortcut;
+        _ = host.ConfigureEditorAsync(keybindings, [.. actions], CancellationToken.None).ContinueWith(static task => _ = task.Exception, TaskScheduler.Default);
+    }
 }
 
 /// <summary>A component that lives in the extension host: its rows are fetched per width until it asks to be redrawn.</summary>

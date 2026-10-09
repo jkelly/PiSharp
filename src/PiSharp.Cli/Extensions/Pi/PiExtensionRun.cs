@@ -49,6 +49,14 @@ internal sealed class PiExtensionRun : IAsyncDisposable
             ProjectTrusted = _ => projectTrusted
         }, token).ConfigureAwait(false);
         Host?.Reorder(sources.Select(source => source.Path));
+        // agent-session.ts reload(): the resource loader resolves the extension paths again (settings, packages, auto-discovery).
+        if (Host is { } host)
+            host.ResolveReloadPaths ??= async reloadToken =>
+            {
+                var reloaded = await ResolveSourcesAsync(PiSettings.Load(_cwd, _agentDir, host.ProjectTrusted ?? projectTrusted), reloadToken).ConfigureAwait(false);
+                foreach (var source in reloaded) host.SetSourceInfo(source.Path, source.SourceInfo());
+                return [.. reloaded.Where(source => File.Exists(source.Path)).Select(source => source.Path)];
+            };
     }
 
     /// <summary>resource-loader.ts reload: <c>packageManager.resolveExtensionSources(-e paths, temporary)</c> first, then (unless
@@ -68,7 +76,7 @@ internal sealed class PiExtensionRun : IAsyncDisposable
         foreach (var resource in cli.Extensions.Concat(resolved.Extensions))
         {
             if (!resource.Enabled || resource.Path.StartsWith("builtin:", StringComparison.Ordinal)) continue;
-            if (seen.Add(Path.GetFullPath(resource.Path))) list.Add(new(resource.Path, resource.Metadata.Scope, resource.Metadata.Source));
+            if (seen.Add(Path.GetFullPath(resource.Path))) list.Add(new(resource.Path, resource.Metadata.Scope, resource.Metadata.Source, resource.Metadata.Origin, resource.Metadata.BaseDir));
         }
         // A local -e path that does not exist is still reported (Extension path does not exist).
         foreach (var path in _parsed.Extensions ?? [])

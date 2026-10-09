@@ -23,6 +23,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     public ImmutableArray<RpcSessionTreePublicationException> SessionTreePublicationFailures
     { get { lock (_gate) return _sessionTreePublicationFailures; } }
     private PersistentAgentSession _session;
+    private readonly SemaphoreSlim _projectionGate = new(1, 1);
     private readonly ReplaceableAgentSession? _sessionOwner;
     private readonly Func<CancellationToken, ValueTask>? _sessionStartup;
     private readonly Func<PersistentAgentSession, Task>? _postInputSettlement, _postRunSettlement;
@@ -1104,13 +1105,33 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 if (observation is AgentLoopStarted && run is not null)
                     run.HistoryLength = _session.Snapshot.Agent.Messages.Length;
             }
+            if (run is null && observation is AgentLoopInputMessageStarted { Message.Role: "custom" } or AgentLoopInputMessageEnded { Message.Role: "custom" })
+            {
+                // agent-session.ts _appendCustomMessage: an idle session appends an extension's custom message and emits its
+                // message_start/message_end at once, outside any run.
+                lock (_gate) if (_fatal is not null) throw _fatal;
+                await _projectionGate.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    foreach (var record in _events.Project(observation, _session.Snapshot, _session.Snapshot.Agent.Messages.Length))
+                        await WriteAsync(record).ConfigureAwait(false);
+                }
+                finally { _projectionGate.Release(); }
+                return;
+            }
             if (run is null) throw new RpcDispatchException(RpcDispatchFailure.SessionRunFailed);
             await run.Ready.Task.ConfigureAwait(false);
             lock (_gate) if (_fatal is not null) throw _fatal;
             if (observation is AgentLoopInputMessageStarted) await PublishQueueAsync(force: false).ConfigureAwait(false);
-            var projected = _events.Project(observation, _session.Snapshot, run.HistoryLength,
-                observation is AgentLoopEnded ended && _session.WillRetryAfterAgentEnd(ended.Result));
-            foreach (var record in projected) await WriteAsync(record).ConfigureAwait(false);
+            // A parallel tool batch reports its tools' progress and ends concurrently; projection and its records stay in order.
+            await _projectionGate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                var projected = _events.Project(observation, _session.Snapshot, run.HistoryLength,
+                    observation is AgentLoopEnded ended && _session.WillRetryAfterAgentEnd(ended.Result));
+                foreach (var record in projected) await WriteAsync(record).ConfigureAwait(false);
+            }
+            finally { _projectionGate.Release(); }
         }
         catch (Exception error) { SignalFatal(error is RpcDispatchException dispatch ? dispatch.Failure : RpcDispatchFailure.SessionRunFailed, error); throw; }
         finally { _inCallback.Value = previous; }

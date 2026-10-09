@@ -90,6 +90,7 @@ internal sealed partial class OfflineSessionProfile
         {
             input = PromptInputValue.Own(input);
             token.ThrowIfCancellationRequested();
+            if (profile._extension?.Pi is { } pi) await pi.WaitForRegistrationsAsync(token).ConfigureAwait(false);
             var text = input.Text;
             var command = IsReloadCommand(text);
             if (!command)
@@ -106,6 +107,13 @@ internal sealed partial class OfflineSessionProfile
             if (type != "prompt" || text.TrimEnd() != "/reload" || input.Images is not null || input.StreamingBehavior is not null)
                 throw new PromptInputAdmissionException(PromptInputAdmissionFailure.InvalidInput);
             var owner = profile.Sessions ?? throw new InvalidOperationException("Reload requires an attached profile owner.");
+            // The Pi entry reloads its extensions and resources in place (agent-session.ts reload()).
+            bool admitted; lock (profile.reloadGate) admitted = profile.reloadAdmission is not null;
+            if (!admitted && profile.SupportsPiReload)
+            {
+                await profile.PiReloadAsync(token).ConfigureAwait(false);
+                return new(PromptInputAction.Handled);
+            }
             var original = profile.ReloadAsync(owner.Current, token);
             var receipt = await original.ConfigureAwait(false);
             if (!receipt.Workflow.Failures.IsEmpty)

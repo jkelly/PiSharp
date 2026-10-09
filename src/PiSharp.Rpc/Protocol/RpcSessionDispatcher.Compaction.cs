@@ -108,6 +108,18 @@ public sealed partial class RpcSessionDispatcher
         }
     }
 
+    /// <summary>Pi ExtensionContext.compact(): the current session's manual compaction as the <c>compact</c> command runs it (its
+    /// compaction events included), with no response record; upstream's compact() first aborts a run in progress. Returns the
+    /// CompactionResult data; failures throw with the command's message.</summary>
+    public async Task<JsonData> CompactForExtensionAsync(SessionCompactionRequest request, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        lock (_gate) if (_run is not null) _session.Abort();
+        await WaitForIdleAsync(token).ConfigureAwait(false);
+        var command = new RpcCommandEnvelope(null, "compact", Compaction: request);
+        return (await SummaryCommandAsync(command, _sessionOwner?.Current, token).ConfigureAwait(false))!;
+    }
+
     private double SummaryContextWindow(RpcCommandEnvelope command, AgentSessionAttachment attachment)
     {
         if (!TryGetModel(attachment.Session.Snapshot.Agent.Model, out var model) ||

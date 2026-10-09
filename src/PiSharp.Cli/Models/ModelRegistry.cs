@@ -76,7 +76,36 @@ internal sealed class ModelRegistry
         Builtins.GetOrAdd(provider, id => [.. BuiltinModelCatalog.Get(id).Models.Select(RegistryModel.FromCatalog)]);
 
     private IEnumerable<string> ProviderIds() => BuiltinProviders.All.Select(provider => provider.Id)
-        .Concat(config.ProviderIds).Concat(virtualModels.Keys).Distinct(StringComparer.Ordinal);
+        .Concat(config.ProviderIds).Concat(extensionProviders.Keys).Concat(virtualModels.Keys).Distinct(StringComparer.Ordinal);
+
+    // model-runtime.ts registerProvider/unregisterProvider: an extension's provider layer over the built-in and models.json layers.
+    private readonly Dictionary<string, JsonObject> extensionProviders = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Func<RegistryModel, PiSharp.AI.IChatTransport>> customStreams = new(StringComparer.Ordinal);
+
+    /// <summary>Source registerProvider(name, config): validated alone first (a broken registration throws without changing the stored
+    /// one); a re-registration merges defined values over the previous one.</summary>
+    internal void RegisterExtensionProvider(string providerId, JsonObject configuration)
+    {
+        if (string.IsNullOrWhiteSpace(providerId)) throw new InvalidOperationException("Provider id must not be empty.");
+        if (configuration["hasStreamSimple"]?.GetValue<bool>() == true && JsonTree.String(configuration, "api") is null)
+            throw new InvalidOperationException($"Provider {providerId}: \"api\" is required when registering streamSimple.");
+        var effective = extensionProviders.TryGetValue(providerId, out var previous) ? (JsonObject)previous.DeepClone() : new JsonObject();
+        foreach (var (key, value) in configuration) if (value is not null) effective[key] = value.DeepClone();
+        var baseModels = BuiltinModels(providerId);
+        _ = ModelProviderComposer.ApplyExtension(providerId, ModelProviderComposer.ApplyModelsJson(providerId, baseModels, config.GetProvider(providerId)), effective);
+        extensionProviders[providerId] = effective;
+        Rebuild();
+    }
+
+    internal void UnregisterExtensionProvider(string providerId)
+    {
+        if (extensionProviders.Remove(providerId)) Rebuild();
+    }
+
+    /// <summary>Source registerApiProvider(streamSimple): models of this API stream through the extension (keyed by API, as pi-ai's
+    /// API provider registry is).</summary>
+    internal void RegisterCustomStream(string api, Func<RegistryModel, PiSharp.AI.IChatTransport> create) => customStreams[api] = create;
+    internal Func<RegistryModel, PiSharp.AI.IChatTransport>? CustomStream(string api) => customStreams.GetValueOrDefault(api);
 
     private void Rebuild()
     {
@@ -86,8 +115,13 @@ internal sealed class ModelRegistry
             IReadOnlyList<RegistryModel> baseModels = id == "radius" && radiusDynamic is { } dynamic ? dynamic :
                 overlays.TryGetValue(id, out var overlay) ? overlay.Apply(BuiltinModels(id)) : BuiltinModels(id);
             var providerConfig = config.GetProvider(id);
-            if (providerConfig is null) { next.Add(new(id, [.. baseModels], false, null)); continue; }
-            try { next.Add(new(id, ModelProviderComposer.Compose(id, baseModels, providerConfig), true, null)); }
+            var extension = extensionProviders.GetValueOrDefault(id);
+            if (providerConfig is null && extension is null) { next.Add(new(id, [.. baseModels], false, null)); continue; }
+            try
+            {
+                var composed = providerConfig is null ? [.. baseModels] : ModelProviderComposer.Compose(id, baseModels, providerConfig);
+                next.Add(new(id, ModelProviderComposer.ApplyExtension(id, composed, extension), true, null));
+            }
             catch (InvalidOperationException error) { next.Add(new(id, [.. baseModels], false, error.Message)); }
         }
         providers = next;
@@ -207,7 +241,7 @@ internal sealed class ModelRegistry
         string? Inherited(ProviderStoredCredential? credential) =>
             builtin is null ? null : BuiltinProviders.CheckAuth(builtin, credential, options.Environment, options.FileExists, options.Home);
         if (!composed.Overlaid) return Inherited(stored);
-        var providerConfig = config.GetProvider(providerId);
+        var providerConfig = ProviderConfig(providerId);
         if (stored?.Type == "oauth") return builtin?.OAuthName is not null ? "OAuth" : null;
         var rawKey = ModelProviderComposer.ApiKey(providerConfig);
         // composeApiKeyAuth: OAuth-only providers get no fabricated API-key method.
@@ -230,7 +264,7 @@ internal sealed class ModelRegistry
     internal ProviderAuthStatus GetProviderAuthStatus(string provider)
     {
         if (options.StoredCredentials.ContainsKey(provider)) return new(true, "stored");
-        if (ModelProviderComposer.ConfiguredRequestAuthStatus(config.GetProvider(provider), Values) is { } configured) return configured;
+        if (ModelProviderComposer.ConfiguredRequestAuthStatus(ProviderConfig(provider), Values) is { } configured) return configured;
         return CheckAuth(provider) is { } source ? new(true, "environment", source) : new(false);
     }
 
@@ -239,7 +273,26 @@ internal sealed class ModelRegistry
         config.GetProvider(provider) is { } providerConfig && JsonTree.String(providerConfig, "name") is { } configured ? configured :
         BuiltinProviders.TryGet(provider, out var builtin) ? builtin.Name : provider;
 
-    internal JsonObject? GetProviderConfig(string provider) => config.GetProvider(provider);
+    internal JsonObject? GetProviderConfig(string provider) => ProviderConfig(provider);
+
+    /// <summary>The provider's configuration for request auth: models.json, with an extension's apiKey, headers and authHeader over it
+    /// (provider-composer.ts configuredApiKey/configuredHeaders).</summary>
+    private JsonObject? ProviderConfig(string provider)
+    {
+        var configured = config.GetProvider(provider);
+        if (!extensionProviders.TryGetValue(provider, out var extension)) return configured;
+        var merged = configured is null ? new JsonObject() : (JsonObject)configured.DeepClone();
+        if (extension["apiKey"] is { } apiKey) merged["apiKey"] = apiKey.DeepClone();
+        if (extension["authHeader"] is { } authHeader) merged["authHeader"] = authHeader.DeepClone();
+        if (extension["headers"] is JsonObject headers)
+        {
+            var all = merged["headers"] as JsonObject ?? new JsonObject();
+            foreach (var (name, value) in headers) all[name] = value?.DeepClone();
+            merged["headers"] = all;
+        }
+        if (extension["baseUrl"] is { } baseUrl && merged["baseUrl"] is null) merged["baseUrl"] = baseUrl.DeepClone();
+        return merged;
+    }
 
     /// <summary>
     /// Source getApiKeyAndHeaders for a key-auth request: the stored api_key (its environment fallback when the key does not resolve),
@@ -250,7 +303,7 @@ internal sealed class ModelRegistry
     {
         error = null;
         var providerId = model.Provider;
-        var providerConfig = config.GetProvider(providerId);
+        var providerConfig = ProviderConfig(providerId);
         var stored = Stored(providerId);
         BuiltinProviders.TryGet(providerId, out var builtin);
         string? key = null; string? source = null; IReadOnlyDictionary<string, string>? env = null;

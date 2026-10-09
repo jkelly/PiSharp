@@ -51,8 +51,20 @@ internal sealed partial class InteractiveMode
         terminalSizeSnapshot = (ui.Terminal.Columns, ui.Terminal.Rows);
         List<(string Op, JsonElement Args)> pending;
         lock (pendingExtensionPublications) { extensionPublicationsReady = true; pending = [.. pendingExtensionPublications]; pendingExtensionPublications.Clear(); }
+        // CustomEditor-based extension editors match the mode's keybindings, run its app actions and its extension shortcuts.
+        extensions.ConfigureEditor(keybindings.GetEffectiveConfig(), [.. defaultEditor.ActionHandlers.Keys,
+            "app.interrupt", "app.exit", "app.clipboard.pasteImage"], data => defaultEditor.OnExtensionShortcut?.Invoke(data) ?? false);
         foreach (var (op, args) in pending) HandleExtensionPublication(extensions, op, args);
     }
+
+    /// <summary>An app action of the mode's editor by name (custom-editor.ts: onEscape, onCtrlD, onPasteImage, actionHandlers).</summary>
+    private Action? EditorAction(string action) => action switch
+    {
+        "app.interrupt" => defaultEditor.OnEscape ?? (defaultEditor.ActionHandlers.TryGetValue(action, out var interrupt) ? interrupt : null),
+        "app.exit" => defaultEditor.OnCtrlD ?? (defaultEditor.ActionHandlers.TryGetValue(action, out var exit) ? exit : null),
+        "app.clipboard.pasteImage" => defaultEditor.OnPasteImage,
+        _ => defaultEditor.ActionHandlers.TryGetValue(action, out var handler) ? handler : null
+    };
 
     private ExtensionRowsComponent ExtensionComponent(IInteractiveExtensionHost extensions, string id, bool input = false)
     {
@@ -123,6 +135,20 @@ internal sealed partial class InteractiveMode
             case "onTerminalInput":
                 if (Arg(args, 0).ValueKind == JsonValueKind.String && Arg(args, 0).GetString() is { } callback && !extensionTerminalInputs.ContainsKey(callback))
                     extensionTerminalInputs[callback] = AddExtensionTerminalInputListener(data => extensions.TerminalInput(callback, data));
+                return;
+            case "setEditorComponent":
+                // interactive-mode.ts setCustomEditorComponent: the extension's editor (in the Node host) replaces the editor.
+                if (ComponentId(args, 0) is { } editorId && extensions.CreateEditor(editorId, context.Loop.Post, EditorAction) is { } created)
+                    SetCustomEditorComponent((_, _, _) => created);
+                else SetCustomEditorComponent(null);
+                return;
+            case "addAutocompleteProvider":
+                if (Arg(args, 0) is { ValueKind: JsonValueKind.Object } wrapper && wrapper.TryGetProperty("wrapper", out var wrapperId) &&
+                    wrapperId.ValueKind == JsonValueKind.String && extensions.AutocompleteWrapper(wrapperId.GetString()!) is { } wrap)
+                {
+                    autocompleteProviderWrappers.Add(wrap);
+                    SetupAutocompleteProvider();
+                }
                 return;
             case "offTerminalInput":
                 if (Arg(args, 0).ValueKind == JsonValueKind.String && extensionTerminalInputs.Remove(Arg(args, 0).GetString()!, out var remove)) remove();

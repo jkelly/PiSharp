@@ -23,6 +23,10 @@ public sealed record SessionRegisteredTool(JsonData Declaration, IPreparedToolAd
     public ImmutableArray<string> PromptGuidelines { get; init; } = [];
     /// <summary>Source ToolAnnotations of an extension or MCP tool (getAllTools reports them).</summary>
     public ImmutableDictionary<string, bool>? Annotations { get; init; }
+    /// <summary>Source promptSnippet of an extension tool (the system prompt's tool list entry).</summary>
+    public string? PromptSnippet { get; init; }
+    /// <summary>Source outputSchema: the shape of the result's structuredContent (codemode declarations).</summary>
+    public JsonData? OutputSchema { get; init; }
 }
 public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int MaximumTools = 128,
     int MaximumMessages = 1024, int MaximumDeclarations = 4096, int MaximumCharacters = 1_048_576,
@@ -255,7 +259,7 @@ public sealed partial class SessionRuntimeRegistry
         return ToolLoadoutPresentation.Prepare(loadout, (name, original) => _tools[name].PrepareLoadout?.Invoke(original),
             report ? _options.ReportLoadoutDiagnostic : null, _options.MaximumCharacters, token);
         static ToolLoadoutTool Metadata(SessionRegisteredTool tool) => new(tool.Declaration, tool.Exposure)
-            { Namespace = tool.Namespace, PromptGuidelines = tool.PromptGuidelines.IsDefault ? [] : tool.PromptGuidelines };
+            { Namespace = tool.Namespace, PromptGuidelines = tool.PromptGuidelines.IsDefault ? [] : tool.PromptGuidelines, OutputSchema = tool.OutputSchema };
     }
 
     public SessionRuntimeSelection Resolve(SessionContextProjection context, ModelDescriptor? fallbackModel = null,

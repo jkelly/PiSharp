@@ -52,9 +52,21 @@ internal sealed partial class OfflineSessionProfile
             lifecycleRequests.Add(origin);
         }
     }
+    private bool piShutdownRequested;
+    /// <summary>Pi ctx.shutdown(): the mode's shutdown handler. RPC mode records the request and stops after the current command or
+    /// run settles (rpc-mode.ts checkShutdownRequested); without a mode stop (print mode) it does nothing, as upstream's default.</summary>
+    internal void RequestPiShutdown()
+    {
+        lock (lifecycleGate) if (lifecycleModeStop is not null && !lifecycleClosing) piShutdownRequested = true;
+    }
+
     /// <summary>Invoked only after the host's actual input/run and writer originals settle, outside their gates.</summary>
     internal async Task DrainLifecycleHandoffsAsync(PersistentAgentSession originating)
     {
+        Func<Task?>? piStop = null;
+        lock (lifecycleGate)
+            if (piShutdownRequested && !LifecycleShutdownRequested && !lifecycleClosing) { piShutdownRequested = false; LifecycleShutdownRequested = true; piStop = lifecycleModeStop; }
+        if (piStop?.Invoke() is { } stopping) await stopping.ConfigureAwait(false);
         NativeLifecycleOrigin[] pending;
         lock (lifecycleGate)
         {

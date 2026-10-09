@@ -18,6 +18,8 @@ public sealed record ToolLoadoutTool(JsonData Declaration, ToolExposure Exposure
     public ToolNamespace? Namespace { get; init; }
     /// <summary>The tool's promptGuidelines. Hidden declarations leave them out of the system prompt.</summary>
     public ImmutableArray<string> PromptGuidelines { get; init; } = [];
+    /// <summary>The tool's outputSchema (its structuredContent shape), when it declares one.</summary>
+    public JsonData? OutputSchema { get; init; }
     public string Name => Declaration.Value.GetProperty("name").GetString()!;
     public string Description => Declaration.Value.GetProperty("description").GetString()!;
 }

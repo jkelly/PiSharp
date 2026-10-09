@@ -7,7 +7,9 @@ import { Worker, MessageChannel, receiveMessageOnPort } from 'node:worker_thread
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import util from 'node:util';
+import { Readable } from 'node:stream';
 import { installHooks } from './loader-hooks.mjs';
+import { loadPiModules } from './pi-modules.mjs';
 import { ExtensionRuntime, describeExtension } from './runtime.mjs';
 import { validateToolArguments } from './validate.mjs';
 
@@ -21,6 +23,12 @@ process.stdout.write = (chunk, encoding, callback) => {
   if (typeof encoding === 'function') encoding(); else if (typeof callback === 'function') callback();
   return true;
 };
+// Standard input is the protocol, read by the I/O thread. On Windows, opening it again here (the lazy process.stdin, which Pi's own
+// modules touch) blocks until the I/O thread's pending read completes, so extensions get an empty, never-ending stream instead, as
+// an extension would see stdin in Pi's RPC mode.
+const isolatedStdin = new Readable({ read() {} });
+isolatedStdin.isTTY = false;
+Object.defineProperty(process, 'stdin', { configurable: true, enumerable: true, get: () => isolatedStdin });
 
 // ------------------------------------------------------------------------------------------------ channel to the I/O thread
 const flag = new SharedArrayBuffer(4);
@@ -91,13 +99,25 @@ const active = new Map(); // host request id -> AbortController
 async function handle(method, params, id) {
   switch (method) {
     case 'init': {
-      await installHooks();
-      let themeFactory;
-      try { const themes = await import(pathToFileURL(path.join(here, 'virtual', 'theme.mjs')).href); themeFactory = (name) => themes.createTheme(name); } catch { themeFactory = undefined; }
       if (params.agentDir && !process.env.PI_CODING_AGENT_DIR) process.env.PI_CODING_AGENT_DIR = params.agentDir;
       globalThis.__pisharpHost = { agentDir: params.agentDir, version: params.version, cwd: params.cwd };
-      runtime = new ExtensionRuntime(bridge, { ...params, themeFactory });
-      return { node: process.version, pid: process.pid };
+      let themeFactory, importExtension, createEventStream, tuiModule, editorTheme, modules = 'compatibility';
+      if (params.piModules) {
+        // The installed Pi packages, loaded with Pi's own jiti and aliases.
+        const pi = await loadPiModules(params.piModules, params.theme);
+        themeFactory = pi.themeFactory; importExtension = pi.importExtension; createEventStream = pi.createEventStream; modules = 'pi@' + pi.version;
+        tuiModule = pi.tui; editorTheme = () => pi.themes.getEditorTheme();
+      } else {
+        // Offline fallback: PiSharp's compatibility modules and loader hooks.
+        await installHooks();
+        try { const themes = await import(pathToFileURL(path.join(here, 'virtual', 'theme.mjs')).href); themeFactory = (name) => themes.createTheme(name); } catch { themeFactory = undefined; }
+        const ai = await import(pathToFileURL(path.join(here, 'virtual', 'pi-ai.mjs')).href);
+        createEventStream = () => ai.createAssistantMessageEventStream();
+        try { tuiModule = await import(pathToFileURL(path.join(here, 'virtual', 'pi-tui.mjs')).href); } catch { tuiModule = undefined; }
+        try { const themes = await import(pathToFileURL(path.join(here, 'virtual', 'theme.mjs')).href); editorTheme = typeof themes.getEditorTheme === 'function' ? () => themes.getEditorTheme() : undefined; } catch { editorTheme = undefined; }
+      }
+      runtime = new ExtensionRuntime(bridge, { ...params, themeFactory, importExtension, createEventStream, tuiModule, editorTheme });
+      return { node: process.version, pid: process.pid, modules };
     }
     case 'load': {
       const results = [];
@@ -108,6 +128,21 @@ async function handle(method, params, id) {
       return { results, flagValues: Object.fromEntries(runtime.flagValues) };
     }
     case 'bind': runtime.bound = true; return { flagValues: Object.fromEntries(runtime.flagValues) };
+    case 'reload': {
+      // agent-session.ts reload(): the old runtime is invalidated (its pi and ctx objects are stale) and the extensions load again
+      // into a fresh runtime with fresh modules, keeping the flag values.
+      const previous = runtime;
+      previous.invalidate();
+      runtime = new ExtensionRuntime(bridge, { ...previous.options, flagValues: Object.fromEntries(previous.flagValues), generation: previous.generation + 1 });
+      runtime.themeName = previous.themeName;
+      const results = [];
+      for (const entry of params.paths) {
+        const loaded = await runtime.load(entry);
+        results.push(loaded.error ? { path: entry, error: loaded.error } : { path: entry, extension: describeExtension(loaded.extension) });
+      }
+      runtime.bound = previous.bound;
+      return { results, flagValues: Object.fromEntries(runtime.flagValues) };
+    }
     case 'flags.set': for (const [name, value] of Object.entries(params.values ?? {})) runtime.flagValues.set(name, value); return true;
     case 'emit': return runtime.emit(runtime.extensions[params.ext], params.event, params.payload, params.ctx, params.handler);
     case 'tool.execute': {
@@ -144,6 +179,22 @@ async function handle(method, params, id) {
     case 'component.render': return runtime.renderComponent(params.id, params.width);
     case 'component.input': runtime.inputComponent(params.id, params.data); return null;
     case 'component.dispose': runtime.disposeComponent(params.id); return null;
+    case 'component.method': return plain(runtime.callComponent(params.id, params.method, params.args)) ?? null;
+    case 'editor.configure': runtime.configureEditor(params.keybindings, params.actions); return null;
+    case 'editor.autocomplete': runtime.setEditorAutocomplete(params.id, params.token); return null;
+    case 'autocomplete.suggest': {
+      const controller = new AbortController(); active.set(id, controller);
+      try {
+        const provider = runtime.autocompleteProvider(params.wrapper, params.token);
+        return plain(await provider.getSuggestions(params.lines, params.cursorLine, params.cursorCol, { force: params.force === true, signal: controller.signal })) ?? null;
+      } finally { active.delete(id); }
+    }
+    case 'autocomplete.apply': return plain(runtime.autocompleteProvider(params.wrapper, params.token).applyCompletion(params.lines, params.cursorLine, params.cursorCol, params.item, params.prefix)) ?? null;
+    case 'autocomplete.triggers': return plain(runtime.autocompleteProvider(params.wrapper, params.token).triggerCharacters ?? []);
+    case 'autocomplete.file': {
+      const provider = runtime.autocompleteProvider(params.wrapper, params.token);
+      return typeof provider.shouldTriggerFileCompletion === 'function' ? provider.shouldTriggerFileCompletion(params.lines, params.cursorLine, params.cursorCol) !== false : true;
+    }
     case 'render.tool': return runtime.renderTool(params);
     case 'render.resolve': {
       const renderers = runtime.resolveToolRenderers(params.toolName);
@@ -162,6 +213,25 @@ async function handle(method, params, id) {
       if (params.op === 'generateImages') return config.images[params.api].generateImages(...params.args);
       if (params.op === 'refreshModels') return config.refreshModels(params.args?.[0] ?? {});
       throw new Error(`Unsupported provider operation ${params.op}`);
+    }
+    case 'provider.stream': {
+      // An extension provider's streamSimple (registerProvider with api + streamSimple): its AssistantMessageEvents stream back as
+      // progress (pi-ai source events with their partial message), the final message as the result.
+      const record = [...runtime.providers.values()].find(item => item.config?.api === params.api && typeof item.config?.streamSimple === 'function')
+        ?? runtime.providers.get(params.provider);
+      const streamSimple = record?.config?.streamSimple;
+      if (typeof streamSimple !== 'function') throw new Error(`No extension provider streams the ${params.api} API`);
+      const controller = new AbortController(); active.set(id, controller);
+      try {
+        const stream = await streamSimple(params.model, params.context, { ...(params.options ?? {}), signal: controller.signal });
+        let final;
+        for await (const event of stream) {
+          send({ type: 'progress', id, value: plain(event) });
+          if (event.type === 'done') final = event.message; else if (event.type === 'error') final = event.error;
+        }
+        if (!final && typeof stream.result === 'function') final = await stream.result();
+        return plain(final ?? null);
+      } finally { active.delete(id); }
     }
     case 'events.deliver': runtime.eventBus.deliver(params.channel, params.data); return null;
     case 'invalidate': runtime.invalidate(params.message); return null;

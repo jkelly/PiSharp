@@ -270,6 +270,39 @@ internal static class PiCommand
             new(path.Path, path.Source, path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
                 PromptTemplateSourceOrigin.TopLevel), ReportMissingPath: path.ReportMissing))]);
 
+        // resource-loader.ts reload(): the same discovery for /reload and ctx.reload(), with resources_discover reason "reload".
+        async Task<PiReloadedResources> ReloadResources(PiSharp.Cli.Extensions.NativeExtensionActivation? activation, CancellationToken reloadToken)
+        {
+            var reloadSettings = PiSettings.Load(sessionCwd, agentDir, projectTrusted);
+            var reloadDiscovered = activation is null ? PiDiscoveredResources.Empty : await PiExtensionEvents.ResourcesDiscoverAsync(activation.Registry,
+                activation.Registry.CaptureSnapshot(), sessionCwd, "reload", (_, _) => ValueTask.CompletedTask, reloadToken).ConfigureAwait(false);
+            PiSharp.Cli.Packages.PiResolvedPaths reloadPackages;
+            try
+            {
+                reloadPackages = await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, reloadSettings, host.GetEnvironment,
+                    host.PackageProcesses?.Invoke(TextWriter.Null, TextWriter.Null) ?? new() { Output = TextWriter.Null, ErrorOutput = TextWriter.Null })
+                    .ResolveAsync(cancellationToken: reloadToken).ConfigureAwait(false);
+            }
+            catch (PiSharp.Cli.Packages.PiPackageException) { reloadPackages = packageResources; }
+            var reloaded = PiResources.WithDiscovered(PiResources.Discover(new(sessionCwd, agentDir, home, reloadSettings, projectTrusted)
+            {
+                Packages = reloadPackages,
+                CliSkills = [.. parsed.Skills ?? []], CliPromptTemplates = [.. parsed.PromptTemplates ?? []], CliThemes = [.. parsed.Themes ?? []],
+                NoSkills = parsed.NoSkills, NoPromptTemplates = parsed.NoPromptTemplates, NoThemes = parsed.NoThemes, NoContextFiles = parsed.NoContextFiles,
+                SystemPrompt = parsed.SystemPrompt, AppendSystemPrompt = parsed.AppendSystemPrompt is null ? default : [.. parsed.AppendSystemPrompt]
+            }), reloadDiscovered, sessionCwd, home);
+            var reloadSkills = reloaded.SkillPaths.IsEmpty ? null : await SkillCliBinding.LoadAsync(new([.. reloaded.SkillPaths.Select(path => new SkillPathSelection(path.Path)
+            {
+                Scope = path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
+                ReportMissingPath = path.ReportMissing
+            })]), token: reloadToken).ConfigureAwait(false);
+            var reloadPrompts = new PromptTemplateCliConfiguration([.. reloaded.PromptPaths.Select(path => new PromptTemplatePathSelection(path.Path,
+                new(path.Path, path.Source, path.Scope switch { "user" => PromptTemplateSourceScope.User, "project" => PromptTemplateSourceScope.Project, _ => PromptTemplateSourceScope.Temporary },
+                    PromptTemplateSourceOrigin.TopLevel), ReportMissingPath: path.ReportMissing))]);
+            return new(PiSystemPrompt.Admission(reloaded, reloadSkills?.Resources, host.ApplicationDirectory ?? (host.GetEnvironment("PI_PACKAGE_DIR") is { Length: > 0 } reloadPackageDir ? PiPaths.NormalizePath(reloadPackageDir, home) : null)),
+                reloadSkills, reloadPrompts);
+        }
+
         // Model (source buildSessionOptions), then the --api-key runtime override for its provider.
         var startupSnapshot = await settings.ToStartupSnapshotAsync(token).ConfigureAwait(false);
         // main.ts configureHttpDispatcher(settingsManager.getHttpIdleTimeoutMs()): provider requests time out when headers or body data
@@ -278,11 +311,12 @@ internal static class PiCommand
         try { idleTimeout = PiHttpIdleTimeout.FromSettings(settings.Merged); }
         catch (InvalidDataException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
         var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout) };
-        // runner.ts bindCore: virtual models the extensions registered join every model registry the run builds (model selection too).
-        if (extensionRun?.Host is { VirtualModelRegistrations.IsEmpty: false } virtualHost)
+        // runner.ts bindCore: the providers and virtual models the extensions registered join every model registry the run builds
+        // (model selection, the live routes and model switching), including ones registered later.
+        if (extensionRun?.Host is { } virtualHost)
         {
             var configured = runtime.ConfigureRegistry;
-            runtime = runtime with { ConfigureRegistry = registry => { configured?.Invoke(registry); virtualHost.RegisterVirtualModels(registry); } };
+            runtime = runtime with { ConfigureRegistry = registry => { configured?.Invoke(registry); virtualHost.RegisterProviders(registry); virtualHost.RegisterVirtualModels(registry); } };
         }
         LiveSessionSelection selection;
         try
@@ -366,6 +400,7 @@ internal static class PiCommand
             ToolPolicy = toolPolicy, Settings = startupSnapshot, Selection = selection, LiveRuntime = runtime,
             SessionCwdOverride = sessionCwdOverride,
             ReloadSettings = reloadToken => PiSettings.Load(sessionCwd, agentDir, projectTrusted).ToStartupSnapshotAsync(reloadToken),
+            ReloadResources = ReloadResources,
             SystemPrompt = PiSystemPrompt.Admission(resources, skills?.Resources, host.ApplicationDirectory ?? packageDir),
             HeaderId = plan.HeaderId, HeaderTimestamp = plan.HeaderTimestamp, SessionName = sessionName,
             Skills = skills, PromptTemplates = prompts, ThinkingLevel = parsed.Thinking, ThinkingFromCli = parsed.Thinking is not null,

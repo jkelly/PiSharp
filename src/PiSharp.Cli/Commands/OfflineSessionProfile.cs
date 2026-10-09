@@ -256,12 +256,19 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         if (extension is not null)
         {
             policy.ExtensionTargets = extension.Targets;
+            if (extension.Pi is not null) policy.ExtensionGrant = extension.IsCurrentToolTarget;
             extension.Bind(policy, invokerOptions);
+            // A Pi extension tool with a built-in name replaces the built-in (agent-session.ts: custom definitions override the base ones).
+            if (extension.Pi is not null)
+                registrations = registrations.RemoveAll(tool => extension.EnabledAdapters.Any(adapter => adapter.Name == tool.Adapter.Name));
             registrations = registrations.AddRange(extension.EnabledAdapters.Select((adapter, index) =>
-                new SessionRegisteredTool(extension.EnabledDeclarations[index], adapter, ToolExecutionMode.Sequential)
+                // Pi extension tools run in parallel batches unless one declares executionMode "sequential" (agent-loop.ts).
+                new SessionRegisteredTool(extension.EnabledDeclarations[index], adapter,
+                    extension.Pi is null || extension.EnabledRegistrations[index].SequentialExecution ? ToolExecutionMode.Sequential : ToolExecutionMode.Parallel)
                 { IsExtension = true, Exposure = extension.EnabledRegistrations[index].Exposure, Namespace = extension.EnabledRegistrations[index].Namespace,
                     DefaultActive = extension.EnabledRegistrations[index].DefaultActive,
                     PromptGuidelines = extension.EnabledRegistrations[index].PromptGuidelines, Annotations = extension.EnabledRegistrations[index].Annotations,
+                    PromptSnippet = extension.EnabledRegistrations[index].PromptSnippet, OutputSchema = extension.EnabledRegistrations[index].OutputSchema,
                     PrepareLoadout = extension.Binding.GetLoadoutPreparation(adapter.Name) }));
         }
         if (toolSelection is not null)
@@ -303,7 +310,13 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             .Select(value => value.Adapter.Name).ToImmutableArray();
         startupOriginalPrompt = OriginalSystemPromptBuilder.Capture(originalSystemPrompt ?? new() { CustomPrompt = literalSystem },
             workspace, initialTools, literal: originalSystemPrompt is null);
-        _startupRegistry = new([DecorateOriginalPromptBinding(new(model, transport, ExecutionMode: ToolExecutionMode.Sequential, Hooks: extension?.Binding.ContextHooks))], registrations, policy,
+        if (originalSystemPrompt is not null && extension?.Pi is { } piHost)
+            startupOriginalPrompt = WithExtensionToolPrompts(startupOriginalPrompt, registrations, piHost.Extensions
+                .SelectMany(loaded => (loaded.Descriptor["tools"] as System.Text.Json.Nodes.JsonArray ?? []).OfType<System.Text.Json.Nodes.JsonObject>())
+                .Select(tool => tool["name"]!.GetValue<string>()).ToHashSet(StringComparer.Ordinal));
+        // Pi runs a turn's tool calls in parallel (Agent toolExecution "parallel"); other profiles keep their sequential batches.
+        _startupRegistry = new([DecorateOriginalPromptBinding(new(model, transport, ExecutionMode: policy.Pi is not null ? ToolExecutionMode.Parallel : ToolExecutionMode.Sequential,
+            Hooks: extension?.Binding.ContextHooks))], registrations, policy,
             new SessionRuntimeRegistryOptions(MaximumModels: 4096, MaximumCharacters: PiPayloadBudget.SessionFileBytes, ToolInvokerOptions: invokerOptions) { PreparedToolHooks = NormalizedToolHooks(extension?.Binding.PreparedHooks), BlockImages = () => ImageSettings.BlockImages,
                 LifetimeToolSelection = lifetimeSelection, InitialActiveToolNames = _initialActiveTools,
                 BindNestedCallsToSessionOwner = true, ReportLoadoutDiagnostic = extension is null ? null : extension.CaptureLoadoutDiagnostic,
@@ -585,6 +598,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             if (readApplicationHost is not null) profile.ConfigureMcpRegistrationRuntime(readApplicationHost().CreateRegisteredAdmission());
             else if (registeredMcpAdmission is not null) profile.ConfigureMcpRegistrationRuntime(registeredMcpAdmission);
             else if (mcpAdmission is not null) profile.ConfigureMcpRuntime(mcpAdmission);
+            // pi.getCommands(): extension commands, prompt templates and skills, as the session's command catalog lists them.
+            if (piExtensions is not null) { piExtensions.CommandCatalog = () => profile.CommandCatalog; piExtensions.ShutdownRequested = profile.RequestPiShutdown; }
             return profile;
         }
         catch (Exception original)
@@ -673,6 +688,8 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
         private static StringComparison Comparison => OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         public readonly List<object> Actions = [];
         public ImmutableDictionary<string, string> ExtensionTargets { get; set; } = ImmutableDictionary<string, string>.Empty;
+        /// <summary>Pi extension tools registered after the session bound (a later registerTool, a reload): granted by exact target.</summary>
+        public Func<string, string, bool>? ExtensionGrant { get; set; }
         /// <summary>MCP call grants by session generation (Pi trusts the servers of mcp.json): an invoke action is admitted only
         /// for a tool of a server admitted in the invocation's own generation, or for that generation's host tool_search.</summary>
         private ImmutableDictionary<long, PiSharp.Cli.Mcp.McpCallGrants> mcpGrants = ImmutableDictionary<long, PiSharp.Cli.Mcp.McpCallGrants>.Empty;
@@ -735,6 +752,7 @@ internal sealed partial class OfflineSessionProfile : IAsyncDisposable, IRpcExte
             if (action.Kind == PreparedToolActionKind.Extension)
             {
                 var granted = (ExtensionTargets.TryGetValue(action.ToolName, out var exactTarget) && action.Target == exactTarget ||
+                        ExtensionGrant?.Invoke(action.ToolName, action.Target) == true ||
                         invocation.Context?.SessionGeneration is { } generation && mcpGrants.TryGetValue(generation, out var grants) &&
                         grants.Allows(action.ToolName, action.Target)) &&
                     action.Operation == "invoke" && action.WorkingDirectory is null && !action.CommandArguments.IsDefault &&

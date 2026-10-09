@@ -30,7 +30,7 @@ internal static class McpCodemode
         var withModels = true;
         return McpDiscoveryExecutableDefinition.CreateCodemode(RegistrationId, CodemodeToolDefinition.CreateDescription([], withModels),
             (code, attachment, invocation, token) => new(ExecuteAsync(code, attachment, invocation, models, waitForServers, token)),
-            loadout => CodemodeToolDefinition.PrepareLoadout(loadout, mode, withModels, inlineBudget, tool => OutputSchema(tool.Name, tool.Namespace)),
+            loadout => CodemodeToolDefinition.PrepareLoadout(loadout, mode, withModels, inlineBudget, tool => tool.OutputSchema ?? OutputSchema(tool.Name, tool.Namespace)),
             descriptor => descriptor with
             {
                 DefaultActive = defaultActive, PromptGuidelines = CodemodeToolDefinition.PromptGuidelines,
@@ -90,7 +90,7 @@ internal static class McpCodemode
                     row.Tool.Declaration.Value.TryGetProperty("parameters", out var parameters) ? JsonData.FromElement(parameters) : JsonData.EmptyObject)
                 {
                     Namespace = row.Tool.Namespace, PromptGuidelines = row.Tool.PromptGuidelines.IsDefault ? [] : row.Tool.PromptGuidelines,
-                    OutputSchema = OutputSchema(row.Name, row.Tool.Namespace)
+                    OutputSchema = row.Tool.OutputSchema ?? OutputSchema(row.Name, row.Tool.Namespace)
                 })];
         });
         private readonly Lazy<ICodemodeModelRuntime?> runtime = new(models);

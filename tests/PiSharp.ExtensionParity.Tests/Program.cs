@@ -9,7 +9,8 @@ using PiSharp.Cli.Pi;
 // cli/args.ts (--extension, --no-extensions, extension flags) and cli/config-selector.ts. Expectations are written from the pinned
 // sources by reading, never captured from an upstream run. Cases that run extension code need Node.js on PATH (22.13 or later for
 // TypeScript) and report SKIP_NO_NODE without it; package cases that install from npm need npm and use only local tarballs and a
-// local registry fixture. No network, no real credentials, no real home or agent directory.
+// local registry fixture. The only network use is the one-time npm install of the Pi 1.1.0 packages extensions run
+// against (PiNodeRuntime, verified against the public registry); without it the cases run on the compatibility modules. No real credentials, no real home or agent directory.
 internal static partial class Program
 {
     private const string Upstream = "abe508e1b89912adde45528136c3221eb69acdd7";
@@ -28,6 +29,8 @@ internal static partial class Program
         cases.AddRange(BridgeCases());
         cases.AddRange(CliCases());
         cases.AddRange(ProviderCases());
+        cases.AddRange(RuntimeCases());
+        cases.AddRange(GapCases());
         var filter = Environment.GetEnvironmentVariable("EXTPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0; var skipped = 0;
@@ -73,6 +76,23 @@ internal static partial class Program
         var parts = version.TrimStart('v').Split('.');
         if (int.Parse(parts[0]) < 22 || int.Parse(parts[0]) == 22 && int.Parse(parts[1]) < 13) throw new SkipException("NO_NODE", "Node.js " + version + " is older than 22.13.");
     }
+    /// <summary>The Pi 1.1.0 packages for every sandbox: installed with npm from the public registry once (the production installer,
+    /// verified against the registry's integrity hashes) into a machine-wide test folder. Null (and the compatibility modules) when
+    /// Node, npm or the registry is unavailable.</summary>
+    internal static readonly string SharedPiRuntimeDirectory = Path.Combine(Path.GetFullPath(Path.GetTempPath()), "pisharp-ext-parity-pi-runtime", PiSharp.Cli.Extensions.Pi.PiNodeRuntime.PiVersion);
+    internal static readonly Lazy<Task<string?>> SharedPiRuntime = new(async () =>
+    {
+        if (NodeVersion.Value is null || NpmVersion.Value is null) return null;
+        var (modules, fallback) = await PiSharp.Cli.Extensions.Pi.PiNodeRuntime.EnsureAsync(SharedPiRuntimeDirectory,
+            name => name == "PISHARP_PI_RUNTIME_DIR" ? SharedPiRuntimeDirectory : null, Console.Error, null, null, CancellationToken.None);
+        if (fallback is not null) Console.Error.WriteLine("ExtensionParity: " + fallback);
+        return modules;
+    });
+    private static string RequirePiRuntime()
+    {
+        RequireNpm();
+        return SharedPiRuntime.Value.GetAwaiter().GetResult() ?? throw new SkipException("NO_PI_RUNTIME", "The Pi 1.1.0 packages could not be installed (no registry access).");
+    }
     private static void RequireNpm() { RequireNode(); if (NpmVersion.Value is null) throw new SkipException("NO_NPM", "npm is not on PATH."); }
     private static void RequireGit() { if (GitVersion.Value is null) throw new SkipException("NO_GIT", "git is not on PATH."); }
 
@@ -104,6 +124,8 @@ internal static partial class Program
             Home = Path.Combine(Root, "home"); AgentDir = Path.Combine(Home, ".pi", "agent"); Cwd = Path.Combine(Root, "project");
             Directory.CreateDirectory(AgentDir); Directory.CreateDirectory(Cwd);
             Vars["ANTHROPIC_API_KEY"] = "sk-test-key";
+            // Extensions run against the real Pi 1.1.0 packages, installed once per machine for the suite (PiNodeRuntime).
+            if (SharedPiRuntime.Value.GetAwaiter().GetResult() is not null) Vars["PISHARP_PI_RUNTIME_DIR"] = SharedPiRuntimeDirectory;
             // The sandbox is a git repository, so the ancestor walk for .agents/skills stops at its root (collectAncestorAgentsSkillDirs).
             Directory.CreateDirectory(Path.Combine(Root, ".git"));
             File.WriteAllText(Path.Combine(Root, ".git", "HEAD"), "ref: refs/heads/main\n");

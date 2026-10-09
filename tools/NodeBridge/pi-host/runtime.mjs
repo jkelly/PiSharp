@@ -110,6 +110,9 @@ export function describeExtension(ext) {
 export class ExtensionRuntime {
   constructor(bridge, options) {
     this.bridge = bridge;
+    this.options = options;
+    /** Reload generation: the compatibility loader imports a reloaded module afresh (jiti's moduleCache:false does in Pi mode). */
+    this.generation = options.generation ?? 0;
     this.cwd = options.cwd;
     this.mode = options.mode ?? 'print';
     this.hasUI = options.hasUI === true;
@@ -127,6 +130,10 @@ export class ExtensionRuntime {
     this.uiPromptDepth = 0; this.activeUIPrompt = undefined;
     this.components = new Map(); this.nextComponent = 0;
     this.themeFactory = options.themeFactory;
+    this.importExtension = options.importExtension;
+    this.tuiModule = options.tuiModule;
+    this.editorTheme = options.editorTheme;
+    this.createEventStream = options.createEventStream;
     this.themeName = options.theme ?? 'dark';
     this.rendererState = new Map();
     this.callbacks = new Map();
@@ -283,9 +290,14 @@ export class ExtensionRuntime {
   async load(extensionPath) {
     const resolvedPath = path.resolve(this.cwd, extensionPath);
     try {
-      const imported = await import(pathToFileURL(resolvedPath).href);
-      let factory = imported && 'default' in imported ? imported.default : imported;
-      if (factory && typeof factory === 'object' && typeof factory.default === 'function') factory = factory.default;
+      let factory;
+      if (this.importExtension) factory = await this.importExtension(resolvedPath);
+      else {
+        const url = pathToFileURL(resolvedPath).href + (this.generation > 0 ? `?pisharp-reload=${this.generation}` : '');
+        const imported = await import(url);
+        factory = imported && 'default' in imported ? imported.default : imported;
+        if (factory && typeof factory === 'object' && typeof factory.default === 'function') factory = factory.default;
+      }
       if (typeof factory !== 'function') return { error: `Extension does not export a valid factory function: ${extensionPath}` };
       const extension = this.createExtension(extensionPath, resolvedPath);
       const load = this.createExtensionAPI(extension);
@@ -452,13 +464,36 @@ export class ExtensionRuntime {
       refresh: (options) => bridge.call('models.call', { ctx, op: 'refresh', args: [options ?? {}] }),
       classify: (model, context, options) => bridge.call('models.call', { ctx, op: 'classify', args: [model, context, plainOptions(options)] }, { signal: options?.signal }),
       generateImages: (model, context, options) => bridge.call('models.call', { ctx, op: 'generateImages', args: [model, context, plainOptions(options)] }, { signal: options?.signal }),
-      complete: (model, context, options) => bridge.call('models.call', { ctx, op: 'complete', args: [model, context, plainOptions(options)] }, { signal: options?.signal }),
+      // model-registry.ts stream/streamSimple/complete: request-time authentication and PiSharp's live route for the model.
+      stream: (model, context, options) => this.modelStream('stream', model, context, options, ctx),
+      streamSimple: (model, context, options) => this.modelStream('streamSimple', model, context, options, ctx),
+      complete: (model, context, options) => this.modelStream('complete', model, context, options, ctx).result(),
+      completeSimple: (model, context, options) => this.modelStream('completeSimple', model, context, options, ctx).result(),
       registerProvider: (providerOrName, config) => typeof providerOrName === 'string'
         ? this.registerProvider(providerOrName, config, { path: '<modelRegistry>' }) : this.registerNativeProvider(providerOrName, { path: '<modelRegistry>' }),
       unregisterProvider: (name) => this.unregisterProvider(name),
       registerVirtualModel: (definition) => this.registerVirtualModel(definition, { path: '<modelRegistry>' }),
       unregisterVirtualModel: (provider, id) => this.unregisterVirtualModel(provider, id),
     };
+  }
+
+  /** An AssistantMessageEventStream (the installed pi-ai's, or the compatibility module's) over the host's answer for the model. */
+  modelStream(name, model, context, options, ctx) {
+    const stream = this.createEventStream();
+    const failed = (error) => ({
+      role: 'assistant', content: [], api: model?.api ?? 'unknown', provider: model?.provider ?? 'unknown', model: model?.id ?? 'unknown',
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+      stopReason: options?.signal?.aborted ? 'aborted' : 'error', errorMessage: message(error), timestamp: Date.now(),
+    });
+    const finish = (result) => {
+      if (result.stopReason === 'error' || result.stopReason === 'aborted') stream.push({ type: 'error', reason: result.stopReason, error: result });
+      else { stream.push({ type: 'start', partial: result }); stream.push({ type: 'done', reason: result.stopReason ?? 'stop', message: result }); }
+      stream.end(result);
+    };
+    this.bridge.call('bridge.call', { name, args: [model, context, plainOptions(options)], ctx }, { signal: options?.signal })
+      .then((result) => finish(result && typeof result === 'object' && result.role === 'assistant' ? result : failed(new Error('PiSharp host returned no message'))),
+        (error) => finish(failed(error)));
+    return stream;
   }
 
   /** Source ExtensionUIContext over the host UI, with the ui_prompt_start/ui_prompt_end wrapping of withUIPrompt. */
@@ -504,8 +539,12 @@ export class ExtensionRuntime {
       pasteToEditor: (text) => bridge.notify('ui.publish', { ctx, op: 'pasteToEditor', args: [text] }),
       setEditorText: (text) => bridge.notify('ui.publish', { ctx, op: 'setEditorText', args: [text] }),
       getEditorText: () => bridge.sync('ui.read', { ctx, op: 'getEditorText' }) ?? '',
-      addAutocompleteProvider: () => bridge.notify('ui.publish', { ctx, op: 'addAutocompleteProvider', args: [] }),
-      setEditorComponent: (factory) => { runtime.editorFactory = factory; bridge.notify('ui.publish', { ctx, op: 'setEditorComponent', args: [factory ? { component: runtime.createComponent((tui, theme, keybindings) => factory(tui, theme, keybindings)) } : null] }); },
+      // interactive-mode.ts addAutocompleteProvider: the factory wraps the mode's provider (a proxy to it), once per base provider.
+      addAutocompleteProvider: (factory) => bridge.notify('ui.publish', { ctx, op: 'addAutocompleteProvider', args: [{ wrapper: runtime.registerAutocomplete(factory) }] }),
+      // interactive-mode.ts setCustomEditorComponent: factory(tui, getEditorTheme(), keybindings); the mode wires submit, change and
+      // the app actions of a CustomEditor.
+      setEditorComponent: (factory) => { runtime.editorFactory = factory; bridge.notify('ui.publish', { ctx, op: 'setEditorComponent', args: [factory ? { component: runtime.createEditorComponent(factory) } : null] }); },
+      getEditorComponent: () => runtime.editorFactory,
       getEditorComponent: () => runtime.editorFactory,
       get theme() { return runtime.theme(); },
       getAllThemes: () => bridge.sync('ui.read', { ctx, op: 'getAllThemes' }) ?? [],
@@ -562,7 +601,69 @@ export class ExtensionRuntime {
   // ---------------------------------------------------------------------------------------------------------------- components
 
   /** A component lives here; the host renders it with component.render(width) and feeds keys with component.input(data). */
-  createComponent(factory) {
+  /** The mode's effective keybindings and its editor's app actions (editor.configure), for CustomEditor-based editors. */
+  configureEditor(keybindings, actions) {
+    this.keybindingsConfig = keybindings ?? {};
+    this.editorActions = actions ?? [];
+    for (const id of this.editorIds ?? []) { const editor = this.components.get(id)?.component; if (editor) this.wireEditor(id, editor); }
+  }
+  editorKeybindings() {
+    const runtime = this;
+    const keys = (action) => { const value = runtime.keybindingsConfig?.[action]; return value === undefined ? [] : Array.isArray(value) ? value : [value]; };
+    return { matches: (data, action) => keys(action).some(key => runtime.tuiModule?.matchesKey?.(data, key) === true), getKeys: keys, get: keys };
+  }
+  createEditorComponent(factory) {
+    const runtime = this;
+    this.editorIds ??= new Set();
+    const id = this.createComponent((tui) => factory(tui, runtime.editorTheme?.() ?? runtime.theme(), runtime.editorKeybindings()),
+      (component, componentId) => runtime.wireEditor(componentId, component));
+    this.editorIds.add(id);
+    return id;
+  }
+  wireEditor(id, editor) {
+    const notify = (event, extra) => this.bridge.notify('component.event', { id, event, ...extra });
+    editor.onSubmit = (text) => notify('submit', { text });
+    editor.onChange = (text) => notify('change', { text });
+    if (editor.actionHandlers instanceof Map) {
+      editor.onEscape ??= () => notify('action', { action: 'app.interrupt' });
+      editor.onCtrlD ??= () => notify('action', { action: 'app.exit' });
+      editor.onPasteImage ??= () => notify('action', { action: 'app.clipboard.pasteImage' });
+      editor.onExtensionShortcut ??= (data) => this.bridge.sync('editor.shortcut', { data }) === true;
+      for (const action of this.editorActions ?? []) if (!editor.actionHandlers.has(action)) editor.actionHandlers.set(action, () => notify('action', { action }));
+    }
+  }
+  callComponent(id, method, args) {
+    const component = this.components.get(id)?.component;
+    const fn = component?.[method];
+    return typeof fn === 'function' ? fn.apply(component, args ?? []) : undefined;
+  }
+
+  // Autocomplete providers (addAutocompleteProvider): each wrapper wraps a proxy of a host provider (its token).
+  registerAutocomplete(factory) {
+    const id = `a${++this.nextComponent}`;
+    (this.autocompletes ??= new Map()).set(id, { factory, providers: new Map() });
+    return id;
+  }
+  hostAutocomplete(token) {
+    const bridge = this.bridge;
+    return {
+      get triggerCharacters() { return bridge.sync('autocomplete.base', { token, op: 'triggers' }) ?? []; },
+      getSuggestions: (lines, cursorLine, cursorCol, options) =>
+        bridge.call('autocomplete.base', { token, op: 'suggest', lines, cursorLine, cursorCol, force: options?.force === true }, { signal: options?.signal }),
+      applyCompletion: (lines, cursorLine, cursorCol, item, prefix) => bridge.sync('autocomplete.base', { token, op: 'apply', lines, cursorLine, cursorCol, item, prefix }),
+      shouldTriggerFileCompletion: (lines, cursorLine, cursorCol) => bridge.sync('autocomplete.base', { token, op: 'file', lines, cursorLine, cursorCol }) !== false,
+    };
+  }
+  autocompleteProvider(wrapper, token) {
+    const entry = this.autocompletes?.get(wrapper);
+    if (!entry) throw new Error(`Unknown autocomplete provider ${wrapper}`);
+    let provider = entry.providers.get(token);
+    if (!provider) { provider = entry.factory(this.hostAutocomplete(token)); entry.providers.set(token, provider); }
+    return provider;
+  }
+  setEditorAutocomplete(id, token) { this.components.get(id)?.component?.setAutocompleteProvider?.(this.hostAutocomplete(token)); }
+
+  createComponent(factory, onCreated) {
     const id = `c${++this.nextComponent}`;
     const runtime = this, bridge = this.bridge;
     const tui = {
@@ -574,8 +675,8 @@ export class ExtensionRuntime {
     const record = { id, component: undefined, pending: undefined };
     this.components.set(id, record);
     const created = factory(tui, runtime.theme(), keybindings);
-    if (created && typeof created.then === 'function') record.pending = created.then(component => { record.component = component; bridge.notify('component.invalidate', { id }); }, () => {});
-    else record.component = created;
+    if (created && typeof created.then === 'function') record.pending = created.then(component => { record.component = component; onCreated?.(component, id); bridge.notify('component.invalidate', { id }); }, () => {});
+    else { record.component = created; if (created) onCreated?.(created, id); }
     return id;
   }
   renderComponent(id, width) {

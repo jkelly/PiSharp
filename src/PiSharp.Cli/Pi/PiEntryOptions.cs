@@ -45,6 +45,9 @@ internal sealed record PiEntryOptions
     internal string? SessionCwdOverride { get; init; }
     /// <summary>Re-reads the settings files (the SettingsManager the session runtime reads when it creates a new session).</summary>
     internal Func<CancellationToken, Task<StartupSettingsSnapshot>>? ReloadSettings { get; init; }
+    /// <summary>resourceLoader.reload() for /reload and ctx.reload(): skills, prompt templates and the system prompt inputs (context
+    /// files, SYSTEM.md, APPEND_SYSTEM.md), with resources_discover (reason "reload") asked of the session's extensions.</summary>
+    internal Func<PiSharp.Cli.Extensions.NativeExtensionActivation?, CancellationToken, Task<PiReloadedResources>>? ReloadResources { get; init; }
     internal required OriginalSystemPromptAdmission SystemPrompt { get; init; }
     internal required LiveSessionSelection Selection { get; init; }
     internal required LiveSessionRuntime LiveRuntime { get; init; }

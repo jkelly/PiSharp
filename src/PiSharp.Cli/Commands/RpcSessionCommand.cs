@@ -170,6 +170,7 @@ public static class RpcSessionCommand
             }
             IExtensionUiProvider? activationUi = ui is null ? null : decorateTerminalUi?.Invoke(ui) ?? ui;
             if (activationUi is not null && terminalInputAdmission is not null) activationUi = terminalInputAdmission.Decorate(activationUi);
+            if (piExtensions is not null) piExtensions.UiProvider = activationUi;
             profile = await OfflineSessionProfile.CreateAsync(parsed.Workspace, parsed.Session, parsed.Script,
                 turns, parsed.Reads, parsed.Writes, cancellationToken, gate.BeforeSendAsync, parsed.OfflineApi, parsed.Bash, parsed.Extension, activationUi,
                 async (diagnostic, token) =>
@@ -203,6 +204,8 @@ public static class RpcSessionCommand
             profile.ConfigureEffectiveSettings(settings);
             profile.BindSettingsThinkingReads();
             if (pi?.Skills is { } piSkills) profile.AdoptOriginalPromptSkills(piSkills);
+            // /reload and ctx.reload() (agent-session.ts reload): the Pi entry reloads extensions and resources in place.
+            if (pi is not null) { profile.PiReloadResources = pi.ReloadResources; if (pi.Extensions is { } reloading) { var reloader = profile; reloading.Reload = reloader.PiReloadAsync; } }
             else await profile.LoadSkillsAsync(parsed.Skills, stderr, cancellationToken).ConfigureAwait(false);
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);
@@ -270,6 +273,9 @@ public static class RpcSessionCommand
             // in interactive mode), as agent-session.ts setModel/cycleModel do over modelRuntime.getAvailableSnapshot.
             var liveModels = pi is not null && profile.IsLive
                 ? await profile.EnableModelSwitchingAsync(liveRuntime ?? LiveSessionRuntime.Default, cancellationToken).ConfigureAwait(false) : null;
+            // model-runtime.ts registerProvider/unregisterProvider/unregisterVirtualModel after startup: the selectable models follow.
+            if (pi?.Extensions is { } providerHost && liveModels is not null)
+                providerHost.ProvidersChanged = () => _ = liveModels.RefreshAsync().ContinueWith(task => _ = task.Exception, TaskScheduler.Default);
             var scope = liveSelection?.ScopedModels ?? [];
             var modelRuntime = liveModels is null ? null : new PiSharp.Rpc.Protocol.RpcModelRuntime(() => liveModels.Available)
             {
@@ -291,6 +297,12 @@ public static class RpcSessionCommand
                 compactionSettings: pi is null ? null : model => CompactionSettings(pi.ReloadSettings is { } reloadCompaction
                     ? reloadCompaction(CancellationToken.None).GetAwaiter().GetResult() : settings, model));
             profile.ConfigureLifecycleModeStop(lifecycleStop.CancelAsync);
+            if (pi?.Extensions is { } compactingExtensions)
+            {
+                var compactor = dispatcher;
+                compactingExtensions.Compact = async (instructions, token) =>
+                    System.Text.Json.Nodes.JsonNode.Parse((await compactor.CompactForExtensionAsync(profile.ManualCompactionRequest(instructions), token).ConfigureAwait(false)).ToString());
+            }
             // IMPL-I: the interactive mode reads the live session for features the RPC protocol does not carry.
             var publishedProfile = profile; var publishedSession = session;
             pi?.Interactive?.Host.Publish(() => publishedProfile.Sessions?.Current.Session ?? publishedSession, publishedProfile);
@@ -366,6 +378,7 @@ public static class RpcSessionCommand
             if (finalSession is not null)
             {
                 var state = finalSession.Snapshot;
+                if (state.Fault is not null && Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1") await stderr.WriteAsync("session fault: " + state.Fault + Environment.NewLine).ConfigureAwait(false);
                 var bytes = backend is null ? new FileInfo(finalSession.Path).Length : backend.GetMetadata(finalSession.Path).Bytes;
                 var newFault = state.Fault is not null &&
                     (operationFailure is null || !ReferenceEquals(state.Fault, operationFault));
@@ -376,7 +389,10 @@ public static class RpcSessionCommand
         catch (Exception error) { cleanupFailures.Add(error); }
         settlement?.Complete((operationFailure is null ? cleanupFailures : cleanupFailures.Prepend(operationFailure)).ToImmutableArray());
         if (cleanupFailures.Count > 0)
+        {
+            if (Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1") await stderr.WriteAsync(string.Join(Environment.NewLine, cleanupFailures) + Environment.NewLine).ConfigureAwait(false);
             return await Fail("CleanupFailed", "RPC host cleanup failed after joining owned work; inspect durable state.", 1).ConfigureAwait(false);
+        }
         if (operationFailure is null)
         {
             if (cancellationToken.IsCancellationRequested && userShutdown?.Invoke() != true)

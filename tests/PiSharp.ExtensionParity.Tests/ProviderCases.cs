@@ -8,19 +8,18 @@ internal static partial class Program
     private static IEnumerable<(string, Func<Task>)> ProviderCases() =>
     [
         ("provider.classifier-and-image-providers-registered-by-an-extension", ClassifierAndImageProviders),
-        ("provider.pi-ai-complete-from-extension-code", CompleteFromExtension),
+        ("provider.model-registry-complete-from-extension-code", CompleteFromExtension),
     ];
 
-    // summarize.ts/qna.ts style: an extension calls pi-ai complete() with ctx.model; the request streams through PiSharp's live route.
+    // summarize.ts/qna.ts: an extension calls ctx.modelRegistry.complete() with ctx.model; the request streams through PiSharp's live route.
     private static async Task CompleteFromExtension()
     {
         using var sandbox = NodeSandbox("complete");
         var extension = sandbox.Write(Path.Combine(sandbox.Cwd, "summarize.ts"), """
-            import { complete } from "@earendil-works/pi-ai";
             import { appendFileSync } from "node:fs";
             export default function (pi: any) {
               pi.registerCommand("summarize", { description: "Summarize", handler: async (args: string, ctx: any) => {
-                const reply = await complete(ctx.model, { systemPrompt: "You summarize.", messages: [{ role: "user", content: [{ type: "text", text: "Summarize: " + args }], timestamp: Date.now() }] });
+                const reply = await ctx.modelRegistry.complete(ctx.model, { systemPrompt: "You summarize.", messages: [{ role: "user", content: [{ type: "text", text: "Summarize: " + args }], timestamp: Date.now() }] });
                 appendFileSync(process.cwd() + "/probe.log", JSON.stringify(["reply", reply.stopReason, reply.content.map((c: any) => c.text ?? "").join(""), reply.errorMessage ?? null]) + "\n");
               } });
             }

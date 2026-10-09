@@ -21,6 +21,9 @@ public sealed record ExtensionRegistryOptions
         ["read", "bash", "powershell", "edit", "write", "grep", "find", "ls"];
     public ImmutableArray<string> ReservedCommandNames { get; init; } =
         ["help", "quit", "exit", "reload", "settings", "trust", "permissions"];
+    /// <summary>Command names as Pi accepts them: any non-empty name without whitespace or control characters (Pi's registerCommand
+    /// takes any name, and a duplicate becomes <c>name:N</c>). Registration ids stay identifiers.</summary>
+    public bool AllowAnyCommandName { get; init; }
 }
 
 public enum ExtensionRegistrationFailure
@@ -76,6 +79,9 @@ internal static class RegistrationPolicy
         value is { Length: > 0 } && value.Length <= maximum &&
         value.All(character => character is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or
             >= '0' and <= '9' or '.' or '_' or '-');
+
+    internal static bool CommandName(string? value, int maximum) =>
+        value is { Length: > 0 } && value.Length <= maximum && !value.Any(character => char.IsWhiteSpace(character) || char.IsControl(character));
 
     internal static bool Description(string? value, ExtensionRegistryOptions options) =>
         value is not null && value.Length <= options.MaximumDescriptionCharacters &&
