@@ -71,7 +71,7 @@ public sealed class McpPreOpenServerCapture : IAsyncDisposable
                 !ReferenceEquals(owner.Current, attachment) || attachment.LifetimeToken.IsCancellationRequested ||
                 invocation.SessionGeneration != attachment.Generation || attachment.Generation != options.Generation ||
                 runtime.Snapshot.Generation != options.Generation || string.IsNullOrWhiteSpace(invocation.OwnerId) ||
-                invocation.OwnerGeneration <= 0 || string.IsNullOrWhiteSpace(invocation.ToolCallId))
+                invocation.OwnerGeneration <= 0 || invocation.ToolCallId is null)
                 throw new InvalidOperationException("Resource capture requires this capture's live bound attachment and runtime generation.");
             return runtime.CaptureResourceServer(invocation);
         }

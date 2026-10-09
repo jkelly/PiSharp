@@ -106,7 +106,7 @@ public sealed class McpPreparedServer : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(invocation); RefuseReentry(); ValidateAttachment();
         scope.ExtensionLifetimeCancellationToken.ThrowIfCancellationRequested();
         if (invocation.SessionGeneration != attachment.Generation || string.IsNullOrWhiteSpace(invocation.OwnerId) ||
-            invocation.OwnerGeneration <= 0 || string.IsNullOrWhiteSpace(invocation.ToolCallId))
+            invocation.OwnerGeneration <= 0 || invocation.ToolCallId is null)
             throw new InvalidOperationException("Resource capture requires the actual prepared attachment invocation.");
         lock (admission)
         {

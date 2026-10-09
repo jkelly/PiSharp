@@ -305,12 +305,15 @@ public sealed class ToolInvoker : IFinalizedToolExecutor
                 !ReferenceEquals(assistant.Content[invocation.SourceIndex], invocation.Call) ||
                 invocation.Call.Id is null || invocation.Call.Name is null ||
                 invocation.Call.Id.Length > _options.MaximumActionCharacters || invocation.Call.Name.Length > _options.MaximumActionCharacters ||
-                !ValidText(invocation.Call.Id, nonempty: true) || !ValidText(invocation.Call.Name, nonempty: true))
+                !ValidText(invocation.Call.Id, nonempty: false) || !ValidText(invocation.Call.Name, nonempty: true))
                 return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+            // Owner decision 13: agent-loop.ts runs a call whatever id its API finalized. openai-completions.ts and bedrock-converse-stream.ts
+            // give an id-less call the id "", which several calls of one message may share; non-empty ids stay unique. The id is identity,
+            // not authority: the name, the reachable set, preparation, policy and hooks below still decide whether anything runs.
             var ids = new HashSet<string>(StringComparer.Ordinal);
             foreach (var call in assistant.Content.OfType<ToolCallContent>())
                 if (call.Id is null || call.Id.Length > _options.MaximumActionCharacters ||
-                    !ValidText(call.Id, nonempty: true) || !ids.Add(call.Id)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
+                    !ValidText(call.Id, nonempty: false) || call.Id.Length > 0 && !ids.Add(call.Id)) return CompleteResult(Error(ToolFailureKind.InvalidArguments));
             if (!_tools.TryGetValue(invocation.Call.Name, out var tool)) return CompleteResult(Error(ToolFailureKind.UnknownTool));
             var reachable = invocation.Context?.CallDepth is > 0 ? _options.AllowedNestedTools : _options.AllowedRootTools;
             if (reachable is not null && !reachable.Contains(invocation.Call.Name))

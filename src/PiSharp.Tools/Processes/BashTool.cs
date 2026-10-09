@@ -68,7 +68,8 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             invocation.AssistantMessage.Content.IsDefault || invocation.SourceIndex < 0 ||
             invocation.SourceIndex >= invocation.AssistantMessage.Content.Length ||
             !ReferenceEquals(invocation.AssistantMessage.Content[invocation.SourceIndex], invocation.Call) ||
-            !Text(invocation.Call.Id) || string.IsNullOrWhiteSpace(invocation.Call.Id))
+            // An id-less call (id "", owner decision 13) runs as upstream runs it; the id names the call, it authorizes nothing.
+            !Text(invocation.Call.Id))
             throw Invalid();
         var input = Parse(invocation.Call.Arguments, normalized: false);
         cancellationToken.ThrowIfCancellationRequested();

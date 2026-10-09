@@ -176,9 +176,13 @@ internal static class OpenAICompletionsWireTests
             "Indexed provisional identity was delayed, invented or never finalized.");
         var filled = (ToolCallContent)Terminal(provisional).Message.Content[0];
         Equal("filled", filled.Id); Equal("read", filled.Name); Equal("{\"n\":1}", filled.Arguments.ToString());
+        // Owner decision 13: openai-completions.ts ensureToolCallBlock keeps a call that never gets an id or a name with id "" and name ""
+        // (`toolCall.id || ""`, `function?.name ?? custom?.name ?? ""`) and ends it normally; the captured pi-ai 1.1.0 turn is toolUse.
         var neverFilled = await Collect([ToolChunk(new { index = 9, function = new { arguments = "{}" } }), Finish("tool_calls")]);
-        Failed(Terminal(neverFilled), OpenAICompletionsWireFailure.MalformedStream);
-        Equal(0, neverFilled.OfType<ToolCallEnded>().Count()); Equal(0, neverFilled.OfType<StreamDone>().Count());
+        Check(Terminal(neverFilled) is StreamDone { Reason: StopReason.ToolUse } && neverFilled.OfType<ToolCallEnded>().Count() == 1,
+            "A call that never got an identity did not end as upstream ends it.");
+        var nameless = (ToolCallContent)Terminal(neverFilled).Message.Content[0];
+        Equal("", nameless.Id); Equal("", nameless.Name); Equal("{}", nameless.Arguments.ToString());
         var encrypted = Terminal(await Collect([
             """{"choices":[{"delta":{"reasoning_details":[{"type":"reasoning.encrypted","data":"private"}]}}]}""", Finish("stop")]));
         Check(encrypted is StreamDone && encrypted.Message.Content[0] is ThinkingContent { Thinking: "" },

@@ -570,7 +570,8 @@ public sealed partial class ExtensionRegistry : IAsyncDisposable
 
     private bool ValidInvocationId(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Length > options.MaximumJsonCharacters || value.Contains('\0')) return false;
+        // An id-less call keeps the id "" its API gave it (owner decision 13); the id identifies the invocation, it authorizes nothing.
+        if (value is null || value.Length > options.MaximumJsonCharacters || value.Contains('\0')) return false;
         for (var index = 0; index < value.Length; index++)
             if (char.IsHighSurrogate(value[index])) { if (++index >= value.Length || !char.IsLowSurrogate(value[index])) return false; }
             else if (char.IsLowSurrogate(value[index])) return false;

@@ -152,9 +152,12 @@ internal static class CompletionsSourceDifferentialTests
         var header = frames.OfType<ToolCallHeaderUpdated>().Single();
         Check(CompletionsSourceEventProjection.ReadEmission(header) is null, "Native header update invented an extra source push.");
         Equal("", start.ToolCall.Id, "mutable alias entered native start");
-        var failed = await Collect(["""{"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"arguments":"{}"}}]},"finish_reason":"tool_calls"}]}"""]);
-        Check(failed[^1] is StreamError && !failed.OfType<ToolCallEnded>().Any() && !failed.OfType<StreamDone>().Any(),
-            "Provisional identity acquired final tool authority.");
+        // Owner decision 13: a provisional identity that is never filled ends as upstream ends it, with id "" and name ""
+        // (openai-completions.ts ensureToolCallBlock; captured pi-ai 1.1.0 turn is toolUse). Its finality grants no execution: the agent
+        // finds no tool named "" and answers "Tool  not found".
+        var unfilled = await Collect(["""{"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"arguments":"{}"}}]},"finish_reason":"tool_calls"}]}"""]);
+        Check(unfilled[^1] is StreamDone { Reason: StopReason.ToolUse } && unfilled.OfType<ToolCallEnded>().Single().ToolCall is { Id: "", Name: "" },
+            "An unfilled provisional identity did not end as upstream ends it.");
         // Pi abe508 openai-completions.ts:464 finalizes with parseStreamingJson (json-parse.ts:104-124): an unfinished '{"n":' is the
         // partial-json {} (installed pi-ai 1.1.0), so a complete identity with repaired arguments ends the call.
         var repaired = await Collect(["""{"choices":[{"delta":{"tool_calls":[{"index":1,"id":"x","function":{"name":"read","arguments":"{\"n\":"}}]},"finish_reason":"tool_calls"}]}"""]);

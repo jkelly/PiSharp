@@ -72,7 +72,7 @@ public sealed class McpServerRuntime : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(invocation);
         if (publishing.Value) throw new InvalidOperationException("MCP callback cannot capture its owning runtime.");
         var identity = new McpInvocationIdentity(invocation.OwnerId, invocation.OwnerGeneration, invocation.SessionGeneration, invocation.ToolCallId, invocation.ParentToolCallId);
-        if (string.IsNullOrWhiteSpace(identity.OwnerId) || identity.OwnerGeneration <= 0 || identity.SessionGeneration <= 0 || string.IsNullOrWhiteSpace(identity.ToolCallId))
+        if (string.IsNullOrWhiteSpace(identity.OwnerId) || identity.OwnerGeneration <= 0 || identity.SessionGeneration <= 0 || identity.ToolCallId is null)
             throw new InvalidOperationException("Resource capture requires an actual native invocation identity.");
         lock (gate)
         {
@@ -98,7 +98,7 @@ public sealed class McpServerRuntime : IAsyncDisposable
         if (capturedGeneration != options.Generation) throw new InvalidOperationException("Stale captured MCP resource generation.");
         var identity = new McpInvocationIdentity(invocation.OwnerId, invocation.OwnerGeneration, invocation.SessionGeneration, invocation.ToolCallId, invocation.ParentToolCallId);
         if (requestOptions.InvocationIdentity != identity || string.IsNullOrWhiteSpace(identity.OwnerId) || identity.OwnerGeneration <= 0 ||
-            identity.SessionGeneration <= 0 || string.IsNullOrWhiteSpace(identity.ToolCallId))
+            identity.SessionGeneration <= 0 || identity.ToolCallId is null)
             throw new InvalidOperationException("Resource requests require the actual captured native invocation identity.");
         if (!double.IsFinite(requestOptions.TimeoutMilliseconds) || requestOptions.TimeoutMilliseconds <= 0 || requestOptions.MaximumResponseBytes <= 0 || requestOptions.OnProgress is not null)
             throw new ArgumentException("Bounded resource request options with runtime-owned progress required.", nameof(requestOptions));
