@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): coding-agent/src/cli/startup-ui.ts (createStartupTui, startStartupTui,
 // showStartupSelector, showStartupInput, showFirstTimeSetup, shouldRunFirstTimeSetup), coding-agent/src/cli/session-picker.ts
-// (selectSession) and the interactive prompts main.ts runs before the session starts (project trust, missing session cwd).
+// (selectSession), coding-agent/src/cli/config-selector.ts (selectConfig) and the interactive prompts main.ts runs before the session\n// starts (project trust, missing session cwd).
 using System.Collections.Immutable;
 using PiSharp.Cli.Interactive.Mode.Components;
 using PiSharp.Cli.Pi;
@@ -112,4 +112,38 @@ internal sealed class StartupUi(string agentDir, string cwd, Func<string, string
                 path => finish(path), () => finish(null), () => { ui.Stop(); Environment.Exit(0); }, () => ui.RequestRender(),
                 new SessionSelectorOptions { ShowRenameHint = false, Keybindings = keybindings.Manager });
         }, token, focus: component => ((SessionSelectorComponent)component).GetSessionList());
+
+    /// <summary>cli/config-selector.ts selectConfig (<c>pisharp config</c>): the package resource configuration TUI; completes when it
+    /// closes. Changes are written through the command's settings (SettingsManager setters).</summary>
+    public Task SelectConfigAsync(PiSharp.Cli.Packages.PiPackageConfigRequest request, CancellationToken token = default)
+    {
+        static ResolvedPaths Map(PiSharp.Cli.Packages.PiResolvedPaths paths)
+        {
+            static IReadOnlyList<ResolvedResource> Resources(IEnumerable<PiSharp.Cli.Packages.PiResolvedResource> items) => [.. items.Select(item =>
+                new ResolvedResource(item.Path, item.Enabled, new(item.Metadata.Source, item.Metadata.Scope, item.Metadata.Origin, item.Metadata.BaseDir, item.Metadata.PackageRoot)))];
+            return new(Resources(paths.Extensions), Resources(paths.Skills), Resources(paths.Prompts), Resources(paths.Themes));
+        }
+        return RunAsync<bool>((ui, _, finish) => new ConfigSelectorComponent(new(Map(request.Global), Map(request.Project)),
+            new ConfigSettings(request.Settings), request.Cwd, request.AgentDir, () => finish(true), () => { ui.Stop(); Environment.Exit(0); },
+            () => ui.RequestRender(), ui.Terminal.Rows, request.WriteScope, request.ProjectModeAvailable),
+            token, focus: component => ((ConfigSelectorComponent)component).GetResourceList());
+    }
+
+    /// <summary>The SettingsManager setters config-selector.ts calls, over the command's <see cref="PiSettings"/>.</summary>
+    private sealed class ConfigSettings(PiSettings settings) : IConfigSelectorSettings
+    {
+        private static System.Text.Json.Nodes.JsonArray Array(IReadOnlyList<string> paths) => [.. paths.Select(path => (System.Text.Json.Nodes.JsonNode)path)];
+        public System.Text.Json.Nodes.JsonObject GetGlobalSettings() => settings.Global;
+        public System.Text.Json.Nodes.JsonObject GetProjectSettings() => settings.Project;
+        public void SetExtensionPaths(IReadOnlyList<string> paths) => settings.SetField("global", "extensions", Array(paths));
+        public void SetSkillPaths(IReadOnlyList<string> paths) => settings.SetField("global", "skills", Array(paths));
+        public void SetPromptTemplatePaths(IReadOnlyList<string> paths) => settings.SetField("global", "prompts", Array(paths));
+        public void SetThemePaths(IReadOnlyList<string> paths) => settings.SetField("global", "themes", Array(paths));
+        public void SetProjectExtensionPaths(IReadOnlyList<string> paths) => settings.SetField("project", "extensions", Array(paths));
+        public void SetProjectSkillPaths(IReadOnlyList<string> paths) => settings.SetField("project", "skills", Array(paths));
+        public void SetProjectPromptTemplatePaths(IReadOnlyList<string> paths) => settings.SetField("project", "prompts", Array(paths));
+        public void SetProjectThemePaths(IReadOnlyList<string> paths) => settings.SetField("project", "themes", Array(paths));
+        public void SetPackages(System.Text.Json.Nodes.JsonArray packages) => settings.SetField("global", "packages", packages);
+        public void SetProjectPackages(System.Text.Json.Nodes.JsonArray packages) => settings.SetField("project", "packages", packages);
+    }
 }

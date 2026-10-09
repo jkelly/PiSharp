@@ -522,6 +522,77 @@ internal static class InteractiveModeCases
                 await pi.WaitUntil(_ => InteractiveHarness.ReadShared(sessionFile).Contains("still here", StringComparison.Ordinal), "entries appended to the session file");
                 Contains(InteractiveHarness.ReadShared(sessionFile), missing.Replace("\\", "\\\\"), "header keeps the stored cwd");
             });
+        // interactive-mode.ts createExtensionUIContext with a TypeScript extension in the Node extension host: a component widget, a
+        // footer factory, a message renderer, a markdown transformer and ctx.ui.custom() draw in the mode.
+        yield return ("e2e.extensions.node-ui-components", async () =>
+        {
+            RequireNode();
+            await using var pi = new InteractiveHarness("ext-ui");
+            foreach (var name in new[] { "SystemRoot", "PISHARP_NODE" })
+                if (Environment.GetEnvironmentVariable(name) is { } value) pi.Vars[name] = value;
+            var extension = pi.Write("project/ui.ts", """
+                import { Text } from "@earendil-works/pi-tui";
+                export default function (pi: any) {
+                  pi.on("session_start", async (_event: any, ctx: any) => {
+                    ctx.ui.setWidget("demo", () => ({ render: (width: number) => ["LIVE WIDGET " + width], invalidate() {} }));
+                    ctx.ui.setFooter(() => ({ render: () => ["CUSTOM FOOTER"], invalidate() {} }));
+                  });
+                  pi.registerMessageRenderer("note", (message: any) => new Text("NOTE: " + message.content, 1, 0));
+                  pi.registerMarkdownTransformer((markdown: string) => markdown.replace("fake model", "FAKE MODEL"));
+                  pi.registerEntryRenderer("marker", (entry: any) => new Text("MARKER " + entry.data.n, 1, 0));
+                  pi.registerCommand("pick", { description: "Pick something", handler: async (_args: any, ctx: any) => {
+                    const choice = await ctx.ui.custom((_tui: any, _theme: any, _keys: any, done: (value: string) => void) =>
+                      ({ render: () => ["CUSTOM PICKER"], handleInput: (data: string) => { if (data === "\r") done("chosen"); }, invalidate() {} }));
+                    ctx.ui.notify("picked " + choice);
+                  } });
+                }
+                """);
+            // A resumed session's custom message and custom entry draw through the extension's renderers.
+            var session = pi.Write("old/2026-01-01T00-00-00-000Z_0198a2b0-0000-7000-8000-000000000002.jsonl", string.Join("\n",
+                System.Text.Json.JsonSerializer.Serialize(new { type = "session", version = 3, id = "0198a2b0-0000-7000-8000-000000000002", timestamp = "2026-01-01T00:00:00.000Z", cwd = pi.Cwd }),
+                System.Text.Json.JsonSerializer.Serialize(new { type = "custom_message", id = "a1", parentId = (string?)null, timestamp = "2026-01-01T00:00:01.000Z", customType = "note", content = "hi there", display = true }),
+                System.Text.Json.JsonSerializer.Serialize(new { type = "custom", id = "a2", parentId = "a1", timestamp = "2026-01-01T00:00:02.000Z", customType = "marker", data = new { n = 7 } })) + "\n");
+            pi.Start([.. Regular, "-e", extension, "--session", session]);
+            await pi.WaitFor("escape interrupt");
+            await pi.WaitFor("LIVE WIDGET 100");
+            await pi.WaitFor("CUSTOM FOOTER");
+            await pi.Submit("hello");
+            await pi.WaitFor("Hello from the FAKE MODEL.");
+            await pi.WaitFor("NOTE: hi there");
+            await pi.WaitFor("MARKER 7");
+
+            pi.Type("/pick");
+            await Task.Delay(300);
+            pi.Type("\r");
+            await Task.Delay(300);
+            pi.Type("\r");
+            await pi.WaitFor("CUSTOM PICKER");
+            pi.Type("\r");
+            await pi.WaitFor("picked chosen");
+            await pi.WaitUntil(text => !text.Contains("CUSTOM PICKER", StringComparison.Ordinal), "the editor is back");
+        });
+        // cli/config-selector.ts selectConfig: `pisharp config` opens the resource configuration TUI; space toggles the selected resource
+        // (written to settings.json) and escape closes it.
+        yield return ("e2e.config.selector", async () =>
+        {
+            await using var pi = new InteractiveHarness("config");
+            pi.Write(Path.Combine(pi.AgentDir, "extensions", "local.ts"), "export default function () {}\n");
+            var host = new PiSharp.Cli.Pi.PiHost
+            {
+                Cwd = pi.Cwd, Home = pi.Home, GetEnvironment = name => pi.Vars.GetValueOrDefault(name), Stdout = pi.Stdout, Stderr = pi.Stderr,
+                Stdin = new StringReader(""), StdinIsTty = true, StdoutIsTty = true, LiveRuntime = PiSharp.Cli.Commands.LiveSessionRuntime.Default,
+                ConfigSelector = (request, token) => new PiSharp.Cli.Interactive.Mode.StartupUi(request.AgentDir, request.Cwd, name => pi.Vars.GetValueOrDefault(name),
+                    loop => new PiSharp.Tui.Pi.ProcessTerminal(loop, pi.Terminal, name => pi.Vars.GetValueOrDefault(name))).SelectConfigAsync(request, token)
+            };
+            var run = Task.Run(() => PiSharp.Cli.Pi.PiCommand.RunAsync(["config"], host, CancellationToken.None));
+            await pi.WaitFor("local.ts");
+            Contains(pi.Terminal.Text, "Global Resources", "global mode");
+            pi.Type(" ");
+            await pi.WaitUntil(_ => File.Exists(Path.Combine(pi.AgentDir, "settings.json")) &&
+                File.ReadAllText(Path.Combine(pi.AgentDir, "settings.json")).Contains("local.ts", StringComparison.Ordinal), "toggle written to settings.json");
+            pi.Type("\u001b");
+            Equal(0, await run.WaitAsync(TimeSpan.FromSeconds(30)), "config exits 0 after closing: " + pi.Stderr);
+        });
         yield return ("e2e.autocomplete.at-file", Case("at-file", async pi =>
         {
             if (new PiSharp.Cli.Pi.PiToolsManager(Path.Join(pi.AgentDir, "bin"), Environment.GetEnvironmentVariable).GetToolPath("fd") is null)
@@ -587,5 +658,16 @@ internal static class InteractiveModeCases
             lock (seen) seen.Add(request.RequestUri!.AbsoluteUri);
             return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
         }
+    }
+
+    /// <summary>TypeScript extensions need Node.js 22.13 or later (module.stripTypeScriptTypes).</summary>
+    private static void RequireNode()
+    {
+        var node = PiSharp.Compatibility.Node.Pi.PiNodeHost.FindNode(Environment.GetEnvironmentVariable) ?? throw new SkipCaseException("Node.js is not on PATH.");
+        using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(node, "--version") { RedirectStandardOutput = true, UseShellExecute = false })!;
+        var version = process.StandardOutput.ReadToEnd().Trim().TrimStart('v').Split('.');
+        process.WaitForExit();
+        if (version.Length < 2 || !int.TryParse(version[0], out var major) || !int.TryParse(version[1], out var minor) || major < 22 || major == 22 && minor < 13)
+            throw new SkipCaseException("Node.js " + string.Join('.', version) + " is older than 22.13.");
     }
 }

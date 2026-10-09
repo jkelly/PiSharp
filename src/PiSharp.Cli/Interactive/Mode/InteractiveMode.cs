@@ -195,6 +195,7 @@ internal sealed partial class InteractiveMode
         Themes.SetRegisteredThemes(context.Startup.Resources.Themes.Select(registered => (registered.Name, registered.Path)));
         programStatus = new InteractiveProgramStatus(() => ui.Terminal, () => state.SessionName, AppName);
         themeController = new InteractiveThemeController(ui, () => settings, ShowError, UpdateEditorBorderColor, options.InitialThemeSetting);
+        ConnectExtensionHost();
     }
 
     private TuiBase CreateRenderer(string tuiMode, bool showHardwareCursor, ITerminal terminal) => InteractiveTui.Create(new InteractiveTuiOptions(
@@ -377,6 +378,7 @@ internal sealed partial class InteractiveMode
 
         SetupKeyHandlers();
         SetupEditorSubmitHandler();
+        AttachExtensionHost();
         ui.RequestRender();
 
         await RebindCurrentSessionAsync();

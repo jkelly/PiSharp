@@ -30,6 +30,30 @@ internal static class InteractiveHostServices
         var prices = new DelegateModelPriceSource((provider, id) => registry?.Find(provider, id) is { } model ? ModelCostOf(model.CloneJson()) : null);
         PiSharp.Cli.Commands.OfflineSessionProfile? Profile() => startup.Host.Profile as PiSharp.Cli.Commands.OfflineSessionProfile;
         bool UsingOAuth(string provider) => registry?.CheckAuth(provider) == "OAuth";
+        // runner.ts getMessageRenderer/getEntryRenderer/getMarkdownTransformers and the loaded extensions, from the Node extension host.
+        var extensions = options.Extensions is { } piExtensions ? new PiInteractiveExtensionHost(piExtensions) : null;
+        var resourceDiagnostics = context.GetResourceDiagnostics;
+        if (extensions is not null)
+            context = context with
+            {
+                Extensions = extensions,
+                MarkdownTransformers = () => extensions.HasMarkdownTransformers
+                    ? [(markdown, transform) => extensions.TransformMarkdown(markdown, new JsonObject
+                        { ["messageType"] = transform.MessageType, ["isStreaming"] = transform.IsStreaming, ["availableWidth"] = transform.AvailableWidth })]
+                    : [],
+                GetMessageRenderer = customType => extensions.RendersMessage(customType)
+                    ? (message, renderOptions, _) => new ExtensionRowsComponent(width => extensions.RenderMessage(customType, message, width, renderOptions.Expanded) ?? [])
+                    : null,
+                GetEntryRenderer = customType => extensions.RendersEntry(customType)
+                    ? (entry, renderOptions, _) => new ExtensionRowsComponent(width => extensions.RenderEntry(customType, entry, width, renderOptions.Expanded) ?? [])
+                    : null,
+                GetLoadedExtensions = extensions.LoadedExtensions,
+                GetResourceDiagnostics = () =>
+                {
+                    var diagnostics = resourceDiagnostics?.Invoke() ?? new ResourceDiagnostics([], [], [], []);
+                    return diagnostics with { Extensions = [.. diagnostics.Extensions, .. extensions.Diagnostics()] };
+                }
+            };
         return context with
         {
             RefreshModelCatalogs = async token =>

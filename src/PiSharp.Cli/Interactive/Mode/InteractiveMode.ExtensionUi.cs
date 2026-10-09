@@ -91,6 +91,8 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
                 SetExtensionStatus(S(request["statusKey"]) ?? "", S(request["statusText"]));
                 break;
             case "setWidget":
+                // A widget an extension host component draws keeps drawing live; the host's one-off text copy of it is not shown.
+                if (request["widgetLines"] is JsonArray && extensionComponentWidgets.Contains(S(request["widgetKey"]) ?? "")) break;
                 SetExtensionWidget(S(request["widgetKey"]) ?? "", request["widgetLines"] is JsonArray lines ? lines.Select(S).OfType<string>().ToList() : null,
                     S(request["widgetPlacement"]) ?? "aboveEditor");
                 break;
@@ -408,6 +410,9 @@ internal sealed partial class InteractiveMode : IRpcExtensionUiPresentationObser
         openRpcDialogs.Clear();
         ui.HideOverlay();
         ClearExtensionTerminalInputListeners();
+        extensionTerminalInputs.Clear();
+        extensionComponentWidgets.Clear();
+        extensionComponents.Clear();
         SetExtensionFooter(null);
         SetExtensionHeader(null);
         ClearExtensionWidgets();

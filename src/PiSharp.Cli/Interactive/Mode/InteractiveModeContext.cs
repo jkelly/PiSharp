@@ -74,6 +74,8 @@ internal sealed record InteractiveModeContext
     // Extensions
     public Func<string, ToolRenderers?>? ResolveToolRenderers { get; init; }
     public Func<IReadOnlyList<MarkdownTransformer>>? MarkdownTransformers { get; init; }
+    /// <summary>The run's extension host (TypeScript extensions in Node): ctx.ui components, widgets and terminal input.</summary>
+    public IInteractiveExtensionHost? Extensions { get; init; }
     public Func<string, EntryRenderer?>? GetEntryRenderer { get; init; }
     public Func<string, MessageRenderer?>? GetMessageRenderer { get; init; }
     public Func<IReadOnlyDictionary<string, IReadOnlyList<string>>, IReadOnlyList<ExtensionShortcut>>? GetExtensionShortcuts { get; init; }
