@@ -23,6 +23,10 @@ public sealed record BashToolOptions(string Executable, string WorkingDirectory,
     /// <summary>Source spawnHook: adjusts the command, working directory or environment before execution. The final
     /// action, including any change the hook makes, is what the host policy authorizes.</summary>
     public Func<BashSpawnContext, BashSpawnContext>? SpawnHook { get; init; }
+    /// <summary>Source createLocalBashOperations resolves the shell inside exec: when getShellConfig throws ("No bash shell found",
+    /// "Custom shell path not found"), the tool is still registered and every command fails with that message. <see cref="Executable"/>
+    /// is then only the action's target name and is never launched.</summary>
+    public string? UnavailableShellError { get; init; }
 
     /// <summary>Options for a resolved <see cref="ShellConfiguration"/>.</summary>
     public static BashToolOptions FromShell(ShellConfiguration shell, string workingDirectory,
@@ -31,6 +35,14 @@ public sealed record BashToolOptions(string Executable, string WorkingDirectory,
         ArgumentNullException.ThrowIfNull(shell);
         return new(shell.Shell, workingDirectory, environment, spillDirectory)
         { ShellArguments = shell.Arguments, CommandTransport = shell.CommandTransport };
+    }
+
+    /// <summary>Options for a shell that getShellConfig could not resolve: every command fails with <paramref name="shellError"/>.</summary>
+    public static BashToolOptions Unavailable(string shellError, string target, string workingDirectory,
+        ImmutableDictionary<string, string> environment, string spillDirectory)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(shellError);
+        return new(target, workingDirectory, environment, spillDirectory) { UnavailableShellError = shellError };
     }
 }
 

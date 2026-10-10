@@ -41,7 +41,8 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
         if (options.MaximumCommandCharacters is < 1 or > 96_000 || options.MaximumArgumentCharacters is < 1 or > 96_000 ||
             options.ShellArguments.IsDefault || options.ShellArguments.Length > 16 || options.ShellArguments.Any(argument => !Text(argument)) ||
             !Enum.IsDefined(options.CommandTransport) || options.CommandPrefix is { } prefix && (!Text(prefix) || prefix.Length > 12_000) ||
-            !Absolute(options.Executable) || !File.Exists(options.Executable) ||
+            !Text(options.Executable) || options.UnavailableShellError is null && (!Absolute(options.Executable) || !ShellExists(options.Executable)) ||
+            options.UnavailableShellError is { } shellError && (shellError.Length == 0 || !Text(shellError)) ||
             !Absolute(options.WorkingDirectory) || !Directory.Exists(options.WorkingDirectory) ||
             !Absolute(options.SpillDirectory) || !Directory.Exists(options.SpillDirectory) ||
             !EnvironmentValid(options.Environment))
@@ -86,9 +87,11 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
         // Source spawn(shell, [...args, command], { cwd, env }): Node rejects a NUL byte in the file, an argument, the cwd or the
         // environment before spawning, on every platform (posix_spawn would otherwise cut the string and run something else). With
         // commandTransport "stdin" the command is not a spawn argument.
+        // With no shell found, getShellConfig's error (after resolveTimeoutMs) comes before spawn's: the action cannot carry the NUL, so
+        // the command fails here with the error exec would give.
         if (NodeArgumentErrors.SpawnNullBytes(_options.Executable, Shell.CommandArguments(context.Command), context.WorkingDirectory,
             context.Environment) is { } spawnError)
-            throw new ToolSourceErrorException(spawnError);
+            throw new ToolSourceErrorException(_options.UnavailableShellError is { } shellError ? TimeoutError(input.Timeout) ?? shellError : spawnError);
         if (!Text(context.Command, allowNul: StdinTransport) || context.Command.Length > _options.MaximumCommandCharacters + (_options.CommandPrefix?.Length + 1 ?? 0) &&
             _options.SpawnHook is null || !Absolute(context.WorkingDirectory) || !EnvironmentValid(context.Environment)) throw Invalid();
         var arguments = new Dictionary<string, object?> { ["command"] = input.Command, ["outputPath"] = outputPath };
@@ -104,10 +107,16 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
     /// <summary>Source commandTransport "stdin" (legacy WSL bash): the command is written to the shell's standard input, so a NUL
     /// byte in it reaches the shell as data (Node checks only spawn arguments); argv and the environment never carry one.</summary>
     private bool StdinTransport => _options.CommandTransport == ShellCommandTransport.Stdin;
-
-    /// <summary>Node's child_process.spawn error when the operating system refuses the command line: on Windows CreateProcess takes at
-    /// most 32,767 characters (libuv reports ENAMETOOLONG); on Unix one argument is at most 128 KiB (E2BIG).</summary>
-    private static string? SpawnLimitError(PreparedToolAction action) => NodeArgumentErrors.SpawnLimit(action.Target, action.CommandArguments);
+    /// <summary>Source resolveTimeoutMs: its error for a non-positive or too large timeout.</summary>
+    private static string? TimeoutError(double? timeout) => timeout switch
+    {
+        <= 0 => "Invalid timeout: must be a finite number of seconds",
+        { } large when large * 1000 > MaximumTimeoutMilliseconds =>
+            "Invalid timeout: maximum is " + (MaximumTimeoutMilliseconds / 1000).ToString("R", CultureInfo.InvariantCulture) + " seconds",
+        _ => null
+    };
+    /// <summary>Source getShellConfig's existsSync, which also accepts a directory (spawn then refuses it with Node's error).</summary>
+    private static bool ShellExists(string path) => File.Exists(path) || Directory.Exists(path);
     /// <summary>Source <c>commandPrefix ? `${commandPrefix}\n${command}` : command</c>.</summary>
     private string Resolve(string command) => string.IsNullOrEmpty(_options.CommandPrefix) ? command : _options.CommandPrefix + "\n" + command;
 
@@ -122,7 +131,8 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             var shellCommand = _options.CommandTransport == ShellCommandTransport.Stdin ? input.StandardInput
                 : action.CommandArguments.IsDefault || action.CommandArguments.Length == 0 ? null : action.CommandArguments[^1];
             var valid = action.ToolName == Name && action.Operation == Name && action.Kind == PreparedToolActionKind.Command &&
-                action.Target == _options.Executable && File.Exists(action.Target) && shellCommand is not null && Text(shellCommand, allowNul: StdinTransport) &&
+                action.Target == _options.Executable && (_options.UnavailableShellError is not null || ShellExists(action.Target)) &&
+                shellCommand is not null && Text(shellCommand, allowNul: StdinTransport) &&
                 (_options.SpawnHook is not null || shellCommand == Resolve(input.Command)) &&
                 !action.CommandArguments.IsDefault && action.CommandArguments.SequenceEqual(Shell.CommandArguments(shellCommand)) &&
                 (input.StandardInput is null) == (_options.CommandTransport == ShellCommandTransport.Argv) &&
@@ -145,14 +155,14 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
         if (!await ValidateAsync(action, cancellationToken).ConfigureAwait(false))
             return ToolResult.Error(ToolFailureKind.InvalidArguments, "Invalid or unsupported final Bash action.");
         var input = Parse(action.Arguments, normalized: true);
-        // Source resolveTimeoutMs and the working-directory check run inside exec, after the initial empty update.
-        string? setupError = null;
-        if (input.Timeout is { } requested && requested <= 0) setupError = "Invalid timeout: must be a finite number of seconds";
-        else if (input.Timeout is { } large && large * 1000 > MaximumTimeoutMilliseconds)
-            setupError = "Invalid timeout: maximum is " + (MaximumTimeoutMilliseconds / 1000).ToString("R", CultureInfo.InvariantCulture) + " seconds";
-        else if (!Directory.Exists(action.WorkingDirectory))
-            setupError = $"Working directory does not exist: {action.WorkingDirectory}\nCannot execute bash commands.";
-        else if (SpawnLimitError(action) is { } spawnError) setupError = spawnError;
+        // Source createLocalShellOperations exec, after the initial empty update: resolveTimeoutMs, then getShellConfig (its error when no
+        // shell is found), then the working-directory check (fs.access, which a file passes) and spawn's own refusals with Node's errors.
+        var setupError = TimeoutError(input.Timeout) ?? _options.UnavailableShellError;
+        if (setupError is null)
+        {
+            try { ShellSpawnPreflight.Check(Shell, StdinTransport ? input.StandardInput! : action.CommandArguments[^1], action.WorkingDirectory!, action.Environment); }
+            catch (ToolSourceErrorException error) { setupError = error.Message; }
+        }
         if (setupError is not null)
         {
             try { await ToolProgressDelivery.ReportAndWaitAsync(onProgress, new([], JsonData.Null), cancellationToken).ConfigureAwait(false); }
@@ -177,7 +187,7 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
             }, cancellationToken).ConfigureAwait(false);
             CheckResult(result, input.OutputPath!);
             // The runner has already awaited process/output cleanup. Preserve its known output even on cancellation.
-            return Final(result, input.Timeout, cancellationToken.IsCancellationRequested);
+            return Final(result, input.Timeout, cancellationToken.IsCancellationRequested, action.Target);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         { return Failure(lastOutput, ToolFailureKind.Canceled, "Command aborted"); }
@@ -316,8 +326,11 @@ public sealed class BashTool : IToolArgumentSchemaAdapter
     private static ToolResult Failure(ProcessOutputSnapshot? output, ToolFailureKind kind, string status, string empty = "") =>
         new([new TextContent(Append(output is null ? "" : Format(output, empty), status))],
             output is null ? JsonData.Null : Details(output), IsError: true, Failure: new(kind, status));
-    private static ToolResult Final(ProcessRunResult result, double? timeout, bool canceled)
+    private static ToolResult Final(ProcessRunResult result, double? timeout, bool canceled, string shell)
     {
+        // CreateProcess refused the shell: Node's spawn error for libuv's code, as user bash reports it.
+        if (!canceled && result.LaunchError is { } launch && !result.ProcessStarted)
+            return Failure(null, ToolFailureKind.ExecutionError, ShellSpawnPreflight.WindowsLaunchFailure(shell, launch).Message);
         if (!result.CleanupConfirmed)
             return Failure(result.Output, ToolFailureKind.ExecutionError, "Command execution failed.");
         if (canceled || result.Status == ProcessRunStatus.Canceled)
