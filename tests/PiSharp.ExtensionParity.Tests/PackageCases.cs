@@ -1147,6 +1147,9 @@ internal static partial class Program
         Check(seen is { WriteScope: "project", ProjectModeAvailable: true }, "request scope");
         Check(seen!.Global.Extensions.Any(r => r.Path.EndsWith("user.ts", StringComparison.Ordinal)) && !seen.Global.Extensions.Any(r => r.Path.EndsWith("project.ts", StringComparison.Ordinal)), "global view without the project");
         Check(seen.Project.Extensions.Any(r => r.Path.EndsWith("project.ts", StringComparison.Ordinal)), "project view");
+        // handleConfigCommand passes the built-in extension names: pi config lists them (extensions/index.ts order).
+        Names(["builtin:llama.cpp", "builtin:codemode", "builtin:tool-search", "builtin:mcp"],
+            seen.Global.Extensions.Where(r => r.Metadata.Source == "builtin").Select(r => r.Path), "built-in extensions listed");
         Equal("{\n  \"extensions\": [\n    \"-extensions/user.ts\"\n  ]\n}", File.ReadAllText(Path.Combine(sandbox.AgentDir, "settings.json")), "selector writes through the settings");
     }
 

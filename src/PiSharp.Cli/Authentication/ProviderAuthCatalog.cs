@@ -101,8 +101,11 @@ internal static class ProviderAuthCatalog
     public static IEnumerable<ProviderAuthEntry> Entries()
     {
         var extensions = Extensions?.Invoke().ToList() ?? [];
-        foreach (var builtin in All.Concat(BuiltinExtensions)) yield return extensions.FirstOrDefault(entry => entry.Id == builtin.Id) ?? builtin;
-        foreach (var extension in extensions) if (!All.Concat(BuiltinExtensions).Any(builtin => builtin.Id == extension.Id)) yield return extension;
+        // A built-in extension that is not loaded (-builtin:llama.cpp, --no-extensions) registers no provider.
+        var loaded = PiSharp.Cli.Pi.PiEntryOptions.Current?.BuiltinExtensions;
+        var builtins = All.Concat(BuiltinExtensions.Where(entry => loaded?.IsEnabled(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Llama) != false)).ToList();
+        foreach (var builtin in builtins) yield return extensions.FirstOrDefault(entry => entry.Id == builtin.Id) ?? builtin;
+        foreach (var extension in extensions) if (!builtins.Any(builtin => builtin.Id == extension.Id)) yield return extension;
     }
 
     public static ProviderAuthEntry? Find(string id) => Entries().FirstOrDefault(entry => entry.Id == id);

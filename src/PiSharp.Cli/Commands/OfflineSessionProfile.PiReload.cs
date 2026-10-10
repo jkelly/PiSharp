@@ -1,7 +1,8 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/agent-session.ts (reload: session_shutdown with reason
 // "reload", the extension runner invalidated and reloaded, settingsManager.reload(), resourceLoader.reload() for skills, prompt templates
 // and context files, the system prompt rebuilt, then session_start with reason "reload") and packages/coding-agent/src/modes/
-// interactive/interactive-mode.ts (handleReloadCommand).
+// interactive/interactive-mode.ts (handleReloadCommand) and packages/coding-agent/src/core/resource-loader.ts (reload: the built-in
+// extensions resolved again).
 using PiSharp.Cli.Extensions;
 using PiSharp.Cli.Prompts;
 using PiSharp.Cli.Skills;
@@ -37,7 +38,18 @@ internal sealed partial class OfflineSessionProfile
             if (activation is not null)
                 await activation.DispatchSessionShutdownAsync(activation.CaptureShutdownSessionSnapshot(attachment), "reload").ConfigureAwait(false);
             if (activation?.Pi is { } host) await host.ReloadExtensionsAsync(token).ConfigureAwait(false);
+            var builtinsBefore = BuiltinExtensions?.Enabled;
             if (PiReloadResources is { } load) await ApplyPiResourcesAsync(await load(activation, token).ConfigureAwait(false), attachment, view, token).ConfigureAwait(false);
+            // resource-loader.ts reload resolves the built-in extensions again: MCP support, codemode and tool_search that were loaded
+            // or left out come with a new runtime generation, and the llama.cpp provider joins or leaves the selectable models.
+            if (BuiltinExtensions?.Enabled is { } builtinsAfter && builtinsBefore is not null)
+            {
+                bool Changed(string name) => builtinsBefore.Contains(name) != builtinsAfter.Contains(name);
+                if (mcpRuntime is not null && (Changed(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Mcp) ||
+                    Changed(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Codemode) || Changed(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.ToolSearch)))
+                    await RefreshMcpRuntimeAsync(owner.Current, new object(), token).ConfigureAwait(false);
+                if (Changed(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Llama) && LiveModels is { } models) await models.RefreshAsync(token).ConfigureAwait(false);
+            }
             if (activation is not null) await activation.DispatchSessionStartAsync("reload", token).ConfigureAwait(false);
         }
         finally { piReload.Release(); }

@@ -262,9 +262,16 @@ internal static class PiCommand
         {
             var packageOutput = appMode == PiAppMode.Interactive ? host.Stdout : err;
             packageResources = await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, settings, host.GetEnvironment,
-                host.PackageProcesses?.Invoke(packageOutput, err) ?? new() { Output = packageOutput, ErrorOutput = err }).ResolveAsync(cancellationToken: token).ConfigureAwait(false);
+                host.PackageProcesses?.Invoke(packageOutput, err) ?? new() { Output = packageOutput, ErrorOutput = err }, PiBuiltinExtensions.Names)
+                .ResolveAsync(cancellationToken: token).ConfigureAwait(false);
         }
         catch (PiSharp.Cli.Packages.PiPackageException error) { await Error(error.Message).ConfigureAwait(false); return 1; }
+        // resource-loader.ts: the builtin: extension paths of -e and resolve() (main.ts disabledBuiltinExtensions: --no-mcp leaves mcp
+        // out), less the replaceable ones another loaded extension takes over from.
+        string[] disabledBuiltins = parsed.NoMcp ? [PiBuiltinExtensions.Mcp] : [];
+        var builtinResolution = PiBuiltinExtensions.Resolve(parsed.Extensions, packageResources, parsed.NoExtensions, disabledBuiltins, extensionRun?.Host?.Extensions ?? []);
+        var builtins = new PiBuiltinExtensions(builtinResolution.Enabled);
+        runtimeDiagnostics.AddRange([.. builtinResolution.Errors, .. builtinResolution.Warnings]);
         // resource-loader.ts reload: packageManager.resolveExtensionSources(-e sources, temporary) contributes the -e packages' skills,
         // prompts and themes as well as their extensions (their enabled resources lead each list).
         async Task<PiSharp.Cli.Packages.PiResolvedPaths?> ExtensionSourcesAsync(PiSettings sourceSettings, TextWriter output, TextWriter errorOutput, CancellationToken sourceToken)
@@ -315,10 +322,13 @@ internal static class PiCommand
             try
             {
                 reloadPackages = await new PiSharp.Cli.Packages.PiPackageManager(sessionCwd, agentDir, home, reloadSettings, host.GetEnvironment,
-                    host.PackageProcesses?.Invoke(TextWriter.Null, TextWriter.Null) ?? new() { Output = TextWriter.Null, ErrorOutput = TextWriter.Null })
-                    .ResolveAsync(cancellationToken: reloadToken).ConfigureAwait(false);
+                    host.PackageProcesses?.Invoke(TextWriter.Null, TextWriter.Null) ?? new() { Output = TextWriter.Null, ErrorOutput = TextWriter.Null },
+                    PiBuiltinExtensions.Names).ResolveAsync(cancellationToken: reloadToken).ConfigureAwait(false);
             }
             catch (PiSharp.Cli.Packages.PiPackageException) { reloadPackages = packageResources; }
+            // The reload resolves the built-in extensions again over the reloaded settings and extensions.
+            builtins.Set(PiBuiltinExtensions.Resolve(parsed.Extensions, reloadPackages, parsed.NoExtensions, disabledBuiltins,
+                activation?.Pi?.Extensions ?? extensionRun?.Host?.Extensions ?? []).Enabled);
             var reloadSources = await ExtensionSourcesAsync(reloadSettings, TextWriter.Null, TextWriter.Null, reloadToken).ConfigureAwait(false) ?? extensionSources;
             var reloaded = PiResources.WithDiscovered(PiResources.Discover(new(sessionCwd, agentDir, home, reloadSettings, projectTrusted)
             {
@@ -349,7 +359,9 @@ internal static class PiCommand
         // sdk.ts transport: settingsManager.getTransport() ("auto" by default); /settings changes it for the running session.
         PiTransportSetting.Start(settings.String("transport"));
         var runtime = host.LiveRuntime with { CreateHttpHandler = PiHttpIdleTimeout.Wrap(host.LiveRuntime.CreateHttpHandler, idleTimeout),
-            Transport = host.LiveRuntime.Transport ?? (() => PiTransportSetting.Current()) };
+            Transport = host.LiveRuntime.Transport ?? (() => PiTransportSetting.Current()),
+            // extensions/llama: the llama.cpp provider is the built-in llama.cpp extension's registration.
+            LlamaProvider = () => builtins.IsEnabled(PiBuiltinExtensions.Llama) };
         // runner.ts bindCore: the providers and virtual models the extensions registered join every model registry the run builds
         // (model selection, the live routes and model switching), including ones registered later.
         if (extensionRun?.Host is { } virtualHost)
@@ -419,10 +431,10 @@ internal static class PiCommand
         var allDiagnostics = Deduplicate([.. startupDiagnostics, .. runtimeDiagnostics]);
         if (appMode != PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
         // main.ts: runtime errors (an extension that failed to load, an unknown extension flag) stop the run in every mode.
-        if (extensionRun?.Diagnostics.Any(diagnostic => diagnostic.Type == "error") == true)
+        if (extensionRun?.Diagnostics.Any(diagnostic => diagnostic.Type == "error") == true || !builtinResolution.Errors.IsEmpty)
         {
             if (appMode == PiAppMode.Interactive) await Report(allDiagnostics).ConfigureAwait(false);
-            if (extensionRun.HasLoadErrors) await Line(err, Paint(Yellow, PiExtensionLoading.LoadFailureHint)).ConfigureAwait(false);
+            if (extensionRun?.HasLoadErrors == true || !builtinResolution.Errors.IsEmpty) await Line(err, Paint(Yellow, PiExtensionLoading.LoadFailureHint)).ConfigureAwait(false);
             return 1;
         }
         if (IsTruthyEnvFlag(host.GetEnvironment("PI_STARTUP_BENCHMARK")) && appMode != PiAppMode.Interactive)
@@ -458,7 +470,7 @@ internal static class PiCommand
             ProjectTrusted = PiProjectTrust.Seam(trustedDirectories), StartupDiagnostics = allDiagnostics,
             ExtensionPaths = [.. (parsed.Extensions ?? []).Select(path => PiPaths.IsLocalPath(path) ? PiPaths.ResolvePath(path, cwd, home) : path)],
             NoExtensions = parsed.NoExtensions, ExtensionFlagValues = parsed.UnknownFlags.ToImmutableDictionary(StringComparer.Ordinal),
-            Extensions = extensionRun?.Host, ExtensionMode = extensionMode,
+            Extensions = extensionRun?.Host, ExtensionMode = extensionMode, BuiltinExtensions = builtins,
             Interactive = appMode == PiAppMode.Interactive ? new(agentDir, home, sessionCwd, sessionDir, sessionDir is null, resources, projectTrusted, plan.Mode) : null
         };
         var sessionArgs = SessionArguments(plan, parsed);

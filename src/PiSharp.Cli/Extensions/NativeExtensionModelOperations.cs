@@ -90,7 +90,7 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
     /// </summary>
     public static ModelOperationsRegistry CreateDefaultRegistry(Func<string, string?> readEnvironment, string? authPath,
         Func<HttpMessageInvoker>? createAuthHttp = null, TimeProvider? timeProvider = null,
-        IReadOnlyDictionary<string, IAdmittedOAuthRefresh>? oauthRefreshes = null)
+        IReadOnlyDictionary<string, IAdmittedOAuthRefresh>? oauthRefreshes = null, Func<bool>? llamaProvider = null)
     {
         ArgumentNullException.ThrowIfNull(readEnvironment);
         var catalogs = new List<FrozenModelCatalog>();
@@ -139,7 +139,8 @@ public sealed class NativeExtensionModelOperations(ModelOperationsRegistry regis
             return await standard(request, token).ConfigureAwait(false);
         });
         // The built-in llama.cpp extension's provider (extensions/llama/provider.ts getAllModels): the classifier models of the catalog
-        // the models store next to auth.json holds, as the latest refresh or /llama left them.
+        // the models store next to auth.json holds, as the latest refresh or /llama left them. Not loaded, it registers nothing.
+        if (llamaProvider?.Invoke() == false) return registry;
         var llama = PiSharp.Cli.Llama.LlamaCatalog.For(authPath is null ? null : Path.Combine(Path.GetDirectoryName(Path.GetFullPath(authPath))!, "models-store.json"));
         registry.SetProvider(BuiltinModelOperationProviders.LlamaCpp([], () =>
         {
