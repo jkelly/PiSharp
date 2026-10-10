@@ -437,25 +437,16 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         }
         catch (Exception error)
         {
+            // rpc-mode.ts handleInputLine: a command that throws answers error(id, type, commandError.message) — the thrown error's
+            // message (a prompt refused by its preflight answers with the refusal's), never its stack. Cancellation keeps PiSharp's texts.
             var message = error switch
             {
-                RpcDispatchException dispatch => dispatch.Message,
-                AgentPendingInputException queue => queue.Message,
-                PersistentAgentSessionException session => session.Message,
-                AgentSessionReplacementNotificationException replacement => replacement.Message,
-                SessionBranchPublishException publication => publication.Message,
-                SessionBranchPlanException plan => plan.Message,
-                SessionCatalogException catalog => catalog.Message,
-                SessionContextEditException edit => edit.Message,
-                PromptInputAdmissionException admission => admission.Message,
-                // rpc-mode.ts prompt: a prompt refused by its preflight answers with the refusal's message.
-                SessionPromptRejectedException rejected => rejected.Message,
                 OperationCanceledException when originatingAttachment is not null && !ReferenceEquals(originatingAttachment, _sessionOwner!.Current) =>
                     "Command canceled after session replacement committed; inspect the current session and durable state.",
                 OperationCanceledException => "Command canceled before acceptance.",
-                _ => "RPC command failed."
+                _ => error.Message
             };
-            // The wire keeps Pi's fixed text; PISHARP_DEBUG=1 names the cause on stderr for bug reports.
+            // PISHARP_DEBUG=1 also writes the full exception (with its stack) to stderr for bug reports.
             if (Environment.GetEnvironmentVariable("PISHARP_DEBUG") == "1")
                 Console.Error.WriteLine($"pisharp: {command?.Type ?? "parse"} failed: {error}");
             await WriteAsync(RpcCommandCodec.Error(command?.Id, command?.Type ?? "parse", message, _options)).ConfigureAwait(false);
@@ -636,6 +627,9 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 if (_sessionOwner is null || !_sessionOwner.CanCreateSessions)
                     throw new RpcCommandException(command.Id, command.Type, "Durable session creation is unavailable from this host.");
                 var expected = _sessionOwner.Current;
+                // rpc-mode.ts clone: a session without a current entry answers this error instead of forking.
+                if (command.Type == "clone" && expected.Session.Snapshot.Context.LeafId is null)
+                    throw new RpcCommandException(command.Id, command.Type, "Cannot clone session: no current entry selected");
                 var kind = command.Type == "new_session" ? AgentSessionCreationKind.New : command.Type == "clone" ?
                     AgentSessionCreationKind.Clone : command.Mode == "at" ? AgentSessionCreationKind.ForkAt : AgentSessionCreationKind.ForkBefore;
                 JsonData Response(PersistentAgentSession target, string? text, long generation) => RpcCommandCodec.Build(writer =>
@@ -1005,7 +999,15 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 new InputAdmission(this, selected, token), limits, _stopInputToken);
             // Started coordinator submissions finish after the run. Its actual first event is the admission witness.
             await Task.WhenAny(candidate.Entered.Task, processing).ConfigureAwait(false);
-            if (candidate.Entered.Task.IsCompleted)
+            if (candidate.Entered.Task.IsCompleted && originating.TakeInputTriggeredRun() is { } triggered)
+            {
+                // agent-session.ts sendCustomMessage: a command's sendMessage({ triggerTurn }) runs its turn while the handler still runs;
+                // the turn's events flow at once and the prompt is answered when the handler returns.
+                lock (_gate) if (ReferenceEquals(_startingInput, candidate)) _startingInput = null;
+                _ = MonitorAsync(candidate, triggered, originating);
+                candidate.Ready.TrySetResult();
+            }
+            else if (candidate.Entered.Task.IsCompleted)
             {
                 lock (_gate) if (ReferenceEquals(_startingInput, candidate)) _startingInput = null;
                 lock (_gate) _postInputMovedToRun.Add(command);
@@ -1121,6 +1123,16 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         try
         {
             RunState? run;
+            // agent-session.ts sendCustomMessage: an extension's sendMessage({ triggerTurn }) on an idle session runs a turn of its own
+            // (a timer, an event handler); the host adopts it, streams its events and settles it as any run.
+            bool unowned; lock (_gate) unowned = observation is AgentLoopStarted && _run is null && _startingInput is null;
+            if (unowned && _session.TakeInputTriggeredRun() is { } triggered)
+            {
+                var adopted = new RunState(_session.Snapshot.Agent.Messages.Length);
+                bool owns; lock (_gate) { owns = _run is null && !_closed; if (owns) _run = adopted; }
+                adopted.Ready.TrySetResult();
+                if (owns) _ = MonitorAsync(adopted, triggered, _session);
+            }
             lock (_gate)
             {
                 if (observation is AgentLoopStarted && _startingInput is { } starting)

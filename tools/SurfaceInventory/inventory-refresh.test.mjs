@@ -89,7 +89,10 @@ test('v1.1.0 event catalog: native status cites existing authored tests', () => 
   }
   const settled = current.events.find(row => row.name === 'agent_settled');
   assert.equal(settled.actualStatus.nativeHostIntegration, 'ImplementedWithAuthoredTests');
-  assert.equal(current.events.find(row => row.name === 'tool_execution_end').actualStatus.nativeHostIntegration, 'WireOnlyNotDispatchedToExtensions');
+  // The agent-loop topics reach extension handlers (native and Node owners share the registry); no row is wire-only any more.
+  for (const name of ['agent_start', 'agent_end', 'turn_start', 'turn_end', 'message_start', 'message_update', 'message_end', 'tool_execution_start', 'tool_execution_end'])
+    assert.equal(current.events.find(row => row.name === name).actualStatus.nativeHostIntegration, 'ImplementedWithAuthoredTests', name);
+  assert(!current.events.some(row => row.actualStatus.nativeHostIntegration === 'WireOnlyNotDispatchedToExtensions'), 'wire-only event');
   const cited = references(current); assert(cited.length > 0);
   cited.forEach((reference, index) => assertTestReference(reference, 'catalog test ' + index));
   // The overlay is the only authored difference beyond re-derived source evidence and refresh notes.

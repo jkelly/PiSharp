@@ -1,5 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/coding-agent/src/core/sdk.ts.
 using System.Collections.Immutable;
+using PiSharp.AI;
 using PiSharp.Agent;
 using PiSharp.Sessions.Context;
 
@@ -37,6 +38,8 @@ public sealed partial class PersistentAgentSession
             await DrainLoadoutDiagnosticsAsync(work).ConfigureAwait(false);
             SessionContextProjection context; AgentConfiguration configuration; SessionRuntimeRegistry registry;
             lock (_gate) { context = _context; configuration = _configuration; registry = _registry!; }
+            // sdk.ts createAgentSession: options.thinkingLevel is clamped to the model's capabilities (clampThinkingLevel).
+            level = ThinkingLevels.Clamp(registry.GetSupportedThinkingLevels(configuration.Model), level);
             if (level == configuration.ThinkingLevel) return;
             var resolved = WithUnrecordedLoadout(context, configuration.Tools.Select(tool => tool.Name).ToImmutableArray(), work);
             var selection = await PrepareAndDrainLoadoutAsync(() => registry.Resolve(resolved, configuration.Model, work,

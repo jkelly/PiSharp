@@ -108,7 +108,7 @@ Don't keep mutable state in fields. Rebuild it from the current branch's session
 - [StatefulTodo](https://github.com/jkelly/PiSharp/tree/main/samples/extensions/StatefulTodo): a tool whose state is rebuilt from the session branch, ported from Pi's `todo.ts` example.
 - [SessionCheckpoint](https://github.com/jkelly/PiSharp/tree/main/samples/extensions/SessionCheckpoint): a `/checkpoint` command, a session-start observer and a pre-switch handler.
 
-The samples were written for PiSharp's earlier package loader. To load one through the extension folders, add a `pisharp-extension.json` as shown above.
+Each sample ships a `pisharp-extension.json`, so its build output loads straight from an extension folder or with `-e`. The older `session …` loader still accepts them too.
 
 :::note[The older package loader]
 The `pisharp session …` commands keep an older, Windows-only loader with a signed manifest, defined in [`schemas/pisharp-extension.schema.json`](https://github.com/jkelly/PiSharp/blob/main/schemas/pisharp-extension.schema.json), and an approval file. Plain `pisharp` doesn't use it.

@@ -70,12 +70,9 @@ internal static class RpcModelThinkingTests
         Success(await fixture.Send(new { id = "runtime", type = "set_thinking_level", level = "low" }));
         var cycle = await fixture.Send(new { id = "thinking-cycle", type = "cycle_thinking_level" }); Success(cycle);
         Check(cycle.GetProperty("data").ValueKind == JsonValueKind.Null, "Legacy off-only binding fabricated an enabled thinking cycle.");
-        try
-        {
-            await fixture.Session.ConfigureAsync(new(ThinkingLevel: "medium"));
-            throw new InvalidOperationException("Legacy registry admitted direct non-off configuration.");
-        }
-        catch (SessionRuntimeRegistryException error) when (error.Failure == SessionRuntimeRegistryFailure.UnsupportedThinkingLevel) { }
+        // agent-session.ts setThinkingLevel clamps to the model's capabilities: direct configuration of an unsupported level on the
+        // off-only binding selects "off", which is no change.
+        await fixture.Session.ConfigureAsync(new(ThinkingLevel: "medium"));
         var afterRejected = await ReadAcknowledgedBytes(fixture);
         Check(before.SequenceEqual(afterRejected) && fixture.Session.Snapshot.Context.ThinkingLevel == "off" &&
             fixture.Session.Snapshot.Fault is null && fixture.Transport.Requests == 0, "Legacy clamp/refusal changed disk/runtime, poisoned the session or sent.");
@@ -86,9 +83,12 @@ internal static class RpcModelThinkingTests
         foreach (var command in new object[] {
             new { id = "missing", type = "set_model", provider = "fixture", modelId = "missing" },
             new { id = "shape", type = "set_model", provider = 7, modelId = "first" },
-            new { id = "absent", type = "set_model", provider = "fixture" },
-            new { id = "bad-level", type = "set_thinking_level", level = "ultra" } })
+            new { id = "absent", type = "set_model", provider = "fixture" } })
             Check(!(await fixture.Send(command)).GetProperty("success").GetBoolean(), "Malformed/missing selection unexpectedly succeeded.");
+        // rpc-mode.ts set_thinking_level -> setThinkingLevel: a level the model does not list is clamped (an unknown one to the model's
+        // first level, models.ts clampThinkingLevel), not refused; on this off-only model it changes nothing.
+        Success(await fixture.Send(new { id = "unknown-level", type = "set_thinking_level", level = "ultra" }));
+        Check(fixture.Session.Snapshot.Context.ThinkingLevel == "off", "An unknown level was not clamped to the model's first level.");
         using var canceled = new CancellationTokenSource(); canceled.Cancel();
         try { await fixture.Dispatcher.SubmitAsync(JsonData.Parse("{\"id\":\"canceled\",\"type\":\"set_model\",\"provider\":\"fixture\",\"modelId\":\"second\"}"), canceled.Token); throw new InvalidOperationException("Canceled command admitted."); }
         catch (OperationCanceledException) when (canceled.IsCancellationRequested) { }
