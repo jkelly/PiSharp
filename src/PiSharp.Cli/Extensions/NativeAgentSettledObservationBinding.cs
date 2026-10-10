@@ -49,7 +49,7 @@ internal sealed class NativeAgentSettledObservationBinding(ExtensionRegistry reg
     }
 
     private sealed class Sink(NativeAgentSettledObservationBinding binding, ReplaceableAgentSession owner, AgentSessionAttachment attached)
-        : ISessionOperationEventSink
+        : ISessionOperationExtensionSink
     {
         public ValueTask EmitAsync(SessionOperationEvent observation, CancellationToken cancellationToken) =>
             observation is SessionOperationSettled settled ? binding.PublishAsync(owner, attached, settled) : ValueTask.CompletedTask;

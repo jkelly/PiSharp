@@ -22,6 +22,10 @@ public sealed record SessionOperationSettled(long OperationGeneration, string St
 public interface ISessionOperationEventSink
 { ValueTask EmitAsync(SessionOperationEvent observation, CancellationToken cancellationToken); }
 
+/// <summary>An extension runner's sink: it observes each operation event before the ordinary sinks (agent-session.ts
+/// _emitAgentSettled awaits the extension runner's agent_settled before its listeners, such as RPC and JSON output, see it).</summary>
+public interface ISessionOperationExtensionSink : ISessionOperationEventSink;
+
 public sealed partial class PersistentAgentSession
 {
     private double? _recoveryDesiredOutput;
@@ -80,7 +84,8 @@ public sealed partial class PersistentAgentSession
     {
         ImmutableArray<OperationSubscription> subscriptions;lock(_gate)subscriptions=_operationSubscriptions;
         Exception? failure = null;
-        foreach(var item in subscriptions)
+        // Extension runners first, then the other sinks, each group in subscription order.
+        foreach(var item in subscriptions.Where(item=>item.Sink is ISessionOperationExtensionSink).Concat(subscriptions.Where(item=>item.Sink is not ISessionOperationExtensionSink)))
             try { await item.Sink.EmitAsync(observation,CancellationToken.None).ConfigureAwait(false); }
             catch (Exception error) { failure ??= error; }
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
