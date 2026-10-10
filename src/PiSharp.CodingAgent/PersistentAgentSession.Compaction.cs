@@ -413,7 +413,9 @@ public sealed partial class PersistentAgentSession
         try { var summary = await generator.GenerateAsync(request, token).ConfigureAwait(false); ValidateGenerated(summary); return summary; }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (SessionCompactionException) { throw; }
-        catch { throw new SessionCompactionException(SessionCompactionFailure.SummaryFailed); }
+        // agent-session.ts compact()/_runAutoCompaction: a summarizer that throws reports its own error message
+        // ("Compaction failed: <message>"); thrown errors are never retried (retryAssistantCall only retries error responses).
+        catch (Exception error) { throw new SessionCompactionException(SessionCompactionFailure.SummaryFailed) { FailureText = error.Message }; }
     }
     private static TokenUsage CombineSummaryUsage(TokenUsage left, TokenUsage right)
     {

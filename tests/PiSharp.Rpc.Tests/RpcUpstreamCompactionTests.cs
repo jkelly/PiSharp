@@ -26,7 +26,8 @@ internal static class RpcUpstreamCompactionTests
         (Prefix + "abort-joins-original-summary-and-emits-aborted-end", Abort),
         (Prefix + "admitted-checkpoint-wins-late-abort-and-end-observes-idle", Checkpoint),
         (Prefix + "EOF-joins-original-summary-and-borrowed-owner-survives", Eof),
-        (Prefix + "active-run-is-aborted-before-manual-compaction", Active)
+        (Prefix + "active-run-is-aborted-before-manual-compaction", Active),
+        (Prefix + "throwing-summarizer-reports-its-own-message", ThrowingSummarizer)
     ];
     private static void Check(bool value, string message) { if (!value) throw new InvalidOperationException(message); }
     private static void Success(JsonElement value) => Check(value.GetProperty("success").GetBoolean(), value.GetRawText());
@@ -58,6 +59,19 @@ internal static class RpcUpstreamCompactionTests
         Check(!again.GetProperty("success").GetBoolean() && again.GetProperty("error").GetString() == "Already compacted" && f.Summary.Calls == 1,
             "Already compacted returned a fabricated skipped success or invoked summary again.");
         var repeated = await Bytes(f); Check(after.SequenceEqual(repeated) && f.Transport.Calls == 0, "Repeated manual command wrote or ran a normal provider.");
+    }
+    // agent-session.ts compact(): the summarizer's thrown error answers the command with its message, and compaction_end carries
+    // "Compaction failed: <message>"; nothing is appended and the thrown error is not retried.
+    private static async Task ThrowingSummarizer()
+    {
+        await using var f = await Fixture.Create(); var before = await Bytes(f);
+        f.Summary.Throw = new InvalidOperationException("summarizer exploded");
+        var response = await f.Send(new { id = "manual", type = "compact" });
+        Check(!response.GetProperty("success").GetBoolean() && response.GetProperty("error").GetString() == "summarizer exploded", response.GetRawText());
+        var end = f.Records.Single(value => value.GetProperty("type").GetString() == "compaction_end");
+        Check(!end.GetProperty("aborted").GetBoolean() && !end.TryGetProperty("result", out _) &&
+            end.GetProperty("errorMessage").GetString() == "Compaction failed: summarizer exploded", end.GetRawText());
+        Check((await Bytes(f)).SequenceEqual(before) && f.Summary.Calls == 1, "A failed summary appended or retried.");
     }
     private static async Task Grammar()
     {
@@ -244,7 +258,7 @@ internal static class RpcUpstreamCompactionTests
     }
     private sealed class Summary : ISessionSummaryGenerator
     {
-        internal bool Hold; internal string Text = "offline summary"; internal int Calls, Active; internal SessionSummaryRequest? LastRequest;
+        internal bool Hold; internal string Text = "offline summary"; internal int Calls, Active; internal SessionSummaryRequest? LastRequest; internal Exception? Throw;
         internal readonly TaskCompletionSource Entered = new(TaskCreationOptions.RunContinuationsAsynchronously), Canceled = new(TaskCreationOptions.RunContinuationsAsynchronously),
             Release = new(TaskCreationOptions.RunContinuationsAsynchronously), Joined = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public async ValueTask<SessionGeneratedSummary> GenerateAsync(SessionSummaryRequest request, CancellationToken token = default)
@@ -252,7 +266,7 @@ internal static class RpcUpstreamCompactionTests
             Calls++; Active++; LastRequest = request;
             try { Check(request.Kind == SessionSummaryKind.History && request.Model == Model, "Unexpected native summary request.");
                 if (Hold) { using var cancellation = token.UnsafeRegister(_ => Canceled.TrySetResult(), null); Entered.TrySetResult(); await Release.Task; }
-                token.ThrowIfCancellationRequested(); return new(Text, new(4, 3, 0, 0, 7, new(0, 0, 0, 0, 0))); }
+                token.ThrowIfCancellationRequested(); if (Throw is not null) throw Throw; return new(Text, new(4, 3, 0, 0, 7, new(0, 0, 0, 0, 0))); }
             finally { Active--; Joined.TrySetResult(); }
         }
     }

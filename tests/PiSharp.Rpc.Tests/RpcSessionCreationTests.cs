@@ -18,7 +18,8 @@ internal static class RpcSessionCreationTests
         ("rpc.lifecycle-staged-response-budget-rolls-back-known-file-before-source-retirement", ResponseBudget),
         ("rpc.lifecycle-tree-chronological-labels-opaque-shapes-and-depth-budget-have-no-effects", TreeAndBounds),
         ("rpc.lifecycle-postcommit-notification-error-retains-fresh-file-and-current-identity", NotificationFailure),
-        ("rpc.lifecycle-queue-publication-orders-authority-switch-and-joins-held-writes", QueuePublication)
+        ("rpc.lifecycle-queue-publication-orders-authority-switch-and-joins-held-writes", QueuePublication),
+        ("rpc.lifecycle-fork-of-missing-or-non-user-entry-answers-upstream-text", ForkInvalidEntry)
     ];
     private static readonly ModelDescriptor Model = new("lifecycle-rpc", "openai-responses", "fixture");
     private static readonly JsonData ModelWire = JsonData.Parse("""{"id":"lifecycle-rpc","api":"openai-responses","provider":"fixture","name":"Offline lifecycle","baseUrl":"https://offline.invalid","reasoning":false,"input":["text"],"contextWindow":32768,"maxTokens":1024,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}""");
@@ -34,6 +35,23 @@ internal static class RpcSessionCreationTests
             "Response budgeting crossed source retirement or leaked staged file/writer.");
         Check((await Bytes(fixture.Source)).SequenceEqual(before), "Rejected response changed physical source bytes.");
         await fixture.Owner.AppendExtensionEntryAsync(attached, new("fixture", "after-rejection", 1, JsonData.Parse("{}")));
+    }
+    // agent-session-runtime.ts fork(): a missing entry, and a "before" fork of anything but a user message, both throw
+    // "Invalid entry ID for forking", which rpc-mode answers as the command's error.
+    private static async Task ForkInvalidEntry()
+    {
+        await using var fixture = await Fixture.Create([Entry("u", null, "message", new { message = new { role = "user", timestamp = 0, content = "hello" } }),
+            Entry("c", "u", "custom", new { customType = "fixture", data = new { } })]);
+        var before = await Bytes(fixture.Source); var attached = fixture.Owner.Current;
+        foreach (var (id, entry) in new[] { ("missing", "absent"), ("custom", "c") })
+        {
+            await fixture.Send(new { id, type = "fork", entryId = entry });
+            var error = fixture.Response(id).Value;
+            Check(!error.GetProperty("success").GetBoolean() && error.GetProperty("error").GetString() == "Invalid entry ID for forking",
+                "Fork of " + entry + " answered " + error.GetRawText());
+        }
+        Check(ReferenceEquals(attached, fixture.Owner.Current) && Directory.GetFiles(fixture.Root, "*.jsonl").Length == 1 &&
+            (await Bytes(fixture.Source)).SequenceEqual(before), "A refused fork created a session or changed the source.");
     }
     private static async Task TreeAndBounds()
     {

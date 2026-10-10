@@ -109,8 +109,9 @@ internal static class SessionTreeNavigationTests
         Equal(SessionTreeNavigationFailure.StaleSelection, (await Throws<SessionTreeNavigationException>(() =>
             f.Owner.NavigateTreeAsync(f.Owner.Current, new("left-system", other.Revision)))).Failure);
         var current = f.Owner.CaptureTree(f.Owner.Current);
-        Equal(SessionTreeNavigationFailure.UnknownTarget, (await Throws<SessionTreeNavigationException>(() =>
-            f.Owner.NavigateTreeAsync(current.Attachment, new("missing", current.Revision)))).Failure);
+        var unknown = await Throws<SessionTreeNavigationException>(() => f.Owner.NavigateTreeAsync(current.Attachment, new("missing", current.Revision)));
+        // agent-session.ts navigateTree(): throw new Error(`Entry ${targetId} not found`).
+        Equal(SessionTreeNavigationFailure.UnknownTarget, unknown.Failure); Equal("Entry missing not found", unknown.Message);
         Equal(SessionTreeNavigationFailure.InvalidRequest, (await Throws<SessionTreeNavigationException>(() =>
             f.Owner.NavigateTreeAsync(current.Attachment, new("", current.Revision)))).Failure);
         await foreign.Owner.DisposeAsync();

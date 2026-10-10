@@ -68,6 +68,7 @@ public sealed class TransportSessionSummaryGenerator(Func<SessionSummaryRequest,
         {
             StopReason.Error => $"{label} failed: {(string.IsNullOrEmpty(error) ? "Unknown error" : error)}",
             StopReason.Length => $"{label} failed: generation hit the token cap and the summary is incomplete",
+            _ when !message.Content.IsDefault && message.Content.Any(content => content is ToolCallContent) => $"{label} attempted to call a tool",
             _ => null
         };
         return new(SessionCompactionFailure.SummaryFailed)
