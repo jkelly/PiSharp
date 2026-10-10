@@ -56,11 +56,13 @@ internal sealed partial class InteractiveMode
             case "session_info_changed": state.SessionName = S(e["name"]); break;
             case "thinking_level_changed": state.ThinkingLevel = S(e["level"]) ?? state.ThinkingLevel; break;
             case "entry_appended" when e["entry"] is JsonObject entry:
+                if (SessionEntries.Type(entry) == "model_change") _ = RefreshStateAsync();
+                // An entries read (SyncEntriesAsync) may already hold it.
+                if (SessionEntries.Id(entry) is { } appendedId && state.Entries.FindLastIndex(known => SessionEntries.Id(known) == appendedId) >= 0) break;
                 var copy = (JsonObject)entry.DeepClone();
                 state.Entries.Add(copy);
                 state.LeafId = SessionEntries.Id(copy) ?? state.LeafId;
                 if (SessionEntries.Type(copy) == "message" && S(copy["message"]?["role"]) is "user" or "assistant" or "toolResult") state.MessageCount++;
-                if (SessionEntries.Type(copy) == "model_change") _ = RefreshStateAsync();
                 break;
         }
     }
@@ -82,6 +84,9 @@ internal sealed partial class InteractiveMode
         if (!isInitialized) await InitAsync();
         UpdateStateFromEvent(e);
         footer.Invalidate();
+        // The session appends a message after its message_end; these events follow an append (see RequestSessionSync).
+        if (type is "message_start" or "message_end" or "tool_execution_start" or "turn_end" or "agent_end" or "entry_appended" or "compaction_end")
+            RequestSessionSync();
         programStatus.HandleEvent(e);
 
         switch (type)
@@ -243,7 +248,6 @@ internal sealed partial class InteractiveMode
                     streamingComponent = null;
                     streamingMessage = null;
                     footer.Invalidate();
-                    _ = RefreshStatsAsync().ContinueWith(_ => context.Loop.Post(() => { footer.Invalidate(); ui.RequestRender(); }), TaskScheduler.Default);
                 }
                 ui.RequestRender();
                 break;
@@ -417,9 +421,14 @@ internal sealed partial class InteractiveMode
             footerDataProvider.SetCwd(cwd);
         }
         await RefreshSessionAsync();
+        // rebindCurrentSession -> applyRuntimeSettings: footer.setAutoCompactEnabled(session.autoCompactionEnabled).
+        await ApplyAutoCompactionSettingAsync();
         await RefreshCommandsAsync();
         RenderCurrentSessionState();
         SetupAutocompleteProvider();
+        // rebindCurrentSession: updateAvailableProviderCount() after the new session's extensions bound (they can add providers).
+        await RefreshAvailableModelsAsync();
+        UpdateAvailableProviderCount();
         UpdateEditorBorderColor();
         UpdateTerminalTitle();
         footer.Invalidate();

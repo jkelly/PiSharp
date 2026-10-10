@@ -630,7 +630,7 @@ internal sealed partial class InteractiveMode
 
     private async Task HandleSessionCommandAsync()
     {
-        await RefreshStatsAsync();
+        await SyncSessionAsync();
         var stats = state.Stats ?? new JsonObject();
         var sessionName = state.SessionName;
         var cacheWaste = context.ComputeCacheWaste?.Invoke(state.Entries) ?? new CacheWaste(0, 0, 0);
@@ -936,6 +936,7 @@ internal sealed partial class InteractiveMode
         programStatus.Reset();
         ApplyRuntimeSettings();
         await RefreshSessionAsync();
+        await ApplyAutoCompactionSettingAsync();
         renderedGeneration = state.Generation;
         await RefreshAvailableModelsAsync();
         await RefreshCommandsAsync();

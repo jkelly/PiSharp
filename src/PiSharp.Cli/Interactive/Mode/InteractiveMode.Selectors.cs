@@ -604,6 +604,7 @@ internal sealed partial class InteractiveMode
             }
             await RefreshEntriesAsync();
             await RefreshStateAsync();
+            RequestSessionSync(); // The context usage follows the new leaf.
             chatContainer.Clear();
             RenderInitialMessages();
             if (editorText is { Length: > 0 } && TextUtils.JsTrim(editor.GetText()).Length == 0) editor.SetText(editorText);
