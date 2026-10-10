@@ -247,6 +247,29 @@ internal sealed partial class InteractiveMode
         footer.Invalidate();
         UpdateEditorBorderColor();
         ShowStatus($"{actionLabel}. Credentials saved to {context.Login?.AuthPath}");
+        // completeProviderAuthentication for llama.cpp: a session without a model gets llamaCppPostLoginGuidance; the provider's
+        // catalog is then refreshed in the background (15 s), warning when that fails.
+        if (providerId == PiSharp.Cli.Llama.LlamaCatalog.ProviderId && context.Llama is { } llama)
+        {
+            if (state.Model is { } model && SessionEntries.Str(model["provider"]) == "unknown" && SessionEntries.Str(model["id"]) == "unknown" && SessionEntries.Str(model["api"]) == "unknown")
+            {
+                var loadedModelCount = state.AvailableModels.Count(available => SessionEntries.Str(available["provider"]) == providerId);
+                ShowError(loadedModelCount == 0
+                    ? $"{actionLabel}. No llama.cpp models are loaded. Use /llama to load a model, then /model to select it."
+                    : $"{actionLabel}. Use /model to select a loaded llama.cpp model, or /llama to manage models.");
+            }
+            else _ = MaybeWarnAboutAnthropicSubscriptionAuthAsync();
+            Run(async () =>
+            {
+                using var timeout = new CancellationTokenSource(PiSharp.Cli.Llama.LlamaClient.RequestTimeout);
+                try { await llama.Refresh(timeout.Token); }
+                catch (OperationCanceledException) when (timeout.IsCancellationRequested) { ShowWarning($"{actionLabel}, but its model catalog refresh timed out; using cached models."); }
+                catch (Exception) { ShowWarning($"{actionLabel}, but its model catalog could not be refreshed; using cached models."); }
+                await RefreshAvailableModelsAsync();
+                UpdateAvailableProviderCount();
+            });
+            return;
+        }
         _ = MaybeWarnAboutAnthropicSubscriptionAuthAsync();
     }
 

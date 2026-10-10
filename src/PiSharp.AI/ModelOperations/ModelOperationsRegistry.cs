@@ -51,6 +51,11 @@ public delegate ValueTask<ProviderAuthResult?> ProviderAuthResolver(ProviderAuth
 public sealed record ModelOperationsProvider(string Id, string Name)
 {
     public ImmutableArray<OperationModel> Models { get; init; } = [];
+    /// <summary>models.ts <c>Provider.getAllModels()</c> for a provider whose catalog changes at runtime (a discovered or refreshed
+    /// catalog): read on every lookup instead of <see cref="Models"/>.</summary>
+    public Func<ImmutableArray<OperationModel>>? ModelSource { get; init; }
+    /// <summary>The provider's models now: <see cref="ModelSource"/>, else <see cref="Models"/>.</summary>
+    public ImmutableArray<OperationModel> CurrentModels => ModelSource?.Invoke() ?? Models;
     public ImmutableDictionary<string, IClassifierApi> Classifiers { get; init; } = ImmutableDictionary<string, IClassifierApi>.Empty;
     public ImmutableDictionary<string, IImagesApi> Images { get; init; } = ImmutableDictionary<string, IImagesApi>.Empty;
     /// <summary>Rewrites the model with the request's resolved env before dispatch.</summary>
@@ -142,9 +147,9 @@ public static class BuiltinModelOperationProviders
     /// <summary>A llama.cpp server's classifier models (coding-agent extensions/llama/provider.ts): decision models
     /// answer through System One at the server's <c>/v1</c> URL, chat models through <c>llama-cpp-classify</c>. Model
     /// discovery is the caller's.</summary>
-    public static ModelOperationsProvider LlamaCpp(IEnumerable<OperationModel> models) => new("llama.cpp", "llama.cpp")
+    public static ModelOperationsProvider LlamaCpp(IEnumerable<OperationModel> models, Func<ImmutableArray<OperationModel>>? source = null) => new("llama.cpp", "llama.cpp")
     {
-        Models = models.ToImmutableArray(),
+        Models = models.ToImmutableArray(), ModelSource = source,
         Classifiers = ImmutableDictionary<string, IClassifierApi>.Empty.WithComparers(StringComparer.Ordinal)
             .Add(LlamaCppClassifier.ApiId, LlamaCppClassifier.Instance).Add(TypeSafeSystemOneClassifier.ApiId, TypeSafeSystemOneClassifier.Instance)
     };
@@ -286,8 +291,8 @@ public sealed class ModelOperationsRegistry
 
     /// <summary>Every model of every type, of one provider or of all providers in registration order.</summary>
     public ImmutableArray<OperationModel> GetAllModels(string? provider = null) => provider is not null
-        ? GetProvider(provider)?.Models ?? []
-        : [.. GetProviders().SelectMany(entry => entry.Models)];
+        ? GetProvider(provider)?.CurrentModels ?? []
+        : [.. GetProviders().SelectMany(entry => entry.CurrentModels)];
 
     /// <summary>models.ts <c>getModelsOfType</c>.</summary>
     public ImmutableArray<OperationModel> GetModelsOfType(ModelType type, string? provider = null) =>
@@ -317,7 +322,7 @@ public sealed class ModelOperationsRegistry
             var resolved = await auth(new(entry.Id) { Check = true }, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             if (resolved is null) continue;
-            var models = entry.FilterAllModels?.Invoke(entry.Models, resolved) ?? entry.Models;
+            var models = entry.FilterAllModels?.Invoke(entry.CurrentModels, resolved) ?? entry.CurrentModels;
             available.AddRange(models.Where(model => model.Type == type));
         }
         return available.ToImmutable();

@@ -29,6 +29,14 @@ public sealed partial class NativeExtensionContextFacadeHost : IExtensionModelOp
             throw new InvalidOperationException("The model registry is already bound.");
     }
 
+    /// <summary>The run's model registry (the Pi entry's: built-in providers plus the providers its extensions registered), replacing
+    /// any earlier binding; later reads use it.</summary>
+    internal void BindRunModelOperations(ModelOperationsRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        Volatile.Write(ref modelOperations, new(registry));
+    }
+
     private NativeExtensionModelOperations Operations(IExtensionContext context) => Read(context, _ =>
     {
         Interlocked.CompareExchange(ref modelOperations, DefaultModelOperations.Value, null);

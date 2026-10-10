@@ -206,6 +206,13 @@ internal sealed partial class InteractiveMode
         if (text == "/dementedelves") { HandleDementedDelves(); editor.SetText(""); return; }
         if (text == "/resume") { ShowSessionSelector(); editor.SetText(""); return; }
         if (text == "/quit") { editor.SetText(""); await ShutdownAsync(); return; }
+        if (Is("/llama") && context.Llama is not null)
+        {
+            editor.SetText("");
+            editor.AddToHistory(text);
+            await HandleLlamaCommandAsync();
+            return;
+        }
         if (Is("/mcp") && context.Mcp is not null)
         {
             editor.SetText("");

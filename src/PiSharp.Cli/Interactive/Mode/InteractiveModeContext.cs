@@ -115,6 +115,8 @@ internal sealed record InteractiveModeContext
     public PiSharp.Cli.Authentication.ProviderLoginHost? Login { get; init; }
     public Func<string, Task> OnCredentialsChanged { get; init; } = _ => Task.CompletedTask;
     public McpBinding? Mcp { get; init; }
+    /// <summary>The built-in llama.cpp extension's /llama services (null: /llama is not offered).</summary>
+    public LlamaServices? Llama { get; init; }
 
     public bool RecordCrash(string kind, object? error, string? sessionFile, string cwd) => RecordCrashImpl(kind, error, sessionFile, cwd);
     public void RequestExit(bool fromSignal, int code = 0) => RequestExitImpl(fromSignal, code);

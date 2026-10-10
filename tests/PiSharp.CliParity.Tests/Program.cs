@@ -46,6 +46,7 @@ internal static partial class Program
         cases.AddRange(SessionFormatCases());
         cases.AddRange(CapCases());
         cases.AddRange(NamelessToolCallCases());
+        cases.AddRange(LlamaCases());
         cases.AddRange(CloseoutCases());
         cases.AddRange(ThinkingClampCases());
         var filter = Environment.GetEnvironmentVariable("CLIPARITY_FILTER");

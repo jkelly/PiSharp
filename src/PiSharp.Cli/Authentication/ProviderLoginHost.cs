@@ -67,13 +67,15 @@ internal sealed class ProviderLoginHost(AuthJsonCredentialStore store, Func<Http
             await new StoredOAuthLifecycle(store, flow, timeProvider).ReauthenticateAsync(option.Provider.Id, credential, cancellationToken).ConfigureAwait(false);
             return;
         }
-        var (key, environment) = await ApiKeyLoginAsync(option.Provider, interaction, cancellationToken).ConfigureAwait(false);
+        using var loginHttp = createHttp();
+        var (key, environment) = await ApiKeyLoginAsync(option.Provider, interaction, cancellationToken, ReadEnvironment, loginHttp).ConfigureAwait(false);
         await store.WriteApiKeyAsync(option.Provider.Id, key, environment, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>The api-key login prompts: envApiKeyAuth, cloudflare-auth.ts, amazon-bedrock.ts and google-vertex.ts.</summary>
+    /// <summary>The api-key login prompts: envApiKeyAuth, cloudflare-auth.ts, amazon-bedrock.ts, google-vertex.ts and the llama.cpp
+    /// extension's provider.ts (which reads the router's catalog through <paramref name="http"/>).</summary>
     internal static async Task<(string? Key, IReadOnlyDictionary<string, string>? Environment)> ApiKeyLoginAsync(ProviderAuthEntry provider,
-        IProviderAuthInteraction interaction, CancellationToken token)
+        IProviderAuthInteraction interaction, CancellationToken token, Func<string, string?>? readEnvironment = null, HttpMessageInvoker? http = null)
     {
         Task<string> Prompt(AuthPromptKind kind, string message, IReadOnlyList<AuthPromptOption>? options = null)
         {
@@ -82,6 +84,8 @@ internal sealed class ProviderLoginHost(AuthJsonCredentialStore store, Func<Http
         }
         switch (provider.ApiKeyLogin)
         {
+            case ApiKeyLoginKind.LlamaCpp:
+                return await PiSharp.Cli.Llama.LlamaCatalog.LoginAsync(interaction, readEnvironment ?? Environment.GetEnvironmentVariable, token, http).ConfigureAwait(false);
             case ApiKeyLoginKind.CloudflareWorkersAI:
             case ApiKeyLoginKind.CloudflareAIGateway:
             {
