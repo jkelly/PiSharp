@@ -2,7 +2,7 @@
 // DEVIATION: upstream loads prebuilt N-API helpers (AppKit on macOS, user32 on Windows, an X11 worker on Linux). PiSharp ships no
 // native addon and adds no packages, so the macOS and Windows helpers are replaced by the platform commands below (pbpaste,
 // osascript/JXA, PowerShell Get-Clipboard/Set-Clipboard and the System.Windows.Forms clipboard inside powershell.exe). The Linux
-// X11 helper has no command equivalent beyond the xclip/xsel fallbacks the callers already try, so it is reported unavailable.
+// X11 helper is ported over the same libxcb.so.1 through P/Invoke (X11Clipboard), read-only as upstream.
 // The process runner, environment, temp directory and stdout writer are injectable through ClipboardEnvironment.
 using System.Text;
 using PiSharp.Tools.Images;
@@ -53,11 +53,12 @@ internal static class NativeClipboard
 {
     private const int TimeoutMs = 5000;
 
-    /// <summary>Command-backed helpers for darwin and win32. Linux (X11 helper) and other platforms have none.</summary>
+    /// <summary>Command-backed helpers for darwin and win32, the libxcb reader on Linux with DISPLAY; other platforms have none.</summary>
     public static INativeClipboard? Create(ClipboardEnvironment environment) => environment.Platform switch
     {
         "darwin" => new DarwinCommandClipboard(environment),
         "win32" => new WindowsCommandClipboard(environment),
+        "linux" => X11Clipboard.Create(environment),
         _ => null,
     };
 

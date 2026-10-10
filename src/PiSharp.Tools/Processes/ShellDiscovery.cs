@@ -26,6 +26,10 @@ public sealed record ShellHost(bool IsWindows, Func<string, string?> GetEnvironm
 {
     public static ShellHost Current { get; } = new(OperatingSystem.IsWindows(), Environment.GetEnvironmentVariable, File.Exists,
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+
+    /// <summary>Source existsSync also accepts a directory as the custom shell path (spawn then refuses it). Null (the default, also for
+    /// <see cref="Current"/>): a directory is not found, so the model bash tool stays unregistered.</summary>
+    public Func<string, bool>? DirectoryExists { get; init; }
 }
 
 /// <summary>Source shell resolution, shell environment and the shellPath setting normalization.</summary>
@@ -49,7 +53,7 @@ public static class ShellDiscovery
         host ??= ShellHost.Current;
         if (!string.IsNullOrEmpty(customShellPath))
         {
-            if (host.FileExists(customShellPath)) return ForBash(customShellPath);
+            if (host.FileExists(customShellPath) || host.DirectoryExists?.Invoke(customShellPath) == true) return ForBash(customShellPath);
             throw new ShellDiscoveryException($"Custom shell path not found: {customShellPath}");
         }
         if (host.IsWindows)

@@ -174,6 +174,51 @@ internal static partial class Program
             Equal("The property 'options.env['K\0']' must be a string without null bytes. Received 'K\\x00'",
                 PiSharp.Tools.NodeArgumentErrors.SpawnNullBytes("sh", ["-c", "echo"], "/tmp", new Dictionary<string, string> { ["K\0"] = "v" }), "env key");
         }),
+        // rpc-mode.ts "bash" -> executeBash -> createLocalBashOperations exec: getShellConfig runs inside exec (its error is the response),
+        // and a shell spawn cannot start answers with Node's spawn error (Node 22: an empty .exe is "spawn EFTYPE" on Windows; a
+        // directory is "spawn <dir> ENOENT" on Windows and EACCES on Linux and macOS). Nothing is recorded in the session.
+        ("validation.rpc-user-bash-start-failures-are-node-spawn-errors", async () =>
+        {
+            async Task<JsonElement> Bash(string shellPath, string name)
+            {
+                using var sandbox = new Sandbox("validation-rpc-shell-" + name);
+                sandbox.Vars["PI_OFFLINE"] = "1";
+                sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), System.Text.Json.JsonSerializer.Serialize(new { shellPath }));
+                var line = System.Text.Json.JsonSerializer.Serialize(new { id = "s0", type = "bash", command = "echo hi" }) + "\n" +
+                    System.Text.Json.JsonSerializer.Serialize(new { id = "s1", type = "get_messages" }) + "\n";
+                var gate = new GatedInput(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(line)));
+                using var output = new SignalingStream("\"command\":\"get_messages\"", gate.Release);
+                using var stdout = new StringWriter(); using var stderr = new StringWriter();
+                var host = sandbox.Host(stdout, stderr, null, rpcInput: gate, rpcOutput: output) with { StdoutIsTty = false };
+                Equal(0, await PiCommand.RunAsync(["--mode", "rpc", "--provider", "anthropic", "--model", "claude-sonnet-4-5"], host, CancellationToken.None), "exit; " + stderr);
+                var lines = System.Text.Encoding.UTF8.GetString(output.ToArray()).Split('\n');
+                var messages = JsonDocument.Parse(lines.First(text => text.Contains("\"command\":\"get_messages\"", StringComparison.Ordinal))).RootElement;
+                Equal(0, messages.GetProperty("data").GetProperty("messages").GetArrayLength(), name + ": nothing recorded");
+                return JsonDocument.Parse(lines.First(text => text.Contains("\"command\":\"bash\"", StringComparison.Ordinal))).RootElement;
+            }
+            var root = Directory.CreateTempSubdirectory("pisharp-shells-").FullName;
+            try
+            {
+                var missing = Path.Combine(root, "no-shell");
+                var missingResponse = await Bash(missing, "missing");
+                Equal(false, missingResponse.GetProperty("success").GetBoolean(), "missing shell fails");
+                Equal("Custom shell path not found: " + missing, missingResponse.GetProperty("error").GetString(), "getShellConfig error");
+                var directory = Directory.CreateDirectory(Path.Combine(root, "shell-dir")).FullName;
+                Equal($"spawn {directory} {(OperatingSystem.IsWindows() ? "ENOENT" : "EACCES")}",
+                    (await Bash(directory, "directory")).GetProperty("error").GetString(), "directory shell");
+                var empty = Path.Combine(root, OperatingSystem.IsWindows() ? "empty.exe" : "empty");
+                await File.WriteAllBytesAsync(empty, []);
+                Equal(OperatingSystem.IsWindows() ? "spawn EFTYPE" : $"spawn {empty} EACCES", (await Bash(empty, "empty")).GetProperty("error").GetString(),
+                    "empty shell");
+                // A text file as the shell (Node 22 on Windows: CreateProcess ERROR_BAD_EXE_FORMAT, thrown as "spawn EFTYPE"; Linux and
+                // macOS: not executable, EACCES).
+                var text = Path.Combine(root, "shell.txt");
+                await File.WriteAllTextAsync(text, "hello\n");
+                Equal(OperatingSystem.IsWindows() ? "spawn EFTYPE" : $"spawn {text} EACCES", (await Bash(text, "text")).GetProperty("error").GetString(),
+                    "text file shell");
+            }
+            finally { try { Directory.Delete(root, true); } catch (IOException) { } }
+        }),
         // bash.ts execute: an empty command runs, resolveTimeoutMs rejects a non-positive timeout and accepts a fractional one, and only
         // the operating system bounds the command length (captured from the installed Pi 1.1.0 bash tool on Windows).
         ("validation.bash-admits-what-the-source-schema-admits", async () =>

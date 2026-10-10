@@ -70,6 +70,8 @@ internal sealed record LiveSessionRuntime(Func<string, string?> ReadEnvironment,
 
     /// <summary>Extension registrations applied to every registry this runtime creates (pi.registerVirtualModel, IMPL-E).</summary>
     internal Action<PiSharp.Cli.Models.ModelRegistry>? ConfigureRegistry { get; init; }
+    /// <summary>StreamOptions.transport for providers with a WebSocket transport (OpenAI Codex), read per request; null is "auto".</summary>
+    internal Func<string?>? Transport { get; init; }
 
     /// <summary>The session's environment, built once from <see cref="ReadEnvironment"/>.</summary>
     internal PiSharp.Cli.Authentication.LiveProcessEnvironment CreateEnvironment() => new(ReadEnvironment, ProviderVariables);

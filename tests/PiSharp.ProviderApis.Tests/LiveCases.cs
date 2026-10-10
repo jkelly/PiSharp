@@ -25,7 +25,7 @@ internal static partial class Program
         http.OnUrl("https://", _ => Json("""{"error":{"message":"fake peer refuses"}}""", HttpStatusCode.BadRequest));
         LiveSessionRuntime Runtime(Dictionary<string, string?> env, string? path = null) =>
             new(name => env.GetValueOrDefault(name), () => http, path ?? authPath, () => new HttpMessageInvoker(http, disposeHandler: false), new FixedTime(1_800_000_000_000))
-            { HomeDirectory = directory };
+            { HomeDirectory = directory, Transport = () => "sse" }; // One SSE request per provider; the Codex WebSocket has its own cases.
         async Task<Recorded> Send(string provider, string id, Dictionary<string, string?>? env = null)
         {
             var selection = LiveSessionSelection.Parse(provider, id, "512");

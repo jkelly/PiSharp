@@ -36,7 +36,11 @@ public sealed record ProcessStructuredOutput(string Content, bool Truncated);
 public sealed record ProcessRunResult(ProcessRunStatus Status, int? ExitCode, int? ProcessId,
     bool ProcessStarted, bool CleanupConfirmed, bool CapturedOutputComplete,
     ProcessOutputSnapshot Output, ProcessStructuredOutput StructuredOutput,
-    double WallTimeSeconds, ImmutableArray<ProcessDiagnostic> Diagnostics);
+    double WallTimeSeconds, ImmutableArray<ProcessDiagnostic> Diagnostics)
+{
+    /// <summary>The Win32 error when CreateProcess refused the executable (the launch never started).</summary>
+    public int? LaunchError { get; init; }
+}
 
 public delegate ValueTask ProcessOutputCallback(ProcessOutputSnapshot snapshot);
 /// <summary>Raw stdout/stderr bytes in arrival order (source onData), awaited before the next chunk is collected.</summary>
@@ -179,7 +183,10 @@ public sealed class NativeProcessRunner : ISeparatedProcessRunner
         catch (OperationCanceledException) when (caller.IsCancellationRequested)
         { await output.DisposeAsync().ConfigureAwait(false); return Result(ProcessRunStatus.Canceled, null, null, false, true); }
         catch (ProcessLaunchException error)
-        { Add(error.Diagnostic); await output.DisposeAsync().ConfigureAwait(false); return Result(ProcessRunStatus.Failed, null, null, false, error.CleanupConfirmed); }
+        {
+            Add(error.Diagnostic); await output.DisposeAsync().ConfigureAwait(false);
+            return Result(ProcessRunStatus.Failed, null, null, false, error.CleanupConfirmed) with { LaunchError = error.NativeError };
+        }
         catch (Exception)
         { Add(ProcessDiagnostic.SpawnFailed); await output.DisposeAsync().ConfigureAwait(false); return Result(ProcessRunStatus.Failed, null, null, false, true); }
 

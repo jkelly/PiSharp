@@ -11,18 +11,32 @@ internal sealed partial class OfflineSessionProfile
 {
     /// <summary>The bash tool and user bash of the <c>pi</c> tool policy (owner decision 0004): the discovered shell (settings
     /// <c>shellPath</c>, then platform discovery), the full environment with Pi's bin directory first on PATH, output spilled to the
-    /// temporary directory as upstream does. No shell found leaves bash unregistered, as upstream fails to create it.</summary>
+    /// temporary directory as upstream does. No shell found leaves the bash tool unregistered; user commands then fail with the discovery
+    /// error, as upstream's exec does.</summary>
     private static (BashTool? Bash, UserBashHost? UserBash, OwnedProcessCleanup? Cleanup, string? Shell) PiBash(
         PiSharp.Cli.Pi.PiToolPolicy policy, BuiltinToolSettings settings, string workspace, Func<BashSessionEnvironment?> session)
     {
         // Windows runs the native job-object runner; Linux and macOS the POSIX process-group admission (posix_spawn into a fresh group).
         if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()) return (null, null, null, null);
         ShellConfiguration shell;
-        try { shell = ShellDiscovery.Resolve(settings.ShellPath); }
-        catch (ShellDiscoveryException) { return (null, null, null, null); }
-        var environment = ShellDiscovery.ShellEnvironment(policy.Environment ?? ProcessEnvironment(), ShellDiscovery.BinDirectory(), OperatingSystem.IsWindows());
         var spill = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()));
+        var environment = ShellDiscovery.ShellEnvironment(policy.Environment ?? ProcessEnvironment(), ShellDiscovery.BinDirectory(), OperatingSystem.IsWindows());
         var unboundedOutput = new ProcessRunnerOptions(MaximumRawBytes: int.MaxValue);
+        try { shell = ShellDiscovery.Resolve(settings.ShellPath); }
+        catch (ShellDiscoveryException error)
+        {
+            // createLocalBashOperations resolves the shell inside exec: a user command fails with getShellConfig's error, or, for a
+            // shellPath that is a directory (existsSync accepts it), with spawn's error for it.
+            IShellOperations unavailable;
+            try
+            {
+                var directory = ShellDiscovery.Resolve(settings.ShellPath, ShellHost.Current with { DirectoryExists = Directory.Exists });
+                unavailable = OperatingSystem.IsWindows() ? new NativeShellOperations(directory, environment, spill, unboundedOutput)
+                    : new PiSharp.Tools.Processes.Unix.PosixShellOperations(directory, environment, spill);
+            }
+            catch (ShellDiscoveryException) { unavailable = new UnavailableShellOperations(error.Message); }
+            return (null, new UserBashHost(new(unavailable, spill), settings.ShellCommandPrefix), null, null);
+        }
         var cleanup = new OwnedProcessCleanup(OperatingSystem.IsWindows() ? new NativeProcessRunner(unboundedOutput)
             : new PiSharp.Tools.Processes.Unix.UnixProcessRunner(new PiSharp.Tools.Processes.Unix.PosixSpawnProcessAdmission(), unboundedOutput));
         try
@@ -35,6 +49,14 @@ internal sealed partial class OfflineSessionProfile
             return (bash, user, cleanup, shell.Shell);
         }
         catch (ArgumentException) { return (null, null, null, null); }
+    }
+
+    /// <summary>Source createLocalShellOperations exec when getShellConfig throws ("Custom shell path not found", "No bash shell found"):
+    /// the command fails with that message before anything runs.</summary>
+    private sealed class UnavailableShellOperations(string message) : IShellOperations
+    {
+        public ValueTask<int?> ExecuteAsync(string command, string workingDirectory, ProcessRawOutputCallback onData, CancellationToken cancellationToken) =>
+            throw new PiSharp.Agent.ToolSourceErrorException(message);
     }
 
     /// <summary>The separated process runner of the search tools: the native runner on Windows, the POSIX process-group runner on Linux
