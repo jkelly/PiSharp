@@ -136,6 +136,11 @@ public static class RpcSessionCommand
         return new(enabled, Token("reserveTokens", defaults.ReserveTokens), Token("keepRecentTokens", defaults.KeepRecentTokens));
     }
 
+    /// <summary>settings-manager.ts getCompactionEnabled: compaction.enabled ?? true.</summary>
+    internal static bool CompactionEnabled(StartupSettingsSnapshot? settings) =>
+        !(settings?.Values.Value is { ValueKind: JsonValueKind.Object } values && values.TryGetProperty("compaction", out var compaction) &&
+            compaction.ValueKind == JsonValueKind.Object && compaction.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.False);
+
     private static async Task<int> RunCoreAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
         IRpcExtensionUiPresentationObserver? presentation, CancellationToken cancellationToken, Func<bool>? userShutdown = null,
         Func<RpcSessionShutdownSettlement, ValueTask<RpcTerminalStoppedAcknowledgment>>? stopTerminalAndJoin = null,
@@ -170,7 +175,7 @@ public static class RpcSessionCommand
                 parsed.SessionMode == "open", cancellationToken).ConfigureAwait(false));
             // Production sessions read the global mcp.json once at start (--no-mcp connects nothing); every session gets the built-in codemode.
             var hostAdmission = mcpAdmission is null && mcpHost is not null;
-            if (hostAdmission) mcpAdmission = mcpHost!.CreateAdmission(parsed.Workspace, stderr, settings?.Values, parsed.Tools.NoMcp);
+            if (hostAdmission) mcpAdmission = mcpHost!.CreateAdmission(parsed.Workspace, stderr, settings?.Values, parsed.Tools.NoMcp, pi?.BuiltinExtensions);
             backend = parsed.SessionMode == "open" ? null : new SessionStorageBackend(Path.GetDirectoryName(parsed.Session)!,
                 parsed.SessionMode == "new-memory" ? SessionStorageMode.InMemory : SessionStorageMode.LazyLocal,
                 pi is null ? new(MaximumFileBytes: PiPayloadBudget.SessionFileBytes, MaximumResidentBytes: PiPayloadBudget.SessionFileBytes)
@@ -181,7 +186,8 @@ public static class RpcSessionCommand
             // Pending input commands may carry Pi-sized images; retain two maximal commands while a dialog is open.
             // Pi extensions (IMPL-E) get a UI in the modes upstream gives one (tui and rpc); print and json run without (hasUI false).
             var piExtensions = pi?.Extensions;
-            ui = parsed.Extension is null && (piExtensions is null || pi!.ExtensionMode is not ("rpc" or "tui")) ? null
+            // The built-in extensions (extensions/index.ts: /llama, /mcp) have rpc-mode.ts's UI context too, with no file extension loaded.
+            ui = parsed.Extension is null && (piExtensions is null ? pi?.ExtensionMode != "rpc" : pi!.ExtensionMode is not ("rpc" or "tui")) ? null
                 : new(pi is null ? new RpcExtensionUiOptions(MaximumRetainedOrdinaryBytes: 2 * PiPayloadBudget.RpcCommandBytes)
                     // rpc-mode.ts createExtensionUIContext: dialogs, their texts, choices and responses have no limits of their own;
                     // requests and responses stay within one frame and a bounded number of open dialogs.
@@ -240,10 +246,13 @@ public static class RpcSessionCommand
             }
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
+            // agent-session.ts setModel from an extension (pi.setModel): the settings files the Pi entry reads now.
+            if (pi is not null) profile.ModelSwitchThinking = model => ModelSwitchThinkingLevel(pi.ReloadSettings is { } reloadSwitch
+                ? reloadSwitch(CancellationToken.None).GetAwaiter().GetResult() : settings, model);
             profile.BindSettingsThinkingReads();
             if (pi?.Skills is { } piSkills) profile.AdoptOriginalPromptSkills(piSkills);
             // /reload and ctx.reload() (agent-session.ts reload): the Pi entry reloads extensions and resources in place.
-            if (pi is not null) { profile.PiReloadResources = pi.ReloadResources; if (pi.Extensions is { } reloading) { var reloader = profile; reloading.Reload = reloader.PiReloadAsync; } }
+            if (pi is not null) { profile.PiReloadResources = pi.ReloadResources; profile.BuiltinExtensions = pi.BuiltinExtensions; profile.McpManager = pi.McpManager; if (pi.Extensions is { } reloading) { var reloader = profile; reloading.Reload = reloader.PiReloadAsync; } }
             else await profile.LoadSkillsAsync(parsed.Skills, stderr, cancellationToken).ConfigureAwait(false);
             long ticks = 0; var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             long Clock() => started + Interlocked.Increment(ref ticks);
@@ -406,6 +415,9 @@ public static class RpcSessionCommand
                 compactingExtensions.Compact = async (instructions, token) =>
                     System.Text.Json.Nodes.JsonNode.Parse((await compactor.CompactForExtensionAsync(profile.ManualCompactionRequest(instructions), token).ConfigureAwait(false)).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             }
+            // sdk.ts/agent-session.ts: every mode's session starts with auto-compaction set to compaction.enabled (default true).
+            if (pi is not null) await dispatcher.ConfigureAutoCompactionAsync(CompactionEnabled(settings), cancellationToken).ConfigureAwait(false);
+            if (pi?.PersistGlobalSetting is { } persistSetting) dispatcher.GlobalSettingChanged = persistSetting;
             // IMPL-I: the interactive mode reads the live session for features the RPC protocol does not carry.
             var publishedProfile = profile; var publishedSession = session;
             pi?.Interactive?.Host.Publish(() => publishedProfile.Sessions?.Current.Session ?? publishedSession, publishedProfile);

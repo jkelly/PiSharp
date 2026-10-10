@@ -21,7 +21,7 @@ public sealed partial class ExtensionRegistry
         Func<ExtensionEventDiagnostic, CancellationToken, ValueTask>? report, CancellationToken operationToken = default,
         CancellationToken sessionToken = default)
     {
-        if (!RegistrationPolicy.Json(observation, options with { MaximumJsonCharacters = options.MaximumObservationCharacters, MaximumJsonDepth = 64 }))
+        if (!RegistrationPolicy.Json(observation, options with { MaximumJsonCharacters = options.MaximumObservationCharacters, MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth }))
             throw Failure(ExtensionRegistrationFailure.InvalidDescriptor, "registry", "dispatch-observation");
         var admission = Admit(captured, RegistrationKind.Observation, topic, "dispatch-observation", operationToken, sessionToken);
         try

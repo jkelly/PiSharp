@@ -116,6 +116,10 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
     /// runs when the switch does not happen (an extension veto), so a cancelled switch leaves the path as it was.</summary>
     private readonly Func<string, CancellationToken, ValueTask<Func<ValueTask>?>>? _prepareSessionPath;
     private readonly Func<ModelDescriptor, PiSharp.Sessions.Compaction.SessionCompactionSettings?>? _compactionSettings;
+    /// <summary>agent-session.ts setSteeringMode, setFollowUpMode, setAutoCompactionEnabled and setAutoRetryEnabled save the global
+    /// setting (<c>steeringMode</c>, <c>followUpMode</c>, <c>compaction.enabled</c>, <c>retry.enabled</c>) through the settings manager;
+    /// the host persists each accepted change here.</summary>
+    public Action<string, System.Text.Json.Nodes.JsonNode>? GlobalSettingChanged { get; set; }
     /// <summary>The definition of a model: the startup definitions, then the host's current runtime models.</summary>
     private bool TryGetModel(ModelDescriptor model, out JsonData wire)
     {
@@ -178,6 +182,9 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         public readonly TaskCompletionSource Settled = NewGate();
         /// <summary>Set (under the gate) just before agent_settled is written: a client that saw it may prompt at once.</summary>
         public bool SettledPublished;
+        /// <summary>A run an extension command's handler triggered: the command holds input admission while its handler runs, and the
+        /// run settles inside it (agent-session.ts _runAgentPrompt outlives the sendMessage call).</summary>
+        public bool CommandTriggered, InputHeldByCommand, MonitorBorrowingInput, InputReleasePending;
     }
     private sealed class EventSink(RpcSessionDispatcher owner) : IAgentEventSink
     { public ValueTask EmitAsync(AgentEvent observation, CancellationToken token) => owner.ObserveAsync(observation); }
@@ -525,6 +532,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                     if (command.Type == "set_steering_mode") _session.SteeringMode = mode; else _session.FollowUpMode = mode;
                 }
                 finally { _transitions.Release(); }
+                GlobalSettingChanged?.Invoke(command.Type == "set_steering_mode" ? "steeringMode" : "followUpMode", command.Mode == "all" ? "all" : "one-at-a-time");
                 data = null; break;
             case "get_state": data = State(); break;
             case "set_auto_retry": case "abort_retry":
@@ -1003,7 +1011,13 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             {
                 // agent-session.ts sendCustomMessage: a command's sendMessage({ triggerTurn }) runs its turn while the handler still runs;
                 // the turn's events flow at once and the prompt is answered when the handler returns.
-                lock (_gate) if (ReferenceEquals(_startingInput, candidate)) _startingInput = null;
+                lock (_gate)
+                {
+                    if (ReferenceEquals(_startingInput, candidate)) _startingInput = null;
+                    candidate.CommandTriggered = candidate.InputHeldByCommand = true;
+                }
+                // _emitAgentSettled: agent_settled precedes the handler's return from waitForIdle (and so the "handled" response).
+                originating.HoldCommandIdleUntil(candidate.Settled.Task);
                 _ = MonitorAsync(candidate, triggered, originating);
                 candidate.Ready.TrySetResult();
             }
@@ -1032,7 +1046,10 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 if (ReferenceEquals(_startingInput, candidate)) _startingInput = null;
                 _admittingSession = null;
             }
-            _inputCommands.Release();
+            // A command-triggered run that is deciding its settlement under this admission keeps it until it has decided.
+            bool release = true;
+            lock (_gate) if (candidate.InputHeldByCommand) { candidate.InputHeldByCommand = false; if (candidate.MonitorBorrowingInput) { candidate.InputReleasePending = true; release = false; } }
+            if (release) _inputCommands.Release();
         }
     }
     private static async Task<AgentLoopResult> SubmittedRunAsync(Task<SubmittedInputResult> processing)
@@ -1049,8 +1066,11 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             while (true)
             {
                 var result = await processing.ConfigureAwait(false);
-                await _session.WaitForIdleAsync().ConfigureAwait(false);
-                await _inputCommands.WaitAsync().ConfigureAwait(false);
+                // A command's triggered run settles while the handler (the command's input) still runs.
+                await (run.CommandTriggered ? originating.WaitForTriggeredRunIdleAsync() : _session.WaitForIdleAsync()).ConfigureAwait(false);
+                var borrowed = false;
+                lock (_gate) if (run.InputHeldByCommand) borrowed = run.MonitorBorrowingInput = true;
+                if (!borrowed) await _inputCommands.WaitAsync().ConfigureAwait(false);
                 await _transitions.WaitAsync().ConfigureAwait(false);
                 TaskCompletionSource? ready = null;
                 try
@@ -1066,9 +1086,9 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                     if (++continuations > _options.MaximumContinuationRuns) throw new RpcDispatchException(RpcDispatchFailure.ResourceLimit);
                     run.HistoryLength = _session.Snapshot.Agent.Messages.Length;
                     run.Ready = ready = NewGate(); // Keep callbacks out of this short transition, even for a synchronous continuation.
-                    processing = _session.ContinueAsync();
+                    processing = borrowed ? originating.ContinueTriggeredRunAsync() : _session.ContinueAsync();
                 }
-                finally { _transitions.Release(); _inputCommands.Release(); ready?.TrySetResult(); }
+                finally { _transitions.Release(); ReleaseInputTurn(run, borrowed); ready?.TrySetResult(); }
             }
             await PublishQueueAsync(force: false).ConfigureAwait(false);
             bool fatal, aborted; lock (_gate) { fatal = _fatal is not null; aborted = run.AbortRequested; }
@@ -1088,6 +1108,12 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
             // A reserved post-run slot remains part of actual dispatcher shutdown custody.
             await JoinPostOrigin("run-settled", _postRunSettlement, originating, postSlot).ConfigureAwait(false);
         }
+    }
+    private void ReleaseInputTurn(RunState run, bool borrowed)
+    {
+        if (!borrowed) { _inputCommands.Release(); return; }
+        bool release; lock (_gate) { run.MonitorBorrowingInput = false; release = run.InputReleasePending; run.InputReleasePending = false; }
+        if (release) _inputCommands.Release();
     }
     private async Task AbortAsync(CancellationToken token)
     {

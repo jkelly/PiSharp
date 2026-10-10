@@ -68,7 +68,8 @@ internal static partial class Program
         using var sandbox = new Sandbox("print-error");
         sandbox.Vars["PI_OFFLINE"] = "1";
         sandbox.Respond = (_, _) => AnthropicError(400, "prompt is too long");
-        sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"retry":{"enabled":false}}""");
+        // Auto-compaction off: with it on, a context overflow is recovered instead (auto-compaction.print-overflow-...).
+        sandbox.Write(Path.Combine(sandbox.AgentDir, "settings.json"), """{"retry":{"enabled":false},"compaction":{"enabled":false}}""");
         var (code, stdout, stderr) = await sandbox.Run("-p", "--provider", "anthropic", "--model", "claude-sonnet-4-5", "x");
         Equal(1, code, "exit");
         Equal("", stdout, "nothing on stdout");

@@ -22,6 +22,28 @@ public sealed partial class PersistentAgentSession
     {
         lock (_gate) { var run = _inputTriggeredRun; _inputTriggeredRun = null; return run; }
     }
+    private ImmutableList<Task> _commandIdleBarriers = [];
+    /// <summary>agent-session.ts _emitAgentSettled: the session emits agent_settled before it resolves the idle waiters, so a command
+    /// awaiting waitForIdle resumes after it. A host that publishes the settlement of a run it took (<see cref="TakeInputTriggeredRun"/>)
+    /// holds the command's <see cref="WaitForCommandIdleAsync"/> until <paramref name="published"/> completes.</summary>
+    public void HoldCommandIdleUntil(Task published)
+    {
+        ArgumentNullException.ThrowIfNull(published);
+        lock (_gate) _commandIdleBarriers = _commandIdleBarriers.RemoveAll(barrier => barrier.IsCompleted).Add(published);
+    }
+    /// <summary>The idle of the run an admitted input triggered (a command's sendMessage with triggerTurn), without that input: the
+    /// host settles the run while the command's handler is still running, as agent-session.ts _runAgentPrompt does.</summary>
+    public Task WaitForTriggeredRunIdleAsync()
+    {
+        var agentIdle = _agent.WaitForIdleAsync();
+        Task idle; Task diagnostics; Task settings; Task[] bash;
+        lock (_gate) { idle = _active?.Task ?? Task.CompletedTask; diagnostics = LoadoutDiagnosticIdleLocked(); settings = RetrySettingsIdleLocked(); bash = CaptureUserBashCompletionsLocked(); }
+        return Task.WhenAll(new[] { agentIdle, idle, diagnostics, settings }.Concat(bash));
+    }
+    /// <summary>agent-session.ts _runAgentPrompt: a triggered run continues with what was queued at its end (agent.continue) while the
+    /// command's handler still runs.</summary>
+    public Task<AgentLoopResult> ContinueTriggeredRunAsync(CancellationToken cancellationToken = default) =>
+        Start(_agent.ContinueAsync, cancellationToken, duringInput: true);
     /// <summary>The default execution context (no async-local values), captured on a thread started without flowing the caller's.</summary>
     private static readonly Lazy<ExecutionContext> CleanExecutionContext = new(() =>
     {

@@ -117,6 +117,9 @@ internal sealed record InteractiveModeContext
     public McpBinding? Mcp { get; init; }
     /// <summary>The built-in llama.cpp extension's /llama services (null: /llama is not offered).</summary>
     public LlamaServices? Llama { get; init; }
+    /// <summary>Whether a built-in extension (extensions/index.ts: llama.cpp, codemode, tool-search, mcp) is loaded; one that is not
+    /// registers no command (/llama, /mcp). A reload can change it.</summary>
+    public Func<string, bool> IsBuiltinExtensionLoaded { get; init; } = _ => true;
 
     public bool RecordCrash(string kind, object? error, string? sessionFile, string cwd) => RecordCrashImpl(kind, error, sessionFile, cwd);
     public void RequestExit(bool fromSignal, int code = 0) => RequestExitImpl(fromSignal, code);

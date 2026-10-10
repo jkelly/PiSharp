@@ -135,8 +135,9 @@ public sealed class RpcAgentEventProjector
         {
             return RpcCommandCodec.Build(writer =>
             {
+                // The result was admitted by the invoker: a lone surrogate it kept is written as its escape.
                 ToolResultValueCodec.WriteProperties(writer, result, new(options.MaximumOutputBytes, options.MaximumOutputBytes, 1024,
-                    options.MaximumJsonDepth, options.MaximumOutputBytes, options.MaximumOutputBytes));
+                    options.MaximumJsonDepth, options.MaximumOutputBytes, options.MaximumOutputBytes) { KeepsLoneSurrogates = true });
             }, options.MaximumOutputBytes);
         }
         catch (InvalidOperationException)

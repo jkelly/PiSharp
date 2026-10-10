@@ -35,7 +35,7 @@ internal sealed partial class NativeExtensionActivation
         {
             if (result.Value.ValueKind != System.Text.Json.JsonValueKind.Object || !result.Value.TryGetProperty("action", out var action) ||
                 action.ValueKind != System.Text.Json.JsonValueKind.String || action.GetString() is not ("warm" or "stop")) return null;
-            var node = System.Text.Json.Nodes.JsonNode.Parse(current.Value.GetRawText())!.AsObject(); node["action"] = action.GetString();
+            var node = PiSharp.Contracts.JsonUtf16.MutableNode(current.Value.GetRawText())!.AsObject(); node["action"] = action.GetString();
             return JsonData.Parse(node.ToJsonString());
         }, _reportInputDiagnostic, CancellationToken.None, _closing.Token).ConfigureAwait(false);
         return reduced.Value.GetProperty("action").GetString()!;

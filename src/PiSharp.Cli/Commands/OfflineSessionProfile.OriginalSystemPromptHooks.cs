@@ -56,11 +56,11 @@ internal sealed partial class OfflineSessionProfile
                     var current = new SessionSystemReplay().Replay(currentMessages, token).CurrentMessage;
                     if (current is not null)
                     {
-                        var body = JsonNode.Parse(message.WireBody.ToString())!.AsObject();
+                        var body = JsonNode.Parse(message.WireBody.ToString(), documentOptions: JsonData.DocumentOptions)!.AsObject();
                         foreach (var property in current.WireBody.Value.EnumerateObject())
                             if (property.Name is not ("role" or "content" or "sections" or "timestamp"))
-                                body[property.Name] = JsonNode.Parse(property.Value.GetRawText());
-                        message = new("system", JsonData.Parse(body.ToJsonString()));
+                                body[property.Name] = JsonNode.Parse(property.Value.GetRawText(), documentOptions: JsonData.DocumentOptions);
+                        message = new("system", JsonData.Parse(body.ToJsonString(JsonData.SerializerOptions)));
                     }
                     return currentMessages.Where(row => row.Role != "system").Prepend(message).ToImmutableArray();
                 }

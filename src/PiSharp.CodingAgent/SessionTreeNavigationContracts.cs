@@ -47,11 +47,12 @@ public sealed record SessionTreeNavigationRequest(string? TargetId, SessionTreeN
 }
 public enum SessionTreeNavigationDisposition { Selected, NoOp, Vetoed, Aborted }
 public enum SessionTreeNavigationFailure { StaleSelection, UnknownTarget, InvalidRequest }
-public sealed class SessionTreeNavigationException(SessionTreeNavigationFailure failure)
+/// <param name="targetId">The unknown target: agent-session.ts navigateTree() throws "Entry &lt;id&gt; not found".</param>
+public sealed class SessionTreeNavigationException(SessionTreeNavigationFailure failure, string? targetId = null)
     : InvalidOperationException(failure switch
     {
         SessionTreeNavigationFailure.StaleSelection => "Session tree selection is stale.",
-        SessionTreeNavigationFailure.UnknownTarget => "Session tree target does not exist.",
+        SessionTreeNavigationFailure.UnknownTarget => $"Entry {targetId} not found",
         _ => "Session tree navigation request is invalid."
     })
 {

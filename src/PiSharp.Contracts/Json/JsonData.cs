@@ -17,6 +17,10 @@ public sealed class JsonData
     /// <summary>Document options that admit <see cref="MaximumDepth"/> levels (System.Text.Json's default is 64).</summary>
     public static JsonDocumentOptions DocumentOptions => new() { MaxDepth = MaximumDepth };
 
+    /// <summary>Serializer options whose writer admits the levels of a <see cref="MaximumDepth"/> value nested in a serialized object
+    /// (System.Text.Json's default is 64).</summary>
+    public static JsonSerializerOptions SerializerOptions { get; } = new() { MaxDepth = 2 * MaximumDepth };
+
     public JsonElement Value { get; }
 
     private JsonData(JsonElement value)
@@ -53,8 +57,10 @@ public sealed class JsonData
                 var names = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var property in current.EnumerateObject())
                 {
-                    if (!names.Add(property.Name))
-                        throw new JsonException($"Duplicate JSON property: {property.Name}");
+                    // A name may hold a lone surrogate, as a JavaScript property key does (JSON.parse keeps it).
+                    var name = JsonUtf16.GetName(property);
+                    if (!names.Add(name))
+                        throw new JsonException($"Duplicate JSON property: {JsonUtf16.ToWellFormed(name)}");
                     pending.Push((property.Value, depth + 1));
                 }
             }
@@ -87,7 +93,10 @@ public sealed class JsonFields
         var builder = ImmutableDictionary.CreateBuilder<string, JsonData>(StringComparer.Ordinal);
         var order = ImmutableList.CreateBuilder<string>();
         foreach (var property in value.EnumerateObject())
-            if (!known.Contains(property.Name)) { builder.Add(property.Name, JsonData.FromElement(property.Value)); order.Add(property.Name); }
+        {
+            var name = JsonUtf16.GetName(property);
+            if (!known.Contains(name)) { builder.Add(name, JsonData.FromElement(property.Value)); order.Add(name); }
+        }
         return new(builder.ToImmutable(), order.ToImmutable());
     }
 }

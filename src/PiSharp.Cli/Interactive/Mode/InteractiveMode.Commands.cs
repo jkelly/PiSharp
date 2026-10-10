@@ -206,14 +206,14 @@ internal sealed partial class InteractiveMode
         if (text == "/dementedelves") { HandleDementedDelves(); editor.SetText(""); return; }
         if (text == "/resume") { ShowSessionSelector(); editor.SetText(""); return; }
         if (text == "/quit") { editor.SetText(""); await ShutdownAsync(); return; }
-        if (Is("/llama") && context.Llama is not null)
+        if (Is("/llama") && context.Llama is not null && context.IsBuiltinExtensionLoaded(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Llama))
         {
             editor.SetText("");
             editor.AddToHistory(text);
             await HandleLlamaCommandAsync();
             return;
         }
-        if (Is("/mcp") && context.Mcp is not null)
+        if (Is("/mcp") && context.Mcp is not null && context.IsBuiltinExtensionLoaded(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Mcp))
         {
             editor.SetText("");
             editor.AddToHistory(text);
@@ -936,7 +936,8 @@ internal sealed partial class InteractiveMode
         programStatus.Reset();
         ApplyRuntimeSettings();
         await RefreshSessionAsync();
-        await ApplyAutoCompactionSettingAsync();
+        // agent-session.ts: autoCompactionEnabled is the compaction.enabled setting, which the host applies to every session.
+        footer.SetAutoCompactEnabled(state.AutoCompactionEnabled);
         renderedGeneration = state.Generation;
         await RefreshAvailableModelsAsync();
         await RefreshCommandsAsync();

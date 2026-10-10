@@ -219,17 +219,14 @@ public sealed class SessionEntryCodec
                 var names = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var property in value.EnumerateObject())
                 {
-                    string name;
-                    try { name = property.Name; }
-                    catch (InvalidOperationException) { throw Failure(SessionEntryCodecFailure.UnsupportedUnicode); }
-                    CheckUnicode(name);
+                    var name = JsonUtf16.GetName(property);
                     if (!names.Add(name)) throw Failure(SessionEntryCodecFailure.DuplicateProperty);
                     ValidateJson(property.Value, depth);
                 }
             }
             else foreach (var item in value.EnumerateArray()) ValidateJson(item, depth);
         }
-        // session-manager.ts reads each line with JSON.parse, which keeps an escaped lone surrogate in a string value (and
+        // session-manager.ts reads each line with JSON.parse, which keeps an escaped lone surrogate in a name or a string value (and
         // JSON.stringify writes it back as its escape): the value is retained as that escape (see JsonUtf16).
         else if (value.ValueKind == JsonValueKind.Undefined) throw Failure(SessionEntryCodecFailure.InvalidRecord);
     }

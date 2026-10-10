@@ -214,6 +214,30 @@ internal static class FooterUsageCases
             Equal(0, await pi.Quit(), "exit code");
         });
 
+        // agent-session.ts autoCompactionEnabled is compaction.enabled, which the host applies to every session it runs (the mode only
+        // shows it: footer.setAutoCompactEnabled), so a disabled setting holds for the startup session and a new one, without "(auto)".
+        yield return ("e2e.footer.auto-compaction-disabled-by-setting-holds-for-new-sessions", async () =>
+        {
+            await using var pi = new InteractiveHarness("footer-auto-off", columns: 120, rows: 40);
+            File.WriteAllText(Path.Combine(pi.AgentDir, "settings.json"), """{"compaction":{"enabled":false}}""");
+            pi.Respond = (_, _) => Text("first answer", 1200, 250);
+            pi.Start(Regular);
+            await pi.WaitFor("escape interrupt");
+            await pi.Submit("one");
+            await pi.WaitFor("first answer");
+            await pi.WaitUntil(text => text.Contains("0.1%/1.0M", StringComparison.Ordinal), "footer stats");
+            Check(!pi.Terminal.Text.Contains("(auto)", StringComparison.Ordinal), "no auto indicator: " + pi.Terminal.Text);
+            Equal(false, (await pi.Mode!.Rpc.RequestAsync(new JsonObject { ["type"] = "get_state" }))?["autoCompactionEnabled"]?.GetValue<bool>(),
+                "the startup session follows compaction.enabled false");
+            await pi.Submit("/new");
+            await pi.WaitFor("✓ New session started");
+            await pi.WaitUntil(text => text.Contains("0.0%/1.0M", StringComparison.Ordinal), "new session footer");
+            Check(!pi.Terminal.Text.Contains("(auto)", StringComparison.Ordinal), "no auto indicator after /new: " + pi.Terminal.Text);
+            Equal(false, (await pi.Mode!.Rpc.RequestAsync(new JsonObject { ["type"] = "get_state" }))?["autoCompactionEnabled"]?.GetValue<bool>(),
+                "the new session follows compaction.enabled false too");
+            Equal(0, await pi.Quit(), "exit code");
+        });
+
         // footer.ts sums usage over ALL entries (the compaction entry's own summary usage included), and getContextUsage reports
         // unknown tokens until an assistant responds after the compaction.
         yield return ("e2e.footer.compaction-adds-its-usage-and-resets-context", async () =>

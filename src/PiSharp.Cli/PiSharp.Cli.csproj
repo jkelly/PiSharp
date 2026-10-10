@@ -55,6 +55,8 @@
     <!-- The codemode tool's description names this reference (CodemodeToolDefinition.DocsPath). -->
     <None Include="Interactive/Mode/Assets/*.png" Link="assets/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <None Include="docs/codemode.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <!-- Pi's llama.cpp guide for the built-in llama.cpp provider and /llama (packages/coding-agent/docs/llama-cpp.md). -->
+    <None Include="docs/llama-cpp.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <!-- What's New and /changelog read CHANGELOG.md next to the executable (built from website/src/content/changelog). -->
     <None Include="../../CHANGELOG.md" Link="CHANGELOG.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
     <None Include="../../third-party/Jint.LICENSE.txt;../../third-party/Jint.CREDITS.txt;../../third-party/Acornima.LICENSE.txt;../../third-party/Acornima.NOTICE.txt" Link="licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />

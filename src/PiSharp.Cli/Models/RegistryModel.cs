@@ -26,7 +26,7 @@ internal static class JsonTree
     }
     internal static JsonNode? Parse(string text)
     {
-        using var document = JsonDocument.Parse(text, new JsonDocumentOptions { MaxDepth = 64 });
+        using var document = JsonDocument.Parse(text, PiSharp.Contracts.JsonData.DocumentOptions);
         return From(document.RootElement);
     }
     internal static JsonObject CloneObject(JsonObject value) => (JsonObject)value.DeepClone();

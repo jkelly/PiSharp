@@ -16,6 +16,8 @@ internal static class ToolEdgeInputTests
         ("edge pi ls limits follow the source number arithmetic", LsNumbers),
         ("edge NUL bytes give Node's argument errors", NulBytes),
         ("edge user shell failures give the source's errors", UserShellFailures),
+        ("edge model bash without a shell stays registered and fails each command with getShellConfig's error", ModelBashWithoutShell),
+        ("edge model bash shell that cannot start gives Node's spawn errors", ModelBashSpawnFailures),
         ("edge edit applies more than 1024 replacements as the source does", ManyEdits),
     ];
 
@@ -113,6 +115,54 @@ internal static class ToolEdgeInputTests
             Text(await bash.ExecuteAsync(Invocation("bash", """{"command":"echo a\u0000b"}"""), default)), "bash");
         Equal("The argument 'args[1]' must be a string without null bytes. Received \"echo 'q\\\\ \\x00\\n\\t\\x01\u00e9\"",
             Text(await bash.ExecuteAsync(Invocation("bash", """{"command":"echo 'q\\ \u0000\n\t\u0001\u00e9"}"""), default)), "bash escapes");
+    }
+
+    // bash.ts createLocalShellOperations exec resolves the shell (getShellConfig) inside exec, after resolveTimeoutMs: with no shell the
+    // bash tool is still registered and every command, NUL bytes included, fails with the discovery error before anything is spawned.
+    private static async Task ModelBashWithoutShell()
+    {
+        using var temp = new Temp();
+        var host = new ShellHost(true, name => name == "ProgramFiles" ? @"C:\Program Files" : null, _ => false, temp.Root);
+        string error;
+        try { ShellDiscovery.Resolve(host: host); throw new InvalidOperationException("A shell was found."); }
+        catch (ShellDiscoveryException discovery) { error = discovery.Message; }
+        Check(error.StartsWith("No bash shell found. Options:\n", StringComparison.Ordinal) && error.EndsWith("Searched Git Bash in:\n  C:\\Program Files\\Git\\bin\\bash.exe", StringComparison.Ordinal), error);
+        var tool = new BashTool(new NoRunner(), BashToolOptions.Unavailable(error, "bash", temp.Root, ImmutableDictionary<string, string>.Empty, temp.Root));
+        Equal("bash", tool.Name, "registered name");
+        var bash = new ToolInvoker([tool], new Allow());
+        foreach (var (input, what) in new[] { ("""{"command":"echo hi"}""", "command"), ("""{"command":"echo a\u0000b"}""", "NUL byte"), ("""{"command":"x","timeout":5}""", "timeout") })
+        {
+            var result = await bash.ExecuteAsync(Invocation("bash", input), default);
+            Check(result.IsError, what + " succeeded"); Equal(error, Text(result), what);
+        }
+        Equal("Invalid timeout: must be a finite number of seconds", Text(await bash.ExecuteAsync(Invocation("bash", """{"command":"x","timeout":-1}"""), default)), "timeout first");
+        Equal("Custom shell path not found: /no/such/bash", Text(await new ToolInvoker([new BashTool(new NoRunner(), BashToolOptions.Unavailable(
+            "Custom shell path not found: /no/such/bash", "/no/such/bash", temp.Root, ImmutableDictionary<string, string>.Empty, temp.Root))], new Allow())
+            .ExecuteAsync(Invocation("bash", """{"command":"echo hi"}"""), default)), "custom shell path");
+    }
+
+    // A shellPath that is a directory passes getShellConfig's existsSync; spawn then fails with Node's error, as for any shell libuv cannot
+    // start (the model's bash tool reports what user bash reports).
+    private static async Task ModelBashSpawnFailures()
+    {
+        using var temp = new Temp();
+        var directoryShell = Directory.CreateDirectory(Path.Combine(temp.Root, "shell-dir" + (OperatingSystem.IsWindows() ? ".exe" : ""))).FullName;
+        async Task<string> Run(string shell, IProcessRunner? runner = null) => Text(await new ToolInvoker([new BashTool(runner ?? new NoRunner(),
+            new BashToolOptions(shell, temp.Root, ImmutableDictionary<string, string>.Empty, temp.Root))], new Allow())
+            .ExecuteAsync(Invocation("bash", """{"command":"echo hi"}"""), default));
+        Equal($"spawn {directoryShell} " + (OperatingSystem.IsWindows() ? "ENOENT" : "EACCES"), await Run(directoryShell), "directory shell");
+        if (OperatingSystem.IsWindows())
+        {
+            var bare = temp.File("noext"); await File.WriteAllTextAsync(bare, "x");
+            Equal($"spawn {bare} ENOENT", await Run(bare), "extensionless file");
+            var empty = temp.File("empty.exe"); await File.WriteAllBytesAsync(empty, []);
+            Equal("spawn EFTYPE", await Run(empty, new NativeProcessRunner()), "empty executable");
+        }
+        else
+        {
+            var text = temp.File("text"); await File.WriteAllTextAsync(text, "hello");
+            Equal($"spawn {text} EACCES", await Run(text), "not executable");
+        }
     }
 
     // edit.ts has no replacement-count limit (the native cap was 1,024).

@@ -101,7 +101,7 @@ public sealed class NodeToolCallExtension : IPiSharpExtension
         if (!result.GetProperty("publicationJoined").GetBoolean()) throw new InvalidOperationException("Native publication did not join.");
         var after = result.GetProperty("inputAfter").GetProperty("serializedJson").GetString()!;
         var before = result.GetProperty("inputBefore").GetProperty("serializedJson").GetString()!;
-        using var sourceEvent = JsonDocument.Parse(after);
+        using var sourceEvent = JsonDocument.Parse(after, PiSharp.Contracts.JsonData.DocumentOptions);
         var arguments = JsonData.FromElement(sourceEvent.RootElement.GetProperty("input"));
         // Compare source-owned observations to one another, retaining original native raw tokens for an unchanged input.
         JsonData? replacement = after == before ? null : arguments;

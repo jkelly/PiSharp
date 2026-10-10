@@ -1,6 +1,6 @@
 // Pi abe508e1b89912adde45528136c3221eb69acdd7 (MIT): packages/ai/src/api/bedrock-converse-stream.ts (stream request building:
 // convertMessages, buildSystemPrompt, convertToolConfig, buildAdditionalModelRequestFields, streamSimple and the model capability
-// predicates). The body is the ConverseStream REST JSON the SDK serializes (members in its alphabetical order, blobs as base64).
+// predicates). The body is the ConverseStream REST JSON the SDK 3.1127.0 serializes (members in its schema's order, blobs as base64).
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -127,19 +127,19 @@ internal static partial class BedrockConverseRequest
         var initial = collapsed.Count > 0 && ProviderTranscript.Role(collapsed[0]) == "system" ? collapsed[0] : null;
         var systemPrompt = initial is null ? null : ProviderTranscript.SystemText(initial);
         var inferenceMaxTokens = stream.MaxTokens ?? (IsAnthropicClaude(model) ? model.MaxTokens : null);
-        var body = new JsonObject();
-        if (BuildAdditionalModelRequestFields(model, options, stream, configuredRegion) is { } additional) body["additionalModelRequestFields"] = additional;
+        // The SDK's schema serializer writes ConverseStreamRequest members in the schema's order.
+        var body = new JsonObject { ["messages"] = ConvertMessages(collapsed, model, request, cacheRetention, env) };
+        if (BuildSystemPrompt(systemPrompt, model, cacheRetention, env) is { } system) body["system"] = system;
         var inference = new JsonObject();
         if (inferenceMaxTokens is { } tokens) inference["maxTokens"] = (long)tokens;
         if (options.Temperature is { } temperature) inference["temperature"] = temperature;
         body["inferenceConfig"] = inference;
-        body["messages"] = ConvertMessages(collapsed, model, request, cacheRetention, env);
+        if (ConvertToolConfig(ProviderTranscript.CurrentTools(collapsed), options.ToolChoice, model.SupportsStrictMode) is { } tools) body["toolConfig"] = tools;
+        if (BuildAdditionalModelRequestFields(model, options, stream, configuredRegion) is { } additional) body["additionalModelRequestFields"] = additional;
         if (options.RequestMetadata is { } metadata)
         {
             var values = new JsonObject(); foreach (var (key, value) in metadata) values[key] = value; body["requestMetadata"] = values;
         }
-        if (BuildSystemPrompt(systemPrompt, model, cacheRetention, env) is { } system) body["system"] = system;
-        if (ConvertToolConfig(ProviderTranscript.CurrentTools(collapsed), options.ToolChoice, model.SupportsStrictMode) is { } tools) body["toolConfig"] = tools;
         return body;
     }
 
@@ -211,7 +211,7 @@ internal static partial class BedrockConverseRequest
                             }
                         if (content.Count == 0) content.Add(new JsonObject { ["text"] = EmptyTextPlaceholder });
                     }
-                    result.Add(new JsonObject { ["content"] = content, ["role"] = "user" });
+                    result.Add(new JsonObject { ["role"] = "user", ["content"] = content });
                     break;
                 }
                 case "assistant":
@@ -225,8 +225,8 @@ internal static partial class BedrockConverseRequest
                             case "toolCall":
                                 content.Add(new JsonObject { ["toolUse"] = new JsonObject
                                 {
-                                    ["input"] = SanitizeDocument(block["arguments"]?.DeepClone() ?? new JsonObject()),
-                                    ["name"] = ProviderTranscript.Text(block, "name"), ["toolUseId"] = ProviderTranscript.Text(block, "id")
+                                    ["toolUseId"] = ProviderTranscript.Text(block, "id"), ["name"] = ProviderTranscript.Text(block, "name"),
+                                    ["input"] = SanitizeDocument(block["arguments"]?.DeepClone() ?? new JsonObject())
                                 } });
                                 break;
                             case "thinking":
@@ -252,7 +252,7 @@ internal static partial class BedrockConverseRequest
                             }
                         }
                     if (content.Count == 0) continue;
-                    result.Add(new JsonObject { ["content"] = content, ["role"] = "assistant" });
+                    result.Add(new JsonObject { ["role"] = "assistant", ["content"] = content });
                     break;
                 }
                 case "toolResult":
@@ -266,13 +266,13 @@ internal static partial class BedrockConverseRequest
                         var isError = toolResult["isError"] is JsonValue error && error.TryGetValue<bool>(out var failed) && failed;
                         results.Add(new JsonObject { ["toolResult"] = new JsonObject
                         {
-                            ["content"] = ToolResultContent(toolResult["content"] as JsonArray),
-                            ["status"] = isError ? "error" : "success", ["toolUseId"] = ProviderTranscript.Text(toolResult, "toolCallId")
+                            ["toolUseId"] = ProviderTranscript.Text(toolResult, "toolCallId"),
+                            ["content"] = ToolResultContent(toolResult["content"] as JsonArray), ["status"] = isError ? "error" : "success"
                         } });
                         next++;
                     }
                     index = next - 1;
-                    result.Add(new JsonObject { ["content"] = results, ["role"] = "user" });
+                    result.Add(new JsonObject { ["role"] = "user", ["content"] = results });
                     break;
                 }
             }
@@ -338,14 +338,14 @@ internal static partial class BedrockConverseRequest
             var strict = ProviderTranscript.ResolveStrict(tool, supportsStrictMode);
             var spec = new JsonObject
             {
-                ["description"] = ProviderTranscript.Text(tool, "description"),
+                ["name"] = ProviderTranscript.Text(tool, "name"),
                 ["inputSchema"] = new JsonObject { ["json"] = ProviderTranscript.ToolParameters(tool, strict) },
-                ["name"] = ProviderTranscript.Text(tool, "name")
+                ["description"] = ProviderTranscript.Text(tool, "description")
             };
             if (strict == true) spec["strict"] = true;
             specs.Add(new JsonObject { ["toolSpec"] = spec });
         }
-        var config = new JsonObject();
+        var config = new JsonObject { ["tools"] = specs };
         if (choice is { } selected)
         {
             if (selected.ValueKind == JsonValueKind.String && selected.GetString() == "auto") config["toolChoice"] = new JsonObject { ["auto"] = new JsonObject() };
@@ -353,7 +353,6 @@ internal static partial class BedrockConverseRequest
             else if (selected.ValueKind == JsonValueKind.Object && selected.TryGetProperty("type", out var type) && type.GetString() == "tool")
                 config["toolChoice"] = new JsonObject { ["tool"] = new JsonObject { ["name"] = selected.GetProperty("name").GetString() } };
         }
-        config["tools"] = specs;
         return config;
     }
 

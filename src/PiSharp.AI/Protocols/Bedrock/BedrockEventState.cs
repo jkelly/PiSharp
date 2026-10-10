@@ -198,14 +198,26 @@ internal sealed class BedrockEventState
         foreach (var detail in (usage["cacheDetails"] as JsonArray)?.OfType<JsonObject>() ?? [])
             if (Text(detail, "ttl") == "1h") longWrite += Number(detail["inputTokens"]);
         var total = Count("totalTokens"); if (total == 0) total = input + output;
-        // calculateCost: the prompt-length tier prices the whole request; 1h cache writes cost twice the input rate.
+        // calculateCost runs in binary64 Numbers: the prompt-length tier prices the whole request, 1h cache writes cost twice the input
+        // rate, and each cost is the Number Pi records (3 / 1e6 * 3.5 is 0.000010500000000000001).
         var cost = _model.Cost;
-        var rates = PromptLengthPricing.Select(cost.Input, cost.Output, cost.CacheRead, cost.CacheWrite, cost.Tiers, input, read, write);
-        var costInput = rates.Input / 1_000_000m * (decimal)input; var costOutput = rates.Output / 1_000_000m * (decimal)output;
-        var costRead = rates.CacheRead / 1_000_000m * (decimal)read; var costWrite = (rates.CacheWrite * (decimal)(write - longWrite) + rates.Input * 2 * (decimal)longWrite) / 1_000_000m;
+        static double Rate(decimal value) => double.Parse(value.ToString(CultureInfo.InvariantCulture), NumberStyles.Float, CultureInfo.InvariantCulture);
+        double inputRate = Rate(cost.Input), outputRate = Rate(cost.Output), readRate = Rate(cost.CacheRead), writeRate = Rate(cost.CacheWrite);
+        if (PromptLengthPricing.TrySelect(cost.Tiers.IsDefault ? [] : cost.Tiers, tier => Rate(tier.InputTokensAbove), input, read, write, out var selected))
+        { inputRate = Rate(selected.Input); outputRate = Rate(selected.Output); readRate = Rate(selected.CacheRead); writeRate = Rate(selected.CacheWrite); }
+        var shortWrite = write - longWrite;
+        var costInput = inputRate / 1_000_000d * input; var costOutput = outputRate / 1_000_000d * output;
+        var costRead = readRate / 1_000_000d * read; var costWrite = (writeRate * shortWrite + inputRate * 2d * longWrite) / 1_000_000d;
+        var costTotal = costInput + costOutput + costRead + costWrite;
+        var binary64 = JsonData.Parse("{\"input\":" + JsonNumber.Text(costInput) + ",\"output\":" + JsonNumber.Text(costOutput) + ",\"cacheRead\":" +
+            JsonNumber.Text(costRead) + ",\"cacheWrite\":" + JsonNumber.Text(costWrite) + ",\"total\":" + JsonNumber.Text(costTotal) + "}");
+        var costs = binary64.Value;
+        if (costs.EnumerateObject().Any(field => field.Value.ValueKind != JsonValueKind.Number)) throw new InvalidOperationException("Bedrock usage cost is not finite.");
         var extras = usage.ContainsKey("cacheDetails")
             ? JsonFields.Empty.Set("cacheWrite1h", JsonData.Parse(JsonNumber.Text(longWrite))) : null;
-        _usage = new(input, output, read, write, total, new(costInput, costOutput, costRead, costWrite, costInput + costOutput + costRead + costWrite), extras);
+        _usage = new(input, output, read, write, total, new(costs.GetProperty("input").GetDecimal(), costs.GetProperty("output").GetDecimal(),
+            costs.GetProperty("cacheRead").GetDecimal(), costs.GetProperty("cacheWrite").GetDecimal(), costs.GetProperty("total").GetDecimal(),
+            SourceBinary64Cost: binary64), extras);
     }
 
     /// <summary>The successful settlement: a stop reason is required and every open block is finalized.</summary>

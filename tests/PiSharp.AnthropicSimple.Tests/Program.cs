@@ -149,6 +149,22 @@ internal static class Program
         Check(Resolve(Options(), sections).ContextEstimate.Tokens == 6, "System sections/declaration estimates differ.");
         var bounded = Resolve(Options("high", window: 5000), User());
         Check(bounded.MaxTokens == 903 && bounded.ThinkingBudgetTokens == 0, "Second context clamp/answer room differs.");
+        // estimate.ts estimateContextTokens and simple-options.ts clampMaxTokensToContext run on JavaScript numbers: a fractional usage
+        // total stays a fraction in the estimate, the context cap and the thinking budget (formerly rounded up to 104 tokens).
+        var fractionalAssistant = new TranscriptEntry("assistant", PiWireJson.WriteMessage(
+            new(Model.Api, Model.Provider, Model.Id, 2, [new TextContent("old")], new(70.25, 20, 5, 5, 100.5, new(0, 0, 0, 0, 0)), StopReason.Stop)));
+        var fractional = Resolve(Options(window: 5000), User(), fractionalAssistant, User("12345678", 3));
+        Check(fractional.ContextEstimate == new AnthropicMessagesContextUsageEstimate(103.5, 100.5, 3, 1) && fractional.MaxTokens == 800.5,
+            "Fractional usage estimate differs: " + fractional);
+        var budgeted = Resolve(Options("high", window: 6500), User(), fractionalAssistant, User("12345678", 3));
+        Check(budgeted.MaxTokens == 2300.5 && budgeted.ThinkingBudgetTokens == 1276.5, "Fractional cap and budget differ: " + budgeted);
+        using (var request = new AnthropicMessagesSimpleRequestFactory(client, new("https://anthropic.invalid"), Model, Options("high", window: 6500))
+            .Create(Request(User(), fractionalAssistant, User("12345678", 3)), Key))
+        {
+            var body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            Check(body.Contains("\"max_tokens\":2300.5,", StringComparison.Ordinal) && body.Contains("\"budget_tokens\":1276.5,", StringComparison.Ordinal),
+                "Fractional cap and budget body differ: " + body);
+        }
         return Task.CompletedTask;
     }
 

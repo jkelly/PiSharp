@@ -216,8 +216,8 @@ internal sealed class PiNodeOwner(PiExtensionHost host, PiLoadedExtension initia
         return response is { ValueKind: JsonValueKind.Object } value && value.TryGetProperty("result", out var result) ? result : null;
     }
 
-    private static JsonNode Parse(JsonData value) => JsonNode.Parse(value.ToString())!;
-    private static JsonNode Parse(JsonElement value) => JsonNode.Parse(value.GetRawText())!;
+    private static JsonNode Parse(JsonData value) => PiSharp.Contracts.JsonUtf16.MutableNode(value.ToString())!;
+    private static JsonNode Parse(JsonElement value) => PiSharp.Contracts.JsonUtf16.MutableNode(value.GetRawText())!;
     private static JsonData Data(JsonElement value) => JsonData.Parse(value.GetRawText());
     private static JsonObject Event(string type, params (string Name, JsonNode? Value)[] fields)
     {

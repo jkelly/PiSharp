@@ -680,25 +680,18 @@ public sealed class ResponsesTextToolTransport : IChatTransport
             {
                 if (depth >= _options.MaximumJsonDepth) throw Limit();
                 if (value.ValueKind == JsonValueKind.Object)
-                    foreach (var property in value.EnumerateObject()) { CheckString(property.Name); CheckJson(property.Value, depth + 1); }
+                    foreach (var property in value.EnumerateObject()) { _ = JsonUtf16.GetName(property); CheckJson(property.Value, depth + 1); }
                 else foreach (var child in value.EnumerateArray()) CheckJson(child, depth + 1);
             }
-            else if (value.ValueKind == JsonValueKind.String) CheckString(value.GetString()!);
+            // openai-responses-shared.ts reads each event with JSON.parse: a string keeps a lone surrogate.
+            else if (value.ValueKind == JsonValueKind.String) _ = JsonUtf16.GetString(value);
         }
 
-        private static void CheckString(string value)
-        {
-            for (var index = 0; index < value.Length; index++)
-                if (char.IsSurrogate(value[index]))
-                {
-                    if (!char.IsHighSurrogate(value[index]) || index + 1 >= value.Length || !char.IsLowSurrogate(value[++index])) throw Protocol();
-                }
-        }
         private static JsonElement Object(JsonElement value) => value.ValueKind == JsonValueKind.Object ? value : throw Protocol();
         private static string String(JsonElement value, string name, bool allowEmpty = false)
         {
             if (!value.TryGetProperty(name, out var field) || field.ValueKind != JsonValueKind.String) throw Protocol();
-            var result = field.GetString()!;
+            var result = JsonUtf16.GetString(field);
             if (!allowEmpty && result.Length == 0) throw Protocol();
             return result;
         }
@@ -709,7 +702,7 @@ public sealed class ResponsesTextToolTransport : IChatTransport
         private static string CallText(JsonElement value, string name) =>
             !value.TryGetProperty(name, out var field) ? "undefined" : field.ValueKind switch
             {
-                JsonValueKind.String => field.GetString()!, JsonValueKind.Null => "null", _ => throw Protocol()
+                JsonValueKind.String => JsonUtf16.GetString(field), JsonValueKind.Null => "null", _ => throw Protocol()
             };
         private static string ItemText(JsonElement item, string name, bool call) => call ? CallText(item, name) : String(item, name);
         private static int Index(JsonElement value)

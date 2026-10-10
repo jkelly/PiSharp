@@ -142,7 +142,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     /// <summary>The transcript and projection budget (several images of ~4.5 MB each).</summary>
     private int Budget => (int)Math.Min(int.MaxValue / 2, Math.Max(_options.MaximumEntryCharacters, 1_048_576) * 2L);
 
-    private static readonly JsonSerializerOptions BodyJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly JsonSerializerOptions BodyJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping, MaxDepth = 2 * JsonData.MaximumDepth };
 
     /// <summary>convertResponsesMessages options for Codex: no system prompt, Codex tool-call providers.</summary>
     private ResponsesTranscriptProjectionOptions ProjectionOptions() => new(
@@ -171,8 +171,8 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var instructions = initial is null ? "" : ProviderTranscript.SystemText(initial);
         var projection = ProjectionOptions();
         var projector = new ResponsesTranscriptProjector(projection);
-        var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString());
-        var tools = JsonNode.Parse(projector.ProjectTools(request, CancellationToken.None).ToString()) as JsonArray;
+        var input = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions);
+        var tools = JsonNode.Parse(projector.ProjectTools(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions) as JsonArray;
         var cacheKey = _options.CacheRetention == "none" ? null : ClampCacheKey(_options.SessionId ?? request.SessionId);
         var body = new JsonObject
         {
@@ -263,7 +263,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         internal bool? EndTurn;
         internal readonly List<JsonObject> Diagnostics = [];
         internal WebSocketLease? Lease;
-        internal bool WebSocketStarted, UseCachedContext;
+        internal bool WebSocketStarted, UseCachedContext, RetriedMissingContinuation;
         internal JsonObject? FullBody;
         internal string? CacheSessionId, ConfiguredTransport;
         internal int RequestBytes;
@@ -274,7 +274,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var invocation = new Invocation();
         var inner = new ResponsesTextToolTransport((chat, cancellation, context) => PrepareAsync(chat, invocation, cancellation),
             new ResponsesTextToolOptions(MaximumEvents: int.MaxValue, MaximumEventCharacters: 16 * 1_048_576, MaximumInputCharacters: 64 * 1_048_576,
-                MaximumContentSlots: int.MaxValue, MaximumContentCharacters: 16 * 1_048_576, MaximumJsonDepth: 64, Rates: _rates)
+                MaximumContentSlots: int.MaxValue, MaximumContentCharacters: 16 * 1_048_576, MaximumJsonDepth: JsonData.MaximumDepth, Rates: _rates)
             { SupportsOpenAIGrammarTools = _grammar });
         var keep = false;
         try
@@ -341,7 +341,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         var headers = BuildHeaders(token0, request.SessionId);
         var body = BuildBody(request);
         if (_options.OnPayload is { } hook && await hook(JsonData.Parse(body.ToJsonString(BodyJson)), _model, token).ConfigureAwait(false) is { } replaced)
-            body = JsonNode.Parse(replaced.ToString()) as JsonObject ?? throw new InvalidOperationException("Codex payload must be an object.");
+            body = JsonNode.Parse(replaced.ToString(), documentOptions: JsonData.DocumentOptions) as JsonObject ?? throw new InvalidOperationException("Codex payload must be an object.");
         var bodyJson = body.ToJsonString(BodyJson);
         var transport = _options.Transport?.Invoke() is { Length: > 0 } configured ? configured : "auto";
         var cacheSessionId = _options.CacheRetention == "none" ? null : _options.SessionId ?? request.SessionId;
@@ -351,8 +351,17 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         {
             if (OpenAICodexWebSockets.IsFallbackActive(cacheSessionId)) OpenAICodexWebSockets.RecordSseFallback(cacheSessionId);
             else if (await TryWebSocketAsync(body, token0, accountId, cacheSessionId, transport, invocation, token).ConfigureAwait(false) is { } events)
-                return events;
+                return RetryMissingContinuationAsync(events, invocation, async () =>
+                    await TryWebSocketAsync(body, token0, accountId, cacheSessionId, transport, invocation, token).ConfigureAwait(false)
+                    ?? await SendSseAsync(headers, bodyJson, invocation, token).ConfigureAwait(false), token).GetAsyncEnumerator(token);
         }
+        return await SendSseAsync(headers, bodyJson, invocation, token).ConfigureAwait(false);
+    }
+
+    /// <summary>The SSE request with retries; the response's events.</summary>
+    private async ValueTask<IAsyncEnumerator<JsonData>> SendSseAsync(List<KeyValuePair<string, string>> headers, string bodyJson, Invocation invocation,
+        CancellationToken token)
+    {
         // compressRequestBodyZstd: the SSE body is a zstd frame (Content-Encoding: zstd); the WebSocket frame above stays plain JSON.
         var bytes = Encoding.UTF8.GetBytes(bodyJson);
         if (CompressBody(bytes) is { } compressed) { bytes = compressed; headers.Add(new("content-encoding", "zstd")); }
@@ -483,7 +492,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
         string? friendly = null;
         try
         {
-            if (JsonNode.Parse(raw) is JsonObject parsed && parsed["error"] is JsonObject error)
+            if (JsonNode.Parse(raw, documentOptions: JsonData.DocumentOptions) is JsonObject parsed && parsed["error"] is JsonObject error)
             {
                 string? Text(string name) => error[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
                 var code = Text("code") is { Length: > 0 } c ? c : Text("type") ?? "";
@@ -508,7 +517,8 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             var data = frame.Data.Trim();
             if (data.Length == 0 || data == "[DONE]") continue;
             JsonObject value;
-            try { value = JsonNode.Parse(data) as JsonObject ?? throw new JsonException("not an object"); }
+            // JSON.parse keeps a lone surrogate in a string.
+            try { value = JsonUtf16.MutableNode(data) as JsonObject ?? throw new JsonException("not an object"); }
             catch (JsonException error) { throw new CodexProtocolException("Invalid Codex SSE JSON: " + error.Message); }
             var (mapped, completed) = await MapEventAsync(value, invocation, token).ConfigureAwait(false);
             if (mapped is { } next) yield return next;
@@ -523,7 +533,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
     {
         if (_options.OnProviderStreamEvent is { } hook)
         {
-            try { await hook(JsonData.Parse(value.ToJsonString()), _model, token).ConfigureAwait(false); }
+            try { await hook(JsonData.Parse(JsonUtf16.ToJsonString(value)), _model, token).ConfigureAwait(false); }
             catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
             { throw new ProviderStreamEventCallbackException(error); }
         }
@@ -534,7 +544,7 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             string? Field(string name) => value[name] is JsonValue own && own.TryGetValue<string>(out var text) ? text
                 : nested?[name] is JsonValue inner && inner.TryGetValue<string>(out var innerText) ? innerText : null;
             var code = Field("code"); var message = Field("message");
-            throw new CodexApiException("Codex error: " + (!string.IsNullOrEmpty(message) ? message : !string.IsNullOrEmpty(code) ? code : value.ToJsonString()), code);
+            throw new CodexApiException("Codex error: " + (!string.IsNullOrEmpty(message) ? message : !string.IsNullOrEmpty(code) ? code : JsonUtf16.ToJsonString(value)), code);
         }
         if (type == "response.failed")
         {
@@ -554,9 +564,9 @@ public sealed partial class OpenAICodexResponsesTransport : IChatTransport, IThi
             var responseTier = response["service_tier"] is JsonValue tierValue && tierValue.TryGetValue<string>(out var tier) ? tier : null;
             var resolvedTier = responseTier == "default" && _options.ServiceTier is "flex" or "priority" ? _options.ServiceTier : responseTier ?? _options.ServiceTier;
             response["service_tier"] = resolvedTier is "flex" or "priority" ? resolvedTier : "default";
-            return (JsonData.Parse(new JsonObject { ["type"] = status == "incomplete" ? "response.incomplete" : "response.completed", ["response"] = response.DeepClone() }.ToJsonString()), true);
+            return (JsonData.Parse(JsonUtf16.ToJsonString(new JsonObject { ["type"] = status == "incomplete" ? "response.incomplete" : "response.completed", ["response"] = JsonUtf16.MutableNode(JsonUtf16.ToJsonString(response)) })), true);
         }
-        return (JsonData.Parse(value.ToJsonString()), false);
+        return (JsonData.Parse(JsonUtf16.ToJsonString(value)), false);
     }
 
     private static JsonData Observation(HttpResponseMessage response)

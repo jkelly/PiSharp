@@ -37,9 +37,17 @@ internal sealed class PiExtensionModels
         _chat = chat; _builtin = builtin;
         Operations = new ModelOperationsRegistry(async (request, token) =>
         {
+            bool keyless;
             lock (_extensionKeys)
-                if (_extensionKeys.TryGetValue(request.Provider, out var key)) return new ProviderAuthResult(request.ApiKey ?? key);
-            return await _builtin.GetAuthAsync(request.Provider, request.ApiKey, request.Env, token).ConfigureAwait(false);
+            {
+                if (!_extensionKeys.TryGetValue(request.Provider, out var key)) keyless = false;
+                else if (key is not null) return new ProviderAuthResult(request.ApiKey ?? key);
+                else keyless = true;
+            }
+            // composeApiKeyAuth without a key or an inherited method: an explicit request key or a stored api_key credential, else the
+            // provider is not configured (model-runtime.ts prepareRequest: "Provider is not configured: <id>").
+            return keyless ? await _builtin.ResolveAuthAsync(request, token).ConfigureAwait(false)
+                : await _builtin.GetAuthAsync(request.Provider, request.ApiKey, request.Env, token).ConfigureAwait(false);
         });
         foreach (var provider in builtin.GetProviders()) Operations.SetProvider(provider);
     }
@@ -47,7 +55,8 @@ internal sealed class PiExtensionModels
     internal static async Task<PiExtensionModels> CreateAsync(PiExtensionHost host, LiveSessionRuntime runtime, CancellationToken token)
     {
         var chat = await runtime.CreateModelRegistryAsync(token).ConfigureAwait(false);
-        var builtin = NativeExtensionModelOperations.CreateDefaultRegistry(runtime.ReadEnvironment, runtime.AuthPath, runtime.CreateAuthHttp, runtime.Time);
+        var builtin = NativeExtensionModelOperations.CreateDefaultRegistry(runtime.ReadEnvironment, runtime.AuthPath, runtime.CreateAuthHttp, runtime.Time,
+            llamaProvider: runtime.LlamaProvider);
         var models = new PiExtensionModels(chat, builtin) { _runtime = runtime, _host = host, _environment = runtime.ReadEnvironment };
         host.Stream = models.StreamAsync;
         models.SyncProviders();
@@ -55,14 +64,14 @@ internal sealed class PiExtensionModels
         host.RegistrationsChanged += models.SyncProviders;
         host.NativeModelProviders.Changed += models.SyncProviders;
         host.Models = models.CallAsync;
-        host.ModelJson = (provider, id) => chat.Find(provider, id) is { } model ? JsonNode.Parse(model.ToJsonString()) : null;
+        host.ModelJson = (provider, id) => chat.Find(provider, id) is { } model ? PiSharp.Contracts.JsonUtf16.MutableNode(model.ToJsonString()) : null;
         // The native extensions' ctx.modelRegistry is this registry too.
         host.BindModelOperations(models.Operations);
         return models;
     }
 
     /// <summary>The config object of one registered model (a JSON object, else an empty object that fails validation).</summary>
-    internal static JsonObject ModelObject(JsonData model) => JsonNode.Parse(model.ToString()) as JsonObject ?? new JsonObject();
+    internal static JsonObject ModelObject(JsonData model) => PiSharp.Contracts.JsonUtf16.MutableNode(model.ToString()) as JsonObject ?? new JsonObject();
 
     /// <summary>The image and classifier models of a provider config: <c>api</c> defaults to the first implementation of the model's type,
     /// <c>baseUrl</c> to the provider's, <c>name</c> to the id, <c>input</c> to <c>["text"]</c> and <c>cost</c> to zero. Chat models are
@@ -129,7 +138,8 @@ internal sealed class PiExtensionModels
                 var builtin = _builtin.GetProvider(provider.Name);
                 lock (_extensionKeys)
                 {
-                    // composeApiKeyAuth: the extension's apiKey (an environment variable name or a literal), else the built-in auth.
+                    // composeApiKeyAuth: the extension's apiKey (an environment variable name or a literal), else the built-in auth; a
+                    // provider with neither (null) has only a request key or a stored credential.
                     if (provider.ApiKey is { } apiKey) _extensionKeys[provider.Name] = _environment(apiKey) ?? apiKey;
                     else if (builtin is null) _extensionKeys[provider.Name] = null;
                     else _extensionKeys.Remove(provider.Name);
@@ -198,7 +208,7 @@ internal sealed class PiExtensionModels
             var result = await host.CallAsync("provider.call", new JsonObject
             {
                 ["provider"] = provider, ["api"] = api, ["op"] = "classify",
-                ["args"] = new JsonArray(JsonNode.Parse(model.ToJson().ToString()), JsonNode.Parse(ModelOperationJson.WriteClassifierContext(context).ToString()), Options(options))
+                ["args"] = new JsonArray(PiSharp.Contracts.JsonUtf16.MutableNode(model.ToJson().ToString()), PiSharp.Contracts.JsonUtf16.MutableNode(ModelOperationJson.WriteClassifierContext(context).ToString()), Options(options))
             }, cancellationToken).ConfigureAwait(false);
             return ModelOperationJson.ParseClassifierResult(result ?? throw new InvalidOperationException("The extension classifier returned nothing"));
         }
@@ -212,7 +222,7 @@ internal sealed class PiExtensionModels
             var result = await host.CallAsync("provider.call", new JsonObject
             {
                 ["provider"] = provider, ["api"] = api, ["op"] = "generateImages",
-                ["args"] = new JsonArray(JsonNode.Parse(model.ToJson().ToString()), JsonNode.Parse(ModelOperationJson.WriteImagesContext(context).ToString()), Options(options))
+                ["args"] = new JsonArray(PiSharp.Contracts.JsonUtf16.MutableNode(model.ToJson().ToString()), PiSharp.Contracts.JsonUtf16.MutableNode(ModelOperationJson.WriteImagesContext(context).ToString()), Options(options))
             }, cancellationToken).ConfigureAwait(false);
             return ModelOperationJson.ParseAssistantImages(result ?? throw new InvalidOperationException("The extension image provider returned nothing"));
         }
@@ -230,7 +240,7 @@ internal sealed class PiExtensionModels
         var provider = model.GetProperty("provider").GetString()!; var id = model.GetProperty("id").GetString()!;
         try
         {
-            var entry = _chat.Find(provider, id) ?? RegistryModel.FromJson(JsonNode.Parse(model.GetRawText())!.AsObject());
+            var entry = _chat.Find(provider, id) ?? RegistryModel.FromJson(PiSharp.Contracts.JsonUtf16.MutableNode(model.GetRawText())!.AsObject());
             await using var connection = LiveSessionSelection.FromEntry(entry, _chat, null, useModelMaximum: true).Connect(_runtime);
             var messages = ImmutableArray.CreateBuilder<TranscriptEntry>();
             var system = new JsonObject { ["role"] = "system", ["content"] = context.TryGetProperty("systemPrompt", out var prompt) && prompt.ValueKind == JsonValueKind.String ? prompt.GetString() : "",
@@ -239,7 +249,7 @@ internal sealed class PiExtensionModels
                 system["toolsAdded"] = new JsonArray([.. tools.EnumerateArray().Select(tool => (JsonNode)new JsonObject
                 {
                     ["name"] = tool.GetProperty("name").GetString(), ["description"] = tool.TryGetProperty("description", out var d) ? d.GetString() : "",
-                    ["parameters"] = tool.TryGetProperty("parameters", out var p) ? JsonNode.Parse(p.GetRawText()) : new JsonObject()
+                    ["parameters"] = tool.TryGetProperty("parameters", out var p) ? PiSharp.Contracts.JsonUtf16.MutableNode(p.GetRawText()) : new JsonObject()
                 })]);
             messages.Add(new("system", JsonData.Parse(system.ToJsonString())));
             if (context.TryGetProperty("messages", out var list) && list.ValueKind == JsonValueKind.Array)
@@ -249,7 +259,7 @@ internal sealed class PiExtensionModels
             await foreach (var observation in connection.CreateTransport().StreamAsync(new PiSharp.AI.ChatRequest(new(entry.Id, entry.Api, entry.Provider), messages.ToImmutable(),
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), token).ConfigureAwait(false))
                 if (observation is StreamTerminalEvent done) terminal = done;
-            return terminal is null ? Failed("The stream ended without a final message") : JsonNode.Parse(PiWireJson.WriteMessage(terminal.Message).ToString());
+            return terminal is null ? Failed("The stream ended without a final message") : PiSharp.Contracts.JsonUtf16.MutableNode(PiWireJson.WriteMessage(terminal.Message).ToString());
         }
         catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
         { return Failed(error.Message); }
@@ -268,9 +278,9 @@ internal sealed class PiExtensionModels
     private static string? Text(JsonElement args, int index) =>
         args.ValueKind == JsonValueKind.Array && args.GetArrayLength() > index && args[index].ValueKind == JsonValueKind.String ? args[index].GetString() : null;
     private static ModelType TypeOf(string? type) => type switch { "image" => ModelType.Image, "classifier" => ModelType.Classifier, _ => ModelType.Chat };
-    private static JsonNode? Node(RegistryModel? model) => model is null ? null : JsonNode.Parse(model.ToJsonString());
-    private static JsonArray Nodes(IEnumerable<RegistryModel> models) => new([.. models.Select(model => JsonNode.Parse(model.ToJsonString()))]);
-    private static JsonArray Nodes(IEnumerable<OperationModel> models) => new([.. models.Select(model => JsonNode.Parse(model.ToJson().ToString()))]);
+    private static JsonNode? Node(RegistryModel? model) => model is null ? null : PiSharp.Contracts.JsonUtf16.MutableNode(model.ToJsonString());
+    private static JsonArray Nodes(IEnumerable<RegistryModel> models) => new([.. models.Select(model => PiSharp.Contracts.JsonUtf16.MutableNode(model.ToJsonString()))]);
+    private static JsonArray Nodes(IEnumerable<OperationModel> models) => new([.. models.Select(model => PiSharp.Contracts.JsonUtf16.MutableNode(model.ToJson().ToString()))]);
 
     internal async Task<JsonNode?> CallAsync(string op, JsonElement args, CancellationToken token)
     {
@@ -302,7 +312,7 @@ internal sealed class PiExtensionModels
             case "getModelOfType":
             case "findOfType":
                 return TypeOf(Text(args, 0)) == ModelType.Chat ? Node(Text(args, 1) is { } p && Text(args, 2) is { } i ? _chat.Find(p, i) : null)
-                    : Text(args, 1) is { } provider2 && Text(args, 2) is { } id2 && Operations.GetModelOfType(TypeOf(Text(args, 0)), provider2, id2) is { } typed ? JsonNode.Parse(typed.ToJson().ToString()) : null;
+                    : Text(args, 1) is { } provider2 && Text(args, 2) is { } id2 && Operations.GetModelOfType(TypeOf(Text(args, 0)), provider2, id2) is { } typed ? PiSharp.Contracts.JsonUtf16.MutableNode(typed.ToJson().ToString()) : null;
             case "getAvailableOfType":
                 return TypeOf(Text(args, 0)) == ModelType.Chat ? Nodes(_chat.GetAvailable())
                     : Nodes(await Operations.GetAvailableOfTypeAsync(TypeOf(Text(args, 0)), Text(args, 1), token).ConfigureAwait(false));
@@ -313,7 +323,7 @@ internal sealed class PiExtensionModels
                     ? await Operations.ClassifyAsync(classifier, ModelOperationJson.ParseClassifierContext(args[1]), ReadOptions<ClassifierOptions>(args, 2), token).ConfigureAwait(false)
                     : new ClassifierResult(model.Api, model.Provider, model.Id, [], ModelOperationStopReason.Error, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
                     { ErrorMessage = $"Model {model.Provider}/{model.Id} is not a classifier model" };
-                return JsonNode.Parse(ModelOperationJson.WriteClassifierResult(result).ToString());
+                return PiSharp.Contracts.JsonUtf16.MutableNode(ModelOperationJson.WriteClassifierResult(result).ToString());
             }
             case "generateImages":
             {
@@ -322,7 +332,7 @@ internal sealed class PiExtensionModels
                     ? await Operations.GenerateImagesAsync(image, ModelOperationJson.ParseImagesContext(args[1]), ReadOptions<ImagesOptions>(args, 2), token).ConfigureAwait(false)
                     : new AssistantImages(model.Api, model.Provider, model.Id, [], ModelOperationStopReason.Error, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
                     { ErrorMessage = $"Model {model.Provider}/{model.Id} is not an image model" };
-                return JsonNode.Parse(ModelOperationJson.WriteAssistantImages(result).ToString());
+                return PiSharp.Contracts.JsonUtf16.MutableNode(ModelOperationJson.WriteAssistantImages(result).ToString());
             }
             case "refresh": return new JsonObject();
             default: throw new NotSupportedException($"ctx.modelRegistry.{op}() is not available in this PiSharp host");

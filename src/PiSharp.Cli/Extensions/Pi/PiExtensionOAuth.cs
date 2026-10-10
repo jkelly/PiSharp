@@ -55,7 +55,7 @@ internal sealed class PiExtensionOAuth(PiExtensionHost host, string provider, st
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var result = host.CallAsync("provider.oauth", new JsonObject
         { ["provider"] = provider, ["op"] = "modifyModels", ["models"] = models.DeepClone(), ["credentials"] = ToJson(credential) }, timeout.Token).GetAwaiter().GetResult();
-        return result is { ValueKind: JsonValueKind.Array } array ? JsonNode.Parse(array.GetRawText())!.AsArray() : null;
+        return result is { ValueKind: JsonValueKind.Array } array ? PiSharp.Contracts.JsonUtf16.MutableNode(array.GetRawText())!.AsArray() : null;
     }
 
     /// <summary>OAuthCredentials as the extension sees them: access, refresh, expires and the flow's other fields.</summary>
@@ -63,7 +63,7 @@ internal sealed class PiExtensionOAuth(PiExtensionHost host, string provider, st
     {
         var json = new JsonObject { ["type"] = "oauth" };
         foreach (var (key, value) in credential.ProviderData) json[key] = value;
-        foreach (var (key, value) in credential.ProviderJson) json[key] = JsonNode.Parse(value.ToString());
+        foreach (var (key, value) in credential.ProviderJson) json[key] = PiSharp.Contracts.JsonUtf16.MutableNode(value.ToString());
         json["access"] = credential.Access; json["refresh"] = credential.Refresh; json["expires"] = credential.ExpiresUnixMilliseconds;
         return json;
     }

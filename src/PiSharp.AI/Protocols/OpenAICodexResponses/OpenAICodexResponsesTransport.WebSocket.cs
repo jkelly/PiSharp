@@ -174,16 +174,16 @@ public sealed partial class OpenAICodexResponsesTransport
     private static bool IsNonTransport(Exception error) => error is CodexApiException or CodexProtocolException or ProviderStreamEventCallbackException;
 
     /// <summary>The stream's WebSocket attempt: the response.create frame on an acquired connection until the first Codex event, retried
-    /// once for websocket_connection_limit_reached before any event and once for previous_response_not_found. A transport failure
-    /// before the first event records a provider_transport_failure diagnostic and returns null (the SSE fallback); Codex errors,
-    /// hook failures and aborts propagate.</summary>
+    /// once for websocket_connection_limit_reached before any event and once per stream for previous_response_not_found (also after
+    /// events, <see cref="RetryMissingContinuationAsync"/>). A transport failure before the first event records a
+    /// provider_transport_failure diagnostic and returns null (the SSE fallback); Codex errors, hook failures and aborts propagate.</summary>
     private async Task<IAsyncEnumerator<JsonData>?> TryWebSocketAsync(JsonObject body, string token, string accountId, string? cacheSessionId,
         string transport, Invocation invocation, CancellationToken cancellation)
     {
         var requestId = ClampCacheKey(cacheSessionId) ?? Guid.CreateVersion7().ToString("D");
         var headers = BuildWebSocketHeaders(token, requestId);
         var url = ResolveWebSocketUrl(_metadata.TryGetProperty("baseUrl", out var baseUrl) && baseUrl.ValueKind == JsonValueKind.String ? baseUrl.GetString() : null);
-        bool retriedConnectionLimit = false, retriedMissingContinuation = false;
+        var retriedConnectionLimit = false;
         while (true)
         {
             WebSocketLease? lease = null;
@@ -209,8 +209,8 @@ public sealed partial class OpenAICodexResponsesTransport
                 if (lease is not null) { if (lease.Entry is { } entry) entry.Continuation = null; lease.Release(false); }
                 var aborted = cancellation.IsCancellationRequested;
                 var connectionLimit = error is CodexApiException { Code: ConnectionLimitReached };
-                if (!aborted && error is CodexApiException { Code: PreviousResponseNotFound } && !retriedMissingContinuation)
-                { retriedMissingContinuation = true; continue; }
+                if (!aborted && error is CodexApiException { Code: PreviousResponseNotFound } && !invocation.RetriedMissingContinuation)
+                { invocation.RetriedMissingContinuation = true; continue; }
                 if (!aborted && connectionLimit && !retriedConnectionLimit) { retriedConnectionLimit = true; continue; }
                 if (aborted || IsNonTransport(error) && !connectionLimit)
                 {
@@ -223,6 +223,36 @@ public sealed partial class OpenAICodexResponsesTransport
                 return null;
             }
         }
+    }
+
+    /// <summary>stream's retry of previous_response_not_found, which also applies once events were emitted: processWebSocketStream's
+    /// failure drops the cached continuation and closes the connection, and the attempt runs again with the full body (its events
+    /// continue the same output); a transport failure before the retry's first event falls back to SSE.</summary>
+    private static async IAsyncEnumerable<JsonData> RetryMissingContinuationAsync(IAsyncEnumerator<JsonData> events, Invocation invocation,
+        Func<ValueTask<IAsyncEnumerator<JsonData>>> retry, [EnumeratorCancellation] CancellationToken cancellation)
+    {
+        IAsyncEnumerator<JsonData>? current = events;
+        try
+        {
+            while (true)
+            {
+                bool moved;
+                try { moved = await current.MoveNextAsync().ConfigureAwait(false); }
+                catch (CodexApiException error) when (error.Code == PreviousResponseNotFound && !cancellation.IsCancellationRequested && !invocation.RetriedMissingContinuation)
+                {
+                    invocation.RetriedMissingContinuation = true;
+                    var failed = current; current = null;
+                    await failed.DisposeAsync().ConfigureAwait(false);
+                    if (invocation.Lease is { } lease) { if (lease.Entry is { } entry) entry.Continuation = null; lease.Release(false); }
+                    invocation.Lease = null; invocation.WebSocketStarted = false;
+                    current = await retry().ConfigureAwait(false);
+                    continue;
+                }
+                if (!moved) yield break;
+                yield return current.Current;
+            }
+        }
+        finally { if (current is not null) await current.DisposeAsync().ConfigureAwait(false); }
     }
 
     /// <summary>The first event, already read, then the rest.</summary>
@@ -310,7 +340,7 @@ public sealed partial class OpenAICodexResponsesTransport
     {
         var projector = new ResponsesTranscriptProjector(ProjectionOptions());
         var request = new ChatRequest(_model, [new TranscriptEntry("assistant", PiWireJson.WriteMessage(message))]);
-        var items = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString()) as JsonArray ?? [];
+        var items = JsonNode.Parse(projector.ProjectInput(request, CancellationToken.None).ToString(), documentOptions: JsonData.DocumentOptions) as JsonArray ?? [];
         return new JsonArray([.. items.Where(item => item?["type"] is not JsonValue type || !type.TryGetValue<string>(out var name) ||
             name is not ("function_call_output" or "custom_tool_call_output")).Select(item => item?.DeepClone())]);
     }
@@ -459,7 +489,7 @@ public sealed partial class OpenAICodexResponsesTransport
             if (message.Length == 0) continue;
             var text = Encoding.UTF8.GetString(message.GetBuffer(), 0, (int)message.Length);
             JsonNode? parsed;
-            try { parsed = JsonNode.Parse(text); }
+            try { parsed = JsonUtf16.MutableNode(text); }
             catch (JsonException error) { throw new CodexProtocolException("Invalid Codex WebSocket JSON: " + error.Message); }
             if (parsed is not JsonObject value) continue;
             var (mapped, completed) = await MapEventAsync(value, invocation, cancellation).ConfigureAwait(false);

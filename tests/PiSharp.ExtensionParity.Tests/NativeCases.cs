@@ -25,6 +25,8 @@ internal static partial class Program
         ("native.classifier-provider-reaches-native-model-registry-and-codemode", NativeProviderFromNativeAndCodemode),
         ("native.unregister-and-reload-remove-the-provider", NativeProviderRemoved),
         ("native.llama-command-in-rpc-mode-notifies", NativeLlamaRpcNotify),
+        ("native.classifier-provider-without-api-key-needs-a-credential", NativeProviderWithoutKey),
+        ("native.classifier-and-image-callbacks-run-under-the-owner-callback-lease", NativeProviderCallbackLease),
     ];
 
     // extensions/llama/index.ts: outside interactive mode the built-in /llama only warns through ctx.ui.notify (an RPC
@@ -112,6 +114,105 @@ internal static partial class Program
             Check(result.Contains("verdict 0.75", StringComparison.Ordinal), "codemode classified with the native provider: " + result);
         }
         finally { Environment.SetEnvironmentVariable(NativeProviderVariable, null); }
+    }
+
+    // provider-composer.ts composeApiKeyAuth: a native provider registered without ApiKey (and no built-in provider of its id) resolves
+    // only a request key or a stored api_key credential; without one classify fails before the implementation runs.
+    private static async Task NativeProviderWithoutKey()
+    {
+        using var sandbox = NativeProviderSandbox("native-provider-keyless", node: false);
+        Environment.SetEnvironmentVariable(NativeProviderVariable, "keyless");
+        try
+        {
+            var (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "/native-judge"]);
+            Equal(0, code, "exit; " + stderr);
+            var log = NativeLog(sandbox);
+            Check(log.Contains("judge error Provider is not configured: native-acme") && !log.Any(line => line.StartsWith("classify ", StringComparison.Ordinal)) &&
+                !log.Contains("available judge"), "unconfigured: " + string.Join("|", log));
+            File.Delete(Path.Combine(sandbox.Root, "native.log"));
+            File.WriteAllText(Path.Combine(sandbox.AgentDir, "auth.json"), """{"native-acme":{"type":"api_key","key":"stored-secret"}}""");
+            (code, _, stderr) = await sandbox.Run([.. new[] { "-p" }, .. Model, "/native-judge"]);
+            Equal(0, code, "stored exit; " + stderr);
+            log = NativeLog(sandbox);
+            Check(log.Contains("judge stop 0.75") && log.Contains("available judge") && log.Any(line => line.StartsWith("classify judge ", StringComparison.Ordinal) &&
+                line.EndsWith(" key=stored-secret", StringComparison.Ordinal)), "the stored credential configures it: " + string.Join("|", log));
+        }
+        finally { Environment.SetEnvironmentVariable(NativeProviderVariable, null); }
+    }
+
+    // A native provider's classify/generateImages run as the owner's callbacks, as the registry runs its tools: under the owner's callback
+    // lease (its disposal waits for them), inside its callback frame (it cannot dispose itself from one), cancelled with its lifetime, and
+    // refused once the owner generation retired.
+    private static async Task NativeProviderCallbackLease()
+    {
+        var registry = new PiSharp.Extensions.Runtime.ExtensionRegistry();
+        var host = new CapturingModelOperationProviderHost();
+        registry.ModelOperationProviderHost = host;
+        var entered = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reentrant = "";
+        IExtensionRegistry? own = null;
+        var extension = new InlineProviderExtension(scope =>
+        {
+            own = scope;
+            ((IExtensionModelOperationProviderRegistry)scope).RegisterModelOperationProvider(new("lease-acme")
+            {
+                Models = [JsonData.Parse("""{"id":"judge","type":"classifier","api":"lease-classify"}"""), JsonData.Parse("""{"id":"painter","type":"image","api":"lease-images"}""")],
+                Classifiers = ImmutableDictionary<string, ExtensionClassifierImplementation>.Empty.Add("lease-classify", async (model, context, options, token) =>
+                {
+                    try { await ((IAsyncDisposable)own!).DisposeAsync(); reentrant = "disposed"; }
+                    catch (PiSharp.Extensions.Runtime.ExtensionRegistrationException error) { reentrant = error.Failure.ToString(); }
+                    entered.SetResult(token);
+                    await release.Task;
+                    return new ClassifierResult("lease-classify", "lease-acme", "judge", [], ModelOperationStopReason.Stop, 1);
+                }),
+                Images = ImmutableDictionary<string, ExtensionImagesImplementation>.Empty.Add("lease-images", (model, context, options, token) =>
+                    Task.FromResult(new AssistantImages("lease-images", "lease-acme", "painter", [], ModelOperationStopReason.Stop, 2)))
+            });
+        });
+        var owner = await registry.ActivateAsync("lease-owner", extension);
+        var provider = host.Providers.Single();
+        var model = JsonData.Parse("""{"id":"judge","provider":"lease-acme","api":"lease-classify","type":"classifier"}""");
+        var context = new ClassifierContext(JsonData.Parse("""{"text":"hi"}"""), [new("safe", new ClassifierBoolQuestion("Safe?", "yes", "no"))]);
+        var images = await provider.Images["lease-images"](JsonData.Parse("""{"id":"painter","provider":"lease-acme","api":"lease-images","type":"image"}"""),
+            new ImagesContext([new ImagesTextBlock("a cat")]), new(), CancellationToken.None);
+        Equal(ModelOperationStopReason.Stop, images.StopReason, "an image callback of the active owner runs");
+        var running = provider.Classifiers["lease-classify"](model, context, new(), CancellationToken.None);
+        var token = await entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        Equal("ReentrantDisposal", reentrant, "the callback runs in the owner's callback frame");
+        Check(token.CanBeCanceled && !token.IsCancellationRequested, "the callback token follows the extension lifetime");
+        var disposal = owner.DisposeAsync().AsTask();
+        Check(await WaitFor(() => token.IsCancellationRequested), "disposal cancels the running callback's token");
+        await Task.Delay(200);
+        Check(!disposal.IsCompleted, "disposal waits for the leased callback");
+        release.SetResult();
+        Equal(ModelOperationStopReason.Stop, (await running).StopReason, "the callback finishes");
+        await disposal.WaitAsync(TimeSpan.FromSeconds(30));
+        Check(host.Providers.IsEmpty, "the retired owner's providers left the host");
+        var refused = await ThrowsAsync<PiSharp.Extensions.Runtime.ExtensionRegistrationException>(() => provider.Classifiers["lease-classify"](model, context, new(), CancellationToken.None));
+        Equal(PiSharp.Extensions.Runtime.ExtensionRegistrationFailure.StaleSnapshot, refused.Failure, "a retired owner's classifier is refused");
+        await ThrowsAsync<PiSharp.Extensions.Runtime.ExtensionRegistrationException>(() => provider.Images["lease-images"](model, new ImagesContext([new ImagesTextBlock("x")]), new(), CancellationToken.None));
+    }
+
+    private static async Task<bool> WaitFor(Func<bool> condition)
+    {
+        for (var attempt = 0; attempt < 200 && !condition(); attempt++) await Task.Delay(25);
+        return condition();
+    }
+
+    private sealed class CapturingModelOperationProviderHost : IExtensionModelOperationProviderHost
+    {
+        private ImmutableList<(string Owner, ExtensionModelOperationProvider Provider)> entries = [];
+        public ImmutableArray<ExtensionModelOperationProvider> Providers => [.. entries.Select(entry => entry.Provider)];
+        public void Register(string ownerId, ExtensionModelOperationProvider provider) => ImmutableInterlocked.Update(ref entries, list => list.Add((ownerId, provider)));
+        public void Unregister(string ownerId, string name) => ImmutableInterlocked.Update(ref entries, list => list.RemoveAll(entry => entry.Owner == ownerId && entry.Provider.Name == name));
+        public void UnregisterOwner(string ownerId) => ImmutableInterlocked.Update(ref entries, list => list.RemoveAll(entry => entry.Owner == ownerId));
+    }
+
+    private sealed class InlineProviderExtension(Action<IExtensionRegistry> initialize) : IPiSharpExtension
+    {
+        public ValueTask InitializeAsync(IExtensionRegistry registry, CancellationToken cancellationToken) { initialize(registry); return ValueTask.CompletedTask; }
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     // model-runtime.ts unregisterProvider and reload: the provider leaves ctx.modelRegistry.
@@ -317,11 +418,12 @@ public sealed class ParityNativeExtension : IPiSharpExtension
         { Log("shutdown " + observation.Value.GetProperty("reason").GetString()); return ValueTask.CompletedTask; }));
         if (registry is IExtensionEventBusRegistry bus)
             bus.Events.On("native-ping", data => bus.Events.Emit("native-pong", data));
-        if (Environment.GetEnvironmentVariable("PISHARP_EXTENSION_PARITY_NATIVE_PROVIDER") == "1" && registry is IExtensionModelOperationProviderRegistry providers)
+        if (Environment.GetEnvironmentVariable("PISHARP_EXTENSION_PARITY_NATIVE_PROVIDER") is "1" or "keyless" && registry is IExtensionModelOperationProviderRegistry providers)
         {
             providers.RegisterModelOperationProvider(new("native-acme")
             {
-                DisplayName = "Native Acme", BaseUrl = "https://acme.invalid/v1", ApiKey = "NATIVE_ACME_KEY",
+                DisplayName = "Native Acme", BaseUrl = "https://acme.invalid/v1",
+                ApiKey = Environment.GetEnvironmentVariable("PISHARP_EXTENSION_PARITY_NATIVE_PROVIDER") == "keyless" ? null : "NATIVE_ACME_KEY",
                 Models = [JsonData.Parse("""{"id":"judge","name":"Judge","type":"classifier","api":"native-classify","input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0},"contextWindow":8000}"""),
                     JsonData.Parse("""{"id":"painter","name":"Painter","type":"image","api":"native-images","input":["text"],"output":["image"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}""")],
                 Classifiers = ImmutableDictionary<string, ExtensionClassifierImplementation>.Empty.Add("native-classify", (model, context, options, token) =>

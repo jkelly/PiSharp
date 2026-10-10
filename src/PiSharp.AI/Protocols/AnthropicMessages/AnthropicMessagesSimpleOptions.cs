@@ -19,9 +19,10 @@ public sealed record AnthropicMessagesSimpleOptions(JsonData ModelMetadata, Anth
     public override string ToString() => nameof(AnthropicMessagesSimpleOptions);
 }
 
-public sealed record AnthropicMessagesContextUsageEstimate(int Tokens, int UsageTokens, int TrailingTokens, int? LastUsageIndex);
+/// <summary>estimate.ts ContextUsageEstimate: JavaScript numbers (a fractional usage count stays a fraction).</summary>
+public sealed record AnthropicMessagesContextUsageEstimate(double Tokens, double UsageTokens, double TrailingTokens, int? LastUsageIndex);
 public sealed record AnthropicMessagesSimpleResolution(AnthropicMessagesContextUsageEstimate ContextEstimate,
-    int MaxTokens, bool ThinkingEnabled, int ThinkingBudgetTokens, string? Effort);
+    double MaxTokens, bool ThinkingEnabled, double ThinkingBudgetTokens, string? Effort);
 public enum AnthropicMessagesSimpleFailure { InvalidConfiguration, InvalidTranscript, ResourceLimit }
 public sealed class AnthropicMessagesSimpleException : Exception
 {

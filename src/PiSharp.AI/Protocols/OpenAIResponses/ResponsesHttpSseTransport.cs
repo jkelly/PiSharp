@@ -244,25 +244,14 @@ public sealed class ResponsesHttpSseTransport : IChatTransport
             if (value.ValueKind == JsonValueKind.Object)
                 foreach (var property in value.EnumerateObject())
                 {
-                    ValidateUnicode(property.Name);
+                    _ = JsonUtf16.GetName(property);
                     Validate(property.Value, depth + 1);
                 }
             else
                 foreach (var child in value.EnumerateArray()) Validate(child, depth + 1);
         }
-        else if (value.ValueKind == JsonValueKind.String) ValidateUnicode(value.GetString()!);
-    }
-
-    private static void ValidateUnicode(string value)
-    {
-        for (var index = 0; index < value.Length; index++)
-        {
-            if (char.IsHighSurrogate(value[index]))
-            {
-                if (index + 1 >= value.Length || !char.IsLowSurrogate(value[++index])) throw Protocol();
-            }
-            else if (char.IsLowSurrogate(value[index])) throw Protocol();
-        }
+        // The SDK reads each event with JSON.parse: a string keeps a lone surrogate.
+        else if (value.ValueKind == JsonValueKind.String) _ = JsonUtf16.GetString(value);
     }
 
     private static StreamProtocolException Protocol() => new("Invalid Responses SSE JSON data.");

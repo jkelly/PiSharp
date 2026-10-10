@@ -718,10 +718,11 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
             {
                 if (++depth > _options.MaximumJsonDepth) throw Limit();
                 if (value.ValueKind == JsonValueKind.Object)
-                    foreach (var property in value.EnumerateObject()) { Unicode(property.Name); CheckJson(property.Value, depth); }
+                    foreach (var property in value.EnumerateObject()) { _ = JsonUtf16.GetName(property); CheckJson(property.Value, depth); }
                 else foreach (var item in value.EnumerateArray()) CheckJson(item, depth);
             }
-            else if (value.ValueKind == JsonValueKind.String) Unicode(value.GetString()!);
+            // openai-completions.ts reads each chunk with the SDK's JSON.parse: a string keeps a lone surrogate.
+            else if (value.ValueKind == JsonValueKind.String) _ = JsonUtf16.GetString(value);
             else if (value.ValueKind == JsonValueKind.Number &&
                 (!value.TryGetDouble(out var number) || !double.IsFinite(number))) throw Protocol();
         }
@@ -745,7 +746,7 @@ public sealed class OpenAICompletionsWireSource : IChatTransport
         private static string? OptionalString(JsonElement value, string name)
         {
             if (!value.TryGetProperty(name, out var item) || item.ValueKind == JsonValueKind.Null) return null;
-            return item.ValueKind == JsonValueKind.String ? item.GetString() : throw Protocol();
+            return item.ValueKind == JsonValueKind.String ? JsonUtf16.GetString(item) : throw Protocol();
         }
         private static long Number(JsonElement value)
         {

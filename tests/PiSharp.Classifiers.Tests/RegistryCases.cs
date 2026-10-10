@@ -201,6 +201,18 @@ internal static partial class Program
             env.Remove("LLAMA_BASE_URL");
             Equal(null, await stored(new("llama.cpp"), default), "llama needs a server url");
         }),
+        // provider-composer.ts composeApiKeyAuth for an extension provider without apiKey, oauth or a built-in provider: an explicit
+        // request key or the stored api_key credential, else not configured. The registry resolves it for providers it does not list.
+        ("registry.resolve-auth-reaches-providers-the-registry-does-not-list", async () =>
+        {
+            var registry = new ModelOperationsRegistry(ModelOperationsAuth.Standard(_ => null,
+                (provider, _) => ValueTask.FromResult(provider == "ext-acme" ? new StoredApiKeyCredential("stored-acme") : null)));
+            Equal(null, await registry.GetAuthAsync("ext-acme"), "GetAuthAsync covers listed providers only");
+            Equal("stored-acme", (await registry.ResolveAuthAsync(new("ext-acme")))?.ApiKey, "stored credential");
+            Equal("explicit", (await registry.ResolveAuthAsync(new("ext-acme", "explicit")))?.ApiKey, "explicit request key");
+            Equal(null, await registry.ResolveAuthAsync(new("ext-other")), "nothing configures it");
+            Equal("explicit", (await registry.ResolveAuthAsync(new("ext-other", "explicit")))?.ApiKey, "a request key alone");
+        }),
         ("registry.cli-default-registry-embeds-the-catalog-shards", async () =>
         {
             var registry = PiSharp.Cli.Extensions.NativeExtensionModelOperations.CreateDefaultRegistry(

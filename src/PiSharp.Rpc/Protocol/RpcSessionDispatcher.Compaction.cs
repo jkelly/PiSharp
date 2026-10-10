@@ -22,9 +22,18 @@ public sealed partial class RpcSessionDispatcher
         if (!manualWire && !upstreamToggle && command.ExpectedGeneration != attachment.Generation)
             throw new RpcCommandException(command.Id, command.Type, command.Type == "pisharp_set_auto_compaction"
                 ? "Automatic summary configuration generation is stale." : "Summary session generation is stale.");
-        // agent-session.ts compact/_runAutoCompaction: settingsManager.getCompactionSettings(model) for the upstream commands.
+        // agent-session.ts setAutoCompactionEnabled: the compaction.enabled setting; every check then reads the current model's
+        // settings and window (_checkCompaction, _runAutoCompaction), so the toggle reads neither.
+        if (upstreamToggle) GlobalSettingChanged?.Invoke("compaction.enabled", command.Mode == "enabled");
+        if (upstreamToggle && _compactionSettings is not null)
+        {
+            _ = RpcCommandCodec.Success(command, null, _options);
+            await ConfigureModelBoundAutoCompactionAsync(attachment, command.Mode == "enabled", token).ConfigureAwait(false);
+            return null;
+        }
+        // agent-session.ts compact: settingsManager.getCompactionSettings(model) for the upstream command.
         SessionCompactionSettings? hostSettings = null;
-        if ((manualWire || upstreamToggle) && _compactionSettings is not null)
+        if (manualWire && _compactionSettings is not null)
         {
             try { hostSettings = _compactionSettings(attachment.Session.Snapshot.Agent.Model); }
             catch (InvalidOperationException error) { throw new RpcCommandException(command.Id, command.Type, "Compaction failed: " + error.Message); }
@@ -123,6 +132,27 @@ public sealed partial class RpcSessionDispatcher
         return (await SummaryCommandAsync(command, _sessionOwner?.Current, token).ConfigureAwait(false))!;
     }
 
+    /// <summary>sdk.ts/agent-session.ts: a session's auto-compaction is the compaction.enabled setting (default true) in every mode;
+    /// the host applies it when it starts. The configuration carries to replacement sessions, as a setting does.</summary>
+    public async Task ConfigureAutoCompactionAsync(bool enabled, CancellationToken token = default)
+    {
+        if (_sessionOwner is null || _compactionSettings is null)
+            throw new InvalidOperationException("Setting-bound auto-compaction requires an owning host with compaction settings.");
+        if (enabled && _summaryGenerator is null) return;
+        await ConfigureModelBoundAutoCompactionAsync(_sessionOwner.Current, enabled, token).ConfigureAwait(false);
+    }
+    private Task ConfigureModelBoundAutoCompactionAsync(AgentSessionAttachment attachment, bool enabled, CancellationToken token)
+    {
+        SessionCompactionRequest? ForModel(ModelDescriptor model)
+        {
+            // _checkCompaction: contextWindow = this.model.contextWindow ?? 0; no usable window never compacts.
+            if (!TryGetModel(model, out var wire) || !wire.Value.TryGetProperty("contextWindow", out var value) ||
+                !value.TryGetDouble(out var window) || !double.IsFinite(window) || window <= 0) return null;
+            return new(_compactionSettings!(model), Automatic: true, ContextWindow: window);
+        }
+        return _sessionOwner!.ConfigureAutomaticCompactionAsync(attachment, enabled ? _summaryGenerator : null,
+            new SessionCompactionRequest(new(), Automatic: true), token, _recoveryDesiredMaxOutput, ForModel);
+    }
     private double SummaryContextWindow(RpcCommandEnvelope command, AgentSessionAttachment attachment)
     {
         if (!TryGetModel(attachment.Session.Snapshot.Agent.Model, out var model) ||

@@ -111,9 +111,9 @@ internal sealed partial class InteractiveMode
                     }
                 };
         }
-        if (context.Mcp is not null) slashCommands.Add(new SlashCommand("mcp", "Manage MCP servers", null, prefix => McpArgumentCompletions(prefix)));
+        if (context.Mcp is not null && context.IsBuiltinExtensionLoaded(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Mcp)) slashCommands.Add(new SlashCommand("mcp", "Manage MCP servers", null, prefix => McpArgumentCompletions(prefix)));
         // extensions/llama/index.ts: the built-in llama.cpp extension's command (built-in extension commands are untagged).
-        if (context.Llama is not null) slashCommands.Add(new SlashCommand("llama", "Manage llama.cpp router models", null, null));
+        if (context.Llama is not null && context.IsBuiltinExtensionLoaded(PiSharp.Cli.Extensions.Pi.PiBuiltinExtensions.Llama)) slashCommands.Add(new SlashCommand("llama", "Manage llama.cpp router models", null, null));
         var builtinNames = new HashSet<string>(slashCommands.Select(command => command.Name), StringComparer.Ordinal);
         var templateCommands = new List<SlashCommand>();
         var extensionCommands = new List<SlashCommand>();

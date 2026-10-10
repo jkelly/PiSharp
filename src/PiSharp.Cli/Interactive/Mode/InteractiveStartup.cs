@@ -21,8 +21,17 @@ internal sealed class InteractiveHostLink
     /// <summary>The current session object (it changes on new/fork/switch).</summary>
     public PiSharp.CodingAgent.PersistentAgentSession? CurrentSession => currentSession?.Invoke();
     public object? Profile { get; private set; }
+    /// <summary>interactive-mode.ts bindCurrentSessionExtensions commandContextActions newSession/fork: what the mode does around an
+    /// extension's ctx.newSession()/ctx.fork() (set by the mode, called by the session host).</summary>
+    public InteractiveExtensionSessionActions? ExtensionSessionActions { get; set; }
     public void Publish(Func<PiSharp.CodingAgent.PersistentAgentSession?> session, object? profile)
     {
         currentSession = session; Profile = profile; ready.TrySetResult();
     }
 }
+
+/// <summary>The interactive mode's side of an extension's ctx.newSession()/ctx.fork(): <see cref="NewSessionStarting"/> clears the status
+/// indicator before a new session, <see cref="Forked"/> receives the fork's selected text and the generation the fork made (the editor
+/// takes the text once that session shows, with "Forked to new session"), and <see cref="Failed"/> is handleFatalRuntimeError with
+/// "Failed to create session" or "Failed to fork session".</summary>
+internal sealed record InteractiveExtensionSessionActions(Action NewSessionStarting, Action<string?, long> Forked, Action<string, Exception> Failed);

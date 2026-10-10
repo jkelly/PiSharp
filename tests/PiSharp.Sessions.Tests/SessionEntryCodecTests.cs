@@ -220,9 +220,11 @@ internal static class SessionEntryCodecTests
         var lone = Entry("custom", Fields("""{"customType":"x","data":["\uD800","a\udc00b"]}"""));
         Equal(lone, codec.Serialize(codec.Parse(lone)));
         Equal("a\udc00b", PiSharp.Contracts.JsonUtf16.GetString(codec.Parse(lone).WireBody.Value.GetProperty("data")[1]));
-        // A lone surrogate of a name, or a raw (unescaped) lone surrogate code unit, stays outside the owned profile.
-        foreach (var fields in new[] { Fields("""{"customType":"x","data":{"\uDC00":1}}"""), "\"customType\":\"x\",\"data\":\"" + '\uD800' + "\"" })
-            Fails(SessionEntryCodecFailure.UnsupportedUnicode, () => codec.Parse(Entry("custom", fields)));
+        // JSON.parse keeps an escaped lone surrogate of a name too (JSON.stringify writes it back as its escape).
+        var loneName = Entry("custom", Fields("""{"customType":"x","data":{"\udc00":1}}"""));
+        Equal(loneName, codec.Serialize(codec.Parse(loneName)));
+        // A raw (unescaped) lone surrogate code unit stays outside the owned profile.
+        Fails(SessionEntryCodecFailure.UnsupportedUnicode, () => codec.Parse(Entry("custom", "\"customType\":\"x\",\"data\":\"" + '\uD800' + "\"")));
         Fails(SessionEntryCodecFailure.UnsupportedUnicode, () => codec.ParseUtf8(new byte[] { 0xC0, 0xAF }));
         Fails(SessionEntryCodecFailure.MalformedJson, () => codec.ParseUtf8(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(raw)).ToArray()));
         var byteCount = Encoding.UTF8.GetByteCount(raw);
