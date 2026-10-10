@@ -156,11 +156,12 @@ public sealed class McpBackgroundConnections
         }
         catch (Exception error)
         {
-            // The session ended meanwhile; like the original, late results of a retired session are dropped.
-            if (stop.IsCancellationRequested) return;
+            // The session ended meanwhile; like the original, late results of a retired session are dropped. Retirement cancels the
+            // attachment's lifetime before it stops these connections, so a connection cancelled in between is dropped too.
+            if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested) return;
             Report(new(generation, entry, null, error)); return;
         }
-        if (stop.IsCancellationRequested) return;
+        if (stop.IsCancellationRequested || attachment.LifetimeToken.IsCancellationRequested) return;
         section?.Connected(generation, snapshot.Catalog);
         Report(new(generation, entry, snapshot, null));
     }
