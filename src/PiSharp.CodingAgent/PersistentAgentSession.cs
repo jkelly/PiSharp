@@ -272,6 +272,8 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             try { thinkingLevel = initialThinking(initialModel, registry.GetSupportedThinkingLevels(initialModel)); }
             catch (SessionRuntimeRegistryException error) when (error.Failure == SessionRuntimeRegistryFailure.UnknownModel) { }
         thinkingLevel ??= registry.GetDefaultThinkingLevel(initialModel);
+        // sdk.ts createAgentSession: the level is clamped to the model's capabilities (clampThinkingLevel), never refused.
+        thinkingLevel = ThinkingLevels.Clamp(registry.GetSupportedThinkingLevels(initialModel), thinkingLevel);
         var selection = await registry.PrepareAndDrainAsync(() => registry.Resolve(initialModel, [], thinkingLevel, cancellationToken), cancellationToken).ConfigureAwait(false);
         var session = await CreateAsync(path, header, selection.Configuration, clock, nextEntryId, options, cancellationToken).ConfigureAwait(false);
         session._registry = registry;
@@ -350,8 +352,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     try { _ = registry.GetSupportedThinkingLevels(chosen); model = chosen; }
                     catch (SessionRuntimeRegistryException error) when (error.Failure == SessionRuntimeRegistryFailure.UnknownModel) { /* Not bound: keep. */ }
                 }
-                var level = initialThinking(model, registry.GetSupportedThinkingLevels(model)) ?? (model == loadout.Selection.Configuration.Model
-                    ? loadout.Selection.Configuration.ThinkingLevel : registry.GetDefaultThinkingLevel(model));
+                var supported = registry.GetSupportedThinkingLevels(model);
+                // sdk.ts: the recorded thinking_level_change holds the level clamped to the model (clampThinkingLevel).
+                var level = ThinkingLevels.Clamp(supported, initialThinking(model, supported) ?? (model == loadout.Selection.Configuration.Model
+                    ? loadout.Selection.Configuration.ThinkingLevel : registry.GetDefaultThinkingLevel(model)));
                 var header = store.Snapshot.Header; var existing = store.Snapshot.Entries;
                 var modelEntry = Record(codec, "model_change", Identity(nextEntryId, header.Id, existing), context.LeafId, clock, writer =>
                 {
@@ -374,7 +378,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             opened = new(path, store, agent, bridge, projector, codec, context, selection.Configuration, clock, nextEntryId,
                 configured.AgentOptions, configured.SessionLogStoreOptions?.ReaderOptions)
             { _registry = registry, _runtimeLease = runtime, PromptPreflight = configured.PromptPreflight,
-                _toleratedSelection = Divergent(context, selection.Configuration.Model) };
+                _toleratedSelection = Divergent(context, selection.Configuration.Model),
+                // sdk.ts createAgentSession: a recorded level the model cannot run opens clamped (agent.state.thinkingLevel) and is not
+                // rewritten; the branch's level is tolerated, as after tree navigation, until a change names the session's.
+                _toleratedThinking = context.ThinkingLevel != selection.Configuration.ThinkingLevel ? context.ThinkingLevel : null };
             var restored = selection.Configuration.Tools.Select(tool => tool.Name).ToImmutableArray();
             // Source constructor: the initial names (_buildRuntime) or the transcript's loadout (_restoreToolsFromTranscript) are
             // applied in memory and the file is not written; the next request records a loadout that differs from the recorded one.
@@ -496,8 +503,13 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                     writer.WriteString("provider", model.Provider);
                     writer.WriteString("modelId", model.Id);
                 });
-            // Source setThinkingLevel: a change of the session's level (which tree navigation may have kept over the branch's).
-            if (update.ThinkingLevel is { } level && level != effectiveThinking)
+            // Source setThinkingLevel: the level is clamped to the (new) model's capabilities (_clampThinkingLevel), and setModel
+            // applies the current level clamped to the new model; only a change of the session's level (which tree navigation may
+            // have kept over the branch's) is recorded.
+            var requestedThinking = update.ThinkingLevel ?? (update.Model is not null ? effectiveThinking : null);
+            var clampedThinking = requestedThinking is null ? null
+                : ThinkingLevels.Clamp(_registry!.GetSupportedThinkingLevels(update.Model ?? _configuration.Model), requestedThinking);
+            if (clampedThinking is { } level && level != effectiveThinking)
                 Add("thinking_level_change", writer => writer.WriteString("thinkingLevel", level));
             // Source setActiveToolsByName: a selection applies in memory, and the next request records its difference from the declared
             // tools (declareToolChanges) with the prompt sections it changes. setModel/setThinkingLevel write only their own entries.
@@ -525,7 +537,7 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
                 ? WithLoadoutRecord(_registry!, prospective.LlmMessages, selectedNames, work, context.LlmMessages.Length)
                 : WithUnrecordedLoadout(prospective.LlmMessages, currentNames, work, context.LlmMessages.Length) };
             var unrecordedAfter = selectedTools is { } loadout ? _registry!.CreateToolChangeMessage(context.LlmMessages, loadout, 0, work) is not null : (bool?)null;
-            var targetThinking = update.ThinkingLevel ?? effectiveThinking;
+            var targetThinking = clampedThinking ?? effectiveThinking;
             var selection = await PrepareAndDrainLoadoutAsync(() => _registry!.Resolve(resolved, update.Model ?? _configuration.Model, work,
                 thinkingLevel: resolved.ThinkingLevel != targetThinking ? targetThinking : null, activeOrder: selectedTools ?? currentNames), work).ConfigureAwait(false);
             if (selectedTools is { } expected && !selection.Configuration.Tools.Select(tool => tool.Name).SequenceEqual(expected, StringComparer.Ordinal))

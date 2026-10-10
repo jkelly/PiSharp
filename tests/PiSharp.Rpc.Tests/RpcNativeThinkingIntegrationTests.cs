@@ -83,8 +83,8 @@ internal static class RpcNativeThinkingIntegrationTests
             "A metadata-only model changed runtime/durable selection without an operational binding.");
         Success(await fixture.Send(new { id = "cap", type = "set_model", provider = "anthropic", modelId = BoundedAnthropic.Id }));
         var capped = fixture.Session.Snapshot;
-        try { await fixture.Session.ConfigureAsync(new(ThinkingLevel: "high")); throw new InvalidOperationException("Native cap was bypassed."); }
-        catch (SessionRuntimeRegistryException error) when (error.Failure == SessionRuntimeRegistryFailure.UnsupportedThinkingLevel) { }
+        // agent-session.ts setThinkingLevel clamps to the native cap: "high" on the off-only binding selects "off", which is no change.
+        await fixture.Session.ConfigureAsync(new(ThinkingLevel: "high"));
         var after = fixture.Session.Snapshot;
         Check(after.Context.ThinkingLevel == "off" && after.Fault is null && after.Log.Sequence == capped.Log.Sequence &&
             after.Log.LeafId == capped.Log.LeafId && after.Log.CommittedByteLength == capped.Log.CommittedByteLength && fixture.Handler.Calls == 0,
@@ -111,13 +111,14 @@ internal static class RpcNativeThinkingIntegrationTests
         Check(wrap.GetProperty("data").GetProperty("level").GetString() == "low", "High did not wrap to low without inserting off.");
         var next = await fixture.Send(new { id = "no-off-next", type = "cycle_thinking_level" }); Success(next);
         Check(next.GetProperty("data").GetProperty("level").GetString() == "high", "Low did not cycle to high.");
-        var before = fixture.Session.Snapshot; var bytes = await ReadIdleAcknowledgedBytes(fixture.Session);
-        try { await fixture.Session.ConfigureAsync(new(ThinkingLevel: "off")); throw new InvalidOperationException("Explicit unsupported off was admitted."); }
-        catch (SessionRuntimeRegistryException error) when (error.Failure == SessionRuntimeRegistryFailure.UnsupportedThinkingLevel) { }
-        var afterBytes = await ReadIdleAcknowledgedBytes(fixture.Session); var after = fixture.Session.Snapshot;
-        Check(bytes.SequenceEqual(afterBytes) && after.Log.Sequence == before.Log.Sequence && after.Log.LeafId == before.Log.LeafId &&
-            after.Context.ThinkingLevel == "high" && after.Agent.Model == Responses && after.Fault is null,
-            "Rejected explicit off changed durable bytes, selection or fault state.");
+        var before = fixture.Session.Snapshot;
+        // agent-session.ts setThinkingLevel: an explicit unsupported "off" is clamped up to "low" and recorded as that change.
+        await fixture.Session.ConfigureAsync(new(ThinkingLevel: "off"));
+        var after = fixture.Session.Snapshot;
+        Check(after.Log.Entries.Length == before.Log.Entries.Length + 1 && after.Log.Entries[^1].Kind == SessionEntryKind.ThinkingLevelChange &&
+            after.Log.Entries[^1].WireBody.Value.GetProperty("thinkingLevel").GetString() == "low" &&
+            after.Context.ThinkingLevel == "low" && after.Agent.Model == Responses && after.Fault is null,
+            "Explicit unsupported off was not clamped to low and recorded.");
         var other = await fixture.Send(new { id = "no-off-other", type = "cycle_model" }); Success(other);
         Check(other.GetProperty("data").GetProperty("model").GetProperty("id").GetString() == BoundedAnthropic.Id &&
             other.GetProperty("data").GetProperty("thinkingLevel").GetString() == "off", "Model cycle ignored the off-only target.");

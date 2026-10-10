@@ -46,6 +46,7 @@ internal static partial class Program
         cases.AddRange(SessionFormatCases());
         cases.AddRange(CapCases());
         cases.AddRange(NamelessToolCallCases());
+        cases.AddRange(ThinkingClampCases());
         var filter = Environment.GetEnvironmentVariable("CLIPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];
         var results = new List<object>(); var failures = 0;
