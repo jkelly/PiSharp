@@ -42,8 +42,8 @@ public sealed class SessionBranchPlanner
     public SessionBranchPlanner(SessionBranchPlanOptions? options = null)
     {
         this.options = options ?? new();
-        if (this.options.MaximumEntries is < 1 or > 100_000 || this.options.MaximumOutputBytes is < 1 or > 67_108_864 ||
-            this.options.MaximumInputCharacters is < 1 or > 67_108_864)
+        if (this.options.MaximumEntries is < 1 or > 100_000 || this.options.MaximumOutputBytes is < 1 or > PiSharp.Sessions.Storage.SessionBranchPublisher.MaximumInputBytes ||
+            this.options.MaximumInputCharacters is < 1 or > PiSharp.Sessions.Storage.SessionBranchPublisher.MaximumInputBytes)
             throw new ArgumentOutOfRangeException(nameof(options));
         codec = new(this.options.CodecOptions);
     }

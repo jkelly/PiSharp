@@ -48,7 +48,7 @@ internal sealed record McpSessionHost(string AgentDirectory, string HomeDirector
     {
         MaximumRegistrations = int.MaxValue, MaximumRegistrationsPerOwner = int.MaxValue, MaximumConcurrentDispatches = int.MaxValue,
         MaximumMetadataCharacters = int.MaxValue, MaximumDescriptionCharacters = 16 * 1024 * 1024, MaximumJsonCharacters = 16 * 1024 * 1024,
-        MaximumJsonDepth = 64
+        MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth
     };
     /// <summary>The binding of one server's (or the resource tools') registrations admits every tool it lists.</summary>
     internal static ToolInvokerOptions BindingInvokerOptions { get; } = new(MaximumTools: int.MaxValue);

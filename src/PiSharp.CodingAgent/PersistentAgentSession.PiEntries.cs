@@ -16,7 +16,7 @@ public sealed partial class PersistentAgentSession
         return AppendLeafEntryAsync("custom", writer =>
         {
             writer.WriteString("customType", customType);
-            if (data is not null) { writer.WritePropertyName("data"); writer.WriteRawValue(data.ToString()); }
+            if (data is not null) { writer.WritePropertyName("data"); writer.WriteRawValue(data.ToString(), skipInputValidation: true); }
         }, cancellationToken);
     }
 

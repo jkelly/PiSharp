@@ -58,7 +58,7 @@ public sealed class AgentPendingInputQueue
         ValidateMode(_options.SteeringMode);
         ValidateMode(_options.FollowUpMode);
         if (_options.MaximumMessagesPerQueue <= 0 || _options.MaximumMessageCharacters <= 0 ||
-            _options.MaximumCharactersPerQueue <= 0 || _options.MaximumJsonDepth is < 1 or > 64)
+            _options.MaximumCharactersPerQueue <= 0 || _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid pending agent input limits.");
         _steering = new(_options.SteeringMode);
         _followUp = new(_options.FollowUpMode);

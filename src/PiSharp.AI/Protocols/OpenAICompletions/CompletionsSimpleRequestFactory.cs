@@ -242,7 +242,7 @@ public sealed class CompletionsSimpleRequestFactory : IChatTransport
     private string JsonText(JsonElement value) => EcmaScriptJsonProjection.Project(JsonData.FromElement(value), new(
         MaximumInputCharacters: _options.MaximumContextCharacters, MaximumInputBytes: _options.MaximumContextCharacters,
         MaximumOutputCharacters: _options.MaximumContextCharacters, MaximumOutputBytes: _options.MaximumContextCharacters,
-        MaximumDepth: 64, MaximumStringCharacters: _options.MaximumContextCharacters));
+        MaximumDepth: PiSharp.Contracts.JsonData.MaximumDepth, MaximumStringCharacters: _options.MaximumContextCharacters));
 
     private static string SystemContent(JsonElement content) => content.ValueKind == JsonValueKind.String ? content.GetString()! :
         string.Join("\n", content.EnumerateArray().Where(b => String(b, "type") == "text").Select(b => b.GetProperty("text").GetString()!));

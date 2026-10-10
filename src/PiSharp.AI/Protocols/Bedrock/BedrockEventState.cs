@@ -189,19 +189,22 @@ internal sealed class BedrockEventState
 
     private void Usage(JsonObject usage)
     {
-        long Count(string name) => usage[name] is JsonValue value && value.TryGetValue<long>(out var count) ? count : 0;
-        long input = Count("inputTokens"), output = Count("outputTokens"), read = Count("cacheReadInputTokens"), write = Count("cacheWriteInputTokens");
-        long longWrite = 0;
+        // bedrock-converse-stream.ts keeps each count as the JavaScript number the stream reports (a fraction included; `|| 0`).
+        static double Number(JsonNode? node) => node is JsonValue value && value.GetValueKind() == JsonValueKind.Number &&
+            (value.TryGetValue<JsonElement>(out var element) ? JsonNumber.Read(element) : value.GetValue<double>()) is var number && double.IsFinite(number) ? number : 0;
+        double Count(string name) => Number(usage[name]);
+        double input = Count("inputTokens"), output = Count("outputTokens"), read = Count("cacheReadInputTokens"), write = Count("cacheWriteInputTokens");
+        double longWrite = 0;
         foreach (var detail in (usage["cacheDetails"] as JsonArray)?.OfType<JsonObject>() ?? [])
-            if (Text(detail, "ttl") == "1h" && detail["inputTokens"] is JsonValue tokens && tokens.TryGetValue<long>(out var count)) longWrite += count;
+            if (Text(detail, "ttl") == "1h") longWrite += Number(detail["inputTokens"]);
         var total = Count("totalTokens"); if (total == 0) total = input + output;
         // calculateCost: the prompt-length tier prices the whole request; 1h cache writes cost twice the input rate.
         var cost = _model.Cost;
         var rates = PromptLengthPricing.Select(cost.Input, cost.Output, cost.CacheRead, cost.CacheWrite, cost.Tiers, input, read, write);
-        var costInput = rates.Input / 1_000_000m * input; var costOutput = rates.Output / 1_000_000m * output;
-        var costRead = rates.CacheRead / 1_000_000m * read; var costWrite = (rates.CacheWrite * (write - longWrite) + rates.Input * 2 * longWrite) / 1_000_000m;
+        var costInput = rates.Input / 1_000_000m * (decimal)input; var costOutput = rates.Output / 1_000_000m * (decimal)output;
+        var costRead = rates.CacheRead / 1_000_000m * (decimal)read; var costWrite = (rates.CacheWrite * (decimal)(write - longWrite) + rates.Input * 2 * (decimal)longWrite) / 1_000_000m;
         var extras = usage.ContainsKey("cacheDetails")
-            ? JsonFields.Empty.Set("cacheWrite1h", JsonData.Parse(longWrite.ToString(CultureInfo.InvariantCulture))) : null;
+            ? JsonFields.Empty.Set("cacheWrite1h", JsonData.Parse(JsonNumber.Text(longWrite))) : null;
         _usage = new(input, output, read, write, total, new(costInput, costOutput, costRead, costWrite, costInput + costOutput + costRead + costWrite), extras);
     }
 

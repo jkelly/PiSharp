@@ -122,7 +122,7 @@ public sealed partial class PersistentAgentSession
         finally { _activationPreparation.Value = false; }
         if (delta is null && !changesTools) { promptPreparation?.ValidateSource(); token.ThrowIfCancellationRequested(); return null; }
         var entry = delta is null ? null : Record(_codec, "message", Identity(_nextEntryId, log.Header.Id, log.Entries), context.LeafId, _clock,
-            writer => { writer.WritePropertyName("message"); writer.WriteRawValue(delta.WireBody.Value.GetRawText()); });
+            writer => { writer.WritePropertyName("message"); writer.WriteRawValue(delta.WireBody.Value.GetRawText(), skipInputValidation: true); });
         var prospective = entry is null ? context : _projector.Project(log.Entries.Add(entry), entry.Id, token);
         var verified = registry.Resolve(_configuration.Model, prospective.LlmMessages, _configuration.ThinkingLevel, cancellationToken: token, prepareLoadout: false,
             preparedLoadout: presentation, activeOrder: names);

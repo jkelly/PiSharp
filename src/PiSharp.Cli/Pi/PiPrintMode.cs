@@ -113,7 +113,7 @@ internal static class PiPrintMode
         async Task<int> PromptAsync(string message, System.Collections.Immutable.ImmutableArray<JsonData>? images)
         {
             var command = new JsonObject { ["type"] = "prompt", ["message"] = message };
-            if (images is { } attached) command["images"] = new JsonArray([.. attached.Select(image => JsonNode.Parse(image.ToString()))]);
+            if (images is { } attached) command["images"] = new JsonArray([.. attached.Select(image => JsonNode.Parse(image.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions))]);
             var id = "pi-print-" + ++sequence; command["id"] = id;
             await connection.SendAsync(JsonData.Parse(command.ToJsonString()), token).ConfigureAwait(false);
             var responded = false; var waitSettled = true;
@@ -143,7 +143,7 @@ internal static class PiPrintMode
                 if (record.Value.GetProperty("type").GetString() != "response" || !record.Value.TryGetProperty("id", out var responseId) || responseId.GetString() != id) continue;
                 if (!record.Value.GetProperty("success").GetBoolean())
                     return (null, record.Value.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.String ? error.GetString()! : "Request failed");
-                return (record.Value.TryGetProperty("data", out var data) ? data.Clone() : JsonDocument.Parse("{}").RootElement.Clone(), "");
+                return (record.Value.TryGetProperty("data", out var data) ? data.Clone() : JsonDocument.Parse("{}", PiSharp.Contracts.JsonData.DocumentOptions).RootElement.Clone(), "");
             }
         }
         async Task<JsonData> NextAsync()

@@ -197,12 +197,13 @@ internal static class SessionEntryCodecTests
         Equal(raw, new SessionEntryCodec().Serialize(new SessionEntryCodec().Parse(whitespace)));
         var quoted = Entry("custom", Fields("""{"customType":"x","data":"[[[[ { \\\" }"}"""));
         new SessionEntryCodec(new(MaximumJsonDepth: 1)).Parse(quoted);
-        var deepest = Entry("custom", "\"customType\":\"x\",\"data\":" + new string('[', 63) + "0" + new string(']', 63));
-        var maximumDepth = new SessionEntryCodec(new(MaximumJsonDepth: 64));
+        // JsonData.MaximumDepth (1,000) levels: JSON.parse has no limit and V8's JSON.stringify gives up at about 1,700.
+        var deepest = Entry("custom", "\"customType\":\"x\",\"data\":" + new string('[', 999) + "0" + new string(']', 999));
+        var maximumDepth = new SessionEntryCodec(new(MaximumRecordCharacters: 1_048_576, MaximumJsonDepth: 1000));
         RoundTrip(maximumDepth, maximumDepth.Parse(deepest));
-        Fails(SessionEntryCodecFailure.DepthLimit, () => maximumDepth.Parse(Entry("custom", "\"customType\":\"x\",\"data\":" + new string('[', 64) + "0" + new string(']', 64))));
+        Fails(SessionEntryCodecFailure.DepthLimit, () => maximumDepth.Parse(Entry("custom", "\"customType\":\"x\",\"data\":" + new string('[', 1000) + "0" + new string(']', 1000))));
         foreach (var options in new[] { new SessionEntryCodecOptions(0), new SessionEntryCodecOptions(MaximumUtf8Bytes: 0),
-            new SessionEntryCodecOptions(MaximumJsonDepth: 0), new SessionEntryCodecOptions(MaximumJsonDepth: 65) })
+            new SessionEntryCodecOptions(MaximumJsonDepth: 0), new SessionEntryCodecOptions(MaximumJsonDepth: 1001) })
             Throws<ArgumentOutOfRangeException>(() => new SessionEntryCodec(options));
         return Task.CompletedTask;
     }
@@ -215,7 +216,12 @@ internal static class SessionEntryCodecTests
         Equal("\u03C0\U0001F600", codec.Parse(raw).WireBody.Value.GetProperty("literal").GetString());
         Equal("e\u0301", codec.Parse(raw).WireBody.Value.GetProperty("combining").GetString());
         Equal(raw, codec.Serialize(codec.Parse(raw))); RoundTrip(codec, codec.ParseUtf8(Encoding.UTF8.GetBytes(raw)));
-        foreach (var fields in new[] { Fields("""{"customType":"x","data":"\uD800"}"""), Fields("""{"customType":"x","data":{"\uDC00":1}}"""), "\"customType\":\"x\",\"data\":\"" + '\uD800' + "\"" })
+        // session-manager.ts JSON.parse keeps an escaped lone surrogate of a string value, and JSON.stringify writes it back as its escape.
+        var lone = Entry("custom", Fields("""{"customType":"x","data":["\uD800","a\udc00b"]}"""));
+        Equal(lone, codec.Serialize(codec.Parse(lone)));
+        Equal("a\udc00b", PiSharp.Contracts.JsonUtf16.GetString(codec.Parse(lone).WireBody.Value.GetProperty("data")[1]));
+        // A lone surrogate of a name, or a raw (unescaped) lone surrogate code unit, stays outside the owned profile.
+        foreach (var fields in new[] { Fields("""{"customType":"x","data":{"\uDC00":1}}"""), "\"customType\":\"x\",\"data\":\"" + '\uD800' + "\"" })
             Fails(SessionEntryCodecFailure.UnsupportedUnicode, () => codec.Parse(Entry("custom", fields)));
         Fails(SessionEntryCodecFailure.UnsupportedUnicode, () => codec.ParseUtf8(new byte[] { 0xC0, 0xAF }));
         Fails(SessionEntryCodecFailure.MalformedJson, () => codec.ParseUtf8(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(raw)).ToArray()));

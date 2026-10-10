@@ -130,7 +130,10 @@ internal static class OpenAICompletionsWireTests
         Equal(0L, priority.Input); Equal("0", Property(priority.ExtraProperties, "reasoning"));
         var missing = Terminal(await Collect([Finish("stop")])).Message.Usage;
         Check(missing.ExtraProperties?.TryGet("reasoning", out _) != true, "Absent complete usage became a reported reasoning zero.");
-        foreach (var count in new[] { "1.0", "1e0", "-1", "9007199254740992", "\"1\"" })
+        // parseChunkUsage keeps every count as the JavaScript number the chunk reports; only a non-number fails here.
+        foreach (var (count, value) in new[] { ("1.5", 1.5), ("1e0", 1d), ("9007199254740992", 9007199254740992d) })
+            Equal(value, Terminal(await Collect(["{\"usage\":{\"prompt_tokens\":" + count + "},\"choices\":[]}", Finish("stop")])).Message.Usage.Input);
+        foreach (var count in new[] { "\"1\"" })
             Failed(Terminal(await Collect(["{\"usage\":{\"prompt_tokens\":" + count + "},\"choices\":[]}", Finish("stop")])),
                 OpenAICompletionsWireFailure.MalformedStream);
         var safe = Terminal(await Collect(["""{"usage":{"prompt_tokens":9007199254740991},"choices":[]}""", Finish("stop")])).Message.Usage;
@@ -141,12 +144,12 @@ internal static class OpenAICompletionsWireTests
     {
         // Pi abe508 openai-completions.ts:464 finalizes every tool call with parseStreamingJson (json-parse.ts:104-124), so partial,
         // duplicate, invalid-escape, out-of-range and non-object arguments end the call and the turn completes. Expected values are the
-        // installed pi-ai 1.1.0 results as JSON.stringify writes them (1e999 is Infinity, written null); a lone surrogate is owned as
-        // U+FFFD (StreamingJson's documented representation limit).
+        // installed pi-ai 1.1.0 results as JSON.stringify writes them (1e999 is Infinity, written null); a lone surrogate is kept, as
+        // its JSON.stringify escape (see JsonUtf16).
         foreach (var (raw, expected) in new[]
         {
             ("{\"path\":\"private", "{\"path\":\"private\"}"), ("{\"n\":1,\"n\":2}", "{\"n\":2}"), ("[1]", "[1]"), ("null", "null"),
-            ("{\"path\":\"\\q\"}", "{\"path\":\"\\\\q\"}"), ("{\"n\":1e999}", "{\"n\":null}"), ("{\"s\":\"\\ud800\"}", "{\"s\":\"\\uFFFD\"}")
+            ("{\"path\":\"\\q\"}", "{\"path\":\"\\\\q\"}"), ("{\"n\":1e999}", "{\"n\":null}"), ("{\"s\":\"\\ud800\"}", "{\"s\":\"\\ud800\"}")
         })
         {
             var frames = await Collect([ToolChunk(new { index = 9, id = "call", function = new { name = "read", arguments = raw } }),
@@ -235,7 +238,7 @@ internal static class OpenAICompletionsWireTests
             Failed(Terminal(await Collect(new OpenAICompletionsWireSource((_, _) => OwnedSequence([value])))),
                 OpenAICompletionsWireFailure.MalformedStream);
         }
-        foreach (var options in new[] { new OpenAICompletionsWireOptions(MaximumChunks: 0), new(MaximumJsonDepth: 65),
+        foreach (var options in new[] { new OpenAICompletionsWireOptions(MaximumChunks: 0), new(MaximumJsonDepth: 1001),
             new(Rates: new(-1)) })
             Throws<ArgumentOutOfRangeException>(() => new OpenAICompletionsWireSource((_, _) => Sequence([]), options));
         var acquisitions = 0;
@@ -397,7 +400,7 @@ internal static class OpenAICompletionsWireTests
         if (left.ValueKind == JsonValueKind.Array)
             return left.GetArrayLength() == right.GetArrayLength() &&
                 left.EnumerateArray().Zip(right.EnumerateArray()).All(pair => Same(pair.First, pair.Second));
-        return left.ValueKind == JsonValueKind.String ? left.GetString() == right.GetString() : left.GetRawText() == right.GetRawText();
+        return left.ValueKind == JsonValueKind.String ? JsonUtf16.GetString(left) == JsonUtf16.GetString(right) : left.GetRawText() == right.GetRawText();
     }
     private sealed class Probe(JsonData[] values) : IAsyncEnumerable<JsonData>, IAsyncEnumerator<JsonData>
     {

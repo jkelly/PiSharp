@@ -82,21 +82,26 @@ public static partial class PiWireJson
         {
             case StreamStarted start: node["type"] = "start"; node["partial"] = MessageNode(start.Partial); break;
             case TextStarted start: Indexed("text_start", start.ContentIndex); node["content"] = ContentNode(start.Content); break;
-            case TextDelta delta: Indexed("text_delta", delta.ContentIndex); node["delta"] = delta.Delta; break;
-            case TextEnded end: Indexed("text_end", end.ContentIndex); node["content"] = end.Content; break;
+            case TextDelta delta: Indexed("text_delta", delta.ContentIndex); node["delta"] = JsonUtf16.StringNode(delta.Delta); break;
+            case TextEnded end: Indexed("text_end", end.ContentIndex); node["content"] = JsonUtf16.StringNode(end.Content); break;
             case ThinkingStarted start: Indexed("thinking_start", start.ContentIndex); node["content"] = ContentNode(start.Content); break;
-            case ThinkingDelta delta: Indexed("thinking_delta", delta.ContentIndex); node["delta"] = delta.Delta; break;
-            case ThinkingCheckpoint checkpoint: Indexed("thinking_checkpoint", checkpoint.ContentIndex); node["content"] = checkpoint.Content; break;
-            case ThinkingEnded end: Indexed("thinking_end", end.ContentIndex); node["content"] = end.Content; break;
+            case ThinkingDelta delta: Indexed("thinking_delta", delta.ContentIndex); node["delta"] = JsonUtf16.StringNode(delta.Delta); break;
+            case ThinkingCheckpoint checkpoint: Indexed("thinking_checkpoint", checkpoint.ContentIndex); node["content"] = JsonUtf16.StringNode(checkpoint.Content); break;
+            case ThinkingEnded end: Indexed("thinking_end", end.ContentIndex); node["content"] = JsonUtf16.StringNode(end.Content); break;
             case ToolCallStarted start: Indexed("toolcall_start", start.ContentIndex); node["toolCall"] = ContentNode(start.ToolCall); break;
             case ToolCallProvisionalStarted start: Indexed("toolcall_provisional_start", start.ContentIndex); node["toolCall"] = ContentNode(start.ToolCall); break;
             case ToolCallHeaderUpdated header: Indexed("toolcall_header_update", header.ContentIndex); node["id"] = header.Id; node["name"] = header.Name; break;
-            case ToolCallCheckpoint checkpoint: Indexed("toolcall_checkpoint", checkpoint.ContentIndex); node["json"] = checkpoint.Json; break;
-            case ToolCallDelta delta: Indexed("toolcall_delta", delta.ContentIndex); node["delta"] = delta.Delta; break;
+            case ToolCallCheckpoint checkpoint: Indexed("toolcall_checkpoint", checkpoint.ContentIndex); node["json"] = JsonUtf16.StringNode(checkpoint.Json); break;
+            case ToolCallDelta delta: Indexed("toolcall_delta", delta.ContentIndex); node["delta"] = JsonUtf16.StringNode(delta.Delta); break;
             case ToolCallEnded end:
                 Indexed("toolcall_end", end.ContentIndex);
-                foreach (var item in ContentNode(end.ToolCall))
-                    if (item.Key != "type") node[item.Key] = item.Value?.DeepClone();
+                // Moved, not cloned: a node holding a lone surrogate is written only (see JsonUtf16).
+                var content = ContentNode(end.ToolCall);
+                foreach (var key in content.Select(item => item.Key).ToArray())
+                {
+                    var item = content[key]; content.Remove(key);
+                    if (key != "type") node[key] = item;
+                }
                 break;
             case ContentBlockFinalized finalized: Indexed("content_finalized", finalized.ContentIndex); node["content"] = ContentNode(finalized.Content); break;
             case StreamTerminalEvent terminal:
@@ -130,9 +135,9 @@ public static partial class PiWireJson
     private static TokenUsage ReadUsage(JsonElement value)
     {
         var cost = value.GetProperty("cost");
-        return new(value.GetProperty("input").GetInt64(), value.GetProperty("output").GetInt64(),
-            value.GetProperty("cacheRead").GetInt64(), value.GetProperty("cacheWrite").GetInt64(),
-            value.GetProperty("totalTokens").GetInt64(),
+        return new(JsonNumber.Read(value.GetProperty("input")), JsonNumber.Read(value.GetProperty("output")),
+            JsonNumber.Read(value.GetProperty("cacheRead")), JsonNumber.Read(value.GetProperty("cacheWrite")),
+            JsonNumber.Read(value.GetProperty("totalTokens")),
             new(cost.GetProperty("input").GetDecimal(), cost.GetProperty("output").GetDecimal(),
                 cost.GetProperty("cacheRead").GetDecimal(), cost.GetProperty("cacheWrite").GetDecimal(),
                 cost.GetProperty("total").GetDecimal(), JsonFields.FromObjectExcept(cost, "input", "output", "cacheRead", "cacheWrite", "total"),
@@ -163,24 +168,25 @@ public static partial class PiWireJson
         var node = new JsonObject { ["role"] = "assistant" };
         node["content"] = new JsonArray(message.Content.Select(content => (JsonNode)ContentNode(content)).ToArray());
         node["api"] = message.Api; node["provider"] = message.Provider; node["model"] = message.Model;
-        if (extras.TryGet("providerThinkingLevel", out var providerLevel)) node["providerThinkingLevel"] = JsonNode.Parse(providerLevel!.ToString());
+        if (extras.TryGet("providerThinkingLevel", out var providerLevel)) node["providerThinkingLevel"] = JsonUtf16.Node(providerLevel!);
         node["usage"] = UsageNode(message.Usage);
         node["stopReason"] = StopReasonName(message.StopReason); node["timestamp"] = message.Timestamp;
         foreach (var item in extras.Ordered)
             if (item.Key is not ("providerThinkingLevel" or "thinkingLevel") && !MessageFields.Contains(item.Key))
-                node[item.Key] = JsonNode.Parse(item.Value.ToString());
+                node[item.Key] = JsonUtf16.Node(item.Value);
         if (message.DurationMs is { } duration) node["durationMs"] = duration;
-        if (extras.TryGet("thinkingLevel", out var level)) node["thinkingLevel"] = JsonNode.Parse(level!.ToString());
+        if (extras.TryGet("thinkingLevel", out var level)) node["thinkingLevel"] = JsonUtf16.Node(level!);
         return node;
     }
 
     private static readonly string[] UsageFields = ["input", "output", "cacheRead", "cacheWrite", "totalTokens", "cost"];
     private static JsonObject UsageNode(TokenUsage value)
     {
-        var usage = new JsonObject { ["input"] = value.Input, ["output"] = value.Output, ["cacheRead"] = value.CacheRead, ["cacheWrite"] = value.CacheWrite };
+        // Counts are JavaScript numbers: a whole count is written as an integer, a fraction as Number::toString writes it.
+        var usage = new JsonObject { ["input"] = JsonNumber.Node(value.Input), ["output"] = JsonNumber.Node(value.Output), ["cacheRead"] = JsonNumber.Node(value.CacheRead), ["cacheWrite"] = JsonNumber.Node(value.CacheWrite) };
         var extras = (value.ExtraProperties ?? JsonFields.Empty).Ordered.Where(item => !UsageFields.Contains(item.Key)).ToArray();
-        if (value.ExtrasBeforeTotal) foreach (var item in extras) usage[item.Key] = JsonNode.Parse(item.Value.ToString());
-        usage["totalTokens"] = value.TotalTokens;
+        if (value.ExtrasBeforeTotal) foreach (var item in extras) usage[item.Key] = JsonUtf16.Node(item.Value);
+        usage["totalTokens"] = JsonNumber.Node(value.TotalTokens);
         var cost = new JsonObject
         {
             ["input"] = value.Cost.Input, ["output"] = value.Cost.Output, ["cacheRead"] = value.Cost.CacheRead,
@@ -205,13 +211,13 @@ public static partial class PiWireJson
                 };
                 if (!number.TryGetDecimal(out var owned) || owned != typed)
                     throw new JsonException("Source cost differs from its typed decimal value.");
-                cost[name] = JsonNode.Parse(number.GetRawText());
+                cost[name] = JsonNode.Parse(number.GetRawText(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             }
         }
         foreach (var item in (value.Cost.ExtraProperties ?? JsonFields.Empty).Ordered)
-            if (!cost.ContainsKey(item.Key)) cost[item.Key] = JsonNode.Parse(item.Value.ToString());
+            if (!cost.ContainsKey(item.Key)) cost[item.Key] = JsonUtf16.Node(item.Value);
         usage["cost"] = cost;
-        if (!value.ExtrasBeforeTotal) foreach (var item in extras) usage[item.Key] = JsonNode.Parse(item.Value.ToString());
+        if (!value.ExtrasBeforeTotal) foreach (var item in extras) usage[item.Key] = JsonUtf16.Node(item.Value);
         return usage;
     }
 
@@ -223,15 +229,15 @@ public static partial class PiWireJson
         string[] own;
         switch (content)
         {
-            case TextContent text: node["type"] = "text"; node["text"] = text.Text; own = ["type", "text"]; break;
-            case ThinkingContent thinking: node["type"] = "thinking"; node["thinking"] = thinking.Thinking; own = ["type", "thinking"]; break;
+            case TextContent text: node["type"] = "text"; node["text"] = JsonUtf16.StringNode(text.Text); own = ["type", "text"]; break;
+            case ThinkingContent thinking: node["type"] = "thinking"; node["thinking"] = JsonUtf16.StringNode(thinking.Thinking); own = ["type", "thinking"]; break;
             case ToolCallContent tool:
                 node["type"] = "toolCall"; node["id"] = tool.Id; node["name"] = tool.Name;
-                node["arguments"] = JsonNode.Parse(tool.Arguments.ToString()); own = ["type", "id", "name", "arguments"]; break;
+                node["arguments"] = JsonUtf16.Node(tool.Arguments); own = ["type", "id", "name", "arguments"]; break;
             default: throw new ArgumentException("Unknown assistant content.", nameof(content));
         }
         foreach (var item in (content.ExtraProperties ?? JsonFields.Empty).Ordered)
-            if (!own.Contains(item.Key)) node[item.Key] = JsonNode.Parse(item.Value.ToString());
+            if (!own.Contains(item.Key)) node[item.Key] = JsonUtf16.Node(item.Value);
         return node;
     }
 
@@ -239,12 +245,12 @@ public static partial class PiWireJson
     {
         var node = new JsonObject();
         foreach (var item in (properties ?? JsonFields.Empty).Ordered)
-            node[item.Key] = JsonNode.Parse(item.Value.ToString());
+            node[item.Key] = JsonUtf16.Node(item.Value);
         return node;
     }
 
-    private static JsonData Own(JsonNode node) => JsonData.Parse(node.ToJsonString());
-    private static string String(JsonElement value, string name) => value.GetProperty(name).GetString()
+    private static JsonData Own(JsonNode node) => JsonData.Parse(JsonUtf16.ToJsonString(node));
+    private static string String(JsonElement value, string name) => (value.GetProperty(name) is { ValueKind: JsonValueKind.String } text ? JsonUtf16.GetString(text) : value.GetProperty(name).GetString())
         ?? throw new JsonException($"{name} cannot be null.");
     private static void RequireString(JsonElement value, string name, string expected)
     {

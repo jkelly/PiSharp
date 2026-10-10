@@ -37,7 +37,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
         if (baseUri is null || expectedModel is null || projectionOptions is null ||
             !double.IsFinite(_options.MaximumTokenMagnitude) || _options.MaximumTokenMagnitude <= 0 ||
             _options.MaxTokens is { } tokens && !double.IsFinite(tokens) || _options.MaximumKeyCharacters <= 0 || _options.MaximumBaseUriCharacters <= 0 ||
-            _options.MaximumPayloadBytes <= 0 || _options.MaximumPayloadDepth is < 1 or > 64 || _options.MaximumHeaders <= 0 ||
+            _options.MaximumPayloadBytes <= 0 || _options.MaximumPayloadDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth || _options.MaximumHeaders <= 0 ||
             _options.MaximumHeaderCharacters <= 0 || _options.MaximumTotalHeaderCharacters <= 0 ||
             !baseUri.IsAbsoluteUri || baseUri.Scheme is not ("http" or "https") || baseUri.UserInfo.Length != 0 ||
             baseUri.Fragment.Length != 0 || baseUri.Query.Length != 0 || expectedModel.Api != "anthropic-messages" ||
@@ -150,7 +150,7 @@ public sealed class AnthropicMessagesAuthenticatedRequestFactory
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (property.Name == "betas") continue;
-                writer.WritePropertyName(property.Name); writer.WriteRawValue(prepared is null ? Raw(property) : property.Value.GetRawText());
+                writer.WritePropertyName(property.Name); writer.WriteRawValue(prepared is null ? Raw(property) : property.Value.GetRawText(), skipInputValidation: true);
             }
             writer.WriteEndObject();
         }

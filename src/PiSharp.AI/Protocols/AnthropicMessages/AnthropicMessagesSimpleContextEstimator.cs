@@ -16,7 +16,7 @@ internal static class AnthropicMessagesSimpleContextEstimator
         if (messages.Length > options.MaximumContextMessages) throw Fail(AnthropicMessagesSimpleFailure.ResourceLimit);
         try
         {
-            long characters = 0; var latestPrefix = long.MinValue; int? last = null; var usageTokens = 0;
+            long characters = 0; var latestPrefix = long.MinValue; int? last = null; var usageTokens = 0d;
             for (var i = 0; i < messages.Length; i++)
             {
                 token.ThrowIfCancellationRequested(); var entry = messages[i];
@@ -29,7 +29,7 @@ internal static class AnthropicMessagesSimpleContextEstimator
                 if (entry.Role == "assistant")
                 {
                     var usage = message.GetProperty("usage"); var total = Counter(usage, "totalTokens");
-                    if (total == 0) total = checked(Counter(usage, "input") + Counter(usage, "output") + Counter(usage, "cacheRead") + Counter(usage, "cacheWrite"));
+                    if (total == 0) total = Counter(usage, "input") + Counter(usage, "output") + Counter(usage, "cacheRead") + Counter(usage, "cacheWrite");
                     if (timestamp >= latestPrefix && message.GetProperty("stopReason").GetString() is not ("aborted" or "error") && total > 0)
                     { last = i; usageTokens = total; }
                 }
@@ -38,7 +38,9 @@ internal static class AnthropicMessagesSimpleContextEstimator
             var trailing = 0;
             for (var i = last is { } index ? index + 1 : 0; i < messages.Length; i++)
             { token.ThrowIfCancellationRequested(); trailing = checked(trailing + MessageTokens(messages[i].WireBody.Value, options)); }
-            return new(checked(usageTokens + trailing), usageTokens, trailing, last);
+            // A usage count may be a fraction (Pi keeps the JavaScript number); the integer estimate rounds it up to whole tokens.
+            var whole = checked((int)Math.Ceiling(usageTokens));
+            return new(checked(whole + trailing), whole, trailing, last);
         }
         catch (EcmaScriptJsonProjectionException) { throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript); }
         catch (OverflowException) { throw Fail(AnthropicMessagesSimpleFailure.ResourceLimit); }
@@ -57,7 +59,7 @@ internal static class AnthropicMessagesSimpleContextEstimator
             if (message.TryGetProperty("sections", out var sections) && sections.ValueKind != JsonValueKind.Null)
             {
                 // Object.values follows ECMAScript integer-key ordering.
-                using var ordered = JsonDocument.Parse(JsonText(sections, options));
+                using var ordered = JsonDocument.Parse(JsonText(sections, options), PiSharp.Contracts.JsonData.DocumentOptions);
                 foreach (var section in ordered.RootElement.EnumerateObject())
                     if (section.Value.ValueKind != JsonValueKind.Null) parts.Add(section.Value.GetString()!);
             }
@@ -85,16 +87,16 @@ internal static class AnthropicMessagesSimpleContextEstimator
         else throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript);
         return checked((int)Math.Ceiling(characters / CharsPerToken));
     }
-    private static int Counter(JsonElement usage, string name)
+    private static double Counter(JsonElement usage, string name)
     {
-        var count = usage.GetProperty(name).GetInt32();
-        if (count < 0) throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript);
+        var count = JsonNumber.Read(usage.GetProperty(name));
+        if (!double.IsFinite(count) || count < 0) throw Fail(AnthropicMessagesSimpleFailure.InvalidTranscript);
         return count;
     }
     private static int TextTokens(string text) => (int)Math.Ceiling(text.Length / CharsPerToken);
     private static string JsonText(JsonElement value, AnthropicMessagesSimpleOptions options) => EcmaScriptJsonProjection.Project(JsonData.FromElement(value), new(
         MaximumInputCharacters: options.MaximumContextCharacters, MaximumInputBytes: options.MaximumContextCharacters * 4,
         MaximumOutputCharacters: options.MaximumContextCharacters, MaximumOutputBytes: options.MaximumContextCharacters * 4,
-        MaximumDepth: 64, MaximumStringCharacters: options.MaximumContextCharacters));
+        MaximumDepth: PiSharp.Contracts.JsonData.MaximumDepth, MaximumStringCharacters: options.MaximumContextCharacters));
     private static AnthropicMessagesSimpleException Fail(AnthropicMessagesSimpleFailure failure) => new(failure);
 }

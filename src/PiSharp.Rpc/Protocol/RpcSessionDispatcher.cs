@@ -986,7 +986,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
                 _options.MaximumCommandBytes, _options.MaximumCommandBytes, _options.MaximumJsonDepth,
                 _options.MaximumCommandBytes, _options.MaximumCommandBytes)
             {
-                QueueOnly = command.Type != "prompt",
+                QueueOnly = command.Type != "prompt", KeepsLoneSurrogates = PromptInputAdmissionOptions.Default.KeepsLoneSurrogates,
                 BeforeQueueCommit = (message, queue, behavior) =>
                 {
                     admissionCancellation.Token.ThrowIfCancellationRequested();
@@ -1316,7 +1316,7 @@ public sealed partial class RpcSessionDispatcher : IAsyncDisposable
         return RpcCommandCodec.Build(writer =>
         {
             writer.WritePropertyName("entries"); writer.WriteStartArray();
-            for (var index = start; index < snapshot.Log.Entries.Length; index++) writer.WriteRawValue(snapshot.Log.Entries[index].WireBody.ToString());
+            for (var index = start; index < snapshot.Log.Entries.Length; index++) writer.WriteRawValue(snapshot.Log.Entries[index].WireBody.ToString(), skipInputValidation: true);
             writer.WriteEndArray(); writer.WriteString("leafId", snapshot.Context.LeafId);
         }, _options.MaximumOutputBytes);
     }

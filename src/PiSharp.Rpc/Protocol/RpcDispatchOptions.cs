@@ -24,7 +24,7 @@ public sealed record RpcDispatchOptions(int MaximumConcurrentCommands = 8, int M
     internal void Validate(RpcSessionOwnership ownership)
     {
         if (MaximumConcurrentCommands <= 0 || MaximumCommandBytes is < 1 or > int.MaxValue - 1 ||
-            MaximumOutputBytes is < 256 or > int.MaxValue - 1 || MaximumJsonDepth is < 1 or > 64 ||
+            MaximumOutputBytes is < 256 or > int.MaxValue - 1 || MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth ||
             MaximumIdCharacters <= 0 || MaximumCommandTypeCharacters <= 0 || MaximumPromptCharacters <= 0 ||
             MaximumImages < 0 || MaximumModels <= 0 || MaximumModelDefinitionBytes is < 1 or > int.MaxValue - 1 ||
             MaximumReturnedMessages <= 0 || MaximumReturnedEntries <= 0 || MaximumContinuationRuns <= 0 ||

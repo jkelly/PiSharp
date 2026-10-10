@@ -13,7 +13,7 @@ public static class AnthropicSourceEventProjection
         if (terminal is not StreamError) return source;
         // Native Anthropic failure producers own this exact message-level field.
         // Do not filter generic extension fields, nested data, or sanitized errorMessage.
-        var node = JsonNode.Parse(source.ToString())!;
+        var node = JsonNode.Parse(source.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!;
         ((JsonObject)node["error"]!).Remove("anthropicFailure");
         return JsonData.Parse(node.ToJsonString());
     }

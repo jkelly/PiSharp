@@ -12,7 +12,7 @@ public sealed record ResponsesTranscriptProjectionOptions(
     bool Reasoning, bool SupportsDeveloperRole = true, bool SupportsMidConversationSystemMessages = false,
     bool IncludeInitialSystemPrompt = true, ImmutableHashSet<string>? AllowedToolCallProviders = null,
     int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumEntryCharacters = PiRequestBudget.RequestEntryCharacters, int MaximumInputCharacters = PiRequestBudget.RequestPayloadBytes,
-    int MaximumContentBlocks = PiRequestBudget.RequestItems, int MaximumJsonDepth = 32,
+    int MaximumContentBlocks = PiRequestBudget.RequestItems, int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth,
     int MaximumOutputItems = PiRequestBudget.RequestItems, int MaximumOutputCharacters = PiRequestBudget.RequestPayloadBytes,
     ResponsesToolDeclarationProjectionOptions? ToolDeclarations = null,
     bool SynthesizeMissingToolResults = false)
@@ -53,7 +53,7 @@ public sealed class ResponsesTranscriptProjector
     private readonly ResponsesTranscriptProjectionOptions _options;
     private readonly ImmutableHashSet<string> _allowed;
     private readonly ResponsesToolDeclarationProjector _tools;
-    private static readonly JsonSerializerOptions OutputJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    private static readonly JsonSerializerOptions OutputJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, MaxDepth = 2 * JsonData.MaximumDepth };
 
     public ResponsesTranscriptProjector(ResponsesTranscriptProjectionOptions options)
     {
@@ -64,7 +64,7 @@ public sealed class ResponsesTranscriptProjector
             MaximumJsonDepth: options.MaximumJsonDepth));
         if (options.MaximumMessages <= 0 || options.MaximumEntryCharacters <= 0 || options.MaximumInputCharacters <= 0 ||
             options.MaximumContentBlocks <= 0 || options.MaximumOutputItems <= 0 || options.MaximumOutputCharacters < 2 ||
-            options.MaximumJsonDepth is < 1 or > 64) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Responses projection limits.");
+            options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth) throw new ArgumentOutOfRangeException(nameof(options), "Invalid Responses projection limits.");
         _allowed = (options.AllowedToolCallProviders ?? ImmutableHashSet.Create("openai", "openai-codex", "opencode"))
             .ToImmutableHashSet(StringComparer.Ordinal);
     }
@@ -224,7 +224,7 @@ public sealed class ResponsesTranscriptProjector
                 }
                 else if (entry.Role == "toolResult" && _idMap.TryGetValue(String(entry.Body.Value, "toolCallId"), out var id))
                 {
-                    var body = JsonNode.Parse(entry.Body.ToString())!.AsObject(); body["toolCallId"] = id;
+                    var body = JsonNode.Parse(entry.Body.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!.AsObject(); body["toolCallId"] = id;
                     transformed.Add(entry with { Body = JsonData.Parse(body.ToJsonString(OutputJson)) });
                 }
                 else transformed.Add(entry);
@@ -342,7 +342,7 @@ public sealed class ResponsesTranscriptProjector
                     CheckJson(reasoning.Value, 0);
                     if (reasoning.Value.ValueKind != JsonValueKind.Object || String(reasoning.Value, "type") != "reasoning")
                         throw Failure(ResponsesProjectionFailure.UnsupportedSignature);
-                    Add(JsonNode.Parse(reasoning.ToString())!);
+                    Add(JsonNode.Parse(reasoning.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)!);
                 }
                 else if (part is TextContent text)
                 {
@@ -375,7 +375,7 @@ public sealed class ResponsesTranscriptProjector
                         item = new JsonObject { ["type"] = "function_call", ["call_id"] = call, ["name"] = tool.Name, ["arguments"] = ArgumentString(tool.Arguments.Value) };
                         if (itemId is not null) item["id"] = itemId;
                     }
-                    if (same && tool.ExtraProperties?.TryGet("namespace", out var ns) == true) item["namespace"] = JsonNode.Parse(ns!.ToString());
+                    if (same && tool.ExtraProperties?.TryGet("namespace", out var ns) == true) item["namespace"] = JsonNode.Parse(ns!.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
                     Add(item);
                 }
             }
@@ -466,7 +466,7 @@ public sealed class ResponsesTranscriptProjector
             var size = serialized.Length + (_output.Count == 0 ? 0 : 1);
             if (_output.Count >= options.MaximumOutputItems || size > options.MaximumOutputCharacters - _outputCharacters)
                 throw Failure(ResponsesProjectionFailure.ResourceLimit);
-            using var document = JsonDocument.Parse(serialized);
+            using var document = JsonDocument.Parse(serialized, PiSharp.Contracts.JsonData.DocumentOptions);
             CheckJson(document.RootElement, 1); // The containing output array adds a level.
             _outputCharacters += size; _output.Add(item);
         }
@@ -480,7 +480,7 @@ public sealed class ResponsesTranscriptProjector
                     foreach (var property in value.EnumerateObject()) { CheckString(property.Name); CheckJson(property.Value, depth + 1); }
                 else foreach (var child in value.EnumerateArray()) CheckJson(child, depth + 1);
             }
-            else if (value.ValueKind == JsonValueKind.String) CheckString(Text(value));
+            else if (value.ValueKind == JsonValueKind.String) _ = Text(value); // a lone surrogate only in tool call arguments (TranscriptSurrogates)
         }
         // Pi abe508 openai-responses-shared.ts convertToolResultOutput (after transform-messages.ts downgradeUnsupportedImages).
         private JsonNode ToolOutput(JsonElement body)
@@ -530,7 +530,7 @@ public sealed class ResponsesTranscriptProjector
         private static string Text(JsonElement value)
         {
             if (value.ValueKind != JsonValueKind.String) throw Failure(ResponsesProjectionFailure.InvalidTranscript);
-            try { return value.GetString()!; }
+            try { return JsonUtf16.GetString(value); }
             catch (InvalidOperationException) { throw Failure(ResponsesProjectionFailure.UnsupportedUnicode); }
         }
         private static string? OptionalString(JsonFields? fields, string name) => fields?.TryGet(name, out var value) == true ? Text(value!.Value) : null;
@@ -552,19 +552,8 @@ public sealed class ResponsesTranscriptProjector
         .OrderBy(item => item.key is null ? 1 : 0).ThenBy(item => item.key ?? 0).ThenBy(item => item.index).Select(item => item.property);
     private static uint? ArrayIndex(string name) => uint.TryParse(name, NumberStyles.None, CultureInfo.InvariantCulture, out var index) &&
         index != uint.MaxValue && name == index.ToString(CultureInfo.InvariantCulture) ? index : null;
-    private static void Quote(StringBuilder builder, string value)
-    {
-        builder.Append('"');
-        foreach (var character in value)
-            switch (character)
-            {
-                case '"': builder.Append("\\\""); break; case '\\': builder.Append("\\\\"); break;
-                case '\b': builder.Append("\\b"); break; case '\f': builder.Append("\\f"); break;
-                case '\n': builder.Append("\\n"); break; case '\r': builder.Append("\\r"); break; case '\t': builder.Append("\\t"); break;
-                default: if (character < 0x20) builder.Append("\\u").Append(((int)character).ToString("x4", CultureInfo.InvariantCulture)); else builder.Append(character); break;
-            }
-        builder.Append('"');
-    }
+    // JSON.stringify of a string: a lone surrogate of a tool call's arguments is written as its escape.
+    private static void Quote(StringBuilder builder, string value) => JsonUtf16.Quote(builder, value);
     private static string ShortHash(string value)
     {
         unchecked

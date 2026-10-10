@@ -18,7 +18,7 @@ public static partial class PiWireJson
         {
             var content = SourceSlot<ThinkingContent>(partial, thinking.ContentIndex);
             if (content.ExtraProperties is not { } capturedProperties || !capturedProperties.TryGet("thinkingSignature", out var captured) ||
-                !JsonNode.DeepEquals(JsonNode.Parse(signature!.ToString()), JsonNode.Parse(captured!.ToString())))
+                !JsonNode.DeepEquals(JsonNode.Parse(signature!.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions), JsonNode.Parse(captured!.ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions)))
                 throw new JsonException("Thinking signature differs from the actual source partial.");
             properties = signatureProperties.Remove("thinkingSignature");
         }

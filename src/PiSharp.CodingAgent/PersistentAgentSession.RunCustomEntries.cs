@@ -32,7 +32,7 @@ public sealed partial class PersistentAgentSession
             var entry = Record(_codec, "custom", Identity(_nextEntryId, log.Header.Id, log.Entries), previous.LeafId, _clock, writer =>
             {
                 writer.WriteString("customType", customType);
-                writer.WritePropertyName("data"); writer.WriteRawValue(data.ToString());
+                writer.WritePropertyName("data"); writer.WriteRawValue(data.ToString(), skipInputValidation: true);
             });
             var next = _projector.Project(log.Entries.Add(entry), entry.Id);
             writeAdmitted = true;

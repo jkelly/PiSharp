@@ -37,7 +37,7 @@ public sealed class AnthropicMessagesPreparedRequest
         {
             writer.WriteStartObject();
             foreach (var property in payload.Value.EnumerateObject())
-            { token.ThrowIfCancellationRequested(); writer.WritePropertyName(property.Name); writer.WriteRawValue(raw(property)); }
+            { token.ThrowIfCancellationRequested(); writer.WritePropertyName(property.Name); writer.WriteRawValue(raw(property), skipInputValidation: true); }
             writer.WriteEndObject();
         }
         return JsonData.Parse(Encoding.UTF8.GetString(buffer.ToArray()));

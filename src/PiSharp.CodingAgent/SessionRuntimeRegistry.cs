@@ -30,7 +30,7 @@ public sealed record SessionRegisteredTool(JsonData Declaration, IPreparedToolAd
 }
 public sealed record SessionRuntimeRegistryOptions(int MaximumModels = 128, int MaximumTools = 128,
     int MaximumMessages = PiRequestBudget.RequestMessages, int MaximumDeclarations = PiRequestBudget.RequestItems, int MaximumCharacters = 1_048_576,
-    int MaximumJsonDepth = 32, ToolInvokerOptions? ToolInvokerOptions = null)
+    int MaximumJsonDepth = PiSharp.Contracts.JsonData.MaximumDepth, ToolInvokerOptions? ToolInvokerOptions = null)
 {
     /// <summary>Borrowed prepared hooks for all active native and extension adapters in the single final-action invoker.</summary>
     public IPreparedToolHooks? PreparedToolHooks { get; init; }
@@ -109,7 +109,7 @@ public sealed partial class SessionRuntimeRegistry
         ArgumentNullException.ThrowIfNull(policy);
         _options = options ?? new();
         if (_options.MaximumModels <= 0 || _options.MaximumTools <= 0 || _options.MaximumMessages <= 0 ||
-            _options.MaximumDeclarations <= 0 || _options.MaximumCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > 64)
+            _options.MaximumDeclarations <= 0 || _options.MaximumCharacters <= 0 || _options.MaximumJsonDepth is < 1 or > PiSharp.Contracts.JsonData.MaximumDepth)
             throw new ArgumentOutOfRangeException(nameof(options), "Invalid session runtime binding limits.");
         if (models.IsDefaultOrEmpty || tools.IsDefault) throw Error(SessionRuntimeRegistryFailure.InvalidRegistration);
         if (models.Length > _options.MaximumModels || tools.Length > _options.MaximumTools)
@@ -266,7 +266,7 @@ public sealed partial class SessionRuntimeRegistry
             if (added.Length > 0)
             {
                 writer.WritePropertyName("toolsAdded"); writer.WriteStartArray();
-                foreach (var name in added) writer.WriteRawValue(Declared(name).GetRawText());
+                foreach (var name in added) writer.WriteRawValue(Declared(name).GetRawText(), skipInputValidation: true);
                 writer.WriteEndArray();
             }
             if (removed.Length > 0)
@@ -556,11 +556,8 @@ public sealed partial class SessionRuntimeRegistry
                 { if (!Unicode(property.Name)) throw Error(SessionRuntimeRegistryFailure.InvalidTranscript); CheckJson(property.Value, depth, token); }
             else foreach (var child in value.EnumerateArray()) CheckJson(child, depth, token);
         }
-        else if (value.ValueKind == JsonValueKind.String)
-        {
-            try { if (!Unicode(value.GetString()!)) throw Error(SessionRuntimeRegistryFailure.InvalidTranscript); }
-            catch (InvalidOperationException) { throw Error(SessionRuntimeRegistryFailure.InvalidTranscript); }
-        }
+        // A string value may hold a lone surrogate, as a JavaScript string does; each provider drops it from request text as Pi's
+        // sanitizeSurrogates does (or keeps it, escaped, where Pi stringifies the value).
     }
     private static string Declaration(JsonElement value)
     {

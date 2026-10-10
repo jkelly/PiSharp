@@ -12,13 +12,13 @@ namespace PiSharp.AI;
 /// when the repair changed the text, then partial-json's <c>parse</c> of the text and of its repair, then <c>{}</c>. It never throws for
 /// malformed input. The result is any JSON value (an array, string, number, boolean or null passes through as upstream returns it) and is
 /// owned as its <c>JSON.stringify</c> text: duplicate names keep the last value at the first position, array-index names come first in
-/// ascending order, and numbers are binary64 (non-finite ones become null). Two representation limits remain, since a
-/// <see cref="JsonData"/> and System.Text.Json cannot carry them: a lone surrogate becomes U+FFFD (toWellFormed) in the owned value, and
-/// a value nested deeper than 64 levels is a <see cref="JsonException"/>.
+/// ascending order, and numbers are binary64 (non-finite ones become null). A string value keeps every code unit, a lone surrogate as its
+/// escape (see <see cref="JsonUtf16"/>). Two representation limits remain: a lone surrogate of a name becomes U+FFFD (toWellFormed), and a
+/// value nested deeper than <see cref="JsonData.MaximumDepth"/> levels is a <see cref="JsonException"/>.
 /// </summary>
 public static class StreamingJson
 {
-    private const int MaximumDepth = 64;
+    private const int MaximumDepth = JsonData.MaximumDepth;
 
     public static JsonData Parse(string? partialJson)
     {
@@ -29,7 +29,7 @@ public static class StreamingJson
 
     /// <summary>
     /// <c>JSON.parse(text)</c> with the same ownership as <see cref="Parse"/>: any JSON value, duplicate names keep the last value,
-    /// lone surrogates become U+FFFD. A text JSON.parse rejects is a <see cref="JsonException"/> carrying V8's SyntaxError message.
+    /// lone surrogates of string values are kept. A text JSON.parse rejects is a <see cref="JsonException"/> carrying V8's SyntaxError message.
     /// </summary>
     public static JsonData JsonParse(string text) => JsonParse(text, out _, out _);
 
@@ -486,8 +486,9 @@ public static class StreamingJson
 
     // --- JSON.stringify -------------------------------------------------------------------------------------------------------------
 
-    // wellFormed: String.prototype.toWellFormed on every name and string (a lone surrogate becomes U+FFFD; names that then collide
-    // keep the first position and the last value), the only form a JsonData can hold and System.Text.Json can write.
+    // wellFormed: String.prototype.toWellFormed on every name (a lone surrogate becomes U+FFFD; names that then collide keep the first
+    // position and the last value), since a JsonData refuses a name System.Text.Json cannot read. String values keep every code unit:
+    // a lone surrogate is written as its JSON.stringify escape, which a JsonData carries (see JsonUtf16).
     private static string Stringify(Value value, bool wellFormed)
     {
         var builder = new StringBuilder();
@@ -502,7 +503,7 @@ public static class StreamingJson
             case NullValue: builder.Append("null"); break;
             case BoolValue flag: builder.Append(flag.Bool ? "true" : "false"); break;
             case NumberValue number: builder.Append(NumberText(number.Number)); break;
-            case StringValue text: Quote(builder, wellFormed ? ToWellFormed(text.Text) : text.Text); break;
+            case StringValue text: Quote(builder, text.Text); break;
             case ArrayValue array:
                 builder.Append('[');
                 for (var index = 0; index < array.Items.Count; index++)
@@ -591,39 +592,7 @@ public static class StreamingJson
     }
 
     /// <summary>JSON.stringify of a binary64: Number::toString for finite values, <c>null</c> otherwise.</summary>
-    private static string NumberText(double value)
-    {
-        if (!double.IsFinite(value)) return "null";
-        if (value == 0) return "0";
-        // .NET Core 3.0+ "R" is the shortest round-tripping digit string, the digits Number::toString chooses.
-        var shortest = Math.Abs(value).ToString("R", CultureInfo.InvariantCulture);
-        var exponent = 0;
-        var mantissa = shortest;
-        var marker = shortest.IndexOfAny(['E', 'e']);
-        if (marker >= 0)
-        {
-            exponent = int.Parse(shortest.AsSpan(marker + 1), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
-            mantissa = shortest[..marker];
-        }
-        var point = mantissa.IndexOf('.');
-        var digits = point >= 0 ? mantissa.Remove(point, 1) : mantissa;
-        var n = (point >= 0 ? point : mantissa.Length) + exponent;
-        var leading = 0;
-        while (leading < digits.Length - 1 && digits[leading] == '0') leading++;
-        digits = digits[leading..].TrimEnd('0');
-        n -= leading;
-        var k = digits.Length;
-        string text;
-        if (k <= n && n <= 21) text = digits + new string('0', n - k);
-        else if (0 < n && n <= 21) text = digits[..n] + "." + digits[n..];
-        else if (-6 < n && n <= 0) text = "0." + new string('0', -n) + digits;
-        else
-        {
-            var e = n - 1;
-            text = digits[..1] + (k == 1 ? "" : "." + digits[1..]) + "e" + (e < 0 ? "-" : "+") + Math.Abs(e).ToString(CultureInfo.InvariantCulture);
-        }
-        return value < 0 ? "-" + text : text;
-    }
+    private static string NumberText(double value) => JsonNumber.Text(value);
 
     // --- String.prototype helpers ----------------------------------------------------------------------------------------------------
 

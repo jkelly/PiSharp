@@ -154,7 +154,8 @@ static class ResponsesTranscriptProjectionTests
             var error = Throws(() => Project([Assistant([new ThinkingContent("", fields)], stop: StopReason.Stop)]));
             Equal(ResponsesProjectionFailure.UnsupportedSignature, error.Failure); Assert(!error.Message.Contains("private", StringComparison.Ordinal), "Signature leaked in diagnostic.");
         }
-        Equal(ResponsesProjectionFailure.UnsupportedUnicode, Throws(() => Project([Entry("{\"role\":\"user\",\"content\":\"\\uD83D\",\"timestamp\":0}")])).Failure);
+        // A string value may hold a lone surrogate (Pi keeps it); the agent's TranscriptSurrogates drops it from message text first.
+        _ = Project([Entry("{\"role\":\"user\",\"content\":\"\\uD83D\",\"timestamp\":0}")]);
         return Task.CompletedTask;
     }
 
@@ -174,7 +175,7 @@ static class ResponsesTranscriptProjectionTests
         var signature = JsonFields.Empty.Set("thinkingSignature", JsonData.Parse("\"{\\\"type\\\":\\\"reasoning\\\",\\\"nested\\\":[[[]]]}\""));
         Equal(ResponsesProjectionFailure.ResourceLimit, Throws(() => Project([Assistant([new ThinkingContent("", signature)], stop: StopReason.Stop)], Options() with { MaximumJsonDepth = 3 })).Failure);
         Equal("[]", Project([], Options() with { MaximumOutputCharacters = 2 }).ToString());
-        foreach (var invalid in new[] { Options() with { MaximumMessages = 0 }, Options() with { MaximumJsonDepth = 65 }, Options() with { MaximumOutputCharacters = 1 } })
+        foreach (var invalid in new[] { Options() with { MaximumMessages = 0 }, Options() with { MaximumJsonDepth = 1001 }, Options() with { MaximumOutputCharacters = 1 } })
         { try { _ = new ResponsesTranscriptProjector(invalid); throw new Exception("Invalid limits accepted."); } catch (ArgumentOutOfRangeException) { } }
         var projector = new ResponsesTranscriptProjector(Options()); var request = Request(entry); var previous = projector.Project(request).ToString();
         using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
