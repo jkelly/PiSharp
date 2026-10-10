@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using PiSharp.AI.Authentication;
 using PiSharp.AI.Protocols.OpenAICompletions;
+using PiSharp.AI.Protocols.ProviderShared;
 using PiSharp.Contracts;
 
 namespace PiSharp.AI.Providers;
@@ -43,33 +44,48 @@ public static class AzureOpenAIConfiguration
     /// <summary>resolveAzureBaseUrl: explicit or AZURE_OPENAI_BASE_URL, then a resource name, then model.baseUrl; Azure hosts get /openai/v1.</summary>
     public static string ResolveBaseUrl(string? modelBaseUrl, AzureEndpointOptions? options = null)
     {
-        var baseUrl = Truthy(options?.AzureBaseUrl?.Trim()) ?? Truthy(options?.Environment?.GetValue(BaseUrlVariable)?.Trim());
-        var resource = Truthy(options?.AzureResourceName) ?? options?.Environment?.GetValue(ResourceNameVariable);
-        if (baseUrl is null && resource is not null)
-        {
-            // PiSharp keeps the resource a single DNS label rather than letting URL parsing reinterpret it.
-            if (resource.Length > 63 || !char.IsAsciiLetterOrDigit(resource[0]) || !char.IsAsciiLetterOrDigit(resource[^1]) ||
-                resource.Any(character => !(char.IsAsciiLetterOrDigit(character) || character == '-')))
-                throw new ArgumentException("Invalid Azure OpenAI resource name.");
-            baseUrl = "https://" + resource + ".openai.azure.com/openai/v1";
-        }
+        var baseUrl = Truthy(EcmaTrimOrNull(options?.AzureBaseUrl)) ?? Truthy(EcmaTrimOrNull(options?.Environment?.GetValue(BaseUrlVariable)));
+        var resource = Truthy(options?.AzureResourceName) ?? Truthy(options?.Environment?.GetValue(ResourceNameVariable));
+        // buildDefaultBaseUrl: any resource name goes into the URL text as given; the WHATWG parse below decides what it means
+        // (owner decision 14), so dots, upper case, IDN and the rest resolve exactly as Pi resolves them.
+        if (baseUrl is null && resource is not null) baseUrl = BuildDefaultBaseUrl(resource);
         baseUrl ??= Truthy(modelBaseUrl) ?? throw new ArgumentException(
             "Azure OpenAI base URL is required. Set AZURE_OPENAI_BASE_URL or AZURE_OPENAI_RESOURCE_NAME, or pass azureBaseUrl, azureResourceName, or model.baseUrl.");
-        return NormalizeBaseUrl(baseUrl);
+        return NormalizeBaseUrl(baseUrl, out var normalized) switch
+        {
+            AzureBaseUrlStatus.Valid => normalized,
+            // The SDK appends the resource path to the base URL text, so a query would land before it.
+            AzureBaseUrlStatus.Query => throw new ArgumentException("Unsupported Azure OpenAI base URL query."),
+            _ => throw new ArgumentException("Invalid Azure OpenAI base URL.")
+        };
     }
 
-    private static string NormalizeBaseUrl(string value)
+    /// <summary>buildDefaultBaseUrl.</summary>
+    internal static string BuildDefaultBaseUrl(string resourceName) => "https://" + resourceName + ".openai.azure.com/openai/v1";
+
+    internal enum AzureBaseUrlStatus { Valid, Invalid, Query }
+
+    /// <summary>normalizeAzureBaseUrl over Node's URL (WHATWG): trim, drop trailing slashes, parse; Azure hosts with an empty,
+    /// <c>/openai</c> or <c>/openai/v1/responses</c> path become <c>/openai/v1</c> without a query; the result is
+    /// <c>url.toString()</c> without trailing slashes. Beyond Pi, a base URL that is not http(s), carries credentials or a
+    /// fragment, or keeps a query is refused, since the request path is appended to its text.</summary>
+    internal static AzureBaseUrlStatus NormalizeBaseUrl(string value, out string normalized)
     {
-        if (!Uri.TryCreate(value.Trim().TrimEnd('/'), UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") ||
-            uri.UserInfo.Length != 0 || uri.Fragment.Length != 0) throw new ArgumentException("Invalid Azure OpenAI base URL.");
-        var azure = uri.Host.EndsWith(".openai.azure.com", StringComparison.OrdinalIgnoreCase) ||
-            uri.Host.EndsWith(".cognitiveservices.azure.com", StringComparison.OrdinalIgnoreCase) || uri.Host.EndsWith(".ai.azure.com", StringComparison.OrdinalIgnoreCase);
-        var path = uri.AbsolutePath.TrimEnd('/');
-        if (azure && path is "" or "/openai" or "/openai/v1/responses") return new UriBuilder(uri) { Path = "/openai/v1", Query = "" }.Uri.AbsoluteUri.TrimEnd('/');
-        // The SDK appends the resource path to the base URL text, so a query would land before it.
-        if (uri.Query.Length != 0) throw new ArgumentException("Unsupported Azure OpenAI base URL query.");
-        return uri.AbsoluteUri.TrimEnd('/');
+        normalized = "";
+        var url = WhatwgUrl.Parse(ProviderErrorText.EcmaTrim(value).TrimEnd('/'));
+        if (url is null || url.Scheme is not ("http" or "https") || url.Username.Length != 0 || url.Password.Length != 0 || url.Fragment is not null)
+            return AzureBaseUrlStatus.Invalid;
+        var host = url.Host ?? "";
+        var azure = host.EndsWith(".openai.azure.com", StringComparison.Ordinal) || host.EndsWith(".cognitiveservices.azure.com", StringComparison.Ordinal) ||
+            host.EndsWith(".ai.azure.com", StringComparison.Ordinal);
+        if (azure && url.Path.TrimEnd('/') is "" or "/openai" or "/openai/v1/responses") { url.Path = "/openai/v1"; url.Query = null; }
+        else if (url.Query is not null) return AzureBaseUrlStatus.Query;
+        normalized = url.ToString().TrimEnd('/');
+        // The endpoint is requested through System.Uri; a host Node would only fail to resolve is refused here instead.
+        return Uri.TryCreate(normalized, UriKind.Absolute, out _) ? AzureBaseUrlStatus.Valid : AzureBaseUrlStatus.Invalid;
     }
+
+    private static string? EcmaTrimOrNull(string? value) => value is null ? null : ProviderErrorText.EcmaTrim(value);
 
     private static string? Truthy(string? value) => string.IsNullOrEmpty(value) ? null : value;
 }

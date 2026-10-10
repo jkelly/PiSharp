@@ -2,4 +2,8 @@
   <ItemGroup>
     <ProjectReference Include="../PiSharp.Contracts/PiSharp.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- WhatwgUrl: bug-report redaction re-serializes URLs with the same WHATWG subset as the Azure endpoint. -->
+    <InternalsVisibleTo Include="PiSharp.CodingAgent" />
+  </ItemGroup>
 </Project>

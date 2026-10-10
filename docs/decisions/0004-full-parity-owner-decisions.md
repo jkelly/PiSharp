@@ -61,5 +61,21 @@ Earlier decisions stand: MCP servers in `mcp.json` are trusted and their tools c
 13. **Nameless tool calls** (Google streams them) are accepted exactly as far as Pi accepts
     them; the shared reducer check is relaxed to match, for every provider.
 
+## Later decisions (2026-10-10)
+
+14. **Azure resource name** (`AZURE_OPENAI_RESOURCE_NAME` or `azureResourceName`) is taken as
+    Pi takes it, for both the Chat Completions and Responses routes: any non-empty value goes
+    into `https://{resource}.openai.azure.com/openai/v1`, and that text is parsed as Node's
+    WHATWG `URL` parses it before Pi's Azure path normalization. Dots, upper case, underscores,
+    IDN names, backslashes, tabs, percent-escapes and slashes resolve exactly as in Pi; an empty
+    value falls through to the model's base URL. PiSharp previously accepted only one ASCII DNS
+    label. Names Node's `URL` refuses fail with Pi's "Invalid Azure OpenAI base URL" message
+    (without echoing the value). Three outcomes are refused up front where Pi fails only on the
+    request: a URL that ends up with credentials, a fragment or a query in front of the request
+    path (the same rule as for `AZURE_OPENAI_BASE_URL`), and a host `System.Uri` cannot hold
+    (empty labels or sub-delimiters such as `$`, `+`, `~`, `=`), which no resolver answers.
+    Tests: `PiSharp.ProviderSync.Tests` (Pi's outputs for each name, under Node 22) and
+    `PiSharp.AzureResponses.Tests`.
+
 Install telemetry (`core/telemetry.ts`, which reports installs to Pi's servers) is not
 ported: PiSharp is not Pi and must not report as it.
