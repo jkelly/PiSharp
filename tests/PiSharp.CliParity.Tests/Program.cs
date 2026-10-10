@@ -49,6 +49,7 @@ internal static partial class Program
         cases.AddRange(LlamaCases());
         cases.AddRange(CloseoutCases());
         cases.AddRange(ThinkingClampCases());
+        cases.AddRange(AutoCompactionCases());
         cases.AddRange(JsonFidelityCases());
         cases.AddRange(BuiltinExtensionCases());
         var filter = Environment.GetEnvironmentVariable("CLIPARITY_FILTER");

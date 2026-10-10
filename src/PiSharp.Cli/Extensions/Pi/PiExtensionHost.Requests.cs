@@ -180,13 +180,17 @@ internal sealed partial class PiExtensionHost
             case "pi.setActiveTools":
             {
                 var names = p.GetProperty("toolNames").EnumerateArray().Select(name => name.GetString()!).ToImmutableArray();
-                await RequireAttached().Session.SetActiveToolsAsync(names, token).ConfigureAwait(false);
+                var tools = RequireAttached().Session;
+                await InCommandInput(() => tools.SetActiveToolsAsync(names, token)).ConfigureAwait(false);
                 return null;
             }
             case "pi.setThinkingLevel":
-                await RequireAttached().Session.ConfigureAsync(new SessionRuntimeUpdate(ThinkingLevel: p.GetProperty("level").GetString()), token).ConfigureAwait(false);
+            {
+                var thinking = RequireAttached().Session; var level = p.GetProperty("level").GetString();
+                await InCommandInput(() => thinking.ConfigureAsync(new SessionRuntimeUpdate(ThinkingLevel: level), token)).ConfigureAwait(false);
                 return null;
-            case "pi.setModel": return await SetModelAsync(p.GetProperty("model"), token).ConfigureAwait(false);
+            }
+            case "pi.setModel": return await InCommandInput(() => SetModelAsync(p.GetProperty("model").Clone(), token)).ConfigureAwait(false);
             case "pi.sendMessage": await SendMessageAsync(p, token).ConfigureAwait(false); return null;
             case "pi.sendUserMessage": await SendUserMessageAsync(p, token).ConfigureAwait(false); return null;
             case "ctx.read": return ContextRead(p, Op());
@@ -406,6 +410,24 @@ internal sealed partial class PiExtensionHost
             new ExtensionUserMessageOptions(deliverAs == "followUp" ? ExtensionMessageDelivery.FollowUp : deliverAs == "steer" ? ExtensionMessageDelivery.Steer : null,
                 options.ValueKind == JsonValueKind.Object && options.TryGetProperty("expandPromptTemplates", out var expand) && expand.ValueKind == JsonValueKind.True ? true : null),
             token).ConfigureAwait(false);
+    }
+
+    /// <summary>agent-session.ts: a pi.* action an extension command's handler awaits acts at once, within the command's input (the
+    /// callback flow whose session input is executing); outside a command it runs on its own.</summary>
+    private Task<T> InCommandInput<T>(Func<Task<T>> action)
+    {
+        if (Attached?.Session is { } session)
+            foreach (var flow in _flows.Values)
+            {
+                if (flow is null) continue;
+                var inInput = false;
+                ExecutionContext.Run(flow, _ => inInput = session.IsExecutingInputCallback, null);
+                if (!inInput) continue;
+                Task<T> started = null!;
+                ExecutionContext.Run(flow, _ => started = action(), null);
+                return started;
+            }
+        return action();
     }
 
     private async Task<JsonNode?> SetModelAsync(JsonElement model, CancellationToken token)

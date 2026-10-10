@@ -154,8 +154,6 @@ internal sealed partial class InteractiveMode
         if (JsonNode.DeepEquals(model, state.Model)) return;
         // The footer's context window and usage follow the model (getContextUsage reads the limits model).
         RequestSessionSync();
-        // _runAutoCompaction checks the current model's window; the host fixes it when automatic compaction is configured.
-        if (model is not null && state.AutoCompactionEnabled) rpc.Post(new JsonObject { ["type"] = "set_auto_compaction", ["enabled"] = true });
     }
 
     /// <summary>Entries at the start of <see cref="SessionState.Entries"/> that came from get_entries, in log order; the rest arrived
@@ -417,26 +415,6 @@ internal sealed partial class InteractiveMode
         await rpc.RequestAsync(command);
     }
 
-    /// <summary>
-    /// agent-session.ts: a session's autoCompactionEnabled is settingsManager.getCompactionEnabled() (compaction.enabled, default
-    /// true), and the footer shows it (setAutoCompactEnabled in applyRuntimeSettings, on startup and every session rebind). The RPC
-    /// host starts each session, including a replacement, without automatic compaction, so the mode applies the setting; where the
-    /// host cannot (no summary transport), the footer shows the session's actual state.
-    /// </summary>
-    private async Task ApplyAutoCompactionSettingAsync()
-    {
-        var enabled = settings.CompactionEnabled;
-        if (state.AutoCompactionEnabled != enabled)
-        {
-            try
-            {
-                await rpc.RequestAsync(new JsonObject { ["type"] = "set_auto_compaction", ["enabled"] = enabled });
-                state.AutoCompactionEnabled = enabled;
-            }
-            catch (RpcCommandFailedException) { }
-        }
-        footer.SetAutoCompactEnabled(state.AutoCompactionEnabled);
-    }
 
     private async Task SetAutoCompactionEnabledAsync(bool enabled)
     {

@@ -33,10 +33,10 @@ internal sealed class NativeExtensionSessionBehaviorHost : IExtensionDirectSessi
     public Task SetThinkingLevel(IExtensionCommandContext context, string level, CancellationToken token)
     {
         var attached = Capture(context); token.ThrowIfCancellationRequested();
-        if (!ThinkingLevels.Ordered.Contains(level, StringComparer.Ordinal)) throw new ArgumentException("Unknown thinking level.", nameof(level));
-        var available = attached.Session.GetSupportedThinkingLevels();
-        var selected = available.Contains(level, StringComparer.Ordinal) ? level :
-            ThinkingLevels.Ordered.Skip(ThinkingLevels.Ordered.IndexOf(level)).FirstOrDefault(candidate => available.Contains(candidate, StringComparer.Ordinal)) ?? available[^1];
+        ArgumentNullException.ThrowIfNull(level);
+        // agent-session.ts setThinkingLevel: a level the model lacks, or one that is no level at all, is clamped (models.ts
+        // clampThinkingLevel: an unknown name selects the model's first supported level), never refused.
+        var selected = ThinkingLevels.Clamp(attached.Session.GetSupportedThinkingLevels(), level);
         owner.ValidateAttachment(attached);
         // Return this exact engine original. It intentionally refuses an active session operation.
         return attached.Session.ConfigureAsync(new(ThinkingLevel: selected), token);

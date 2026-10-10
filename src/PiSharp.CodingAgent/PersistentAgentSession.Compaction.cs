@@ -12,7 +12,12 @@ namespace PiSharp.CodingAgent;
 
 public sealed partial class PersistentAgentSession
 {
-    private sealed record AutomaticCompaction(SessionCompactionRequest Request, ISessionSummaryGenerator Generator);
+    internal sealed record AutomaticCompaction(SessionCompactionRequest Request, ISessionSummaryGenerator Generator)
+    {
+        /// <summary>agent-session.ts _checkCompaction/_runAutoCompaction: the settings (getCompactionSettings(model)) and context window
+        /// of the model the session runs when it checks; null for a model without a usable window.</summary>
+        public Func<ModelDescriptor, SessionCompactionRequest?>? ForModel { get; init; }
+    }
     private AutomaticCompaction? _automaticCompaction;
     private Func<SessionCompactionObservation, ValueTask>? _compactionObservation;
     /// <summary>Trusted host observation binding, captured once per original compaction reservation. No abort signal or veto.</summary>
@@ -42,7 +47,7 @@ public sealed partial class PersistentAgentSession
     private SessionAutomaticCompactionStatus? _lastAutomaticCompaction;
     public void ConfigureAutomaticCompaction(ISessionSummaryGenerator? generator, SessionCompactionSettings? settings = null,
         double contextWindow = 128_000, SessionSummaryRequestOptions? summaryOptions = null,
-        double? recoveryDesiredMaxOutput = null)
+        double? recoveryDesiredMaxOutput = null, Func<ModelDescriptor, SessionCompactionRequest?>? requestForModel = null)
     {
         settings ??= new(); _ = SessionCompactionTokenEstimator.ShouldCompact(0, contextWindow, settings);
         if (recoveryDesiredMaxOutput is { } desired && (!double.IsFinite(desired) || desired <= 0))
@@ -52,7 +57,8 @@ public sealed partial class PersistentAgentSession
             ThrowAvailable(); ThrowInputMutation();
             if (_active is not null || _inputSubmission is not null) throw new InvalidOperationException("Automatic compaction configuration requires an idle session.");
             _automaticCompaction = generator is null || !settings.Enabled ? null : new(new(settings, Automatic: true,
-                ContextWindow: contextWindow, SummaryOptions: summaryOptions) { Reason = SessionCompactionReason.Threshold, WillRetry = false }, generator);
+                ContextWindow: contextWindow, SummaryOptions: summaryOptions) { Reason = SessionCompactionReason.Threshold, WillRetry = false }, generator)
+                { ForModel = requestForModel };
             if (recoveryDesiredMaxOutput is not null)
             {
                 _recoveryDesiredOutput = recoveryDesiredMaxOutput;
@@ -61,20 +67,48 @@ public sealed partial class PersistentAgentSession
             _lastAutomaticCompaction = null;
         }
     }
+    /// <summary>The automatic request for <paramref name="model"/>: a request bound to the model it was configured with, or the settings
+    /// and window of the current model (agent-session.ts reads both from this.model at check time). Null skips the check.</summary>
+    private static SessionCompactionRequest? AutomaticRequest(AutomaticCompaction configured, ModelDescriptor model)
+    {
+        if (configured.ForModel is not { } forModel) return configured.Request;
+        try
+        {
+            if (forModel(model) is not { } current) return null;
+            var settings = (current.Settings ?? new()) with { Enabled = true };
+            _ = SessionCompactionTokenEstimator.ShouldCompact(0, current.ContextWindow, settings);
+            return configured.Request with { Settings = settings, ContextWindow = current.ContextWindow };
+        }
+        catch (Exception error) when (error is InvalidOperationException or ArgumentException) { return null; }
+    }
+    internal sealed record AutomaticCompactionAdmission(AutomaticCompaction Configured, double? RecoveryDesiredOutput);
+    /// <summary>agent-session.ts autoCompactionEnabled is a setting (compaction.enabled), not a session's: a model-bound configuration
+    /// carries to the session that replaces this one.</summary>
+    internal AutomaticCompactionAdmission? CaptureAutomaticCompactionAdmission()
+    { lock (_gate) return _automaticCompaction is { ForModel: not null } configured ? new(configured, _recoveryDesiredOutput) : null; }
+    internal void RetainAutomaticCompactionAdmission(AutomaticCompactionAdmission? admission)
+    {
+        if (admission is null) return;
+        lock (_gate) if (_automaticCompaction is not null) return;
+        var request = admission.Configured.Request;
+        ConfigureAutomaticCompaction(admission.Configured.Generator, request.Settings, request.ContextWindow, request.SummaryOptions,
+            admission.RecoveryDesiredOutput, admission.Configured.ForModel);
+    }
     private async Task RunConfiguredAutomaticCompactionAsync(TaskCompletionSource idle, CancellationToken token)
     {
-        AutomaticCompaction? configured; ContextEditCancellation abort;
+        AutomaticCompaction? configured; SessionCompactionRequest? request; ContextEditCancellation abort;
         lock (_gate)
         {
             configured = _automaticCompaction;
             var queue = _agent.GetPendingInputQueueSnapshot();
             if (configured is null || !queue.SteeringMessages.IsEmpty || !queue.FollowUpMessages.IsEmpty || _fault is not null || _disposed || _retired) return;
+            if ((request = AutomaticRequest(configured, _configuration.Model)) is null) return;
             if (!_context.Messages.Any(message => message.Role == "assistant" && message.WireBody.Value.GetProperty("stopReason").GetString() is not ("error" or "aborted"))) return;
             abort = new(); _contextEditCancellation = abort; _compacting = true;
         }
         try
         {
-            var receipt = await SummaryCoreAsync(configured.Request, null, configured.Generator, token, idle, abort,
+            var receipt = await SummaryCoreAsync(request, null, configured.Generator, token, idle, abort,
                 default, null, releaseReservation: false).ConfigureAwait(false);
             lock (_gate) _lastAutomaticCompaction = new(receipt is null ? "skipped" : "committed", receipt?.Entry.Id);
         }

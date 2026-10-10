@@ -202,14 +202,16 @@ internal static partial class Program
         Equal("turn answer\n", stdout, "print mode prints the turn's assistant text");
 
         // rpc-mode.ts: the turn's events stream while the handler runs; the prompt is answered "handled" once the handler returns,
-        // and the run settles (agent_settled) as any other.
+        // and the run settles as any other: _emitAgentSettled emits agent_settled before it resolves the handler's waitForIdle, so
+        // agent_settled precedes the "handled" response.
         File.Delete(Path.Combine(sandbox.Cwd, "probe.log"));
         var (rpcCode, records, rpcStderr) = await RunRpc(sandbox, [.. Model, "-e", extension], ["""{"id":"k","type":"prompt","message":"/kick"}"""],
             (record, seen) => seen.Any(item => IsResponse(item, "k")) && seen.Any(item => item["type"]?.GetValue<string>() == "agent_settled"));
         var types = records.Select(record => record["type"]?.GetValue<string>() == "response" ? "response:" + record["data"]?["disposition"]?.GetValue<string>() : record["type"]?.GetValue<string>()).ToList();
         Equal(0, rpcCode, "rpc exit; " + rpcStderr + " " + string.Join(",", types));
         Check(types.IndexOf("agent_start") >= 0 && types.IndexOf("agent_end") > types.IndexOf("agent_start") &&
-            types.IndexOf("response:handled") > types.IndexOf("agent_end") && types.Contains("agent_settled"), "record order: " + string.Join(",", types));
+            types.IndexOf("agent_settled") > types.IndexOf("agent_end") && types.IndexOf("response:handled") > types.IndexOf("agent_settled"),
+            "record order: " + string.Join(",", types));
         Equal(2, sandbox.Requests.Count, "the RPC turn made its own request");
     }
 
