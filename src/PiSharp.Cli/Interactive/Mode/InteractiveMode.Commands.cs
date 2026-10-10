@@ -936,7 +936,8 @@ internal sealed partial class InteractiveMode
         programStatus.Reset();
         ApplyRuntimeSettings();
         await RefreshSessionAsync();
-        await ApplyAutoCompactionSettingAsync();
+        // agent-session.ts: autoCompactionEnabled is the compaction.enabled setting, which the host applies to every session.
+        footer.SetAutoCompactEnabled(state.AutoCompactionEnabled);
         renderedGeneration = state.Generation;
         await RefreshAvailableModelsAsync();
         await RefreshCommandsAsync();

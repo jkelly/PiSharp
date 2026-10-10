@@ -251,7 +251,8 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
         finally { inMutation.Value = priorMutation; mutations.Release(); }
     }
     public async Task ConfigureAutomaticCompactionAsync(AgentSessionAttachment attachment, ISessionSummaryGenerator? generator,
-        SessionCompactionRequest request, CancellationToken token = default, double? recoveryDesiredMaxOutput = null)
+        SessionCompactionRequest request, CancellationToken token = default, double? recoveryDesiredMaxOutput = null,
+        Func<PiSharp.Contracts.ModelDescriptor, SessionCompactionRequest?>? requestForModel = null)
     {
         ArgumentNullException.ThrowIfNull(request); RejectTransitionReentrancy(); ValidateAttachment(attachment);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, closing.Token, attachment.LifetimeToken);
@@ -260,7 +261,7 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
         {
             ValidateAttachment(attachment); linked.Token.ThrowIfCancellationRequested();
             attachment.Session.ConfigureAutomaticCompaction(generator, request.Settings, request.ContextWindow, request.SummaryOptions,
-                recoveryDesiredMaxOutput);
+                recoveryDesiredMaxOutput, requestForModel);
         }
         finally { mutations.Release(); }
     }
@@ -346,6 +347,7 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
             lock (gate) if (lifetimes.Count >= attachmentLimit) throw new InvalidOperationException("Session attachment limit reached; restart the host.");
             using var reservation = expected.Session.ReserveReplacement();
             var retainedRetry = expected.Session.CaptureRetryAdmission();
+            var retainedCompaction = expected.Session.CaptureAutomaticCompactionAdmission();
             if (creation is not null)
             {
                 if (BeforeCreation is { } veto && !await veto(expected, creation, linked.Token).ConfigureAwait(false)) return null;
@@ -366,6 +368,7 @@ public sealed partial class ReplaceableAgentSession : IAsyncDisposable
             // only an observation; reserve availability through publication so those handles cannot start
             // a checkpoint, input, configuration, queue mutation or disposal in the intervening interval.
             staged.RetainRetryAdmission(retainedRetry);
+            staged.RetainAutomaticCompactionAdmission(retainedCompaction);
             using var targetReservation = staged.ReserveReplacement();
             if (expected.Session.LifetimeToolSelection is { } retainedSelection && !ReferenceEquals(staged.LifetimeToolSelection, retainedSelection))
                 throw new InvalidOperationException("Replacement factory must retain the attachment's exact lifetime tool selection before admission.");

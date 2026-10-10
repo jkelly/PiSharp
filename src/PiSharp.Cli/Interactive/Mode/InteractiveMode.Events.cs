@@ -422,7 +422,7 @@ internal sealed partial class InteractiveMode
         }
         await RefreshSessionAsync();
         // rebindCurrentSession -> applyRuntimeSettings: footer.setAutoCompactEnabled(session.autoCompactionEnabled).
-        await ApplyAutoCompactionSettingAsync();
+        footer.SetAutoCompactEnabled(state.AutoCompactionEnabled);
         await RefreshCommandsAsync();
         RenderCurrentSessionState();
         SetupAutocompleteProvider();

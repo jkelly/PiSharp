@@ -49,6 +49,7 @@ internal static partial class Program
         cases.AddRange(LlamaCases());
         cases.AddRange(CloseoutCases());
         cases.AddRange(ThinkingClampCases());
+        cases.AddRange(AutoCompactionCases());
         cases.AddRange(JsonFidelityCases());
         var filter = Environment.GetEnvironmentVariable("CLIPARITY_FILTER");
         if (!string.IsNullOrEmpty(filter)) cases = [.. cases.Where(test => test.Id.Contains(filter, StringComparison.Ordinal))];

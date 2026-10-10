@@ -136,6 +136,11 @@ public static class RpcSessionCommand
         return new(enabled, Token("reserveTokens", defaults.ReserveTokens), Token("keepRecentTokens", defaults.KeepRecentTokens));
     }
 
+    /// <summary>settings-manager.ts getCompactionEnabled: compaction.enabled ?? true.</summary>
+    internal static bool CompactionEnabled(StartupSettingsSnapshot? settings) =>
+        !(settings?.Values.Value is { ValueKind: JsonValueKind.Object } values && values.TryGetProperty("compaction", out var compaction) &&
+            compaction.ValueKind == JsonValueKind.Object && compaction.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.False);
+
     private static async Task<int> RunCoreAsync(string[] args, Stream stdin, Stream stdout, TextWriter stderr,
         IRpcExtensionUiPresentationObserver? presentation, CancellationToken cancellationToken, Func<bool>? userShutdown = null,
         Func<RpcSessionShutdownSettlement, ValueTask<RpcTerminalStoppedAcknowledgment>>? stopTerminalAndJoin = null,
@@ -240,6 +245,9 @@ public static class RpcSessionCommand
             }
             profile.ConfigureRetrySettings(settings, persistRetryEnabledOriginal);
             profile.ConfigureEffectiveSettings(settings);
+            // agent-session.ts setModel from an extension (pi.setModel): the settings files the Pi entry reads now.
+            if (pi is not null) profile.ModelSwitchThinking = model => ModelSwitchThinkingLevel(pi.ReloadSettings is { } reloadSwitch
+                ? reloadSwitch(CancellationToken.None).GetAwaiter().GetResult() : settings, model);
             profile.BindSettingsThinkingReads();
             if (pi?.Skills is { } piSkills) profile.AdoptOriginalPromptSkills(piSkills);
             // /reload and ctx.reload() (agent-session.ts reload): the Pi entry reloads extensions and resources in place.
@@ -406,6 +414,8 @@ public static class RpcSessionCommand
                 compactingExtensions.Compact = async (instructions, token) =>
                     System.Text.Json.Nodes.JsonNode.Parse((await compactor.CompactForExtensionAsync(profile.ManualCompactionRequest(instructions), token).ConfigureAwait(false)).ToString(), documentOptions: PiSharp.Contracts.JsonData.DocumentOptions);
             }
+            // sdk.ts/agent-session.ts: every mode's session starts with auto-compaction set to compaction.enabled (default true).
+            if (pi is not null) await dispatcher.ConfigureAutoCompactionAsync(CompactionEnabled(settings), cancellationToken).ConfigureAwait(false);
             // IMPL-I: the interactive mode reads the live session for features the RPC protocol does not carry.
             var publishedProfile = profile; var publishedSession = session;
             pi?.Interactive?.Host.Publish(() => publishedProfile.Sessions?.Current.Session ?? publishedSession, publishedProfile);

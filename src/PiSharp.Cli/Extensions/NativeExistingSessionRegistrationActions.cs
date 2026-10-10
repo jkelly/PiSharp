@@ -32,7 +32,10 @@ public sealed class NativeExistingSessionRegistrationActions : IExtensionRegistr
         try { _ = attachment.Session.GetSupportedThinkingLevels(model); }
         catch (SessionRuntimeRegistryException error) when (error.Failure == SessionRuntimeRegistryFailure.UnknownModel)
         { return ValueTask.FromResult(false); }
-        return new(Own(attachment, token, work => attachment.Session.ConfigureAsync(new(Model: model), work), _ => true));
+        // agent-session.ts setModel: the per-model or default thinking level from the settings (else the current one), clamped to the
+        // new model by setThinkingLevel.
+        var thinking = reads.ModelSwitchThinkingLevel(model);
+        return new(Own(attachment, token, work => attachment.Session.ConfigureAsync(new(Model: model, ThinkingLevel: thinking), work), _ => true));
     }
     public ValueTask SendUserMessageAsync(JsonData content, ExtensionUserMessageOptions? options, CancellationToken token)
     {

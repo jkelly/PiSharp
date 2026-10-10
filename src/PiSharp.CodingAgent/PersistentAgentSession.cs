@@ -471,7 +471,10 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
             ThrowUserBashMutationLocked();
             if (_registry is null) throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
             ThrowUserBashMutationLocked();
-            if (_active is not null || _inputSubmission is not null) throw new InvalidOperationException("Session is already processing.");
+            // agent-session.ts setModel/setThinkingLevel/setActiveToolsByName apply at once from an extension command's handler (the
+            // admitted input's own callback, outside any agent run).
+            if (_active is not null || _inputSubmission is not null && !(_inputSubmission is { Releasing: false } input && ReferenceEquals(_inputCallback.Value, input)))
+                throw new InvalidOperationException("Session is already processing.");
             var snapshot = _agent.Snapshot;
             if (!snapshot.PendingInputs.IsEmpty || snapshot.SteeringCount != 0 || snapshot.FollowUpCount != 0)
                 throw Error(PersistentAgentSessionFailure.InvalidConfiguration);
@@ -1395,8 +1398,15 @@ public sealed partial class PersistentAgentSession : IAsyncDisposable
         var agentIdle = _agent.WaitForIdleAsync();
         Task idle; Task diagnostics; Task settings; Task[] bash;
         lock (_gate) { idle = _active?.Task ?? Task.CompletedTask; diagnostics = LoadoutDiagnosticIdleLocked(); settings = RetrySettingsIdleLocked(); bash = CaptureUserBashCompletionsLocked(); }
-        var settled = Task.WhenAll(new[] { agentIdle, idle, diagnostics, settings }.Concat(bash));
+        var settled = AfterPublishedAsync(Task.WhenAll(new[] { agentIdle, idle, diagnostics, settings }.Concat(bash)));
         return cancellationToken.CanBeCanceled ? settled.WaitAsync(cancellationToken) : settled;
+        // _emitAgentSettled: agent_settled is published before the waiter resumes (the host adds its barrier when the run starts).
+        async Task AfterPublishedAsync(Task run)
+        {
+            await run.ConfigureAwait(false);
+            ImmutableList<Task> barriers; lock (_gate) barriers = _commandIdleBarriers;
+            if (!barriers.IsEmpty) await Task.WhenAll(barriers).ConfigureAwait(false);
+        }
     }
 
     // Same pre-mutation callback checks as WaitForIdle, without creating an aggregate idle join.
