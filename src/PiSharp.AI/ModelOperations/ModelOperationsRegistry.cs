@@ -311,6 +311,15 @@ public sealed class ModelOperationsRegistry
         return await auth(new(provider, apiKey, env), cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>The registry's auth resolver for any provider id, listed or not: a registry layering extension providers over this
+    /// one resolves an extension provider without an <c>apiKey</c> through it (an explicit key, else the stored credential).</summary>
+    public ValueTask<ProviderAuthResult?> ResolveAuthAsync(ProviderAuthRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        return auth(request, cancellationToken);
+    }
+
     /// <summary>models.ts <c>getAvailableOfType</c>: models of one type whose providers have complete auth, after each
     /// provider's credential-dependent filter.</summary>
     public async Task<ImmutableArray<OperationModel>> GetAvailableOfTypeAsync(ModelType type, string? provider = null,
